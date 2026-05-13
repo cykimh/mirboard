@@ -1,0 +1,40 @@
+# Java / Gradle
+.gradle/
+build/
+out/
+*.class
+hs_err_pid*
+
+# Spring Boot
+application-local.yml
+application-local.properties
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Node / Vite
+node_modules/
+dist/
+.eslintcache
+.cache/
+client/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Docker volume mounts created locally
+docker-data/

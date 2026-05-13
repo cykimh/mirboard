@@ -1,0 +1,59 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mirboard-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mirboard}
+      MYSQL_USER: ${MYSQL_USER:-mirboard}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mirboardpw}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=caching_sha2_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: mirboard-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  flyway:
+    image: flyway/flyway:10
+    container_name: mirboard-flyway
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command:
+      - -url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-mirboard}?useSSL=false&allowPublicKeyRetrieval=true
+      - -user=${MYSQL_USER:-mirboard}
+      - -password=${MYSQL_PASSWORD:-mirboardpw}
+      - -connectRetries=30
+      - -locations=filesystem:/flyway/sql
+      - migrate
+    volumes:
+      - ./server/src/main/resources/db/migration:/flyway/sql:ro
+    profiles: ["migrate"]
+
+volumes:
+  mysql-data:
+  redis-data:
