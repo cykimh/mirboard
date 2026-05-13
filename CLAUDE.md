@@ -93,15 +93,28 @@ docker compose exec mysql mysql -umirboard -pmirboardpw mirboard -e "SHOW TABLES
 
 기본 자격증명 (개발 한정): MySQL `mirboard / mirboardpw`, DB `mirboard`, Redis 비밀번호 없음.
 
-### 서버/클라이언트 (Phase 2 이후 사용 가능)
-아직 빌드 파일이 없음. Phase 2 시작 시 `server/build.gradle.kts`, `client/package.json` 을 생성하면서 아래 형태로 명령을 추가할 예정:
+### 서버 (Phase 2a~ 사용 가능)
+처음 한 번만:
+```bash
+gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21 ...
+```
+이후:
+```bash
+./gradlew :server:bootRun
+./gradlew :server:test
+./gradlew :server:test --tests "com.mirboard.domain.lobby.auth.JwtServiceTest"
+./gradlew :server:test --tests "com.mirboard.domain.lobby.auth.AuthServiceTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.core.GameRegistryTest"
+./gradlew :server:test --tests "com.mirboard.domain.lobby.room.RoomServiceConcurrencyIT"
+./gradlew :server:test --tests "com.mirboard.infra.rest.auth.AuthFlowIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.infra.rest.games.GameCatalogIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.infra.rest.rooms.RoomControllerIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.infra.ws.StompLobbyIntegrationTest"
+```
+통합 테스트는 Docker 가 떠 있어야 함 (Testcontainers 가 MySQL 8 컨테이너를 띄움).
 
-- `./gradlew :server:bootRun` — 백엔드 기동
-- `./gradlew :server:test --tests TichuHandDetectorTest` — 단일 테스트
-- `npm --prefix client run dev` — 프론트엔드 dev 서버
-- `npm --prefix client run test -- HandSelector` — 단일 테스트
-
-명령이 추가되면 본 CLAUDE.md 도 같이 갱신할 것.
+### 클라이언트 (Phase 4 에서 사용 가능)
+아직 없음. Phase 4 진입 시 `npm --prefix client run dev` / `npm --prefix client run test` 추가 예정.
 
 ## STOMP envelope 규약 (자주 참조됨)
 
@@ -128,32 +141,44 @@ docker compose exec mysql mysql -umirboard -pmirboardpw mirboard -e "SHOW TABLES
 
 본 프로젝트는 초기 설계 변경이 잦아 추적을 형식화한다. 미래 Claude 세션은 아래 규칙을 따른다.
 
+### 플랜 파일 — canonical 은 프로젝트 내부
+
+- **단일 진실 공급원**: `docs/plans/mvp-roadmap.md` (그 외 새 플랜이 생기면 `docs/plans/` 아래 의미 있는 이름으로 추가).
+- Plan Mode 가 자동 생성하는 `%USERPROFILE%\.claude\plans\*.md` 는 **임시 스크래치 패드** — 그대로 두면 다음 세션이 헷갈리므로, `ExitPlanMode` 직후 변경분을 `docs/plans/` 의 canonical 파일에 동기화한다.
+- 새 Plan Mode 세션 시작 시 먼저 `docs/plans/mvp-roadmap.md` 를 읽고 현 상태를 파악한 뒤 스크래치에서 작업.
+
 ### Plan 모드를 쓰는 시점
+
 - **Phase 전환 직전** (Phase N 완료 → N+1 진입).
 - **설계 변경**: `docs/*.md` 또는 스키마(`V1__init.sql`) 수정을 동반하는 작업.
 - **새 게임 도메인 추가** (`domain.game.{newgame}` 신설).
 - **번복**: 이미 docs/CLAUDE.md/플랜에 적힌 결정을 뒤집어야 할 때.
 
-→ Plan 파일 (`%USERPROFILE%\.claude\plans\<plan-name>.md`) 작성 후 `ExitPlanMode`로 사용자 승인을 받아야 코드/문서 변경 시작. 단순 typo/한 줄 수정은 Plan 모드 불필요.
+단순 typo/한 줄 수정은 Plan 모드 불필요.
 
 ### Task 추적 (TaskCreate)
+
 - 3개 이상의 명확한 단계가 보이는 작업은 **반드시 TaskCreate 로 분해**한다.
 - 단계 시작 시 `in_progress`, 끝나는 즉시 `completed` (배치 처리 금지). 막혔으면 `in_progress` 유지 + 차단 사유를 새 task로 추가.
 
 ### Memory 사용 정책
-- **저장 안 함**: docs/CLAUDE.md/README/decisions.md 에 이미 적힌 모든 사실. 코드/git 으로 도출 가능한 사실.
+
+- **저장 안 함**: docs/CLAUDE.md/README/decisions.md/플랜에 이미 적힌 모든 사실. 코드/git 으로 도출 가능한 사실.
 - **사용자 메모리(user)**: 응답 스타일, 한국어 선호, 보고 톤 등의 개인 선호가 명확히 드러날 때.
 - **피드백 메모리(feedback)**: 사용자가 명시적으로 교정하거나 비표준 접근을 승인했을 때 (이유와 함께).
 - **프로젝트 메모리(project)**: 마감, 진행 중인 Phase 상태, 의사결정 백로그 등 docs로 만들기 애매한 휘발성 컨텍스트.
 
-### 이력 관리 (Decision Log)
-- 설계 결정/번복은 `docs/decisions.md` 에 **코드 작업 전에** 항목을 추가한다.
-- ID 규칙 `D-YYYYMMDD-NN`, 폐기 결정은 삭제하지 않고 `상태: 폐기됨 → [후속 ID]` 마커.
-- 결정 항목과 관련 docs/CLAUDE.md/README/플랜 사이의 정합성은 사용자 승인 단계에서 검증.
+### 이력 관리 (Decision Log) — 단순 포맷
+
+- 위치: `docs/decisions.md`.
+- 형식: `## D-NN (YYYY-MM-DD) — 제목` + **짧은 문단(2~4문장)**. "무엇/왜" 가 한 문단에 같이.
+- 번복/폐기는 항목 끝에 `*폐기 → D-XX*` 또는 `*변경 → D-XX*` 한 줄 추가 (삭제 금지).
+- ID 는 단조 증가 (D-01, D-02, ...). 코드 작업 **전에** 항목을 먼저 추가.
 
 ### 작업 체크리스트 (설계 변경 동반 시)
-1. `docs/decisions.md` 에 새 항목 추가 (또는 기존 항목 폐기 마커).
-2. 영향받는 `docs/*.md` / `CLAUDE.md` / `README.md` / 플랜 갱신.
+
+1. `docs/decisions.md` 에 새 항목 추가 (또는 기존 항목에 폐기/변경 마커).
+2. 영향받는 `docs/*.md` / `CLAUDE.md` / `README.md` / `docs/plans/*.md` 갱신.
 3. (해당 시) 스키마/코드 변경.
 4. TaskList 정리 (완료/폐기), 사용자에게 변경 요약 보고.
 

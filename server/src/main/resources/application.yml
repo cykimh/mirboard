@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: mirboard
+
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: jdbc:mysql://${MIRBOARD_DB_HOST:127.0.0.1}:${MIRBOARD_DB_PORT:3306}/${MIRBOARD_DB_NAME:mirboard}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
+    username: ${MIRBOARD_DB_USER:mirboard}
+    password: ${MIRBOARD_DB_PASSWORD:mirboardpw}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: ${MIRBOARD_REDIS_HOST:127.0.0.1}
+      port: ${MIRBOARD_REDIS_PORT:6379}
+      timeout: 2s
+
+server:
+  port: ${MIRBOARD_PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+mirboard:
+  jwt:
+    secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
+    expires-in: 12h
+    issuer: mirboard
+
+logging:
+  level:
+    root: INFO
+    com.mirboard: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
