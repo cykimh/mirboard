@@ -26,6 +26,7 @@ export interface Room {
   capacity: number;
   playerCount: number;
   playerIds: number[];
+  spectatorIds: number[];
   createdAt: number;
 }
 

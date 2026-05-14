@@ -14,6 +14,7 @@ export function LobbyPage() {
   const [error, setError] = useState<string | null>(null);
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [spectateInput, setSpectateInput] = useState('');
   const { messages, connected, send } = useLobbyStomp(token);
   const [draft, setDraft] = useState('');
 
@@ -55,6 +56,18 @@ export function LobbyPage() {
     if (!token) return;
     try {
       await roomsApi.join(token, roomId);
+      navigate(`/rooms/${roomId}`);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+    }
+  }
+
+  async function handleSpectate(event: React.FormEvent) {
+    event.preventDefault();
+    if (!token || !spectateInput.trim()) return;
+    const roomId = spectateInput.trim();
+    try {
+      await roomsApi.spectate(token, roomId);
       navigate(`/rooms/${roomId}`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -104,6 +117,18 @@ export function LobbyPage() {
           />
           <button type="submit" disabled={creating}>
             {creating ? '생성 중...' : '방 만들기'}
+          </button>
+        </form>
+
+        <form className="spectate" onSubmit={handleSpectate}>
+          <input
+            type="text"
+            value={spectateInput}
+            placeholder="방 ID 로 관전 진입"
+            onChange={(e) => setSpectateInput(e.target.value)}
+          />
+          <button type="submit" disabled={!spectateInput.trim()}>
+            구경하기
           </button>
         </form>
       </section>

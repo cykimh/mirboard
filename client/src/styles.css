@@ -549,3 +549,23 @@ a {
   border: 1px solid #a060a0;
   cursor: help;
 }
+
+/* 관전 모드 배너 + LobbyPage 의 spectate 입력 (Phase 6A-6) */
+.spectator-banner {
+  background: #2a3a4a;
+  border-left: 3px solid #5b8def;
+  padding: 8px 12px;
+  margin: 12px 0;
+  color: #c5d5e8;
+  border-radius: 4px;
+}
+
+.lobby-page .spectate {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lobby-page .spectate input {
+  flex: 1;
+}

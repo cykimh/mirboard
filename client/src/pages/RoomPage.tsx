@@ -41,10 +41,19 @@ export function RoomPage() {
     };
   }, [token, roomId, navigate]);
 
+  const iAmPlayer = !!(room && user && room.playerIds.includes(user.userId));
+  const iAmSpectator = !!(
+    room && user && !iAmPlayer && (room.spectatorIds ?? []).includes(user.userId)
+  );
+
   async function handleLeave() {
     if (!token) return;
     try {
-      await roomsApi.leave(token, roomId);
+      if (iAmSpectator) {
+        await roomsApi.stopSpectating(token, roomId);
+      } else {
+        await roomsApi.leave(token, roomId);
+      }
       navigate('/games');
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -88,8 +97,17 @@ export function RoomPage() {
         </>
       )}
 
+      {iAmSpectator && (
+        <p className="spectator-banner">관전 중 — 본인 손패는 표시되지 않습니다.</p>
+      )}
+
       {room.status === 'IN_GAME' && (
-        <GameTable roomId={room.roomId} playerIds={room.playerIds} myUserId={user.userId} />
+        <GameTable
+          roomId={room.roomId}
+          playerIds={room.playerIds}
+          myUserId={user.userId}
+          spectator={iAmSpectator}
+        />
       )}
 
       {room.status === 'FINISHED' && (

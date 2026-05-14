@@ -559,12 +559,13 @@ public void onAction(@DestinationVariable String roomId,
 
 | 청크 | 내용 | 상태 |
 | --- | --- | --- |
-| 6A-1 | MDC (userId/roomId/eventId) + logback-spring.xml 표준화 | 대기 |
-| 6A-2 | 도메인 이벤트 감사 로그 (RoomService/TichuRoundStarter/GameStompController/MatchResultRecorder) | 대기 |
-| 6A-3 | Actuator + Micrometer + Prometheus endpoint | 대기 |
-| 6A-4 | 도메인 카운터 (방/게임/라운드/매치/액션 reject) | 대기 |
-| 6A-5 | 관전 모드 — Room.spectatorIds, `/api/rooms/{id}/spectate`, resync 검증 확장 | 대기 |
-| 6A-6 | 클라 관전 진입 — 로비 IN_GAME 방 "구경하기" + GameTable spectator mode | 대기 |
+| 6A-1 | MDC (userId/roomId/eventId) + 로그 패턴 자동 부착 | ✅ 완료 (`3128a61`) |
+| 6A-2 | 도메인 이벤트 감사 로그 | ✅ 완료 (`0ad15b6`) |
+| 6A-3 | Actuator + Micrometer + Prometheus endpoint | ✅ 완료 (`70de3e3`) |
+| 6A-4 | 도메인 카운터 6개 (Micrometer) | ✅ 완료 (`bddece9`) |
+| 6A-5 | 관전 모드 — Room.spectatorIds, `/api/rooms/{id}/spectate`, resync 검증 확장 | ✅ 완료 (`da23dc7`) |
+| 6A-6 | 클라 관전 — RoomPage spectator 감지 + GameTable spectator UI + LobbyPage 방 ID 관전 입력 | ✅ 완료 |
+| (보류) | LobbyPage 의 IN_GAME 방 자동 목록 — 서버 측 별도 추적 ZSET 필요 (별도 사이클) | 보류 |
 
 **Done 기준**: `/actuator/prometheus` 에 도메인 카운터 노출. 관전자 통합 테스트 (TableView O,
 PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.

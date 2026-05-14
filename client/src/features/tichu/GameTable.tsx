@@ -18,6 +18,8 @@ interface GameTableProps {
   roomId: string;
   playerIds: number[];
   myUserId: number;
+  /** true 이면 관전자 모드: 손패/액션 버튼/모달 미표시. TableView 만 시청. */
+  spectator?: boolean;
 }
 
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
@@ -26,7 +28,7 @@ const PASS_SLOT_LABEL: Record<PassSlot, string> = {
   right: t('pass.slot.right'),
 };
 
-export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
+export function GameTable({ roomId, playerIds, myUserId, spectator = false }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction } = useStompRoom(roomId, token);
   const tableView = useTichuStore((s) => s.tableView);
@@ -266,7 +268,7 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
         </div>
       )}
 
-      {isInPassing && privateHand && !iAmPassSubmitted && (
+      {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
         <div className="pass-picker">
           <h3>{t('pass.picker.title')}</h3>
           <div className="pass-slots">
@@ -292,6 +294,7 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
         </div>
       )}
 
+      {!spectator && (
       <div className="my-hand">
         <div className="hand-toolbar">
           <h3>{t('hand.title')}</h3>
@@ -315,7 +318,9 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
           <p>{t('hand.loading')}</p>
         )}
       </div>
+      )}
 
+      {!spectator && (
       <div className="actions">
         {isInDealing && !iAmReady && (
           <>
@@ -358,6 +363,7 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
         )}
         {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
 
+
         {isInPlaying && (
           <>
             <button
@@ -393,6 +399,7 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
           </>
         )}
       </div>
+      )}
 
       {errorMessage && (
         <p className="error" onClick={() => setError(null)}>

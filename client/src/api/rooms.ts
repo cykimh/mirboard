@@ -33,6 +33,20 @@ export const roomsApi = {
     });
   },
 
+  spectate(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/spectate`, {
+      method: 'POST',
+      token,
+    });
+  },
+
+  stopSpectating(token: string, roomId: string): Promise<void> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/spectate`, {
+      method: 'DELETE',
+      token,
+    });
+  },
+
   resync<T = unknown>(token: string, roomId: string): Promise<T> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/resync`, { token });
   },
