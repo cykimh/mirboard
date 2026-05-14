@@ -28,6 +28,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/ws/**", "/error").permitAll()
+                        // Phase 6A-3 — Actuator (health, prometheus 스크래핑) 은 내부망 노출 가정.
+                        // 운영 전에 IP 화이트리스트 또는 별도 management.server.port 분리 필요.
+                        .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

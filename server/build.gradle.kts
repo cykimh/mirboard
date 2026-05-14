@@ -41,6 +41,10 @@ dependencies {
     // Cache / 실시간 상태
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
+    // 운영 (Phase 6A-3) — Actuator + Prometheus 메트릭 노출
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     // Spring Boot 4.0 에서 WebMVC test 슬라이스 (AutoConfigureMockMvc 등) 가

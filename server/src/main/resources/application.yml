@@ -41,6 +41,24 @@ server:
     include-message: never
     include-stacktrace: never
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Phase 6A-3 — health/info 외에 metrics + prometheus 노출.
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: mirboard
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 mirboard:
   jwt:
     secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
