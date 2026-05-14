@@ -166,6 +166,31 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(useTichuStore.getState().tableView!.activeWishRank).toBe(7);
   });
 
+  it('TRICK_TAKEN preserves activeWishRank (wish 는 라운드 전체 유지)', () => {
+    loadTable(baseTable({ activeWishRank: 5 }), 1);
+    useTichuStore.getState().applyEvent({
+      type: 'TRICK_TAKEN',
+      seq: 2,
+      payload: { takerSeat: 1, trickPoints: 10 },
+    });
+    expect(useTichuStore.getState().tableView!.activeWishRank).toBe(5);
+    expect(useTichuStore.getState().tableView!.roundScores.B).toBe(10);
+  });
+
+  it('DRAGON_GIVEN 은 seq 만 진행 — 점수 패치는 동반 TRICK_TAKEN 이 처리', () => {
+    loadTable(baseTable(), 1);
+    const r = useTichuStore.getState().applyEvent({
+      type: 'DRAGON_GIVEN',
+      seq: 2,
+      payload: { fromSeat: 0, toSeat: 1 },
+    });
+    expect(r).toBe('applied');
+    expect(useTichuStore.getState().lastSeq).toBe(2);
+    // tableView 자체는 동일.
+    expect(useTichuStore.getState().tableView!.roundScores.A).toBe(0);
+    expect(useTichuStore.getState().tableView!.roundScores.B).toBe(0);
+  });
+
   it('ROUND_ENDED sets banner state and advances seq', () => {
     loadTable(baseTable(), 1);
     useTichuStore.getState().applyEvent({

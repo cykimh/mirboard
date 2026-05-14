@@ -547,10 +547,10 @@ public void onAction(@DestinationVariable String roomId,
 
 | 청크 | 내용 | 상태 |
 | --- | --- | --- |
-| 6E-1 | `MakeWishModal` — Mahjong 카드 플레이 시 rank 2~14 선택 | 진행 중 |
-| 6E-2 | `GiveDragonTrickModal` — Dragon 트릭 양도 좌석 선택 + `DRAGON_GIVEN` 리듀서 | 대기 |
-| 6E-3 | Phoenix 단독 SINGLE 표시 — CardChip `phoenixSingle` 배지/툴팁 | 대기 |
-| 6E-4 | 이벤트 리듀서 보강 — `WISH_MADE` / `DRAGON_GIVEN` / wish 강제 힌트 | 대기 |
+| 6E-1 | `MakeWishModal` — Mahjong 카드 플레이 시 rank 2~14 선택 | ✅ 완료 (`bacaf34`) |
+| 6E-2 | `GiveDragonTrickModal` — Dragon 트릭 양도 좌석 선택 | ✅ 완료 (`3642655`) |
+| 6E-3 | Phoenix 단독 SINGLE 표시 — currentTop 영역 배지 + 툴팁 | ✅ 완료 (`f31bb26`) |
+| 6E-4 | 이벤트 리듀서 회귀 테스트 — TRICK_TAKEN 후 activeWishRank 유지 / DRAGON_GIVEN seq-only | ✅ 완료 |
 
 **Done 기준**: 4탭 모의 게임에서 Mahjong 소원/Dragon 양도/Phoenix 단독 SINGLE 전부
 정상 UX. `npm --prefix client run test` 그린.
