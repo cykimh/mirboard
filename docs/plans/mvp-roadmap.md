@@ -469,7 +469,7 @@ record Card(Suit suit, int rank /*2-14*/, Special special /* nullable */)
 | 4e | 프론트엔드 GameTable + `useStompRoom` 훅 + 카드 클릭 선택 (dnd-kit 보류) | ✅ 완료 |
 | 4f | 재접속 동기화 + 1게임 시연 검증 (강제 종료 후 복원) | ✅ 완료 |
 
-### 4.1 WebSocket 컨트롤러
+### 4.1 WebSocket 컨트롤러 1
 ```
 @MessageMapping("/room/{roomId}/action")
 public void onAction(@DestinationVariable String roomId,
