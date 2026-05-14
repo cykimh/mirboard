@@ -350,6 +350,86 @@ Redis 단일 진실 공급원이라 두 인스턴스가 같은 상태를 본다.
   유실 가능성 있음 (현재 MVP 범위에선 무시).
 - 게임 액션 처리 락 (`room:{id}:lock`) 은 Redis SET NX 라 이미 분산 안전.
 
+## Phase 6 시연 체크리스트
+
+Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 검증할 시나리오 모음.
+사전 코드 점검은 완료 — 모든 시나리오 진행 가능. 실패 시 디버깅 포인트는 각 항목
+끝에 명시.
+
+### 시나리오 1 — Mahjong 소원 (6E-1)
+
+1. 4탭으로 게임 시작 (4명 모이면 자동 IN_GAME).
+2. Dealing(8) → Dealing(14) → Passing → Playing 진입까지 Ready/카드 패스 진행.
+3. 첫 리드 차례 (헤더 `현재 차례`) 가 Mahjong 보유자 (손패에 rank=1 카드) 인 탭에서
+   Mahjong 단독 클릭 → "내기".
+4. **기대**: `MakeWishModal` 자동 노출. rank 2~14 그리드 + 건너뛰기 / 소원 지정.
+5. rank 선택 후 "소원 지정" → 헤더의 `활성 소원: N` 표시.
+6. 다른 클라 탭 헤더에서도 동일 `활성 소원: N` 확인 → STOMP fan-out 정상.
+7. **실패 시**: 서버 로그 `Action rejected: MAKE_WISH reason=WISH_OUT_OF_CONTEXT` 검색.
+   currentTopSeat 이 본인이고 currentTop 이 Mahjong 단독이어야 함.
+
+### 시나리오 2 — Dragon 트릭 양도 (6E-2)
+
+1. Dragon 보유자가 단독 리드 또는 다른 카드 위에 Dragon 단독 플레이.
+2. 다른 3명이 모두 PASS → 트릭이 본인에게 닫힘.
+3. **기대**: `GiveDragonTrickModal` 자동 노출. 상대팀 두 좌석만 표시.
+4. 한 좌석 선택 후 "양도" → 헤더 `누적 A:B` 변화 (Dragon +25 + 트릭 카드 점수).
+5. **실패 시**: BOMB 으로 누가 깼다면 currentTop 이 Dragon 아님 → 모달 안 뜸. 정상.
+   currentTurnSeat 이 본인이 아니면 트릭이 아직 안 닫힌 상태.
+
+### 시나리오 3 — Phoenix 단독 SINGLE (6E-3)
+
+1. 다른 단일 카드 위에 Phoenix 단독 SINGLE 플레이.
+2. **기대**: 트릭 영역에 보라색 "Phoenix +0.5" 배지 + 호버 시 비교 룰 툴팁
+   (Dragon 만 못 이김).
+3. 다음 플레이어가 더 높은 SINGLE 로 이기면 currentTop 변경 + 배지 사라짐.
+
+### 시나리오 4 — 관전 모드 (6A-5/6A-6)
+
+1. 5번째 사용자 (예: `spec_user`) 가 로비 진입 → "방 ID 로 관전 진입" 입력 박스에
+   IN_GAME 방 ID 붙여넣기 → "구경하기".
+2. **기대**: GameTable 표시되되 손패 영역 / 액션 버튼 / 모달 모두 숨김.
+   "관전 중 — 본인 손패는 표시되지 않습니다." 배너 노출.
+3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 로비로 복귀.
+4. **추가 보안 검증** (옵션): 관전자가 `curl -X POST /app/room/{id}/action` 직접
+   호출 시 `NOT_IN_ROOM` 에러 (실제 UI 에선 액션 버튼 자체가 안 보임).
+
+### 시나리오 5 — 멀티 인스턴스 Redis fan-out (6D)
+
+위 "분산 시연 (멀티 인스턴스, Phase 6D)" 섹션의 단계 따라 진행.
+
+추가 확인: `redis-cli MONITOR` 로 `PUBLISH stomp:routes ...` 와 `PUBLISH domain:event
+...` 명령이 흐르는지 관찰.
+
+### 운영 카운터 점검 (시연 도중)
+
+```bash
+curl -s http://localhost:8080/actuator/prometheus | grep '^mirboard_'
+```
+
+기대 출력:
+- `mirboard_room_created_total`
+- `mirboard_room_joined_total`
+- `mirboard_game_started_total{gameType="TICHU"}`
+- `mirboard_round_completed_total`
+- `mirboard_match_completed_total`
+- `mirboard_action_rejected_total`
+
+각 카운터가 0 이상의 값으로 나오면 6A-3/6A-4 정상.
+
+### 로그 MDC 확인
+
+서버 stdout 의 로그 라인이 `HH:mm:ss.SSS LEVEL [thread] logger [user=N room=R event=-]
+- msg` 형식인지 확인. 액션 처리 / 방 변경 시 `user=` 와 `room=` 가 채워지면 6A-1 성공.
+
+### 시연 실패 시 보고 가이드
+
+각 시나리오 실패 시 다음 4가지를 함께 보고:
+1. 실패한 시나리오 번호 + 단계.
+2. 서버 stdout 의 마지막 ~30줄 (특히 `Action rejected` 또는 `Failed to ...`).
+3. 브라우저 콘솔의 STOMP 메시지 / API 응답 에러.
+4. 재현 가능한지 (1회성 / 반복).
+
 ## 작업 흐름 (Phase Gate)
 
 1. **Phase 1 — 설계**: 본 문서 + `docs/*.md` + Flyway V1. ✅
