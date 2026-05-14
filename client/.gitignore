@@ -3,3 +3,8 @@ dist/
 .vite/
 .eslintcache
 *.log
+
+# TypeScript build artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
