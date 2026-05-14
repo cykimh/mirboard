@@ -81,6 +81,12 @@ const KO = {
   'play.error.pickCard': '카드를 한 장 이상 선택하세요',
   'play.error.passSlots': '3장(왼쪽/파트너/오른쪽) 모두 선택해야 합니다',
 
+  // --- Mahjong 소원 모달 ---
+  'wish.title': '소원 — 다음에 강제할 랭크',
+  'wish.body': '다른 플레이어가 가능한 한 이 랭크 카드를 포함하도록 강제합니다. 건너뛰면 소원 없음.',
+  'wish.skip': '건너뛰기 (소원 없음)',
+  'wish.confirm': '소원 지정',
+
   // --- 라운드/매치 종료 ---
   'round.ended.title': '라운드 종료',
   'round.ended.firstFinisher': '첫 완주: 시트',

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   useTichuStore,
@@ -11,6 +11,7 @@ import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
+import { MakeWishModal } from './MakeWishModal';
 
 interface GameTableProps {
   roomId: string;
@@ -48,6 +49,7 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
   const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
 
   const mySeat = playerIds.indexOf(myUserId);
+  const [wishModalDismissed, setWishModalDismissed] = useState(false);
 
   const phase = tableView?.phase ?? null;
   const dealingCardCount = tableView?.dealingCardCount ?? 0;
@@ -59,6 +61,25 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
     isInPassing && (tableView?.passingSubmittedSeats ?? []).includes(mySeat);
   const myDeclaration = tableView?.declarations?.[mySeat] ?? 'NONE';
   const myTurn = isInPlaying && tableView !== null && tableView.currentTurnSeat === mySeat;
+
+  const myMahjongLeadActive =
+    isInPlaying &&
+    tableView !== null &&
+    tableView.currentTopSeat === mySeat &&
+    tableView.currentTop !== null &&
+    tableView.currentTop.cards.length === 1 &&
+    tableView.currentTop.cards[0].special === 'MAHJONG' &&
+    tableView.activeWishRank === null;
+
+  const wishContextKey = myMahjongLeadActive
+    ? `${tableView.currentTopSeat}-mahjong`
+    : null;
+
+  useEffect(() => {
+    setWishModalDismissed(false);
+  }, [wishContextKey]);
+
+  const showWishModal = myMahjongLeadActive && !wishModalDismissed;
 
   const selectedCards = useMemo<Card[]>(() => {
     if (!privateHand) return [];
@@ -95,6 +116,15 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
 
   function handleDeclareGrandTichu() {
     sendAction({ '@action': 'DECLARE_GRAND_TICHU' });
+  }
+
+  function handleMakeWish(rank: number) {
+    sendAction({ '@action': 'MAKE_WISH', rank });
+    setWishModalDismissed(true);
+  }
+
+  function handleSkipWish() {
+    setWishModalDismissed(true);
   }
 
   function handleReady() {
@@ -345,6 +375,12 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
           {errorMessage}
         </p>
       )}
+
+      <MakeWishModal
+        open={showWishModal}
+        onConfirm={handleMakeWish}
+        onSkip={handleSkipWish}
+      />
 
       {matchEnded ? (
         <div className="match-ended">

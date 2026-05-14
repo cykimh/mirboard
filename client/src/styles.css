@@ -438,3 +438,70 @@ a {
 }
 
 /* dnd-kit dragOverlay 가 아닌 inline transform 처리 — SortableCard div 가 적용 */
+
+/* --- 모달 (Phase 6E) --- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #1f1f24;
+  border: 1px solid #3a3a44;
+  border-radius: 8px;
+  padding: 20px 24px;
+  max-width: 480px;
+  width: calc(100% - 32px);
+  color: #eaeaea;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal h3 {
+  margin: 0 0 12px;
+}
+
+.modal-body {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #b8b8c0;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.wish-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.wish-rank-btn {
+  background: #2a2a32;
+  border: 1px solid #444;
+  color: #eaeaea;
+  border-radius: 4px;
+  padding: 10px 0;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.wish-rank-btn:hover {
+  background: #36363f;
+}
+
+.wish-rank-btn.selected {
+  background: #3a4a3a;
+  border-color: #8bc34a;
+  font-weight: 600;
+}

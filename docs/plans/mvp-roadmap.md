@@ -534,3 +534,63 @@ public void onAction(@DestinationVariable String roomId,
 | 5e | UI polish + @dnd-kit 손패 정렬 + i18n 베이스 | ✅ 완료 |
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
+
+---
+
+## Phase 6 — Post-MVP 확장 (E → A → C → D)
+
+사용자 결정 (D-33): MVP 룰 UX 마감(E) → 운영성/관전(A) → 디자인 토큰/공용 컴포넌트(C) →
+멀티 인스턴스(D) 순. **Option B (새 게임 추가) 는 본 사이클에서 제외** — 별도 사이클.
+외부 브로커 채택: Redis Pub/Sub.
+
+### Phase 6E — 티츄 룰 UX 마감
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 6E-1 | `MakeWishModal` — Mahjong 카드 플레이 시 rank 2~14 선택 | 진행 중 |
+| 6E-2 | `GiveDragonTrickModal` — Dragon 트릭 양도 좌석 선택 + `DRAGON_GIVEN` 리듀서 | 대기 |
+| 6E-3 | Phoenix 단독 SINGLE 표시 — CardChip `phoenixSingle` 배지/툴팁 | 대기 |
+| 6E-4 | 이벤트 리듀서 보강 — `WISH_MADE` / `DRAGON_GIVEN` / wish 강제 힌트 | 대기 |
+
+**Done 기준**: 4탭 모의 게임에서 Mahjong 소원/Dragon 양도/Phoenix 단독 SINGLE 전부
+정상 UX. `npm --prefix client run test` 그린.
+
+### Phase 6A — 운영 강화 + 관전 모드
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 6A-1 | MDC (userId/roomId/eventId) + logback-spring.xml 표준화 | 대기 |
+| 6A-2 | 도메인 이벤트 감사 로그 (RoomService/TichuRoundStarter/GameStompController/MatchResultRecorder) | 대기 |
+| 6A-3 | Actuator + Micrometer + Prometheus endpoint | 대기 |
+| 6A-4 | 도메인 카운터 (방/게임/라운드/매치/액션 reject) | 대기 |
+| 6A-5 | 관전 모드 — Room.spectatorIds, `/api/rooms/{id}/spectate`, resync 검증 확장 | 대기 |
+| 6A-6 | 클라 관전 진입 — 로비 IN_GAME 방 "구경하기" + GameTable spectator mode | 대기 |
+
+**Done 기준**: `/actuator/prometheus` 에 도메인 카운터 노출. 관전자 통합 테스트 (TableView O,
+PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.
+
+### Phase 6C — UI 디자인 토큰 + 공용 컴포넌트
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 6C-1 | CSS 디자인 토큰 (`tokens.css`) + hardcode 색상 치환 | 대기 |
+| 6C-2 | 공용 컴포넌트 디렉토리 (`Button`, `Modal`, `Input`, `Card`, `Stack`, `Badge`) | 대기 |
+| 6C-3 | 페이지 리팩토링 (Login/GameHub/Lobby/Room) | 대기 |
+| 6C-4 | 모바일 점검 (480px/720px) + media query 정리 | 대기 |
+
+**Done 기준**: `styles.css` 의 hardcode 색상 0건. `npm run build` 통과. Chrome 모바일
+시뮬레이터 화면 깨짐 없음.
+
+### Phase 6D — 멀티 인스턴스 (Redis Pub/Sub)
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 6D-1 | `MessageGateway` 추상 + `RedisMessageGateway` / `InMemoryMessageGateway` 구현체 | 대기 |
+| 6D-2 | STOMP 브로드캐스트 다중인스턴스화 — gateway publish + 인스턴스별 relay | 대기 |
+| 6D-3 | ApplicationEvent → Redis Pub/Sub `DomainEventBus` + eventId 기반 dedup | 대기 |
+| 6D-4 | docker-compose `multi` 프로파일 + README 분산 시연 가이드 | 대기 |
+
+**Done 기준**: 기존 통합 테스트 그린 + 두 인스턴스 분산 시연 시 양쪽 동기화. eventId 중복
+처리 0건.
+
+각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
