@@ -574,10 +574,10 @@ PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.
 
 | 청크 | 내용 | 상태 |
 | --- | --- | --- |
-| 6C-1 | CSS 디자인 토큰 (`tokens.css`) + hardcode 색상 치환 | 대기 |
-| 6C-2 | 공용 컴포넌트 디렉토리 (`Button`, `Modal`, `Input`, `Card`, `Stack`, `Badge`) | 대기 |
-| 6C-3 | 페이지 리팩토링 (Login/GameHub/Lobby/Room) | 대기 |
-| 6C-4 | 모바일 점검 (480px/720px) + media query 정리 | 대기 |
+| 6C-1 | CSS 디자인 토큰 (`tokens.css`) + 핵심 16색 var() 치환 | ✅ 완료 (`48d0806`) |
+| 6C-2 + 6C-3 | 공용 컴포넌트 (Button/Input/Modal/Stack/Badge) + Login/Register/Room/모달 리팩토링 | ✅ 완료 (`b81a1c1`) |
+| 6C-4 | 모바일 @media (720px/480px) 좌석 그리드/패스 슬롯/wish grid 적응 | ✅ 완료 |
+| (보류) | 잔여 21색 (페이지 특수 톤) 토큰화 — 별도 사이클 | 보류 |
 
 **Done 기준**: `styles.css` 의 hardcode 색상 0건. `npm run build` 통과. Chrome 모바일
 시뮬레이터 화면 깨짐 없음.

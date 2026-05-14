@@ -638,3 +638,49 @@ a {
   background: var(--color-accent);
   color: var(--color-text-on-accent);
 }
+
+/* --- 모바일 반응형 (Phase 6C-4) --- */
+@media (max-width: 720px) {
+  #root {
+    padding: var(--space-3);
+  }
+
+  /* 데스크탑 4열 좌석 그리드 → 모바일 2열. */
+  .table-seats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 헤더는 wrap 으로 줄바꿈. */
+  .game-table-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* 카드 패스 슬롯이 가로로 너무 좁아지지 않게 wrap. */
+  .pass-slots {
+    flex-wrap: wrap;
+  }
+
+  /* 게임 카탈로그 그리드 — auto-fill minmax 가 자동 분해되지만 여백 정리. */
+  .game-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 손패 카드 크기 살짝 축소 — 14장이 보이도록. */
+  .card-chip {
+    padding: 4px 8px;
+    gap: var(--space-1);
+  }
+
+  /* 모달 폭 더 줄임. */
+  .modal {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  /* 소원 rank grid 7열 → 5열. */
+  .wish-rank-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
