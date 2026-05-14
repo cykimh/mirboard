@@ -1,29 +1,33 @@
 package com.mirboard.infra.ws;
 
 import com.mirboard.domain.game.tichu.event.TichuEvent;
+import com.mirboard.infra.messaging.StompPublisher;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 /**
  * 엔진이 반환한 이벤트들을 STOMP 토픽/큐로 분기 발행. 공개 이벤트는 `/topic/room/{id}` 로,
  * 비공개(HandDealt) 는 `/user/{userId}/queue/room/{id}` 로 보낸다. envelope 의 단조
  * 증가 seq 는 `room:{id}:seq` INCR 로 부여.
+ *
+ * <p>Phase 6D-2: 직접 {@code SimpMessagingTemplate} 호출 대신 {@link StompPublisher}
+ * 를 거쳐 모든 인스턴스로 fan-out. 단일 인스턴스 환경에선 InMemoryMessageGateway 가
+ * 동기로 같은 JVM 내 relay 콜백을 호출해 동일 동작.
  */
 @Component
 public class GameEventBroadcaster {
 
-    private final SimpMessagingTemplate broker;
+    private final StompPublisher publisher;
     private final StringRedisTemplate redis;
     private final Clock clock;
 
-    public GameEventBroadcaster(SimpMessagingTemplate broker, StringRedisTemplate redis, Clock clock) {
-        this.broker = broker;
+    public GameEventBroadcaster(StompPublisher publisher, StringRedisTemplate redis, Clock clock) {
+        this.publisher = publisher;
         this.redis = redis;
         this.clock = clock;
     }
@@ -39,10 +43,9 @@ public class GameEventBroadcaster {
                 int seat = seatOf(ev);
                 if (seat < 0 || seat >= playerIds.size()) continue;
                 long userId = playerIds.get(seat);
-                broker.convertAndSendToUser(Long.toString(userId),
-                        "/queue/room/" + roomId, envelope);
+                publisher.publishToUser(userId, "/queue/room/" + roomId, envelope);
             } else {
-                broker.convertAndSend("/topic/room/" + roomId, envelope);
+                publisher.publishToTopic("/topic/room/" + roomId, envelope);
             }
         }
     }
@@ -52,8 +55,7 @@ public class GameEventBroadcaster {
         long ts = Instant.now(clock).toEpochMilli();
         var envelope = new StompEnvelope<>(UUID.randomUUID().toString(), "ERROR", ts, null,
                 Map.of("code", code, "message", message));
-        broker.convertAndSendToUser(Long.toString(userId),
-                "/queue/room/" + roomId, envelope);
+        publisher.publishToUser(userId, "/queue/room/" + roomId, envelope);
     }
 
     private long nextSeq(String roomId) {
