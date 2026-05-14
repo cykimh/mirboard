@@ -12,6 +12,7 @@ import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
+import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.web.MdcKeys;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
@@ -21,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -52,7 +52,7 @@ public class GameStompController {
     private final TichuRoundStarter roundStarter;
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
-    private final ApplicationEventPublisher events;
+    private final DomainEventBus events;
     private final com.mirboard.infra.metrics.MirboardMetrics metrics;
 
     public GameStompController(RoomService roomService,
@@ -61,7 +61,7 @@ public class GameStompController {
                                TichuRoundStarter roundStarter,
                                GameEventBroadcaster broadcaster,
                                RoomActionLock lock,
-                               ApplicationEventPublisher events,
+                               DomainEventBus events,
                                com.mirboard.infra.metrics.MirboardMetrics metrics) {
         this.roomService = roomService;
         this.stateStore = stateStore;
@@ -178,7 +178,7 @@ public class GameStompController {
                     afterRound.winningTeam(),
                     afterRound.scoresByTeam(),
                     afterRound.roundScores().size()));
-            events.publishEvent(new TichuMatchCompleted(
+            events.publish(new TichuMatchCompleted(
                     roomId,
                     room.playerIds(),
                     afterRound.cumulativeA(),
