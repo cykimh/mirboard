@@ -93,6 +93,10 @@ const KO = {
   'dragon.confirm': '양도',
   'dragon.giveTo': '시트',
 
+  // --- Phoenix 단독 SINGLE 표식 ---
+  'phoenix.singleBadge': 'Phoenix +0.5',
+  'phoenix.singleTooltip': 'Phoenix 단독 SINGLE — 현재 트릭 최강 +0.5. Dragon 만 못 이김.',
+
   // --- 라운드/매치 종료 ---
   'round.ended.title': '라운드 종료',
   'round.ended.firstFinisher': '첫 완주: 시트',

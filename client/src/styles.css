@@ -535,3 +535,17 @@ a {
   border-color: #ff6b6b;
   font-weight: 600;
 }
+
+/* Phoenix 단독 SINGLE 배지 */
+.phoenix-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #6b3a6b;
+  color: #f5d4ff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid #a060a0;
+  cursor: help;
+}

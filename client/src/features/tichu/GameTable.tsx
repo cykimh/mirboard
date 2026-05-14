@@ -251,6 +251,14 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
                 ))}
               </span>
               <span className="hand-type">{tableView.currentTop.type}</span>
+              {tableView.currentTop.phoenixSingle && (
+                <span
+                  className="phoenix-badge"
+                  title={t('phoenix.singleTooltip')}
+                >
+                  {t('phoenix.singleBadge')}
+                </span>
+              )}
             </div>
           ) : (
             <p>{t('trick.leadWaiting')}</p>
