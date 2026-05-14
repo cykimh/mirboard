@@ -1,0 +1,79 @@
+/**
+ * Mirboard 디자인 토큰 (Phase 6C-1).
+ *
+ * 다크 1테마. 카테고리:
+ *   - color-bg-*       : 표면 톤 (가장 짙은 게 base, 위로 갈수록 elevated)
+ *   - color-text-*     : 텍스트 명도 단계
+ *   - color-border-*   : 테두리 강도
+ *   - color-accent     : 인터랙티브 액션 (블루)
+ *   - color-success/danger/warning : 시멘틱
+ *   - color-phoenix/dragon : 도메인-특이 (티츄)
+ *   - space-N          : 4px 그리드 스케일
+ *   - radius-*         : 모서리 반경
+ *   - shadow-*         : 그림자
+ *   - font-size-*      : 폰트 스케일
+ *
+ * 다국어/멀티테마 도입 시: 본 파일을 :root 가 아닌 [data-theme="..."] 셀렉터로
+ * 옮기고 토큰 값만 분기. 컴포넌트는 var() 만 쓰므로 자동 적용.
+ */
+:root {
+  /* ---- Background ---- */
+  --color-bg-base: #1a1a1f;
+  --color-bg-surface: #22222a;
+  --color-bg-surface-elevated: #2a2a32;
+  --color-bg-input: #1a1a22;
+  --color-bg-modal: #1f1f24;
+
+  /* ---- Text ---- */
+  --color-text-primary: #f0f0f4;
+  --color-text-secondary: #b8b8c0;
+  --color-text-muted: #8b8b94;
+  --color-text-on-accent: #ffffff;
+
+  /* ---- Border ---- */
+  --color-border: #444;
+  --color-border-strong: #555;
+  --color-border-subtle: #3a3a44;
+
+  /* ---- Accent / Semantic ---- */
+  --color-accent: #5b8def;
+  --color-accent-link: #8ab4f8;
+  --color-success: #8bc34a;
+  --color-success-bg: #2d4a3d;
+  --color-danger: #ef5350;
+  --color-danger-bg: #2a1a1a;
+  --color-warning: #ffc107;
+  --color-warning-bg: rgba(255, 193, 7, 0.3);
+
+  /* ---- Domain-specific (티츄) ---- */
+  --color-phoenix: #6b3a6b;
+  --color-phoenix-fg: #f5d4ff;
+  --color-phoenix-border: #a060a0;
+  --color-dragon: #ff6b6b;
+  --color-mahjong: #b3d4fc;
+
+  /* ---- Spacing (4px grid) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-pill: 9999px;
+
+  /* ---- Shadow ---- */
+  --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: rgba(0, 0, 0, 0.6);
+
+  /* ---- Font size ---- */
+  --font-size-sm: 0.9rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.1rem;
+  --font-size-xl: 1.25rem;
+}

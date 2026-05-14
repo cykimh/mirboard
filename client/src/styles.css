@@ -1,8 +1,8 @@
 :root {
   font-family: system-ui, sans-serif;
   color-scheme: light dark;
-  background: #1a1a1f;
-  color: #f0f0f4;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
 }
 
 body {
@@ -21,13 +21,13 @@ button {
   padding: 8px 14px;
   border-radius: 6px;
   border: 1px solid #555;
-  background: #2a2a32;
+  background: var(--color-bg-surface-elevated);
   color: inherit;
   font: inherit;
 }
 
 button:hover:not(:disabled) {
-  background: #3a3a44;
+  background: var(--color-border-subtle);
 }
 
 button:disabled {
@@ -39,18 +39,18 @@ input {
   padding: 8px;
   border-radius: 6px;
   border: 1px solid #555;
-  background: #1a1a22;
+  background: var(--color-bg-input);
   color: inherit;
   font: inherit;
 }
 
 a {
-  color: #8ab4f8;
+  color: var(--color-accent-link);
 }
 
 .error {
-  color: #ef5350;
-  background: #2a1a1a;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
   padding: 10px;
   border-radius: 6px;
 }
@@ -96,7 +96,7 @@ a {
   border: 1px solid #444;
   border-radius: 10px;
   padding: 16px;
-  background: #22222a;
+  background: var(--color-bg-surface);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -118,7 +118,7 @@ a {
   border-radius: 6px;
   text-decoration: none;
   color: inherit;
-  background: #2d4a3d;
+  background: var(--color-success-bg);
 }
 
 .badge {
@@ -152,7 +152,7 @@ a {
   padding: 10px;
   border: 1px solid #444;
   border-radius: 6px;
-  background: #22222a;
+  background: var(--color-bg-surface);
 }
 
 .lobby-page .rooms .name {
@@ -184,7 +184,7 @@ a {
 }
 
 .lobby-page .chat strong {
-  color: #8ab4f8;
+  color: var(--color-accent-link);
 }
 
 .lobby-page .chat form {
@@ -220,12 +220,12 @@ a {
   border: 1px solid #444;
   border-radius: 8px;
   padding: 10px;
-  background: #22222a;
+  background: var(--color-bg-surface);
   text-align: center;
 }
 
 .seat.turn {
-  border-color: #ffc107;
+  border-color: var(--color-warning);
   box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
 }
 
@@ -242,7 +242,7 @@ a {
 .declared {
   margin-top: 4px;
   font-size: 0.75rem;
-  color: #ffc107;
+  color: var(--color-warning);
 }
 
 .trick {
@@ -265,7 +265,7 @@ a {
   padding: 6px 10px;
   border-radius: 6px;
   border: 2px solid #555;
-  background: #2a2a32;
+  background: var(--color-bg-surface-elevated);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -284,7 +284,7 @@ a {
   border: 1px solid #444;
   border-radius: 8px;
   padding: 12px;
-  background: #22222a;
+  background: var(--color-bg-surface);
 }
 
 .actions {
@@ -294,7 +294,7 @@ a {
 }
 
 .round-ended {
-  border: 1px solid #ffc107;
+  border: 1px solid var(--color-warning);
   border-radius: 8px;
   padding: 12px;
   background: #2a2a16;
@@ -329,7 +329,7 @@ a {
 
 /* --- Phase 5b: 패스 픽커 --- */
 .pass-picker {
-  border: 1px solid #5b8def;
+  border: 1px solid var(--color-accent);
   border-radius: 8px;
   padding: 12px;
   background: #16203a;
@@ -359,7 +359,7 @@ a {
 }
 
 .pass-slot.active {
-  border-color: #ffc107;
+  border-color: var(--color-warning);
   border-style: solid;
   box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
 }
@@ -380,7 +380,7 @@ a {
 }
 
 .seat.submitted {
-  border-color: #5b8def;
+  border-color: var(--color-accent);
 }
 
 .status-tag {
@@ -395,7 +395,7 @@ a {
 
 .seat.submitted .status-tag {
   background: #1a2a3a;
-  color: #b3d4fc;
+  color: var(--color-mahjong);
 }
 
 /* --- Phase 5e: 손패 툴바 + 드래그 --- */
@@ -434,7 +434,7 @@ a {
 .card-chip.selected {
   background: #3a4a3a;
   transform: translateY(-6px);
-  border-color: #8bc34a;
+  border-color: var(--color-success);
 }
 
 /* dnd-kit dragOverlay 가 아닌 inline transform 처리 — SortableCard div 가 적용 */
@@ -451,13 +451,13 @@ a {
 }
 
 .modal {
-  background: #1f1f24;
-  border: 1px solid #3a3a44;
+  background: var(--color-bg-modal);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 20px 24px;
   max-width: 480px;
   width: calc(100% - 32px);
-  color: #eaeaea;
+  color: var(--color-text-primary);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -468,7 +468,7 @@ a {
 .modal-body {
   margin: 0 0 16px;
   font-size: 14px;
-  color: #b8b8c0;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -486,9 +486,9 @@ a {
 }
 
 .wish-rank-btn {
-  background: #2a2a32;
+  background: var(--color-bg-surface-elevated);
   border: 1px solid #444;
-  color: #eaeaea;
+  color: var(--color-text-primary);
   border-radius: 4px;
   padding: 10px 0;
   font-size: 15px;
@@ -502,7 +502,7 @@ a {
 
 .wish-rank-btn.selected {
   background: #3a4a3a;
-  border-color: #8bc34a;
+  border-color: var(--color-success);
   font-weight: 600;
 }
 
@@ -514,9 +514,9 @@ a {
 }
 
 .dragon-seat-btn {
-  background: #2a2a32;
+  background: var(--color-bg-surface-elevated);
   border: 1px solid #444;
-  color: #eaeaea;
+  color: var(--color-text-primary);
   border-radius: 6px;
   padding: 14px 24px;
   font-size: 16px;
@@ -532,7 +532,7 @@ a {
 
 .dragon-seat-btn.selected {
   background: #4a3a3a;
-  border-color: #ff6b6b;
+  border-color: var(--color-dragon);
   font-weight: 600;
 }
 
@@ -541,19 +541,19 @@ a {
   display: inline-block;
   margin-left: 8px;
   padding: 2px 8px;
-  background: #6b3a6b;
-  color: #f5d4ff;
+  background: var(--color-phoenix);
+  color: var(--color-phoenix-fg);
   font-size: 12px;
   font-weight: 600;
   border-radius: 10px;
-  border: 1px solid #a060a0;
+  border: 1px solid var(--color-phoenix-border);
   cursor: help;
 }
 
 /* 관전 모드 배너 + LobbyPage 의 spectate 입력 (Phase 6A-6) */
 .spectator-banner {
   background: #2a3a4a;
-  border-left: 3px solid #5b8def;
+  border-left: 3px solid var(--color-accent);
   padding: 8px 12px;
   margin: 12px 0;
   color: #c5d5e8;
