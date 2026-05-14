@@ -31,6 +31,7 @@ public final class ActionValidator {
             case TichuAction.PassTrick __ -> validatePassTrick(state, seat);
             case TichuAction.DeclareTichu __ -> validateDeclareTichu(state, seat);
             case TichuAction.DeclareGrandTichu __ -> validateDeclareGrandTichu(state, seat);
+            case TichuAction.Ready __ -> validateReady(state, seat);
             case TichuAction.PassCards pc -> validatePassCards(state, seat, pc);
             case TichuAction.MakeWish w -> validateMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> validateGiveDragonTrick(state, seat, g);
@@ -99,36 +100,68 @@ public final class ActionValidator {
 
     // ---------- Declarations ----------
     private static void validateDeclareTichu(TichuState state, int seat) {
-        if (!(state instanceof TichuState.Playing playing)) {
-            throw reject(RejectionReason.INVALID_STATE_FOR_ACTION);
+        // Dealing(phase=14): 정식 윈도우 — 아직 ready 가 아니어야.
+        if (state instanceof TichuState.Dealing dealing) {
+            if (dealing.phaseCardCount() != 14) {
+                throw reject(RejectionReason.TICHU_DECLARATION_TOO_LATE);
+            }
+            if (dealing.ready().contains(seat)) {
+                throw reject(RejectionReason.ALREADY_READY);
+            }
+            PlayerState p = dealing.players().get(seat);
+            if (p.declaration() != TichuDeclaration.NONE) {
+                throw reject(RejectionReason.DUPLICATE_DECLARATION);
+            }
+            return;
         }
-        PlayerState p = playing.players().get(seat);
-        if (p.declaration() != TichuDeclaration.NONE) {
-            throw reject(RejectionReason.DUPLICATE_DECLARATION);
+        // Playing: 첫 플레이 전까지 (handSize 그대로 14) 가능. 그랜드티츄 선언자는 불가.
+        if (state instanceof TichuState.Playing playing) {
+            PlayerState p = playing.players().get(seat);
+            if (p.declaration() != TichuDeclaration.NONE) {
+                throw reject(RejectionReason.DUPLICATE_DECLARATION);
+            }
+            if (p.handSize() != 14) {
+                throw reject(RejectionReason.TICHU_DECLARATION_TOO_LATE);
+            }
+            return;
         }
-        if (p.handSize() != 14) {
-            throw reject(RejectionReason.TICHU_DECLARATION_TOO_LATE);
-        }
+        throw reject(RejectionReason.INVALID_STATE_FOR_ACTION);
     }
 
     private static void validateDeclareGrandTichu(TichuState state, int seat) {
-        // Grand Tichu must happen in the 8-card dealing phase. Phase 3d does not
-        // model Dealing8 yet, so accept only when player has 8 cards regardless
-        // of state subtype. The engine in Phase 3f will tighten this.
-        List<PlayerState> players = state.players();
-        PlayerState p = players.get(seat);
+        // Grand Tichu 는 Dealing(8) 단계에서만, 아직 ready 가 아닐 때만.
+        if (!(state instanceof TichuState.Dealing dealing)) {
+            throw reject(RejectionReason.GRAND_TICHU_DECLARATION_WRONG_PHASE);
+        }
+        if (dealing.phaseCardCount() != 8) {
+            throw reject(RejectionReason.GRAND_TICHU_DECLARATION_WRONG_PHASE);
+        }
+        if (dealing.ready().contains(seat)) {
+            throw reject(RejectionReason.ALREADY_READY);
+        }
+        PlayerState p = dealing.players().get(seat);
         if (p.declaration() != TichuDeclaration.NONE) {
             throw reject(RejectionReason.DUPLICATE_DECLARATION);
         }
-        if (p.handSize() != 8) {
-            throw reject(RejectionReason.GRAND_TICHU_DECLARATION_WRONG_PHASE);
+    }
+
+    // ---------- Ready ----------
+    private static void validateReady(TichuState state, int seat) {
+        if (!(state instanceof TichuState.Dealing dealing)) {
+            throw reject(RejectionReason.NOT_IN_DEALING_PHASE);
+        }
+        if (dealing.ready().contains(seat)) {
+            throw reject(RejectionReason.ALREADY_READY);
         }
     }
 
     // ---------- PassCards ----------
     private static void validatePassCards(TichuState state, int seat, TichuAction.PassCards pc) {
         if (!(state instanceof TichuState.Passing passing)) {
-            throw reject(RejectionReason.INVALID_STATE_FOR_ACTION);
+            throw reject(RejectionReason.NOT_IN_PASSING_PHASE);
+        }
+        if (passing.submitted().containsKey(seat)) {
+            throw reject(RejectionReason.ALREADY_PASSED);
         }
         PlayerState player = passing.players().get(seat);
         List<Card> chosen = List.of(pc.toLeft(), pc.toPartner(), pc.toRight());
@@ -138,9 +171,6 @@ public final class ActionValidator {
         }
         if (!playerOwnsAll(player.hand(), chosen)) {
             throw reject(RejectionReason.CARDS_NOT_OWNED);
-        }
-        if (Boolean.TRUE.equals(passing.submitted().get(seat))) {
-            throw reject(RejectionReason.DUPLICATE_DECLARATION, "pass already submitted");
         }
     }
 

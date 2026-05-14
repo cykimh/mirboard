@@ -5,14 +5,6 @@ import { useTichuStore } from '@/features/tichu/tichuStore';
 import type { Card, ResyncResponse } from '@/types/tichu';
 import type { StompEnvelope } from '@/types/stomp';
 
-interface RoundEndedPayload {
-  score: {
-    teamAScore: number;
-    teamBScore: number;
-    firstFinisherSeat: number;
-  };
-}
-
 interface HandDealtPayload {
   seat: number;
   cards: Card[];
@@ -25,16 +17,18 @@ interface ErrorPayload {
 
 /**
  * 방의 STOMP 연결 + 이벤트 디스패치. 공개 토픽과 본인 큐를 동시 구독.
- * 액션 후 매번 `/resync` 로 최신 스냅샷을 가져오는 보수적 전략 — 라이브 이벤트 patch
- * 는 후속 작업 (4f). 단조 증가 `seq` 는 patch 도입 시 사용.
+ *
+ * Phase 5d 부터: 공개 이벤트는 store.applyEvent 로 부분 패치를 시도하고, 리듀서가
+ * 없는 라이프사이클 이벤트 / seq gap / unknown 일 때만 /resync 로 권위 있는
+ * 스냅샷 재취득. 초기 mount 와 STOMP onConnect 는 항상 /resync (재접속 안전망).
  */
 export function useStompRoom(roomId: string, token: string | null) {
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const applySnapshot = useTichuStore((s) => s.applySnapshot);
   const applyPrivateHand = useTichuStore((s) => s.applyPrivateHand);
+  const applyEvent = useTichuStore((s) => s.applyEvent);
   const setError = useTichuStore((s) => s.setError);
-  const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
   const reset = useTichuStore((s) => s.reset);
 
   const resync = useCallback(async () => {
@@ -67,17 +61,16 @@ export function useStompRoom(roomId: string, token: string | null) {
       reconnectDelay: 2000,
       onConnect: () => {
         setConnected(true);
+        // 연결/재연결 직후 권위 있는 스냅샷으로 lastSeq 동기화.
         resync();
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
-          if (env.type === 'ROUND_ENDED') {
-            const payload = env.payload as RoundEndedPayload;
-            setRoundEnded(payload.score);
-          } else {
-            // For other public events (PLAYED, PASSED, TURN_CHANGED, ...) MVP
-            // simply re-fetches the authoritative table view.
+          const result = applyEvent(env);
+          if (result === 'unhandled' || result === 'gap') {
+            // 라이프사이클 이벤트 또는 갭 — 권위 있는 스냅샷 재취득.
             resync();
           }
+          // 'applied' / 'duplicate' 인 경우엔 추가 동작 없음.
         });
         client.subscribe(`/user/queue/room/${roomId}`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
@@ -100,7 +93,7 @@ export function useStompRoom(roomId: string, token: string | null) {
       clientRef.current = null;
       setConnected(false);
     };
-  }, [token, roomId, resync, applyPrivateHand, setError, setRoundEnded]);
+  }, [token, roomId, resync, applyEvent, applyPrivateHand, setError]);
 
   const sendAction = useCallback(
     (action: Record<string, unknown>) => {

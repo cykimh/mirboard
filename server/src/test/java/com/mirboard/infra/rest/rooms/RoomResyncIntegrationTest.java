@@ -62,18 +62,24 @@ class RoomResyncIntegrationTest {
                 List.of("rs_alice", "rs_bob", "rs_charlie", "rs_dave"));
         String roomId = createRoomAndJoinAll(tokens);
 
+        // Phase 5b: 라운드 시작 시점에는 Dealing(phase=8) — 가시 손패 8장.
         String token = tokens.get("rs_alice");
         mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.roomId").value(roomId))
-                .andExpect(jsonPath("$.phase").value("PLAYING"))
+                .andExpect(jsonPath("$.phase").value("DEALING"))
                 .andExpect(jsonPath("$.eventSeq").exists())
-                .andExpect(jsonPath("$.tableView.handCounts.0").value(14))
-                .andExpect(jsonPath("$.tableView.handCounts.3").value(14))
+                .andExpect(jsonPath("$.tableView.phase").value("DEALING"))
+                .andExpect(jsonPath("$.tableView.dealingCardCount").value(8))
+                .andExpect(jsonPath("$.tableView.handCounts.0").value(8))
+                .andExpect(jsonPath("$.tableView.handCounts.3").value(8))
                 .andExpect(jsonPath("$.tableView.currentTop").doesNotExist())
+                .andExpect(jsonPath("$.tableView.roundNumber").value(1))
+                .andExpect(jsonPath("$.tableView.matchScores.A").value(0))
+                .andExpect(jsonPath("$.tableView.matchScores.B").value(0))
                 .andExpect(jsonPath("$.privateHand.seat").value(0))
-                .andExpect(jsonPath("$.privateHand.cards.length()").value(14));
+                .andExpect(jsonPath("$.privateHand.cards.length()").value(8));
     }
 
     @Test

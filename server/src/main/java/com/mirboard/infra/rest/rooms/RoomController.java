@@ -1,6 +1,8 @@
 package com.mirboard.infra.rest.rooms;
 
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
+import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.PrivateHand;
 import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
@@ -30,10 +32,14 @@ public class RoomController {
 
     private final RoomService rooms;
     private final TichuGameStateStore stateStore;
+    private final TichuMatchStateStore matchStateStore;
 
-    public RoomController(RoomService rooms, TichuGameStateStore stateStore) {
+    public RoomController(RoomService rooms,
+                          TichuGameStateStore stateStore,
+                          TichuMatchStateStore matchStateStore) {
         this.rooms = rooms;
         this.stateStore = stateStore;
+        this.matchStateStore = matchStateStore;
     }
 
     @GetMapping
@@ -80,11 +86,14 @@ public class RoomController {
         }
         var state = stateStore.load(roomId)
                 .orElseThrow(() -> new ResyncNotAvailableException(roomId));
+        TichuMatchState matchState = matchStateStore.load(roomId)
+                .orElseGet(() -> TichuMatchState.initial(room.playerIds()));
         return new ResyncResponse(
                 roomId,
                 TichuStateMapper.phaseName(state),
                 stateStore.currentSeq(roomId),
-                TichuStateMapper.toTableView(state),
+                TichuStateMapper.toTableView(state, matchState.scoresByTeam(),
+                        matchState.roundNumber()),
                 TichuStateMapper.toPrivateHand(state, seat));
     }
 

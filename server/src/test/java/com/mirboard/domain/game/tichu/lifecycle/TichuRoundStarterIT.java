@@ -2,12 +2,16 @@ package com.mirboard.domain.game.tichu.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mirboard.domain.game.tichu.card.Card;
 import com.mirboard.domain.game.tichu.card.Deck;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,8 +53,11 @@ class TichuRoundStarterIT {
     @Autowired
     TichuGameStateStore stateStore;
 
+    @Autowired
+    TichuMatchStateStore matchStateStore;
+
     @Test
-    void fourth_join_triggers_round_start_and_persists_initial_state() {
+    void fourth_join_triggers_round_start_in_dealing_phase_8() {
         Room room = roomService.createRoom(101L, "lifecycle-room", "TICHU");
         String roomId = room.roomId();
         roomService.joinRoom(roomId, 102L);
@@ -62,17 +69,26 @@ class TichuRoundStarterIT {
         TichuState state = stateStore.load(roomId)
                 .orElseThrow(() -> new AssertionError("State must be persisted after 4th join"));
 
-        assertThat(state).isInstanceOf(TichuState.Playing.class);
-        var playing = (TichuState.Playing) state;
-        assertThat(playing.players()).hasSize(4);
+        assertThat(state).isInstanceOf(TichuState.Dealing.class);
+        var dealing = (TichuState.Dealing) state;
+        assertThat(dealing.phaseCardCount()).isEqualTo(8);
+        assertThat(dealing.players()).hasSize(4);
+        assertThat(dealing.ready()).isEmpty();
 
-        int totalCards = playing.players().stream()
-                .mapToInt(p -> p.hand().size())
-                .sum();
-        assertThat(totalCards).isEqualTo(Deck.SIZE);   // 56 dealt
-        assertThat(playing.players()).allMatch(p -> p.hand().size() == 14);
-        assertThat(playing.trick().leadSeat()).isBetween(0, 3);
-        assertThat(playing.trick().currentTop()).isNull();
+        // 각 좌석: 8장 visible + 6장 reserved → 합 14장.
+        int totalVisible = dealing.players().stream()
+                .mapToInt(p -> p.hand().size()).sum();
+        int totalReserved = dealing.reservedSecondHalf().values().stream()
+                .mapToInt(java.util.List::size).sum();
+        assertThat(totalVisible + totalReserved).isEqualTo(Deck.SIZE);
+        assertThat(dealing.players()).allMatch(p -> p.hand().size() == 8);
+        assertThat(dealing.reservedSecondHalf().values()).allMatch(list -> list.size() == 6);
+
+        // 56장 중복 없음 — visible + reserved 합집합 카드 set 크기 = 56.
+        Set<Card> allCards = new HashSet<>();
+        dealing.players().forEach(p -> allCards.addAll(p.hand()));
+        dealing.reservedSecondHalf().values().forEach(allCards::addAll);
+        assertThat(allCards).hasSize(Deck.SIZE);
     }
 
     @Test
@@ -88,12 +104,30 @@ class TichuRoundStarterIT {
         stateStore.save(roomId, reloaded);
         TichuState second = stateStore.load(roomId).orElseThrow();
 
-        assertThat(second).isInstanceOf(TichuState.Playing.class);
-        assertThat(((TichuState.Playing) second).players()).hasSize(4);
+        assertThat(second).isInstanceOf(TichuState.Dealing.class);
+        assertThat(((TichuState.Dealing) second).players()).hasSize(4);
+        assertThat(((TichuState.Dealing) second).phaseCardCount()).isEqualTo(8);
+        assertThat(((TichuState.Dealing) second).reservedSecondHalf()).hasSize(4);
     }
 
     @Test
-    void each_player_hand_is_individually_persisted() {
+    void match_state_is_initialized_on_first_round() {
+        Room room = roomService.createRoom(401L, "match-init-room", "TICHU");
+        String roomId = room.roomId();
+        roomService.joinRoom(roomId, 402L);
+        roomService.joinRoom(roomId, 403L);
+        roomService.joinRoom(roomId, 404L);
+
+        var matchState = matchStateStore.load(roomId)
+                .orElseThrow(() -> new AssertionError("match state must exist after game start"));
+        assertThat(matchState.roundNumber()).isEqualTo(1);
+        assertThat(matchState.cumulativeA()).isZero();
+        assertThat(matchState.cumulativeB()).isZero();
+        assertThat(matchState.playerIds()).containsExactly(401L, 402L, 403L, 404L);
+    }
+
+    @Test
+    void each_player_visible_hand_is_individually_persisted() {
         Room room = roomService.createRoom(301L, "hands-room", "TICHU");
         String roomId = room.roomId();
         roomService.joinRoom(roomId, 302L);
@@ -103,7 +137,8 @@ class TichuRoundStarterIT {
         for (long uid : new long[]{301L, 302L, 303L, 304L}) {
             var hand = stateStore.loadHand(roomId, uid)
                     .orElseThrow(() -> new AssertionError("Hand missing for user " + uid));
-            assertThat(hand).hasSize(14);
+            // Phase 5b: 첫 분배에서 좌석별 8장만 비공개 큐로 노출.
+            assertThat(hand).hasSize(8);
         }
     }
 }

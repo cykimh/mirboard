@@ -1,44 +1,54 @@
 package com.mirboard.domain.game.tichu.lifecycle;
 
 import com.mirboard.domain.game.core.GameStartingEvent;
+import com.mirboard.domain.game.tichu.TichuGameDefinition;
 import com.mirboard.domain.game.tichu.TurnManager;
 import com.mirboard.domain.game.tichu.card.Card;
 import com.mirboard.domain.game.tichu.card.Deck;
-import com.mirboard.domain.game.tichu.card.Special;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
+import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TichuState;
-import com.mirboard.domain.game.tichu.state.TrickState;
-import com.mirboard.domain.game.tichu.TichuGameDefinition;
 import java.security.SecureRandom;
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * 방이 막 IN_GAME 으로 전이되었을 때 본 컴포넌트가 라운드를 초기화한다 — Dealing 단계
- * (8장 → Grand Tichu, 14장 → Tichu, 카드 패스) 는 MVP 단순화를 위해 스킵하고 Playing
- * 단계로 바로 진입. Mahjong 보유자가 첫 트릭의 리드.
+ * 방이 IN_GAME 으로 전이되었을 때 첫 라운드를 초기화하고, 한 라운드가 종료된 직후
+ * 매치가 계속되면 다음 라운드도 본 컴포넌트를 통해 새 Dealing(8) 상태가 만들어진다.
+ * Phase 5b 의 분배 룰을 그대로 적용: 8장 visible + 6장 reserved.
  */
 @Component
 public class TichuRoundStarter {
 
     private static final Logger log = LoggerFactory.getLogger(TichuRoundStarter.class);
-    private static final int CARDS_PER_PLAYER = Deck.SIZE / TurnManager.SEATS;  // 14
+    private static final int FULL_HAND = Deck.SIZE / TurnManager.SEATS;       // 14
+    private static final int FIRST_DEAL_SIZE = 8;
+    private static final int RESERVED_SIZE = FULL_HAND - FIRST_DEAL_SIZE;     // 6
 
     private final TichuGameStateStore stateStore;
+    private final TichuMatchStateStore matchStateStore;
     private final SecureRandom random;
 
-    public TichuRoundStarter(TichuGameStateStore stateStore) {
-        this(stateStore, new SecureRandom());
+    public TichuRoundStarter(TichuGameStateStore stateStore,
+                             TichuMatchStateStore matchStateStore) {
+        this(stateStore, matchStateStore, new SecureRandom());
     }
 
     /** Test-only entry point (deterministic shuffle). */
-    public TichuRoundStarter(TichuGameStateStore stateStore, SecureRandom random) {
+    public TichuRoundStarter(TichuGameStateStore stateStore,
+                             TichuMatchStateStore matchStateStore,
+                             SecureRandom random) {
         this.stateStore = stateStore;
+        this.matchStateStore = matchStateStore;
         this.random = random;
     }
 
@@ -51,43 +61,50 @@ public class TichuRoundStarter {
             log.warn("Tichu round needs 4 players, got {} — skipping", event.playerIds().size());
             return;
         }
+        TichuMatchState matchState = TichuMatchState.initial(event.playerIds());
+        matchStateStore.save(event.roomId(), matchState);
+        startRound(event.roomId(), event.playerIds(), matchState.roundNumber());
+    }
 
+    /**
+     * 새 라운드를 시작 — 8장 visible + 6장 reserved 분배 후 Dealing(8) 영속화.
+     * 다음 라운드 진입 시 GameStompController 가 호출.
+     */
+    public void startRound(String roomId, List<Long> playerIds, int roundNumber) {
         Deck deck = Deck.shuffled(random);
-        List<List<Card>> hands = deal(deck.cards());
+        DealResult dealt = deal(deck.cards());
 
-        List<PlayerState> players = new ArrayList<>(TurnManager.SEATS);
+        List<PlayerState> players = new java.util.ArrayList<>(TurnManager.SEATS);
         for (int seat = 0; seat < TurnManager.SEATS; seat++) {
-            players.add(PlayerState.initial(seat, hands.get(seat)));
+            players.add(PlayerState.initial(seat, dealt.visible().get(seat)));
         }
 
-        int leadSeat = mahjongHolderSeat(hands);
-        TichuState.Playing initial = new TichuState.Playing(
-                players, TrickState.lead(leadSeat, null), -1);
+        TichuState.Dealing initial = new TichuState.Dealing(
+                players, FIRST_DEAL_SIZE, Set.of(), dealt.reserved());
 
-        stateStore.save(event.roomId(), initial);
+        stateStore.save(roomId, initial);
         for (int seat = 0; seat < TurnManager.SEATS; seat++) {
-            stateStore.saveHand(event.roomId(), event.playerIds().get(seat), hands.get(seat));
+            stateStore.saveHand(roomId, playerIds.get(seat), dealt.visible().get(seat));
         }
 
-        log.info("Tichu round started for room={}, leadSeat={}", event.roomId(), leadSeat);
+        log.info("Tichu round {} started for room={} — Dealing(8), reserved 6 per seat",
+                roundNumber, roomId);
     }
 
-    private static List<List<Card>> deal(List<Card> shuffled) {
-        List<List<Card>> hands = new ArrayList<>(TurnManager.SEATS);
+    private static DealResult deal(List<Card> shuffled) {
+        Map<Integer, List<Card>> visible = new LinkedHashMap<>(TurnManager.SEATS);
+        Map<Integer, List<Card>> reserved = new HashMap<>(TurnManager.SEATS);
         for (int seat = 0; seat < TurnManager.SEATS; seat++) {
-            int from = seat * CARDS_PER_PLAYER;
-            int to = from + CARDS_PER_PLAYER;
-            hands.add(List.copyOf(shuffled.subList(from, to)));
+            int from = seat * FULL_HAND;
+            int firstEnd = from + FIRST_DEAL_SIZE;
+            int reservedEnd = firstEnd + RESERVED_SIZE;
+            visible.put(seat, List.copyOf(shuffled.subList(from, firstEnd)));
+            reserved.put(seat, List.copyOf(shuffled.subList(firstEnd, reservedEnd)));
         }
-        return hands;
+        return new DealResult(visible, reserved);
     }
 
-    private static int mahjongHolderSeat(List<List<Card>> hands) {
-        for (int seat = 0; seat < hands.size(); seat++) {
-            if (hands.get(seat).stream().anyMatch(c -> c.is(Special.MAHJONG))) {
-                return seat;
-            }
-        }
-        throw new IllegalStateException("Mahjong not found in any hand — deck integrity broken");
+    private record DealResult(Map<Integer, List<Card>> visible,
+                              Map<Integer, List<Card>> reserved) {
     }
 }

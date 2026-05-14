@@ -2,11 +2,11 @@ package com.mirboard.domain.game.tichu.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.mirboard.domain.game.tichu.event.TichuRoundCompleted;
+import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
-import com.mirboard.domain.game.tichu.state.PlayerState;
-import com.mirboard.domain.lobby.auth.UserRepository;
+import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.lobby.auth.User;
+import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,18 +72,22 @@ class MatchResultRecorderIT {
         var users = registerFour("mr_a", "mr_b", "mr_c", "mr_d");
         var ids = users.stream().map(User::getId).toList();
 
-        // Team A wins (100 : 25)
-        var score = new RoundScore(100, 25, 0, false);
-        publisher.publishEvent(new TichuRoundCompleted("room-X", ids, fakePlayers(), score));
+        // 두 라운드 결과를 합쳐 누적 1100:300 (Team A 승) 으로 매치 종료 가정.
+        List<RoundScore> rounds = List.of(
+                new RoundScore(500, 100, 0, false),
+                new RoundScore(600, 200, 0, false));
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-X", ids, 1100, 300, Team.A, rounds));
 
-        // Match row
+        // Match row — 누적 점수가 기록.
         var matches = matchRepo.findAll();
         assertThat(matches).hasSize(1);
         assertThat(matches.get(0).getRoomId()).isEqualTo("room-X");
-        assertThat(matches.get(0).getTeamAScore()).isEqualTo(100);
-        assertThat(matches.get(0).getTeamBScore()).isEqualTo(25);
+        assertThat(matches.get(0).getTeamAScore()).isEqualTo(1100);
+        assertThat(matches.get(0).getTeamBScore()).isEqualTo(300);
+        assertThat(matches.get(0).getPayloadJson()).contains("\"roundScores\"");
 
-        // Participants: A=seats 0,2 = mr_a, mr_c; B=1,3 = mr_b, mr_d
+        // Participants: A=seats 0,2 = mr_a, mr_c; B=1,3 = mr_b, mr_d.
         var matchId = matches.get(0).getId();
         var participantsByUser = participantRepo.findAll().stream()
                 .collect(java.util.stream.Collectors.toMap(
@@ -94,7 +98,7 @@ class MatchResultRecorderIT {
         assertThat(participantsByUser.get(ids.get(3)).isWin()).isFalse();
         assertThat(participantsByUser.values()).allMatch(p -> p.getMatchId().equals(matchId));
 
-        // Win/lose counts
+        // Win/lose counts.
         var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
         assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
         assertThat(refreshed.get(2).getWinCount()).isEqualTo(1);
@@ -114,13 +118,5 @@ class MatchResultRecorderIT {
             created.add(saved);
         }
         return created;
-    }
-
-    private static List<PlayerState> fakePlayers() {
-        var list = new ArrayList<PlayerState>();
-        for (int seat = 0; seat < 4; seat++) {
-            list.add(PlayerState.initial(seat, List.of()));
-        }
-        return list;
     }
 }

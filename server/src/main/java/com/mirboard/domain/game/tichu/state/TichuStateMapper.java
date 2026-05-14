@@ -12,17 +12,32 @@ import java.util.Map;
  * 마스터 {@link TichuState} 를 공개 가능한 {@link TableView} 와 본인 한정
  * {@link PrivateHand} 로 분리한다 — D-01 의 State Hiding 원칙 직렬화 단계의 마지막
  * 방어선. 공개 뷰는 손패 카드를 절대 노출하지 않고 장수(handCount)만 포함.
+ *
+ * <p>Phase 5c 부터 매치 누적 정보 (matchScores, roundNumber) 가 같이 노출되므로
+ * 매퍼 호출 시 두 값을 함께 전달해야 한다.
  */
 public final class TichuStateMapper {
+
+    public static final Map<Team, Integer> ZERO_MATCH_SCORES;
+
+    static {
+        Map<Team, Integer> m = new EnumMap<>(Team.class);
+        m.put(Team.A, 0);
+        m.put(Team.B, 0);
+        ZERO_MATCH_SCORES = Map.copyOf(m);
+    }
 
     private TichuStateMapper() {
     }
 
-    public static TableView toTableView(TichuState state) {
+    public static TableView toTableView(TichuState state,
+                                        Map<Team, Integer> matchScores,
+                                        int roundNumber) {
         return switch (state) {
-            case TichuState.Playing p -> playingToTableView(p);
-            case TichuState.Passing p -> passingToTableView(p);
-            case TichuState.RoundEnd r -> roundEndToTableView(r);
+            case TichuState.Dealing d -> dealingToTableView(d, matchScores, roundNumber);
+            case TichuState.Passing p -> passingToTableView(p, matchScores, roundNumber);
+            case TichuState.Playing p -> playingToTableView(p, matchScores, roundNumber);
+            case TichuState.RoundEnd r -> roundEndToTableView(r, matchScores, roundNumber);
         };
     }
 
@@ -32,15 +47,72 @@ public final class TichuStateMapper {
 
     public static String phaseName(TichuState state) {
         return switch (state) {
-            case TichuState.Playing __ -> "PLAYING";
+            case TichuState.Dealing __ -> "DEALING";
             case TichuState.Passing __ -> "PASSING";
+            case TichuState.Playing __ -> "PLAYING";
             case TichuState.RoundEnd __ -> "ROUND_END";
         };
     }
 
     // ---------- internals ----------
 
-    private static TableView playingToTableView(TichuState.Playing playing) {
+    private static TableView dealingToTableView(TichuState.Dealing dealing,
+                                                Map<Team, Integer> matchScores,
+                                                int roundNumber) {
+        Map<Integer, Integer> handCounts = new HashMap<>();
+        Map<Integer, TichuDeclaration> declarations = new HashMap<>();
+        for (PlayerState p : dealing.players()) {
+            handCounts.put(p.seat(), p.handSize());
+            declarations.put(p.seat(), p.declaration());
+        }
+        List<Integer> ready = dealing.ready().stream().sorted().toList();
+        return new TableView(
+                "DEALING",
+                dealing.phaseCardCount(),
+                ready,
+                List.of(),
+                -1,
+                handCounts,
+                null,
+                -1,
+                declarations,
+                liveTrickScores(dealing.players()),
+                matchScores,
+                roundNumber,
+                List.of(),
+                null);
+    }
+
+    private static TableView passingToTableView(TichuState.Passing passing,
+                                                Map<Team, Integer> matchScores,
+                                                int roundNumber) {
+        Map<Integer, Integer> handCounts = new HashMap<>();
+        Map<Integer, TichuDeclaration> declarations = new HashMap<>();
+        for (PlayerState p : passing.players()) {
+            handCounts.put(p.seat(), p.handSize());
+            declarations.put(p.seat(), p.declaration());
+        }
+        List<Integer> submitted = passing.submitted().keySet().stream().sorted().toList();
+        return new TableView(
+                "PASSING",
+                0,
+                List.of(),
+                submitted,
+                -1,
+                handCounts,
+                null,
+                -1,
+                declarations,
+                liveTrickScores(passing.players()),
+                matchScores,
+                roundNumber,
+                List.of(),
+                null);
+    }
+
+    private static TableView playingToTableView(TichuState.Playing playing,
+                                                Map<Team, Integer> matchScores,
+                                                int roundNumber) {
         TrickState trick = playing.trick();
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
@@ -49,30 +121,25 @@ public final class TichuStateMapper {
             declarations.put(p.seat(), p.declaration());
         }
         return new TableView(
+                "PLAYING",
+                0,
+                List.of(),
+                List.of(),
                 trick.currentTurnSeat(),
                 handCounts,
                 trick.currentTop(),
                 trick.currentTopSeat(),
                 declarations,
                 liveTrickScores(playing.players()),
+                matchScores,
+                roundNumber,
                 finishingOrder(playing.players()),
                 trick.hasActiveWish() ? trick.activeWish().rank() : null);
     }
 
-    private static TableView passingToTableView(TichuState.Passing passing) {
-        Map<Integer, Integer> handCounts = new HashMap<>();
-        Map<Integer, TichuDeclaration> declarations = new HashMap<>();
-        for (PlayerState p : passing.players()) {
-            handCounts.put(p.seat(), p.handSize());
-            declarations.put(p.seat(), p.declaration());
-        }
-        return new TableView(
-                -1, handCounts, null, -1, declarations,
-                liveTrickScores(passing.players()),
-                List.of(), null);
-    }
-
-    private static TableView roundEndToTableView(TichuState.RoundEnd r) {
+    private static TableView roundEndToTableView(TichuState.RoundEnd r,
+                                                 Map<Team, Integer> matchScores,
+                                                 int roundNumber) {
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
         for (PlayerState p : r.players()) {
@@ -83,8 +150,20 @@ public final class TichuStateMapper {
         scores.put(Team.A, r.teamAScore());
         scores.put(Team.B, r.teamBScore());
         return new TableView(
-                -1, handCounts, null, -1, declarations,
-                scores, finishingOrder(r.players()), null);
+                "ROUND_END",
+                0,
+                List.of(),
+                List.of(),
+                -1,
+                handCounts,
+                null,
+                -1,
+                declarations,
+                scores,
+                matchScores,
+                roundNumber,
+                finishingOrder(r.players()),
+                null);
     }
 
     private static Map<Team, Integer> liveTrickScores(List<PlayerState> players) {

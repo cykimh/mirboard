@@ -12,13 +12,18 @@ import com.mirboard.domain.game.tichu.hand.Hand;
 import com.mirboard.domain.game.tichu.hand.HandDetector;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
 import com.mirboard.domain.game.tichu.scoring.ScoreCalculator;
+import com.mirboard.domain.game.tichu.state.PassCardsSelection;
 import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuDeclaration;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TrickState;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 티츄 라운드의 상태 전이를 담당하는 엔진. 외부에서는 {@link #apply(TichuState, int,
@@ -47,11 +52,153 @@ public final class TichuEngine implements GameEngine {
             case TichuAction.PassTrick __ -> applyPassTrick(state, seat);
             case TichuAction.DeclareTichu __ -> applyDeclareTichu(state, seat);
             case TichuAction.DeclareGrandTichu __ -> applyDeclareGrandTichu(state, seat);
+            case TichuAction.Ready __ -> applyReady(state, seat);
+            case TichuAction.PassCards pc -> applyPassCards(state, seat, pc);
             case TichuAction.MakeWish w -> applyMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> applyGiveDragonTrick(state, seat, g);
-            case TichuAction.PassCards __ -> throw new UnsupportedOperationException(
-                    "PassCards belongs to the Passing phase — handled outside Playing state");
         };
+    }
+
+    // ---------- Dealing / Passing lifecycle ----------
+
+    private Result applyDeclareGrandTichu(TichuState state, int seat) {
+        // Validator 가 Dealing(8) 인지 확인. 선언 + ready 둘 다 표시 후 4명 ready 시 다음 단계.
+        TichuState.Dealing dealing = (TichuState.Dealing) state;
+        List<PlayerState> players = new ArrayList<>(dealing.players());
+        players.set(seat, players.get(seat).withDeclaration(TichuDeclaration.GRAND_TICHU));
+        Set<Integer> ready = new HashSet<>(dealing.ready());
+        ready.add(seat);
+
+        List<TichuEvent> events = new ArrayList<>();
+        events.add(new TichuEvent.TichuDeclared(seat, TichuDeclaration.GRAND_TICHU));
+        events.add(new TichuEvent.PlayerReady(seat));
+
+        return advanceFromDealing(
+                new TichuState.Dealing(players, dealing.phaseCardCount(), ready,
+                        dealing.reservedSecondHalf()),
+                events);
+    }
+
+    private Result applyDeclareTichu(TichuState state, int seat) {
+        // Dealing(14) 또는 Playing 둘 다 허용.
+        if (state instanceof TichuState.Dealing dealing) {
+            List<PlayerState> players = new ArrayList<>(dealing.players());
+            players.set(seat, players.get(seat).withDeclaration(TichuDeclaration.TICHU));
+            Set<Integer> ready = new HashSet<>(dealing.ready());
+            ready.add(seat);
+
+            List<TichuEvent> events = new ArrayList<>();
+            events.add(new TichuEvent.TichuDeclared(seat, TichuDeclaration.TICHU));
+            events.add(new TichuEvent.PlayerReady(seat));
+            return advanceFromDealing(
+                    new TichuState.Dealing(players, dealing.phaseCardCount(), ready,
+                            dealing.reservedSecondHalf()),
+                    events);
+        }
+        // Playing: 첫 플레이 전까지 (handSize==14) 만 허용 — Validator 가 확인.
+        TichuState.Playing playing = (TichuState.Playing) state;
+        List<PlayerState> players = new ArrayList<>(playing.players());
+        players.set(seat, players.get(seat).withDeclaration(TichuDeclaration.TICHU));
+        TichuState newState = new TichuState.Playing(players, playing.trick(), playing.firstFinisher());
+        return new Result(newState, List.of(new TichuEvent.TichuDeclared(seat, TichuDeclaration.TICHU)));
+    }
+
+    private Result applyReady(TichuState state, int seat) {
+        TichuState.Dealing dealing = (TichuState.Dealing) state;
+        Set<Integer> ready = new HashSet<>(dealing.ready());
+        ready.add(seat);
+
+        List<TichuEvent> events = new ArrayList<>();
+        events.add(new TichuEvent.PlayerReady(seat));
+
+        return advanceFromDealing(
+                new TichuState.Dealing(dealing.players(), dealing.phaseCardCount(), ready,
+                        dealing.reservedSecondHalf()),
+                events);
+    }
+
+    private Result advanceFromDealing(TichuState.Dealing dealing, List<TichuEvent> events) {
+        if (dealing.ready().size() < TurnManager.SEATS) {
+            return new Result(dealing, events);
+        }
+        // All 4 ready in this phase.
+        if (dealing.phaseCardCount() == 8) {
+            // 14장 단계로 전이 — 각자 reservedSecondHalf 를 hand 에 합친다.
+            List<PlayerState> updatedPlayers = new ArrayList<>(TurnManager.SEATS);
+            for (PlayerState p : dealing.players()) {
+                List<Card> reserved = dealing.reservedSecondHalf()
+                        .getOrDefault(p.seat(), List.of());
+                List<Card> merged = new ArrayList<>(p.hand());
+                merged.addAll(reserved);
+                updatedPlayers.add(p.withHand(merged));
+            }
+            TichuState.Dealing next = new TichuState.Dealing(
+                    updatedPlayers, 14, Set.of(), Map.of());
+            events.add(new TichuEvent.DealingPhaseStarted(14));
+            for (PlayerState p : updatedPlayers) {
+                events.add(new TichuEvent.HandDealt(p.seat(), p.hand(), 14));
+            }
+            return new Result(next, events);
+        }
+        // phaseCardCount==14 → Passing 단계.
+        TichuState.Passing passing = new TichuState.Passing(dealing.players(), Map.of());
+        events.add(new TichuEvent.PassingStarted());
+        return new Result(passing, events);
+    }
+
+    private Result applyPassCards(TichuState state, int seat, TichuAction.PassCards action) {
+        TichuState.Passing passing = (TichuState.Passing) state;
+        Map<Integer, PassCardsSelection> submitted = new LinkedHashMap<>(passing.submitted());
+        submitted.put(seat, new PassCardsSelection(
+                action.toLeft(), action.toPartner(), action.toRight()));
+
+        List<TichuEvent> events = new ArrayList<>();
+        events.add(new TichuEvent.PassingSubmitted(seat));
+
+        if (submitted.size() < TurnManager.SEATS) {
+            return new Result(new TichuState.Passing(passing.players(), submitted), events);
+        }
+        // 4명 모두 제출 — 동시 스왑 후 Playing 으로 전이.
+        return swapAndStartPlaying(passing.players(), submitted, events);
+    }
+
+    private Result swapAndStartPlaying(List<PlayerState> currentPlayers,
+                                       Map<Integer, PassCardsSelection> submitted,
+                                       List<TichuEvent> events) {
+        List<PlayerState> updatedPlayers = new ArrayList<>(TurnManager.SEATS);
+        for (int r = 0; r < TurnManager.SEATS; r++) {
+            PlayerState p = currentPlayers.get(r);
+            PassCardsSelection mine = submitted.get(r);
+            List<Card> newHand = new ArrayList<>(p.hand());
+            // 보낸 3장 제거.
+            newHand.remove(mine.toLeft());
+            newHand.remove(mine.toPartner());
+            newHand.remove(mine.toRight());
+            // 받은 3장 추가: (R+3)%4 의 toLeft, (R+2)%4 의 toPartner, (R+1)%4 의 toRight.
+            newHand.add(submitted.get((r + 3) % TurnManager.SEATS).toLeft());
+            newHand.add(submitted.get((r + 2) % TurnManager.SEATS).toPartner());
+            newHand.add(submitted.get((r + 1) % TurnManager.SEATS).toRight());
+            updatedPlayers.add(p.withHand(newHand));
+        }
+        events.add(new TichuEvent.CardsPassed());
+        for (PlayerState p : updatedPlayers) {
+            events.add(new TichuEvent.HandDealt(p.seat(), p.hand(), 14));
+        }
+        int leadSeat = mahjongHolder(updatedPlayers);
+        TichuState.Playing playing = new TichuState.Playing(
+                updatedPlayers, TrickState.lead(leadSeat, null), -1);
+        events.add(new TichuEvent.PlayingStarted(leadSeat));
+        events.add(new TichuEvent.TurnChanged(leadSeat));
+        return new Result(playing, events);
+    }
+
+    private static int mahjongHolder(List<PlayerState> players) {
+        for (PlayerState p : players) {
+            if (p.hand().stream().anyMatch(c -> c.is(Special.MAHJONG))) {
+                return p.seat();
+            }
+        }
+        throw new IllegalStateException("Mahjong not found in any post-swap hand");
     }
 
     // ---------- PlayCard ----------
@@ -146,7 +293,7 @@ public final class TichuEngine implements GameEngine {
         List<TichuEvent> events = new ArrayList<>();
         events.add(new TichuEvent.Passed(seat));
 
-        var passed = new java.util.HashSet<>(trick.passedSeats());
+        var passed = new HashSet<>(trick.passedSeats());
         passed.add(seat);
 
         TrickState pending = new TrickState(
@@ -173,25 +320,6 @@ public final class TichuEngine implements GameEngine {
         return new Result(
                 new TichuState.Playing(playing.players(), finalTrick, playing.firstFinisher()),
                 events);
-    }
-
-    // ---------- Declarations ----------
-
-    private Result applyDeclareTichu(TichuState state, int seat) {
-        return applyDeclaration(state, seat, TichuDeclaration.TICHU);
-    }
-
-    private Result applyDeclareGrandTichu(TichuState state, int seat) {
-        return applyDeclaration(state, seat, TichuDeclaration.GRAND_TICHU);
-    }
-
-    private Result applyDeclaration(TichuState state, int seat, TichuDeclaration kind) {
-        TichuState.Playing playing = (TichuState.Playing) state;
-        List<PlayerState> players = new ArrayList<>(playing.players());
-        players.set(seat, players.get(seat).withDeclaration(kind));
-        TichuState newState = new TichuState.Playing(
-                players, playing.trick(), playing.firstFinisher());
-        return new Result(newState, List.of(new TichuEvent.TichuDeclared(seat, kind)));
     }
 
     // ---------- Wish ----------

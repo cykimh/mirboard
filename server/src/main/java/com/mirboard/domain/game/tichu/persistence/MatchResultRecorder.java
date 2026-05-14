@@ -2,13 +2,13 @@ package com.mirboard.domain.game.tichu.persistence;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mirboard.domain.game.tichu.event.TichuRoundCompleted;
-import com.mirboard.domain.game.tichu.scoring.RoundScore;
+import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -16,9 +16,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * `TichuRoundCompleted` ApplicationEvent 를 받아 매치 결과를 영속화 + 유저 전적
- * 증분한다. 라운드 점수 자체는 RoundScore 가 결정한 winning team 기준 — 동점은
- * 양 팀 모두 패배(현실에서는 드물지만 데이터 일관성 보호).
+ * 한 매치(여러 라운드 합산) 가 종료되면 {@link TichuMatchCompleted} 를 받아
+ * {@code tichu_match_results} + {@code tichu_match_participants} 에 1행씩 적재하고
+ * 각 유저의 {@code win_count}/{@code lose_count} 를 증분. 라운드별 점수는 payload_json
+ * 의 roundScores 배열로 같이 저장.
  */
 @Component
 public class MatchResultRecorder {
@@ -45,33 +46,33 @@ public class MatchResultRecorder {
 
     @EventListener
     @Transactional
-    public void onRoundCompleted(TichuRoundCompleted event) {
-        RoundScore score = event.score();
+    public void onMatchCompleted(TichuMatchCompleted event) {
         String payloadJson;
         try {
-            payloadJson = objectMapper.writeValueAsString(score);
+            payloadJson = objectMapper.writeValueAsString(Map.of(
+                    "cumulativeA", event.cumulativeTeamAScore(),
+                    "cumulativeB", event.cumulativeTeamBScore(),
+                    "winningTeam", event.winningTeam().name(),
+                    "roundScores", event.roundScores()));
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize RoundScore", e);
+            throw new IllegalStateException("Failed to serialize match payload", e);
         }
 
         TichuMatchResult result = matchRepo.save(new TichuMatchResult(
                 event.roomId(),
                 Instant.now(clock),
-                score.teamAScore(),
-                score.teamBScore(),
+                event.cumulativeTeamAScore(),
+                event.cumulativeTeamBScore(),
                 payloadJson));
 
-        Team winner = winnerOf(score);
+        Team winner = event.winningTeam();
         List<Long> playerIds = event.playerIds();
         for (int seat = 0; seat < playerIds.size(); seat++) {
             long userId = playerIds.get(seat);
             Team team = Team.ofSeat(seat);
-            boolean isWin = winner != null && team == winner;
+            boolean isWin = team == winner;
             participantRepo.save(new TichuMatchParticipant(
                     result.getId(), userId, team.name(), isWin));
-            if (winner == null) {
-                continue; // tie — neither increments
-            }
             if (isWin) {
                 userRepo.incrementWinCount(userId);
             } else {
@@ -79,13 +80,9 @@ public class MatchResultRecorder {
             }
         }
 
-        log.info("Match recorded: room={}, winner={}, A={}/B={}",
-                event.roomId(), winner, score.teamAScore(), score.teamBScore());
-    }
-
-    private static Team winnerOf(RoundScore score) {
-        if (score.teamAScore() > score.teamBScore()) return Team.A;
-        if (score.teamBScore() > score.teamAScore()) return Team.B;
-        return null;  // tie
+        log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}",
+                event.roomId(), winner,
+                event.cumulativeTeamAScore(), event.cumulativeTeamBScore(),
+                event.roundScores().size());
     }
 }

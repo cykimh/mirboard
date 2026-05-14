@@ -29,13 +29,21 @@ export interface Hand {
 
 export type TichuDeclaration = 'NONE' | 'TICHU' | 'GRAND_TICHU';
 
+export type GamePhase = 'DEALING' | 'PASSING' | 'PLAYING' | 'ROUND_END';
+
 export interface TableView {
+  phase: GamePhase;
+  dealingCardCount: number;
+  readySeats: number[];
+  passingSubmittedSeats: number[];
   currentTurnSeat: number;
   handCounts: Record<string, number>;
   currentTop: Hand | null;
   currentTopSeat: number;
   declarations: Record<string, TichuDeclaration>;
   roundScores: { A?: number; B?: number };
+  matchScores: { A?: number; B?: number };
+  roundNumber: number;
   finishingOrder: number[];
   activeWishRank: number | null;
 }
@@ -50,6 +58,8 @@ export type TichuActionType =
   | 'PASS_TRICK'
   | 'DECLARE_TICHU'
   | 'DECLARE_GRAND_TICHU'
+  | 'READY'
+  | 'PASS_CARDS'
   | 'MAKE_WISH'
   | 'GIVE_DRAGON_TRICK';
 

@@ -2,6 +2,8 @@ package com.mirboard.domain.game.tichu.action;
 
 public enum RejectionReason {
     NOT_IN_PLAYING_PHASE,
+    NOT_IN_DEALING_PHASE,
+    NOT_IN_PASSING_PHASE,
     NOT_YOUR_TURN,
     CARDS_NOT_OWNED,
     EMPTY_CARDS,
@@ -16,6 +18,8 @@ public enum RejectionReason {
     TICHU_DECLARATION_TOO_LATE,
     GRAND_TICHU_DECLARATION_WRONG_PHASE,
     DUPLICATE_DECLARATION,
+    ALREADY_READY,
+    ALREADY_PASSED,
     INVALID_WISH_RANK,
     WISH_OUT_OF_CONTEXT,
     INVALID_STATE_FOR_ACTION

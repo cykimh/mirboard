@@ -1,7 +1,6 @@
 plugins {
     java
     id("org.springframework.boot") version "4.0.1"
-    id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.mirboard"
@@ -14,6 +13,11 @@ java {
 }
 
 dependencies {
+    // Spring Boot 4.0 BOM — Gradle 9.x 에서는 io.spring.dependency-management plugin
+    // 대신 platform() 으로 BOM 을 직접 import 하는 게 호환성이 더 안전.
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.0.1"))
+    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:4.0.1"))
+
     // Web / WebSocket
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-websocket")

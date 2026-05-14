@@ -14,6 +14,7 @@ import java.util.List;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = TichuAction.DeclareGrandTichu.class, name = "DECLARE_GRAND_TICHU"),
         @JsonSubTypes.Type(value = TichuAction.DeclareTichu.class, name = "DECLARE_TICHU"),
+        @JsonSubTypes.Type(value = TichuAction.Ready.class, name = "READY"),
         @JsonSubTypes.Type(value = TichuAction.PassCards.class, name = "PASS_CARDS"),
         @JsonSubTypes.Type(value = TichuAction.PlayCard.class, name = "PLAY_CARD"),
         @JsonSubTypes.Type(value = TichuAction.PassTrick.class, name = "PASS_TRICK"),
@@ -23,18 +24,27 @@ import java.util.List;
 public sealed interface TichuAction extends GameAction
         permits TichuAction.DeclareGrandTichu,
                 TichuAction.DeclareTichu,
+                TichuAction.Ready,
                 TichuAction.PassCards,
                 TichuAction.PlayCard,
                 TichuAction.PassTrick,
                 TichuAction.MakeWish,
                 TichuAction.GiveDragonTrick {
 
-    /** 첫 8장 단계에서 한 번만 선언 가능 (성공/실패 ±200). */
+    /** 첫 8장 단계에서 한 번만 선언 가능 (성공/실패 ±200). Dealing 의 ready 도 함께 표시. */
     record DeclareGrandTichu() implements TichuAction {
     }
 
-    /** 첫 카드를 내기 전까지 선언 가능 (성공/실패 ±100). */
+    /** 14장 단계 또는 Playing 첫 플레이 전까지 선언 가능 (성공/실패 ±100). */
     record DeclareTichu() implements TichuAction {
+    }
+
+    /**
+     * Dealing 단계에서 "선언하지 않고 다음 단계로 가자" 시그널. 본 액션은 선언을 기록
+     * 하지 않고 단순히 해당 좌석을 ready 로 표시. 4명 ready 가 되면 엔진이 다음
+     * 단계 (Dealing(8)→Dealing(14) 또는 Dealing(14)→Passing) 로 전이시킨다.
+     */
+    record Ready() implements TichuAction {
     }
 
     /** 14장 분배 후 좌/파트너/우 각 1장 패스. */

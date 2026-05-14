@@ -298,9 +298,143 @@ a {
   border-radius: 8px;
   padding: 12px;
   background: #2a2a16;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.round-ended button {
+  align-self: flex-start;
+}
+
+.match-ended {
+  border: 1px solid #ff7043;
+  border-radius: 10px;
+  padding: 16px;
+  background: linear-gradient(135deg, #3a1f14, #2a1410);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-ended h3 {
+  margin: 0;
+  color: #ffd180;
 }
 
 .hint {
   font-size: 0.85rem;
   opacity: 0.7;
 }
+
+/* --- Phase 5b: 패스 픽커 --- */
+.pass-picker {
+  border: 1px solid #5b8def;
+  border-radius: 8px;
+  padding: 12px;
+  background: #16203a;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pass-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pass-slot {
+  background: #1c2540;
+  border: 1px dashed #4a5a85;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.pass-slot.active {
+  border-color: #ffc107;
+  border-style: solid;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
+}
+
+.pass-slot .slot-label {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.pass-slot .slot-empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* --- Phase 5b: 좌석 상태 태그 --- */
+.seat.ready {
+  border-color: #66bb6a;
+}
+
+.seat.submitted {
+  border-color: #5b8def;
+}
+
+.status-tag {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #2a3a2a;
+  color: #c8e6c9;
+}
+
+.seat.submitted .status-tag {
+  background: #1a2a3a;
+  color: #b3d4fc;
+}
+
+/* --- Phase 5e: 손패 툴바 + 드래그 --- */
+.hand-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.hand-toolbar h3 {
+  margin: 0;
+}
+
+.hand-sort-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.hand-sort-actions button {
+  font-size: 0.85rem;
+  padding: 4px 10px;
+}
+
+/* dnd-kit 드래그 시 카드 시각 효과 */
+.card-chip {
+  user-select: none;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.card-chip:hover:not(:disabled) {
+  background: #36363f;
+}
+
+.card-chip.selected {
+  background: #3a4a3a;
+  transform: translateY(-6px);
+  border-color: #8bc34a;
+}
+
+/* dnd-kit dragOverlay 가 아닌 inline transform 처리 — SortableCard div 가 적용 */

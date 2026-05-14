@@ -528,9 +528,9 @@ public void onAction(@DestinationVariable String roomId,
 | 청크 | 내용 | 상태 |
 | --- | --- | --- |
 | 5a | 매치 결과 영속화 + win/lose 카운트 + 방 FINISHED 전이 | ✅ 완료 |
-| 5b | (예정) Dealing/Passing 프리뤼드 (Grand Tichu, Tichu, 카드 패스) | 대기 |
-| 5c | (예정) 멀티 라운드 누적 점수 + 1000점 매치 종료 | 대기 |
-| 5d | (예정) 라이브 patch (seq 기반 부분 갱신, /resync polling 축소) | 대기 |
-| 5e | (예정) UI polish + @dnd-kit 손패 정렬 + i18n | 대기 |
+| 5b | Dealing/Passing 프리뤼드 (Grand Tichu, Tichu, 카드 패스) | ✅ 완료 |
+| 5c | 멀티 라운드 누적 점수 + 1000점 매치 종료 | ✅ 완료 |
+| 5d | 라이브 patch (seq 기반 부분 갱신, /resync polling 축소) | ✅ 완료 |
+| 5e | UI polish + @dnd-kit 손패 정렬 + i18n 베이스 | ✅ 완료 |
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

@@ -51,16 +51,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 기술 스택 결정사항
 
-| 영역 | 결정 |
-| --- | --- |
-| JDK | **Java 25 (LTS)** — Virtual Threads 기본 활성화 (`spring.threads.virtual.enabled=true`) |
-| Backend | **Spring Boot 4.0.1** (Jakarta EE 11 / Spring Framework 7). `javax.*` 금지, `jakarta.*` 만 사용 |
-| Build | Gradle 8.10+, Kotlin DSL |
-| Auth | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수 |
-| Migration | **Flyway** — JPA `ddl-auto` 사용 금지 |
-| Frontend | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand + React Query |
-| Data | MySQL 8 (영속), Redis 7 (실시간 세션/방 상태) |
-| Test | JUnit 5 + Mockito + Testcontainers / Vitest + RTL |
+| 영역        | 결정                                                                                         |
+|-----------|--------------------------------------------------------------------------------------------|
+| JDK       | **Java 25 (LTS)** — Virtual Threads 기본 활성화 (`spring.threads.virtual.enabled=true`)         |
+| Backend   | **Spring Boot 4.0.1** (Jakarta EE 11 / Spring Framework 7). `javax.*` 금지, `jakarta.*` 만 사용 |
+| Build     | Gradle 8.10+, Kotlin DSL                                                                   |
+| Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
+| Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand + React Query |
+| Data      | MySQL 8 (영속), Redis 7 (실시간 세션/방 상태)                                                        |
+| Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
 ### Java 25 / Spring Boot 4.0 활용 패턴
 - `HandType`, `GameAction`, `GameEvent` 는 **sealed interface** 로 정의 → `switch` 표현식 패턴 매칭으로 누락 케이스를 컴파일러가 강제 검출.
@@ -115,6 +115,8 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.action.*"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.scoring.*"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarterIT"
 ./gradlew :server:test --tests "com.mirboard.infra.ws.GameStompControllerIntegrationTest"
 ./gradlew :server:test --tests "com.mirboard.infra.rest.rooms.RoomResyncIntegrationTest"

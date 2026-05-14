@@ -7,8 +7,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.game.tichu.card.Card;
 import com.mirboard.domain.game.tichu.card.Special;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TichuState;
+import com.mirboard.domain.game.tichu.state.TrickState;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
@@ -87,8 +90,12 @@ class GameStompControllerIntegrationTest {
         joinRoom(tokens.get("ws_charlie"), roomId);
         joinRoom(tokens.get("ws_dave"), roomId);
 
-        TichuState state = stateStore.load(roomId).orElseThrow();
-        var playing = (TichuState.Playing) state;
+        // Phase 5b: 라운드 시작 시 Dealing(8) 로 진입 — STOMP 라우팅 테스트만 검증하므로
+        // 곧바로 Playing 상태로 덮어쓴다 (덱은 Dealing 의 hand+reserved 를 합쳐 Mahjong
+        // 보유자가 리드하도록 구성).
+        TichuState dealing = stateStore.load(roomId).orElseThrow();
+        TichuState.Playing playing = forcePlayingFromDealing((TichuState.Dealing) dealing);
+        stateStore.save(roomId, playing);
         int leadSeat = playing.trick().leadSeat();
 
         // Map seat → userId via Room.playerIds (alice/bob/charlie/dave joined in order).
@@ -223,5 +230,24 @@ class GameStompControllerIntegrationTest {
                 .map(e -> tokens.get(e.getKey()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /** Dealing(8) 상태에서 reserved 까지 hand 로 합친 Playing 상태를 합성한다 (테스트 셋업용). */
+    private static TichuState.Playing forcePlayingFromDealing(TichuState.Dealing dealing) {
+        List<PlayerState> players = new ArrayList<>();
+        int leadSeat = -1;
+        for (PlayerState p : dealing.players()) {
+            List<Card> fullHand = new ArrayList<>(p.hand());
+            fullHand.addAll(dealing.reservedSecondHalf()
+                    .getOrDefault(p.seat(), List.of()));
+            players.add(p.withHand(fullHand));
+            if (fullHand.stream().anyMatch(c -> c.is(Special.MAHJONG))) {
+                leadSeat = p.seat();
+            }
+        }
+        if (leadSeat < 0) {
+            throw new IllegalStateException("Mahjong not found in dealt hands");
+        }
+        return new TichuState.Playing(players, TrickState.lead(leadSeat, null), -1);
     }
 }
