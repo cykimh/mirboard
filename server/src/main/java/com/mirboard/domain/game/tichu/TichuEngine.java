@@ -243,10 +243,11 @@ public final class TichuEngine implements GameEngine {
         // Wish fulfillment (engine-level — validator's conservative check ensures the
         // wished rank is present if held; here we just flag the wish as fulfilled when
         // the wished rank appears in the play).
-        Wish updatedWish = trick.activeWish();
-        if (updatedWish != null && updatedWish.isActive()
-                && action.cards().stream().anyMatch(c -> c.isNormal() && c.rank() == updatedWish.rank())) {
-            updatedWish = updatedWish.fulfill();
+        Wish wishBefore = trick.activeWish();
+        Wish updatedWish = wishBefore;
+        if (wishBefore != null && wishBefore.isActive()
+                && action.cards().stream().anyMatch(c -> c.isNormal() && c.rank() == wishBefore.rank())) {
+            updatedWish = wishBefore.fulfill();
         }
 
         List<Card> newAccumulated = new ArrayList<>(trick.accumulatedCards());

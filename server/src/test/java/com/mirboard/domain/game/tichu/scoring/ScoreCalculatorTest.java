@@ -43,14 +43,14 @@ class ScoreCalculatorTest {
         var p0 = finishedAt(0, 1, List.of()); // Team A 1st, no tricks
         var p1 = finishedAt(1, 2, List.of()); // Team B
         var p2 = finishedAt(2, 3, List.of()); // Team A
-        // loser has 50 trick points → first finisher (seat 0, Team A) gets them
+        // loser has 5+5+10+10+10 = 40 trick points → first finisher (seat 0, Team A) gets them
         var p3 = stillPlaying(3,
                 List.of(),
                 List.of(n(Suit.JADE, 5), n(Suit.SWORD, 5), n(Suit.JADE, 10), n(Suit.SWORD, 10), n(Suit.STAR, 10)));
 
         var score = ScoreCalculator.compute(List.of(p0, p1, p2, p3));
 
-        assertThat(score.teamAScore()).isEqualTo(50);  // all loser tricks → seat 0's team
+        assertThat(score.teamAScore()).isEqualTo(40);  // all loser tricks → seat 0's team
         assertThat(score.teamBScore()).isZero();
     }
 

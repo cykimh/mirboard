@@ -120,10 +120,11 @@ class GameStompControllerIntegrationTest {
         Card mahjong = Card.mahjong();
         Map<String, Object> action = new HashMap<>();
         action.put("@action", "PLAY_CARD");
-        action.put("cards", List.of(Map.of(
-                "suit", null,
-                "rank", mahjong.rank(),
-                "special", Special.MAHJONG.name())));
+        Map<String, Object> cardJson = new HashMap<>();
+        cardJson.put("suit", null);
+        cardJson.put("rank", mahjong.rank());
+        cardJson.put("special", Special.MAHJONG.name());
+        action.put("cards", List.of(cardJson));
         leaderSession.send("/app/room/" + roomId + "/action", action);
 
         // Expect a Played event broadcast.

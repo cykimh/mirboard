@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.tichu.state;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mirboard.domain.game.tichu.card.Card;
 import java.util.List;
 
@@ -28,14 +29,17 @@ public record PlayerState(
         return new PlayerState(seat, hand, TichuDeclaration.NONE, -1, List.of());
     }
 
+    @JsonIgnore
     public boolean isFinished() {
         return finishedOrder > 0;
     }
 
+    @JsonIgnore
     public int handSize() {
         return hand.size();
     }
 
+    @JsonIgnore
     public Team team() {
         return Team.ofSeat(seat);
     }

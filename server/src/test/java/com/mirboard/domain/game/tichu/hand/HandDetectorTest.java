@@ -48,8 +48,13 @@ class HandDetectorTest {
         }
 
         @Test
-        void phoenix_alone_unsupported_in_phase_3b() {
-            assertThat(HandDetector.detect(List.of(Card.phoenix()))).isEmpty();
+        void phoenix_alone_is_single_with_placeholder_rank_after_phase_3c() {
+            // Phase 3c 이후 Phoenix 단독 플레이가 지원됨 — 트릭 컨텍스트에서 정규화.
+            assertThat(HandDetector.detect(List.of(Card.phoenix())))
+                    .hasValueSatisfying(h -> {
+                        assertThat(h.type()).isEqualTo(HandType.SINGLE);
+                        assertThat(h.phoenixSingle()).isTrue();
+                    });
         }
 
         @Test
@@ -135,8 +140,10 @@ class HandDetectorTest {
 
         @Test
         void with_mahjong_not_triple() {
+            // Mahjong 은 rank=1 고유로 일반 카드와 같은 랭크가 존재하지 않으므로
+            // Mahjong + 2 + 2 (가장 가까운 일반 랭크) 도 TRIPLE 이 안 됨.
             assertThat(HandDetector.detect(
-                    List.of(Card.mahjong(), n(Suit.JADE, 1), n(Suit.SWORD, 1))))
+                    List.of(Card.mahjong(), n(Suit.JADE, 2), n(Suit.SWORD, 2))))
                     .isEmpty();
         }
 

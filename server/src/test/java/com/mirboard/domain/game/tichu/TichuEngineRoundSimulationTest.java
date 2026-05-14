@@ -89,9 +89,9 @@ class TichuEngineRoundSimulationTest {
         state = play(engine, state, 0, n(Suit.JADE, 10));
         state = pass(engine, state, 1);
         state = play(engine, state, 2, n(Suit.STAR, 11));
-        state = pass(engine, state, 3);
+        // p2 (Team A) 가 마지막 카드를 내며 두 번째 finisher 가 되어 즉시 더블 빅토리 종료.
+        // p3 의 차례는 발생하지 않는다.
 
-        // Round should have ended (double victory).
         assertThat(state).isInstanceOf(TichuState.RoundEnd.class);
         var round = (TichuState.RoundEnd) state;
         assertThat(round.teamAScore()).isEqualTo(200);

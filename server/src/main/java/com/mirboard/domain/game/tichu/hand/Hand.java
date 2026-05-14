@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.tichu.hand;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mirboard.domain.game.tichu.card.Card;
 import java.util.List;
 
@@ -27,6 +28,7 @@ public record Hand(HandType type, List<Card> cards, int rank, int length, boolea
         this(type, cards, rank, length, false);
     }
 
+    @JsonIgnore
     public boolean isBomb() {
         return type.isBomb();
     }

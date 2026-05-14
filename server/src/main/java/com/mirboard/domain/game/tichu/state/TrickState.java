@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.tichu.state;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mirboard.domain.game.tichu.card.Wish;
 import com.mirboard.domain.game.tichu.hand.Hand;
 import java.util.List;
@@ -37,10 +38,12 @@ public record TrickState(
                 Set.of(), List.of(), List.of(), activeWish);
     }
 
+    @JsonIgnore
     public boolean isLead() {
         return currentTop == null;
     }
 
+    @JsonIgnore
     public boolean hasActiveWish() {
         return activeWish != null && activeWish.isActive();
     }

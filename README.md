@@ -85,35 +85,101 @@ docker compose --profile migrate run --rm flyway
 운영 자격증명은 `.env` 파일 또는 배포 시크릿으로만 주입. JWT 서명 키는
 `MIRBOARD_JWT_SECRET` 환경변수로 전달한다.
 
-## 서버 빌드 / 실행 (Phase 2a)
+## 로컬 환경 부트스트랩 (한 번만)
 
-처음 한 번 Gradle Wrapper 를 부트스트랩 (jar 가 바이너리라 리포에 포함되지 않음):
+> Phase 5e 까지 진행된 후 실제 macOS (Apple Silicon, Java 26 기본) 환경에서 검증된
+> 셋업입니다. Gradle wrapper (`gradlew`) 와 build.gradle.kts 는 이미 리포에 포함.
+
+### 1. JDK 25 LTS 설치
 
 ```bash
-# 옵션 A — 로컬에 Gradle 8.10+ 가 설치되어 있는 경우
-gradle wrapper --gradle-version 8.10.2
+brew install --cask corretto@25       # 또는 SDKMAN, foojay 등
+# 확인
+/usr/libexec/java_home -V             # corretto-25.0.3 가 보여야 함
+export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
+```
 
-# 옵션 B — Docker 만으로 부트스트랩
-docker run --rm -v "$PWD":/work -w /work gradle:8.10.2-jdk21 \
-  gradle wrapper --gradle-version 8.10.2
+### 2. 컨테이너 런타임 (Colima 권장)
+
+```bash
+brew install colima docker docker-compose
+mkdir -p ~/.docker && cat > ~/.docker/config.json <<'EOF'
+{
+  "cliPluginsExtraDirs": [
+    "/opt/homebrew/lib/docker/cli-plugins"
+  ]
+}
+EOF
+colima start --cpu 2 --memory 4 --disk 20
+docker version                         # Client + Server 둘 다 OK 출력
+```
+
+### 3. 인프라 + 마이그레이션
+
+```bash
+cd /path/to/mirboard
+docker compose up -d mysql redis       # MySQL 8 + Redis 7 기동
+docker compose --profile migrate run --rm flyway  # V1__init.sql 적용
+```
+
+### 4. 환경변수
+
+JWT 시크릿은 32바이트 이상 필요:
+
+```bash
+export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
+```
+
+### 5. (옵션) Gradle wrapper 재생성
+
+리포에 `gradlew` 가 이미 있지만 손상 시:
+
+```bash
+gradle wrapper --gradle-version 9.4.1   # 또는 기존 wrapper 사용
 ```
 
 JDK 25 가 로컬에 없으면 Gradle 의 foojay 리졸버가 자동으로 받아온다 (인터넷 필요).
 
-서버 기동 / 테스트:
+## 서버 빌드 / 실행
 
 ```bash
-# 의존 컨테이너가 떠 있어야 함
+# (필수) 인프라가 떠 있어야 함
 docker compose up -d mysql redis
 
-# 서버 기동
+# (필수) JWT 시크릿
+export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
+
+# 서버 기동 (port 8080, dev 환경)
 ./gradlew :server:bootRun
 
-# 단위 + 통합 테스트
+# 별도 터미널 — 클라이언트 dev (port 5173, /api & /ws 는 8080 으로 proxy)
+npm --prefix client install     # 처음 한 번
+npm --prefix client run dev
+```
+
+브라우저로 http://localhost:5173 접속 → 회원가입 → 4 탭 띄워서 4명 모이면 자동 시작.
+
+### 테스트
+
+```bash
+# 단위 테스트 (Docker 불필요, 빠름)
+./gradlew :server:test \
+  --tests "com.mirboard.domain.game.tichu.card.*" \
+  --tests "com.mirboard.domain.game.tichu.hand.*" \
+  --tests "com.mirboard.domain.game.tichu.scoring.*" \
+  --tests "com.mirboard.domain.game.tichu.action.*" \
+  --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest" \
+  --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
+  --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
+  --tests "com.mirboard.domain.lobby.auth.*"
+
+# 통합 테스트 (Testcontainers — Colima 사용 시 socket override 필요)
+export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
 ./gradlew :server:test
 
-# 특정 테스트만
-./gradlew :server:test --tests "com.mirboard.domain.lobby.auth.AuthServiceTest"
+# 클라이언트
+npm --prefix client run test
 ```
 
 **Phase 2a 동작 확인 포인트**

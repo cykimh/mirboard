@@ -9,6 +9,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -59,7 +60,12 @@ class AuthServiceTest {
     void register_persists_user_with_hashed_password() {
         given(userRepository.existsByUsername("alice_01")).willReturn(false);
         given(passwordEncoder.encode("validpass1")).willReturn("hashed");
-        given(userRepository.save(any(User.class))).willAnswer(inv -> inv.getArgument(0));
+        given(userRepository.save(any(User.class))).willAnswer(inv -> {
+            // DB 가 부여하는 PK 를 시뮬레이션 — 실제 환경에서는 @GeneratedValue.
+            User u = inv.getArgument(0);
+            setId(u, 42L);
+            return u;
+        });
 
         var result = service.register("alice_01", "validpass1");
 
@@ -74,12 +80,25 @@ class AuthServiceTest {
     @Test
     void authenticate_returns_principal_on_match() {
         var stored = User.create("bob", "stored-hash", CLOCK);
+        setId(stored, 7L);
         given(userRepository.findByUsername("bob")).willReturn(Optional.of(stored));
         given(passwordEncoder.matches("pw12345678", "stored-hash")).willReturn(true);
 
         var result = service.authenticate("bob", "pw12345678");
 
         assertThat(result.username()).isEqualTo("bob");
+        assertThat(result.userId()).isEqualTo(7L);
+    }
+
+    /** 테스트용 — @GeneratedValue 가 부여하는 PK 를 reflection 으로 시뮬레이션. */
+    private static void setId(User u, long id) {
+        try {
+            Field f = User.class.getDeclaredField("id");
+            f.setAccessible(true);
+            f.set(u, id);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

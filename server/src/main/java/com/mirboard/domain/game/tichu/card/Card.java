@@ -1,5 +1,8 @@
 package com.mirboard.domain.game.tichu.card;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
 
 /**
@@ -13,7 +16,12 @@ import java.util.Objects;
  *   <li>{@code PHOENIX = 0} — 와일드, 컨텍스트에 따라 별도 처리</li>
  *   <li>{@code DRAGON = 100} — 항상 최강 싱글</li>
  * </ul>
+ *
+ * <p>{@code isGetterVisibility=NONE}: {@code isSpecial()} / {@code isNormal()} 가
+ * record 컴포넌트 {@code special} 과 충돌하지 않도록 Jackson 의 is-getter 자동 발견을
+ * 끈다. 컴포넌트는 canonical accessor (suit/rank/special) 로만 직렬화된다.
  */
+@JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 public record Card(Suit suit, int rank, Special special) {
 
     public Card {
@@ -63,6 +71,7 @@ public record Card(Suit suit, int rank, Special special) {
     }
 
     /** 라운드 종료 시 트릭 점수 계산에 쓰이는 카드 자체 점수. */
+    @JsonIgnore
     public int points() {
         if (special == Special.DRAGON) return 25;
         if (special == Special.PHOENIX) return -25;

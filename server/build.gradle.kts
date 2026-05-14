@@ -22,6 +22,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // Spring Boot 4.0 에서 Jackson 의 ObjectMapper autoconfigure 도 별도 starter 로 분리됨.
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
 
     // Security + JWT
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -31,7 +33,8 @@ dependencies {
 
     // Persistence
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("org.flywaydb:flyway-core")
+    // Spring Boot 4.0 에서 Flyway autoconfigure 는 별도 starter 로 분리됨.
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
 
@@ -40,6 +43,9 @@ dependencies {
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // Spring Boot 4.0 에서 WebMVC test 슬라이스 (AutoConfigureMockMvc 등) 가
+    // starter-test 에서 빠지고 별도 starter (spring-boot-starter-webmvc-test) 로 분리됨.
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:junit-jupiter:1.20.4")

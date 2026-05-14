@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +39,7 @@ public class TichuRoundStarter {
     private final TichuMatchStateStore matchStateStore;
     private final SecureRandom random;
 
+    @Autowired
     public TichuRoundStarter(TichuGameStateStore stateStore,
                              TichuMatchStateStore matchStateStore) {
         this(stateStore, matchStateStore, new SecureRandom());

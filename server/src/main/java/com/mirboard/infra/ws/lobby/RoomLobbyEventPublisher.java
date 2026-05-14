@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class RoomLobbyEventPublisher {
 
-    static final String LOBBY_ROOMS_TOPIC = "/topic/lobby/rooms";
+    public static final String LOBBY_ROOMS_TOPIC = "/topic/lobby/rooms";
 
     private final SimpMessagingTemplate broker;
     private final Clock clock;
