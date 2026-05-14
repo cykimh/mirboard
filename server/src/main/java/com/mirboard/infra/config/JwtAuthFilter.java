@@ -3,6 +3,7 @@ package com.mirboard.infra.config;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.auth.InvalidCredentialsException;
 import com.mirboard.domain.lobby.auth.JwtService;
+import com.mirboard.infra.web.MdcKeys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,18 +32,21 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        AuthPrincipal authenticated = null;
         if (header != null && header.startsWith(BEARER_PREFIX)) {
             String token = header.substring(BEARER_PREFIX.length()).trim();
             try {
-                AuthPrincipal principal = jwtService.parse(token);
+                authenticated = jwtService.parse(token);
                 var authentication =
-                        new UsernamePasswordAuthenticationToken(principal, null, List.of());
+                        new UsernamePasswordAuthenticationToken(authenticated, null, List.of());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (InvalidCredentialsException ignored) {
-                // Invalid token → leave context unauthenticated, 401 handled by EntryPoint.
                 SecurityContextHolder.clearContext();
             }
         }
-        chain.doFilter(request, response);
+        try (var _ = MdcKeys.scope()
+                .userId(authenticated != null ? authenticated.userId() : null)) {
+            chain.doFilter(request, response);
+        }
     }
 }

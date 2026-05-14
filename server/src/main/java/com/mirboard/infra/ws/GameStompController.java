@@ -12,6 +12,7 @@ import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
+import com.mirboard.infra.web.MdcKeys;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -74,6 +75,12 @@ public class GameStompController {
                          @Payload TichuAction action,
                          Principal principal) {
         AuthPrincipal me = (AuthPrincipal) principal;
+        try (var _ = MdcKeys.scope().userId(me.userId()).roomId(roomId)) {
+            handleAction(roomId, action, me);
+        }
+    }
+
+    private void handleAction(String roomId, TichuAction action, AuthPrincipal me) {
         Room room;
         try {
             room = roomService.getRoom(roomId);

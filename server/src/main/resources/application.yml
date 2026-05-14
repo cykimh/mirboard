@@ -48,6 +48,9 @@ mirboard:
     issuer: mirboard
 
 logging:
+  pattern:
+    # MDC (userId / roomId / eventId) 를 로그 라인에 자동 부착. 비어있으면 "-" 표시.
+    console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} [user=%X{userId:--} room=%X{roomId:--} event=%X{eventId:--}] - %msg%n"
   level:
     root: INFO
     com.mirboard: DEBUG
