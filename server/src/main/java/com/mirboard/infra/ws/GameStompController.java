@@ -114,6 +114,9 @@ public class GameStompController {
             try {
                 result = engine.apply(state, seat, action);
             } catch (TichuActionRejectedException rejected) {
+                log.info("Action rejected: action={} reason={} message={}",
+                        action.getClass().getSimpleName(), rejected.reason(),
+                        rejected.getMessage());
                 broadcaster.sendErrorTo(me.userId(), roomId, rejected.reason().name(),
                         rejected.getMessage());
                 return;
@@ -161,6 +164,10 @@ public class GameStompController {
         TichuMatchState afterRound = matchState.withRoundCompleted(lastScore);
         matchStateStore.save(roomId, afterRound);
 
+        log.info("Round completed: round={} A={} B={} cumulativeA={} cumulativeB={}",
+                afterRound.roundNumber() - 1, lastScore.teamAScore(), lastScore.teamBScore(),
+                afterRound.cumulativeA(), afterRound.cumulativeB());
+
         if (afterRound.isMatchOver()) {
             outbound.add(new TichuEvent.MatchEnded(
                     afterRound.winningTeam(),
@@ -173,6 +180,9 @@ public class GameStompController {
                     afterRound.cumulativeB(),
                     afterRound.winningTeam(),
                     afterRound.roundScores()));
+            log.info("Match ended: winner={} rounds={} A={} B={}",
+                    afterRound.winningTeam(), afterRound.roundScores().size(),
+                    afterRound.cumulativeA(), afterRound.cumulativeB());
             try {
                 roomService.markFinished(roomId);
             } catch (RuntimeException e) {

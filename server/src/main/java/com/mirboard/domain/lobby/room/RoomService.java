@@ -8,11 +8,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RoomService {
+
+    private static final Logger log = LoggerFactory.getLogger(RoomService.class);
 
     private final RoomRepository repository;
     private final GameRegistry games;
@@ -39,6 +43,8 @@ public class RoomService {
         repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
+        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={}",
+                roomId, gameType, hostUserId, def.maxPlayers());
         return room;
     }
 
@@ -51,9 +57,13 @@ public class RoomService {
         repository.join(roomId, userId, now);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
+        log.info("Room join: roomId={} userId={} occupancy={}/{} status={}",
+                roomId, userId, room.playerIds().size(), room.capacity(), room.status());
         if (room.status() == RoomStatus.IN_GAME) {
             events.publishEvent(new com.mirboard.domain.game.core.GameStartingEvent(
                     room.roomId(), room.gameType(), room.playerIds()));
+            log.info("Game starting: roomId={} gameType={} players={}",
+                    roomId, room.gameType(), room.playerIds());
         }
         return room;
     }
@@ -64,12 +74,15 @@ public class RoomService {
         events.publishEvent(remaining
                 .map(RoomChangedEvent::updated)
                 .orElseGet(() -> RoomChangedEvent.destroyed(roomId)));
+        log.info("Room leave: roomId={} userId={} destroyed={}",
+                roomId, userId, remaining.isEmpty());
     }
 
     public void markFinished(String roomId) {
         repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
         repository.findById(roomId)
                 .ifPresent(room -> events.publishEvent(RoomChangedEvent.updated(room)));
+        log.info("Room finished: roomId={}", roomId);
     }
 
     public List<Room> listWaitingRooms(String gameTypeFilter) {
