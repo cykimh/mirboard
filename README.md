@@ -222,11 +222,43 @@ const client = new Client({
 client.activate();
 ```
 
+## 전체 시연 (End-to-End)
+
+```bash
+# 1) 인프라
+docker compose up -d mysql redis
+
+# 2) 백엔드 (Spring Boot 4.0.1, Java 25)
+./gradlew :server:bootRun
+# → http://localhost:8080
+
+# 3) 프론트엔드 (Vite, 새 터미널)
+npm --prefix client install   # 처음 한 번
+npm --prefix client run dev
+# → http://localhost:5173 — Vite 가 /api 와 /ws 를 8080 으로 proxy
+```
+
+브라우저 4개(또는 incognito 창 4개) 로:
+1. `/register` 에서 4명의 사용자 가입 (예: `p1` ~ `p4`).
+2. 각자 로그인 → `Game Hub` 에서 티츄 선택 → 로비 진입.
+3. p1 이 새 방 생성 → p2, p3, p4 가 입장.
+4. 4번째 입장 시 백엔드가 자동으로 `GameStartingEvent` → `TichuRoundStarter` 가 셔플 +
+   분배 + Redis 저장 → RoomPage 가 폴링으로 `IN_GAME` 감지 → `GameTable` 마운트 →
+   STOMP CONNECT + `/api/rooms/{id}/resync` → 본인 손패 수신.
+5. Mahjong 보유자가 첫 리드. 카드 클릭으로 선택 → "내기" → 다른 클라들이 자동 갱신.
+
+**재접속 시나리오**: 게임 중 한 명이 새로고침 / 탭 닫고 다시 열기 → 동일 토큰으로
+복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
+복원. 다른 플레이어 상태는 변하지 않음.
+
 ## 작업 흐름 (Phase Gate)
 
-1. **Phase 1 — 설계**: 본 문서 + `docs/*.md` + Flyway V1.
-2. **Phase 2 — 로비 모듈**: 회원가입/로그인/방 입장.
-3. **Phase 3 — 티츄 룰 엔진** (+ 단위 테스트 ≥ 90%).
-4. **Phase 4 — 실시간 통합 + 재접속 동기화**.
+1. **Phase 1 — 설계**: 본 문서 + `docs/*.md` + Flyway V1. ✅
+2. **Phase 2 — 로비 모듈**: 회원가입/로그인/방 입장. ✅
+3. **Phase 3 — 티츄 룰 엔진** (+ 단위 테스트 ≥ 90%). ✅
+4. **Phase 4 — 실시간 통합 + 재접속 동기화**. ✅
 
-각 Phase 종료 시 사용자 검토/승인 후 다음 Phase로 진입.
+각 Phase 종료 시 사용자 검토/승인 후 다음 Phase로 진입. 모든 Phase 완료 — 1게임
+End-to-End 시연 가능. 후속 작업 후보: Dealing/Passing 프리뤼드(Grand Tichu, 카드
+패스), 라운드 반복(여러 라운드 누적 점수), 대전 결과 영속 (`tichu_match_results`
+기록), dnd-kit 손패 드래그 정렬, UI 디자인 개선.

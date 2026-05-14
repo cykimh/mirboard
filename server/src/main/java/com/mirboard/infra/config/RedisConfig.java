@@ -24,6 +24,11 @@ public class RedisConfig {
         return scriptOf("lua/room_leave.lua");
     }
 
+    @Bean
+    public RedisScript<Long> roomFinishScript() {
+        return scriptOf("lua/room_finish.lua");
+    }
+
     private static RedisScript<Long> scriptOf(String classpath) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource(classpath));

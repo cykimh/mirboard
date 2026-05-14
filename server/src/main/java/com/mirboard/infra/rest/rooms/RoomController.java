@@ -1,6 +1,12 @@
 package com.mirboard.infra.rest.rooms;
 
+import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.game.tichu.state.PrivateHand;
+import com.mirboard.domain.game.tichu.state.TableView;
+import com.mirboard.domain.game.tichu.state.TichuStateMapper;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
+import com.mirboard.domain.lobby.room.NotInRoomException;
+import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
@@ -23,16 +29,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoomController {
 
     private final RoomService rooms;
+    private final TichuGameStateStore stateStore;
 
-    public RoomController(RoomService rooms) {
+    public RoomController(RoomService rooms, TichuGameStateStore stateStore) {
         this.rooms = rooms;
+        this.stateStore = stateStore;
     }
 
     @GetMapping
     public ListResponse list(@RequestParam(required = false) String gameType,
                              @RequestParam(required = false, defaultValue = "WAITING") RoomStatus status) {
-        // MVP: only WAITING rooms are enumerable (via rooms:open ZSET).
-        // IN_GAME/FINISHED enumeration would require Redis SCAN — out of scope.
         List<Room> result = status == RoomStatus.WAITING
                 ? rooms.listWaitingRooms(gameType)
                 : List.of();
@@ -64,9 +70,35 @@ public class RoomController {
         rooms.leaveRoom(roomId, me.userId());
     }
 
+    @GetMapping("/{roomId}/resync")
+    public ResyncResponse resync(@PathVariable String roomId,
+                                 @AuthenticationPrincipal AuthPrincipal me) {
+        Room room = rooms.getRoom(roomId);
+        int seat = room.playerIds().indexOf(me.userId());
+        if (seat < 0) {
+            throw new NotInRoomException(roomId);
+        }
+        var state = stateStore.load(roomId)
+                .orElseThrow(() -> new ResyncNotAvailableException(roomId));
+        return new ResyncResponse(
+                roomId,
+                TichuStateMapper.phaseName(state),
+                stateStore.currentSeq(roomId),
+                TichuStateMapper.toTableView(state),
+                TichuStateMapper.toPrivateHand(state, seat));
+    }
+
     public record CreateRequest(@NotBlank String name, @NotBlank String gameType) {
     }
 
     public record ListResponse(List<Room> rooms) {
+    }
+
+    public record ResyncResponse(
+            String roomId,
+            String phase,
+            long eventSeq,
+            TableView tableView,
+            PrivateHand privateHand) {
     }
 }

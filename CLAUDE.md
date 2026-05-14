@@ -110,11 +110,33 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.infra.rest.games.GameCatalogIntegrationTest"
 ./gradlew :server:test --tests "com.mirboard.infra.rest.rooms.RoomControllerIntegrationTest"
 ./gradlew :server:test --tests "com.mirboard.infra.ws.StompLobbyIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.card.*"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.hand.*"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.action.*"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.scoring.*"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarterIT"
+./gradlew :server:test --tests "com.mirboard.infra.ws.GameStompControllerIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.infra.rest.rooms.RoomResyncIntegrationTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.MatchResultRecorderIT"
 ```
 통합 테스트는 Docker 가 떠 있어야 함 (Testcontainers 가 MySQL 8 컨테이너를 띄움).
 
-### 클라이언트 (Phase 4 에서 사용 가능)
-아직 없음. Phase 4 진입 시 `npm --prefix client run dev` / `npm --prefix client run test` 추가 예정.
+### 클라이언트 (Phase 4d~ 사용 가능)
+```bash
+# 처음 한 번
+npm --prefix client install
+
+# 개발 서버 (Vite, 기본 포트 5173, /api 와 /ws 는 8080 으로 proxy)
+npm --prefix client run dev
+
+# 타입 체크 + 프로덕션 빌드
+npm --prefix client run build
+
+# 단위 테스트 (Vitest + jsdom)
+npm --prefix client run test
+npm --prefix client run test -- authStore   # 특정 테스트만
+```
 
 ## STOMP envelope 규약 (자주 참조됨)
 

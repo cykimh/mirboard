@@ -401,9 +401,9 @@ Phase 2 는 한 번에 모든 파일을 만들지 않고 **검토 가능한 5개
 | 3a | `card/` 패키지 — Suit/Special/Card record + Deck (SecureRandom + 시드 고정 테스트) | ✅ 완료 |
 | 3b | `hand/` 패키지 — HandType enum, HandDetector(Phoenix 미고려), HandComparator | ✅ 완료 |
 | 3c | Phoenix 와일드 + Mahjong 소원 + 특수카드 룰 (Wish, PlayContext) | ✅ 완료 |
-| 3d | `state/` + `action/` — TichuState sealed, TichuAction sealed, TurnManager, ActionValidator | 대기 |
-| 3e | `scoring/` — ScoreCalculator (트릭 점수, 1등 클리어, 더블 빅토리, 티츄 ±100/±200) | 대기 |
-| 3f | TichuEngine 통합 + `TichuGameDefinition.newEngine` 실구현 | 대기 |
+| 3d | `state/` + `action/` — TichuState sealed, TichuAction sealed, TurnManager, ActionValidator | ✅ 완료 |
+| 3e | `scoring/` — ScoreCalculator (트릭 점수, 1등 클리어, 더블 빅토리, 티츄 ±100/±200) | ✅ 완료 |
+| 3f | TichuEngine 통합 + `TichuGameDefinition.newEngine` 실구현 | ✅ 완료 |
 
 각 청크 끝에 변경 요약 + 다음 청크 진입 동의.
 
@@ -458,6 +458,17 @@ record Card(Suit suit, int rank /*2-14*/, Special special /* nullable */)
 
 ## Phase 4 — 통합 (WS + 클라이언트 + 재접속)
 
+### Phase 4 — 청크 분해 (review-able chunks)
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 4a | 게임 lifecycle: `GameStartingEvent`, `TichuGameStateStore`, `TichuRoundStarter`, RoomService 트리거 + IT | ✅ 완료 |
+| 4b | STOMP 게임 액션 핸들러 (`GameStompController`), 락 + 액션 디스패치, 공개/비공개 이벤트 발행 | ✅ 완료 |
+| 4c | TableView/PrivateHand 매퍼 + `/api/rooms/{id}/resync` 실구현 | ✅ 완료 |
+| 4d | 프론트엔드 스캐폴드: Vite + React + Auth + GameHub + Lobby 페이지 | ✅ 완료 |
+| 4e | 프론트엔드 GameTable + `useStompRoom` 훅 + 카드 클릭 선택 (dnd-kit 보류) | ✅ 완료 |
+| 4f | 재접속 동기화 + 1게임 시연 검증 (강제 종료 후 복원) | ✅ 완료 |
+
 ### 4.1 WebSocket 컨트롤러
 ```
 @MessageMapping("/room/{roomId}/action")
@@ -507,7 +518,19 @@ public void onAction(@DestinationVariable String roomId,
 ## 작업 순서 (사용자 승인 게이트)
 1. **Phase 1 설계 산출물** → 사용자 검토 → 승인 후 Phase 2. ✅
 2. **Phase 2 로비 모듈 + 통합테스트** → 사용자 검토 → 승인 후 Phase 3. ✅ (2a/2b/2c/2d/2e 모두 완료, 사용자 검증 대기)
-3. **Phase 3 티츄 코어 + 단위테스트 리포트** → 사용자 검토 → 승인 후 Phase 4.
-4. **Phase 4 통합 + 시연** → 최종 검증.
+3. **Phase 3 티츄 코어 + 단위테스트 리포트** → 사용자 검토 → 승인 후 Phase 4. ✅ (3a~3f 모두 완료, 사용자 검증 대기)
+4. **Phase 4 통합 + 시연** → 최종 검증. ✅ (4a~4f 모두 완료, README 시연 플로우 정리)
+
+---
+
+## Phase 5 — Post-MVP Follow-up
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 5a | 매치 결과 영속화 + win/lose 카운트 + 방 FINISHED 전이 | ✅ 완료 |
+| 5b | (예정) Dealing/Passing 프리뤼드 (Grand Tichu, Tichu, 카드 패스) | 대기 |
+| 5c | (예정) 멀티 라운드 누적 점수 + 1000점 매치 종료 | 대기 |
+| 5d | (예정) 라이브 patch (seq 기반 부분 갱신, /resync polling 축소) | 대기 |
+| 5e | (예정) UI polish + @dnd-kit 손패 정렬 + i18n | 대기 |
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

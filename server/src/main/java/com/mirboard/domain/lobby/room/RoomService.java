@@ -51,6 +51,10 @@ public class RoomService {
         repository.join(roomId, userId, now);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
+        if (room.status() == RoomStatus.IN_GAME) {
+            events.publishEvent(new com.mirboard.domain.game.core.GameStartingEvent(
+                    room.roomId(), room.gameType(), room.playerIds()));
+        }
         return room;
     }
 
@@ -60,6 +64,12 @@ public class RoomService {
         events.publishEvent(remaining
                 .map(RoomChangedEvent::updated)
                 .orElseGet(() -> RoomChangedEvent.destroyed(roomId)));
+    }
+
+    public void markFinished(String roomId) {
+        repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
+        repository.findById(roomId)
+                .ifPresent(room -> events.publishEvent(RoomChangedEvent.updated(room)));
     }
 
     public List<Room> listWaitingRooms(String gameTypeFilter) {

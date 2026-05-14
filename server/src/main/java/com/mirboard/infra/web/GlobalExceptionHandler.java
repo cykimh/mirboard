@@ -8,6 +8,7 @@ import com.mirboard.domain.lobby.auth.UsernameTakenException;
 import com.mirboard.domain.lobby.room.AlreadyInRoomException;
 import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.NotInRoomException;
+import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.RoomFullException;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import java.util.Map;
@@ -86,6 +87,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorEnvelope> handleGameAlreadyStarted(GameAlreadyStartedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorEnvelope.of("GAME_ALREADY_STARTED", "Game already started",
+                        Map.of("roomId", e.roomId())));
+    }
+
+    @ExceptionHandler(ResyncNotAvailableException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleResyncNotAvailable(ResyncNotAvailableException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorEnvelope.of("RESYNC_NOT_AVAILABLE",
+                        "No active game state to resync",
                         Map.of("roomId", e.roomId())));
     }
 

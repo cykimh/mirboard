@@ -43,7 +43,6 @@ public final class TichuGameDefinition implements GameDefinition {
 
     @Override
     public GameEngine newEngine(GameContext ctx) {
-        throw new UnsupportedOperationException(
-                "TichuEngine will be implemented in Phase 3 (current chunk only exposes metadata)");
+        return new TichuEngine(ctx);
     }
 }

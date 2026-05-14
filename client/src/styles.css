@@ -1,0 +1,306 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color-scheme: light dark;
+  background: #1a1a1f;
+  color: #f0f0f4;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+button {
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #2a2a32;
+  color: inherit;
+  font: inherit;
+}
+
+button:hover:not(:disabled) {
+  background: #3a3a44;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: #1a1a22;
+  color: inherit;
+  font: inherit;
+}
+
+a {
+  color: #8ab4f8;
+}
+
+.error {
+  color: #ef5350;
+  background: #2a1a1a;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.auth-page form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 360px;
+}
+
+.auth-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-page .hint {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.hub-page header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hub-page .user-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.game-card {
+  border: 1px solid #444;
+  border-radius: 10px;
+  padding: 16px;
+  background: #22222a;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-card.coming_soon {
+  opacity: 0.6;
+}
+
+.game-card .meta {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.play-button {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid #5a8;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  background: #2d4a3d;
+}
+
+.badge {
+  font-size: 0.75rem;
+  background: #444;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.lobby-page,
+.room-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lobby-page .rooms ul,
+.room-page ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-page .rooms li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #22222a;
+}
+
+.lobby-page .rooms .name {
+  flex: 1;
+}
+
+.lobby-page .create {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lobby-page .create input {
+  flex: 1;
+}
+
+.lobby-page .chat ul {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px;
+  background: #1c1c24;
+}
+
+.lobby-page .chat li {
+  display: flex;
+  gap: 8px;
+}
+
+.lobby-page .chat strong {
+  color: #8ab4f8;
+}
+
+.lobby-page .chat form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lobby-page .chat input {
+  flex: 1;
+}
+
+.game-table {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.game-table-header {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.table-seats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.seat {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px;
+  background: #22222a;
+  text-align: center;
+}
+
+.seat.turn {
+  border-color: #ffc107;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.4);
+}
+
+.seat.finished {
+  opacity: 0.5;
+}
+
+.seat-id {
+  font-family: monospace;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.declared {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #ffc107;
+}
+
+.trick {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  background: #1c1c24;
+}
+
+.hand-cards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 2px solid #555;
+  background: #2a2a32;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.card-chip.selected {
+  background: #3a4a3a;
+  transform: translateY(-4px);
+}
+
+.card-chip .rank {
+  font-weight: bold;
+}
+
+.my-hand {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  background: #22222a;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.round-ended {
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 12px;
+  background: #2a2a16;
+}
+
+.hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}

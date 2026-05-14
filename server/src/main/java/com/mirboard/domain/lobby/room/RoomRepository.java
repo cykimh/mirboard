@@ -20,16 +20,19 @@ public class RoomRepository {
     private final RedisScript<Long> createScript;
     private final RedisScript<Long> joinScript;
     private final RedisScript<Long> leaveScript;
+    private final RedisScript<Long> finishScript;
 
     public RoomRepository(
             StringRedisTemplate redis,
             @Qualifier("roomCreateScript") RedisScript<Long> createScript,
             @Qualifier("roomJoinScript") RedisScript<Long> joinScript,
-            @Qualifier("roomLeaveScript") RedisScript<Long> leaveScript) {
+            @Qualifier("roomLeaveScript") RedisScript<Long> leaveScript,
+            @Qualifier("roomFinishScript") RedisScript<Long> finishScript) {
         this.redis = redis;
         this.createScript = createScript;
         this.joinScript = joinScript;
         this.leaveScript = leaveScript;
+        this.finishScript = finishScript;
     }
 
     public void create(String roomId, long hostUserId, String name, String gameType,
@@ -61,6 +64,16 @@ public class RoomRepository {
         if (v == -3L) throw new RoomFullException(roomId);
         if (v == -4L) throw new AlreadyInRoomException(roomId);
         return (int) v;
+    }
+
+    public void markFinished(String roomId, long now) {
+        Long result = redis.execute(
+                finishScript,
+                List.of("room:" + roomId, ROOMS_OPEN_KEY),
+                roomId,
+                Long.toString(now));
+        long v = unwrap(result);
+        if (v == -1L) throw new RoomNotFoundException(roomId);
     }
 
     public void leave(String roomId, long userId) {
