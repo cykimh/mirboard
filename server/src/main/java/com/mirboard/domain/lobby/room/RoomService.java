@@ -92,6 +92,30 @@ public class RoomService {
         log.info("Room finished: roomId={}", roomId);
     }
 
+    /** 관전 추가. 이미 플레이어로 입장한 사용자는 거절. */
+    public Room spectate(String roomId, long userId) {
+        Room room = getRoom(roomId);
+        if (room.playerIds().contains(userId)) {
+            throw new AlreadyInRoomException(roomId);
+        }
+        boolean added = repository.addSpectator(roomId, userId);
+        log.info("Room spectate: roomId={} userId={} newcomer={}", roomId, userId, added);
+        return getRoom(roomId);
+    }
+
+    /** 관전 종료. 등록 안 되어 있어도 idempotent. */
+    public void stopSpectating(String roomId, long userId) {
+        boolean removed = repository.removeSpectator(roomId, userId);
+        log.info("Room stop spectating: roomId={} userId={} wasPresent={}",
+                roomId, userId, removed);
+    }
+
+    /** 참여자 또는 관전자 여부. */
+    public boolean isParticipantOrSpectator(String roomId, long userId) {
+        Room room = getRoom(roomId);
+        return room.playerIds().contains(userId) || room.spectatorIds().contains(userId);
+    }
+
     public List<Room> listWaitingRooms(String gameTypeFilter) {
         return repository.openRoomIds().stream()
                 .map(repository::findById)

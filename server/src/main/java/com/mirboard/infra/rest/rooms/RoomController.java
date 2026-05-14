@@ -17,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -76,12 +77,28 @@ public class RoomController {
         rooms.leaveRoom(roomId, me.userId());
     }
 
+    /** 관전 시작. 플레이어로 입장한 방은 거절. */
+    @PostMapping("/{roomId}/spectate")
+    public Room spectate(@PathVariable String roomId,
+                         @AuthenticationPrincipal AuthPrincipal me) {
+        return rooms.spectate(roomId, me.userId());
+    }
+
+    /** 관전 종료. 등록 안 되어 있어도 204. */
+    @DeleteMapping("/{roomId}/spectate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void stopSpectating(@PathVariable String roomId,
+                               @AuthenticationPrincipal AuthPrincipal me) {
+        rooms.stopSpectating(roomId, me.userId());
+    }
+
     @GetMapping("/{roomId}/resync")
     public ResyncResponse resync(@PathVariable String roomId,
                                  @AuthenticationPrincipal AuthPrincipal me) {
         Room room = rooms.getRoom(roomId);
         int seat = room.playerIds().indexOf(me.userId());
-        if (seat < 0) {
+        boolean isSpectator = room.spectatorIds().contains(me.userId());
+        if (seat < 0 && !isSpectator) {
             throw new NotInRoomException(roomId);
         }
         var state = stateStore.load(roomId)
@@ -94,7 +111,8 @@ public class RoomController {
                 stateStore.currentSeq(roomId),
                 TichuStateMapper.toTableView(state, matchState.scoresByTeam(),
                         matchState.roundNumber()),
-                TichuStateMapper.toPrivateHand(state, seat));
+                // 관전자는 손패 없음 — TableView 만 받음.
+                seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null);
     }
 
     public record CreateRequest(@NotBlank String name, @NotBlank String gameType) {

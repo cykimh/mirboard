@@ -108,6 +108,61 @@ class RoomResyncIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("RESYNC_NOT_AVAILABLE"));
     }
 
+    @Test
+    void spectator_can_resync_but_gets_no_private_hand() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("rs4_alice", "rs4_bob", "rs4_charlie", "rs4_dave"));
+        String roomId = createRoomAndJoinAll(tokens);
+
+        String specToken = registerAndLogin("rs4_spec", "validpass1");
+        mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
+                        .header("Authorization", "Bearer " + specToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.spectatorIds[0]").exists());
+
+        mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
+                        .header("Authorization", "Bearer " + specToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tableView.handCounts.0").value(8))
+                .andExpect(jsonPath("$.privateHand").doesNotExist());
+    }
+
+    @Test
+    void player_cannot_spectate_own_room() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("rs5_alice", "rs5_bob", "rs5_charlie", "rs5_dave"));
+        String roomId = createRoomAndJoinAll(tokens);
+
+        // 자기 자신은 이미 플레이어 — 관전 거절.
+        mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
+                        .header("Authorization", "Bearer " + tokens.get("rs5_alice")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ALREADY_IN_ROOM"));
+    }
+
+    @Test
+    void spectator_can_stop_spectating() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("rs6_alice", "rs6_bob", "rs6_charlie", "rs6_dave"));
+        String roomId = createRoomAndJoinAll(tokens);
+
+        String specToken = registerAndLogin("rs6_spec", "validpass1");
+        mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
+                        .header("Authorization", "Bearer " + specToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/rooms/" + roomId + "/spectate")
+                        .header("Authorization", "Bearer " + specToken))
+                .andExpect(status().isNoContent());
+
+        // 관전 해제 후엔 resync 거절.
+        mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
+                        .header("Authorization", "Bearer " + specToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("NOT_IN_ROOM"));
+    }
+
     // ---------- helpers ----------
 
     private Map<String, String> registerAndLoginAll(List<String> usernames) throws Exception {

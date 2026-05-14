@@ -98,6 +98,10 @@ public class RoomRepository {
         List<Long> playerIds = playerStrings == null
                 ? List.of()
                 : playerStrings.stream().map(Long::parseLong).toList();
+        Set<String> spectatorStrings = redis.opsForSet().members(spectatorsKey(roomId));
+        Set<Long> spectatorIds = spectatorStrings == null
+                ? Set.of()
+                : spectatorStrings.stream().map(Long::parseLong).collect(java.util.stream.Collectors.toUnmodifiableSet());
         return Optional.of(new Room(
                 roomId,
                 (String) hash.get("name"),
@@ -107,7 +111,37 @@ public class RoomRepository {
                 Integer.parseInt((String) hash.get("capacity")),
                 playerIds.size(),
                 playerIds,
+                spectatorIds,
                 Long.parseLong((String) hash.get("createdAt"))));
+    }
+
+    /**
+     * 관전자 추가. capacity 같은 원자성 제약이 없으므로 단순 SADD.
+     * @return true 이면 새로 추가됨, false 이면 이미 관전자.
+     */
+    public boolean addSpectator(String roomId, long userId) {
+        // Room 존재 확인 (Hash 비어있으면 NOT_FOUND).
+        if (Boolean.FALSE.equals(redis.hasKey("room:" + roomId))) {
+            throw new RoomNotFoundException(roomId);
+        }
+        Long added = redis.opsForSet().add(spectatorsKey(roomId), Long.toString(userId));
+        redis.expire(spectatorsKey(roomId), java.time.Duration.ofHours(6));
+        return added != null && added > 0;
+    }
+
+    /** 관전자 제거. 존재하지 않으면 no-op. */
+    public boolean removeSpectator(String roomId, long userId) {
+        Long removed = redis.opsForSet().remove(spectatorsKey(roomId), Long.toString(userId));
+        return removed != null && removed > 0;
+    }
+
+    public boolean isSpectator(String roomId, long userId) {
+        Boolean member = redis.opsForSet().isMember(spectatorsKey(roomId), Long.toString(userId));
+        return Boolean.TRUE.equals(member);
+    }
+
+    private static String spectatorsKey(String roomId) {
+        return "room:" + roomId + ":spectators";
     }
 
     public List<String> openRoomIds() {
