@@ -4,6 +4,8 @@ import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
+import { Button } from '@/components/Button';
+import { Badge } from '@/components/Badge';
 import type { Room } from '@/types/api';
 
 /**
@@ -76,7 +78,7 @@ export function RoomPage() {
     <main className="room-page">
       <header>
         <h1>{room.name}</h1>
-        <button type="button" onClick={handleLeave}>나가기</button>
+        <Button type="button" variant="subtle" onClick={handleLeave}>나가기</Button>
       </header>
       <p className="meta">
         {room.gameType} · {room.status} · {room.playerCount}/{room.capacity}
@@ -89,7 +91,7 @@ export function RoomPage() {
             {room.playerIds.map((id) => (
               <li key={id}>
                 <code>#{id}</code>
-                {id === room.hostId && <span className="badge">호스트</span>}
+                {id === room.hostId && <Badge tone="accent">호스트</Badge>}
               </li>
             ))}
           </ul>

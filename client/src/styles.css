@@ -569,3 +569,72 @@ a {
 .lobby-page .spectate input {
   flex: 1;
 }
+
+/* --- 공용 컴포넌트 (Phase 6C-2) --- */
+
+/* Button variants */
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-link);
+  border-color: var(--color-accent-link);
+}
+.btn-danger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-text-on-accent);
+}
+.btn-subtle {
+  background: transparent;
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+/* Input field with label */
+.input-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.input-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Badge tones */
+.badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  background: var(--color-bg-surface-elevated);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.badge-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.badge-phoenix {
+  background: var(--color-phoenix);
+  color: var(--color-phoenix-fg);
+  border: 1px solid var(--color-phoenix-border);
+}
+.badge-accent {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}

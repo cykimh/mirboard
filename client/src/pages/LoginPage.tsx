@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import { Stack } from '@/components/Stack';
 
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
@@ -30,30 +33,28 @@ export function LoginPage() {
     <main className="auth-page">
       <h1>Mirboard 로그인</h1>
       <form onSubmit={handleSubmit}>
-        <label>
-          아이디
-          <input
+        <Stack gap={4}>
+          <Input
+            label="아이디"
             type="text"
             value={username}
             autoComplete="username"
             onChange={(e) => setUsername(e.target.value)}
             required
           />
-        </label>
-        <label>
-          비밀번호
-          <input
+          <Input
+            label="비밀번호"
             type="password"
             value={password}
             autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? '로그인 중...' : '로그인'}
-        </button>
+          {error && <p className="error">{error}</p>}
+          <Button type="submit" variant="primary" disabled={submitting}>
+            {submitting ? '로그인 중...' : '로그인'}
+          </Button>
+        </Stack>
       </form>
       <p>
         계정이 없나요? <Link to="/register">회원가입</Link>

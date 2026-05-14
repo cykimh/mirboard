@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
+import { Button } from '@/components/Button';
+import { Input } from '@/components/Input';
+import { Stack } from '@/components/Stack';
 
 export function RegisterPage() {
   const register = useAuthStore((s) => s.register);
@@ -35,19 +38,17 @@ export function RegisterPage() {
         Mirboard 는 아이디와 비밀번호만 저장합니다. 이메일/전화번호는 받지 않습니다.
       </p>
       <form onSubmit={handleSubmit}>
-        <label>
-          아이디 (영문/숫자/언더스코어 3~20자)
-          <input
+        <Stack gap={4}>
+          <Input
+            label="아이디 (영문/숫자/언더스코어 3~20자)"
             type="text"
             value={username}
             pattern="^[A-Za-z0-9_]{3,20}$"
             onChange={(e) => setUsername(e.target.value)}
             required
           />
-        </label>
-        <label>
-          비밀번호 (8~64자)
-          <input
+          <Input
+            label="비밀번호 (8~64자)"
             type="password"
             value={password}
             minLength={8}
@@ -55,11 +56,11 @@ export function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? '처리 중...' : '회원가입 후 로그인'}
-        </button>
+          {error && <p className="error">{error}</p>}
+          <Button type="submit" variant="primary" disabled={submitting}>
+            {submitting ? '처리 중...' : '회원가입 후 로그인'}
+          </Button>
+        </Stack>
       </form>
       <p>
         이미 계정이 있나요? <Link to="/login">로그인</Link>

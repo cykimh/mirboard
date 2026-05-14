@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { t } from '@/i18n/messages';
+import { Modal } from '@/components/Modal';
+import { Button } from '@/components/Button';
 
 interface GiveDragonTrickModalProps {
   open: boolean;
@@ -14,36 +16,35 @@ export function GiveDragonTrickModal({
 }: GiveDragonTrickModalProps) {
   const [selected, setSelected] = useState<number | null>(null);
 
-  if (!open) return null;
-
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal dragon-modal">
-        <h3>{t('dragon.title')}</h3>
-        <p className="modal-body">{t('dragon.body')}</p>
-        <div className="dragon-seat-choices">
-          {opponentSeats.map((seat) => (
-            <button
-              key={seat}
-              type="button"
-              className={`dragon-seat-btn ${selected === seat ? 'selected' : ''}`}
-              onClick={() => setSelected(seat)}
-            >
-              {t('dragon.giveTo')} {seat}
-            </button>
-          ))}
-        </div>
-        <div className="modal-actions">
+    <Modal
+      open={open}
+      title={t('dragon.title')}
+      body={t('dragon.body')}
+      actions={
+        <Button
+          type="button"
+          variant="primary"
+          disabled={selected === null}
+          onClick={() => selected !== null && onConfirm(selected)}
+        >
+          {t('dragon.confirm')}
+        </Button>
+      }
+    >
+      <div className="dragon-seat-choices">
+        {opponentSeats.map((seat) => (
           <button
+            key={seat}
             type="button"
-            disabled={selected === null}
-            onClick={() => selected !== null && onConfirm(selected)}
+            className={`dragon-seat-btn ${selected === seat ? 'selected' : ''}`}
+            onClick={() => setSelected(seat)}
           >
-            {t('dragon.confirm')}
+            {t('dragon.giveTo')} {seat}
           </button>
-        </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 

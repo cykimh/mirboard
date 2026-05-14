@@ -13,6 +13,7 @@ import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
+import { Badge } from '@/components/Badge';
 
 interface GameTableProps {
   roomId: string;
@@ -254,12 +255,9 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
               </span>
               <span className="hand-type">{tableView.currentTop.type}</span>
               {tableView.currentTop.phoenixSingle && (
-                <span
-                  className="phoenix-badge"
-                  title={t('phoenix.singleTooltip')}
-                >
+                <Badge tone="phoenix" title={t('phoenix.singleTooltip')}>
                   {t('phoenix.singleBadge')}
-                </span>
+                </Badge>
               )}
             </div>
           ) : (
