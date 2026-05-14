@@ -53,6 +53,7 @@ public class GameStompController {
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
     private final ApplicationEventPublisher events;
+    private final com.mirboard.infra.metrics.MirboardMetrics metrics;
 
     public GameStompController(RoomService roomService,
                                TichuGameStateStore stateStore,
@@ -60,7 +61,8 @@ public class GameStompController {
                                TichuRoundStarter roundStarter,
                                GameEventBroadcaster broadcaster,
                                RoomActionLock lock,
-                               ApplicationEventPublisher events) {
+                               ApplicationEventPublisher events,
+                               com.mirboard.infra.metrics.MirboardMetrics metrics) {
         this.roomService = roomService;
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
@@ -68,6 +70,7 @@ public class GameStompController {
         this.broadcaster = broadcaster;
         this.lock = lock;
         this.events = events;
+        this.metrics = metrics;
     }
 
     @MessageMapping("/room/{roomId}/action")
@@ -114,6 +117,7 @@ public class GameStompController {
             try {
                 result = engine.apply(state, seat, action);
             } catch (TichuActionRejectedException rejected) {
+                metrics.actionRejected();
                 log.info("Action rejected: action={} reason={} message={}",
                         action.getClass().getSimpleName(), rejected.reason(),
                         rejected.getMessage());
@@ -164,6 +168,7 @@ public class GameStompController {
         TichuMatchState afterRound = matchState.withRoundCompleted(lastScore);
         matchStateStore.save(roomId, afterRound);
 
+        metrics.roundCompleted();
         log.info("Round completed: round={} A={} B={} cumulativeA={} cumulativeB={}",
                 afterRound.roundNumber() - 1, lastScore.teamAScore(), lastScore.teamBScore(),
                 afterRound.cumulativeA(), afterRound.cumulativeB());
@@ -180,6 +185,7 @@ public class GameStompController {
                     afterRound.cumulativeB(),
                     afterRound.winningTeam(),
                     afterRound.roundScores()));
+            metrics.matchCompleted();
             log.info("Match ended: winner={} rounds={} A={} B={}",
                     afterRound.winningTeam(), afterRound.roundScores().size(),
                     afterRound.cumulativeA(), afterRound.cumulativeB());

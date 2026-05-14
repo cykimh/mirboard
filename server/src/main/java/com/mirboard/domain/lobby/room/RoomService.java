@@ -3,6 +3,7 @@ package com.mirboard.domain.lobby.room;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.infra.metrics.MirboardMetrics;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -22,15 +23,18 @@ public class RoomService {
     private final GameRegistry games;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final MirboardMetrics metrics;
 
     public RoomService(RoomRepository repository,
                        GameRegistry games,
                        Clock clock,
-                       ApplicationEventPublisher events) {
+                       ApplicationEventPublisher events,
+                       MirboardMetrics metrics) {
         this.repository = repository;
         this.games = games;
         this.clock = clock;
         this.events = events;
+        this.metrics = metrics;
     }
 
     public Room createRoom(long hostUserId, String name, String gameType) {
@@ -43,6 +47,7 @@ public class RoomService {
         repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
+        metrics.roomCreated();
         log.info("Room created: roomId={} gameType={} hostUserId={} capacity={}",
                 roomId, gameType, hostUserId, def.maxPlayers());
         return room;
@@ -57,11 +62,13 @@ public class RoomService {
         repository.join(roomId, userId, now);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
+        metrics.roomJoined();
         log.info("Room join: roomId={} userId={} occupancy={}/{} status={}",
                 roomId, userId, room.playerIds().size(), room.capacity(), room.status());
         if (room.status() == RoomStatus.IN_GAME) {
             events.publishEvent(new com.mirboard.domain.game.core.GameStartingEvent(
                     room.roomId(), room.gameType(), room.playerIds()));
+            metrics.gameStarted();
             log.info("Game starting: roomId={} gameType={} players={}",
                     roomId, room.gameType(), room.playerIds());
         }
