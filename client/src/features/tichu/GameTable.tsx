@@ -12,6 +12,7 @@ import { t } from '@/i18n/messages';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { MakeWishModal } from './MakeWishModal';
+import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 
 interface GameTableProps {
   roomId: string;
@@ -81,6 +82,17 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
 
   const showWishModal = myMahjongLeadActive && !wishModalDismissed;
 
+  // Dragon 양도 강제 상태: Dragon 단독으로 내가 받았고, 서버가 TrickTaken 대신
+  // TurnChanged(taker=mySeat) 만 발행해서 currentTurnSeat 가 다시 본인.
+  const mustGiveDragon =
+    isInPlaying &&
+    tableView !== null &&
+    tableView.currentTopSeat === mySeat &&
+    tableView.currentTurnSeat === mySeat &&
+    tableView.currentTop !== null &&
+    tableView.currentTop.cards.length === 1 &&
+    tableView.currentTop.cards[0].special === 'DRAGON';
+
   const selectedCards = useMemo<Card[]>(() => {
     if (!privateHand) return [];
     return privateHand.cards.filter((c) => selectedCardKeys.has(cardKey(c)));
@@ -125,6 +137,10 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
 
   function handleSkipWish() {
     setWishModalDismissed(true);
+  }
+
+  function handleGiveDragon(toSeat: number) {
+    sendAction({ '@action': 'GIVE_DRAGON_TRICK', toSeat });
   }
 
   function handleReady() {
@@ -380,6 +396,12 @@ export function GameTable({ roomId, playerIds, myUserId }: GameTableProps) {
         open={showWishModal}
         onConfirm={handleMakeWish}
         onSkip={handleSkipWish}
+      />
+
+      <GiveDragonTrickModal
+        open={mustGiveDragon}
+        opponentSeats={opponentSeatsOf(mySeat)}
+        onConfirm={handleGiveDragon}
       />
 
       {matchEnded ? (

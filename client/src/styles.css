@@ -505,3 +505,33 @@ a {
   border-color: #8bc34a;
   font-weight: 600;
 }
+
+/* Dragon 양도 모달 좌석 선택 */
+.dragon-seat-choices {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.dragon-seat-btn {
+  background: #2a2a32;
+  border: 1px solid #444;
+  color: #eaeaea;
+  border-radius: 6px;
+  padding: 14px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  flex: 1;
+  max-width: 160px;
+  transition: background 120ms, border-color 120ms;
+}
+
+.dragon-seat-btn:hover {
+  background: #36363f;
+}
+
+.dragon-seat-btn.selected {
+  background: #4a3a3a;
+  border-color: #ff6b6b;
+  font-weight: 600;
+}

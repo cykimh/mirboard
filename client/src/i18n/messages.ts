@@ -87,6 +87,12 @@ const KO = {
   'wish.skip': '건너뛰기 (소원 없음)',
   'wish.confirm': '소원 지정',
 
+  // --- Dragon 트릭 양도 모달 ---
+  'dragon.title': 'Dragon 트릭 양도',
+  'dragon.body': 'Dragon 으로 이긴 트릭은 상대 팀 두 좌석 중 한 명에게 양도해야 합니다.',
+  'dragon.confirm': '양도',
+  'dragon.giveTo': '시트',
+
   // --- 라운드/매치 종료 ---
   'round.ended.title': '라운드 종료',
   'round.ended.firstFinisher': '첫 완주: 시트',
