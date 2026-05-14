@@ -586,10 +586,11 @@ PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.
 
 | 청크 | 내용 | 상태 |
 | --- | --- | --- |
-| 6D-1 | `MessageGateway` 추상 + `RedisMessageGateway` / `InMemoryMessageGateway` 구현체 | 대기 |
-| 6D-2 | STOMP 브로드캐스트 다중인스턴스화 — gateway publish + 인스턴스별 relay | 대기 |
-| 6D-3 | ApplicationEvent → Redis Pub/Sub `DomainEventBus` + eventId 기반 dedup | 대기 |
-| 6D-4 | docker-compose `multi` 프로파일 + README 분산 시연 가이드 | 대기 |
+| 6D-1 | `MessageGateway` + Redis/InMemory 구현체 + 단위 테스트 | ✅ 완료 |
+| 6D-2 | STOMP broadcast 멀티인스턴스화 (StompPublisher/Relay/Route) | ✅ 완료 |
+| 6D-3 | `DomainEventBus` — local + Redis Pub/Sub fan-out + instanceId self-skip | ✅ 완료 |
+| 6D-4 | README 분산 시연 가이드 + application.yml gateway 토글 | ✅ 완료 |
+| (보류) | docker-compose `multi` 프로파일 — Dockerfile 추가 후 별도 사이클 | 보류 |
 
 **Done 기준**: 기존 통합 테스트 그린 + 두 인스턴스 분산 시연 시 양쪽 동기화. eventId 중복
 처리 0건.

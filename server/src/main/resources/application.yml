@@ -64,6 +64,10 @@ mirboard:
     secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
     expires-in: 12h
     issuer: mirboard
+  messaging:
+    # Phase 6D — 멀티 인스턴스 fan-out 모드. in-memory (default, 단일 인스턴스) 또는 redis.
+    # redis 로 전환 시 STOMP broadcast 와 도메인 이벤트가 Redis Pub/Sub 위에서 흐른다.
+    gateway: ${MIRBOARD_MESSAGING_GATEWAY:in-memory}
 
 logging:
   pattern:

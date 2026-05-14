@@ -317,6 +317,39 @@ npm --prefix client run dev
 복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
 복원. 다른 플레이어 상태는 변하지 않음.
 
+## 분산 시연 (멀티 인스턴스, Phase 6D)
+
+기본은 단일 인스턴스 + `mirboard.messaging.gateway=in-memory`. 멀티 인스턴스에서
+STOMP broadcast / 도메인 이벤트를 Redis Pub/Sub 위에서 흐르게 하려면:
+
+```bash
+# 터미널 1 — 8080 인스턴스
+export MIRBOARD_MESSAGING_GATEWAY=redis
+export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
+MIRBOARD_PORT=8080 ./gradlew :server:bootRun
+
+# 터미널 2 — 8081 인스턴스 (같은 Redis 사용)
+export MIRBOARD_MESSAGING_GATEWAY=redis
+export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
+MIRBOARD_PORT=8081 ./gradlew :server:bootRun
+```
+
+검증 시나리오:
+1. 클라 A 가 `ws://localhost:8080/ws`, 클라 B 가 `ws://localhost:8081/ws` 로 STOMP 연결.
+2. 둘 다 `/topic/lobby/rooms` 구독.
+3. 클라 A 가 `POST http://localhost:8080/api/rooms` 로 방 생성.
+4. 클라 B 가 `ROOM_UPDATED` 이벤트 수신 — Redis Pub/Sub 으로 다른 인스턴스에 전파됨.
+
+Sticky session 불필요 — 사용자가 어느 인스턴스에 붙어 있든 자신의 인스턴스 broker
+가 STOMP 프레임을 전달. 방 입장 시 `room:{id}` HASH / `room:{id}:players` LIST 가
+Redis 단일 진실 공급원이라 두 인스턴스가 같은 상태를 본다.
+
+**한계 (현재 시점)**:
+- ApplicationEvent 의 인스턴스 간 fan-out 은 `DomainEventBus` 가 처리하지만 동일
+  이벤트가 두 번 처리되지 않게 `instanceId` 만으로 dedup — 발행 인스턴스 재시작 시
+  유실 가능성 있음 (현재 MVP 범위에선 무시).
+- 게임 액션 처리 락 (`room:{id}:lock`) 은 Redis SET NX 라 이미 분산 안전.
+
 ## 작업 흐름 (Phase Gate)
 
 1. **Phase 1 — 설계**: 본 문서 + `docs/*.md` + Flyway V1. ✅
