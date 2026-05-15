@@ -59,7 +59,8 @@ public class RoomController {
     public Room create(@AuthenticationPrincipal AuthPrincipal me,
                        @RequestBody @Valid CreateRequest req) {
         TeamPolicy policy = req.teamPolicy() == null ? TeamPolicy.SEQUENTIAL : req.teamPolicy();
-        return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy);
+        boolean fillWithBots = Boolean.TRUE.equals(req.fillWithBots());
+        return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy, fillWithBots);
     }
 
     /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
@@ -147,7 +148,8 @@ public class RoomController {
 
     public record CreateRequest(@NotBlank String name,
                                 @NotBlank String gameType,
-                                TeamPolicy teamPolicy) {
+                                TeamPolicy teamPolicy,
+                                Boolean fillWithBots) {
     }
 
     public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {

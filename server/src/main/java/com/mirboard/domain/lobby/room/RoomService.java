@@ -3,6 +3,7 @@ package com.mirboard.domain.lobby.room;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.security.SecureRandom;
@@ -30,14 +31,16 @@ public class RoomService {
     private final DomainEventBus events;
     private final MirboardMetrics metrics;
     private final Random random;
+    private final BotUserRegistry bots;
 
     @Autowired
     public RoomService(RoomRepository repository,
                        GameRegistry games,
                        Clock clock,
                        DomainEventBus events,
-                       MirboardMetrics metrics) {
-        this(repository, games, clock, events, metrics, new SecureRandom());
+                       MirboardMetrics metrics,
+                       BotUserRegistry bots) {
+        this(repository, games, clock, events, metrics, bots, new SecureRandom());
     }
 
     /** Phase 8C — 테스트에서 시드 고정 Random 을 주입할 수 있도록 분리한 생성자. */
@@ -46,32 +49,63 @@ public class RoomService {
                        Clock clock,
                        DomainEventBus events,
                        MirboardMetrics metrics,
+                       BotUserRegistry bots,
                        Random random) {
         this.repository = repository;
         this.games = games;
         this.clock = clock;
         this.events = events;
         this.metrics = metrics;
+        this.bots = bots;
         this.random = random;
     }
 
     public Room createRoom(long hostUserId, String name, String gameType) {
-        return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL);
+        return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false);
     }
 
     public Room createRoom(long hostUserId, String name, String gameType, TeamPolicy teamPolicy) {
+        return createRoom(hostUserId, name, gameType, teamPolicy, false);
+    }
+
+    /**
+     * Phase 9B — `fillWithBots=true` 면 createRoom 직후 capacity 가 찰 때까지 시드 봇을
+     * 자동 join. capacity 도달 시 일반 joinRoom 흐름과 동일하게 IN_GAME 전이 +
+     * GameStartingEvent 발행.
+     */
+    public Room createRoom(long hostUserId, String name, String gameType,
+                           TeamPolicy teamPolicy, boolean fillWithBots) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
         }
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
-        repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy);
+        repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy,
+                fillWithBots);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
         metrics.roomCreated();
-        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={}",
-                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy);
+        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={}",
+                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots);
+
+        if (fillWithBots) {
+            int seatsToFill = def.maxPlayers() - 1;  // host 1 명 이미 들어가 있음.
+            // 호스트가 봇일 수 있으므로 (테스트용 all-bot 시나리오) — 호스트와 다른 봇만 선택.
+            List<Long> botIds = bots.getBotIds().stream()
+                    .filter(id -> id != hostUserId)
+                    .limit(seatsToFill)
+                    .toList();
+            if (botIds.size() < seatsToFill) {
+                throw new IllegalStateException(
+                        "Not enough distinct bots to fill " + seatsToFill + " seats");
+            }
+            log.info("Auto-joining bots: roomId={} botIds={}", roomId, botIds);
+            for (long botId : botIds) {
+                // joinRoom 마지막 호출이 capacity 도달 → IN_GAME 전이 + GameStartingEvent.
+                room = joinRoom(roomId, botId);
+            }
+        }
         return room;
     }
 

@@ -132,6 +132,47 @@ class RoomControllerIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("ROOM_NOT_FOUND"));
     }
 
+    @Test
+    void create_with_fillWithBots_immediately_starts_game_with_3_bots() throws Exception {
+        String token = registerAndLogin("solo_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "솔로 모드",
+                "gameType", "TICHU",
+                "fillWithBots", true));
+        MvcResult created = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fillWithBots").value(true))
+                .andExpect(jsonPath("$.playerCount").value(4))
+                .andExpect(jsonPath("$.status").value("IN_GAME"))
+                .andExpect(jsonPath("$.botSeats.length()").value(3))
+                .andReturn();
+        JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
+        // 호스트는 seat 0, 봇은 seat 1/2/3.
+        assertThat(createdJson.get("botSeats").toString()).isEqualTo("[1,2,3]");
+    }
+
+    @Test
+    void create_without_fillWithBots_stays_waiting_with_only_host() throws Exception {
+        String token = registerAndLogin("default_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "친구 기다리는 방",
+                "gameType", "TICHU"));
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fillWithBots").value(false))
+                .andExpect(jsonPath("$.playerCount").value(1))
+                .andExpect(jsonPath("$.status").value("WAITING"))
+                .andExpect(jsonPath("$.botSeats.length()").value(0));
+    }
+
     private String registerAndLogin(String username, String password) throws Exception {
         var body = objectMapper.writeValueAsString(
                 Map.of("username", username, "password", password));

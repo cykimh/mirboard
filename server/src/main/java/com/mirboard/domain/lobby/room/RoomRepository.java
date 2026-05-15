@@ -1,5 +1,6 @@
 package com.mirboard.domain.lobby.room;
 
+import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,22 +22,26 @@ public class RoomRepository {
     private final RedisScript<Long> joinScript;
     private final RedisScript<Long> leaveScript;
     private final RedisScript<Long> finishScript;
+    private final BotUserRegistry bots;
 
     public RoomRepository(
             StringRedisTemplate redis,
             @Qualifier("roomCreateScript") RedisScript<Long> createScript,
             @Qualifier("roomJoinScript") RedisScript<Long> joinScript,
             @Qualifier("roomLeaveScript") RedisScript<Long> leaveScript,
-            @Qualifier("roomFinishScript") RedisScript<Long> finishScript) {
+            @Qualifier("roomFinishScript") RedisScript<Long> finishScript,
+            BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
         this.joinScript = joinScript;
         this.leaveScript = leaveScript;
         this.finishScript = finishScript;
+        this.bots = bots;
     }
 
     public void create(String roomId, long hostUserId, String name, String gameType,
-                       int capacity, long createdAt, TeamPolicy teamPolicy) {
+                       int capacity, long createdAt, TeamPolicy teamPolicy,
+                       boolean fillWithBots) {
         Long result = redis.execute(
                 createScript,
                 keysFor(roomId),
@@ -46,7 +51,8 @@ public class RoomRepository {
                 gameType,
                 Integer.toString(capacity),
                 Long.toString(createdAt),
-                teamPolicy.name());
+                teamPolicy.name(),
+                Boolean.toString(fillWithBots));
         if (result == null || result != 1L) {
             throw new IllegalStateException("room_create.lua returned unexpected: " + result);
         }
@@ -126,6 +132,15 @@ public class RoomRepository {
         // Phase 8C — teamPolicy 컬럼이 없는 (V1 이전) 방은 SEQUENTIAL 기본값.
         String rawPolicy = (String) hash.get("teamPolicy");
         TeamPolicy teamPolicy = rawPolicy == null ? TeamPolicy.SEQUENTIAL : TeamPolicy.valueOf(rawPolicy);
+        // Phase 9B — fillWithBots 가 없으면 (구방) false 기본값.
+        boolean fillWithBots = "true".equals((String) hash.get("fillWithBots"));
+        // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
+        List<Integer> botSeats = new ArrayList<>();
+        for (int i = 0; i < playerIds.size(); i++) {
+            if (bots.isBot(playerIds.get(i))) {
+                botSeats.add(i);
+            }
+        }
         return Optional.of(new Room(
                 roomId,
                 (String) hash.get("name"),
@@ -137,7 +152,9 @@ public class RoomRepository {
                 playerIds,
                 spectatorIds,
                 teamPolicy,
-                Long.parseLong((String) hash.get("createdAt"))));
+                Long.parseLong((String) hash.get("createdAt")),
+                fillWithBots,
+                List.copyOf(botSeats)));
     }
 
     /**

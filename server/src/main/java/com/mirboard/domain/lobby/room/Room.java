@@ -14,11 +14,13 @@ public record Room(
         List<Long> playerIds,
         Set<Long> spectatorIds,
         TeamPolicy teamPolicy,
-        long createdAt) {
+        long createdAt,
+        boolean fillWithBots,
+        List<Integer> botSeats) {
 
     /** 관전자 추가/제거 같이 spectatorIds 만 다른 사본을 만들 때 사용. */
     public Room withSpectatorIds(Set<Long> newSpectatorIds) {
         return new Room(roomId, name, gameType, hostId, status, capacity, playerCount,
-                playerIds, newSpectatorIds, teamPolicy, createdAt);
+                playerIds, newSpectatorIds, teamPolicy, createdAt, fillWithBots, botSeats);
     }
 }
