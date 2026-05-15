@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 350" width="250" height="350">
+<rect x="2" y="2" width="246" height="346" rx="14" ry="14" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+
+    <rect x="50" y="60" width="150" height="230" rx="10" ry="10"
+          fill="none" stroke="#5a5a5a" stroke-width="2" opacity="0.6"/>
+    <rect x="58" y="68" width="134" height="214" rx="6" ry="6"
+          fill="none" stroke="#5a5a5a" stroke-width="1" opacity="0.4"/>
+
+      <g transform="translate(85 110)">
+        <path d="M0 30 L0 8 L12 22 L20 0 L28 22 L40 0 L48 22 L60 8 L60 30 Z" fill="#5a5a5a" stroke="#1a1a1a" stroke-width="1.5"/>
+        <circle cx="20" cy="6" r="3" fill="#1a1a1a"/>
+        <circle cx="40" cy="6" r="3" fill="#1a1a1a"/>
+        <circle cx="60" cy="14" r="3" fill="#1a1a1a"/>
+        <circle cx="0" cy="14" r="3" fill="#1a1a1a"/>
+        <rect x="28" y="-12" width="4" height="14" fill="#1a1a1a"/>
+        <rect x="24" y="-8" width="12" height="4" fill="#1a1a1a"/>
+        <rect x="0" y="30" width="60" height="4" fill="#1a1a1a"/>
+      </g>
+
+    <text x="125" y="201" fill="#1a1a1a" font-family="Georgia, 'Times New Roman', serif"
+          font-size="100" font-weight="700" text-anchor="middle" dominant-baseline="middle">K</text>
+<g transform="translate(47 179) scale(0.36)"><path fill="#1a1a1a" d="M50 6 C 50 36 96 36 96 64 C 96 82 76 90 56 72 L 62 92 L 38 92 L 44 72 C 24 90 4 82 4 64 C 4 36 50 36 50 6 Z"/></g>
+<g transform="translate(175 179) scale(0.36)"><path fill="#1a1a1a" d="M50 6 C 50 36 96 36 96 64 C 96 82 76 90 56 72 L 62 92 L 38 92 L 44 72 C 24 90 4 82 4 64 C 4 36 50 36 50 6 Z"/></g>
+
+    <g transform="translate(250 350) rotate(180)">
+      <g transform="translate(85 110)">
+        <path d="M0 30 L0 8 L12 22 L20 0 L28 22 L40 0 L48 22 L60 8 L60 30 Z" fill="#5a5a5a" stroke="#1a1a1a" stroke-width="1.5"/>
+        <circle cx="20" cy="6" r="3" fill="#1a1a1a"/>
+        <circle cx="40" cy="6" r="3" fill="#1a1a1a"/>
+        <circle cx="60" cy="14" r="3" fill="#1a1a1a"/>
+        <circle cx="0" cy="14" r="3" fill="#1a1a1a"/>
+        <rect x="28" y="-12" width="4" height="14" fill="#1a1a1a"/>
+        <rect x="24" y="-8" width="12" height="4" fill="#1a1a1a"/>
+        <rect x="0" y="30" width="60" height="4" fill="#1a1a1a"/>
+      </g>
+    </g>
+
+      <g>
+        <text x="14" y="30" fill="#1a1a1a" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">K</text>
+        <g transform="translate(4 36) scale(0.2)"><path fill="#1a1a1a" d="M50 6 C 50 36 96 36 96 64 C 96 82 76 90 56 72 L 62 92 L 38 92 L 44 72 C 24 90 4 82 4 64 C 4 36 50 36 50 6 Z"/></g>
+      </g>
+
+    <g transform="translate(250 350) rotate(180)">
+      <text x="14" y="30" fill="#1a1a1a" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">K</text>
+      <g transform="translate(4 36) scale(0.2)"><path fill="#1a1a1a" d="M50 6 C 50 36 96 36 96 64 C 96 82 76 90 56 72 L 62 92 L 38 92 L 44 72 C 24 90 4 82 4 64 C 4 36 50 36 50 6 Z"/></g>
+    </g>
+</svg>

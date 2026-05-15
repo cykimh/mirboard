@@ -1,8 +1,28 @@
-# Phase 8F — 카드 / 캐릭터 / 보드 AI 이미지 생성 가이드
+# Phase 8F — 카드 / 캐릭터 / 보드 자산 가이드
 
-본 문서는 D-40 의 결정에 따라 사전 생성된 정적 이미지로 카드 비주얼을 교체할
-때 사용하는 prompt 템플릿과 명명 규칙. 56장 카드 + 4종 캐릭터 + 1장 보드 배경을
-정적 번들에 동봉한다 (Phase 7-4 `bundleClient` flag 가 자동 동봉).
+본 문서는 사전 생성된 정적 이미지로 카드 비주얼을 교체할 때의 명명 규칙과
+prompt 템플릿. 56장 카드 + 4종 캐릭터 + 1장 보드 배경을 정적 번들에 동봉한다
+(Phase 7-4 `bundleClient` flag 가 자동 동봉).
+
+## 현재 카드 자산 정책 (D-48 적용)
+
+기본 카드 52장 + `back` 은 **트럼프 풍 SVG** 로 사전 생성됨
+(`scripts/generate-cards.mjs`). Tichu 도메인 슈트 → 트럼프 시각 매핑:
+
+| Tichu Suit | 트럼프 | 색상 |
+| --- | --- | --- |
+| JADE | ♣ Club | `#2d8c4e` (green) |
+| SWORD | ♦ Diamond | `#2f6fe0` (blue) |
+| STAR | ♥ Heart | `#d4253c` (red) |
+| PAGODA | ♠ Spade | `#1a1a1a` (black) |
+
+생성: `node scripts/generate-cards.mjs` 가 `client/public/cards/{suit}-{rank}.svg`
+52장 + `back.svg` + `face-ornate/{suit}-{J,Q,K}.svg` 12장 (왕관/장식 변형) 을
+재생성한다. 특수 4종 (mahjong/dog/phoenix/dragon) 은 별도 일러스트 필요 시
+아래 AI prompt 사용.
+
+아래 AI prompt 섹션은 **특수 카드 + 캐릭터 + 보드** 에만 유효 — 일반 52장은
+SVG 생성기가 우선이다.
 
 ## 핵심 일관성 전략 (D-40)
 

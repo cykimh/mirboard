@@ -23,9 +23,9 @@ interface CardChipProps {
 }
 
 /**
- * Phase 8F — 카드 표시 컴포넌트. 정적 이미지 (`/cards/{suit}-{rank}.webp`) 가
- * 있으면 이미지를, 없으면 (onError) 기존 텍스트 글리프로 graceful fallback. 사용자가
- * AI 생성 자산을 점진적으로 채워도 동작 깨지지 않음.
+ * Phase 8F — 카드 표시 컴포넌트. 정적 SVG (`/cards/{suit}-{rank}.svg`) 가
+ * 있으면 이미지를, 없으면 (onError) 기존 텍스트 글리프로 graceful fallback.
+ * 기본 자산은 `scripts/generate-cards.mjs` 가 생성한 트럼프 풍 SVG.
  */
 export function CardChip({ card, selected, onClick }: CardChipProps) {
   const [imageFailed, setImageFailed] = useState(false);

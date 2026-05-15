@@ -105,10 +105,10 @@ export function cardLabel(c: Card): string {
  */
 export function cardAssetSrc(c: Card): string {
   if (c.special) {
-    return `/cards/${c.special.toLowerCase()}.webp`;
+    return `/cards/${c.special.toLowerCase()}.svg`;
   }
-  if (!c.suit) return '/cards/back.webp';  // 안전망 — suit 없는 일반 카드는 없음.
+  if (!c.suit) return '/cards/back.svg';  // 안전망 — suit 없는 일반 카드는 없음.
   const rankVisual =
     c.rank === 11 ? 'J' : c.rank === 12 ? 'Q' : c.rank === 13 ? 'K' : c.rank === 14 ? 'A' : String(c.rank);
-  return `/cards/${c.suit.toLowerCase()}-${rankVisual}.webp`;
+  return `/cards/${c.suit.toLowerCase()}-${rankVisual}.svg`;
 }

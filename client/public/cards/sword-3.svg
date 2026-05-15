@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 350" width="250" height="350">
+<rect x="2" y="2" width="246" height="346" rx="14" ry="14" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+<g transform="translate(110 65.5) scale(0.3)"><path fill="#2f6fe0" d="M50 4 L 92 50 L 50 96 L 8 50 Z"/></g><g transform="translate(110 160) scale(0.3)"><path fill="#2f6fe0" d="M50 4 L 92 50 L 50 96 L 8 50 Z"/></g><g transform="translate(140 284.5) rotate(180) scale(0.3)"><path fill="#2f6fe0" d="M50 4 L 92 50 L 50 96 L 8 50 Z"/></g>
+
+      <g>
+        <text x="14" y="30" fill="#2f6fe0" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">3</text>
+        <g transform="translate(4 36) scale(0.2)"><path fill="#2f6fe0" d="M50 4 L 92 50 L 50 96 L 8 50 Z"/></g>
+      </g>
+
+    <g transform="translate(250 350) rotate(180)">
+      <text x="14" y="30" fill="#2f6fe0" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">3</text>
+      <g transform="translate(4 36) scale(0.2)"><path fill="#2f6fe0" d="M50 4 L 92 50 L 50 96 L 8 50 Z"/></g>
+    </g>
+</svg>

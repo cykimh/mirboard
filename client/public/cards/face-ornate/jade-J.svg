@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 350" width="250" height="350">
+<rect x="2" y="2" width="246" height="346" rx="14" ry="14" fill="#ffffff" stroke="#d0d0d0" stroke-width="1.5"/>
+
+    <rect x="50" y="60" width="150" height="230" rx="10" ry="10"
+          fill="none" stroke="#2d8c4e" stroke-width="2" opacity="0.6"/>
+    <rect x="58" y="68" width="134" height="214" rx="6" ry="6"
+          fill="none" stroke="#2d8c4e" stroke-width="1" opacity="0.4"/>
+
+      <g transform="translate(89 110)">
+        <path d="M0 30 L4 14 L14 22 L24 4 L34 22 L44 14 L48 14 L58 22 L68 14 L72 30 Z" fill="#2d8c4e" stroke="#2d8c4e" stroke-width="1.5"/>
+        <circle cx="24" cy="2" r="3" fill="#2d8c4e"/>
+        <circle cx="48" cy="12" r="3" fill="#2d8c4e"/>
+        <rect x="0" y="30" width="72" height="4" fill="#2d8c4e"/>
+      </g>
+
+    <text x="125" y="201" fill="#2d8c4e" font-family="Georgia, 'Times New Roman', serif"
+          font-size="100" font-weight="700" text-anchor="middle" dominant-baseline="middle">J</text>
+<g transform="translate(47 179) scale(0.36)"><circle fill="#2d8c4e" cx="50" cy="26" r="20"/><circle fill="#2d8c4e" cx="28" cy="58" r="20"/><circle fill="#2d8c4e" cx="72" cy="58" r="20"/><path fill="#2d8c4e" d="M40 92 L 60 92 L 56 58 L 44 58 Z"/></g>
+<g transform="translate(175 179) scale(0.36)"><circle fill="#2d8c4e" cx="50" cy="26" r="20"/><circle fill="#2d8c4e" cx="28" cy="58" r="20"/><circle fill="#2d8c4e" cx="72" cy="58" r="20"/><path fill="#2d8c4e" d="M40 92 L 60 92 L 56 58 L 44 58 Z"/></g>
+
+    <g transform="translate(250 350) rotate(180)">
+      <g transform="translate(89 110)">
+        <path d="M0 30 L4 14 L14 22 L24 4 L34 22 L44 14 L48 14 L58 22 L68 14 L72 30 Z" fill="#2d8c4e" stroke="#2d8c4e" stroke-width="1.5"/>
+        <circle cx="24" cy="2" r="3" fill="#2d8c4e"/>
+        <circle cx="48" cy="12" r="3" fill="#2d8c4e"/>
+        <rect x="0" y="30" width="72" height="4" fill="#2d8c4e"/>
+      </g>
+    </g>
+
+      <g>
+        <text x="14" y="30" fill="#2d8c4e" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">J</text>
+        <g transform="translate(4 36) scale(0.2)"><circle fill="#2d8c4e" cx="50" cy="26" r="20"/><circle fill="#2d8c4e" cx="28" cy="58" r="20"/><circle fill="#2d8c4e" cx="72" cy="58" r="20"/><path fill="#2d8c4e" d="M40 92 L 60 92 L 56 58 L 44 58 Z"/></g>
+      </g>
+
+    <g transform="translate(250 350) rotate(180)">
+      <text x="14" y="30" fill="#2d8c4e" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" text-anchor="middle">J</text>
+      <g transform="translate(4 36) scale(0.2)"><circle fill="#2d8c4e" cx="50" cy="26" r="20"/><circle fill="#2d8c4e" cx="28" cy="58" r="20"/><circle fill="#2d8c4e" cx="72" cy="58" r="20"/><path fill="#2d8c4e" d="M40 92 L 60 92 L 56 58 L 44 58 Z"/></g>
+    </g>
+</svg>
