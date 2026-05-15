@@ -683,4 +683,21 @@ Phase 7-5 (배포 검증) 그린 후 8A 시작.
 
 ---
 
+## Phase 10 — 티츄 룰 검증 보강 + 명세 문서
+
+진입 조건: Phase 9 완료. 목적: (1) 코드와 룰의 1:1 mapping 문서 정착, (2) 특수 카드
+결정적 시나리오 + Wish follow 강제 + Rule invariant 로 검증 갭 해소.
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 10A | `docs/rules-tichu.md` 14 섹션 명세 (카드/라이프사이클/선언/패스/핸드/Phoenix/비교/특수4종/wish/BOMB/트릭/라운드/점수/매치) | ✅ 완료 (D-56) |
+| 10B | `TichuSpecialCardScenarioTest` 15 결정적 시나리오 (Mahjong wish 4 / Dog 3 / Dragon 3 / Phoenix 3 / BOMB 2) | ✅ 완료 (D-57) |
+| 10C | `WishFulfillmentChecker` + ActionValidator wish follow 강제 마감 (line 82 "deferred" 주석 제거) | ✅ 완료 (D-58) |
+| 10D | `TichuInvariantChecker` (카드 보존/finishedOrder/턴/wish) + BotMatchSimulationIT 통합. **Dog 카드 보존 엔진 버그 catch + fix** | ✅ 완료 (D-59) |
+
+**Done 기준**: 위 4 청크 그린 + 전체 서버 회귀 1m20s 그린 + `docs/rules-tichu.md` 가
+모든 룰 코드 mapping single source of truth 로 동작.
+
+---
+
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
