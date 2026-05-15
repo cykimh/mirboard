@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.game.scoring.EloCalculator;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.state.Team;
+import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
@@ -33,17 +34,20 @@ public class MatchResultRecorder {
     private final TichuMatchResultRepository matchRepo;
     private final TichuMatchParticipantRepository participantRepo;
     private final UserRepository userRepo;
+    private final BotUserRegistry bots;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public MatchResultRecorder(TichuMatchResultRepository matchRepo,
                                TichuMatchParticipantRepository participantRepo,
                                UserRepository userRepo,
+                               BotUserRegistry bots,
                                ObjectMapper objectMapper,
                                Clock clock) {
         this.matchRepo = matchRepo;
         this.participantRepo = participantRepo;
         this.userRepo = userRepo;
+        this.bots = bots;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -51,6 +55,13 @@ public class MatchResultRecorder {
     @EventListener
     @Transactional
     public void onMatchCompleted(TichuMatchCompleted event) {
+        // Phase 9C — 봇이 참여한 매치는 통계/ELO 반영 X (rating 인플레이션 방지).
+        boolean hasBots = event.playerIds().stream().anyMatch(bots::isBot);
+        if (hasBots) {
+            log.info("Skipping ELO/win-loss update for bot match: room={}, players={}",
+                    event.roomId(), event.playerIds());
+            return;
+        }
         String payloadJson;
         try {
             payloadJson = objectMapper.writeValueAsString(Map.of(

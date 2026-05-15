@@ -5,14 +5,9 @@ import com.mirboard.domain.game.tichu.TichuEngine;
 import com.mirboard.domain.game.tichu.action.TichuAction;
 import com.mirboard.domain.game.tichu.action.TichuActionRejectedException;
 import com.mirboard.domain.game.tichu.event.TichuEvent;
-import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
-import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
-import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.web.MdcKeys;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
@@ -48,28 +43,25 @@ public class GameStompController {
 
     private final RoomService roomService;
     private final TichuGameStateStore stateStore;
-    private final TichuMatchStateStore matchStateStore;
-    private final TichuRoundStarter roundStarter;
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
-    private final DomainEventBus events;
+    private final MatchProgressService matchProgress;
+    private final com.mirboard.infra.bot.BotScheduler botScheduler;
     private final com.mirboard.infra.metrics.MirboardMetrics metrics;
 
     public GameStompController(RoomService roomService,
                                TichuGameStateStore stateStore,
-                               TichuMatchStateStore matchStateStore,
-                               TichuRoundStarter roundStarter,
                                GameEventBroadcaster broadcaster,
                                RoomActionLock lock,
-                               DomainEventBus events,
+                               MatchProgressService matchProgress,
+                               com.mirboard.infra.bot.BotScheduler botScheduler,
                                com.mirboard.infra.metrics.MirboardMetrics metrics) {
         this.roomService = roomService;
         this.stateStore = stateStore;
-        this.matchStateStore = matchStateStore;
-        this.roundStarter = roundStarter;
         this.broadcaster = broadcaster;
         this.lock = lock;
-        this.events = events;
+        this.matchProgress = matchProgress;
+        this.botScheduler = botScheduler;
         this.metrics = metrics;
     }
 
@@ -139,66 +131,14 @@ public class GameStompController {
             // MatchEnded) 를 같이 묶어서 한 번에 전송한다.
             List<TichuEvent> outbound = new ArrayList<>(result.events());
             if (result.newState() instanceof TichuState.RoundEnd ended) {
-                handleRoundEnd(roomId, room, ended, outbound);
+                matchProgress.onRoundEnd(roomId, room, ended, outbound);
             }
 
             broadcaster.broadcast(roomId, outbound, room.playerIds());
         } finally {
             lock.release(roomId);
         }
-    }
-
-    private void handleRoundEnd(String roomId,
-                                Room room,
-                                TichuState.RoundEnd ended,
-                                List<TichuEvent> outbound) {
-        TichuMatchState matchState = matchStateStore.load(roomId)
-                .orElseGet(() -> TichuMatchState.initial(room.playerIds()));
-
-        com.mirboard.domain.game.tichu.scoring.RoundScore lastScore =
-                outbound.stream()
-                        .filter(TichuEvent.RoundEnded.class::isInstance)
-                        .map(TichuEvent.RoundEnded.class::cast)
-                        .map(TichuEvent.RoundEnded::score)
-                        .findFirst()
-                        .orElseGet(() ->
-                                new com.mirboard.domain.game.tichu.scoring.RoundScore(
-                                        ended.teamAScore(), ended.teamBScore(), -1, false));
-
-        TichuMatchState afterRound = matchState.withRoundCompleted(lastScore);
-        matchStateStore.save(roomId, afterRound);
-
-        metrics.roundCompleted();
-        log.info("Round completed: round={} A={} B={} cumulativeA={} cumulativeB={}",
-                afterRound.roundNumber() - 1, lastScore.teamAScore(), lastScore.teamBScore(),
-                afterRound.cumulativeA(), afterRound.cumulativeB());
-
-        if (afterRound.isMatchOver()) {
-            outbound.add(new TichuEvent.MatchEnded(
-                    afterRound.winningTeam(),
-                    afterRound.scoresByTeam(),
-                    afterRound.roundScores().size()));
-            events.publish(new TichuMatchCompleted(
-                    roomId,
-                    room.playerIds(),
-                    afterRound.cumulativeA(),
-                    afterRound.cumulativeB(),
-                    afterRound.winningTeam(),
-                    afterRound.roundScores()));
-            metrics.matchCompleted();
-            log.info("Match ended: winner={} rounds={} A={} B={}",
-                    afterRound.winningTeam(), afterRound.roundScores().size(),
-                    afterRound.cumulativeA(), afterRound.cumulativeB());
-            try {
-                roomService.markFinished(roomId);
-            } catch (RuntimeException e) {
-                log.warn("Failed to mark room {} finished: {}", roomId, e.getMessage());
-            }
-            return;
-        }
-        // 매치 계속 — 즉시 다음 라운드 Dealing(8) 생성 + RoundStarted 알림.
-        roundStarter.startRound(roomId, room.playerIds(), afterRound.roundNumber());
-        outbound.add(new TichuEvent.RoundStarted(
-                afterRound.roundNumber(), afterRound.scoresByTeam()));
+        // 락 해제 후 봇 차례면 비동기로 봇 액션 트리거.
+        botScheduler.scheduleBots(roomId);
     }
 }

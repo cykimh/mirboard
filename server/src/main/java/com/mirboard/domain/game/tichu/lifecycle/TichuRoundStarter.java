@@ -19,6 +19,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -38,20 +39,24 @@ public class TichuRoundStarter {
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
     private final SecureRandom random;
+    private final com.mirboard.infra.bot.BotScheduler botScheduler;
 
     @Autowired
     public TichuRoundStarter(TichuGameStateStore stateStore,
-                             TichuMatchStateStore matchStateStore) {
-        this(stateStore, matchStateStore, new SecureRandom());
+                             TichuMatchStateStore matchStateStore,
+                             @Lazy com.mirboard.infra.bot.BotScheduler botScheduler) {
+        this(stateStore, matchStateStore, new SecureRandom(), botScheduler);
     }
 
     /** Test-only entry point (deterministic shuffle). */
     public TichuRoundStarter(TichuGameStateStore stateStore,
                              TichuMatchStateStore matchStateStore,
-                             SecureRandom random) {
+                             SecureRandom random,
+                             com.mirboard.infra.bot.BotScheduler botScheduler) {
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.random = random;
+        this.botScheduler = botScheduler;
     }
 
     @EventListener
@@ -91,6 +96,8 @@ public class TichuRoundStarter {
 
         log.info("Tichu round {} started for room={} — Dealing(8), reserved 6 per seat",
                 roundNumber, roomId);
+        // Phase 9C — 솔로 방이면 봇 차례를 비동기로 처리. 일반 방이면 봇 자리가 없어 no-op.
+        botScheduler.scheduleBots(roomId);
     }
 
     private static DealResult deal(List<Card> shuffled) {
