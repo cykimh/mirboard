@@ -662,4 +662,25 @@ Phase 7-5 (배포 검증) 그린 후 8A 시작.
 
 ---
 
+## Phase 9 — 솔로 모드 (봇 3명) + 코드 수정 검증 자동화
+
+진입 조건: Phase 8 완료. 목적: (1) 친구 3명 없이 1명으로 풀 게임 시연 가능, (2) 코드
+수정 시 회귀를 catch 하는 자동화 layer 구축.
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 9A | V3 마이그레이션 `users.is_bot BOOLEAN` + 시드 봇 4명 + `BotUserRegistry` @Component | ✅ 완료 (D-49) |
+| 9B | `Room.fillWithBots` + `botSeats` derived + `RoomService.createRoom` 자동 봇 join | ✅ 완료 (D-50) |
+| 9C | `LegalActionEnumerator` + `RandomBotPolicy` + `BotScheduler` + `MatchProgressService` 추출 + 봇 매치 ELO 우회 | ✅ 완료 (D-51) |
+| 9D | 클라 — 토글 / 솔로 배지 / `SeatAvatar` 봇 표시 / GameTable 솔로 배너 | ✅ 완료 (D-55) |
+| 9E | `BotMatchSimulationIT` (1+10회) — Dog 완주-파트너 leader 엔진 버그 fix | ✅ 완료 (D-52) |
+| 9F | `.husky/pre-commit` — 클라 tsc + vitest + 서버 컴파일 | ✅ 완료 (D-53) |
+| 9G | `.github/workflows/ci.yml` — server / client / bundle-jar 3 job | ✅ 완료 (D-54) |
+
+**Done 기준**: 방 생성 시 "🤖 빈 좌석 봇으로 채우기" 체크 → 즉시 IN_GAME → 봇 자동 진행
+매치 완주. `./gradlew :server:test` + `npm --prefix client run test` 그린. CI workflow
++ pre-commit hook 활성화.
+
+---
+
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

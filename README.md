@@ -182,6 +182,26 @@ export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
 npm --prefix client run test
 ```
 
+### 코드 수정 검증 흐름 (Phase 9F + 9G)
+
+빠른 회귀 catch 를 위한 두 단계 자동화.
+
+**Pre-commit (로컬, 평균 30초)** — `.husky/pre-commit` 이 클라 타입 체크 + 단위 테스트 +
+서버 컴파일만 실행 (Docker 의존 IT 는 제외).
+
+```bash
+# 활성화 (repo clone 후 한 번만)
+git config core.hooksPath .husky
+chmod +x .husky/pre-commit
+
+# 우회 (긴급 수정 시)
+git commit --no-verify
+```
+
+**GitHub Actions CI (PR 트리거)** — `.github/workflows/ci.yml` 이 서버 단위 + IT (
+Testcontainers 가 Docker-in-Linux 자동 사용) + 클라 단위/빌드 풀 셋. PR 마다 그린
+확인 후 머지 권장.
+
 **Phase 2a 동작 확인 포인트**
 - 로그에 `Started MirboardApplication` 와 Flyway `Successfully applied N migration(s)` 출력.
 - Postgres 에 `users`, `tichu_match_results`, `tichu_match_participants`,
