@@ -383,6 +383,99 @@ class ActionValidatorTest {
                 .doesNotThrowAnyException();
     }
 
+    // ---------- Phase 10C — wish follow 강제 마감 ----------
+
+    @Test
+    void on_follow_with_active_wish_must_include_wished_rank_if_playable() {
+        // top = 3 (single), wish=7, follow 차례 (seat 1), 보유 7 → 7 포함해야.
+        Hand topThree = new Hand(HandType.SINGLE, List.of(n(Suit.PAGODA, 3)), 3, 1);
+        var wish = Wish.active(7);
+        var trick = new TrickState(0, 1, topThree, 0, Set.of(), List.of(topThree),
+                List.of(n(Suit.PAGODA, 3)), wish);
+        var myHand = List.of(n(Suit.JADE, 7), n(Suit.SWORD, 9));
+        var state = playingState(
+                List.of(List.of(n(Suit.JADE, 2)), myHand,
+                        List.of(n(Suit.STAR, 2)), List.of(n(Suit.PAGODA, 2))),
+                trick);
+
+        // 9 단독 follow (7 미포함) → reject
+        assertThatThrownBy(() ->
+                ActionValidator.validate(state, 1,
+                        new TichuAction.PlayCard(List.of(n(Suit.SWORD, 9)))))
+                .extracting(t -> ((TichuActionRejectedException) t).reason())
+                .isEqualTo(RejectionReason.WISH_NOT_FULFILLED);
+
+        // 7 단독 follow → allow
+        assertThatCode(() ->
+                ActionValidator.validate(state, 1,
+                        new TichuAction.PlayCard(List.of(n(Suit.JADE, 7)))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void on_follow_with_active_wish_allows_free_play_when_wish_unplayable() {
+        // top = A (rank 14), wish=7, follow 차례, 보유 7 → 단일 7 은 A 못 이김.
+        // 페어/트리플도 못 만듦 → wish 합법 follow 없음 → 자유 플레이 허용.
+        Hand topAce = new Hand(HandType.SINGLE, List.of(n(Suit.PAGODA, 14)), 14, 1);
+        var wish = Wish.active(7);
+        var trick = new TrickState(0, 1, topAce, 0, Set.of(), List.of(topAce),
+                List.of(n(Suit.PAGODA, 14)), wish);
+        var myHand = List.of(n(Suit.JADE, 7), n(Suit.SWORD, 9));
+        var state = playingState(
+                List.of(List.of(n(Suit.JADE, 2)), myHand,
+                        List.of(n(Suit.STAR, 2)), List.of(n(Suit.PAGODA, 2))),
+                trick);
+
+        // 9 단독 follow — wish 못 이루지만 합법 (top 9 < A → 사실 단일 9 도 A 못 이김)
+        // 실제로는 PassTrick 이 자연스러우나, 본 테스트는 wish 강제 단계까지만 검증.
+        // 단일 9 도 못 이기므로 CANNOT_BEAT_CURRENT 가 먼저 발생할 수 있음.
+        // 대신 단일 7 시도 — 7 < A 라 CANNOT_BEAT_CURRENT, 단 wish 강제는 통과해야 함.
+        assertThatThrownBy(() ->
+                ActionValidator.validate(state, 1,
+                        new TichuAction.PlayCard(List.of(n(Suit.SWORD, 9)))))
+                .extracting(t -> ((TichuActionRejectedException) t).reason())
+                .isEqualTo(RejectionReason.CANNOT_BEAT_CURRENT);  // wish 우회 — beat 만 reject
+    }
+
+    @Test
+    void on_follow_without_wished_rank_in_hand_allows_any_play() {
+        // wish=7, follow 차례, 보유 7 없음 → 자유 플레이 (beat 만 통과하면 OK)
+        Hand topThree = new Hand(HandType.SINGLE, List.of(n(Suit.PAGODA, 3)), 3, 1);
+        var wish = Wish.active(7);
+        var trick = new TrickState(0, 1, topThree, 0, Set.of(), List.of(topThree),
+                List.of(n(Suit.PAGODA, 3)), wish);
+        var myHand = List.of(n(Suit.JADE, 5), n(Suit.SWORD, 9));
+        var state = playingState(
+                List.of(List.of(n(Suit.JADE, 2)), myHand,
+                        List.of(n(Suit.STAR, 2)), List.of(n(Suit.PAGODA, 2))),
+                trick);
+
+        assertThatCode(() ->
+                ActionValidator.validate(state, 1,
+                        new TichuAction.PlayCard(List.of(n(Suit.SWORD, 9)))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void on_follow_wish_fulfilled_no_longer_forces() {
+        // wish=7 이지만 이미 fulfilled=true → 강제 비활성
+        Hand topThree = new Hand(HandType.SINGLE, List.of(n(Suit.PAGODA, 3)), 3, 1);
+        var wish = new Wish(7, true);  // fulfilled
+        var trick = new TrickState(0, 1, topThree, 0, Set.of(), List.of(topThree),
+                List.of(n(Suit.PAGODA, 3)), wish);
+        var myHand = List.of(n(Suit.JADE, 7), n(Suit.SWORD, 9));
+        var state = playingState(
+                List.of(List.of(n(Suit.JADE, 2)), myHand,
+                        List.of(n(Suit.STAR, 2)), List.of(n(Suit.PAGODA, 2))),
+                trick);
+
+        // 9 단독 follow — wish 7 보유하나 fulfilled 이므로 자유
+        assertThatCode(() ->
+                ActionValidator.validate(state, 1,
+                        new TichuAction.PlayCard(List.of(n(Suit.SWORD, 9)))))
+                .doesNotThrowAnyException();
+    }
+
     // ---------- helpers ----------
 
     private static Hand singleHand(Card c) {

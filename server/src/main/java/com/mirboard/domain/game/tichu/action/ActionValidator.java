@@ -70,18 +70,26 @@ public final class ActionValidator {
             throw reject(RejectionReason.CANNOT_BEAT_CURRENT);
         }
 
-        // Active wish enforcement (conservative): if player holds wished rank and
-        // their play doesn't include it, reject. Phase 3f will refine with full
-        // "legal play exists" search.
+        // Active wish enforcement (Phase 10C — D-58 마감):
+        //   lead 차례: 보유한 wish rank 가 있으면 플레이에 포함해야 함.
+        //   follow 차례: 보유 + wish rank 포함한 합법 follow 가 존재하면 포함해야 함.
+        //   "합법 follow 존재" 판단은 WishFulfillmentChecker (1차 구현: 단일/페어/트리플
+        //   + Phoenix 와일드 조합. 콤보는 미포함, 향후 확장).
         if (trick.hasActiveWish()) {
             int wishedRank = trick.activeWish().rank();
             boolean hasWishedInHand = player.hand().stream()
                     .anyMatch(c -> c.isNormal() && c.rank() == wishedRank);
             boolean playsWished = action.cards().stream()
                     .anyMatch(c -> c.isNormal() && c.rank() == wishedRank);
-            if (hasWishedInHand && !playsWished && trick.isLead()) {
-                // Strict only on lead; on follow, deferred (need beat check).
-                throw reject(RejectionReason.WISH_NOT_FULFILLED);
+            if (hasWishedInHand && !playsWished) {
+                if (trick.isLead()) {
+                    throw reject(RejectionReason.WISH_NOT_FULFILLED);
+                }
+                // follow: wish rank 카드를 포함한 합법 follow 가 존재하면 reject
+                if (WishFulfillmentChecker.canPlayWishRank(
+                        player.hand(), trick.currentTop(), wishedRank)) {
+                    throw reject(RejectionReason.WISH_NOT_FULFILLED);
+                }
             }
         }
     }
