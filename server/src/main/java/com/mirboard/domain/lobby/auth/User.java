@@ -33,6 +33,10 @@ public class User {
     @Column(nullable = false)
     private int rating;
 
+    /** Phase 9A — 봇 분류 플래그. true 면 시스템이 자동 운영하는 NPC. */
+    @Column(name = "is_bot", nullable = false)
+    private boolean isBot;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,6 +79,10 @@ public class User {
 
     public int getRating() {
         return rating;
+    }
+
+    public boolean isBot() {
+        return isBot;
     }
 
     public Instant getCreatedAt() {

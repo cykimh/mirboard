@@ -1,5 +1,6 @@
 package com.mirboard.domain.lobby.auth;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -11,6 +12,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
     boolean existsByUsername(String username);
+
+    /** Phase 9A — 시드 봇 4명 조회. id 오름차순으로 안정 정렬. */
+    @Query("SELECT u FROM User u WHERE u.isBot = true ORDER BY u.id ASC")
+    List<User> findBots();
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.winCount = u.winCount + 1 WHERE u.id = :id")
