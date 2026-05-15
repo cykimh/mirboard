@@ -229,12 +229,16 @@ public final class TichuEngine implements GameEngine {
         players.set(seat, player);
 
         // Dog: trick immediately resolves, partner leads with no point transfer.
+        // 파트너가 이미 완주했으면 다음 active 좌석으로 (Phase 9E 시뮬레이션에서 발견).
         boolean isDog = action.cards().size() == 1 && action.cards().get(0).is(Special.DOG);
         if (isDog) {
             int partner = TurnManager.partnerOf(seat);
-            TrickState next = TrickState.lead(partner, trick.activeWish());
-            events.add(new TichuEvent.TrickTaken(partner, 0));
-            events.add(new TichuEvent.TurnChanged(partner));
+            int nextLead = players.get(partner).isFinished()
+                    ? nextActiveSeat(players, partner)
+                    : partner;
+            TrickState next = TrickState.lead(nextLead, trick.activeWish());
+            events.add(new TichuEvent.TrickTaken(nextLead, 0));
+            events.add(new TichuEvent.TurnChanged(nextLead));
             return maybeEndRound(
                     new TichuState.Playing(players, next, firstFinisher(players)),
                     events);
