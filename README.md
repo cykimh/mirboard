@@ -182,25 +182,41 @@ export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
 npm --prefix client run test
 ```
 
-### 코드 수정 검증 흐름 (Phase 9F + 9G)
+### 코드 수정 검증 흐름
 
-빠른 회귀 catch 를 위한 두 단계 자동화.
-
-**Pre-commit (로컬, 평균 30초)** — `.husky/pre-commit` 이 클라 타입 체크 + 단위 테스트 +
-서버 컴파일만 실행 (Docker 의존 IT 는 제외).
+**`scripts/check.sh` wrapper** (Phase 11 — D-60) — 자주 쓰는 검증 명령 단축 + Colima
+Docker socket 자동 감지 (`DOCKER_HOST=...` prefix 불필요).
 
 ```bash
-# 활성화 (repo clone 후 한 번만)
+./scripts/check.sh fast              # 빠른 회귀 (~30s, pre-commit 과 동일)
+./scripts/check.sh rules             # 룰 도메인 단위 (~3s, Docker 불필요)
+./scripts/check.sh server            # 서버 풀 (단위 + IT, ~1m20s)
+./scripts/check.sh client            # 클라 풀 (build:check + test + build, ~10s)
+./scripts/check.sh all               # server + client (~1m30s)
+./scripts/check.sh bot-stress 50     # 봇 시뮬레이션 50 매치
+./scripts/check.sh infra             # docker compose + Postgres/Redis 헬스
+./scripts/check.sh --help
+```
+
+**3 단계 자동화**:
+
+| 단계 | 트리거 | 범위 | 시간 |
+| --- | --- | --- | --- |
+| pre-commit | `git commit` | `check fast` 위임 | ~30s |
+| 로컬 풀 검증 | 수동 | `check server` / `check all` / `check bot-stress N` | ~1~5m |
+| GitHub Actions CI | push / PR | server 풀 + client 풀 + bundle-jar smoke 3 job 병렬 | ~5~10m |
+
+**pre-commit 활성화** (repo clone 후 한 번만):
+```bash
 git config core.hooksPath .husky
-chmod +x .husky/pre-commit
+chmod +x .husky/pre-commit scripts/check.sh
 
 # 우회 (긴급 수정 시)
 git commit --no-verify
 ```
 
-**GitHub Actions CI (PR 트리거)** — `.github/workflows/ci.yml` 이 서버 단위 + IT (
-Testcontainers 가 Docker-in-Linux 자동 사용) + 클라 단위/빌드 풀 셋. PR 마다 그린
-확인 후 머지 권장.
+기존 raw 명령 (`./gradlew :server:test --tests "..."` / `npm --prefix client run test`)
+은 그대로 유지 — wrapper 가 위에 얇게 얹힌 형태. 디버깅 시 직접 호출 가능.
 
 **Phase 2a 동작 확인 포인트**
 - 로그에 `Started MirboardApplication` 와 Flyway `Successfully applied N migration(s)` 출력.

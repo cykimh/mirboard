@@ -1,28 +1,8 @@
 #!/usr/bin/env bash
-# Mirboard pre-commit hook (Phase 9F)
+# Mirboard pre-commit hook (Phase 11 — D-60).
 #
-# 빠른 검증만 실행 — 풀 테스트/IT 는 CI 가 담당.
-#   1) 클라 TypeScript 타입 체크 (`tsc --noEmit`)
-#   2) 클라 단위 테스트 (vitest run, 30s 이내)
-#   3) 서버 컴파일 (단위 테스트 제외 — Docker 의존성 회피)
-#
-# 활성화: 한 번만 `git config core.hooksPath .husky` 실행 (README 참고).
+# `scripts/check.sh fast` 로 위임 — 검증 로직 single source.
+# 활성화: `git config core.hooksPath .husky` (한 번만).
 # 우회: `git commit --no-verify`.
 
-set -e
-
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "$REPO_ROOT"
-
-echo "──[pre-commit]── 클라 타입 체크 + 단위 테스트"
-if [ -d "client/node_modules" ]; then
-    npm --prefix client run build:check
-    npm --prefix client run test
-else
-    echo "  (skip — client/node_modules 없음. \`npm --prefix client install\` 먼저 실행)"
-fi
-
-echo "──[pre-commit]── 서버 컴파일 (단위 테스트 X — CI 가 담당)"
-./gradlew :server:compileJava :server:compileTestJava -q
-
-echo "──[pre-commit]── 모두 통과"
+exec "$(git rev-parse --show-toplevel)/scripts/check.sh" fast
