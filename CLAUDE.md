@@ -59,7 +59,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
 | Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand + React Query |
-| Data      | MySQL 8 (영속), Redis 7 (실시간 세션/방 상태)                                                        |
+| Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
 ### Java 25 / Spring Boot 4.0 활용 패턴
@@ -81,17 +81,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 인프라 (현재 사용 가능)
 ```bash
-# MySQL + Redis 기동
-docker compose up -d mysql redis
+# Postgres + Redis 기동
+docker compose up -d postgres redis
 
 # Flyway 마이그레이션 적용 (스키마 변경 시마다)
 docker compose --profile migrate run --rm flyway
 
 # 스키마 확인
-docker compose exec mysql mysql -umirboard -pmirboardpw mirboard -e "SHOW TABLES;"
+docker compose exec postgres psql -U mirboard -d mirboard -c "\dt"
 ```
 
-기본 자격증명 (개발 한정): MySQL `mirboard / mirboardpw`, DB `mirboard`, Redis 비밀번호 없음.
+기본 자격증명 (개발 한정): Postgres `mirboard / mirboardpw`, DB `mirboard`, 포트 5432, Redis 비밀번호 없음.
 
 ### 서버 (Phase 2a~ 사용 가능)
 처음 한 번만:
@@ -122,7 +122,7 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.infra.rest.rooms.RoomResyncIntegrationTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.MatchResultRecorderIT"
 ```
-통합 테스트는 Docker 가 떠 있어야 함 (Testcontainers 가 MySQL 8 컨테이너를 띄움).
+통합 테스트는 Docker 가 떠 있어야 함 (Testcontainers 가 PostgreSQL 16 컨테이너를 띄움).
 
 ### 클라이언트 (Phase 4d~ 사용 가능)
 ```bash

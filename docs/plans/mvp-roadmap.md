@@ -44,9 +44,9 @@
 | WS Client | `@stomp/stompjs` + SockJS fallback | Spring STOMP와 표준 |
 | DnD | `@dnd-kit` | 지침 명시 |
 | 상태관리 | Zustand + React Query | 보일러플레이트 최소 |
-| Test (BE) | JUnit 5 + Mockito + Testcontainers(MySQL/Redis), Spring Boot Test 4.0 | Java 25 toolchain 동일 |
+| Test (BE) | JUnit 5 + Mockito + Testcontainers(PostgreSQL/Redis), Spring Boot Test 4.0 | Java 25 toolchain 동일 |
 | Test (FE) | Vitest + React Testing Library | |
-| Local Dev | **docker-compose** (MySQL 8, Redis 7) | 1 명령으로 의존성 기동 |
+| Local Dev | **docker-compose** (PostgreSQL 16, Redis 7) | 1 명령으로 의존성 기동 |
 
 ### 1.1 Java 25 / Spring Boot 4.0 활용 포인트 (Phase 2~3 구현 가이드)
 
@@ -77,7 +77,7 @@
 
 ```
 mirboard/
-├── docker-compose.yml          # mysql, redis
+├── docker-compose.yml          # postgres, redis
 ├── README.md
 ├── server/
 │   ├── build.gradle.kts
@@ -594,5 +594,72 @@ PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.
 
 **Done 기준**: 기존 통합 테스트 그린 + 두 인스턴스 분산 시연 시 양쪽 동기화. eventId 중복
 처리 0건.
+
+---
+
+## Phase 7 — 친구 시연 배포 (Fly.io + Postgres + Upstash Redis)
+
+D-39 의 결정에 따라 RDB 를 Postgres 로 통일하고 Fly.io Tokyo 리전 + Upstash Redis
+(Tokyo) 위에 단일 머신 1대로 띄운다. 친구 5~10 명 수준 시연이 목표라 cost
+$5~10/mo 이내. Spring Boot 의 정적 리소스 핸들러로 React 번들까지 같이 서빙해
+nginx sidecar 불필요.
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 7-1 | V1 마이그레이션 Postgres 문법 + JDBC 드라이버 교체 + Testcontainers (9 IT) + docker-compose | ✅ 완료 (D-39) |
+| 7-2 | 서버 Dockerfile (multi-stage: Gradle → JRE 25) + `fly.toml` (Tokyo, 1 machine, 256MB?) + env 스펙 | 대기 |
+| 7-3 | Upstash Redis (TLS) 접속 설정 + `application-prod.yml` profile 분기 + CORS + Spring static + SPA fallback | 대기 |
+| 7-4 | 클라 Vite 빌드 → `server/src/main/resources/static/` 복사 Gradle task + README 배포 섹션 | 대기 |
+| 7-5 | 사용자가 Fly/Upstash 셋업 → `flyctl deploy` → 동작 검증 (회원가입/방/게임) | 대기 |
+
+**Done 기준**: 친구가 도메인으로 접속해 회원가입 → 4탭 게임이 끝까지 진행됨. 운영
+카운터 + MDC 로그가 prod 환경에서도 노출. 비용 알람 셋업 (Fly $20/월 한도).
+
+---
+
+## Phase 8 — 포스트-배포 UX/기능 확장 (D-40)
+
+Phase 7 배포 직후 사용자가 요청한 10개 항목 (보드 풍 레이아웃, 트럼프 카드 비주얼,
+ELO 등급, 팀 옵션, 재접속/직접 링크, 인-게임 채팅, AI 생성 자산, 하이핸드 이펙트)
+을 의존성·위험 순서로 7개 sub-phase 로 분할. Phase 6 패턴 답습 — 각 청크 끝
+사용자 검토/승인 후 다음 진입.
+
+### 결정된 정책 (D-40)
+- AI 이미지: 사전 생성 → `client/public/{cards,characters,board}/*.webp` 정적 번들.
+- 등급: ELO + 6단계 티어. `users.rating INT DEFAULT 1000` V2 마이그레이션. K-factor
+  32 (신규 < 30 게임: K=40). 티어 derived (BRONZE <1100 / SILVER 1100-1249 / GOLD
+  1250-1399 / PLATINUM 1400-1549 / DIAMOND 1550-1699 / MASTER ≥1700).
+- 카드 룩: 트럼프 비주얼 (둥근 모서리/흰 배경/코너 랭크/큰 슈트) + Tichu 4슈트 도메인
+  enum 유지. 특수 4종 일러스트.
+- 채팅: 인메모리 (영속화 없음, 로비 채팅 패턴 동일).
+- Disconnect: 무한 재접속 대기 + 호스트 수동 abort.
+
+### 진입 조건
+Phase 7-5 (배포 검증) 그린 후 8A 시작.
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 8A | 재접속 UX 배너 + 직접 링크 `joinOrReconnect` 분기 (IN_GAME 방 reconnect vs spectator) + 호스트 abort | ✅ 완료 (D-41) |
+| 8B | 인-게임 채팅 (`/app/room/{id}/chat` + `RoomChat` 패널 + 안 읽은 카운트 뱃지) | ✅ 완료 (D-42) |
+| 8C | 팀 옵션 — `Room.teamPolicy` enum (SEQUENTIAL/RANDOM/MANUAL) + 대기실 `SeatingPanel` UI | ✅ 완료 (D-43, MANUAL 드래그 보류) |
+| 8D | ELO + 티어 — V2 마이그레이션 + `EloCalculator` + `MatchResultRecorder` 통합 + 프로필 `TierBadge` | ✅ 완료 (D-44) |
+| 8E | 보드 풍 레이아웃 — 좌석 본인 시점 회전 (하/상/좌/우) + 손패 부채꼴 + 모바일 가로 일렬 폴백 | ✅ 완료 (D-45) |
+| 8F | AI 이미지 — 마스터 prompt + 4장 PoC → 56 + 캐릭터 4 + 보드 1 + `CardChip` 이미지화 | ✅ 완료 (D-46, 실제 자산은 사용자 채움) |
+| 8G | 하이핸드 이펙트 — BOMB/STRAIGHT_FLUSH_BOMB SVG 애니메이션 + 사운드 + mute 토글 | ✅ 완료 (D-47, 실제 mp3 는 사용자 채움) |
+
+### 핵심 위험
+1. **8A 분기 오류** = 손패 노출 (State Hiding 위반). Phase 8 최대 위험. 4명 게임 +
+   5번째 사용자 직접 링크 진입 케이스로 통합 테스트 필수.
+2. **8E 모바일 반응형 붕괴** — `@media (max-width: 640px)` 폴백 명시.
+3. **8F 톤 일관성** — 4장 PoC 사용자 승인 후 나머지 52장.
+4. **8G 자동재생 차단** — 첫 사용자 클릭 후 `AudioContext.resume()`.
+
+**Done 기준**: 7개 sub-phase 각각 검증 통과 + Fly.io 배포 환경에서 4탭 풀 시나리오
+시연 (보드 풍 + 트럼프 카드 + 채팅 + 재접속 + ELO 갱신).
+
+각 sub-phase 의 영향 파일·청크 상세 표는 사용자 plan 스크래치
+(`/Users/yupchang/.claude/plans/abstract-marinating-mochi.md` Phase 8 섹션) 참고.
+
+---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

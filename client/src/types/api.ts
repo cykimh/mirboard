@@ -17,6 +17,8 @@ export interface CatalogResponse {
 
 export type RoomStatus = 'WAITING' | 'IN_GAME' | 'FINISHED';
 
+export type TeamPolicy = 'SEQUENTIAL' | 'RANDOM' | 'MANUAL';
+
 export interface Room {
   roomId: string;
   name: string;
@@ -27,6 +29,7 @@ export interface Room {
   playerCount: number;
   playerIds: number[];
   spectatorIds: number[];
+  teamPolicy: TeamPolicy;
   createdAt: number;
 }
 

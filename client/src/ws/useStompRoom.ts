@@ -1,6 +1,7 @@
 import { Client } from '@stomp/stompjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { roomsApi } from '@/api/rooms';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useTichuStore } from '@/features/tichu/tichuStore';
 import type { Card, ResyncResponse } from '@/types/tichu';
 import type { StompEnvelope } from '@/types/stomp';
@@ -12,6 +13,12 @@ interface HandDealtPayload {
 
 interface ErrorPayload {
   code: string;
+  message: string;
+}
+
+interface ChatPayload {
+  userId: number;
+  username: string;
   message: string;
 }
 
@@ -30,6 +37,10 @@ export function useStompRoom(roomId: string, token: string | null) {
   const applyEvent = useTichuStore((s) => s.applyEvent);
   const setError = useTichuStore((s) => s.setError);
   const reset = useTichuStore((s) => s.reset);
+  const resetChat = useRoomChatStore((s) => s.reset);
+  const appendChat = useRoomChatStore((s) => s.appendIncoming);
+  /** GameTable 에서 채팅 패널 열림 여부를 ref 로 넘겨주면 appendChat 가 unreadCount 분기. */
+  const chatPanelOpenRef = useRef(false);
 
   const resync = useCallback(async () => {
     if (!token) return;
@@ -47,8 +58,9 @@ export function useStompRoom(roomId: string, token: string | null) {
 
   useEffect(() => {
     reset(roomId);
+    resetChat(roomId);
     resync();
-  }, [roomId, reset, resync]);
+  }, [roomId, reset, resetChat, resync]);
 
   useEffect(() => {
     if (!token) return;
@@ -82,6 +94,21 @@ export function useStompRoom(roomId: string, token: string | null) {
             setError(`${payload.code}: ${payload.message}`);
           }
         });
+        // Phase 8B — 인-게임 채팅 구독.
+        client.subscribe(`/topic/room/${roomId}/chat`, (frame) => {
+          const env = JSON.parse(frame.body) as StompEnvelope<ChatPayload>;
+          if (env.type !== 'CHAT') return;
+          appendChat(
+            {
+              eventId: env.eventId,
+              ts: env.ts,
+              userId: env.payload.userId,
+              username: env.payload.username,
+              message: env.payload.message,
+            },
+            chatPanelOpenRef.current,
+          );
+        });
       },
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
@@ -107,5 +134,19 @@ export function useStompRoom(roomId: string, token: string | null) {
     [roomId],
   );
 
-  return { connected, sendAction };
+  const sendChat = useCallback(
+    (message: string) => {
+      const client = clientRef.current;
+      if (!client?.connected) return;
+      const trimmed = message.trim();
+      if (!trimmed) return;
+      client.publish({
+        destination: `/app/room/${roomId}/chat`,
+        body: JSON.stringify({ message: trimmed.slice(0, 500) }),
+      });
+    },
+    [roomId],
+  );
+
+  return { connected, sendAction, sendChat, chatPanelOpenRef };
 }

@@ -1,23 +1,18 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: mirboard-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: mirboard-postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-mirboard}
-      MYSQL_USER: ${MYSQL_USER:-mirboard}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mirboardpw}
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --default-authentication-plugin=caching_sha2_password
+      POSTGRES_DB: ${POSTGRES_DB:-mirboard}
+      POSTGRES_USER: ${POSTGRES_USER:-mirboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mirboardpw}
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpw}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mirboard} -d ${POSTGRES_DB:-mirboard}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -41,12 +36,12 @@ services:
     image: flyway/flyway:10
     container_name: mirboard-flyway
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     command:
-      - -url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-mirboard}?useSSL=false&allowPublicKeyRetrieval=true
-      - -user=${MYSQL_USER:-mirboard}
-      - -password=${MYSQL_PASSWORD:-mirboardpw}
+      - -url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-mirboard}
+      - -user=${POSTGRES_USER:-mirboard}
+      - -password=${POSTGRES_PASSWORD:-mirboardpw}
       - -connectRetries=30
       - -locations=filesystem:/flyway/sql
       - migrate
@@ -55,5 +50,5 @@ services:
     profiles: ["migrate"]
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:

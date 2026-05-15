@@ -82,6 +82,138 @@ Redis fan-out) + 운영 카운터 확인 + 로그 MDC 확인 + 실패 시 보고
 종료 — 남는 항목은 Option B / IN_GAME 자동 목록 / 잔여 21색 / docker-compose multi /
 다중 wish 흐름 등 별도 사이클 보류 건.
 
+## D-39 (2026-05-15) — Phase 7-1: MySQL 8 → PostgreSQL 16 마이그레이션
+
+Fly.io + Upstash Redis 배포를 위해 RDB 를 PostgreSQL 로 통일. Fly Postgres /
+Supabase / Neon 등 매니지드 옵션이 모두 Postgres 기반이고 친구 시연 규모에서
+무료/저비용 티어가 더 풍부하다. **변경 범위**: V1 마이그레이션 SQL 문법
+(`AUTO_INCREMENT` → `GENERATED ALWAYS AS IDENTITY`, `JSON` 컬럼 → `TEXT` —
+앱이 Jackson 으로 직렬화하므로 DB 측 JSON 연산 불필요, `ENGINE/CHARSET` 절 제거,
+복합 인덱스를 별도 `CREATE INDEX` 로 분리), JDBC 드라이버 (`mysql-connector-j` →
+`org.postgresql:postgresql`, `flyway-mysql` → `flyway-database-postgresql`),
+Testcontainers (9 IT 의 `MySQLContainer` → `PostgreSQLContainer`),
+`docker-compose.yml` 의 mysql 서비스 → postgres:16-alpine, `application.yml`
+의 jdbc URL/driver. **불변**: D-02 의 users 테이블 컬럼 화이트리스트, D-01 의
+Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경은 Phase 7
+배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
+profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
+
+## D-47 (2026-05-15) — Phase 8G 마감: 하이핸드 이펙트 (BOMB/STRAIGHT_FLUSH_BOMB)
+
+`effectStore` (Zustand) 가 active effect 1개 관리, `tichuStore.applyEvent` 의
+PLAYED 분기에서 `effectForHandType(p.hand.type)` 가 BOMB/STRAIGHT_FLUSH_BOMB 이면
+`useEffectStore.trigger(kind)` 호출. `EffectsOverlay` 컴포넌트가 active 구독해
+fixed inset:0 + zIndex 9999 로 화면 전역 오버레이 (BOMB: 빨강 플래시 + 12개 노랑
+spike + 주황 원 / STRAIGHT_FLUSH_BOMB: 보라 + 보라 원). CSS keyframes
+(`mirboard-fx-flash/burst/pop`) 으로 1.8초 동안 fade-out. `useSfx` hook 가
+mp3 재생 (`/sfx/bomb.mp3`, `/sfx/straight-flush.mp3`) — 자산 부재 시 silent
+fallback. mute 토글은 localStorage 영속화 (`mirboard.sfxMuted`). 자동재생 차단
+시도는 `.play().catch(() => {})` 로 silent — STOMP 수신 직후라 첫 사용자 클릭
+이전이면 차단되지만 죽지 않음. GameTable 헤더에 🔊/🔇 토글 버튼. 단위 테스트
+5개 (`effectStore.test.ts`) + tichuStore PLAYED BOMB/non-bomb 분기 2개 추가.
+실제 mp3 자산은 사용자가 채워야 함 (`client/public/sfx/README.md` 가이드). 클라
+47/47 회귀 그린.
+
+## D-46 (2026-05-15) — Phase 8F 마감: 카드/캐릭터 이미지 + graceful fallback
+
+`cardAssetSrc(card)` helper 가 `Card → /cards/{suit}-{rank}.webp` URL 매핑 (특수
+카드는 `/cards/{special}.webp`). `CardChip` 이 `<img onError>` 로 이미지 시도 →
+실패 시 기존 텍스트 글리프 fallback — 사용자가 AI 생성 자산을 점진적으로 채워도
+게임이 깨지지 않음. `SeatAvatar` 는 `/characters/seat-{0..3}.webp` 시도 →
+fallback 시 좌석 번호 + 팀 색 border. CSS `.card-chip-img` 가 이미지 모드에서
+56×78px (5:7 비율) 으로 카드 표시, 텍스트 모드는 기존 padding/border. 마스터
+prompt 템플릿 + 슈트별 색상 + 명명 규칙은 `docs/assets/card-prompts.md` 에 정착
+— PoC 4장 → 사용자 승인 → 나머지 52장 일관성 보장 전략. `clientBuild` Gradle
+task 의 inputs 에 `client/public` 추가 — 자산 변경 시 cache 무효화. 실제 56장 +
+캐릭터 4 + 보드 1 자산은 사용자가 AI 로 생성해서 채워야 하는 부분 (코드 측은
+자산 0개 상태에서도 전 테스트 통과). 단위 테스트 3개 (`cardAssetSrc.test.ts`)
++ 클라 40/40 회귀 그린.
+
+## D-45 (2026-05-15) — Phase 8E 마감: 보드 풍 테이블 레이아웃
+
+`.table-seats` (grid 4열) 를 `.table-arena` (relative + absolute 좌석) 로 교체.
+React 측 본인 시점 매핑: `viewIdx = (seat - mySeat + 4) % 4` → S/W/N/E
+className 분기 (본인 항상 S 하단, 파트너 N 상단, 적팀 W/E). 중앙 currentTop 은
+`.table-center-trick` 가 absolute 중앙 — 기존 별도 `.trick` 영역은 통째로 제거하고
+lead 대기/시트 번호/hand-type/Phoenix 배지를 모두 중앙 영역에 통합. 다크 그린
+radial gradient 로 카지노 테이블 분위기. 모바일 fallback (max-width: 640px)
+에서는 absolute 해제 + grid 4열 + 중앙 트릭은 grid 5번째 칸 — 좌석 좁아짐 방지.
+본인 손패 hover 시 translateY(-6px) + scale 1.05 (선택 시 -10px) 로 카드 떠오르기.
+실제 트럼프 카드 이미지 + 부채꼴 fan-out 은 8F 와 함께 도입 예정 (현 SortableHand
+는 가로 일렬 유지). 클라 빌드 +1.5KB CSS, 37 단위 테스트 회귀 그린.
+
+## D-44 (2026-05-15) — Phase 8D 마감: ELO + 6단계 티어
+
+V2 마이그레이션 (`users.rating INT NOT NULL DEFAULT 1000`) — D-02 schema constraint
+통과 (식별정보 아닌 derived 성적 집계). `EloCalculator.applyMatch(teamA, teamB,
+winnerIsTeamA)` 가 팀 평균 rating 기준 기대 승률 산출 → 한 팀 두 명 동일 +/- delta.
+K-factor 32 (기본), 30게임 미만 신규는 40. tier 는 DB 컬럼 X — `Tier.fromRating(int)`
+로 6구간 derived (BRONZE/SILVER/GOLD/PLATINUM/DIAMOND/MASTER). `MatchResultRecorder`
+가 win/lose 증분 *이전*에 rating + gamesPlayed 수집해서 K-factor 임계 정확하게 적용,
+같은 `@Transactional` 안에서 `userRepo.updateRating(userId, newRating)` 호출. 새
+endpoint `GET /api/users/{userId}/stats` 가 rating + tier (derived) + win/lose 반환
+— 이메일/전화 등 식별 정보 노출 0건. 클라는 `TierBadge` 컴포넌트 + Hub 헤더에
+본인 티어/rating/전적 표시. 통합 테스트: `MatchResultRecorderIT` 에 ELO 검증 추가
+(신규 4명 동일 rating → ±20), `UserStatsIntegrationTest` 2개 (신규=BRONZE/1000,
+unknown user 404), `EloCalculatorTest` 단위 6개 (K-factor 임계 / 동일 rating / 업셋
+/ 빈 팀 거절 / tier 구간 boundary).
+
+## D-43 (2026-05-15) — Phase 8C 마감: 팀 배정 정책 (SEQUENTIAL/RANDOM/MANUAL)
+
+`Room.teamPolicy` enum 3개 — `SEQUENTIAL` (입장 순서, 기본), `RANDOM` (4번째 join
+직후 `Collections.shuffle`), `MANUAL` (enum 만 예약, 서버 동작은 SEQUENTIAL 동일 —
+후속 청크에서 호스트 드래그 UI 도입 시 분기). `room_create.lua` 가 ARGV[7] 로
+teamPolicy 수신, `RoomRepository.create()` 시그니처 확장, `findById` 가 누락 컬럼
+시 SEQUENTIAL 기본값 (기존 방과 호환). RANDOM 셔플은 `RoomService.joinRoom` 의
+IN_GAME 분기에서 1회만 — Lua 가 capacity 막은 직후 `repository.replacePlayerOrder`
+(DEL + RPUSHALL, 신규 join 동시성 없음으로 안전). 호스트 정책 변경 endpoint
+(`PUT /api/rooms/{id}/team-policy`) 는 WAITING 한정 + `NotHostException`/
+`GameAlreadyStartedException` 가드. 클라는 `RoomPage` WAITING 섹션에 호스트만
+드롭다운 (참가자는 readonly Badge). `RoomService` 생성자 분리 (`@Autowired` 명시 +
+시드 고정 Random 주입용 보조 생성자 — Spring 4.0 의 No default constructor 오류
+해결). 통합 테스트 6개 (`RoomTeamPolicyIntegrationTest`).
+
+## D-42 (2026-05-15) — Phase 8B 마감: 인-게임 채팅 (인메모리)
+
+`@MessageMapping("/room/{roomId}/chat")` STOMP 핸들러 + `/topic/room/{roomId}/chat`
+broadcast. 로비 채팅 ({@link LobbyStompController}) 패턴 답습 — `StompPublisher`
+경유로 멀티 인스턴스 fan-out. 멤버 검증은 `RoomService.isParticipantOrSpectator`
+재사용 (참여자 + 관전자 모두 송수신 허용, 비-멤버는 silent drop). 영속화 없음 —
+재접속 시 과거 메시지는 못 봄 (MVP 정책, 영속화는 향후 별도 청크). 클라는
+`useRoomChatStore` (Zustand) 가 메시지 큐 + 안 읽은 카운트 관리, `chatPanelOpenRef`
+ref 로 패널 열림 여부 전달해서 패널이 열려있는 동안엔 unread 가 안 늘게 함.
+`RoomChat` 사이드패널 + GameTable 헤더에 💬 토글 + unread 뱃지. 8B-1 (서버), 8B-2
+(클라 컴포넌트), 8B-3 (토글/뱃지) 한 청크에서 처리. 통합 테스트 2개
+(`RoomChatStompIntegrationTest`) 가 멤버 fan-out + 비-멤버 drop 검증, 클라 단위 5개
+(`roomChatStore.test.ts`) 가 reset/unread/cap 검증.
+
+## D-41 (2026-05-15) — Phase 8A 마감: joinOrReconnect 분기 + 호스트 abort
+
+직접 링크 진입 자동 분기 (`POST /api/rooms/{id}/join-or-reconnect`) — 본인이
+이미 playerIds 에 있으면 `RECONNECTED` (Redis 변경 없음, 좌석 보존), WAITING 방
+빈 자리면 `JOINED`, 그 외 (IN_GAME / capacity full) 는 `SPECTATING` 으로 자동
+흡수. State Hiding 의 1차 방어선 — 비-참여자가 player 목록에 절대 들어가지
+않음. 통합 테스트 (`RoomJoinOrReconnectIntegrationTest` 7개) 가 5번째 사용자
+IN_GAME 방 진입 시 `privateHand=null` 임을 검증. 호스트 abort (`POST /api/rooms/{id}/abort`,
+무한 재접속 정책 하의 유일한 탈출구) 는 `NotHostException(403)` / `GameNotInProgressException(409)`
+가드. 클라는 RoomPage 진입 시 자동 호출 + `ReconnectBanner` 가 STOMP `connected=false`
+1초 이상이면 노란 배너, 3분 이상이면 "호스트가 강제 종료할 수 있음" 안내.
+
+## D-40 (2026-05-15) — Phase 8 진입 계획: 포스트-배포 UX/기능 확장 7개 sub-phase
+
+Phase 7 배포 직후 사용자가 요청한 10개 항목 (보드 풍 레이아웃, 트럼프 카드, ELO 등급,
+팀 옵션, 재접속/직접 링크, 인-게임 채팅, AI 생성 자산, 하이핸드 이펙트 등) 을 Phase 6
+패턴으로 7개 sub-phase 로 분할: **8A** 재접속 + 직접 링크 자동 합류 (joinOrReconnect
+분기 + 호스트 abort) → **8B** 인-게임 채팅 (인메모리, 로비 채팅 패턴 답습) → **8C**
+팀 옵션 (Room.teamPolicy SEQUENTIAL/RANDOM/MANUAL) → **8D** ELO + 6단계 티어
+(users.rating INT DEFAULT 1000 V2 마이그레이션, K=32, 티어 derived) → **8E** 보드 풍
+레이아웃 (좌석 본인 시점 회전 + 모바일 가로 일렬 폴백) → **8F** AI 이미지 정적 번들
+(client/public/ 트럼프 풍 카드 56 + 캐릭터 4 + 보드 1, 4장 PoC 우선) → **8G** 하이핸드
+이펙트 (BOMB/STRAIGHT_FLUSH_BOMB SVG 애니메이션 + 사운드, mute 토글). **불변**: D-02
+의 users 컬럼 화이트리스트 (rating 은 식별정보 아님으로 통과), D-01 의 State Hiding
+(8A 분기 오류 시 손패 노출 위험이 본 Phase 최대 위험). **진입 조건**: Phase 7-5
+(배포 검증) 그린 이후 8A 시작.
+
 ## D-37 (2026-05-14) — Phase 6D 마감: 멀티 인스턴스 (Redis Pub/Sub) 추상화
 
 단일 인스턴스 가정 (D-13 의 SimpleBroker + Spring ApplicationEventPublisher 의

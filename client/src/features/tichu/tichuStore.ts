@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Card, Hand, PrivateHand, TableView, TichuDeclaration } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
+import { effectForHandType, useEffectStore } from './effectStore';
 
 /**
  * 패스 단계에서 좌석별 슬롯. UI 가 카드를 클릭할 때 활성 슬롯에 카드 키를 저장.
@@ -218,6 +219,9 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         let next = withHandCountDelta(table, p.seat, -p.hand.cards.length);
         next = { ...next, currentTop: p.hand, currentTopSeat: p.seat };
         advance(next);
+        // Phase 8G — 하이핸드 (BOMB / STRAIGHT_FLUSH_BOMB) 시 화면 이펙트 trigger.
+        const fx = effectForHandType(p.hand.type);
+        if (fx) useEffectStore.getState().trigger(fx);
         return 'applied';
       }
       case 'PASSED': {

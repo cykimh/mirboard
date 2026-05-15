@@ -11,9 +11,15 @@ import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
+import { SeatAvatar } from './SeatAvatar';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
+import { EffectsOverlay } from './EffectsOverlay';
+import { useSfx } from './useSfx';
 import { Badge } from '@/components/Badge';
+import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { RoomChat } from '@/features/chat/RoomChat';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
 
 interface GameTableProps {
   roomId: string;
@@ -31,7 +37,10 @@ const PASS_SLOT_LABEL: Record<PassSlot, string> = {
 
 export function GameTable({ roomId, playerIds, myUserId, spectator = false }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction } = useStompRoom(roomId, token);
+  const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(roomId, token);
+  const [chatOpen, setChatOpen] = useState(false);
+  const unreadCount = useRoomChatStore((s) => s.unreadCount);
+  const { muted, toggleMute } = useSfx();
   const tableView = useTichuStore((s) => s.tableView);
   const privateHand = useTichuStore((s) => s.privateHand);
   const selectedCardKeys = useTichuStore((s) => s.selectedCardKeys);
@@ -187,7 +196,13 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
       : t('game.phase.roundEnd');
 
   return (
-    <section className="game-table">
+    <div
+      className="game-table-layout"
+      style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}
+    >
+    <section className="game-table" style={{ flex: 1, minWidth: 0 }}>
+      <EffectsOverlay />
+      <ReconnectBanner connected={connected} />
       <header className="game-table-header">
         <span>
           {t('game.header.stomp')} {connected ? '●' : '○'}
@@ -212,23 +227,80 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
             {t('game.header.activeWish')}: {tableView.activeWishRank}
           </span>
         )}
+        <button
+          type="button"
+          onClick={toggleMute}
+          style={{
+            marginLeft: 'auto',
+            background: 'transparent',
+            border: '1px solid #444',
+            borderRadius: 4,
+            padding: '2px 8px',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+          aria-label="사운드 토글"
+          title={muted ? '사운드 켜기' : '사운드 끄기'}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setChatOpen((v) => !v)}
+          style={{
+            background: 'transparent',
+            border: '1px solid #444',
+            borderRadius: 4,
+            padding: '2px 8px',
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+          aria-label="채팅 토글"
+        >
+          💬 채팅
+          {unreadCount > 0 && !chatOpen && (
+            <span
+              style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                background: '#d33',
+                color: '#fff',
+                borderRadius: '50%',
+                fontSize: 10,
+                padding: '2px 6px',
+                minWidth: 18,
+                lineHeight: 1,
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
       </header>
 
-      <div className="table-seats">
+      <div className="table-arena">
         {playerIds.map((uid, seat) => {
           const ready = isInDealing && tableView.readySeats.includes(seat);
           const submitted =
             isInPassing && tableView.passingSubmittedSeats.includes(seat);
           const turnHighlight = isInPlaying && seat === tableView.currentTurnSeat;
+          // Phase 8E — 본인 시점 좌석 매핑. mySeat 기준 회전 후 (S/W/N/E) 배치.
+          // viewIdx 0=South(본인), 1=West(우적), 2=North(파트너), 3=East(좌적).
+          const viewIdx = ((seat - mySeat) + 4) % 4;
+          const viewPos = ['s', 'w', 'n', 'e'][viewIdx];
           return (
             <div
               key={uid}
-              className={`seat ${turnHighlight ? 'turn' : ''}
+              className={`seat seat-${viewPos} ${turnHighlight ? 'turn' : ''}
                          ${tableView.finishingOrder.includes(seat) ? 'finished' : ''}
                          ${ready ? 'ready' : ''}
                          ${submitted ? 'submitted' : ''}`}
             >
-              <div className="seat-id">#{uid}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                <SeatAvatar seat={seat} size={32} />
+                <span className="seat-id">#{uid}</span>
+              </div>
               <div className="hand-count">
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}
               </div>
@@ -240,31 +312,31 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
             </div>
           );
         })}
+        {isInPlaying && (
+          <div className="table-center-trick">
+            {tableView.currentTop ? (
+              <>
+                <div className="hand-cards">
+                  {tableView.currentTop.cards.map((c) => (
+                    <CardChip key={cardKey(c)} card={c} />
+                  ))}
+                </div>
+                <div className="trick-meta">
+                  <span>시트 {tableView.currentTopSeat}</span>
+                  <span className="hand-type">{tableView.currentTop.type}</span>
+                  {tableView.currentTop.phoenixSingle && (
+                    <Badge tone="phoenix" title={t('phoenix.singleTooltip')}>
+                      {t('phoenix.singleBadge')}
+                    </Badge>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="trick-empty">{t('trick.leadWaiting')}</p>
+            )}
+          </div>
+        )}
       </div>
-
-      {isInPlaying && (
-        <div className="trick">
-          <h3>{t('trick.title')}</h3>
-          {tableView.currentTop ? (
-            <div className="current-top">
-              <span>시트 {tableView.currentTopSeat} —</span>
-              <span className="hand-cards">
-                {tableView.currentTop.cards.map((c) => (
-                  <CardChip key={cardKey(c)} card={c} />
-                ))}
-              </span>
-              <span className="hand-type">{tableView.currentTop.type}</span>
-              {tableView.currentTop.phoenixSingle && (
-                <Badge tone="phoenix" title={t('phoenix.singleTooltip')}>
-                  {t('phoenix.singleBadge')}
-                </Badge>
-              )}
-            </div>
-          ) : (
-            <p>{t('trick.leadWaiting')}</p>
-          )}
-        </div>
-      )}
 
       {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
         <div className="pass-picker">
@@ -446,6 +518,14 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
         )
       )}
     </section>
+      {chatOpen && (
+        <RoomChat
+          myUserId={myUserId}
+          sendChat={sendChat}
+          panelOpenRef={chatPanelOpenRef}
+        />
+      )}
+    </div>
   );
 }
 

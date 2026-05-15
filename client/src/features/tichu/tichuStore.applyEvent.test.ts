@@ -79,6 +79,50 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(useTichuStore.getState().lastSeq).toBe(2);
   });
 
+  it('PLAYED with BOMB triggers effect (Phase 8G)', async () => {
+    const { useEffectStore } = await import('./effectStore');
+    useEffectStore.getState().clear();
+    loadTable(baseTable(), 1);
+    const bombHand: Hand = {
+      type: 'BOMB',
+      cards: [
+        { suit: 'JADE', rank: 7, special: null },
+        { suit: 'SWORD', rank: 7, special: null },
+        { suit: 'STAR', rank: 7, special: null },
+        { suit: 'PAGODA', rank: 7, special: null },
+      ],
+      rank: 7,
+      length: 4,
+    };
+    useTichuStore.getState().applyEvent({
+      type: 'PLAYED',
+      seq: 2,
+      payload: { seat: 2, hand: bombHand },
+    });
+    expect(useEffectStore.getState().active?.kind).toBe('BOMB');
+  });
+
+  it('PLAYED with non-bomb hand does not trigger effect', async () => {
+    const { useEffectStore } = await import('./effectStore');
+    useEffectStore.getState().clear();
+    loadTable(baseTable(), 1);
+    const pairHand: Hand = {
+      type: 'PAIR',
+      cards: [
+        { suit: 'JADE', rank: 3, special: null },
+        { suit: 'SWORD', rank: 3, special: null },
+      ],
+      rank: 3,
+      length: 2,
+    };
+    useTichuStore.getState().applyEvent({
+      type: 'PLAYED',
+      seq: 2,
+      payload: { seat: 0, hand: pairHand },
+    });
+    expect(useEffectStore.getState().active).toBeNull();
+  });
+
   it('TURN_CHANGED updates currentTurnSeat', () => {
     loadTable(baseTable(), 1);
     useTichuStore.getState().applyEvent({

@@ -29,6 +29,10 @@ public class User {
     @Column(name = "lose_count", nullable = false)
     private int loseCount;
 
+    /** Phase 8D — ELO 점수. 기본 1000 (V2 마이그레이션). 매치 결과로 +/- 갱신. */
+    @Column(nullable = false)
+    private int rating;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -41,6 +45,7 @@ public class User {
         this.passwordHash = passwordHash;
         this.winCount = 0;
         this.loseCount = 0;
+        this.rating = 1000;
         this.createdAt = createdAt;
     }
 
@@ -66,6 +71,10 @@ public class User {
 
     public int getLoseCount() {
         return loseCount;
+    }
+
+    public int getRating() {
+        return rating;
     }
 
     public Instant getCreatedAt() {

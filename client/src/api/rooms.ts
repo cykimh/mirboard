@@ -1,5 +1,10 @@
 import { apiRequest } from './client';
-import type { Room, RoomListResponse } from '@/types/api';
+import type { Room, RoomListResponse, TeamPolicy } from '@/types/api';
+
+export interface JoinOrReconnectResponse {
+  mode: 'JOINED' | 'RECONNECTED' | 'SPECTATING';
+  room: Room;
+}
 
 export const roomsApi = {
   list(token: string, gameType?: string): Promise<RoomListResponse> {
@@ -7,11 +12,20 @@ export const roomsApi = {
     return apiRequest(`/api/rooms${qs}`, { token });
   },
 
-  create(token: string, name: string, gameType: string): Promise<Room> {
+  create(token: string, name: string, gameType: string, teamPolicy?: TeamPolicy): Promise<Room> {
     return apiRequest('/api/rooms', {
       method: 'POST',
       token,
-      body: { name, gameType },
+      body: teamPolicy ? { name, gameType, teamPolicy } : { name, gameType },
+    });
+  },
+
+  /** Phase 8C — WAITING 방에서 호스트만 호출 가능. */
+  updateTeamPolicy(token: string, roomId: string, teamPolicy: TeamPolicy): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/team-policy`, {
+      method: 'PUT',
+      token,
+      body: { teamPolicy },
     });
   },
 
@@ -21,6 +35,22 @@ export const roomsApi = {
 
   join(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
+      method: 'POST',
+      token,
+    });
+  },
+
+  /** Phase 8A — 직접 링크 진입 자동 분기 (JOINED / RECONNECTED / SPECTATING). */
+  joinOrReconnect(token: string, roomId: string): Promise<JoinOrReconnectResponse> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join-or-reconnect`, {
+      method: 'POST',
+      token,
+    });
+  },
+
+  /** Phase 8A — 호스트가 진행 중인 게임을 강제 종료. */
+  abort(token: string, roomId: string): Promise<void> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/abort`, {
       method: 'POST',
       token,
     });

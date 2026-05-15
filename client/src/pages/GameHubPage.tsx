@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { gamesApi } from '@/api/games';
+import { usersApi, type UserStats } from '@/api/users';
 import { useAuthStore } from '@/features/auth/authStore';
+import { TierBadge } from '@/components/TierBadge';
 import type { GameSummary } from '@/types/api';
 
 export function GameHubPage() {
@@ -10,10 +12,11 @@ export function GameHubPage() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const [games, setGames] = useState<GameSummary[] | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !user) {
       navigate('/login');
       return;
     }
@@ -21,14 +24,22 @@ export function GameHubPage() {
       .catalog(token)
       .then((res) => setGames(res.games))
       .catch((err: Error) => setError(err.message));
-  }, [token, navigate]);
+    // Phase 8D — 본인 ELO/티어 표시. 실패해도 게임 카탈로그는 계속 보임.
+    usersApi.stats(token, user.userId).then(setStats).catch(() => {});
+  }, [token, user, navigate]);
 
   return (
     <main className="hub-page">
       <header>
         <h1>Game Hub</h1>
-        <div className="user-bar">
+        <div className="user-bar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {user && <span>{user.username}</span>}
+          {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
+          {stats && (
+            <span style={{ fontSize: 12, opacity: 0.7 }}>
+              {stats.winCount}승 {stats.loseCount}패
+            </span>
+          )}
           <button type="button" onClick={() => { logout(); navigate('/login'); }}>
             로그아웃
           </button>

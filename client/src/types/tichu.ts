@@ -95,3 +95,20 @@ export function cardLabel(c: Card): string {
   if (c.rank === 14) return 'A';
   return String(c.rank);
 }
+
+/**
+ * Phase 8F — 카드 → 정적 이미지 URL 매핑. 자산은 `client/public/cards/` 에 있을
+ * 때 `/cards/...` 로 접근 (Vite 가 public 을 root 로 매핑). 자산 없으면 CardChip
+ * 가 onError 로 텍스트 글리프 fallback.
+ *
+ * 명명 규칙은 `docs/assets/card-prompts.md` 참고.
+ */
+export function cardAssetSrc(c: Card): string {
+  if (c.special) {
+    return `/cards/${c.special.toLowerCase()}.webp`;
+  }
+  if (!c.suit) return '/cards/back.webp';  // 안전망 — suit 없는 일반 카드는 없음.
+  const rankVisual =
+    c.rank === 11 ? 'J' : c.rank === 12 ? 'Q' : c.rank === 13 ? 'K' : c.rank === 14 ? 'A' : String(c.rank);
+  return `/cards/${c.suit.toLowerCase()}-${rankVisual}.webp`;
+}

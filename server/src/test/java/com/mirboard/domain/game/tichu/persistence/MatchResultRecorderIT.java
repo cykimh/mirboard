@@ -21,7 +21,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -35,7 +35,7 @@ class MatchResultRecorderIT {
 
     @Container
     @ServiceConnection
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0");
+    static final PostgreSQLContainer<?> MYSQL = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Container
     static final GenericContainer<?> REDIS =
@@ -104,6 +104,13 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(2).getWinCount()).isEqualTo(1);
         assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
         assertThat(refreshed.get(3).getLoseCount()).isEqualTo(1);
+
+        // Phase 8D — ELO 갱신 검증. 모든 신규 유저 (gamesPlayed=0 → K=40), rating=1000.
+        // expected=0.5, delta = 40 * 0.5 = 20. 승팀 +20, 패팀 -20.
+        assertThat(refreshed.get(0).getRating()).isEqualTo(1020);
+        assertThat(refreshed.get(2).getRating()).isEqualTo(1020);
+        assertThat(refreshed.get(1).getRating()).isEqualTo(980);
+        assertThat(refreshed.get(3).getRating()).isEqualTo(980);
     }
 
     private List<User> registerFour(String... usernames) {

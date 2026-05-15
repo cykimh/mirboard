@@ -156,6 +156,59 @@
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
+### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
+직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:
+- `JOINED` — WAITING 방 + 빈 자리 있을 때 새로 입장.
+- `RECONNECTED` — 이미 본인이 `playerIds` 에 있음 (Redis 변경 없음, 좌석 보존).
+- `SPECTATING` — IN_GAME 방에 들어왔거나 capacity 가 찬 경우 자동 관전.
+
+응답 `200`
+```json
+{ "mode": "JOINED" | "RECONNECTED" | "SPECTATING", "room": { ... } }
+```
+에러: `ROOM_NOT_FOUND`. 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
+
+### GET `/api/users/{userId}/stats` *(Phase 8D)*
+ELO rating + 누적 전적 + 파생 tier 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
+schema constraint 유지.
+
+응답 `200`
+```json
+{
+  "userId": 17,
+  "username": "alice",
+  "winCount": 5,
+  "loseCount": 3,
+  "rating": 1120,
+  "tier": "SILVER"
+}
+```
+
+tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
+1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
+
+### PUT `/api/rooms/{roomId}/team-policy` *(Phase 8C — 호스트 전용)*
+WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
+
+요청
+```json
+{ "teamPolicy": "SEQUENTIAL" | "RANDOM" | "MANUAL" }
+```
+
+응답 `200` — Room 갱신본. 에러: `NOT_HOST` (403), `GAME_ALREADY_STARTED` (409),
+`ROOM_NOT_FOUND` (404).
+
+본 청크 (Phase 8C) 에서는 `RANDOM` 만 서버 동작 분기 (4번째 join 직후 좌석 셔플).
+`MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트
+좌석 드래그 UI 도입 시 분기 추가.
+
+### POST `/api/rooms/{roomId}/abort` *(Phase 8A — 호스트 전용)*
+IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이어가 돌아오지 않을 때
+유일한 탈출구.
+
+응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
+
 ### POST `/api/rooms/{roomId}/leave`
 응답 `204`.
 - 호스트가 떠나면 잔존 인원 중 가장 먼저 입장한 사용자가 호스트 승격.

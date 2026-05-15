@@ -28,7 +28,7 @@ public class TichuMatchResult {
     @Column(name = "team_b_score", nullable = false)
     private int teamBScore;
 
-    @Column(name = "payload_json", nullable = false, columnDefinition = "JSON")
+    @Column(name = "payload_json", nullable = false, columnDefinition = "TEXT")
     private String payloadJson;
 
     protected TichuMatchResult() {

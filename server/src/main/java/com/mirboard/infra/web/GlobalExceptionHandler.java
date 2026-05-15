@@ -7,6 +7,8 @@ import com.mirboard.domain.lobby.auth.InvalidUsernameException;
 import com.mirboard.domain.lobby.auth.UsernameTakenException;
 import com.mirboard.domain.lobby.room.AlreadyInRoomException;
 import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
+import com.mirboard.domain.lobby.room.GameNotInProgressException;
+import com.mirboard.domain.lobby.room.NotHostException;
 import com.mirboard.domain.lobby.room.NotInRoomException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.RoomFullException;
@@ -87,6 +89,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorEnvelope> handleGameAlreadyStarted(GameAlreadyStartedException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorEnvelope.of("GAME_ALREADY_STARTED", "Game already started",
+                        Map.of("roomId", e.roomId())));
+    }
+
+    @ExceptionHandler(NotHostException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleNotHost(NotHostException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorEnvelope.of("NOT_HOST", "Only the host can perform this action",
+                        Map.of("roomId", e.roomId())));
+    }
+
+    @ExceptionHandler(GameNotInProgressException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleGameNotInProgress(GameNotInProgressException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("GAME_NOT_IN_PROGRESS",
+                        "Game is not in progress",
                         Map.of("roomId", e.roomId())));
     }
 

@@ -1,0 +1,55 @@
+# Mirboard — Fly.io 배포 설정 (Phase 7-2 / D-39).
+#
+# 사용자 셋업 (한 번):
+#   1. `flyctl auth login` — Fly 계정 로그인
+#   2. `flyctl launch --copy-config --no-deploy --name <your-app-name> --region nrt`
+#      → 첫 실행 시 이 fly.toml 을 베이스로 머신/볼륨 생성. 이미 만들었으면 생략.
+#   3. `flyctl secrets set ...` — 아래 "필수 secrets" 참고
+#   4. `flyctl deploy` — 첫 배포
+#
+# 필수 secrets (flyctl secrets set KEY=value):
+#   MIRBOARD_JWT_SECRET       JWT HS256 서명 키 (32바이트 이상). 예: `openssl rand -hex 32`
+#   MIRBOARD_DB_URL           Postgres jdbc URL. 예: jdbc:postgresql://<host>:5432/mirboard
+#   MIRBOARD_DB_USER          Postgres 사용자
+#   MIRBOARD_DB_PASSWORD      Postgres 비밀번호
+#   MIRBOARD_REDIS_HOST       Upstash Redis 호스트 (예: foo-bar-12345.upstash.io)
+#   MIRBOARD_REDIS_PORT       Upstash Redis 포트 (기본 6379, TLS 는 보통 6380)
+#   MIRBOARD_REDIS_PASSWORD   Upstash Redis 비밀번호 (Upstash 콘솔의 default user password)
+#   MIRBOARD_REDIS_SSL        "true" (Upstash 는 TLS 강제, Phase 7-3 에서 처리)
+
+app = "mirboard"
+primary_region = "nrt"
+
+# Docker 빌드 — repo 루트의 Dockerfile 사용.
+[build]
+  dockerfile = "Dockerfile"
+
+# 공개 HTTPS 서비스. 단일 머신, 트래픽 없을 때 stop 으로 비용 절감.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  # Spring Boot Actuator health endpoint.
+  # grace_period: 부팅 동안 헬스체크 실패를 무시하는 시간. Spring Boot 4 + JPA + Redis
+  # + Security 풀스택이 shared-cpu-1x / 512MB 에서 콜드 스타트 ~100s 걸려 넉넉히 잡음.
+  [[http_service.checks]]
+    grace_period = "120s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/actuator/health"
+
+# 환경 변수 — 공개해도 무방한 것들만 (secret 은 flyctl secrets 로).
+[env]
+  SPRING_PROFILES_ACTIVE = "prod"
+  MIRBOARD_PORT = "8080"
+  MIRBOARD_MESSAGING_GATEWAY = "redis"
+
+# VM 사이즈 — shared-cpu-1x / 512MB 면 친구 5~10명 시연 + Spring Boot 부팅 충분.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

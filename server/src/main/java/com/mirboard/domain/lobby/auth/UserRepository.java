@@ -19,4 +19,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.loseCount = u.loseCount + 1 WHERE u.id = :id")
     int incrementLoseCount(@Param("id") long id);
+
+    /** Phase 8D — ELO 갱신. EloCalculator 가 계산한 newRating 으로 덮어쓰기. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE User u SET u.rating = :rating WHERE u.id = :id")
+    int updateRating(@Param("id") long id, @Param("rating") int rating);
 }

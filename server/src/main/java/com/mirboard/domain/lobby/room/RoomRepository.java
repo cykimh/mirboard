@@ -36,7 +36,7 @@ public class RoomRepository {
     }
 
     public void create(String roomId, long hostUserId, String name, String gameType,
-                       int capacity, long createdAt) {
+                       int capacity, long createdAt, TeamPolicy teamPolicy) {
         Long result = redis.execute(
                 createScript,
                 keysFor(roomId),
@@ -45,10 +45,31 @@ public class RoomRepository {
                 name,
                 gameType,
                 Integer.toString(capacity),
-                Long.toString(createdAt));
+                Long.toString(createdAt),
+                teamPolicy.name());
         if (result == null || result != 1L) {
             throw new IllegalStateException("room_create.lua returned unexpected: " + result);
         }
+    }
+
+    /**
+     * Phase 8C — IN_GAME 전이 직후 RANDOM 정책에서 좌석 셔플용. capacity 가 이미
+     * 막혔으므로 신규 join 동시성 위험 없음. DEL + RPUSHALL 2-step (Lua 미사용).
+     */
+    public void replacePlayerOrder(String roomId, List<Long> newOrder) {
+        String key = "room:" + roomId + ":players";
+        redis.delete(key);
+        String[] payload = newOrder.stream().map(String::valueOf).toArray(String[]::new);
+        redis.opsForList().rightPushAll(key, payload);
+        redis.expire(key, java.time.Duration.ofHours(6));
+    }
+
+    /** Phase 8C — 호스트가 WAITING 중 정책을 변경. status=IN_GAME 이면 호출 불가. */
+    public void updateTeamPolicy(String roomId, TeamPolicy newPolicy) {
+        if (Boolean.FALSE.equals(redis.hasKey("room:" + roomId))) {
+            throw new RoomNotFoundException(roomId);
+        }
+        redis.opsForHash().put("room:" + roomId, "teamPolicy", newPolicy.name());
     }
 
     public int join(String roomId, long userId, long now) {
@@ -102,6 +123,9 @@ public class RoomRepository {
         Set<Long> spectatorIds = spectatorStrings == null
                 ? Set.of()
                 : spectatorStrings.stream().map(Long::parseLong).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        // Phase 8C — teamPolicy 컬럼이 없는 (V1 이전) 방은 SEQUENTIAL 기본값.
+        String rawPolicy = (String) hash.get("teamPolicy");
+        TeamPolicy teamPolicy = rawPolicy == null ? TeamPolicy.SEQUENTIAL : TeamPolicy.valueOf(rawPolicy);
         return Optional.of(new Room(
                 roomId,
                 (String) hash.get("name"),
@@ -112,6 +136,7 @@ public class RoomRepository {
                 playerIds.size(),
                 playerIds,
                 spectatorIds,
+                teamPolicy,
                 Long.parseLong((String) hash.get("createdAt"))));
     }
 

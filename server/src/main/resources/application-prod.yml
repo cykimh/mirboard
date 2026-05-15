@@ -1,0 +1,53 @@
+# Phase 7-3 (D-39) — Fly.io 배포 시 활성화되는 프로필 (SPRING_PROFILES_ACTIVE=prod).
+#
+# 시크릿은 모두 환경 변수로 주입한다 (`flyctl secrets set ...`). 이 파일에는
+# 평문 시크릿을 절대 두지 않는다.
+#
+# 필수 환경 변수:
+#   MIRBOARD_JWT_SECRET       JWT HS256 키 (32바이트 이상)
+#   MIRBOARD_DB_URL           jdbc:postgresql://... (Fly Postgres / Supabase / Neon)
+#   MIRBOARD_DB_USER          Postgres 사용자
+#   MIRBOARD_DB_PASSWORD      Postgres 비밀번호
+#   MIRBOARD_REDIS_HOST       Upstash Redis 호스트
+#   MIRBOARD_REDIS_PORT       6380 (TLS) 권장
+#   MIRBOARD_REDIS_PASSWORD   Upstash 비밀번호
+#
+# 선택:
+#   MIRBOARD_MESSAGING_GATEWAY  redis (멀티 머신 가능 — fly.toml 에서 이미 설정)
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 1
+
+  jpa:
+    properties:
+      hibernate.format_sql: false
+
+  data:
+    redis:
+      ssl:
+        # Upstash 는 TLS 필수. local dev 와의 유일한 차이.
+        enabled: ${MIRBOARD_REDIS_SSL:true}
+
+# Phase 6D — 멀티 인스턴스 fan-out 기본값을 redis 로. fly.toml [env] 에서도 셋팅했지만
+# yml override 로 안전망 한 겹 더.
+mirboard:
+  messaging:
+    gateway: ${MIRBOARD_MESSAGING_GATEWAY:redis}
+
+server:
+  forward-headers-strategy: framework
+  # Fly proxy 뒤 — 실제 origin 은 X-Forwarded-* 헤더로 들어옴.
+  tomcat:
+    remoteip:
+      protocol-header: x-forwarded-proto
+      remote-ip-header: x-forwarded-for
+
+logging:
+  level:
+    root: INFO
+    com.mirboard: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

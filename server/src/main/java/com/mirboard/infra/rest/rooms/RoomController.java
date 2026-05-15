@@ -7,11 +7,13 @@ import com.mirboard.domain.game.tichu.state.PrivateHand;
 import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
+import com.mirboard.domain.lobby.room.JoinOrReconnectResult;
 import com.mirboard.domain.lobby.room.NotInRoomException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
+import com.mirboard.domain.lobby.room.TeamPolicy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -56,7 +58,16 @@ public class RoomController {
     @ResponseStatus(HttpStatus.CREATED)
     public Room create(@AuthenticationPrincipal AuthPrincipal me,
                        @RequestBody @Valid CreateRequest req) {
-        return rooms.createRoom(me.userId(), req.name(), req.gameType());
+        TeamPolicy policy = req.teamPolicy() == null ? TeamPolicy.SEQUENTIAL : req.teamPolicy();
+        return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy);
+    }
+
+    /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
+    @org.springframework.web.bind.annotation.PutMapping("/{roomId}/team-policy")
+    public Room updateTeamPolicy(@PathVariable String roomId,
+                                 @AuthenticationPrincipal AuthPrincipal me,
+                                 @RequestBody @Valid UpdateTeamPolicyRequest req) {
+        return rooms.updateTeamPolicy(roomId, me.userId(), req.teamPolicy());
     }
 
     @GetMapping("/{roomId}")
@@ -68,6 +79,25 @@ public class RoomController {
     public Room join(@PathVariable String roomId,
                      @AuthenticationPrincipal AuthPrincipal me) {
         return rooms.joinRoom(roomId, me.userId());
+    }
+
+    /**
+     * Phase 8A — 직접 링크로 들어오는 사용자를 자동으로 분기. 본인이 원래 플레이어면
+     * RECONNECTED, 빈 자리면 JOINED, IN_GAME 방에 처음 들어왔으면 SPECTATING.
+     */
+    @PostMapping("/{roomId}/join-or-reconnect")
+    public JoinOrReconnectResponse joinOrReconnect(@PathVariable String roomId,
+                                                   @AuthenticationPrincipal AuthPrincipal me) {
+        JoinOrReconnectResult result = rooms.joinOrReconnect(roomId, me.userId());
+        return new JoinOrReconnectResponse(result.mode().name(), result.room());
+    }
+
+    /** Phase 8A — 호스트만, IN_GAME 일 때만 가능. */
+    @PostMapping("/{roomId}/abort")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void abort(@PathVariable String roomId,
+                      @AuthenticationPrincipal AuthPrincipal me) {
+        rooms.abortGame(roomId, me.userId());
     }
 
     @PostMapping("/{roomId}/leave")
@@ -115,10 +145,18 @@ public class RoomController {
                 seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null);
     }
 
-    public record CreateRequest(@NotBlank String name, @NotBlank String gameType) {
+    public record CreateRequest(@NotBlank String name,
+                                @NotBlank String gameType,
+                                TeamPolicy teamPolicy) {
+    }
+
+    public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {
     }
 
     public record ListResponse(List<Room> rooms) {
+    }
+
+    public record JoinOrReconnectResponse(String mode, Room room) {
     }
 
     public record ResyncResponse(

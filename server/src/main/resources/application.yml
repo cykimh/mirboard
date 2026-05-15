@@ -7,10 +7,13 @@ spring:
       enabled: true
 
   datasource:
-    url: jdbc:mysql://${MIRBOARD_DB_HOST:127.0.0.1}:${MIRBOARD_DB_PORT:3306}/${MIRBOARD_DB_NAME:mirboard}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
+    # Phase 7-1 (D-39) — PostgreSQL 16. MIRBOARD_DB_URL 로 전체 jdbc URL 을
+    # 통째로 덮어쓸 수도 있고 (Fly/Supabase 형 secret), 그렇지 않으면 호스트/포트/디비
+    # 조각을 조합한다. 기본 포트 5432.
+    url: ${MIRBOARD_DB_URL:jdbc:postgresql://${MIRBOARD_DB_HOST:127.0.0.1}:${MIRBOARD_DB_PORT:5432}/${MIRBOARD_DB_NAME:mirboard}}
     username: ${MIRBOARD_DB_USER:mirboard}
     password: ${MIRBOARD_DB_PASSWORD:mirboardpw}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
@@ -32,6 +35,11 @@ spring:
     redis:
       host: ${MIRBOARD_REDIS_HOST:127.0.0.1}
       port: ${MIRBOARD_REDIS_PORT:6379}
+      # Phase 7-3 (D-39) — Upstash / 매니지드 Redis 는 비밀번호 + TLS 필수.
+      # 로컬 docker-compose 는 둘 다 비활성. prod 에서는 application-prod.yml 가 강제.
+      password: ${MIRBOARD_REDIS_PASSWORD:}
+      ssl:
+        enabled: ${MIRBOARD_REDIS_SSL:false}
       timeout: 2s
 
 server:

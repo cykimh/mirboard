@@ -31,6 +31,17 @@ public class SecurityConfig {
                         // Phase 6A-3 — Actuator (health, prometheus 스크래핑) 은 내부망 노출 가정.
                         // 운영 전에 IP 화이트리스트 또는 별도 management.server.port 분리 필요.
                         .requestMatchers("/actuator/**").permitAll()
+                        // Phase 7-3 (D-39) — Spring 이 직접 서빙하는 React SPA 정적 파일.
+                        // 정적 파일과 SPA 라우터 경로 (StaticSpaConfig 의 fallback) 는 인증 없이
+                        // 응답. 실제 API 호출은 /api/** 와 /ws/** 에서 인증을 강제한다.
+                        .requestMatchers(HttpMethod.GET,
+                                "/", "/index.html",
+                                "/assets/**", "/static/**",
+                                "/*.svg", "/*.png", "/*.ico", "/*.txt",
+                                "/login", "/register",
+                                "/hub", "/hub/**",
+                                "/lobby", "/lobby/**",
+                                "/room", "/room/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

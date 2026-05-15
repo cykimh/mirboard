@@ -14,6 +14,7 @@
 | TOPIC | `/topic/lobby/chat` | 서버 | 로그인 사용자 전체 |
 | TOPIC | `/topic/lobby/rooms` | 서버 | 로그인 사용자 전체 (방 목록 변경) |
 | TOPIC | `/topic/room/{roomId}` | 서버 | 해당 방 참가자 (공개 이벤트) |
+| TOPIC | `/topic/room/{roomId}/chat` | 서버 | 해당 방 참가자 + 관전자 (인-게임 채팅, Phase 8B) |
 | QUEUE | `/user/queue/room/{roomId}` | 서버 | 본인만 (손패/에러) |
 | QUEUE | `/user/queue/errors` | 서버 | 본인 (CONNECT 직후 일반 에러) |
 | APP   | `/app/lobby/chat` | 클라 | 서버 |

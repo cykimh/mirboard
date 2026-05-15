@@ -1,0 +1,24 @@
+# 빌드 컨텍스트 슬림화 — 캐시 무효화 방지 + 업로드 시간 절감.
+.git
+.gradle
+.idea
+.vscode
+
+# 클라 / 서버 빌드 산출물 (이미지 안에서 재빌드)
+client/node_modules
+client/dist
+client/*.tsbuildinfo
+server/build
+server/bin
+server/out
+
+# 로컬 환경
+.env
+.env.local
+*.log
+.DS_Store
+
+# 문서 / 메모 — 이미지에 불필요
+docs
+README.md
+CLAUDE.md
