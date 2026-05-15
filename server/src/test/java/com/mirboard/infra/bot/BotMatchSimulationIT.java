@@ -3,6 +3,8 @@ package com.mirboard.infra.bot;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
+import com.mirboard.domain.game.tichu.invariant.TichuInvariantChecker;
+import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -67,6 +69,7 @@ class BotMatchSimulationIT {
     @Autowired RoomService roomService;
     @Autowired BotUserRegistry bots;
     @Autowired MatchCompletedSink sink;
+    @Autowired TichuGameStateStore stateStore;
 
     /**
      * 4 봇 매치 1회: fillWithBots=true 로 만든 방에서 host 가 봇이면 모든 좌석이 봇 →
@@ -97,6 +100,9 @@ class BotMatchSimulationIT {
         assertThat(completed.cumulativeTeamAScore() + completed.cumulativeTeamBScore())
                 .isGreaterThan(0);
         assertThat(completed.winningTeam()).isNotNull();
+
+        // Phase 10D — 매치 종료 직후 마지막 state invariant 검증.
+        stateStore.load(roomId).ifPresent(TichuInvariantChecker::check);
     }
 
     /**
@@ -120,6 +126,9 @@ class BotMatchSimulationIT {
 
             TichuMatchCompleted completed = sink.byRoom(roomId).join();
             assertThat(completed.roomId()).isEqualTo(roomId);
+
+            // Phase 10D — 매 매치 종료 후 invariant 검증
+            stateStore.load(roomId).ifPresent(TichuInvariantChecker::check);
         }
     }
 
