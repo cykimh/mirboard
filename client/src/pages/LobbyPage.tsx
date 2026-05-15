@@ -14,6 +14,7 @@ export function LobbyPage() {
   const [error, setError] = useState<string | null>(null);
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [fillWithBots, setFillWithBots] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
   const { messages, connected, send } = useLobbyStomp(token);
   const [draft, setDraft] = useState('');
@@ -43,7 +44,9 @@ export function LobbyPage() {
     if (!token || !roomName.trim()) return;
     setCreating(true);
     try {
-      const room = await roomsApi.create(token, roomName.trim(), gameId.toUpperCase());
+      const room = await roomsApi.create(token, roomName.trim(), gameId.toUpperCase(), {
+        fillWithBots,
+      });
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -96,7 +99,10 @@ export function LobbyPage() {
           {rooms.length === 0 && <li className="empty">아직 방이 없습니다.</li>}
           {rooms.map((room) => (
             <li key={room.roomId}>
-              <span className="name">{room.name}</span>
+              <span className="name">
+                {room.name}
+                {room.fillWithBots && <span className="solo-badge" title="솔로 모드 — 빈 좌석은 봇이 자동 채움">🤖 솔로</span>}
+              </span>
               <span className="count">
                 {room.playerCount} / {room.capacity}
               </span>
@@ -115,6 +121,14 @@ export function LobbyPage() {
             onChange={(e) => setRoomName(e.target.value)}
             required
           />
+          <label className="fill-bots-toggle" title="혼자 시연/연습할 때 빈 좌석을 봇으로 채워 즉시 게임 시작">
+            <input
+              type="checkbox"
+              checked={fillWithBots}
+              onChange={(e) => setFillWithBots(e.target.checked)}
+            />
+            <span>🤖 빈 좌석 봇으로 채우기</span>
+          </label>
           <button type="submit" disabled={creating}>
             {creating ? '생성 중...' : '방 만들기'}
           </button>

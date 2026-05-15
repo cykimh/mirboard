@@ -180,6 +180,8 @@ export function RoomPage() {
           playerIds={room.playerIds}
           myUserId={user.userId}
           spectator={iAmSpectator}
+          botSeats={room.botSeats ?? []}
+          fillWithBots={room.fillWithBots ?? false}
         />
       )}
 

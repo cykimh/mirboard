@@ -4,13 +4,15 @@ interface SeatAvatarProps {
   seat: number;
   /** 표시 사이즈 (px). 기본 48. */
   size?: number;
+  /** Phase 9D — 이 좌석이 봇이면 🤖 아이콘 + 봇 라벨로 차별화. */
+  isBot?: boolean;
 }
 
 /**
- * Phase 8F — 좌석별 캐릭터 아바타. `/characters/seat-{0..3}.webp` 가 있으면 이미지,
- * 없으면 좌석 번호 숫자 fallback. 팀 색 (A=청, B=적) 으로 border 분기.
+ * Phase 8F/9D — 좌석별 캐릭터 아바타. `/characters/seat-{0..3}.webp` 가 있으면 이미지,
+ * 없으면 좌석 번호 숫자 fallback. 팀 색 (A=청, B=적) 으로 border. 봇이면 🤖 표시.
  */
-export function SeatAvatar({ seat, size = 48 }: SeatAvatarProps) {
+export function SeatAvatar({ seat, size = 48, isBot = false }: SeatAvatarProps) {
   const [failed, setFailed] = useState(false);
   const teamColor = seat % 2 === 0 ? '#5b8def' : '#e85d75';
   const src = `/characters/seat-${seat}.webp`;
@@ -24,16 +26,19 @@ export function SeatAvatar({ seat, size = 48 }: SeatAvatarProps) {
         borderRadius: '50%',
         border: `2px solid ${teamColor}`,
         overflow: 'hidden',
-        background: '#1a1a1f',
+        background: isBot ? '#2a2a30' : '#1a1a1f',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: size * 0.4,
         fontWeight: 700,
         color: teamColor,
+        position: 'relative',
       }}
-      aria-label={`Seat ${seat}`}
+      aria-label={isBot ? `Bot seat ${seat}` : `Seat ${seat}`}
     >
-      {failed ? (
+      {isBot ? (
+        <span style={{ fontSize: size * 0.55 }}>🤖</span>
+      ) : failed ? (
         <span>{seat}</span>
       ) : (
         <img

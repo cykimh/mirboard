@@ -27,6 +27,10 @@ interface GameTableProps {
   myUserId: number;
   /** true 이면 관전자 모드: 손패/액션 버튼/모달 미표시. TableView 만 시청. */
   spectator?: boolean;
+  /** Phase 9D — playerIds 인덱스 중 봇이 차지한 좌석. SeatAvatar 가 🤖 표시. */
+  botSeats?: number[];
+  /** Phase 9D — 솔로 모드 (방 생성 시 봇 자동 채움). 헤더에 배너 표시. */
+  fillWithBots?: boolean;
 }
 
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
@@ -35,7 +39,14 @@ const PASS_SLOT_LABEL: Record<PassSlot, string> = {
   right: t('pass.slot.right'),
 };
 
-export function GameTable({ roomId, playerIds, myUserId, spectator = false }: GameTableProps) {
+export function GameTable({
+  roomId,
+  playerIds,
+  myUserId,
+  spectator = false,
+  botSeats = [],
+  fillWithBots = false,
+}: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(roomId, token);
   const [chatOpen, setChatOpen] = useState(false);
@@ -204,6 +215,11 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
       <EffectsOverlay />
       <ReconnectBanner connected={connected} />
       <header className="game-table-header">
+        {fillWithBots && (
+          <span className="solo-banner" title="이 방은 솔로 모드 — 빈 좌석은 봇이 자동 진행합니다">
+            🤖 솔로 모드 (봇 {botSeats.length}명)
+          </span>
+        )}
         <span>
           {t('game.header.stomp')} {connected ? '●' : '○'}
         </span>
@@ -298,8 +314,8 @@ export function GameTable({ roomId, playerIds, myUserId, spectator = false }: Ga
                          ${submitted ? 'submitted' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                <SeatAvatar seat={seat} size={32} />
-                <span className="seat-id">#{uid}</span>
+                <SeatAvatar seat={seat} size={32} isBot={botSeats.includes(seat)} />
+                <span className="seat-id">#{uid}{botSeats.includes(seat) && ' (봇)'}</span>
               </div>
               <div className="hand-count">
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}

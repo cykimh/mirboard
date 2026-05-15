@@ -12,12 +12,16 @@ export const roomsApi = {
     return apiRequest(`/api/rooms${qs}`, { token });
   },
 
-  create(token: string, name: string, gameType: string, teamPolicy?: TeamPolicy): Promise<Room> {
-    return apiRequest('/api/rooms', {
-      method: 'POST',
-      token,
-      body: teamPolicy ? { name, gameType, teamPolicy } : { name, gameType },
-    });
+  create(
+      token: string,
+      name: string,
+      gameType: string,
+      opts?: { teamPolicy?: TeamPolicy; fillWithBots?: boolean }
+  ): Promise<Room> {
+    const body: Record<string, unknown> = { name, gameType };
+    if (opts?.teamPolicy) body.teamPolicy = opts.teamPolicy;
+    if (opts?.fillWithBots) body.fillWithBots = true;
+    return apiRequest('/api/rooms', { method: 'POST', token, body });
   },
 
   /** Phase 8C — WAITING 방에서 호스트만 호출 가능. */
