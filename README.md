@@ -125,9 +125,16 @@ brew install --cask corretto@25       # 또는 SDKMAN, foojay 등
 export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
 ```
 
-### 2. 컨테이너 런타임 (Colima 또는 OrbStack)
+### 2. 컨테이너 런타임 (OrbStack 권장)
 
-**Colima:**
+**OrbStack (권장):**
+```bash
+brew install --cask orbstack
+open -a OrbStack                       # 최초 1회 기동
+docker version                         # Client + Server 둘 다 OK 출력
+```
+
+**Colima (대안):**
 ```bash
 brew install colima docker docker-compose
 mkdir -p ~/.docker && cat > ~/.docker/config.json <<'EOF'
@@ -141,16 +148,11 @@ colima start --cpu 2 --memory 4 --disk 20
 docker version                         # Client + Server 둘 다 OK 출력
 ```
 
-**OrbStack** (Colima 대안):
-```bash
-brew install --cask orbstack
-open -a OrbStack                       # 최초 1회 기동
-docker version                         # Client + Server 둘 다 OK 출력
-```
-
 `scripts/dev.sh` · `scripts/check.sh` 는 `DOCKER_HOST` 미설정 시
-Colima(`~/.colima/default/docker.sock`) → OrbStack(`~/.orbstack/run/docker.sock`)
-순으로 소켓을 자동 감지한다. Docker Desktop 은 기본 context 로 그대로 동작.
+OrbStack(`~/.orbstack/run/docker.sock`) → Colima(`~/.colima/default/docker.sock`)
+순으로 소켓을 자동 감지한다 (D-72). Docker Desktop 은 기본 context 로 그대로 동작.
+둘 다 떠 있으면 OrbStack 이 우선이며, Colima 를 강제하려면
+`export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"`.
 
 ### 3. 인프라 + 마이그레이션
 
@@ -213,7 +215,7 @@ npm --prefix client run dev
 
 # 통합 테스트 (Testcontainers). scripts/check.sh 가 Colima/OrbStack socket 을
 # 자동 감지하므로 wrapper 사용 시 아래 export 불필요. raw gradlew 직접 호출 시만:
-export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"   # OrbStack: ~/.orbstack/run/docker.sock
+export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"   # Colima: ~/.colima/default/docker.sock
 export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
 ./gradlew :server:test
 

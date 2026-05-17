@@ -98,6 +98,16 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-72 (2026-05-18) — Docker socket 자동 감지 우선순위를 OrbStack 우선으로 변경
+
+사용자 요청으로 `scripts/dev.sh` · `scripts/check.sh` 의 소켓 폴백 순서를
+**Colima → OrbStack 에서 OrbStack → Colima 로** 뒤집음. `DOCKER_HOST` 가
+이미 셋이면 그대로 존중하는 동작은 불변이라 명시적 override 사용자는 영향
+없음. 두 런타임이 동시에 떠 있는 머신에서는 이제 OrbStack 소켓이 선택된다
+(Colima 강제는 `DOCKER_HOST` export). Testcontainers in-container 경로는
+양쪽 모두 `/var/run/docker.sock` 매핑이라 변경 없음. README "컨테이너
+런타임" 을 OrbStack 권장으로 재정렬. D-69 의 우선순위 결정을 번복.
+
 ## D-71 (2026-05-17) — Phase 16: 준비-시작 모델 + 메인 재구성 + 랭킹 + 화면 정리 (9건)
 
 시연 피드백 9건. 핵심 결정: (1) 게임 시작 모델을 **capacity 자동시작
@@ -152,6 +162,8 @@ context 로 동작하므로 분기 불필요. Testcontainers in-container 경로
 모두 `/var/run/docker.sock` 매핑이라 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`
 동일. 런타임/프로토콜/DB 무변경 — 순수 개발 도구. README "컨테이너 런타임"
 섹션에 OrbStack 설치 대안 + 자동 감지 동작 명시.
+
+*변경 → D-72* (우선순위를 OrbStack → Colima 로 뒤집음)
 
 ## D-68 (2026-05-17) — Phase 14: 로컬 실행 wrapper `scripts/dev.sh`
 

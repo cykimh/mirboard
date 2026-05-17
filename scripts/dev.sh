@@ -19,14 +19,14 @@ if [ -z "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT"
 
-# ── Docker socket 자동 감지 (Colima / OrbStack — docker compose CLI 일관성용) ──
-# DOCKER_HOST 가 이미 셋이면 존중. 없으면 Colima → OrbStack 순으로 시도.
+# ── Docker socket 자동 감지 (OrbStack / Colima — docker compose CLI 일관성용) ──
+# DOCKER_HOST 가 이미 셋이면 존중. 없으면 OrbStack → Colima 순으로 시도 (D-72).
 # Docker Desktop 은 기본 context 로 동작하므로 분기 불필요.
 if [ -z "$DOCKER_HOST" ]; then
-    if [ -S "$HOME/.colima/default/docker.sock" ]; then
-        export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
-    elif [ -S "$HOME/.orbstack/run/docker.sock" ]; then
+    if [ -S "$HOME/.orbstack/run/docker.sock" ]; then
         export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"
+    elif [ -S "$HOME/.colima/default/docker.sock" ]; then
+        export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
     fi
 fi
 
