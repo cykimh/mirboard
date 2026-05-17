@@ -41,7 +41,7 @@ public class RoomRepository {
 
     public void create(String roomId, long hostUserId, String name, String gameType,
                        int capacity, long createdAt, TeamPolicy teamPolicy,
-                       boolean fillWithBots) {
+                       boolean fillWithBots, int targetScore) {
         Long result = redis.execute(
                 createScript,
                 keysFor(roomId),
@@ -52,7 +52,8 @@ public class RoomRepository {
                 Integer.toString(capacity),
                 Long.toString(createdAt),
                 teamPolicy.name(),
-                Boolean.toString(fillWithBots));
+                Boolean.toString(fillWithBots),
+                Integer.toString(targetScore));
         if (result == null || result != 1L) {
             throw new IllegalStateException("room_create.lua returned unexpected: " + result);
         }
@@ -134,6 +135,9 @@ public class RoomRepository {
         TeamPolicy teamPolicy = rawPolicy == null ? TeamPolicy.SEQUENTIAL : TeamPolicy.valueOf(rawPolicy);
         // Phase 9B — fillWithBots 가 없으면 (구방) false 기본값.
         boolean fillWithBots = "true".equals((String) hash.get("fillWithBots"));
+        // Phase 12 — targetScore 없으면 (구방) 1000 기본값.
+        String rawTarget = (String) hash.get("targetScore");
+        int targetScore = rawTarget == null ? 1000 : Integer.parseInt(rawTarget);
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -154,7 +158,8 @@ public class RoomRepository {
                 teamPolicy,
                 Long.parseLong((String) hash.get("createdAt")),
                 fillWithBots,
-                List.copyOf(botSeats)));
+                List.copyOf(botSeats),
+                targetScore));
     }
 
     /**

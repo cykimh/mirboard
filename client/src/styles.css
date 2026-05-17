@@ -163,10 +163,41 @@ a {
   display: flex;
   gap: 8px;
   margin-top: 12px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.lobby-page .create input {
+.lobby-page .create input[type='text'] {
   flex: 1;
+  min-width: 160px;
+}
+
+.target-score-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.target-score-label {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-right: 2px;
+}
+
+.target-score-opt {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: var(--color-bg-surface-elevated);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.target-score-opt.active {
+  border-color: var(--color-accent, #5b8def);
+  background: rgba(91, 141, 239, 0.18);
+  font-weight: 700;
 }
 
 .lobby-page .chat ul {
@@ -353,10 +384,28 @@ a {
   background: #1c1c24;
 }
 
+/* Phase 12 (#3,#4) — 손패/낸 카드 살짝 포개기. gap 대신 음수 마진 + z-index. */
 .hand-cards {
   display: flex;
-  gap: 6px;
+  gap: 0;
   flex-wrap: wrap;
+}
+
+.hand-cards > * {
+  position: relative;
+}
+
+.hand-cards > * + * {
+  margin-left: -20px;
+}
+
+.hand-cards > *:hover {
+  z-index: 20;
+}
+
+/* 선택된 카드는 겹친 다음 카드 아래로 가려지지 않게 위로. */
+.hand-cards > *:has(.selected) {
+  z-index: 10;
 }
 
 .card-chip {

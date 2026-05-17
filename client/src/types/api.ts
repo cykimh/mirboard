@@ -35,6 +35,8 @@ export interface Room {
   fillWithBots: boolean;
   /** Phase 9B — playerIds 중 봇 user 좌석 인덱스 (서버 derived). */
   botSeats: number[];
+  /** Phase 12 — 매치 종료 목표점수 (기본 1000). */
+  targetScore: number;
 }
 
 export interface RoomListResponse {

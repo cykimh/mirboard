@@ -98,6 +98,26 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-65 (2026-05-17) — Phase 12E: 방 목표점수 + 조합명 rank + 카드 포갬
+
+배포 시연 추가 요청 4건.
+
+1. **팀 목표점수** — 매치 종료 점수를 방 생성 시 선택 (프리셋 300/500/700/1000,
+   기본 1000). `Room.targetScore` 필드 + `room_create.lua` HSET + `RoomService.createRoom`
+   오버로드 + `GameStartingEvent.targetScore` + `TichuMatchState.targetScore` +
+   `effectiveTarget()` (구 JSON/0 → 1000 폴백) + `isMatchOver` 가 목표점수 사용.
+   `RoomController.CreateRequest.targetScore`. 클라 LobbyPage 프리셋 버튼.
+   매치 종료 룰 변경이므로 `rules-tichu.md` §14 갱신 필요. 단위/IT 케이스 추가.
+2. **조합명 rank** — `handType.ts` `comboLabel(cards)` 가 "페어2"/"풀하우스5"/
+   "스트레이트9" 형식 (대표 rank: PAIR/TRIPLE/BOMB=그 rank, FULL_HOUSE=트리플 rank,
+   STRAIGHT/SFB/CONSEC=최고 rank, SINGLE=카드/특수명). 트릭 메타도 동일 한국어화.
+3. **손패 카드 포갬** — `.hand-cards` gap 제거 + 음수 마진(-20px) + hover/selected
+   z-index. SortableHand·트릭 공통 적용.
+4. **낸 카드 포갬** — 위 `.hand-cards` 변경이 트릭 표시(`table-center-trick`)에도
+   동일 적용 (공통 클래스).
+
+서버 전체 회귀 1m31s + 클라 빌드/테스트 그린.
+
 ## D-64 (2026-05-17) — Phase 12D: 티츄 선언자 배지 강화
 
 코드상 이미 구현돼 있던 선언 표시 (`TableView.declarations` + `TichuDeclared`

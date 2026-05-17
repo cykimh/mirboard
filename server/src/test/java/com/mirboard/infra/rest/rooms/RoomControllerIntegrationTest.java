@@ -173,6 +173,37 @@ class RoomControllerIntegrationTest {
                 .andExpect(jsonPath("$.botSeats.length()").value(0));
     }
 
+    @Test
+    void create_with_custom_target_score_persists_it() throws Exception {
+        String token = registerAndLogin("target_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "300점 빠른 판",
+                "gameType", "TICHU",
+                "targetScore", 300));
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetScore").value(300));
+    }
+
+    @Test
+    void create_without_target_score_defaults_to_1000() throws Exception {
+        String token = registerAndLogin("default_target_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "기본 목표 방",
+                "gameType", "TICHU"));
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.targetScore").value(1000));
+    }
+
     private String registerAndLogin(String username, String password) throws Exception {
         var body = objectMapper.writeValueAsString(
                 Map.of("username", username, "password", password));

@@ -68,4 +68,38 @@ class TichuMatchStateTest {
         assertThat(s.isMatchOver()).isTrue();
         assertThat(s.winningTeam()).isEqualTo(Team.B);
     }
+
+    // ---- Phase 12: 커스텀 목표점수 ----
+
+    @Test
+    void custom_target_300_ends_match_earlier() {
+        TichuMatchState s = TichuMatchState.initial(IDS, 300)
+                .withRoundCompleted(new RoundScore(320, 80, 0, false));
+        assertThat(s.effectiveTarget()).isEqualTo(300);
+        assertThat(s.isMatchOver()).isTrue();
+        assertThat(s.winningTeam()).isEqualTo(Team.A);
+    }
+
+    @Test
+    void custom_target_300_not_over_below_threshold() {
+        TichuMatchState s = TichuMatchState.initial(IDS, 300)
+                .withRoundCompleted(new RoundScore(280, 100, 0, false));
+        assertThat(s.isMatchOver()).isFalse();
+    }
+
+    @Test
+    void zero_target_falls_back_to_1000() {
+        // 구 JSON 역직렬화 시 targetScore=0 → 1000 폴백.
+        TichuMatchState s = new TichuMatchState(IDS, 1100, 200, 5, java.util.List.of(), 0);
+        assertThat(s.effectiveTarget()).isEqualTo(1000);
+        assertThat(s.isMatchOver()).isTrue();
+    }
+
+    @Test
+    void target_carries_through_round_completion() {
+        TichuMatchState s = TichuMatchState.initial(IDS, 500)
+                .withRoundCompleted(new RoundScore(100, 50, 0, false));
+        assertThat(s.targetScore()).isEqualTo(500);
+        assertThat(s.effectiveTarget()).isEqualTo(500);
+    }
 }

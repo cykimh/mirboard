@@ -16,11 +16,12 @@ export const roomsApi = {
       token: string,
       name: string,
       gameType: string,
-      opts?: { teamPolicy?: TeamPolicy; fillWithBots?: boolean }
+      opts?: { teamPolicy?: TeamPolicy; fillWithBots?: boolean; targetScore?: number }
   ): Promise<Room> {
     const body: Record<string, unknown> = { name, gameType };
     if (opts?.teamPolicy) body.teamPolicy = opts.teamPolicy;
     if (opts?.fillWithBots) body.fillWithBots = true;
+    if (opts?.targetScore) body.targetScore = opts.targetScore;
     return apiRequest('/api/rooms', { method: 'POST', token, body });
   },
 

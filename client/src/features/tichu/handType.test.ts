@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/types/tichu';
-import { detectHandType, handTypeLabel } from './handType';
+import { comboLabel, detectHandType, handTypeLabel } from './handType';
 
 const n = (suit: Card['suit'], rank: number): Card => ({ suit, rank, special: null });
 const sp = (special: Card['special']): Card => ({ suit: null, rank: 0, special });
@@ -93,5 +93,41 @@ describe('handTypeLabel', () => {
     expect(handTypeLabel('STRAIGHT')).toBe('스트레이트');
     expect(handTypeLabel('BOMB')).toBe('폭탄');
     expect(handTypeLabel(null)).toBe('?');
+  });
+});
+
+describe('comboLabel (rank 포함)', () => {
+  it('페어2 / 트리플K / 풀하우스5', () => {
+    expect(comboLabel([n('JADE', 2), n('SWORD', 2)])).toBe('페어2');
+    expect(comboLabel([n('JADE', 13), n('SWORD', 13), n('STAR', 13)])).toBe('트리플K');
+    expect(
+      comboLabel([
+        n('JADE', 5), n('SWORD', 5), n('STAR', 5),
+        n('JADE', 8), n('SWORD', 8),
+      ]),
+    ).toBe('풀하우스5');
+  });
+
+  it('싱글 — 일반 rank / 특수 이름', () => {
+    expect(comboLabel([n('JADE', 14)])).toBe('싱글A');
+    expect(comboLabel([sp('DRAGON')])).toBe('싱글드래곤');
+  });
+
+  it('스트레이트 — 최고 rank', () => {
+    expect(
+      comboLabel([
+        n('JADE', 5), n('SWORD', 6), n('STAR', 7), n('PAGODA', 8), n('JADE', 9),
+      ]),
+    ).toBe('스트레이트9');
+  });
+
+  it('폭탄7', () => {
+    expect(
+      comboLabel([n('JADE', 7), n('SWORD', 7), n('STAR', 7), n('PAGODA', 7)]),
+    ).toBe('폭탄7');
+  });
+
+  it('조합 불명 → ?', () => {
+    expect(comboLabel([n('JADE', 5), n('SWORD', 9)])).toBe('?');
   });
 });

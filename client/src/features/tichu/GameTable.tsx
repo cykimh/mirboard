@@ -9,7 +9,7 @@ import { useStompRoom } from '@/ws/useStompRoom';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
-import { detectHandType, handTypeLabel } from './handType';
+import { comboLabel } from './handType';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
@@ -122,9 +122,9 @@ export function GameTable({
     return privateHand.cards.filter((c) => selectedCardKeys.has(cardKey(c)));
   }, [privateHand, selectedCardKeys]);
 
-  // Phase 12C — 선택 카드 조합명 (표시용 hint, 서버가 실제 검증).
-  const selectedHandType = useMemo(
-    () => detectHandType(selectedCards),
+  // Phase 12C/#2 — 선택 카드 조합명 ("페어2" 형식, 표시용 hint. 서버가 실제 검증).
+  const selectedCombo = useMemo(
+    () => comboLabel(selectedCards),
     [selectedCards],
   );
 
@@ -354,7 +354,7 @@ export function GameTable({
                 </div>
                 <div className="trick-meta">
                   <span>시트 {tableView.currentTopSeat}</span>
-                  <span className="hand-type">{tableView.currentTop.type}</span>
+                  <span className="hand-type">{comboLabel(tableView.currentTop.cards)}</span>
                   {tableView.currentTop.phoenixSingle && (
                     <Badge tone="phoenix" title={t('phoenix.singleTooltip')}>
                       {t('phoenix.singleBadge')}
@@ -469,7 +469,7 @@ export function GameTable({
           <>
             {selectedCards.length > 0 && (
               <span className="combo-hint" aria-live="polite">
-                선택: {handTypeLabel(selectedHandType)}
+                선택: {selectedCombo}
                 {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
               </span>
             )}

@@ -311,13 +311,18 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 
 ## 14. 매치 종료
 
-- **종료 조건**: `cumulativeA >= 1000 || cumulativeB >= 1000` **AND** `cumulativeA != cumulativeB`
-- **동점 1000**: 매치 계속
+- **목표점수 (Phase 12, D-65)**: 방 생성 시 프리셋 300/500/700/1000 중 선택
+  (기본 1000). `Room.targetScore` → `GameStartingEvent` → `TichuMatchState.targetScore`.
+- **종료 조건**: `cumulativeA >= target || cumulativeB >= target` **AND** `cumulativeA != cumulativeB`
+  (target = `TichuMatchState.effectiveTarget()` — 구 JSON/0 은 1000 폴백)
+- **동점 (target 도달 동점)**: 매치 계속
 - **승팀**: 누적 점수 높은 팀
 
-**코드:** `TichuMatchState.isMatchOver` / `winningTeam` (`persistence/TichuMatchState.java:55-66`)
+**코드:** `TichuMatchState.isMatchOver` / `effectiveTarget` / `winningTeam`
+(`persistence/TichuMatchState.java`)
 
-**테스트:** `TichuMatchStateTest` (6) — 일반 종료 / 동점 1000 / 한쪽만 1000 / winningTeam 예외.
+**테스트:** `TichuMatchStateTest` — 기본 1000 (6) + 커스텀 target 300/500/0폴백 (4).
+`RoomControllerIntegrationTest` — targetScore 지정/기본 2 케이스.
 
 **갭:** 없음.
 

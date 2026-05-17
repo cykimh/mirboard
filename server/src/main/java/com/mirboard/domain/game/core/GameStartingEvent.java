@@ -8,7 +8,8 @@ import java.util.List;
  * {@code gameType} 일 때만 라운드 초기화 로직을 실행한다 — lobby ↛ game 직접 의존을
  * 끊는 분리.
  */
-public record GameStartingEvent(String roomId, String gameType, List<Long> playerIds) {
+public record GameStartingEvent(String roomId, String gameType, List<Long> playerIds,
+                                int targetScore) {
 
     public GameStartingEvent {
         playerIds = List.copyOf(playerIds);

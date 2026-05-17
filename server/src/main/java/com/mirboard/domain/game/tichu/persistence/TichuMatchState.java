@@ -17,13 +17,19 @@ import java.util.Map;
  * @param cumulativeB     Team B 누적 점수
  * @param roundNumber     현재 진행 중 또는 막 끝난 라운드 번호 (1부터)
  * @param roundScores     라운드별 점수 (직렬화/감사용)
+ * @param targetScore     매치 종료 목표점수 (Phase 12). 구 JSON / 미지정 시 0 →
+ *                        {@link #effectiveTarget()} 가 1000 으로 폴백.
  */
 public record TichuMatchState(
         List<Long> playerIds,
         int cumulativeA,
         int cumulativeB,
         int roundNumber,
-        List<RoundScore> roundScores) {
+        List<RoundScore> roundScores,
+        int targetScore) {
+
+    /** Phase 12 — 미지정/구 JSON 폴백 목표점수. */
+    public static final int DEFAULT_TARGET = 1000;
 
     public TichuMatchState {
         playerIds = List.copyOf(playerIds);
@@ -31,7 +37,11 @@ public record TichuMatchState(
     }
 
     public static TichuMatchState initial(List<Long> playerIds) {
-        return new TichuMatchState(playerIds, 0, 0, 1, List.of());
+        return initial(playerIds, DEFAULT_TARGET);
+    }
+
+    public static TichuMatchState initial(List<Long> playerIds, int targetScore) {
+        return new TichuMatchState(playerIds, 0, 0, 1, List.of(), targetScore);
     }
 
     public TichuMatchState withRoundCompleted(RoundScore score) {
@@ -42,7 +52,14 @@ public record TichuMatchState(
                 cumulativeA + score.teamAScore(),
                 cumulativeB + score.teamBScore(),
                 roundNumber + 1,
-                next);
+                next,
+                targetScore);
+    }
+
+    /** 구 JSON (targetScore 누락 → 0) / 비정상 값은 1000 으로 폴백. */
+    @JsonIgnore
+    public int effectiveTarget() {
+        return targetScore > 0 ? targetScore : DEFAULT_TARGET;
     }
 
     public Map<Team, Integer> scoresByTeam() {
@@ -52,10 +69,11 @@ public record TichuMatchState(
         return m;
     }
 
-    /** 매치 종료 조건: 한 팀 ≥1000 이고 양팀 점수가 다르다. */
+    /** 매치 종료 조건: 한 팀 ≥ 목표점수 이고 양팀 점수가 다르다. */
     @JsonIgnore
     public boolean isMatchOver() {
-        if (cumulativeA < 1000 && cumulativeB < 1000) return false;
+        int target = effectiveTarget();
+        if (cumulativeA < target && cumulativeB < target) return false;
         return cumulativeA != cumulativeB;
     }
 

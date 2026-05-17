@@ -56,7 +56,7 @@ public class MatchProgressService {
                            TichuState.RoundEnd ended,
                            List<TichuEvent> outbound) {
         TichuMatchState matchState = matchStateStore.load(roomId)
-                .orElseGet(() -> TichuMatchState.initial(room.playerIds()));
+                .orElseGet(() -> TichuMatchState.initial(room.playerIds(), room.targetScore()));
 
         RoundScore lastScore = outbound.stream()
                 .filter(TichuEvent.RoundEnded.class::isInstance)

@@ -60,21 +60,33 @@ public class RoomService {
         this.random = random;
     }
 
+    /** Phase 12 — 기본 목표점수 (방 생성 시 미지정 시). */
+    public static final int DEFAULT_TARGET_SCORE = 1000;
+
     public Room createRoom(long hostUserId, String name, String gameType) {
-        return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false);
+        return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false,
+                DEFAULT_TARGET_SCORE);
     }
 
     public Room createRoom(long hostUserId, String name, String gameType, TeamPolicy teamPolicy) {
-        return createRoom(hostUserId, name, gameType, teamPolicy, false);
+        return createRoom(hostUserId, name, gameType, teamPolicy, false, DEFAULT_TARGET_SCORE);
+    }
+
+    public Room createRoom(long hostUserId, String name, String gameType,
+                           TeamPolicy teamPolicy, boolean fillWithBots) {
+        return createRoom(hostUserId, name, gameType, teamPolicy, fillWithBots,
+                DEFAULT_TARGET_SCORE);
     }
 
     /**
      * Phase 9B — `fillWithBots=true` 면 createRoom 직후 capacity 가 찰 때까지 시드 봇을
      * 자동 join. capacity 도달 시 일반 joinRoom 흐름과 동일하게 IN_GAME 전이 +
      * GameStartingEvent 발행.
+     *
+     * Phase 12 — `targetScore` 로 매치 종료 목표점수 지정 (기본 1000).
      */
     public Room createRoom(long hostUserId, String name, String gameType,
-                           TeamPolicy teamPolicy, boolean fillWithBots) {
+                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
@@ -82,12 +94,12 @@ public class RoomService {
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
         repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy,
-                fillWithBots);
+                fillWithBots, targetScore);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
         metrics.roomCreated();
-        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={}",
-                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots);
+        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={}",
+                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots, targetScore);
 
         if (fillWithBots) {
             int seatsToFill = def.maxPlayers() - 1;  // host 1 명 이미 들어가 있음.
@@ -150,7 +162,7 @@ public class RoomService {
                 log.info("Seats shuffled (RANDOM): roomId={} newOrder={}", roomId, shuffled);
             }
             events.publish(new com.mirboard.domain.game.core.GameStartingEvent(
-                    room.roomId(), room.gameType(), room.playerIds()));
+                    room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
             metrics.gameStarted();
             log.info("Game starting: roomId={} gameType={} players={}",
                     roomId, room.gameType(), room.playerIds());

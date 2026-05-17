@@ -96,6 +96,63 @@ function isConsecutive(sortedDistinct: number[]): boolean {
   return true;
 }
 
+const SPECIAL_LABEL: Record<string, string> = {
+  DRAGON: '드래곤',
+  PHOENIX: '피닉스',
+  DOG: '개',
+  MAHJONG: '마작',
+};
+
+/** 일반 카드 rank → 표시 글자 (2~10, J/Q/K/A). Mahjong 은 1. */
+function rankGlyph(rank: number): string {
+  if (rank === 11) return 'J';
+  if (rank === 12) return 'Q';
+  if (rank === 13) return 'K';
+  if (rank === 14) return 'A';
+  return String(rank);
+}
+
+/** 조합의 대표 rank 글자 (없으면 ''). */
+function representativeRank(type: HandType, cards: Card[]): string {
+  if (type === 'SINGLE') {
+    const c = cards[0];
+    if (c.special) return SPECIAL_LABEL[c.special] ?? '';
+    return rankGlyph(c.rank);
+  }
+  const normals = cards.filter((c) => c.special === null);
+  if (normals.length === 0) return '';
+  const counts = new Map<number, number>();
+  for (const c of normals) counts.set(c.rank, (counts.get(c.rank) ?? 0) + 1);
+
+  if (type === 'FULL_HOUSE') {
+    // 트리플 rank
+    for (const [r, n] of counts) if (n === 3) return rankGlyph(r);
+    // Phoenix 와일드로 3장 된 경우 — 더 많은 쪽
+  }
+  if (type === 'PAIR' || type === 'TRIPLE' || type === 'BOMB') {
+    // 동일 rank — 가장 많은 rank
+    let best = normals[0].rank;
+    let bestN = 0;
+    for (const [r, n] of counts) if (n > bestN) { bestN = n; best = r; }
+    return rankGlyph(best);
+  }
+  // STRAIGHT / SFB / CONSECUTIVE_PAIRS → 최고 rank
+  const maxRank = Math.max(...normals.map((c) => c.rank));
+  return rankGlyph(maxRank);
+}
+
+/**
+ * Phase 12 (#2) — 선택 카드 조합을 "페어2", "풀하우스5" 형식으로 표시.
+ * 조합 불명 시 "?".
+ */
+export function comboLabel(cards: Card[]): string {
+  const type = detectHandType(cards);
+  if (type === null) return '?';
+  const base = handTypeLabel(type);
+  const rank = representativeRank(type, cards);
+  return rank ? `${base}${rank}` : base;
+}
+
 /** 조합 타입 → 한국어 표시 라벨. */
 export function handTypeLabel(type: HandType | null): string {
   switch (type) {

@@ -15,6 +15,7 @@ export function LobbyPage() {
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
   const [fillWithBots, setFillWithBots] = useState(false);
+  const [targetScore, setTargetScore] = useState(1000);
   const [spectateInput, setSpectateInput] = useState('');
   const { messages, connected, send } = useLobbyStomp(token);
   const [draft, setDraft] = useState('');
@@ -46,6 +47,7 @@ export function LobbyPage() {
     try {
       const room = await roomsApi.create(token, roomName.trim(), gameId.toUpperCase(), {
         fillWithBots,
+        targetScore,
       });
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
@@ -121,6 +123,20 @@ export function LobbyPage() {
             onChange={(e) => setRoomName(e.target.value)}
             required
           />
+          <div className="target-score-picker" role="group" aria-label="목표 점수">
+            <span className="target-score-label">목표 점수</span>
+            {[300, 500, 700, 1000].map((v) => (
+              <button
+                type="button"
+                key={v}
+                className={`target-score-opt ${targetScore === v ? 'active' : ''}`}
+                onClick={() => setTargetScore(v)}
+                aria-pressed={targetScore === v}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           <label className="fill-bots-toggle" title="혼자 시연/연습할 때 빈 좌석을 봇으로 채워 즉시 게임 시작">
             <input
               type="checkbox"

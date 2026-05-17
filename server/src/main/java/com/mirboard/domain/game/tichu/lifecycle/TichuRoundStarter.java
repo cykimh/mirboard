@@ -68,7 +68,8 @@ public class TichuRoundStarter {
             log.warn("Tichu round needs 4 players, got {} — skipping", event.playerIds().size());
             return;
         }
-        TichuMatchState matchState = TichuMatchState.initial(event.playerIds());
+        TichuMatchState matchState =
+                TichuMatchState.initial(event.playerIds(), event.targetScore());
         matchStateStore.save(event.roomId(), matchState);
         startRound(event.roomId(), event.playerIds(), matchState.roundNumber());
     }

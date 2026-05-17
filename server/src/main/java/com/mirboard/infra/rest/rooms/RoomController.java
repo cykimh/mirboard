@@ -60,7 +60,11 @@ public class RoomController {
                        @RequestBody @Valid CreateRequest req) {
         TeamPolicy policy = req.teamPolicy() == null ? TeamPolicy.SEQUENTIAL : req.teamPolicy();
         boolean fillWithBots = Boolean.TRUE.equals(req.fillWithBots());
-        return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy, fillWithBots);
+        int targetScore = req.targetScore() == null
+                ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_TARGET_SCORE
+                : req.targetScore();
+        return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy,
+                fillWithBots, targetScore);
     }
 
     /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
@@ -135,7 +139,7 @@ public class RoomController {
         var state = stateStore.load(roomId)
                 .orElseThrow(() -> new ResyncNotAvailableException(roomId));
         TichuMatchState matchState = matchStateStore.load(roomId)
-                .orElseGet(() -> TichuMatchState.initial(room.playerIds()));
+                .orElseGet(() -> TichuMatchState.initial(room.playerIds(), room.targetScore()));
         return new ResyncResponse(
                 roomId,
                 TichuStateMapper.phaseName(state),
@@ -149,7 +153,8 @@ public class RoomController {
     public record CreateRequest(@NotBlank String name,
                                 @NotBlank String gameType,
                                 TeamPolicy teamPolicy,
-                                Boolean fillWithBots) {
+                                Boolean fillWithBots,
+                                Integer targetScore) {
     }
 
     public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {
