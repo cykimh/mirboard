@@ -64,6 +64,15 @@ describe('detectHandType', () => {
     ).toBe('CONSECUTIVE_PAIRS');
   });
 
+  it('연속 페어 (4장, 2페어 — D-73)', () => {
+    expect(
+      detectHandType([
+        n('JADE', 5), n('SWORD', 5),
+        n('STAR', 6), n('PAGODA', 6),
+      ]),
+    ).toBe('CONSECUTIVE_PAIRS');
+  });
+
   it('Dog/Dragon 은 단독 외 조합 불가 → null', () => {
     expect(detectHandType([sp('DOG'), n('JADE', 5)])).toBeNull();
     expect(detectHandType([sp('DRAGON'), n('JADE', 5)])).toBeNull();

@@ -76,9 +76,9 @@ export function detectHandType(cards: Card[]): HandType | null {
     return allSameSuit ? 'STRAIGHT_FLUSH_BOMB' : 'STRAIGHT';
   }
 
-  // CONSECUTIVE_PAIRS: ≥6, 짝수, 모든 rank 2장씩, 연속
+  // CONSECUTIVE_PAIRS: ≥4(2페어 이상), 짝수, 모든 rank 2장씩, 연속 (D-73)
   if (
-    cards.length >= 6 &&
+    cards.length >= 4 &&
     cards.length % 2 === 0 &&
     [...counts.values()].every((v) => v === 2) &&
     isConsecutive(distinctRanks)
