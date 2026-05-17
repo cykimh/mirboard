@@ -16,8 +16,11 @@ export interface TichuRoomState {
   selectedCardKeys: Set<string>;
   /** 패스 단계 전용: 슬롯별 카드 키. */
   passSelection: Record<PassSlot, string | null>;
-  /** 현재 패스 슬롯 (다음에 카드를 클릭하면 이 슬롯이 채워진다). */
-  activePassSlot: PassSlot;
+  /**
+   * Phase 13B(#1): 슬롯 미배정 상태로 선택된 카드 키 (카드 먼저 → 슬롯 나중).
+   * null 이면 선택 대기 없음.
+   */
+  pendingPassCardKey: string | null;
   /** Phase 5e: 손패의 클라이언트 정렬 순서. 빈 배열이면 서버 분배 순서 사용. */
   sortOrder: string[];
   errorMessage: string | null;
@@ -50,8 +53,10 @@ export interface TichuActions {
   setMatchEnded: (info: TichuRoomState['matchEnded']) => void;
   toggleCardSelection: (card: Card) => void;
   clearSelection: () => void;
-  setActivePassSlot: (slot: PassSlot) => void;
-  assignPassSlot: (card: Card) => void;
+  /** Phase 13B(#1): 카드 클릭 → 슬롯 미배정 pending 선택 (같은 카드 재클릭 시 해제). */
+  selectPassCard: (card: Card) => void;
+  /** Phase 13B(#1): pending 카드를 슬롯에 배정. pending 없이 채워진 슬롯 클릭 시 해제. */
+  assignPassSlot: (slot: PassSlot) => void;
   clearPassSelection: () => void;
   /** Phase 5e: 드래그 종료 시 호출. fromKey 위치의 카드를 toKey 직전으로 이동. */
   reorderHand: (fromKey: string, toKey: string) => void;
@@ -167,7 +172,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   lastSeq: 0,
   selectedCardKeys: new Set(),
   passSelection: { ...EMPTY_PASS },
-  activePassSlot: 'left',
+  pendingPassCardKey: null,
   sortOrder: [],
   errorMessage: null,
   roundEnded: null,
@@ -181,7 +186,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       lastSeq: 0,
       selectedCardKeys: new Set(),
       passSelection: { ...EMPTY_PASS },
-      activePassSlot: 'left',
+      pendingPassCardKey: null,
       sortOrder: [],
       errorMessage: null,
       roundEnded: null,
@@ -364,30 +369,50 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
     set({ selectedCardKeys: new Set() });
   },
 
-  setActivePassSlot(slot) {
-    set({ activePassSlot: slot });
+  selectPassCard(card) {
+    const key = cardKey(card);
+    const { pendingPassCardKey, passSelection } = get();
+    // 같은 카드 재클릭 → pending 해제.
+    if (pendingPassCardKey === key) {
+      set({ pendingPassCardKey: null });
+      return;
+    }
+    // 이미 슬롯에 배정된 카드를 다시 클릭 → 슬롯에서 빼서 pending 으로.
+    const next: Record<PassSlot, string | null> = { ...passSelection };
+    let wasAssigned = false;
+    (Object.keys(next) as PassSlot[]).forEach((s) => {
+      if (next[s] === key) {
+        next[s] = null;
+        wasAssigned = true;
+      }
+    });
+    set({
+      pendingPassCardKey: key,
+      passSelection: wasAssigned ? next : passSelection,
+    });
   },
 
-  assignPassSlot(card) {
-    const key = cardKey(card);
-    const { passSelection, activePassSlot } = get();
-    // 이미 다른 슬롯에 같은 카드가 있으면 거기서 비움.
+  assignPassSlot(slot) {
+    const { pendingPassCardKey, passSelection } = get();
     const next: Record<PassSlot, string | null> = { ...passSelection };
+    if (pendingPassCardKey === null) {
+      // pending 없음 + 채워진 슬롯 클릭 → 해당 슬롯 해제 (되돌리기).
+      if (next[slot] !== null) {
+        next[slot] = null;
+        set({ passSelection: next });
+      }
+      return;
+    }
+    // pending 카드를 slot 에 배정. 같은 카드가 다른 슬롯에 있으면 비움.
     (Object.keys(next) as PassSlot[]).forEach((s) => {
-      if (next[s] === key) next[s] = null;
+      if (next[s] === pendingPassCardKey) next[s] = null;
     });
-    next[activePassSlot] = key;
-    // 다음 빈 슬롯으로 자동 이동.
-    const nextSlot: PassSlot | null =
-      (['left', 'partner', 'right'] as PassSlot[]).find((s) => next[s] === null) ?? null;
-    set({
-      passSelection: next,
-      activePassSlot: nextSlot ?? activePassSlot,
-    });
+    next[slot] = pendingPassCardKey;
+    set({ passSelection: next, pendingPassCardKey: null });
   },
 
   clearPassSelection() {
-    set({ passSelection: { ...EMPTY_PASS }, activePassSlot: 'left' });
+    set({ passSelection: { ...EMPTY_PASS }, pendingPassCardKey: null });
   },
 
   reorderHand(fromKey, toKey) {

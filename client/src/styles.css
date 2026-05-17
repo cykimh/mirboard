@@ -568,10 +568,22 @@ a {
   font: inherit;
 }
 
-.pass-slot.active {
+/* Phase 13B(#1) — pending 카드 있을 때 슬롯이 드롭 대상임을 강조. */
+.pass-slot.droppable {
   border-color: var(--color-warning);
   border-style: solid;
-  box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.35);
+}
+
+.pass-slot.filled {
+  border-style: solid;
+  border-color: #4a5a85;
+}
+
+.pass-hint {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin: 4px 0 8px;
 }
 
 .pass-slot .slot-label {

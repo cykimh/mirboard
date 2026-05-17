@@ -59,8 +59,8 @@ export function GameTable({
   const toggleCardSelection = useTichuStore((s) => s.toggleCardSelection);
   const clearSelection = useTichuStore((s) => s.clearSelection);
   const passSelection = useTichuStore((s) => s.passSelection);
-  const activePassSlot = useTichuStore((s) => s.activePassSlot);
-  const setActivePassSlot = useTichuStore((s) => s.setActivePassSlot);
+  const pendingPassCardKey = useTichuStore((s) => s.pendingPassCardKey);
+  const selectPassCard = useTichuStore((s) => s.selectPassCard);
   const assignPassSlot = useTichuStore((s) => s.assignPassSlot);
   const clearPassSelection = useTichuStore((s) => s.clearPassSelection);
   const reorderHand = useTichuStore((s) => s.reorderHand);
@@ -191,7 +191,7 @@ export function GameTable({
 
   function handleCardClick(c: Card) {
     if (isInPassing && !iAmPassSubmitted) {
-      assignPassSlot(c);
+      selectPassCard(c);
     } else if (isInPlaying) {
       toggleCardSelection(c);
     }
@@ -370,6 +370,11 @@ export function GameTable({
       {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
         <div className="pass-picker">
           <h3>{t('pass.picker.title')}</h3>
+          <p className="pass-hint">
+            {pendingPassCardKey
+              ? '카드 선택됨 — 줄 사람(좌/파트너/우)을 누르세요'
+              : '먼저 손패에서 카드를 고른 뒤 줄 사람을 누르세요'}
+          </p>
           <div className="pass-slots">
             {(['left', 'partner', 'right'] as PassSlot[]).map((slot) => {
               const c = passCardsBySlot[slot];
@@ -377,8 +382,10 @@ export function GameTable({
                 <button
                   type="button"
                   key={slot}
-                  className={`pass-slot ${activePassSlot === slot ? 'active' : ''}`}
-                  onClick={() => setActivePassSlot(slot)}
+                  className={`pass-slot ${
+                    pendingPassCardKey ? 'droppable' : ''
+                  } ${c ? 'filled' : ''}`}
+                  onClick={() => assignPassSlot(slot)}
                 >
                   <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
                   {c ? (
@@ -401,7 +408,12 @@ export function GameTable({
         {privateHand ? (
           <SortableHand
             cards={orderedHand}
-            selectedKeys={getSelectedKeys(selectedCardKeys, passSelection, isInPassing)}
+            selectedKeys={getSelectedKeys(
+              selectedCardKeys,
+              passSelection,
+              isInPassing,
+              pendingPassCardKey,
+            )}
             onCardClick={handleCardClick}
             onReorder={reorderHand}
           />
@@ -560,11 +572,13 @@ function getSelectedKeys(
   selected: Set<string>,
   passSelection: Record<PassSlot, string | null>,
   isInPassing: boolean,
+  pendingPassCardKey: string | null,
 ): Set<string> {
   if (!isInPassing) return selected;
   const merged = new Set(selected);
   for (const v of Object.values(passSelection)) {
     if (v) merged.add(v);
   }
+  if (pendingPassCardKey) merged.add(pendingPassCardKey);
   return merged;
 }
