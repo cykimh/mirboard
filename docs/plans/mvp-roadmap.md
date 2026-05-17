@@ -733,6 +733,26 @@ Colima Docker socket 자동 감지 + `.husky/pre-commit` 위임. 기존 raw grad
 TurnTimeoutSchedulerIT 로 타임아웃 자동진행 매치 완주 검증. turnSeconds=0 시
 기존 동작 완전 호환.
 
+## Phase 14 — 로컬 실행 wrapper (D-68, D-69)
+
+`scripts/dev.sh` (up/server/client/bundled/all/down) 로 로컬 풀스택을 단축.
+기능 무변경, 오케스트레이션 편의. Colima→OrbStack socket 자동 감지(D-69).
+
+## Phase 15 — 시연 UX 6건 (D-70, 전부 클라 전용)
+
+| 항목 | 내용 | 상태 |
+| --- | --- | --- |
+| #1 | 매치 종료 화면(승리팀+라운드별 표+최종점수) + 게임 중 상시 스코어보드 | ✅ 완료 |
+| #2 | 패스카드 — 줄 사람 클릭 시 그 카드/선택지 제거 | ✅ 완료 |
+| #3 | 경기장 센터 낸 카드 비겹침 (CSS) | ✅ 완료 |
+| #4 | 티츄/그랜드 선언 중앙 대형 배너 이펙트 | ✅ 완료 |
+| #5 | 경기장 채팅 말풍선(좌석 근처 ~5s) + 우측 패널 유지 | ✅ 완료 |
+| #6 | 턴 제한 클라 로컬 카운트다운 | ✅ 완료 |
+
+**Done 기준**: 솔로 1판 풀 플레이로 6건 확인. 서버/프로토콜/스키마 무변경.
+클라 build(tsc)+test 그린, `check.sh fast` 회귀 그린. #1 라운드 표는 클라
+`ROUND_ENDED` 누적 → 게임 중 재접속 시 표 비움(누적 totals 는 복구) 한계 수용.
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

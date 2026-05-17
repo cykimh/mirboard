@@ -581,6 +581,7 @@ export function GameTable({
                   <th>R</th>
                   <th>Team A</th>
                   <th>Team B</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>

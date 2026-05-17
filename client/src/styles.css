@@ -1075,6 +1075,19 @@ a {
     background: rgba(0, 0, 0, 0.25);
   }
 
+  /* Phase 15 — 모바일 grid 에선 절대배치 오버레이를 행 흐름으로 강등. */
+  .scoreboard,
+  .turn-countdown {
+    position: static;
+    transform: none;
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .arena-bubble {
+    display: none;
+  }
+
   /* 아주 좁은 폭(<420)에서는 좌석 1열로 — 경기장이 잘리지 않도록. */
 }
 

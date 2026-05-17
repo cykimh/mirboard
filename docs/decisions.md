@@ -98,6 +98,29 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-70 (2026-05-17) — Phase 15: 시연 UX 6건 (전부 클라 전용)
+
+솔로 시연 중 요청된 게임 화면 UX 6건을 **클라이언트만으로** 구현 —
+서버 로직·STOMP 프로토콜·DB·스키마 무변경. (1) 매치 종료 화면에 승리팀
+강조 + 라운드별 점수표 + 최종 합계, 게임 중 경기장 상시 스코어보드
+(누적 totals 는 서버 `tableView.matchScores` 사용). (2) 패스 단계에서
+줄 사람에게 배정한 카드는 손패에서 제거하고 그 줄 사람 슬롯은 정적
+칩으로 고정(선택지 제거; 되돌리기는 기존 "초기화"). (3) 센터에 낸 카드
+비겹침(`.table-center-trick .hand-cards` 음수 마진 제거, gap 6px).
+(4) 티츄/그랜드 선언 시 기존 `EffectsOverlay` 패턴 재사용해 중앙 대형
+배너(effectStore 에 `TICHU_DECLARED` kind + text 추가). (5) 인게임
+채팅을 발신자 좌석 근처 말풍선으로 ~5s 노출 후 fade(신규
+`ArenaChatBubbles`, `useRoomChatStore` 재사용) — 기존 우측 `RoomChat`
+패널은 그대로 유지. (6) 턴 제한 카운트다운을 클라가 `TURN_CHANGED`
+수신 시각(store `turnStartedAt`)+방 `turnSeconds` 로 로컬 계산해 표시;
+실제 타임아웃 강제는 서버 `TurnTimeoutScheduler` 그대로(표시는 근사).
+
+사용자 결정(AskUserQuestion): 점수는 종료+상시 둘 다, 채팅은 패널 유지
++말풍선, 턴 타이머는 클라 로컬(프로토콜 무변경). 한계: #1 라운드별
+표는 클라 `ROUND_ENDED` 누적이라 게임 중/직후 재접속 시 표가 비고
+(누적 totals 는 복구 가능) — 시연 단일 세션 수용, 서버 payload 확장은
+별도 결정으로 보류. State Hiding 불변(말풍선·스코어보드는 공개 정보만).
+
 ## D-69 (2026-05-17) — OrbStack Docker socket 자동 감지 추가
 
 `scripts/dev.sh` · `scripts/check.sh` 의 소켓 자동 감지를 Colima 전용에서
