@@ -98,6 +98,18 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-69 (2026-05-17) — OrbStack Docker socket 자동 감지 추가
+
+`scripts/dev.sh` · `scripts/check.sh` 의 소켓 자동 감지를 Colima 전용에서
+**Colima → OrbStack 순 폴백**으로 확장. `DOCKER_HOST` 미설정 시
+`~/.colima/default/docker.sock` 우선(기존 동작 불변), 없으면
+`~/.orbstack/run/docker.sock` 사용. Colima 사용자 동작은 그대로이고 OrbStack
+사용자도 wrapper 가 자동으로 올바른 소켓을 잡는다. Docker Desktop 은 기본
+context 로 동작하므로 분기 불필요. Testcontainers in-container 경로는 두 런타임
+모두 `/var/run/docker.sock` 매핑이라 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`
+동일. 런타임/프로토콜/DB 무변경 — 순수 개발 도구. README "컨테이너 런타임"
+섹션에 OrbStack 설치 대안 + 자동 감지 동작 명시.
+
 ## D-68 (2026-05-17) — Phase 14: 로컬 실행 wrapper `scripts/dev.sh`
 
 Fly.io 배포와 별개로 로컬 풀스택을 손쉽게 올리도록 `scripts/dev.sh` 추가

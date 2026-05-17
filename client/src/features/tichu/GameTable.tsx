@@ -20,6 +20,7 @@ import { useSfx } from './useSfx';
 import { Badge } from '@/components/Badge';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { RoomChat } from '@/features/chat/RoomChat';
+import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 
 interface GameTableProps {
@@ -71,10 +72,12 @@ export function GameTable({
   const errorMessage = useTichuStore((s) => s.errorMessage);
   const roundEnded = useTichuStore((s) => s.roundEnded);
   const matchEnded = useTichuStore((s) => s.matchEnded);
+  const roundHistory = useTichuStore((s) => s.roundHistory);
   const setError = useTichuStore((s) => s.setError);
   const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
 
   const mySeat = playerIds.indexOf(myUserId);
+  const myTeam: 'A' | 'B' = mySeat >= 0 && mySeat % 2 === 1 ? 'B' : 'A';
   const [wishModalDismissed, setWishModalDismissed] = useState(false);
 
   const phase = tableView?.phase ?? null;
@@ -139,6 +142,19 @@ export function GameTable({
       right: findByKey(passSelection.right),
     };
   }, [privateHand, passSelection]);
+
+  // Phase 15(#2) — 줄 사람에게 배정된 카드는 손패에서 제거(시각적으로도 사라짐).
+  const assignedPassKeys = useMemo(
+    () => new Set(Object.values(passSelection).filter((v): v is string => v !== null)),
+    [passSelection],
+  );
+  const handCards = useMemo(
+    () =>
+      isInPassing && !iAmPassSubmitted
+        ? orderedHand.filter((c) => !assignedPassKeys.has(cardKey(c)))
+        : orderedHand,
+    [orderedHand, isInPassing, iAmPassSubmitted, assignedPassKeys],
+  );
 
   function handlePlay() {
     if (selectedCards.length === 0) {
@@ -376,6 +392,19 @@ export function GameTable({
             )}
           </div>
         )}
+        <div className="scoreboard" aria-label="현재 점수">
+          <span className="scoreboard-round">R{tableView.roundNumber}</span>
+          <span className="scoreboard-team us">
+            우리 {tableView.matchScores[myTeam] ?? 0}
+          </span>
+          <span className="scoreboard-team them">
+            상대 {tableView.matchScores[myTeam === 'A' ? 'B' : 'A'] ?? 0}
+          </span>
+        </div>
+        {isInPlaying && turnSeconds > 0 && (
+          <TurnCountdown turnSeconds={turnSeconds} />
+        )}
+        <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
       </div>
 
       {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
@@ -389,21 +418,27 @@ export function GameTable({
           <div className="pass-slots">
             {(['left', 'partner', 'right'] as PassSlot[]).map((slot) => {
               const c = passCardsBySlot[slot];
+              // Phase 15(#2) — 카드가 배정된 줄 사람은 선택지(버튼)를 없애고
+              // 정적 칩으로 고정 표시. 잘못 골랐으면 아래 "초기화" 로 다시.
+              if (c) {
+                return (
+                  <div key={slot} className="pass-slot filled">
+                    <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
+                    <CardChip card={c} />
+                    <span className="slot-done">✓</span>
+                  </div>
+                );
+              }
               return (
                 <button
                   type="button"
                   key={slot}
-                  className={`pass-slot ${
-                    pendingPassCardKey ? 'droppable' : ''
-                  } ${c ? 'filled' : ''}`}
+                  className={`pass-slot ${pendingPassCardKey ? 'droppable' : ''}`}
                   onClick={() => assignPassSlot(slot)}
+                  disabled={!pendingPassCardKey}
                 >
                   <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
-                  {c ? (
-                    <CardChip card={c} />
-                  ) : (
-                    <span className="slot-empty">{t('pass.slot.empty')}</span>
-                  )}
+                  <span className="slot-empty">{t('pass.slot.empty')}</span>
                 </button>
               );
             })}
@@ -418,7 +453,7 @@ export function GameTable({
         </div>
         {privateHand ? (
           <SortableHand
-            cards={orderedHand}
+            cards={handCards}
             selectedKeys={getSelectedKeys(
               selectedCardKeys,
               passSelection,
@@ -529,11 +564,43 @@ export function GameTable({
       {matchEnded ? (
         <div className="match-ended">
           <h3>
-            Team {matchEnded.winningTeam} {t('match.ended.titleSuffix')}
+            {mySeat >= 0
+              ? matchEnded.winningTeam === myTeam
+                ? '🏆 승리!'
+                : '패배'
+              : `Team ${matchEnded.winningTeam} 승`}
+            {' — '}Team {matchEnded.winningTeam} {t('match.ended.titleSuffix')}
           </h3>
           <p>
             {t('match.ended.finalScore')} A {matchEnded.finalScores.A ?? 0} : {matchEnded.finalScores.B ?? 0} B
           </p>
+          {roundHistory.length > 0 && (
+            <table className="score-history">
+              <thead>
+                <tr>
+                  <th>R</th>
+                  <th>Team A</th>
+                  <th>Team B</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roundHistory.map((r, i) => (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>{r.teamAScore}</td>
+                    <td>{r.teamBScore}</td>
+                    <td>{r.doubleVictory ? '더블 승' : ''}</td>
+                  </tr>
+                ))}
+                <tr className="score-history-total">
+                  <td>합계</td>
+                  <td>{matchEnded.finalScores.A ?? 0}</td>
+                  <td>{matchEnded.finalScores.B ?? 0}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          )}
           <p>
             {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
           </p>
@@ -579,4 +646,27 @@ function getSelectedKeys(
   }
   if (pendingPassCardKey) merged.add(pendingPassCardKey);
   return merged;
+}
+
+/**
+ * Phase 15(#6) — 경기장 내 턴 카운트다운. 서버 TURN_CHANGED 수신 시각
+ * (store.turnStartedAt) + 방 turnSeconds 로 잔여 초를 클라가 로컬 계산.
+ * 실제 타임아웃 강제는 서버(TurnTimeoutScheduler) 담당 — 표시는 근사.
+ */
+function TurnCountdown({ turnSeconds }: { turnSeconds: number }) {
+  const turnStartedAt = useTichuStore((s) => s.turnStartedAt);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, []);
+  if (turnStartedAt == null) return null;
+  const elapsed = Math.floor((now - turnStartedAt) / 1000);
+  const remaining = Math.max(0, turnSeconds - elapsed);
+  const urgent = remaining <= 5;
+  return (
+    <div className={`turn-countdown ${urgent ? 'urgent' : ''}`} aria-live="off">
+      ⏱ {remaining}
+    </div>
+  );
 }

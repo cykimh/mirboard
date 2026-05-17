@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Mirboard 검증 wrapper (Phase 11 — D-60).
 #
-# 자주 쓰는 검증 명령 7 개를 단축. Colima Docker socket 자동 감지로 매번
-# DOCKER_HOST/TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE prefix 입력 불필요.
+# 자주 쓰는 검증 명령 7 개를 단축. Colima/OrbStack Docker socket 자동 감지로
+# 매번 DOCKER_HOST/TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE prefix 입력 불필요.
 #
 # 사용법: ./scripts/check.sh <subcommand> [args]
 # 자세히는 ./scripts/check.sh --help
@@ -17,12 +17,18 @@ if [ -z "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT"
 
-# ── Colima Docker socket 자동 감지 ──
-# DOCKER_HOST 가 이미 셋이면 존중. 없으면 ~/.colima/default/docker.sock 시도.
+# ── Docker socket 자동 감지 (Colima / OrbStack) ──
+# DOCKER_HOST 가 이미 셋이면 존중. 없으면 Colima → OrbStack 순으로 시도.
+# 둘 다 in-container 경로는 /var/run/docker.sock 로 매핑되므로 TC override 동일.
 # CI Ubuntu runner 에선 socket 부재 → export 생략.
-if [ -z "$DOCKER_HOST" ] && [ -S "$HOME/.colima/default/docker.sock" ]; then
-    export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
-    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
+if [ -z "$DOCKER_HOST" ]; then
+    if [ -S "$HOME/.colima/default/docker.sock" ]; then
+        export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+        export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
+    elif [ -S "$HOME/.orbstack/run/docker.sock" ]; then
+        export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"
+        export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
+    fi
 fi
 
 # ── ANSI 색상 (TTY 일 때만) ──

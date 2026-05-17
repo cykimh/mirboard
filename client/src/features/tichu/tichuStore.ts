@@ -30,6 +30,15 @@ export interface TichuRoomState {
     finalScores: { A?: number; B?: number };
     roundsPlayed: number;
   } | null;
+  /** Phase 15(#1): 매치 전체 라운드별 점수 누적 (ROUND_ENDED 누적; reset 시 비움). */
+  roundHistory: {
+    teamAScore: number;
+    teamBScore: number;
+    firstFinisherSeat: number;
+    doubleVictory: boolean;
+  }[];
+  /** Phase 15(#6): 현재 차례 시작 시각(클라 epoch ms). 턴 카운트다운 표시용. */
+  turnStartedAt: number | null;
 }
 
 export interface TichuActions {
@@ -84,7 +93,12 @@ interface DragonGivenPayload { fromSeat: number; toSeat: number }
 interface PlayerReadyPayload { seat: number }
 interface PassingSubmittedPayload { seat: number }
 interface RoundEndedPayload {
-  score: { teamAScore: number; teamBScore: number; firstFinisherSeat: number };
+  score: {
+    teamAScore: number;
+    teamBScore: number;
+    firstFinisherSeat: number;
+    doubleVictory?: boolean;
+  };
 }
 interface MatchEndedPayload {
   winningTeam: 'A' | 'B';
@@ -177,6 +191,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   errorMessage: null,
   roundEnded: null,
   matchEnded: null,
+  roundHistory: [],
+  turnStartedAt: null,
 
   reset(roomId) {
     set({
@@ -191,6 +207,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       errorMessage: null,
       roundEnded: null,
       matchEnded: null,
+      roundHistory: [],
+      turnStartedAt: null,
     });
   },
 
@@ -200,6 +218,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       privateHand,
       lastSeq: eventSeq,
       errorMessage: null,
+      // 재동기화 시 카운트다운은 정확한 잔여시간을 알 수 없으므로 현재시각 기준 근사.
+      turnStartedAt: Date.now(),
     });
   },
 
@@ -246,7 +266,12 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       case 'TURN_CHANGED': {
         if (!table) return 'unhandled';
         const p = envelope.payload as TurnChangedPayload;
-        advance({ ...table, currentTurnSeat: p.currentTurnSeat });
+        // Phase 15(#6) — 차례 전환 시각 기록 (클라 로컬 카운트다운 기준).
+        set({
+          tableView: { ...table, currentTurnSeat: p.currentTurnSeat },
+          lastSeq: seq ?? lastSeq,
+          turnStartedAt: Date.now(),
+        });
         return 'applied';
       }
       case 'TRICK_TAKEN': {
@@ -280,6 +305,11 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         const p = envelope.payload as TichuDeclaredPayload;
         const declarations = { ...table.declarations, [p.seat]: p.kind };
         advance({ ...table, declarations });
+        // Phase 15(#4) — 모두가 인지하도록 중앙 대형 배너 이펙트.
+        useEffectStore.getState().trigger(
+          'TICHU_DECLARED',
+          `${p.kind === 'GRAND_TICHU' ? '👑 그랜드 티츄!' : '🔔 티츄!'} · 시트 ${p.seat}`,
+        );
         return 'applied';
       }
       case 'WISH_MADE': {
@@ -320,10 +350,19 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       }
       case 'ROUND_ENDED': {
         const p = envelope.payload as RoundEndedPayload;
-        set({
+        set((s) => ({
           roundEnded: p.score,
+          roundHistory: [
+            ...s.roundHistory,
+            {
+              teamAScore: p.score.teamAScore,
+              teamBScore: p.score.teamBScore,
+              firstFinisherSeat: p.score.firstFinisherSeat,
+              doubleVictory: p.score.doubleVictory ?? false,
+            },
+          ],
           lastSeq: seq ?? lastSeq,
-        });
+        }));
         return 'applied';
       }
       case 'MATCH_ENDED': {

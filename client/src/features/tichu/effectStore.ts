@@ -1,22 +1,29 @@
 import { create } from 'zustand';
 import type { HandType } from '@/types/tichu';
 
-export type EffectKind = 'BOMB' | 'STRAIGHT_FLUSH_BOMB';
+export type EffectKind = 'BOMB' | 'STRAIGHT_FLUSH_BOMB' | 'TICHU_DECLARED';
 
 export interface ActiveEffect {
   id: number;
   kind: EffectKind;
+  /** TICHU_DECLARED 전용 — 배너에 표시할 문구 (예: "🔔 티츄! · 시트 2"). */
+  text?: string;
   /** 자동 해제 epoch ms. */
   expiresAt: number;
 }
 
 interface EffectState {
   active: ActiveEffect | null;
-  trigger: (kind: EffectKind) => void;
+  trigger: (kind: EffectKind, text?: string) => void;
   clear: () => void;
 }
 
-const EFFECT_DURATION_MS = 1800;
+/** 이펙트별 노출 시간. 선언 배너는 모두가 인지하도록 약간 더 길게. */
+const DURATION_BY_KIND: Record<EffectKind, number> = {
+  BOMB: 1800,
+  STRAIGHT_FLUSH_BOMB: 1800,
+  TICHU_DECLARED: 2000,
+};
 let nextId = 1;
 
 /**
@@ -26,9 +33,11 @@ let nextId = 1;
  */
 export const useEffectStore = create<EffectState>((set) => ({
   active: null,
-  trigger: (kind) => {
+  trigger: (kind, text) => {
     const id = nextId++;
-    set({ active: { id, kind, expiresAt: Date.now() + EFFECT_DURATION_MS } });
+    set({
+      active: { id, kind, text, expiresAt: Date.now() + DURATION_BY_KIND[kind] },
+    });
   },
   clear: () => set({ active: null }),
 }));

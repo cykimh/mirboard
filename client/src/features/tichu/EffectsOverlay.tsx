@@ -16,13 +16,49 @@ export function EffectsOverlay() {
 
   useEffect(() => {
     if (!active) return;
-    play(active.kind === 'BOMB' ? 'bomb' : 'straight-flush');
+    if (active.kind === 'BOMB') play('bomb');
+    else if (active.kind === 'STRAIGHT_FLUSH_BOMB') play('straight-flush');
     const remaining = Math.max(0, active.expiresAt - Date.now());
     const id = window.setTimeout(clear, remaining);
     return () => window.clearTimeout(id);
   }, [active, clear, play]);
 
   if (!active) return null;
+
+  // Phase 15(#4) — 티츄/그랜드 선언: 중앙 대형 배너 (폭발 SVG 없이 골드 펄스).
+  if (active.kind === 'TICHU_DECLARED') {
+    return (
+      <div
+        key={active.id}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
+          style={{
+            padding: '24px 48px',
+            borderRadius: 16,
+            background: 'rgba(240, 192, 0, 0.92)',
+            color: '#1a1a1f',
+            fontSize: 44,
+            fontWeight: 900,
+            letterSpacing: 1,
+            textAlign: 'center',
+            boxShadow: '0 0 40px 8px rgba(255, 200, 0, 0.7)',
+            animation: 'mirboard-fx-pop 2s ease-out forwards',
+          }}
+        >
+          {active.text ?? '티츄!'}
+        </div>
+      </div>
+    );
+  }
 
   const isStraightFlush = active.kind === 'STRAIGHT_FLUSH_BOMB';
   const flashColor = isStraightFlush ? 'rgba(180, 80, 255, 0.4)' : 'rgba(255, 60, 60, 0.45)';
