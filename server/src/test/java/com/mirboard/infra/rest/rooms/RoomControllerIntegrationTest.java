@@ -133,13 +133,14 @@ class RoomControllerIntegrationTest {
     }
 
     @Test
-    void create_with_fillWithBots_immediately_starts_game_with_3_bots() throws Exception {
+    void create_with_fillWithBots_waits_for_host_ready_then_starts() throws Exception {
         String token = registerAndLogin("solo_user", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "솔로 모드",
                 "gameType", "TICHU",
                 "fillWithBots", true));
+        // Phase 16(#2) — 봇 3 은 자동 ready 지만 사람 호스트가 준비 전이라 WAITING.
         MvcResult created = mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,12 +148,20 @@ class RoomControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.fillWithBots").value(true))
                 .andExpect(jsonPath("$.playerCount").value(4))
-                .andExpect(jsonPath("$.status").value("IN_GAME"))
+                .andExpect(jsonPath("$.status").value("WAITING"))
                 .andExpect(jsonPath("$.botSeats.length()").value(3))
                 .andReturn();
         JsonNode createdJson = objectMapper.readTree(created.getResponse().getContentAsString());
-        // 호스트는 seat 0, 봇은 seat 1/2/3.
         assertThat(createdJson.get("botSeats").toString()).isEqualTo("[1,2,3]");
+        String roomId = createdJson.get("roomId").asText();
+
+        // 호스트가 준비하면 전원 ready → 게임 시작 (IN_GAME).
+        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ready\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"));
     }
 
     @Test

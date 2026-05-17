@@ -83,6 +83,20 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void ranking_excludes_bots_and_orders_by_rating_desc() throws Exception {
+        registerAndGetId("rk_user", "validpass1");
+        String token = login("rk_user", "validpass1");
+
+        mockMvc.perform(get("/api/users/ranking?limit=5")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries").isArray())
+                // 시드 봇(bot_*)은 랭킹에서 제외 — 어떤 entry 도 bot_ 로 시작하지 않음.
+                .andExpect(jsonPath("$.entries[?(@.username =~ /bot_.*/)]").isEmpty())
+                .andExpect(jsonPath("$.entries[0].rank").value(1));
+    }
+
     // ---------- helpers ----------
 
     private long registerAndGetId(String username, String password) throws Exception {

@@ -203,6 +203,14 @@ class RoomTeamPolicyIntegrationTest {
                             .header("Authorization", "Bearer " + tokens.get(ordered.get(i))))
                     .andExpect(status().isOk());
         }
+        // Phase 16(#2) — 전원 준비해야 게임 시작 (이 헬퍼는 IN_GAME 테스트 전용).
+        for (String u : ordered) {
+            mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                            .header("Authorization", "Bearer " + tokens.get(u))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"ready\":true}"))
+                    .andExpect(status().isOk());
+        }
         return roomId;
     }
 }

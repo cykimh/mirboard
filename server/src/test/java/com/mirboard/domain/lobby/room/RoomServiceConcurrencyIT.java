@@ -97,8 +97,8 @@ class RoomServiceConcurrencyIT {
                 .isEqualTo(6);
         assertThat(other.get()).as("No unexpected exceptions").isZero();
         assertThat(finalRoom.status())
-                .as("Room auto-transitions to IN_GAME once full")
-                .isEqualTo(RoomStatus.IN_GAME);
+                .as("Phase 16(#2): join 만으로는 시작 안 함 — 정원 차도 WAITING")
+                .isEqualTo(RoomStatus.WAITING);
     }
 
     @Test

@@ -66,6 +66,9 @@ class MatchResultRecorderIT {
     @Autowired
     Clock clock;
 
+    @Autowired
+    com.mirboard.domain.lobby.auth.BotUserRegistry bots;
+
     @Test
     @Transactional
     void recorder_persists_match_and_increments_winners() {
@@ -111,6 +114,34 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(2).getRating()).isEqualTo(1020);
         assertThat(refreshed.get(1).getRating()).isEqualTo(980);
         assertThat(refreshed.get(3).getRating()).isEqualTo(980);
+    }
+
+    @Test
+    @Transactional
+    void bot_match_records_win_lose_but_skips_elo() {
+        // Phase 16(#4) — 봇 포함 매치: win/lose 는 기록, rating(ELO) 불변.
+        var humans = registerFour("mrbot_a", "mrbot_b", "mrbot_c"); // 3 명만 등록
+        long botId = bots.getBotIds().get(0);
+        // 좌석 0,2 = Team A / 1,3 = Team B. 봇을 seat 3 (Team B) 에 배치.
+        List<Long> ids = List.of(
+                humans.get(0).getId(), humans.get(1).getId(),
+                humans.get(2).getId(), botId);
+
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-bot", ids, 900, 200, Team.A,
+                List.of(new RoundScore(900, 200, 0, false))));
+
+        // match_result + participant 는 기록됨.
+        assertThat(matchRepo.findAll()).anyMatch(m -> m.getRoomId().equals("room-bot"));
+
+        var refreshed = humans.stream()
+                .map(u -> userRepo.findById(u.getId()).orElseThrow()).toList();
+        // 승패는 반영 (seat0,2 = A 승 / seat1 = B 패).
+        assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
+        assertThat(refreshed.get(2).getWinCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
+        // ELO 는 제외 — rating 기본값 1000 유지.
+        assertThat(refreshed).allMatch(u -> u.getRating() == 1000);
     }
 
     private List<User> registerFour(String... usernames) {

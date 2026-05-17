@@ -89,6 +89,11 @@ class GameStompControllerIntegrationTest {
         joinRoom(tokens.get("ws_bob"), roomId);
         joinRoom(tokens.get("ws_charlie"), roomId);
         joinRoom(tokens.get("ws_dave"), roomId);
+        // Phase 16(#2) — 전원 준비해야 게임 시작.
+        ready(tokens.get("ws_alice"), roomId);
+        ready(tokens.get("ws_bob"), roomId);
+        ready(tokens.get("ws_charlie"), roomId);
+        ready(tokens.get("ws_dave"), roomId);
 
         // Phase 5b: 라운드 시작 시 Dealing(8) 로 진입 — STOMP 라우팅 테스트만 검증하므로
         // 곧바로 Playing 상태로 덮어쓴다 (덱은 Dealing 의 hand+reserved 를 합쳐 Mahjong
@@ -223,6 +228,16 @@ class GameStompControllerIntegrationTest {
         http.postForObject(
                 "http://localhost:" + port + "/api/rooms/" + roomId + "/join",
                 new HttpEntity<>(headers), String.class);
+    }
+
+    /** Phase 16(#2) — 대기실 준비. 전원 준비 시 서버가 게임 시작. */
+    private void ready(String token, String roomId) {
+        var headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        http.postForObject(
+                "http://localhost:" + port + "/api/rooms/" + roomId + "/ready",
+                new HttpEntity<>("{\"ready\":true}", headers), String.class);
     }
 
     private static String tokenForUserId(Map<String, String> tokens, Map<String, Long> userIds, long userId) {

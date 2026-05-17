@@ -222,6 +222,14 @@ class RoomJoinOrReconnectIntegrationTest {
                             .header("Authorization", "Bearer " + tokens.get(ordered.get(i))))
                     .andExpect(status().isOk());
         }
+        // Phase 16(#2) — 전원 준비해야 IN_GAME (이 헬퍼는 시작된 방 전용).
+        for (String u : ordered) {
+            mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                            .header("Authorization", "Bearer " + tokens.get(u))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"ready\":true}"))
+                    .andExpect(status().isOk());
+        }
         return roomId;
     }
 }

@@ -5,10 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.invariant.TichuInvariantChecker;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
+import com.mirboard.domain.lobby.auth.User;
+import com.mirboard.domain.lobby.auth.UserRepository;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +25,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -67,17 +71,28 @@ class TurnTimeoutSchedulerIT {
     @Autowired RoomService roomService;
     @Autowired MatchCompletedSink sink;
     @Autowired TichuGameStateStore stateStore;
+    @Autowired UserRepository userRepo;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired Clock clock;
 
     @Test
     void idle_human_seat_is_auto_advanced_until_match_completes() {
         sink.clear();
-        // host = 비-봇 id (seat 0). 절대 행동 안 함 → 타임아웃이 대신 진행.
-        long humanHostId = 987654321L;
+        // host = 비-봇 실제 등록 유저 (seat 0). 절대 행동 안 함 → 타임아웃이 대신
+        // 진행. Phase 16(#4): 봇 매치도 전적 기록되므로 host 는 실재 users 행이어야
+        // participant FK(users.id) 위반 없이 매치 종료가 정상 발행됨.
+        long humanHostId = userRepo
+                .save(User.create("tt_human_host", passwordEncoder.encode("validpass1"), clock))
+                .getId();
         Room room = roomService.createRoom(
                 humanHostId, "turn-timeout", "TICHU",
                 TeamPolicy.SEQUENTIAL, /*fillWithBots*/ true,
                 /*targetScore*/ 300, /*turnSeconds*/ 1);
         String roomId = room.roomId();
+
+        // Phase 16(#2) — 봇 3 은 자동 ready. 사람 호스트가 준비하면 전원 ready
+        // → 게임 시작 (이후 게임 중엔 의도적으로 행동 안 함 = idle).
+        room = roomService.setReady(roomId, humanHostId, true);
 
         assertThat(room.status()).isEqualTo(RoomStatus.IN_GAME);
         assertThat(room.playerIds()).hasSize(4);
