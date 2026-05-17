@@ -98,6 +98,26 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-64 (2026-05-17) — Phase 12D: 티츄 선언자 배지 강화
+
+코드상 이미 구현돼 있던 선언 표시 (`TableView.declarations` + `TichuDeclared`
+공개 이벤트 + 리듀서 + `.declared` div) 가 raw enum 텍스트라 약함. 좌석 헤더에
+한국어 pill 배지로: TICHU → "🔔 티츄!" (노랑), GRAND_TICHU → "👑 그랜드 티츄!"
+(주황 + pulse 애니메이션). 데이터 흐름은 그대로 (변경 X), 표시 레이어만 강화.
+`styles.css` `.declared` pill/대비/`.grand` 펄스 추가. #1 (D-61) 401 픽스로 UI
+가 정상 렌더되면 함께 잘 보임.
+
+## D-63 (2026-05-17) — Phase 12C: 선택 패 조합명 표시 (클라 hint)
+
+`client/src/features/tichu/handType.ts` (순수 함수) — 선택 카드 조합을 표시용
+으로 판별. SINGLE/PAIR/TRIPLE/FULL_HOUSE/STRAIGHT/CONSECUTIVE_PAIRS/BOMB/
+STRAIGHT_FLUSH_BOMB + Mahjong(STRAIGHT rank 1) + Phoenix best-effort
+(PAIR/TRIPLE만, 복잡 케이스 null). **서버 HandDetector 가 룰 단일 진실공급원
+(Phase 10) — 본 함수는 UI hint 전용**, 합법성 강제는 ActionValidator 가 계속
+담당. divergence 시 사용자 혼란 완화: 라벨 "선택: X", 서버 reject 메시지 그대로
+노출. GameTable Play 영역에 "선택: 스트레이트 (5장)" 표시. 단위 테스트 12개
+(handType.test.ts). 클라 48 그린.
+
 ## D-62 (2026-05-17) — Phase 12B: PlayCard 후 HandDealt 재발행
 
 배포 시연에서 "낸 패가 손에서 안 사라짐". 원인: `TichuEngine.applyPlayCard` 가

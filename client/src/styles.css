@@ -314,8 +314,36 @@ a {
 
 .declared {
   margin-top: 4px;
-  font-size: 0.75rem;
-  color: var(--color-warning);
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1a1a1f;
+  background: var(--color-warning, #f0c000);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.declared.grand {
+  background: #ff8c00;
+  color: #1a1a1f;
+  animation: declared-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes declared-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2); }
+  50% { box-shadow: 0 0 8px 2px rgba(255, 140, 0, 0.7); }
+}
+
+.combo-hint {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-accent, #5b8def);
+  background: rgba(91, 141, 239, 0.12);
 }
 
 .trick {

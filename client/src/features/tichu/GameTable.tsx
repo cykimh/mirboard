@@ -9,6 +9,7 @@ import { useStompRoom } from '@/ws/useStompRoom';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
+import { detectHandType, handTypeLabel } from './handType';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
@@ -120,6 +121,12 @@ export function GameTable({
     if (!privateHand) return [];
     return privateHand.cards.filter((c) => selectedCardKeys.has(cardKey(c)));
   }, [privateHand, selectedCardKeys]);
+
+  // Phase 12C — 선택 카드 조합명 (표시용 hint, 서버가 실제 검증).
+  const selectedHandType = useMemo(
+    () => detectHandType(selectedCards),
+    [selectedCards],
+  );
 
   const passCardsBySlot = useMemo(() => {
     if (!privateHand) return { left: null, partner: null, right: null };
@@ -321,7 +328,15 @@ export function GameTable({
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}
               </div>
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
-                <div className="declared">{tableView.declarations[seat]}</div>
+                <div
+                  className={`declared ${
+                    tableView.declarations[seat] === 'GRAND_TICHU' ? 'grand' : ''
+                  }`}
+                >
+                  {tableView.declarations[seat] === 'GRAND_TICHU'
+                    ? '👑 그랜드 티츄!'
+                    : '🔔 티츄!'}
+                </div>
               )}
               {ready && <div className="status-tag">{t('seat.ready')}</div>}
               {submitted && <div className="status-tag">{t('seat.submitted')}</div>}
@@ -452,6 +467,12 @@ export function GameTable({
 
         {isInPlaying && (
           <>
+            {selectedCards.length > 0 && (
+              <span className="combo-hint" aria-live="polite">
+                선택: {handTypeLabel(selectedHandType)}
+                {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
+              </span>
+            )}
             <button
               type="button"
               onClick={handlePlay}

@@ -700,4 +700,26 @@ Phase 7-5 (배포 검증) 그린 후 8A 시작.
 
 ---
 
+## Phase 11 — 검증 자동화 wrapper (D-60)
+
+`scripts/check.sh` 7 서브커맨드 (fast/rules/server/client/all/bot-stress/infra) +
+Colima Docker socket 자동 감지 + `.husky/pre-commit` 위임. 기존 raw gradle/npm
+명령 그대로 유지, CI 미수정 (의도적).
+
+## Phase 12 — 배포 시연 버그 픽스 + UX 보강 (D-61~64)
+
+`mirboard.fly.dev` 첫 실배포 시연에서 발견된 4 이슈.
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 12A | SecurityConfig 비-API default-permit — 정적 자산/SPA 401 픽스 (route-drift 버그 클래스 제거) | ✅ 완료 (D-61) |
+| 12B | `applyPlayCard` 가 Played 직후 HandDealt 재발행 — 낸 패 손에서 제거 | ✅ 완료 (D-62) |
+| 12C | 클라 경량 판별기 `handType.ts` — 선택 카드 조합명 hint (서버가 진실공급원) | ✅ 완료 (D-63) |
+| 12D | 티츄 선언자 한국어 pill 배지 강화 (데이터 흐름 변경 X, 표시 레이어만) | ✅ 완료 (D-64) |
+
+**Done 기준**: 12A+12B 배포 후 게임 플레이 가능 (카드 이미지 200, 낸 패 사라짐).
+12C/12D 시연에서 조합명·선언 배지 표시. 전체 회귀 그린.
+
+---
+
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
