@@ -397,7 +397,7 @@ a {
 /* Phase 12 (#3,#4) — 손패/낸 카드 살짝 포개기. gap 대신 음수 마진 + z-index. */
 .hand-cards {
   display: flex;
-  gap: 0;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -405,16 +405,20 @@ a {
   position: relative;
 }
 
-.hand-cards > * + * {
-  margin-left: -20px;
-}
-
 .hand-cards > *:hover {
   z-index: 20;
 }
 
-/* 선택된 카드는 겹친 다음 카드 아래로 가려지지 않게 위로. */
-.hand-cards > *:has(.selected) {
+/* Phase 13 (#1) — 내 손패는 안 겹침 (위 기본 gap 유지). 낸 카드(트릭)만 살짝 포갬. */
+.table-center-trick .hand-cards {
+  gap: 0;
+}
+
+.table-center-trick .hand-cards > * + * {
+  margin-left: -20px;
+}
+
+.table-center-trick .hand-cards > *:has(.selected) {
   z-index: 10;
 }
 
@@ -917,19 +921,21 @@ a {
   }
 }
 
-/* Phase 8E — 모바일 폴백: 좁은 화면에서는 absolute 원형 배치 해제 + grid 4열
-   + 중앙 트릭은 grid item 5번째로 자연 배치. 640px 미만에서 발동 (스마트폰 세로
-   대부분 < 640px). */
-@media (max-width: 640px) {
+/* Phase 8E / 13(#4) — 모바일 폴백: 좁은 화면에서 absolute 원형 배치 해제 +
+   grid 2열 + 중앙 트릭은 행 전체. 768px 이하에서 발동 (스마트폰 세로/가로 +
+   좁은 창 모두 경기장이 항상 보이도록 — 기존 640 → 768 확대). */
+@media (max-width: 768px) {
   .table-arena {
     position: static;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 6px;
     min-height: auto;
-    background: none;
+    width: 100%;
+    background: radial-gradient(ellipse at center, #1a3a2e 0%, #0e1e18 70%);
     box-shadow: none;
     border: 1px solid var(--color-border);
+    padding: 8px;
   }
 
   .table-arena .seat {
@@ -943,5 +949,13 @@ a {
     transform: none;
     grid-column: 1 / -1;
     background: rgba(0, 0, 0, 0.25);
+  }
+
+  /* 아주 좁은 폭(<420)에서는 좌석 1열로 — 경기장이 잘리지 않도록. */
+}
+
+@media (max-width: 420px) {
+  .table-arena {
+    grid-template-columns: 1fr;
   }
 }

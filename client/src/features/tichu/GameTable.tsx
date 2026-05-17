@@ -178,19 +178,22 @@ export function GameTable({
     sendAction({ '@action': 'READY' });
   }
 
-  function handleSubmitPass() {
+  // Phase 13(#2) — 패스 3장이 모두 배정되면 별도 제출 버튼 없이 자동 제출.
+  // 슬롯 재클릭으로 되돌릴 수 있는 단계가 끝난(3장 확정) 시점이라 안전.
+  useEffect(() => {
+    if (spectator || !isInPassing || iAmPassSubmitted) return;
     const { left, partner, right } = passCardsBySlot;
-    if (!left || !partner || !right) {
-      setError(t('play.error.passSlots'));
-      return;
+    if (left && partner && right) {
+      sendAction({
+        '@action': 'PASS_CARDS',
+        toLeft: left,
+        toPartner: partner,
+        toRight: right,
+      });
     }
-    sendAction({
-      '@action': 'PASS_CARDS',
-      toLeft: left,
-      toPartner: partner,
-      toRight: right,
-    });
-  }
+    // sendAction 은 안정적 식별자가 아니라 의존성에서 제외 (passSelection 변화로만 트리거).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passCardsBySlot, spectator, isInPassing, iAmPassSubmitted]);
 
   function handleCardClick(c: Card) {
     if (isInPassing && !iAmPassSubmitted) {
@@ -455,22 +458,9 @@ export function GameTable({
         {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
 
         {isInPassing && !iAmPassSubmitted && (
-          <>
-            <button
-              type="button"
-              onClick={handleSubmitPass}
-              disabled={
-                !passCardsBySlot.left ||
-                !passCardsBySlot.partner ||
-                !passCardsBySlot.right
-              }
-            >
-              {t('pass.submit')}
-            </button>
-            <button type="button" onClick={clearPassSelection}>
-              {t('pass.clear')}
-            </button>
-          </>
+          <button type="button" onClick={clearPassSelection}>
+            {t('pass.clear')}
+          </button>
         )}
         {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
 

@@ -98,6 +98,21 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-67 (2026-05-17) — Phase 13F: 시연 UX 보정 4건 (클라)
+
+- **#1 내 손패 안 겹침**: Phase 12 의 `.hand-cards` 음수 마진 overlap 을 트릭
+  (`.table-center-trick .hand-cards`) 로만 한정. 내 손패는 gap 6px 복귀.
+- **#2 패스 자동 제출**: 좌/파/우 3장 모두 배정되면 `pass.submit` 버튼 없이
+  useEffect 가 즉시 PASS_CARDS 전송. 되돌리기는 clear 버튼/슬롯 재클릭으로 3장
+  확정 전 가능 (확정 후 자동 — 사용자 선택). submit 버튼 제거.
+- **#3 카드 문양+숫자만**: D-48 트럼프 SVG 렌더 제거 — `CardChip` 이 항상
+  글리프(◆⚔⛩★)+숫자/특수 이모지(🐕🐉🔥/1) 텍스트로. `cardAssetSrc` 헬퍼·테스트는
+  유지 (추후 실제 카드 assets 일괄 교체 시 이미지 모드 재도입 예정).
+- **#4 모바일 경기장**: 보드 폴백 breakpoint 640 → 768px 확대 + width:100% +
+  radial 배경 유지, <420px 는 좌석 1열. 좁은 창/폰에서 항상 경기장 표시.
+
+순수 클라, 서버/프로토콜 무변경. 클라 build:check + test + build 그린.
+
 ## D-66 (2026-05-17) — Phase 13: 시연 UX/기능 7건
 
 배포 시연 요청 7건.

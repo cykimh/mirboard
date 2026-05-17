@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import type { Card, Suit } from '@/types/tichu';
-import { cardAssetSrc, cardLabel } from '@/types/tichu';
+import { cardLabel } from '@/types/tichu';
 
 const SUIT_COLOR: Record<Suit, string> = {
   JADE: '#3fb979',
@@ -23,40 +22,26 @@ interface CardChipProps {
 }
 
 /**
- * Phase 8F — 카드 표시 컴포넌트. 정적 SVG (`/cards/{suit}-{rank}.svg`) 가
- * 있으면 이미지를, 없으면 (onError) 기존 텍스트 글리프로 graceful fallback.
- * 기본 자산은 `scripts/generate-cards.mjs` 가 생성한 트럼프 풍 SVG.
+ * Phase 13(#3) — 트럼프 SVG 대신 문양 + 숫자만 표시 (이전 텍스트 글리프 스타일).
+ * 특수카드(개/용/봉황/마작)는 `cardLabel` 이모지로. 실제 카드 assets 는 추후
+ * 일괄 교체 예정 — 그때 다시 이미지 모드 도입.
  */
 export function CardChip({ card, selected, onClick }: CardChipProps) {
-  const [imageFailed, setImageFailed] = useState(false);
   const color = card.suit ? SUIT_COLOR[card.suit] : '#aaa';
   const glyph = card.suit ? SUIT_GLYPH[card.suit] : '';
   const label = cardLabel(card);
-  const src = cardAssetSrc(card);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`card-chip ${selected ? 'selected' : ''} ${imageFailed ? '' : 'card-chip-img'}`}
-      style={imageFailed ? { borderColor: color } : undefined}
+      className={`card-chip ${selected ? 'selected' : ''}`}
+      style={{ borderColor: color }}
       aria-pressed={selected}
       aria-label={`${card.suit ?? card.special ?? ''} ${label}`}
     >
-      {imageFailed ? (
-        <>
-          <span style={{ color }}>{glyph}</span>
-          <span className="rank">{label}</span>
-        </>
-      ) : (
-        <img
-          src={src}
-          alt=""
-          onError={() => setImageFailed(true)}
-          draggable={false}
-          style={{ display: 'block' }}
-        />
-      )}
+      {glyph && <span style={{ color }}>{glyph}</span>}
+      <span className="rank">{label}</span>
     </button>
   );
 }
