@@ -63,7 +63,33 @@ mirboard/
     # 페이지: Login → GameHub → Lobby → Room → GameTable
 ```
 
-## 로컬 의존성 기동
+## 로컬 실행 (빠른 시작)
+
+`scripts/dev.sh` 로 인프라+서버+클라를 한 번에 (Phase 14 — D-68). dev env
+(JWT/DB/Redis) 는 `application.yml` 기본값이 내장되어 **추가 export 불필요**.
+
+```bash
+./scripts/dev.sh up         # 인프라(postgres+redis) + Flyway 마이그레이션
+./scripts/dev.sh server     # 서버 (:8080)              ┐ 각각 별도 터미널
+./scripts/dev.sh client     # 클라 dev (:5173 → :8080)  ┘
+# 또는 한 방에 (서버 백그라운드 + 클라 포그라운드, Ctrl-C 시 함께 정리):
+./scripts/dev.sh all
+# 단일 프로세스(번들) — localhost:8080 만으로 prod 유사 확인:
+./scripts/dev.sh bundled
+./scripts/dev.sh down            # 중지(데이터 보존), --purge 면 DB 초기화
+./scripts/dev.sh --help
+```
+
+> 호스트 5432/6379 를 **다른 프로젝트 컨테이너**가 점유 중이면 `up` 이 어떤
+> 컨테이너인지 명시하고 중단한다. 그 컨테이너를 끄고 재시도하거나
+> `docker-compose.override.yml` 로 mirboard 로컬 포트를 바꾼다.
+
+역할 구분: 실행=`scripts/dev.sh`, 검증/테스트=`scripts/check.sh`.
+gradle 데몬 완전 종료는 `./gradlew --stop`.
+
+---
+
+### 수동/디버깅용 (직접 명령)
 
 ```bash
 # Postgres + Redis 만 띄움

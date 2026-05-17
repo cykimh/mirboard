@@ -98,6 +98,26 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-68 (2026-05-17) — Phase 14: 로컬 실행 wrapper `scripts/dev.sh`
+
+Fly.io 배포와 별개로 로컬 풀스택을 손쉽게 올리도록 `scripts/dev.sh` 추가
+(`scripts/check.sh` 패턴 재사용 — set -e, repo root cd, Colima socket 자동
+감지, 서브커맨드, --help). 서브커맨드: `up`(docker compose postgres+redis +
+Flyway 마이그레이션, 멱등) / `server`(infra 보장 후 bootRun :8080) /
+`client`(Vite :5173) / `bundled`(bootRun -PbundleClient, :8080 단독) /
+`all`(서버 백그라운드+클라 포그라운드, trap 으로 Ctrl-C 정리) / `down [--purge]`.
+
+핵심 사실 명문화: 로컬 실행은 기존에도 가능했고 부족했던 건 오케스트레이션
+편의뿐 — `application.yml` dev 기본값이 docker-compose 자격증명과 일치하고
+`MIRBOARD_JWT_SECRET` dev 기본값(≥32B)이 내장돼 **추가 env export 불필요**
+(운영만 secret 주입). 서버/프로토콜/DB 무변경, 순수 개발 도구.
+
+호스트 5432/6379 를 mirboard 외 컨테이너가 점유 시 어떤 컨테이너인지 명시하고
+중단(check_port_conflict). 포트 충돌 정책은 사용자 결정으로 **기본 5432 유지 +
+명확한 안내** (override 파일/기본 포트 변경 안 함 — 다른 프로젝트와 동시 구동
+시 그 컨테이너를 잠시 끄고 재시도). README "로컬 실행(빠른 시작)" 섹션 신설,
+기존 raw 명령은 "수동/디버깅용" 으로 보존.
+
 ## D-67 (2026-05-17) — Phase 13F: 시연 UX 보정 4건 (클라)
 
 - **#1 내 손패 안 겹침**: Phase 12 의 `.hand-cards` 음수 마진 overlap 을 트릭
