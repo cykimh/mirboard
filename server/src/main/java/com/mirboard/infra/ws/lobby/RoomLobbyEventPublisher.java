@@ -29,14 +29,22 @@ public class RoomLobbyEventPublisher {
     @EventListener
     public void onRoomChanged(RoomChangedEvent event) {
         if (event.isDestroyed()) {
-            publisher.publishToTopic(LOBBY_ROOMS_TOPIC,
-                    StompEnvelope.of("ROOM_DESTROYED",
-                            new RoomDestroyedPayload(event.roomId()),
-                            clock));
+            var destroyed = StompEnvelope.of("ROOM_DESTROYED",
+                    new RoomDestroyedPayload(event.roomId()), clock);
+            publisher.publishToTopic(LOBBY_ROOMS_TOPIC, destroyed);
+            // Phase 13C(#3) — 해당 방 구독자에게도 (RoomPage 폴링 대체).
+            publisher.publishToTopic(roomMetaTopic(event.roomId()), destroyed);
         } else {
             publisher.publishToTopic(LOBBY_ROOMS_TOPIC,
                     StompEnvelope.of("ROOM_UPDATED", event.currentState(), clock));
+            publisher.publishToTopic(roomMetaTopic(event.roomId()),
+                    StompEnvelope.of("ROOM_META_UPDATED", event.currentState(), clock));
         }
+    }
+
+    /** Phase 13C — per-room 메타 토픽. RoomPage 가 2초 폴링 대신 구독. */
+    public static String roomMetaTopic(String roomId) {
+        return "/topic/room/" + roomId + "/meta";
     }
 
     public record RoomDestroyedPayload(String roomId) {

@@ -4,13 +4,15 @@ import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
+import { useRoomMeta } from '@/ws/useRoomMeta';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/Badge';
 import type { Room, TeamPolicy } from '@/types/api';
 
 /**
  * 대기실 + 게임 테이블 컨테이너. status=WAITING 일 때는 참가자 목록을, IN_GAME
- * 으로 전이되면 {@link GameTable} 을 렌더링한다. 폴링으로 방 메타를 2초마다 갱신.
+ * 으로 전이되면 {@link GameTable} 을 렌더링한다. Phase 13C — 방 메타는 폴링 대신
+ * `/topic/room/{id}/meta` WS 구독으로 즉시 갱신.
  *
  * Phase 8A — 진입 시 자동으로 `/join-or-reconnect` 호출해서 본인 좌석을 복원하거나
  * IN_GAME 방엔 spectator 로 흡수. 직접 링크 공유 시나리오 지원.
@@ -45,26 +47,17 @@ export function RoomPage() {
   useEffect(() => {
     if (!token) {
       navigate('/login');
-      return;
     }
-    if (!autoJoinAttempted) return;  // 자동 join 끝나야 폴링 시작.
-    let cancelled = false;
-    async function poll() {
-      try {
-        const r = await roomsApi.get(token!, roomId);
-        if (!cancelled) setRoom(r);
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof ApiError) setError(err.message);
-      }
-    }
-    poll();
-    const id = window.setInterval(poll, 2000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [token, roomId, navigate, autoJoinAttempted]);
+  }, [token, navigate]);
+
+  // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
+  // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
+  useRoomMeta(
+    roomId,
+    token,
+    (r) => setRoom(r),
+    () => setError('방이 종료되었습니다.'),
+  );
 
   const iAmPlayer = !!(room && user && room.playerIds.includes(user.userId));
   const iAmSpectator = !!(
