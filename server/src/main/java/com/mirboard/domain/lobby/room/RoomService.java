@@ -127,8 +127,15 @@ public class RoomService {
             }
             log.info("Auto-joining bots: roomId={} botIds={}", roomId, botIds);
             for (long botId : botIds) {
-                // joinRoom 마지막 호출이 capacity 도달 → IN_GAME 전이 + GameStartingEvent.
                 room = joinRoom(roomId, botId);
+            }
+            // Phase 16(#2) — 봇은 자동 ready. 솔로(사람 호스트)면 호스트가
+            // RoomPage 에서 준비 눌러야 시작. all-bot 시나리오(호스트도 봇)면
+            // 마지막 봇 ready 에서 전원 ready → 자동 시작(기존 동작 보존).
+            for (long pid : getRoom(roomId).playerIds()) {
+                if (bots.isBot(pid)) {
+                    room = setReady(roomId, pid, true);
+                }
             }
         }
         return room;
@@ -163,28 +170,54 @@ public class RoomService {
         metrics.roomJoined();
         log.info("Room join: roomId={} userId={} occupancy={}/{} status={}",
                 roomId, userId, room.playerIds().size(), room.capacity(), room.status());
-        if (room.status() == RoomStatus.IN_GAME) {
-            // Phase 8C — RANDOM 정책이면 좌석 셔플 후 갱신된 좌석 순서를 브로드캐스트.
-            // capacity 가 막혀 신규 join 동시성 없으므로 안전.
-            if (room.teamPolicy() == TeamPolicy.RANDOM) {
-                List<Long> shuffled = new ArrayList<>(room.playerIds());
-                Collections.shuffle(shuffled, random);
-                repository.replacePlayerOrder(roomId, shuffled);
-                room = getRoom(roomId);
-                events.publish(RoomChangedEvent.updated(room));
-                log.info("Seats shuffled (RANDOM): roomId={} newOrder={}", roomId, shuffled);
-            }
-            events.publish(new com.mirboard.domain.game.core.GameStartingEvent(
-                    room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
-            metrics.gameStarted();
-            log.info("Game starting: roomId={} gameType={} players={}",
-                    roomId, room.gameType(), room.playerIds());
+        // Phase 16(#2) — join 은 더 이상 게임을 시작하지 않음. 시작은 setReady.
+        return room;
+    }
+
+    /**
+     * Phase 16(#2) — 대기실 준비 토글. 전원 ready 가 되면 (room_ready.lua 가
+     * WAITING→IN_GAME 원자 전이) 게임 시작 절차를 수행한다. 멤버가 아니면
+     * NotInRoomException, 이미 시작/종료된 방이면 GameAlreadyStartedException.
+     */
+    public Room setReady(String roomId, long userId, boolean ready) {
+        getRoom(roomId); // 존재 확인 (없으면 RoomNotFound).
+        int code = repository.setReady(roomId, userId, ready);
+        Room room = getRoom(roomId);
+        events.publish(RoomChangedEvent.updated(room));
+        log.info("Room ready toggle: roomId={} userId={} ready={} started={}",
+                roomId, userId, ready, code == 1);
+        if (code == 1) {
+            room = onGameStart(room);
         }
+        return room;
+    }
+
+    /**
+     * Phase 8C/16 — WAITING→IN_GAME 전이 직후 절차: RANDOM 정책이면 좌석 셔플,
+     * GameStartingEvent 발행, metrics. (예전 joinRoom 의 capacity 자동시작
+     * 분기에서 추출. 이제 전원 ready 시점에 한 번만 실행.)
+     */
+    private Room onGameStart(Room room) {
+        String roomId = room.roomId();
+        if (room.teamPolicy() == TeamPolicy.RANDOM) {
+            List<Long> shuffled = new ArrayList<>(room.playerIds());
+            Collections.shuffle(shuffled, random);
+            repository.replacePlayerOrder(roomId, shuffled);
+            room = getRoom(roomId);
+            events.publish(RoomChangedEvent.updated(room));
+            log.info("Seats shuffled (RANDOM): roomId={} newOrder={}", roomId, shuffled);
+        }
+        events.publish(new com.mirboard.domain.game.core.GameStartingEvent(
+                room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
+        metrics.gameStarted();
+        log.info("Game starting: roomId={} gameType={} players={}",
+                roomId, room.gameType(), room.playerIds());
         return room;
     }
 
     public void leaveRoom(String roomId, long userId) {
         repository.leave(roomId, userId);
+        repository.clearReady(roomId, userId); // Phase 16(#2) — ready 플래그 정리.
         Optional<Room> remaining = repository.findById(roomId);
         events.publish(remaining
                 .map(RoomChangedEvent::updated)

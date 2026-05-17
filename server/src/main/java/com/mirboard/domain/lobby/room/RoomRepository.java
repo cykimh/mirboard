@@ -22,6 +22,7 @@ public class RoomRepository {
     private final RedisScript<Long> joinScript;
     private final RedisScript<Long> leaveScript;
     private final RedisScript<Long> finishScript;
+    private final RedisScript<Long> readyScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -30,12 +31,14 @@ public class RoomRepository {
             @Qualifier("roomJoinScript") RedisScript<Long> joinScript,
             @Qualifier("roomLeaveScript") RedisScript<Long> leaveScript,
             @Qualifier("roomFinishScript") RedisScript<Long> finishScript,
+            @Qualifier("roomReadyScript") RedisScript<Long> readyScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
         this.joinScript = joinScript;
         this.leaveScript = leaveScript;
         this.finishScript = finishScript;
+        this.readyScript = readyScript;
         this.bots = bots;
     }
 
@@ -95,6 +98,36 @@ public class RoomRepository {
         return (int) v;
     }
 
+    /**
+     * Phase 16(#2) — ready 토글. 반환 1 이면 전원 ready 로 IN_GAME 전이됨
+     * (호출측이 GameStartingEvent 발행), 0 이면 토글만.
+     */
+    public int setReady(String roomId, long userId, boolean ready) {
+        Long result = redis.execute(
+                readyScript,
+                List.of("room:" + roomId,
+                        "room:" + roomId + ":players",
+                        readyKey(roomId),
+                        ROOMS_OPEN_KEY),
+                Long.toString(userId),
+                ready ? "1" : "0",
+                roomId);
+        long v = unwrap(result);
+        if (v == -1L) throw new RoomNotFoundException(roomId);
+        if (v == -2L) throw new GameAlreadyStartedException(roomId);
+        if (v == -3L) throw new NotInRoomException(roomId);
+        return (int) v;
+    }
+
+    /** 대기실 떠난 플레이어의 ready 플래그 정리 (방 파괴 시엔 TTL 로 자연 소멸). */
+    public void clearReady(String roomId, long userId) {
+        redis.opsForSet().remove(readyKey(roomId), Long.toString(userId));
+    }
+
+    private static String readyKey(String roomId) {
+        return "room:" + roomId + ":ready";
+    }
+
     public void markFinished(String roomId, long now) {
         Long result = redis.execute(
                 finishScript,
@@ -131,6 +164,10 @@ public class RoomRepository {
         Set<Long> spectatorIds = spectatorStrings == null
                 ? Set.of()
                 : spectatorStrings.stream().map(Long::parseLong).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<String> readyStrings = redis.opsForSet().members(readyKey(roomId));
+        Set<Long> readyUserIds = readyStrings == null
+                ? Set.of()
+                : readyStrings.stream().map(Long::parseLong).collect(java.util.stream.Collectors.toUnmodifiableSet());
         // Phase 8C — teamPolicy 컬럼이 없는 (V1 이전) 방은 SEQUENTIAL 기본값.
         String rawPolicy = (String) hash.get("teamPolicy");
         TeamPolicy teamPolicy = rawPolicy == null ? TeamPolicy.SEQUENTIAL : TeamPolicy.valueOf(rawPolicy);
@@ -164,7 +201,8 @@ public class RoomRepository {
                 fillWithBots,
                 List.copyOf(botSeats),
                 targetScore,
-                turnSeconds));
+                turnSeconds,
+                readyUserIds));
     }
 
     /**

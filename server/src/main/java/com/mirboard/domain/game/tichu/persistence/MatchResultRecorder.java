@@ -55,13 +55,9 @@ public class MatchResultRecorder {
     @EventListener
     @Transactional
     public void onMatchCompleted(TichuMatchCompleted event) {
-        // Phase 9C — 봇이 참여한 매치는 통계/ELO 반영 X (rating 인플레이션 방지).
+        // Phase 16(#4) — 봇 포함 매치도 win/lose·match_result 는 기록하되 ELO(rating)
+        // 만 제외 (rating 인플레이션 방지). 사람 4인 매치만 ELO 반영.
         boolean hasBots = event.playerIds().stream().anyMatch(bots::isBot);
-        if (hasBots) {
-            log.info("Skipping ELO/win-loss update for bot match: room={}, players={}",
-                    event.roomId(), event.playerIds());
-            return;
-        }
         String payloadJson;
         try {
             payloadJson = objectMapper.writeValueAsString(Map.of(
@@ -96,8 +92,10 @@ public class MatchResultRecorder {
             if (Team.ofSeat(seat) == Team.A) teamAInput.add(input);
             else teamBInput.add(input);
         }
-        Map<Long, Integer> newRatings = EloCalculator.applyMatch(
-                teamAInput, teamBInput, winner == Team.A);
+        // 봇 포함 매치는 ELO 미적용 — 빈 맵이면 아래 updateRating 이 skip.
+        Map<Long, Integer> newRatings = hasBots
+                ? Map.of()
+                : EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A);
 
         for (int seat = 0; seat < playerIds.size(); seat++) {
             long userId = playerIds.get(seat);
@@ -116,9 +114,9 @@ public class MatchResultRecorder {
             }
         }
 
-        log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, ratings={}",
+        log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, eloApplied={}, ratings={}",
                 event.roomId(), winner,
                 event.cumulativeTeamAScore(), event.cumulativeTeamBScore(),
-                event.roundScores().size(), newRatings);
+                event.roundScores().size(), !hasBots, newRatings);
     }
 }

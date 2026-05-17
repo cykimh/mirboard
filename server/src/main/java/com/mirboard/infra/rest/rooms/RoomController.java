@@ -83,6 +83,17 @@ public class RoomController {
         return rooms.getRoom(roomId);
     }
 
+    /**
+     * Phase 16(#2) — 대기실 준비 토글. 전원(봇 자동 포함) 준비되면 서버가
+     * WAITING→IN_GAME 전이 + 게임 시작. 응답은 갱신된 Room(readyUserIds 포함).
+     */
+    @PostMapping("/{roomId}/ready")
+    public Room ready(@PathVariable String roomId,
+                      @AuthenticationPrincipal AuthPrincipal me,
+                      @RequestBody @Valid ReadyRequest req) {
+        return rooms.setReady(roomId, me.userId(), req.ready());
+    }
+
     @PostMapping("/{roomId}/join")
     public Room join(@PathVariable String roomId,
                      @AuthenticationPrincipal AuthPrincipal me) {
@@ -162,6 +173,9 @@ public class RoomController {
     }
 
     public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {
+    }
+
+    public record ReadyRequest(@jakarta.validation.constraints.NotNull Boolean ready) {
     }
 
     public record ListResponse(List<Room> rooms) {

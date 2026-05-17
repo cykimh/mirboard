@@ -25,6 +25,11 @@ public class RedisConfig {
     }
 
     @Bean
+    public RedisScript<Long> roomReadyScript() {
+        return scriptOf("lua/room_ready.lua");
+    }
+
+    @Bean
     public RedisScript<Long> roomFinishScript() {
         return scriptOf("lua/room_finish.lua");
     }

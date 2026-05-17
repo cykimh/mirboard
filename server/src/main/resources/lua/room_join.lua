@@ -45,11 +45,6 @@ redis.call('HSET', KEYS[1], 'updatedAt', now)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)
 
-local newCount = current + 1
-if newCount >= capacity then
-    -- Auto-transition: WAITING → IN_GAME. Phase 4 will hook GameEngine.start here.
-    redis.call('HSET', KEYS[1], 'status', 'IN_GAME')
-    redis.call('ZREM', KEYS[3], roomId)
-end
-
-return newCount
+-- Phase 16(#2) — capacity 도달 자동시작 폐기. 시작은 room_ready.lua 가
+-- 전원 ready 시에만 WAITING→IN_GAME 전이. join 은 정원만 막고 끝.
+return current + 1
