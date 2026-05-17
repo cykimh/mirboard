@@ -34,6 +34,35 @@ class TichuSpecialCardScenarioTest {
     // Mahjong + Wish
     // ========================================================================
 
+    // ========================================================================
+    // Phase 12B — PlayCard 후 본인 손패 HandDealt 재발행 (낸 패 제거)
+    // ========================================================================
+
+    @Test
+    void play_card_emits_hand_dealt_with_remaining_hand() {
+        var players = List.of(
+                PlayerState.initial(0, List.of(n(Suit.JADE, 5), n(Suit.JADE, 9), n(Suit.SWORD, 11))),
+                PlayerState.initial(1, List.of(n(Suit.SWORD, 7))),
+                PlayerState.initial(2, List.of(n(Suit.STAR, 9))),
+                PlayerState.initial(3, List.of(n(Suit.PAGODA, 11))));
+        TichuState state = new TichuState.Playing(players, TrickState.lead(0, null), -1);
+        var engine = new TichuEngine(CTX);
+
+        var result = engine.apply(state, 0,
+                new TichuAction.PlayCard(List.of(n(Suit.JADE, 5))));
+
+        var handDealt = result.events().stream()
+                .filter(e -> e instanceof com.mirboard.domain.game.tichu.event.TichuEvent.HandDealt)
+                .map(e -> (com.mirboard.domain.game.tichu.event.TichuEvent.HandDealt) e)
+                .filter(hd -> hd.seat() == 0)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("seat 0 HandDealt not emitted after PlayCard"));
+
+        // 낸 카드 (JADE 5) 제외한 나머지 손패
+        assertThat(handDealt.cards())
+                .containsExactlyInAnyOrder(n(Suit.JADE, 9), n(Suit.SWORD, 11));
+    }
+
     @Test
     void mahjong_lead_then_make_wish_activates() {
         var players = List.of(

@@ -76,6 +76,32 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
+    /** Phase 12A (D-61) — 정적 자산은 미인증이어도 401 이 아니어야 한다. */
+    @Test
+    void static_asset_without_token_is_not_unauthorized() throws Exception {
+        // 정적 핸들러가 파일을 못 찾으면 404 (SPA fallback → index.html 200 일 수도).
+        // 핵심: 401 이 아님 (SecurityConfig 가 비-API 를 permitAll).
+        int status = mockMvc.perform(get("/cards/star-7.svg"))
+                .andReturn().getResponse().getStatus();
+        assertThat(status).isNotEqualTo(401);
+    }
+
+    /** Phase 12A — SPA 딥링크 경로도 미인증 401 아님 (StaticSpaConfig fallback). */
+    @Test
+    void spa_deeplink_without_token_is_not_unauthorized() throws Exception {
+        int status = mockMvc.perform(get("/rooms/some-room-id"))
+                .andReturn().getResponse().getStatus();
+        assertThat(status).isNotEqualTo(401);
+    }
+
+    /** Phase 12A — /api/** 는 여전히 인증 강제 (회귀 방지). */
+    @Test
+    void api_endpoint_without_token_stays_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/rooms"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
     @Test
     void register_with_duplicate_username_is_conflict() throws Exception {
         var body = objectMapper.writeValueAsString(

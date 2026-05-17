@@ -25,24 +25,17 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Phase 12A (D-61) — 인증 필요 HTTP 표면은 /api/** 뿐.
+                        // STOMP 는 /ws 핸드셰이크 permitAll + STOMP CONNECT 단계에서
+                        // 별도 인증 (ChannelInterceptor). 정적 자산(cards/characters/
+                        // sfx/board)·SPA 딥링크 경로를 일일이 열거하면 route-drift 로
+                        // 401 이 반복 발생 (배포 시연에서 적발) → 비-API default-permit.
+                        // ⚠️ 규약: 민감한 HTTP 엔드포인트는 반드시 /api/** 하위에 둘 것.
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers("/ws/**", "/error").permitAll()
-                        // Phase 6A-3 — Actuator (health, prometheus 스크래핑) 은 내부망 노출 가정.
-                        // 운영 전에 IP 화이트리스트 또는 별도 management.server.port 분리 필요.
-                        .requestMatchers("/actuator/**").permitAll()
-                        // Phase 7-3 (D-39) — Spring 이 직접 서빙하는 React SPA 정적 파일.
-                        // 정적 파일과 SPA 라우터 경로 (StaticSpaConfig 의 fallback) 는 인증 없이
-                        // 응답. 실제 API 호출은 /api/** 와 /ws/** 에서 인증을 강제한다.
-                        .requestMatchers(HttpMethod.GET,
-                                "/", "/index.html",
-                                "/assets/**", "/static/**",
-                                "/*.svg", "/*.png", "/*.ico", "/*.txt",
-                                "/login", "/register",
-                                "/hub", "/hub/**",
-                                "/lobby", "/lobby/**",
-                                "/room", "/room/**").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/ws/**", "/error", "/actuator/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll())
                 .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

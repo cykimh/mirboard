@@ -98,6 +98,31 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-62 (2026-05-17) — Phase 12B: PlayCard 후 HandDealt 재발행
+
+배포 시연에서 "낸 패가 손에서 안 사라짐". 원인: `TichuEngine.applyPlayCard` 가
+`Played` 만 발행하고 `HandDealt` 미발행. 클라 `useStompRoom` 은 `HAND_DEALT` 로만
+`applyPrivateHand` 호출 → 손패 stale (서버 상태는 정상, UI 만 안 갱신).
+`applyPassCards`/`advanceFromDealing` 은 HandDealt 발행하던 패턴과 불일치.
+fix: `events.add(Played)` 직후 `events.add(new HandDealt(seat, newHand,
+newHand.size()))` — 낸 카드 제거 후 손패. HandDealt 는 `isPrivate()`=true →
+broadcaster 가 `/user/queue` 로만 라우팅 (State Hiding 유지). 모든 return 분기
+(Dog/일반/트릭종료/라운드종료) 가 공유하도록 events 에 일찍 추가. 봇은 stateStore
+직접 읽으므로 영향 없음. `TichuSpecialCardScenarioTest` 에 케이스 추가 (PlayCard
+후 seat HandDealt + 잔여 손패 일치). 전체 서버 회귀 1m25s 그린.
+
+## D-61 (2026-05-17) — Phase 12A: SecurityConfig 비-API default-permit
+
+배포 시연에서 `/cards/*.svg`, `/characters/*.webp` 가 HTTP 401. 원인: `SecurityConfig`
+의 GET permitAll 열거 목록에 정적 자산 디렉토리(`/cards/**` 등) 누락 + SPA 경로가
+옛 이름(`/hub`/`/lobby`/`/room`)이라 실제 라우트(`/games`/`/rooms`)와 불일치 →
+`anyRequest().authenticated()` 폴백 → 401. 열거 방식이 route-drift 버그를 반복
+유발하므로 **인증 표면을 `/api/**` 로 한정**하고 나머지(`anyRequest`)는 permitAll
+로 전환. STOMP 는 `/ws` 핸드셰이크 permitAll + CONNECT 단계 별도 인증이라 영향
+없음. 트레이드오프: 비-API default-permit → **규약: 민감 HTTP 엔드포인트는 반드시
+`/api/**` 하위에 둘 것**. `AuthFlowIntegrationTest` 에 정적/SPA 미인증 non-401 +
+`/api/**` 인증 유지 회귀 케이스 3개 추가. 503 은 별개(콜드스타트 추정, 본 Phase 외).
+
 ## D-60 (2026-05-15) — Phase 11: 검증 자동화 wrapper (scripts/check.sh)
 
 자주 쓰는 검증 명령 7 개를 `scripts/check.sh` 단일 진입점에 묶음. 가치:

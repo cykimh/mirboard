@@ -220,6 +220,12 @@ public final class TichuEngine implements GameEngine {
 
         List<TichuEvent> events = new ArrayList<>();
         events.add(new TichuEvent.Played(seat, normalized));
+        // Phase 12B (D-62) — 낸 카드 제거 후 본인 손패를 HandDealt(private) 로 재발행.
+        // 안 하면 클라 privateHand 가 stale 해서 낸 패가 화면에 남음. HandDealt 는
+        // isPrivate()=true → broadcaster 가 /user/queue 로만 라우팅 (State Hiding 유지).
+        // applyPassCards/advanceFromDealing 과 동일 패턴. 모든 return 분기 공유하도록
+        // events 에 일찍 추가.
+        events.add(new TichuEvent.HandDealt(seat, newHand, newHand.size()));
 
         if (newHand.isEmpty()) {
             int order = 1 + (int) players.stream().filter(PlayerState::isFinished).count();
