@@ -455,22 +455,12 @@ export function GameTable({
                 >
                   {t('play.action.pass')}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleDeclareTichu}
-                  disabled={
-                    myDeclaration !== 'NONE' || (privateHand?.cards.length ?? 0) !== 14
-                  }
-                >
-                  {t('play.action.declareTichu')}
-                </button>
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  disabled={selectedCards.length === 0}
-                >
-                  {t('play.action.clearSelection')}
-                </button>
+                {myDeclaration === 'NONE' &&
+                  (privateHand?.cards.length ?? 0) === 14 && (
+                    <button type="button" onClick={handleDeclareTichu}>
+                      {t('play.action.declareTichu')}
+                    </button>
+                  )}
               </>
             )}
           </div>
