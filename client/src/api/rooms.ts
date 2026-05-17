@@ -44,6 +44,15 @@ export const roomsApi = {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}`, { token });
   },
 
+  /** Phase 16(#2) — 대기실 준비 토글. 전원 준비되면 서버가 게임 시작. */
+  setReady(token: string, roomId: string, ready: boolean): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/ready`, {
+      method: 'POST',
+      token,
+      body: { ready },
+    });
+  },
+
   join(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
       method: 'POST',

@@ -78,6 +78,16 @@ export function RoomPage() {
     }
   }
 
+  async function handleToggleReady(next: boolean) {
+    if (!token) return;
+    try {
+      const updated = await roomsApi.setReady(token, roomId, next);
+      setRoom(updated);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+    }
+  }
+
   async function handleTeamPolicyChange(next: TeamPolicy) {
     if (!token) return;
     try {
@@ -136,12 +146,22 @@ export function RoomPage() {
         <>
           <h2>참가자</h2>
           <ul>
-            {room.playerIds.map((id) => (
-              <li key={id}>
-                <code>#{id}</code>
-                {id === room.hostId && <Badge tone="accent">호스트</Badge>}
-              </li>
-            ))}
+            {room.playerIds.map((id, seat) => {
+              const isReady = (room.readyUserIds ?? []).includes(id);
+              const isBot = (room.botSeats ?? []).includes(seat);
+              return (
+                <li key={id}>
+                  <code>#{id}</code>
+                  {id === room.hostId && <Badge tone="accent">호스트</Badge>}
+                  {isBot && <Badge tone="accent">봇</Badge>}
+                  {isReady ? (
+                    <Badge tone="accent">✓ 준비됨</Badge>
+                  ) : (
+                    <Badge tone="warning">대기</Badge>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
             <span style={{ fontSize: 13 }}>팀 배정:</span>
@@ -159,7 +179,23 @@ export function RoomPage() {
               </Badge>
             )}
           </div>
-          <p className="hint">4/4 모이면 자동으로 게임이 시작됩니다.</p>
+          {iAmPlayer && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+              {(room.readyUserIds ?? []).includes(user.userId) ? (
+                <Button type="button" variant="subtle" onClick={() => handleToggleReady(false)}>
+                  준비 취소
+                </Button>
+              ) : (
+                <Button type="button" variant="primary" onClick={() => handleToggleReady(true)}>
+                  준비
+                </Button>
+              )}
+            </div>
+          )}
+          <p className="hint">
+            정원이 모두 모이고 전원이 준비하면 자동으로 게임이 시작됩니다.
+            (봇은 자동 준비)
+          </p>
         </>
       )}
 
@@ -176,6 +212,7 @@ export function RoomPage() {
           botSeats={room.botSeats ?? []}
           fillWithBots={room.fillWithBots ?? false}
           turnSeconds={room.turnSeconds ?? 0}
+          onExit={handleLeave}
         />
       )}
 

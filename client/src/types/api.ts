@@ -39,6 +39,8 @@ export interface Room {
   targetScore: number;
   /** Phase 13D — 개인 턴 제한 초 (0=끔). */
   turnSeconds: number;
+  /** Phase 16(#2) — 대기실에서 준비 완료한 플레이어 id (봇은 자동 포함). */
+  readyUserIds: number[];
 }
 
 export interface RoomListResponse {

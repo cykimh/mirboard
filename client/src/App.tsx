@@ -4,7 +4,6 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { GameHubPage } from '@/pages/GameHubPage';
-import { LobbyPage } from '@/pages/LobbyPage';
 import { RoomPage } from '@/pages/RoomPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -28,14 +27,6 @@ export function App() {
           element={
             <ProtectedRoute>
               <GameHubPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/games/:gameId/lobby"
-          element={
-            <ProtectedRoute>
-              <LobbyPage />
             </ProtectedRoute>
           }
         />

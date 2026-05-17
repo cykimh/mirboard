@@ -128,14 +128,58 @@ a {
   border-radius: 4px;
 }
 
-.lobby-page,
+/* Phase 16(#7) — 메인 통합: 게임 카드 선택 강조 + 방생성 select. */
+.play-button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.game-card.selected {
+  border-color: var(--color-accent, #5b8def);
+  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.4);
+}
+
+.hub-page .create select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #555;
+  background: var(--color-bg-surface-elevated);
+  color: inherit;
+  font: inherit;
+}
+
+/* Phase 16(#5) — 랭킹 테이블. */
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ranking-table th,
+.ranking-table td {
+  border: 1px solid #3a3a44;
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.ranking-table tr.me {
+  background: rgba(91, 141, 239, 0.16);
+  font-weight: 700;
+}
+
+.ranking .empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.hub-page,
 .room-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.lobby-page .rooms ul,
+.hub-page .rooms ul,
 .room-page ul {
   list-style: none;
   padding: 0;
@@ -145,7 +189,7 @@ a {
   gap: 8px;
 }
 
-.lobby-page .rooms li {
+.hub-page .rooms li {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -155,11 +199,11 @@ a {
   background: var(--color-bg-surface);
 }
 
-.lobby-page .rooms .name {
+.hub-page .rooms .name {
   flex: 1;
 }
 
-.lobby-page .create {
+.hub-page .create {
   display: flex;
   gap: 8px;
   margin-top: 12px;
@@ -167,7 +211,7 @@ a {
   align-items: center;
 }
 
-.lobby-page .create input[type='text'] {
+.hub-page .create input[type='text'] {
   flex: 1;
   min-width: 160px;
 }
@@ -200,7 +244,7 @@ a {
   font-weight: 700;
 }
 
-.lobby-page .chat ul {
+.hub-page .chat ul {
   max-height: 240px;
   overflow-y: auto;
   border: 1px solid #444;
@@ -209,22 +253,22 @@ a {
   background: #1c1c24;
 }
 
-.lobby-page .chat li {
+.hub-page .chat li {
   display: flex;
   gap: 8px;
 }
 
-.lobby-page .chat strong {
+.hub-page .chat strong {
   color: var(--color-accent-link);
 }
 
-.lobby-page .chat form {
+.hub-page .chat form {
   display: flex;
   gap: 8px;
   margin-top: 8px;
 }
 
-.lobby-page .chat input {
+.hub-page .chat input {
   flex: 1;
 }
 
@@ -278,8 +322,23 @@ a {
 
 .table-arena .seat-s {
   left: 50%;
-  bottom: 12px;
+  bottom: 64px;
   transform: translateX(-50%);
+}
+
+/* Phase 16(#9) — 액션 버튼을 경기장 내 남쪽 좌석 아래 바닥에 고정. */
+.arena-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  max-width: 92%;
+  z-index: 25;
 }
 
 .table-arena .seat-n {
@@ -538,6 +597,19 @@ a {
   color: #ffd180;
 }
 
+/* Phase 16(#3) — 매치 종료 후 메인 복귀. */
+.match-exit {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #ff7043;
+  background: #ff7043;
+  color: #1a1a1f;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .hint {
   font-size: 0.85rem;
   opacity: 0.7;
@@ -712,7 +784,7 @@ a {
 
 .arena-bubble-s {
   left: 50%;
-  bottom: 76px;
+  bottom: 128px;
   transform: translateX(-50%);
 }
 
@@ -920,13 +992,13 @@ a {
   border-radius: 4px;
 }
 
-.lobby-page .spectate {
+.hub-page .spectate {
   display: flex;
   gap: 8px;
   margin-top: 8px;
 }
 
-.lobby-page .spectate input {
+.hub-page .spectate input {
   flex: 1;
 }
 
@@ -1077,7 +1149,8 @@ a {
 
   /* Phase 15 — 모바일 grid 에선 절대배치 오버레이를 행 흐름으로 강등. */
   .scoreboard,
-  .turn-countdown {
+  .turn-countdown,
+  .arena-actions {
     position: static;
     transform: none;
     grid-column: 1 / -1;

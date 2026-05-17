@@ -35,6 +35,8 @@ interface GameTableProps {
   fillWithBots?: boolean;
   /** Phase 13D — 개인 턴 제한 초 (0=끔). 헤더 배지. */
   turnSeconds?: number;
+  /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
+  onExit?: () => void;
 }
 
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
@@ -51,6 +53,7 @@ export function GameTable({
   botSeats = [],
   fillWithBots = false,
   turnSeconds = 0,
+  onExit,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(roomId, token);
@@ -265,11 +268,6 @@ export function GameTable({
           {t('game.header.matchScore')} A {tableView.matchScores.A ?? 0} : {tableView.matchScores.B ?? 0} B
         </span>
         <span>{phaseLabel}</span>
-        {isInPlaying && (
-          <span>
-            {t('game.header.currentTurn')}: {tableView.currentTurnSeat}
-          </span>
-        )}
         {tableView.activeWishRank !== null && (
           <span>
             {t('game.header.activeWish')}: {tableView.activeWishRank}
@@ -405,6 +403,78 @@ export function GameTable({
           <TurnCountdown turnSeconds={turnSeconds} />
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
+        {!spectator && (
+          <div className="arena-actions">
+            {isInDealing && !iAmReady && (
+              <>
+                {dealingCardCount === 8 && myDeclaration === 'NONE' && (
+                  <button type="button" onClick={handleDeclareGrandTichu}>
+                    {t('dealing.declareGrand')}
+                  </button>
+                )}
+                {dealingCardCount === 14 && myDeclaration === 'NONE' && (
+                  <button type="button" onClick={handleDeclareTichu}>
+                    {t('dealing.declareTichu')}
+                  </button>
+                )}
+                <button type="button" onClick={handleReady}>
+                  {myDeclaration === 'NONE'
+                    ? t('dealing.skip.noDeclare')
+                    : t('dealing.skip.declared')}
+                </button>
+              </>
+            )}
+            {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
+
+            {isInPassing && !iAmPassSubmitted && (
+              <button type="button" onClick={clearPassSelection}>
+                {t('pass.clear')}
+              </button>
+            )}
+            {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
+
+            {isInPlaying && (
+              <>
+                {selectedCards.length > 0 && (
+                  <span className="combo-hint" aria-live="polite">
+                    선택: {selectedCombo}
+                    {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handlePlay}
+                  disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
+                >
+                  {t('play.action.play')} ({selectedCards.length}{t('seat.handCardsSuffix')})
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePass}
+                  disabled={!myTurn || !tableView.currentTop}
+                >
+                  {t('play.action.pass')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeclareTichu}
+                  disabled={
+                    myDeclaration !== 'NONE' || (privateHand?.cards.length ?? 0) !== 14
+                  }
+                >
+                  {t('play.action.declareTichu')}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  disabled={selectedCards.length === 0}
+                >
+                  {t('play.action.clearSelection')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
@@ -448,9 +518,6 @@ export function GameTable({
 
       {!spectator && (
       <div className="my-hand">
-        <div className="hand-toolbar">
-          <h3>{t('hand.title')}</h3>
-        </div>
         {privateHand ? (
           <SortableHand
             cards={handCards}
@@ -465,80 +532,6 @@ export function GameTable({
           />
         ) : (
           <p>{t('hand.loading')}</p>
-        )}
-      </div>
-      )}
-
-      {!spectator && (
-      <div className="actions">
-        {isInDealing && !iAmReady && (
-          <>
-            {dealingCardCount === 8 && myDeclaration === 'NONE' && (
-              <button type="button" onClick={handleDeclareGrandTichu}>
-                {t('dealing.declareGrand')}
-              </button>
-            )}
-            {dealingCardCount === 14 && myDeclaration === 'NONE' && (
-              <button type="button" onClick={handleDeclareTichu}>
-                {t('dealing.declareTichu')}
-              </button>
-            )}
-            <button type="button" onClick={handleReady}>
-              {myDeclaration === 'NONE'
-                ? t('dealing.skip.noDeclare')
-                : t('dealing.skip.declared')}
-            </button>
-          </>
-        )}
-        {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
-
-        {isInPassing && !iAmPassSubmitted && (
-          <button type="button" onClick={clearPassSelection}>
-            {t('pass.clear')}
-          </button>
-        )}
-        {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
-
-
-        {isInPlaying && (
-          <>
-            {selectedCards.length > 0 && (
-              <span className="combo-hint" aria-live="polite">
-                선택: {selectedCombo}
-                {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handlePlay}
-              disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
-            >
-              {t('play.action.play')} ({selectedCards.length}{t('seat.handCardsSuffix')})
-            </button>
-            <button
-              type="button"
-              onClick={handlePass}
-              disabled={!myTurn || !tableView.currentTop}
-            >
-              {t('play.action.pass')}
-            </button>
-            <button
-              type="button"
-              onClick={handleDeclareTichu}
-              disabled={
-                myDeclaration !== 'NONE' || (privateHand?.cards.length ?? 0) !== 14
-              }
-            >
-              {t('play.action.declareTichu')}
-            </button>
-            <button
-              type="button"
-              onClick={clearSelection}
-              disabled={selectedCards.length === 0}
-            >
-              {t('play.action.clearSelection')}
-            </button>
-          </>
         )}
       </div>
       )}
@@ -605,6 +598,11 @@ export function GameTable({
           <p>
             {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
           </p>
+          {onExit && (
+            <button type="button" className="match-exit" onClick={onExit}>
+              메인으로
+            </button>
+          )}
         </div>
       ) : (
         roundEnded && (
