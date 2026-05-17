@@ -98,6 +98,20 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-73 (2026-05-18) — 연속 페어(CONSECUTIVE_PAIRS) 최소 길이 3페어→2페어 보정
+
+연속 페어는 이미 구현돼 있었으나 최소 길이가 3페어(6장)로 하드코딩
+(`HandDetector.detectConsecutivePairs` 의 `n < 6`, 클라 `handType.ts` 의
+`cards.length >= 6`)되어 있어 표준 티츄의 2페어(4장, 예 33-44) 계단을 낼
+수 없었다. 사용자가 2페어 선택 시 클라 검출이 `'?'` 를 반환해 "내기"
+버튼이 비활성 → "연페어가 안 된다" 증상. 서버/클라 최소 길이를 4장(2페어
+이상, 짝수)로 낮춤. 검출 순서상 n=4 에서 SF-Bomb/FullHouse/Straight 불가,
+Bomb 은 4장 동일 rank 만이라 2페어와 충돌 없음 → 비연속 2페어는 여전히
+무효. HandComparator(동일 type+length rank 비교)·typePriority 는 길이
+무관하게 동작하므로 변경 없음. Phoenix-연속페어 미지원·봇 enumerate·
+Mahjong wish 강제(연속페어)는 기존 의도적 미지원으로 범위 밖.
+`docs/rules-tichu.md` 의 길이 표기 동기화.
+
 ## D-72 (2026-05-18) — Docker socket 자동 감지 우선순위를 OrbStack 우선으로 변경
 
 사용자 요청으로 `scripts/dev.sh` · `scripts/check.sh` 의 소켓 폴백 순서를

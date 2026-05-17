@@ -172,7 +172,8 @@ public final class HandDetector {
 
     private static Optional<Hand> detectConsecutivePairs(List<Card> sorted) {
         int n = sorted.size();
-        if (n < 6 || n % 2 != 0) return Optional.empty();
+        // D-73: 표준 티츄 연속 페어 최소 2페어(4장). 짝수만.
+        if (n < 4 || n % 2 != 0) return Optional.empty();
         if (sorted.stream().anyMatch(Card::isSpecial)) return Optional.empty();
         Map<Integer, Long> byRank = sorted.stream()
                 .collect(Collectors.groupingBy(Card::rank, Collectors.counting()));

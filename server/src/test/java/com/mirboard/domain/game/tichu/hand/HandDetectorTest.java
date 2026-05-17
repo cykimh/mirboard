@@ -304,11 +304,24 @@ class HandDetectorTest {
         }
 
         @Test
-        void two_pairs_too_short() {
+        void two_consecutive_pairs_valid() {
+            // D-73: 표준 티츄 최소 2페어(4장) 연속 페어.
             assertThat(HandDetector.detect(List.of(
                     n(Suit.JADE, 4), n(Suit.SWORD, 4),
                     n(Suit.JADE, 5), n(Suit.SWORD, 5))))
-                    .isEmpty();
+                    .hasValueSatisfying(h -> {
+                        assertThat(h.type()).isEqualTo(HandType.CONSECUTIVE_PAIRS);
+                        assertThat(h.rank()).isEqualTo(5);
+                        assertThat(h.length()).isEqualTo(4);
+                    });
+        }
+
+        @Test
+        void single_pair_is_not_consecutive_pairs() {
+            assertThat(HandDetector.detect(List.of(
+                    n(Suit.JADE, 4), n(Suit.SWORD, 4))))
+                    .hasValueSatisfying(h ->
+                            assertThat(h.type()).isEqualTo(HandType.PAIR));
         }
 
         @Test

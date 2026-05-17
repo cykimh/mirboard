@@ -104,7 +104,7 @@
 | TRIPLE | 동일 rank 3장 | 특수카드 제외 (Phoenix 와일드 가능) |
 | FULL_HOUSE | 3+2 (5장) | Phoenix 와일드 가능 |
 | STRAIGHT | ≥5 장 연속 rank | Mahjong (1) 시작 가능, Phoenix 와일드 가능, Dragon/Dog 불가 |
-| CONSECUTIVE_PAIRS | ≥6 장 짝수, 모두 2장씩 동일 rank 연속 | Phoenix 와일드 가능 |
+| CONSECUTIVE_PAIRS | ≥4 장(2 pair 이상) 짝수, 모두 2장씩 동일 rank 연속 (D-73) | Phoenix 와일드 가능 |
 | BOMB | 동일 rank 4장 | 특수카드 불가, **모든 비-BOMB 핸드 깸** |
 | STRAIGHT_FLUSH_BOMB | ≥5 장 동일 suit + 연속 rank | 특수카드 불가, **BOMB 보다 강함** |
 
