@@ -64,8 +64,6 @@ export function GameTable({
   const assignPassSlot = useTichuStore((s) => s.assignPassSlot);
   const clearPassSelection = useTichuStore((s) => s.clearPassSelection);
   const reorderHand = useTichuStore((s) => s.reorderHand);
-  const sortHandByRank = useTichuStore((s) => s.sortHandByRank);
-  const restoreServerOrder = useTichuStore((s) => s.restoreServerOrder);
   const orderedHand = useTichuStore(sortedHand);
   const errorMessage = useTichuStore((s) => s.errorMessage);
   const roundEnded = useTichuStore((s) => s.roundEnded);
@@ -399,14 +397,6 @@ export function GameTable({
       <div className="my-hand">
         <div className="hand-toolbar">
           <h3>{t('hand.title')}</h3>
-          <div className="hand-sort-actions">
-            <button type="button" onClick={sortHandByRank}>
-              {t('hand.sort.byRank')}
-            </button>
-            <button type="button" onClick={restoreServerOrder}>
-              {t('hand.sort.restore')}
-            </button>
-          </div>
         </div>
         {privateHand ? (
           <SortableHand
@@ -476,7 +466,7 @@ export function GameTable({
             <button
               type="button"
               onClick={handlePlay}
-              disabled={!myTurn || selectedCards.length === 0}
+              disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
             >
               {t('play.action.play')} ({selectedCards.length}{t('seat.handCardsSuffix')})
             </button>

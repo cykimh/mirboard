@@ -17,20 +17,19 @@ function loadHand(cards: Card[]) {
   useTichuStore.setState({ privateHand: hand, sortOrder: [] });
 }
 
-describe('tichuStore — Phase 5e sort + reorder', () => {
+describe('tichuStore — Phase 13A 기본 랭크정렬 + reorder', () => {
   beforeEach(() => {
     useTichuStore.getState().reset('room-sort');
   });
 
-  it('sortedHand returns server order when sortOrder empty', () => {
+  it('#5: sortOrder 비어있으면 기본 랭크순 (버튼 없이 자동)', () => {
     loadHand([c7, c2, c5]);
     const result = sortedHand(useTichuStore.getState());
-    expect(result.map(cardKey)).toEqual([cardKey(c7), cardKey(c2), cardKey(c5)]);
+    expect(result.map(cardKey)).toEqual([cardKey(c2), cardKey(c5), cardKey(c7)]);
   });
 
-  it('sortHandByRank arranges Mahjong < normals < Dragon < Phoenix < Dog', () => {
+  it('#5: 특수카드 포함 랭크순 — Mahjong < 일반 < Dragon < Phoenix < Dog', () => {
     loadHand([c7, dragon, c2, phoenix, mahjong, c14, dog, c5]);
-    useTichuStore.getState().sortHandByRank();
     const result = sortedHand(useTichuStore.getState());
     expect(result.map(cardKey)).toEqual([
       cardKey(mahjong),
@@ -44,10 +43,8 @@ describe('tichuStore — Phase 5e sort + reorder', () => {
     ]);
   });
 
-  it('reorderHand splices fromKey before toKey', () => {
-    loadHand([c2, c5, c7, c14]);
-    useTichuStore.getState().sortHandByRank();
-    // 정렬 결과: c2, c5, c7, c14. c14 를 c5 자리 앞으로 이동.
+  it('reorderHand: 기본 랭크순 기준으로 fromKey 를 toKey 앞으로', () => {
+    loadHand([c14, c2, c7, c5]); // 기본 정렬: c2,c5,c7,c14
     useTichuStore.getState().reorderHand(cardKey(c14), cardKey(c5));
     const result = sortedHand(useTichuStore.getState());
     expect(result.map(cardKey)).toEqual([
@@ -58,37 +55,27 @@ describe('tichuStore — Phase 5e sort + reorder', () => {
     ]);
   });
 
-  it('restoreServerOrder clears sortOrder', () => {
-    loadHand([c7, c2, c5]);
-    useTichuStore.getState().sortHandByRank();
-    useTichuStore.getState().restoreServerOrder();
-    const result = sortedHand(useTichuStore.getState());
-    expect(result.map(cardKey)).toEqual([cardKey(c7), cardKey(c2), cardKey(c5)]);
-  });
-
-  it('sortedHand keeps known order then appends new cards after hand swap', () => {
-    loadHand([c2, c5, c7]);
-    useTichuStore.getState().sortHandByRank();
-    // 사용자가 c7 을 맨 앞으로 옮긴 상태로 가정.
-    useTichuStore.getState().reorderHand(cardKey(c7), cardKey(c2));
-    // 패스 스왑으로 c2 가 c14 로 교체된 상황을 시뮬레이션.
+  it('수동 재배열은 유지, 새 카드는 뒤에 append', () => {
+    loadHand([c2, c5, c7]); // 정렬: c2,c5,c7
+    useTichuStore.getState().reorderHand(cardKey(c7), cardKey(c2)); // c7 맨 앞
     useTichuStore.setState({
       privateHand: { seat: 0, cards: [c7, c14, c5] },
     });
     const result = sortedHand(useTichuStore.getState());
-    // c7 은 sortOrder 의 첫 번째 위치 유지, c5 는 다음 위치, c14 는 서버 순서 따라 뒤로.
     expect(result.map(cardKey)).toEqual([cardKey(c7), cardKey(c5), cardKey(c14)]);
   });
 
-  it('reorderHand is no-op when from equals to', () => {
+  it('reorderHand from==to 면 no-op (sortOrder 그대로 []) ', () => {
     loadHand([c2, c5]);
     useTichuStore.getState().reorderHand(cardKey(c2), cardKey(c2));
     expect(useTichuStore.getState().sortOrder).toEqual([]);
   });
 
-  it('sortHandByRank on empty hand keeps order empty', () => {
-    useTichuStore.setState({ privateHand: { seat: 0, cards: [] }, sortOrder: ['stale'] });
-    useTichuStore.getState().sortHandByRank();
+  it('새 라운드(reset) 시 sortOrder 리셋 → 다시 기본 랭크순', () => {
+    loadHand([c7, c2]);
+    useTichuStore.getState().reorderHand(cardKey(c7), cardKey(c2)); // 수동 c7,c2
+    expect(useTichuStore.getState().sortOrder.length).toBeGreaterThan(0);
+    useTichuStore.getState().reset('room-sort-2');
     expect(useTichuStore.getState().sortOrder).toEqual([]);
   });
 });

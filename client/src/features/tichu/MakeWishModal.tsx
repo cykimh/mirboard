@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { t } from '@/i18n/messages';
 import { Modal } from '@/components/Modal';
 import { Button } from '@/components/Button';
+import { rankGlyph } from './handType';
 
 interface MakeWishModalProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function MakeWishModal({ open, onConfirm, onSkip }: MakeWishModalProps) {
             className={`wish-rank-btn ${selected === r ? 'selected' : ''}`}
             onClick={() => setSelected(r)}
           >
-            {r}
+            {rankGlyph(r)}
           </button>
         ))}
       </div>

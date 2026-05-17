@@ -103,8 +103,8 @@ const SPECIAL_LABEL: Record<string, string> = {
   MAHJONG: '마작',
 };
 
-/** 일반 카드 rank → 표시 글자 (2~10, J/Q/K/A). Mahjong 은 1. */
-function rankGlyph(rank: number): string {
+/** 일반 rank → 표시 글자 (2~10, 11=J, 12=Q, 13=K, 14=A, 1=Mahjong). */
+export function rankGlyph(rank: number): string {
   if (rank === 11) return 'J';
   if (rank === 12) return 'Q';
   if (rank === 13) return 'K';

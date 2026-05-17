@@ -55,10 +55,6 @@ export interface TichuActions {
   clearPassSelection: () => void;
   /** Phase 5e: 드래그 종료 시 호출. fromKey 위치의 카드를 toKey 직전으로 이동. */
   reorderHand: (fromKey: string, toKey: string) => void;
-  /** Phase 5e: 랭크 오름차순 정렬 (Mahjong=1, 일반 2..14, Dragon=15, Phoenix=16, Dog=17). */
-  sortHandByRank: () => void;
-  /** Phase 5e: 서버 분배 순서로 복귀. */
-  restoreServerOrder: () => void;
 }
 
 export type ApplyEventResult = 'applied' | 'duplicate' | 'gap' | 'unhandled';
@@ -130,13 +126,23 @@ const SUIT_ORDER: Record<string, number> = {
   STAR: 3,
 };
 
+/** Phase 13A(#5): 랭크순 비교자 (sortRank → suit 안정). */
+function byRank(a: Card, b: Card): number {
+  const r = sortRank(a) - sortRank(b);
+  if (r !== 0) return r;
+  const sa = a.suit ? SUIT_ORDER[a.suit] : 999;
+  const sb = b.suit ? SUIT_ORDER[b.suit] : 999;
+  return sa - sb;
+}
+
 /**
- * Phase 5e: 손패를 sortOrder 에 맞춰 정렬해서 반환. sortOrder 에 없는 신규 카드는
- * 서버 분배 순서대로 뒤에 append. sortOrder 가 비어있으면 서버 순서 그대로.
+ * Phase 5e/13A: 손패 표시 순서. sortOrder 가 있으면 (사용자가 드래그로 수동
+ * 재배열) 그 순서, 없으면 **기본 랭크순** (#5 — 별도 정렬 버튼 없이 항상 정렬).
+ * 새 손패마다 sortOrder 가 [] 로 리셋되므로 라운드마다 자동 랭크순.
  */
 export function sortedHand(state: TichuRoomState): Card[] {
   const hand = state.privateHand?.cards ?? [];
-  if (state.sortOrder.length === 0) return hand;
+  if (state.sortOrder.length === 0) return [...hand].sort(byRank);
   const byKey = new Map<string, Card>();
   for (const c of hand) byKey.set(cardKey(c), c);
   const result: Card[] = [];
@@ -398,23 +404,4 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
     set({ sortOrder: next });
   },
 
-  sortHandByRank() {
-    const hand = get().privateHand?.cards ?? [];
-    if (hand.length === 0) {
-      set({ sortOrder: [] });
-      return;
-    }
-    const sorted = [...hand].sort((a, b) => {
-      const r = sortRank(a) - sortRank(b);
-      if (r !== 0) return r;
-      const sa = a.suit ? SUIT_ORDER[a.suit] : 999;
-      const sb = b.suit ? SUIT_ORDER[b.suit] : 999;
-      return sa - sb;
-    });
-    set({ sortOrder: sorted.map(cardKey) });
-  },
-
-  restoreServerOrder() {
-    set({ sortOrder: [] });
-  },
 }));
