@@ -17,6 +17,7 @@
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함) | 직렬화 책임은 GameEngine |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore | Phase 5c 추가, 라운드 전환 시 유지 |
+| `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `session:{userId}` | HASH | 30m | `currentRoomId`, `wsSessionId`, `lastSeenAt` | WS CONNECT 시 갱신 |
@@ -38,6 +39,21 @@
 4. `RPUSH players userId`, `HSET room ... lastUpdatedAt=now` → `"OK"`.
 
 모든 단계가 단일 원자 트랜잭션. 4명이 동시 입장해도 capacity 위반 0건 보장.
+**Phase 16(#2)**: 정원 도달 시 IN_GAME 자동전이 블록을 제거했다. 시작은
+`room_ready.lua` 가 전담.
+
+### `room_ready.lua` *(Phase 16 #2)*
+입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`,
+`ARGV = [userId, ready('1'|'0'), roomId]`.
+
+처리:
+1. 방 없음 → `-1`. status≠WAITING → `-2`. players 에 userId 없음 → `-3`.
+2. ready='1' 이면 `SADD ready userId`, '0' 이면 `SREM ready userId` (+EXPIRE).
+3. `LLEN players >= capacity` **and** `SCARD ready >= capacity` 이면
+   `HSET room status IN_GAME` + `ZREM rooms:open` → `1`(started), 아니면 `0`.
+
+단일 원자 트랜잭션 — 다수 플레이어가 동시에 마지막 ready 를 눌러도 `1`(start)
+은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players]`, `ARGV = [userId, now]`.

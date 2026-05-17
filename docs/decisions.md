@@ -98,6 +98,26 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-71 (2026-05-17) — Phase 16: 준비-시작 모델 + 메인 재구성 + 랭킹 + 화면 정리 (9건)
+
+시연 피드백 9건. 핵심 결정: (1) 게임 시작 모델을 **capacity 자동시작
+→ 전원 준비 시 자동시작** 으로 변경. `room_join.lua` 의 정원도달
+IN_GAME 자동전이를 폐기하고, 신규 `room_ready.lua` 가 `SCARD(room:{id}
+:ready)==capacity && #players==capacity` 일 때 원자적으로 WAITING→
+IN_GAME 전이 + `GameStartingEvent` 트리거. 봇은 join 직후 서버가 자동
+ready 처리(솔로=봇3 자동준비+호스트 수동준비, all-bot 시나리오는 자동
+시작 보존). 호스트/시작버튼 없음. 신규 `POST /api/rooms/{id}/ready`,
+신규 Redis 키 `room:{id}:ready`(SET, TTL 21600s), Room DTO 에
+`readyUserIds` 추가(기존 방 메타 WS 로 운반 — STOMP destination 무변경).
+(2) 전적: 봇 포함 매치도 win/lose·match_result 는 기록하되 **ELO(rating)
+만 제외**(인플레 방지). 사람 4인 매치는 기존대로 win/lose+ELO. (3) 신규
+`GET /api/users/ranking`(봇 제외, rating desc) + 메인 랭킹 섹션. (4)
+네비게이션: 게임별 로비 페이지/라우트(`/games/:id/lobby`, LobbyPage)
+제거하고 `/games` 메인에 게임소개+방생성(게임선택)+방목록+관전+로비채팅
++랭킹 통합. (5) 게임 화면: 상단 "현재 차례" 제거, "내 손패" 문구 제거,
+액션 버튼을 경기장 내 남쪽 좌석 아래로 이동, 매치 종료 후 "메인으로"
+복귀 버튼. State Hiding·개인정보 최소화·users 컬럼 화이트리스트 불변.
+
 ## D-70 (2026-05-17) — Phase 15: 시연 UX 6건 (전부 클라 전용)
 
 솔로 시연 중 요청된 게임 화면 UX 6건을 **클라이언트만으로** 구현 —

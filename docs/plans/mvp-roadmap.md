@@ -753,6 +753,25 @@ TurnTimeoutSchedulerIT 로 타임아웃 자동진행 매치 완주 검증. turnS
 클라 build(tsc)+test 그린, `check.sh fast` 회귀 그린. #1 라운드 표는 클라
 `ROUND_ENDED` 누적 → 게임 중 재접속 시 표 비움(누적 totals 는 복구) 한계 수용.
 
+## Phase 16 — 준비-시작 + 메인 재구성 + 랭킹 + 화면 정리 (D-71, 9건)
+
+| 항목 | 내용 | 상태 |
+| --- | --- | --- |
+| #1 | 상단 "현재 차례" 표시 제거 | ✅ |
+| #2 | 대기실 전원 준비 시 자동 시작(봇 자동준비) — `room_ready.lua` 신규, `room_join.lua` 자동시작 폐기, `POST /api/rooms/{id}/ready`, `room:{id}:ready` SET | ✅ |
+| #3 | 매치 종료 결과 후 "메인으로" 복귀 버튼 | ✅ |
+| #4 | 봇 포함 매치도 win/lose 기록, ELO 만 제외 | ✅ |
+| #5 | `GET /api/users/ranking` + 메인 랭킹 섹션 | ✅ |
+| #6 | 로비 채팅을 메인페이지로 이동 | ✅ |
+| #7 | 메인페이지 통합(소개+방생성+방목록+관전), 게임별 로비 페이지 제거 | ✅ |
+| #8 | "내 손패" 문구 제거 (카드만) | ✅ |
+| #9 | 액션 버튼을 경기장 내 남쪽 좌석 아래로 | ✅ |
+
+**Done 기준**: 클라 build(tsc)+test 그린. 영향 서버 IT(ready 전환,
+capacity 미시작, 봇매치 전적, 랭킹, fillWithBots→ready→start, 재접속/
+resync/team-policy/STOMP/bot-sim) 그린. 시작 트리거를 capacity→전원 ready
+로 이동했으므로 다수 IT 가 ready 단계 추가로 갱신됨.
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

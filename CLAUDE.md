@@ -70,11 +70,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 사용자 플로우
 
 ```
-[로그인] → [Game Hub] → [Game Lobby] → [Room] → [Game Table]
-            └─ GET /api/games           └─ GET /api/rooms?gameType=TICHU
+[로그인] → [Game Hub(메인)] → [Room(대기실: 준비)] → [Game Table]
+            └─ 게임 소개 + 방 만들기(게임 선택) + 열린 방 목록/입장
+               + 랭킹(GET /api/users/ranking) + 로비 채팅
 ```
 
-- 통합 대기실 채팅 (`/topic/lobby/chat`) 은 Hub/Lobby 어느 화면에서든 동일하게 보이는 플랫폼 전역 채팅.
+- Phase 16(#7): 게임별 로비 페이지(`/games/:id/lobby`) 폐지 — 메인페이지로
+  통합. 방 생성/입장/관전/랭킹/로비채팅이 모두 `/games` 한 화면.
+- Phase 16(#2): 게임 시작 = 정원 4 + **전원 준비**(`POST /api/rooms/{id}/ready`,
+  봇은 join 시 서버가 자동 ready). capacity 자동시작 폐기.
+- 통합 대기실 채팅 (`/topic/lobby/chat`) 은 메인페이지 전역 채팅.
 - 게임별 격리 채팅은 MVP 범위 밖.
 
 ## 자주 쓰는 명령
@@ -155,8 +160,9 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 
 ## Redis 키 / 원자성
 
-- `room:{id}` (HASH), `room:{id}:players` (LIST), `room:{id}:state` (JSON), `room:{id}:hand:{userId}` (JSON, 서버만), `room:{id}:seq` (INCR), `room:{id}:lock` (SET NX EX 2s).
+- `room:{id}` (HASH), `room:{id}:players` (LIST), `room:{id}:ready` (SET, Phase 16#2), `room:{id}:state` (JSON), `room:{id}:hand:{userId}` (JSON, 서버만), `room:{id}:seq` (INCR), `room:{id}:lock` (SET NX EX 2s).
 - 방 입장/퇴장은 **Lua 스크립트로 원자화** — capacity 위반 0건 보장이 Phase 2 검증 기준.
+- Phase 16(#2): 게임 시작은 `room_ready.lua` 가 전담 — 정원+전원 ready 시에만 WAITING→IN_GAME 원자 전이(중복 start 0건). `room_join.lua` 의 capacity 자동시작 제거.
 - 액션 처리는 `room:{id}:lock` 으로 직렬화.
 
 전체 표: `docs/redis-keys.md`.

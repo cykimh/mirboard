@@ -156,6 +156,16 @@
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
+> **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. 시작은
+> 전원이 `/ready` 로 준비 완료한 시점(아래).
+
+### POST `/api/rooms/{roomId}/ready` *(Phase 16 #2)*
+대기실 준비 토글. body `{ "ready": true|false }`. 응답 `200` — Room 갱신본
+(`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
+전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
+WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석).
+
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:
 - `JOINED` — WAITING 방 + 빈 자리 있을 때 새로 입장.
@@ -186,6 +196,20 @@ schema constraint 유지.
 
 tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
 1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
+
+### GET `/api/users/ranking` *(Phase 16 #5)*
+쿼리 `limit` (기본 20, 1~100 clamp). 봇 제외, rating 내림차순(동점 시 id 오름차순).
+username 외 식별 정보 노출 0건 — D-02 constraint.
+
+응답 `200`
+```json
+{
+  "entries": [
+    { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
+      "tier": "GOLD", "winCount": 12, "loseCount": 4 }
+  ]
+}
+```
 
 ### PUT `/api/rooms/{roomId}/team-policy` *(Phase 8C — 호스트 전용)*
 WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
