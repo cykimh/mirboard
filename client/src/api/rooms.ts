@@ -16,12 +16,18 @@ export const roomsApi = {
       token: string,
       name: string,
       gameType: string,
-      opts?: { teamPolicy?: TeamPolicy; fillWithBots?: boolean; targetScore?: number }
+      opts?: {
+        teamPolicy?: TeamPolicy;
+        fillWithBots?: boolean;
+        targetScore?: number;
+        turnSeconds?: number;
+      },
   ): Promise<Room> {
     const body: Record<string, unknown> = { name, gameType };
     if (opts?.teamPolicy) body.teamPolicy = opts.teamPolicy;
     if (opts?.fillWithBots) body.fillWithBots = true;
     if (opts?.targetScore) body.targetScore = opts.targetScore;
+    if (opts?.turnSeconds != null) body.turnSeconds = opts.turnSeconds;
     return apiRequest('/api/rooms', { method: 'POST', token, body });
   },
 

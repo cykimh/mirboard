@@ -16,6 +16,7 @@ export function LobbyPage() {
   const [creating, setCreating] = useState(false);
   const [fillWithBots, setFillWithBots] = useState(false);
   const [targetScore, setTargetScore] = useState(1000);
+  const [turnSeconds, setTurnSeconds] = useState(0);
   const [spectateInput, setSpectateInput] = useState('');
   const { messages, connected, send } = useLobbyStomp(token);
   const [draft, setDraft] = useState('');
@@ -48,6 +49,7 @@ export function LobbyPage() {
       const room = await roomsApi.create(token, roomName.trim(), gameId.toUpperCase(), {
         fillWithBots,
         targetScore,
+        turnSeconds,
       });
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
@@ -134,6 +136,25 @@ export function LobbyPage() {
                 aria-pressed={targetScore === v}
               >
                 {v}
+              </button>
+            ))}
+          </div>
+          <div className="target-score-picker" role="group" aria-label="턴 제한">
+            <span className="target-score-label">턴 제한</span>
+            {[
+              { v: 0, label: '끔' },
+              { v: 30, label: '30초' },
+              { v: 60, label: '60초' },
+              { v: 90, label: '90초' },
+            ].map((o) => (
+              <button
+                type="button"
+                key={o.v}
+                className={`target-score-opt ${turnSeconds === o.v ? 'active' : ''}`}
+                onClick={() => setTurnSeconds(o.v)}
+                aria-pressed={turnSeconds === o.v}
+              >
+                {o.label}
               </button>
             ))}
           </div>

@@ -720,6 +720,19 @@ Colima Docker socket 자동 감지 + `.husky/pre-commit` 위임. 기존 raw grad
 **Done 기준**: 12A+12B 배포 후 게임 플레이 가능 (카드 이미지 200, 낸 패 사라짐).
 12C/12D 시연에서 조합명·선언 배지 표시. 전체 회귀 그린.
 
+## Phase 13 — 시연 UX/기능 7건 (D-66)
+
+| 청크 | 내용 | 상태 |
+| --- | --- | --- |
+| 13A | #2 MakeWish J/Q/K/A · #4 내기버튼 유효조합 · #5 기본 랭크정렬+버튼제거 · #7 Dragon 즉시양도 | ✅ 완료 |
+| 13B | #1 패스 카드 UX 뒤집기 (카드 먼저 → 슬롯) | ✅ 완료 |
+| 13C | #3 RoomPage 폴링 → per-room meta WS (`useRoomMeta`) | ✅ 완료 |
+| 13D | #6 개인 턴 타이머 + 자동 진행 (`TurnTimeoutScheduler`/`TimeoutActionPolicy`) | ✅ 완료 |
+
+**Done 기준**: 7건 시연 동작. 서버 전체 회귀 + bot-stress + 클라 그린.
+TurnTimeoutSchedulerIT 로 타임아웃 자동진행 매치 완주 검증. turnSeconds=0 시
+기존 동작 완전 호환.
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

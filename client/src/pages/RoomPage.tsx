@@ -175,6 +175,7 @@ export function RoomPage() {
           spectator={iAmSpectator}
           botSeats={room.botSeats ?? []}
           fillWithBots={room.fillWithBots ?? false}
+          turnSeconds={room.turnSeconds ?? 0}
         />
       )}
 

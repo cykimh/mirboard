@@ -98,6 +98,32 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-66 (2026-05-17) — Phase 13: 시연 UX/기능 7건
+
+배포 시연 요청 7건.
+- **#1 패스 UX 뒤집기**: 슬롯 먼저 → 카드 먼저. tichuStore `pendingPassCardKey`
+  + `selectPassCard`/`assignPassSlot(slot)`. `passSelection`/PASS_CARDS 계약 불변.
+- **#2 MakeWish J/Q/K/A**: `rankGlyph` export, 모달 표시만 글자화 (서버 int).
+- **#3 폴링→WS**: `RoomLobbyEventPublisher` 가 per-room `/topic/room/{id}/meta`
+  추가 발행 (ROOM_META_UPDATED/ROOM_DESTROYED). 클라 `useRoomMeta` 훅 신규,
+  RoomPage 2초 폴링 제거.
+- **#4 내기 버튼**: `selectedCombo==='?'` 조건 추가 (유효 조합 hint, 서버 최종 검증).
+- **#5 기본 랭크 정렬**: `sortedHand` 가 sortOrder 비면 byRank 정렬. 정렬 버튼/
+  `sortHandByRank`/`restoreServerOrder` 제거. 드래그 수동 재배열 유지, 새 손패마다
+  리셋(라운드 단위 자동 랭크순).
+- **#6 개인 턴 타이머**: `Room.turnSeconds` (프리셋 끔/30/60/90, 기본 끔=0)
+  targetScore 패턴 미러 배선. `TurnTimeoutScheduler` (ScheduledExecutorService +
+  per-room generation gen-guard + RoomActionLock 공유) + `TimeoutActionPolicy`
+  (결정적: GiveDragon>Ready>PassCards>PassTrick>약한 단일카드, LegalActionEnumerator
+  재사용). hook: GameStompController/BotScheduler/TichuRoundStarter 액션 후
+  `onTurnAdvanced`. turnSeconds=0 → no-op (기존 동작 완전 호환). **단일 머신 전제 —
+  타이머 in-memory. 다중 인스턴스 전환 시 Redis 동기화 필요 (범위 외).**
+- **#7 Dragon 양도 즉시**: 좌석 클릭 시 즉시 onConfirm, 확인 버튼 제거.
+
+서버 전체 회귀 3m1s + bot-stress 3 + 클라 build/test 그린. 신규 IT:
+TurnTimeoutSchedulerIT (비-봇 host idle → 타임아웃 자동진행 매치 완주),
+RoomLobbyEventPublisherTest 4, RoomController turnSeconds 2 케이스.
+
 ## D-65 (2026-05-17) — Phase 12E: 방 목표점수 + 조합명 rank + 카드 포갬
 
 배포 시연 추가 요청 4건.

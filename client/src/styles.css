@@ -241,6 +241,16 @@ a {
   opacity: 0.8;
 }
 
+/* Phase 13D — 턴 제한 배지. */
+.turn-limit-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #1a1a1f;
+  background: #ffb020;
+  opacity: 1;
+}
+
 .table-seats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

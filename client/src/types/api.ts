@@ -37,6 +37,8 @@ export interface Room {
   botSeats: number[];
   /** Phase 12 — 매치 종료 목표점수 (기본 1000). */
   targetScore: number;
+  /** Phase 13D — 개인 턴 제한 초 (0=끔). */
+  turnSeconds: number;
 }
 
 export interface RoomListResponse {

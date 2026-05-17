@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -74,6 +75,7 @@ public class BotScheduler {
     private final MatchProgressService matchProgress;
     private final BotUserRegistry bots;
     private final RandomBotPolicy policy;
+    private final TurnTimeoutScheduler turnTimeout;
     private final ExecutorService executor;
     private final long botDelayMillis;
 
@@ -83,6 +85,7 @@ public class BotScheduler {
                         RoomActionLock lock,
                         MatchProgressService matchProgress,
                         BotUserRegistry bots,
+                        @Lazy TurnTimeoutScheduler turnTimeout,
                         @Value("${mirboard.bot.seed:-1}") long seed,
                         @Value("${mirboard.bot.delay-millis:200}") long botDelayMillis) {
         this.roomService = roomService;
@@ -91,6 +94,7 @@ public class BotScheduler {
         this.lock = lock;
         this.matchProgress = matchProgress;
         this.bots = bots;
+        this.turnTimeout = turnTimeout;
         Random random = seed < 0 ? new SecureRandom() : new Random(seed);
         this.policy = new RandomBotPolicy(random);
         this.botDelayMillis = botDelayMillis;
@@ -226,6 +230,8 @@ public class BotScheduler {
             matchProgress.onRoundEnd(roomId, room, ended, outbound);
         }
         broadcaster.broadcast(roomId, outbound, room.playerIds());
+        // Phase 13D — 봇 액션 후에도 다음 턴 타임아웃 (re)스케줄 (인간 차례면 카운트 시작).
+        turnTimeout.onTurnAdvanced(roomId);
         log.debug("Bot action applied: roomId={} seat={} action={} eventsCount={}",
                 roomId, seat, action.getClass().getSimpleName(), outbound.size());
     }

@@ -63,8 +63,11 @@ public class RoomController {
         int targetScore = req.targetScore() == null
                 ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_TARGET_SCORE
                 : req.targetScore();
+        int turnSeconds = req.turnSeconds() == null
+                ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_TURN_SECONDS
+                : req.turnSeconds();
         return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy,
-                fillWithBots, targetScore);
+                fillWithBots, targetScore, turnSeconds);
     }
 
     /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
@@ -154,7 +157,8 @@ public class RoomController {
                                 @NotBlank String gameType,
                                 TeamPolicy teamPolicy,
                                 Boolean fillWithBots,
-                                Integer targetScore) {
+                                Integer targetScore,
+                                Integer turnSeconds) {
     }
 
     public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {

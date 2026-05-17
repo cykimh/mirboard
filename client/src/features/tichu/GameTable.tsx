@@ -32,6 +32,8 @@ interface GameTableProps {
   botSeats?: number[];
   /** Phase 9D — 솔로 모드 (방 생성 시 봇 자동 채움). 헤더에 배너 표시. */
   fillWithBots?: boolean;
+  /** Phase 13D — 개인 턴 제한 초 (0=끔). 헤더 배지. */
+  turnSeconds?: number;
 }
 
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
@@ -47,6 +49,7 @@ export function GameTable({
   spectator = false,
   botSeats = [],
   fillWithBots = false,
+  turnSeconds = 0,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(roomId, token);
@@ -223,6 +226,11 @@ export function GameTable({
         {fillWithBots && (
           <span className="solo-banner" title="이 방은 솔로 모드 — 빈 좌석은 봇이 자동 진행합니다">
             🤖 솔로 모드 (봇 {botSeats.length}명)
+          </span>
+        )}
+        {turnSeconds > 0 && (
+          <span className="turn-limit-badge" title="개인 턴 제한 — 초과 시 자동으로 다음 순서로 넘어갑니다">
+            ⏱ 턴 제한 {turnSeconds}초
           </span>
         )}
         <span>

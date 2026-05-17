@@ -328,6 +328,33 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 
 ---
 
+## 15. 개인 턴 타임아웃 자동 진행 (Phase 13D, D-66)
+
+방 생성 시 `turnSeconds` (프리셋 끔=0 / 30 / 60 / 90, 기본 끔) 지정. 0 이면
+타이머 없음 (기존 동작 완전 호환). >0 이면 한 좌석이 그 시간 내 행동하지 않으면
+서버가 **결정적 안전 액션**을 대신 적용해 다음 순서로 넘긴다 — 게임이 멈추지 않음.
+
+자동 액션 우선순위 (`TimeoutActionPolicy`, `LegalActionEnumerator` 합법 후보 중):
+1. **GiveDragonTrick** — Dragon 트릭 양도 보류 해소 (상대팀 첫 좌석)
+2. **Ready** — Dealing 단계
+3. **PassCards** — Passing 단계 (enumerator 3장 조합)
+4. **PassTrick** — Playing, 리드가 아니면 (손패 보존)
+5. **PlayCard** — 리드라 패스 불가 시 가장 약한 단일 카드
+
+**코드:** `infra/bot/TurnTimeoutScheduler.java` (ScheduledExecutorService +
+per-room generation gen-guard + RoomActionLock 공유, BotScheduler 와 동일
+동시성 패턴), `domain/game/tichu/bot/TimeoutActionPolicy.java`.
+
+**테스트:** `TurnTimeoutSchedulerIT` — 비-봇 host idle 좌석을 타임아웃이 매 턴
+자동 진행해 매치 완주 + invariant. `RoomControllerIntegrationTest` — turnSeconds
+지정/기본 2 케이스.
+
+**갭/제약:** 단일 머신 배포 전제 (타이머 in-memory). 다중 인스턴스 전환 시 Redis
+동기화 필요 (Phase 6D 패턴, 범위 외). 클라 실시간 카운트다운 UI 는 후속 (현재는
+"턴 제한 N초" 정적 배지만).
+
+---
+
 ## 본 문서 ↔ 코드 동기화 규칙
 
 - 룰 변경 시 본 문서 + `docs/decisions.md` D-NN + 코드 + 테스트를 같은 commit 으로 묶는다.

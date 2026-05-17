@@ -47,6 +47,7 @@ public class GameStompController {
     private final RoomActionLock lock;
     private final MatchProgressService matchProgress;
     private final com.mirboard.infra.bot.BotScheduler botScheduler;
+    private final com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout;
     private final com.mirboard.infra.metrics.MirboardMetrics metrics;
 
     public GameStompController(RoomService roomService,
@@ -55,6 +56,7 @@ public class GameStompController {
                                RoomActionLock lock,
                                MatchProgressService matchProgress,
                                com.mirboard.infra.bot.BotScheduler botScheduler,
+                               com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout,
                                com.mirboard.infra.metrics.MirboardMetrics metrics) {
         this.roomService = roomService;
         this.stateStore = stateStore;
@@ -62,6 +64,7 @@ public class GameStompController {
         this.lock = lock;
         this.matchProgress = matchProgress;
         this.botScheduler = botScheduler;
+        this.turnTimeout = turnTimeout;
         this.metrics = metrics;
     }
 
@@ -140,5 +143,7 @@ public class GameStompController {
         }
         // 락 해제 후 봇 차례면 비동기로 봇 액션 트리거.
         botScheduler.scheduleBots(roomId);
+        // Phase 13D — 다음 턴 타임아웃 타이머 (re)스케줄 (turnSeconds=0 이면 no-op).
+        turnTimeout.onTurnAdvanced(roomId);
     }
 }

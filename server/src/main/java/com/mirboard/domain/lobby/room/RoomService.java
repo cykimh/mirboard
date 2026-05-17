@@ -62,20 +62,29 @@ public class RoomService {
 
     /** Phase 12 — 기본 목표점수 (방 생성 시 미지정 시). */
     public static final int DEFAULT_TARGET_SCORE = 1000;
+    /** Phase 13D — 기본 턴 제한 (0=끔). */
+    public static final int DEFAULT_TURN_SECONDS = 0;
 
     public Room createRoom(long hostUserId, String name, String gameType) {
         return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false,
-                DEFAULT_TARGET_SCORE);
+                DEFAULT_TARGET_SCORE, DEFAULT_TURN_SECONDS);
     }
 
     public Room createRoom(long hostUserId, String name, String gameType, TeamPolicy teamPolicy) {
-        return createRoom(hostUserId, name, gameType, teamPolicy, false, DEFAULT_TARGET_SCORE);
+        return createRoom(hostUserId, name, gameType, teamPolicy, false, DEFAULT_TARGET_SCORE,
+                DEFAULT_TURN_SECONDS);
     }
 
     public Room createRoom(long hostUserId, String name, String gameType,
                            TeamPolicy teamPolicy, boolean fillWithBots) {
         return createRoom(hostUserId, name, gameType, teamPolicy, fillWithBots,
-                DEFAULT_TARGET_SCORE);
+                DEFAULT_TARGET_SCORE, DEFAULT_TURN_SECONDS);
+    }
+
+    public Room createRoom(long hostUserId, String name, String gameType,
+                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore) {
+        return createRoom(hostUserId, name, gameType, teamPolicy, fillWithBots, targetScore,
+                DEFAULT_TURN_SECONDS);
     }
 
     /**
@@ -83,10 +92,13 @@ public class RoomService {
      * 자동 join. capacity 도달 시 일반 joinRoom 흐름과 동일하게 IN_GAME 전이 +
      * GameStartingEvent 발행.
      *
-     * Phase 12 — `targetScore` 로 매치 종료 목표점수 지정 (기본 1000).
+     * Phase 12 — `targetScore` 매치 종료 목표점수 (기본 1000).
+     * Phase 13D — `turnSeconds` 개인 턴 제한 (0=끔). 타이머는 매치 상태가 아니라
+     * 방 메타라 TichuMatchState 까진 흘리지 않고 스케줄러가 room 으로 참조.
      */
     public Room createRoom(long hostUserId, String name, String gameType,
-                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore) {
+                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
+                           int turnSeconds) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
@@ -94,12 +106,13 @@ public class RoomService {
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
         repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy,
-                fillWithBots, targetScore);
+                fillWithBots, targetScore, turnSeconds);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
         metrics.roomCreated();
-        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={}",
-                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots, targetScore);
+        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={}",
+                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots,
+                targetScore, turnSeconds);
 
         if (fillWithBots) {
             int seatsToFill = def.maxPlayers() - 1;  // host 1 명 이미 들어가 있음.

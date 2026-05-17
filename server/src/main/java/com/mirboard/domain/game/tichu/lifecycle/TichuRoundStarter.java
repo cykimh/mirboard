@@ -40,23 +40,27 @@ public class TichuRoundStarter {
     private final TichuMatchStateStore matchStateStore;
     private final SecureRandom random;
     private final com.mirboard.infra.bot.BotScheduler botScheduler;
+    private final com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout;
 
     @Autowired
     public TichuRoundStarter(TichuGameStateStore stateStore,
                              TichuMatchStateStore matchStateStore,
-                             @Lazy com.mirboard.infra.bot.BotScheduler botScheduler) {
-        this(stateStore, matchStateStore, new SecureRandom(), botScheduler);
+                             @Lazy com.mirboard.infra.bot.BotScheduler botScheduler,
+                             @Lazy com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout) {
+        this(stateStore, matchStateStore, new SecureRandom(), botScheduler, turnTimeout);
     }
 
     /** Test-only entry point (deterministic shuffle). */
     public TichuRoundStarter(TichuGameStateStore stateStore,
                              TichuMatchStateStore matchStateStore,
                              SecureRandom random,
-                             com.mirboard.infra.bot.BotScheduler botScheduler) {
+                             com.mirboard.infra.bot.BotScheduler botScheduler,
+                             com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout) {
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.random = random;
         this.botScheduler = botScheduler;
+        this.turnTimeout = turnTimeout;
     }
 
     @EventListener
@@ -99,6 +103,8 @@ public class TichuRoundStarter {
                 roundNumber, roomId);
         // Phase 9C — 솔로 방이면 봇 차례를 비동기로 처리. 일반 방이면 봇 자리가 없어 no-op.
         botScheduler.scheduleBots(roomId);
+        // Phase 13D — 라운드 시작 시 첫 턴 타임아웃 타이머 시작 (turnSeconds=0 이면 no-op).
+        turnTimeout.onTurnAdvanced(roomId);
     }
 
     private static DealResult deal(List<Card> shuffled) {

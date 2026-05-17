@@ -190,6 +190,37 @@ class RoomControllerIntegrationTest {
     }
 
     @Test
+    void create_with_turn_seconds_persists_it() throws Exception {
+        String token = registerAndLogin("turn_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "30초 턴 방",
+                "gameType", "TICHU",
+                "turnSeconds", 30));
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.turnSeconds").value(30));
+    }
+
+    @Test
+    void create_without_turn_seconds_defaults_to_zero() throws Exception {
+        String token = registerAndLogin("default_turn_user", "validpass1");
+
+        var body = objectMapper.writeValueAsString(Map.of(
+                "name", "턴 제한 끔 방",
+                "gameType", "TICHU"));
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.turnSeconds").value(0));
+    }
+
+    @Test
     void create_without_target_score_defaults_to_1000() throws Exception {
         String token = registerAndLogin("default_target_user", "validpass1");
 
