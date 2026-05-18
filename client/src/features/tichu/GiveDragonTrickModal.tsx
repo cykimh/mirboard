@@ -1,5 +1,12 @@
 import { t } from '@/i18n/messages';
-import { Modal } from '@/components/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface GiveDragonTrickModalProps {
   open: boolean;
@@ -7,27 +14,36 @@ interface GiveDragonTrickModalProps {
   onConfirm: (toSeat: number) => void;
 }
 
+/** Phase 20e(D-76) — shadcn Dialog 재디자인. 즉시 양도 로직 불변. */
 export function GiveDragonTrickModal({
   open,
   opponentSeats,
   onConfirm,
 }: GiveDragonTrickModalProps) {
-  // Phase 13A (#7) — 좌석 클릭 시 별도 확인 없이 즉시 양도.
   return (
-    <Modal open={open} title={t('dragon.title')} body={t('dragon.body')}>
-      <div className="dragon-seat-choices">
-        {opponentSeats.map((seat) => (
-          <button
-            key={seat}
-            type="button"
-            className="dragon-seat-btn"
-            onClick={() => onConfirm(seat)}
-          >
-            {t('dragon.giveTo')} {seat}
-          </button>
-        ))}
-      </div>
-    </Modal>
+    <Dialog open={open}>
+      <DialogContent
+        className="app-shell"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>{t('dragon.title')}</DialogTitle>
+          <DialogDescription>{t('dragon.body')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-2">
+          {opponentSeats.map((seat) => (
+            <Button
+              key={seat}
+              type="button"
+              onClick={() => onConfirm(seat)}
+            >
+              {t('dragon.giveTo')} {seat}
+            </Button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

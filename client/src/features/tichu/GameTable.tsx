@@ -17,7 +17,8 @@ import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
 import { useSfx } from './useSfx';
-import { Badge } from '@/components/Badge';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
@@ -273,56 +274,32 @@ export function GameTable({
             {t('game.header.activeWish')}: {tableView.activeWishRank}
           </span>
         )}
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
           onClick={toggleMute}
-          style={{
-            marginLeft: 'auto',
-            background: 'transparent',
-            border: '1px solid #444',
-            borderRadius: 4,
-            padding: '2px 8px',
-            cursor: 'pointer',
-            fontSize: 14,
-          }}
           aria-label="사운드 토글"
           title={muted ? '사운드 켜기' : '사운드 끄기'}
         >
           {muted ? '🔇' : '🔊'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="relative"
           onClick={() => setChatOpen((v) => !v)}
-          style={{
-            background: 'transparent',
-            border: '1px solid #444',
-            borderRadius: 4,
-            padding: '2px 8px',
-            cursor: 'pointer',
-            position: 'relative',
-          }}
           aria-label="채팅 토글"
         >
           💬 채팅
           {unreadCount > 0 && !chatOpen && (
-            <span
-              style={{
-                position: 'absolute',
-                top: -6,
-                right: -6,
-                background: '#d33',
-                color: '#fff',
-                borderRadius: '50%',
-                fontSize: 10,
-                padding: '2px 6px',
-                minWidth: 18,
-                lineHeight: 1,
-              }}
-            >
+            <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-destructive px-1.5 py-0.5 text-[10px] leading-none text-destructive-foreground">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
-        </button>
+        </Button>
       </header>
 
       <div className="table-arena">
@@ -379,7 +356,7 @@ export function GameTable({
                   <span>시트 {tableView.currentTopSeat}</span>
                   <span className="hand-type">{comboLabel(tableView.currentTop.cards)}</span>
                   {tableView.currentTop.phoenixSingle && (
-                    <Badge tone="phoenix" title={t('phoenix.singleTooltip')}>
+                    <Badge variant="secondary" title={t('phoenix.singleTooltip')}>
                       {t('phoenix.singleBadge')}
                     </Badge>
                   )}
@@ -408,20 +385,20 @@ export function GameTable({
             {isInDealing && !iAmReady && (
               <>
                 {dealingCardCount === 8 && myDeclaration === 'NONE' && (
-                  <button type="button" onClick={handleDeclareGrandTichu}>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleDeclareGrandTichu}>
                     {t('dealing.declareGrand')}
-                  </button>
+                  </Button>
                 )}
                 {dealingCardCount === 14 && myDeclaration === 'NONE' && (
-                  <button type="button" onClick={handleDeclareTichu}>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleDeclareTichu}>
                     {t('dealing.declareTichu')}
-                  </button>
+                  </Button>
                 )}
-                <button type="button" onClick={handleReady}>
+                <Button type="button" size="sm" onClick={handleReady}>
                   {myDeclaration === 'NONE'
                     ? t('dealing.skip.noDeclare')
                     : t('dealing.skip.declared')}
-                </button>
+                </Button>
               </>
             )}
             {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
@@ -461,9 +438,9 @@ export function GameTable({
                     );
                   })}
                 </div>
-                <button type="button" onClick={clearPassSelection}>
+                <Button type="button" size="sm" variant="outline" onClick={clearPassSelection}>
                   {t('pass.clear')}
-                </button>
+                </Button>
               </div>
             )}
             {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
@@ -476,25 +453,28 @@ export function GameTable({
                     {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
                   </span>
                 )}
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={handlePlay}
                   disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
                 >
                   {t('play.action.play')} ({selectedCards.length}{t('seat.handCardsSuffix')})
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  size="sm"
+                  variant="secondary"
                   onClick={handlePass}
                   disabled={!myTurn || !tableView.currentTop}
                 >
                   {t('play.action.pass')}
-                </button>
+                </Button>
                 {myDeclaration === 'NONE' &&
                   (privateHand?.cards.length ?? 0) === 14 && (
-                    <button type="button" onClick={handleDeclareTichu}>
+                    <Button type="button" size="sm" variant="outline" onClick={handleDeclareTichu}>
                       {t('play.action.declareTichu')}
-                    </button>
+                    </Button>
                   )}
               </>
             )}
@@ -585,9 +565,9 @@ export function GameTable({
             {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
           </p>
           {onExit && (
-            <button type="button" className="match-exit" onClick={onExit}>
+            <Button type="button" className="match-exit" onClick={onExit}>
               메인으로
-            </button>
+            </Button>
           )}
         </div>
       ) : (
@@ -600,9 +580,9 @@ export function GameTable({
             <p>
               {t('round.ended.firstFinisher')} {roundEnded.firstFinisherSeat}
             </p>
-            <button type="button" onClick={() => setRoundEnded(null)}>
+            <Button type="button" onClick={() => setRoundEnded(null)}>
               {t('round.ended.continue')}
-            </button>
+            </Button>
           </div>
         )
       )}
