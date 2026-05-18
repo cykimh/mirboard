@@ -15,6 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -60,6 +63,9 @@ class RoomJoinOrReconnectIntegrationTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    StringRedisTemplate redis;
+
     @Test
     void newcomer_to_waiting_room_is_joined() throws Exception {
         String hostToken = registerAndLogin("jor_host1", "validpass1");
@@ -86,6 +92,59 @@ class RoomJoinOrReconnectIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("RECONNECTED"))
                 .andExpect(jsonPath("$.room.playerCount").value(1));
+    }
+
+    /**
+     * D-74 — 사용자가 보고한 재입장 버그. 대기실 입장 → 나가기 → 메인에서 다시
+     * 입장. 메인 입장이 멱등 join-or-reconnect 를 쓰므로 ALREADY_IN_ROOM(409)
+     * 없이 정상 재진입(JOINED) 해야 한다.
+     */
+    @Test
+    void guest_can_leave_waiting_room_and_rejoin() throws Exception {
+        String hostToken = registerAndLogin("jor_lr_host", "validpass1");
+        String guestToken = registerAndLogin("jor_lr_guest", "validpass1");
+        String roomId = createRoom(hostToken);
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
+                        .header("Authorization", "Bearer " + guestToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("JOINED"))
+                .andExpect(jsonPath("$.room.playerCount").value(2));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/leave")
+                        .header("Authorization", "Bearer " + guestToken))
+                .andExpect(status().isNoContent());
+
+        // 재입장 — 예전 /join 경로면 ALREADY_IN_ROOM 이 났던 자리.
+        mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
+                        .header("Authorization", "Bearer " + guestToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("JOINED"))
+                .andExpect(jsonPath("$.room.playerCount").value(2));
+    }
+
+    /**
+     * D-74 — 빈 방이 destroy 될 때 room_leave.lua 가 room:{id}:ready SET 도
+     * 함께 삭제해 고아 키가 남지 않아야 한다.
+     */
+    @Test
+    void leaving_last_player_clears_ready_set() throws Exception {
+        String hostToken = registerAndLogin("jor_ready_host", "validpass1");
+        String roomId = createRoom(hostToken);
+        String readyKey = "room:" + roomId + ":ready";
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ready\":true}"))
+                .andExpect(status().isOk());
+        assertThat(redis.hasKey(readyKey)).isTrue();
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/leave")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(redis.hasKey(readyKey)).isFalse();
     }
 
     /**

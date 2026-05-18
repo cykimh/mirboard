@@ -91,7 +91,9 @@ export function GameHubPage() {
   async function handleJoin(roomId: string) {
     if (!token) return;
     try {
-      await roomsApi.join(token, roomId);
+      // D-74: 멱등 경로. 이미 참가 상태(나갔다 재입장 등)여도 RECONNECTED
+      // 로 정상 진입 — ALREADY_IN_ROOM 재입장 버그 제거.
+      await roomsApi.joinOrReconnect(token, roomId);
       navigate(`/rooms/${roomId}`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);

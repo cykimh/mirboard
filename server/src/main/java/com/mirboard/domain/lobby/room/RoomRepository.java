@@ -139,9 +139,16 @@ public class RoomRepository {
     }
 
     public void leave(String roomId, long userId) {
+        // D-74: leave 는 빈 방 destroy 시 ready SET 도 정리하므로 KEYS[4] 로
+        // ready 키를 추가 전달한다 (join/create 와 공유하는 keysFor 는 불변).
+        List<String> keys = List.of(
+                "room:" + roomId,
+                "room:" + roomId + ":players",
+                ROOMS_OPEN_KEY,
+                readyKey(roomId));
         Long result = redis.execute(
                 leaveScript,
-                keysFor(roomId),
+                keys,
                 Long.toString(userId),
                 roomId);
         long v = unwrap(result);

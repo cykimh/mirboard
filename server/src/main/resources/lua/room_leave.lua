@@ -4,6 +4,7 @@
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = rooms:open
+-- KEYS[4] = room:{roomId}:ready
 -- ARGV    = userId, roomId
 --
 -- Return codes:
@@ -26,7 +27,8 @@ end
 
 local remaining = redis.call('LLEN', KEYS[2])
 if remaining == 0 then
-    redis.call('DEL', KEYS[1], KEYS[2])
+    -- D-74: ready SET 도 함께 삭제해 고아 키가 남지 않도록 한다.
+    redis.call('DEL', KEYS[1], KEYS[2], KEYS[4])
     redis.call('ZREM', KEYS[3], roomId)
     return 0
 end
