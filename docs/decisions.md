@@ -98,6 +98,30 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-75 (2026-05-18) — Phase 19: WS 끊김 빈 방 정리 + 게임중 탈주 패널티 + 패스 UI 통합
+
+시연에서 (a) 새로고침/탭닫기 시 서버가 STOMP 끊김을 감지 못해 빈 방이
+영구 잔존, (b) 게임 중 탈주에 대한 집계/제재 부재, (c) 패스 카드 선택
+UI 분리 문제 확인. 결정: 서버에 `SessionSubscribeEvent`/
+`SessionDisconnectEvent` 후킹(신규 in-memory `WsSessionRegistry`,
+session→room 은 `^/topic/room/([^/]+)$` 구독 파싱)을 추가한다. WAITING
+방에서 끊기면 즉시 leave/stopSpectating → 빈 방 즉시 소멸(관전자만 남은
+방도 소멸, `room_leave.lua` 가 `spectators` SET 도 정리, 신규
+`room_delete.lua`). IN_GAME 에서 끊기면 즉시 퇴장하지 않고 유예
+(`mirboard.desertion.grace-seconds` 기본 30s) 후 재접속 안 하면 탈주로
+확정. 탈주(IN_GAME 명시 '나가기' 또는 끊김 후 미복귀) = 탈주자
+`desert_count`+1 · `lose_count`+1 · ELO 차감, **매치는 상대팀 승리**로
+즉시 종료. 구현은 합성 `TichuMatchCompleted(winningTeam=상대팀,
+deserterUserId)` 1회 발행으로 기존 `MatchResultRecorder` 경로를
+재사용(중복 점수기록·중복 markFinished 없음, 봇 포함 매치 ELO 제외는
+D-71 유지). leave/grace 양쪽 `RoomActionLock`+`status!=IN_GAME` 가드로
+멱등. `users.desert_count` 컬럼은 `V4__desert_count.sql` 로 추가 —
+게임행동 derived 값이라 D-02(식별/연락정보 금지) 위반 아님(V2 rating·
+V3 is_bot 선례). in-memory 세션 레지스트리는 단일 인스턴스 MVP(D-03)
+전제 — 다중 인스턴스 전환 시 Redis presence 로 교체(범위 밖). 패스
+픽커는 별도 박스에서 `arena-actions`(액션 버튼 영역)로 통합 — 상태/
+제출 로직 불변, JSX/CSS 배치만.
+
 ## D-74 (2026-05-18) — Phase 18: 메인 입장 멱등화 + room_leave ready 정리 + 방 만들기 모달 + "미르보드카페" 개편
 
 시연에서 "방 나갔다 다시 입장하면 '이미 들어가 있다'(ALREADY_IN_ROOM)" 재입장

@@ -190,9 +190,13 @@ schema constraint 유지.
   "winCount": 5,
   "loseCount": 3,
   "rating": 1120,
-  "tier": "SILVER"
+  "tier": "SILVER",
+  "desertCount": 1
 }
 ```
+
+`desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
+미복귀) 누적. 게임행동 derived — D-02 위반 아님.
 
 tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
 1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
@@ -206,7 +210,7 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 {
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
-      "tier": "GOLD", "winCount": 12, "loseCount": 4 }
+      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
   ]
 }
 ```
@@ -236,10 +240,15 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 ### POST `/api/rooms/{roomId}/leave`
 응답 `204`.
 - 호스트가 떠나면 잔존 인원 중 가장 먼저 입장한 사용자가 호스트 승격.
-- 마지막 인원이 떠나면 방 삭제.
-- 게임이 이미 진행 중이라면 leave는 "연결 종료(disconnect)"로 처리되며 방은
-  유지된다(재접속 가능). 명시적 leave는 게임 포기로 간주하되, 정책은 Phase 4 에서
-  확정한다.
+- 마지막 인원이 떠나면 방 삭제(`room_leave.lua` 가 players/ready/spectators
+  정리). 관전자만 남았다가 0이 되면 `room_delete.lua` 로 즉시 소멸.
+- Phase 19(#3, D-75): 방이 **IN_GAME** 이고 호출자가 플레이어면 명시적
+  leave 는 **탈주**로 처리 — 상대팀 승리로 매치 즉시 종료, 탈주자
+  `desert_count`+1 · `lose_count`+1 · ELO 차감(봇 포함 매치는 ELO 제외,
+  D-71). WAITING/FINISHED 이거나 관전자면 일반 leave/stopSpectating.
+- WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
+  은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
+  기본 30s) 후 미복귀 시 탈주.
 
 ### GET `/api/rooms/{roomId}`
 응답 `200` — 단일 Room 상세.

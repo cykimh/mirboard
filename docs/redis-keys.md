@@ -18,10 +18,16 @@
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore | Phase 5c 추가, 라운드 전환 시 유지 |
 | `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
+| `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `session:{userId}` | HASH | 30m | `currentRoomId`, `wsSessionId`, `lastSeenAt` | WS CONNECT 시 갱신 |
 | `presence:lobby` | SET | — | 로비 접속자 userId | WS DISCONNECT 시 SREM |
+
+> Phase 19(#1, D-75): 세션→방 매핑은 Redis presence 키가 아니라 서버
+> in-memory `WsSessionRegistry`(SUBSCRIBE 등록 / DISCONNECT 제거)로 구현.
+> 단일 인스턴스 MVP(D-03) 전제 — 다중 인스턴스 전환 시 Redis presence 로
+> 교체(범위 밖). `session:{userId}`/`presence:*` 행은 향후 설계용 placeholder.
 
 > `rooms:open` 은 TTL이 없는 대신, 방이 `IN_GAME`/`FINISHED` 가 되거나 삭제되면
 > ZREM 으로 동기 제거된다.
@@ -56,16 +62,25 @@
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
 
 ### `room_leave.lua`
-입력: `KEYS = [room, players, rooms:open, room:{id}:ready]`,
-`ARGV = [userId, roomId]`.
+입력: `KEYS = [room, players, rooms:open, room:{id}:ready,
+room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 
 처리:
 1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM).
-2. `players` 빈 리스트면 `DEL room players ready` 및 `ZREM rooms:open`
-   → `0`(방 파괴). D-74: `room:{id}:ready` 도 함께 삭제(고아 키 방지).
+2. `players` 빈 리스트면 `DEL room players ready spectators` 및
+   `ZREM rooms:open` → `0`(방 파괴). D-74: ready, D-75: spectators 도
+   함께 삭제(고아 키 방지).
 3. 호스트가 떠났다면 `LINDEX players 0` 으로 새 호스트 지정 후 `HSET room hostId`.
    (state/hand/seq 키는 게임별 cleanup·TTL 로 소멸 — leave 스크립트 비관여.)
-4. `"OK"` 반환.
+4. 남은 인원 수(또는 `0`) 반환.
+
+### `room_delete.lua` *(Phase 19 #1, D-75)*
+입력: `KEYS = [room, players, room:{id}:ready, room:{id}:spectators,
+rooms:open]`, `ARGV = [roomId]`.
+멤버십 검사 없이 방을 무조건 원자 소멸 — `DEL room players ready
+spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 남았다가
+마지막 관전자가 나간 경우)을 `RoomService.destroyIfEmpty` 가 정리할 때
+호출. 방 존재 시 `1`, 없으면 `0` 반환.
 
 ### `room_action_seq.lua` (선택)
 액션 처리 직후 `INCR seq` + 이벤트 페이로드를 Pub/Sub 으로 동시 발행. 단일 인스턴스

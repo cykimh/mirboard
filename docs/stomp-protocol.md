@@ -6,6 +6,14 @@
 - 헤더: `Authorization: Bearer <JWT>` — `ChannelInterceptor` 가 CONNECT 단계에서
   검증, 실패 시 `ERROR` 프레임 후 연결 종료.
 - 클라는 CONNECT 직후 자기 큐 `/user/queue/...` 와 필요한 토픽을 구독한다.
+- Phase 19(#1·#3, D-75): 서버가 `SessionSubscribeEvent`(`/topic/room/{id}`
+  `/meta` `/chat` 정규식 매칭)로 세션→방을 `WsSessionRegistry`(in-memory,
+  단일 인스턴스 전제 D-03)에 기록하고, `SessionDisconnectEvent` 시
+  `RoomDisconnectHandler` 가 처리한다 — **WAITING**: 즉시 leave/
+  stopSpectating(빈 방·관전자0 방 즉시 소멸). **IN_GAME**:
+  `DesertionGraceScheduler` 가 `mirboard.desertion.grace-seconds`(기본
+  30s) 후 재접속 없으면 탈주 확정(상대팀 승리, `desert_count`+1·lose+1·
+  ELO−). **FINISHED**: no-op.
 
 ## 토픽 / 큐 카탈로그
 

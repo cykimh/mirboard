@@ -86,6 +86,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `room:{id}:ready` 도 정리. 방 만들기는 버튼+모달. 메인 제목
   "미르보드카페", 게임 카드는 요약+외부 위키 "자세히" 링크(위키 URL 클라
   하드코딩, 카탈로그 API 무변경).
+- Phase 19(D-75): 서버 STOMP Subscribe/Disconnect 후킹(in-memory
+  `WsSessionRegistry`, 단일 인스턴스 전제). WAITING 끊김=즉시 leave(빈 방·
+  관전자0 방 즉시 소멸). IN_GAME 탈주(명시 '나가기' / 끊김 후
+  `mirboard.desertion.grace-seconds` 기본 30s 미복귀)=상대팀 승리로
+  매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
+  D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
+  재사용. 패스 카드 선택 UI 는 `arena-actions` 로 통합(로직 불변).
 
 ## 자주 쓰는 명령
 

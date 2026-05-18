@@ -792,6 +792,18 @@ resync/team-policy/STOMP/bot-sim) 그린. 시작 트리거를 capacity→전원 
 `RoomControllerIntegrationTest`(leave→재입장 케이스 포함) 그린, 클라
 build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 불변).
 
+## Phase 19 — WS 끊김 빈방 정리 + 게임중 탈주 패널티 + 패스 UI 통합 (D-75, 3건)
+
+| 항목 | 내용 | 상태 |
+| --- | --- | --- |
+| #1 | STOMP Subscribe/Disconnect 후킹(WsSessionRegistry) — WAITING 끊김 즉시 leave, 빈 방·관전자0 방 소멸, `room_leave`/`room_delete.lua` spectators 정리 | ⏳ |
+| #2 | 패스 카드 선택 UI 를 `arena-actions`(액션 버튼 영역)로 통합 — 상태/제출 로직 불변 | ⏳ |
+| #3 | 게임중 탈주(명시 leave / 끊김 후 미복귀 30s) → desert_count+1·lose+1·ELO−, 상대팀 승리. `V4__desert_count.sql`, 합성 TichuMatchCompleted 재사용 | ⏳ |
+
+**Done 기준**: `check.sh fast` 그린, Desertion/Disconnect IT + 유닛 +
+회귀 IT 그린, 클라 build(tsc)+test 그린. D-02 재확인(desert_count 게임
+스탯). in-memory 세션 레지스트리 단일 인스턴스 전제.
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
