@@ -1,5 +1,5 @@
 import { FormEvent, MutableRefObject, useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { useRoomChatStore } from './roomChatStore';
 
 interface RoomChatProps {
@@ -100,7 +100,7 @@ export function RoomChat({ myUserId, sendChat, panelOpenRef }: RoomChatProps) {
           placeholder="메시지 입력..."
           style={{ flex: 1, padding: '4px 8px', fontSize: 13 }}
         />
-        <Button type="submit" variant="primary">전송</Button>
+        <Button type="submit" size="sm">전송</Button>
       </form>
     </aside>
   );

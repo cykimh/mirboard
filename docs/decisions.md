@@ -117,6 +117,16 @@ shadcn 토큰을 `:root`(light)/`.dark`(dark) 로 정의하고 기존
 덕분에 부분 마이그레이션 중 미전환 화면 안전. 각 Phase 끝 빌드/테스트
 그린 + Phase 게이트 사용자 검토. 서버/스키마/프로토콜 무변경.
 
+*구현 편차(20a~20f 완료): 기존 `components/{Button,Badge,Input,Modal,
+Stack}` 는 "어댑터화"가 미전환(.app-shell 밖·레거시 CSS 의존) 화면을
+깨므로, 어댑터 대신 페이지별 마이그레이션 후 20f 에서 **삭제**(전 소비자
+ui/* 전환 완료). theme.css 의 shadcn slate 토큰은 전역 `:root`/`.dark`
+정의(스코프 X), 레거시 `--color-*` 는 다크 유지+`html:not(.dark)`
+라이트 오버라이드. shadcn 의 최소 base(box-sizing/border) 만
+`.app-shell` 스코프 주입. 20e 는 GameTable 기하(styles.css) 보존하고
+컨트롤/모달만 shadcn. styles.css 의 페이지-레벨 dead 규칙(.hub-*/
+.auth-page 등)은 무해하여 점진 정리로 남김(후속).*
+
 ## D-75 (2026-05-18) — Phase 19: WS 끊김 빈 방 정리 + 게임중 탈주 패널티 + 패스 UI 통합
 
 시연에서 (a) 새로고침/탭닫기 시 서버가 STOMP 끊김을 감지 못해 빈 방이

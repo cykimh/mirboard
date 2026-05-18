@@ -58,7 +58,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 8.10+, Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand + React Query |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles.css` 유지 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 

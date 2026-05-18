@@ -812,8 +812,8 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 | 20b | 메인 GameHubPage + CreateRoomModal shadcn 재디자인 | ✅ |
 | 20c | LoginPage / RegisterPage | ✅ |
 | 20d | RoomPage / 대기실 | ✅ |
-| 20e | GameTable + 게임 모달 (대형, 최후) | ⏳ |
-| 20f | 정리(잔여 styles.css/legacy) + 문서 | ⏳ |
+| 20e | GameTable + 게임 모달 (기하 CSS 보존, 컨트롤/모달만 shadcn) | ✅ |
+| 20f | 정리(레거시 컴포넌트 제거+RoomChat ui Button)+문서. styles.css 잔존 dead 규칙은 무해 — 후속 점진 정리 | ✅ |
 
 **Done 기준(각 단계)**: `npm run build`(tsc+vite)+`test`(vitest 66)+
 `check.sh fast` 그린, 라이트/다크 토글·미전환 화면 무회귀, Phase 게이트
