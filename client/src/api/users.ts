@@ -15,6 +15,7 @@ export interface UserStats {
   loseCount: number;
   rating: number;
   tier: Tier;
+  desertCount: number;
 }
 
 export interface RankEntry {
@@ -25,6 +26,7 @@ export interface RankEntry {
   tier: Tier;
   winCount: number;
   loseCount: number;
+  desertCount: number;
 }
 
 export interface RankingResponse {

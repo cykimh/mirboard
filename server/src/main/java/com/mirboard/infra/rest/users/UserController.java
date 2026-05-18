@@ -55,7 +55,8 @@ public class UserController {
                     u.getRating(),
                     Tier.fromRating(u.getRating()).name(),
                     u.getWinCount(),
-                    u.getLoseCount()));
+                    u.getLoseCount(),
+                    u.getDesertCount()));
         }
         return new RankingResponse(entries);
     }
@@ -67,7 +68,8 @@ public class UserController {
             int rating,
             String tier,
             int winCount,
-            int loseCount) {
+            int loseCount,
+            int desertCount) {
     }
 
     public record RankingResponse(List<RankEntry> entries) {
@@ -80,7 +82,8 @@ public class UserController {
                 u.getWinCount(),
                 u.getLoseCount(),
                 u.getRating(),
-                Tier.fromRating(u.getRating()).name());
+                Tier.fromRating(u.getRating()).name(),
+                u.getDesertCount());
     }
 
     public record UserStatsResponse(
@@ -89,6 +92,7 @@ public class UserController {
             int winCount,
             int loseCount,
             int rating,
-            String tier) {
+            String tier,
+            int desertCount) {
     }
 }

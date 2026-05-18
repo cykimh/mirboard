@@ -37,6 +37,10 @@ public class User {
     @Column(name = "is_bot", nullable = false)
     private boolean isBot;
 
+    /** Phase 19(#3) — IN_GAME 탈주(명시 나가기 / 끊김 후 미복귀) 누적 횟수. */
+    @Column(name = "desert_count", nullable = false)
+    private int desertCount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -50,6 +54,7 @@ public class User {
         this.winCount = 0;
         this.loseCount = 0;
         this.rating = 1000;
+        this.desertCount = 0;
         this.createdAt = createdAt;
     }
 
@@ -83,6 +88,10 @@ public class User {
 
     public boolean isBot() {
         return isBot;
+    }
+
+    public int getDesertCount() {
+        return desertCount;
     }
 
     public Instant getCreatedAt() {

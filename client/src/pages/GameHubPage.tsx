@@ -109,6 +109,7 @@ export function GameHubPage() {
           {stats && (
             <span style={{ fontSize: 12, opacity: 0.7 }}>
               {stats.winCount}승 {stats.loseCount}패
+              {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
             </span>
           )}
           <button type="button" onClick={() => { logout(); navigate('/login'); }}>
@@ -215,6 +216,7 @@ export function GameHubPage() {
                 <th>티어</th>
                 <th>레이팅</th>
                 <th>전적</th>
+                <th>탈주</th>
               </tr>
             </thead>
             <tbody>
@@ -225,6 +227,7 @@ export function GameHubPage() {
                   <td>{e.tier}</td>
                   <td>{e.rating}</td>
                   <td>{e.winCount}승 {e.loseCount}패</td>
+                  <td>{e.desertCount}</td>
                 </tr>
               ))}
             </tbody>
