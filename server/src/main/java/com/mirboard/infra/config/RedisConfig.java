@@ -34,6 +34,12 @@ public class RedisConfig {
         return scriptOf("lua/room_finish.lua");
     }
 
+    /** Phase 19(#1, D-75) — 플레이어/관전자 0 인 방 무조건 소멸. */
+    @Bean
+    public RedisScript<Long> roomDeleteScript() {
+        return scriptOf("lua/room_delete.lua");
+    }
+
     private static RedisScript<Long> scriptOf(String classpath) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource(classpath));

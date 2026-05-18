@@ -290,6 +290,22 @@ public class RoomService {
         boolean removed = repository.removeSpectator(roomId, userId);
         log.info("Room stop spectating: roomId={} userId={} wasPresent={}",
                 roomId, userId, removed);
+        destroyIfEmpty(roomId);
+    }
+
+    /**
+     * Phase 19(#1, D-75) — 플레이어 0 && 관전자 0 이면 방을 즉시 소멸시킨다.
+     * 관전자만 남았다가 마지막 관전자가 나간 방을 정리. 플레이어 leave 의 빈 방
+     * 소멸은 room_leave.lua 가 이미 처리하므로 여기서는 관전자-only 케이스 담당.
+     */
+    private void destroyIfEmpty(String roomId) {
+        repository.findById(roomId).ifPresent(room -> {
+            if (room.playerIds().isEmpty() && room.spectatorIds().isEmpty()
+                    && repository.deleteRoom(roomId)) {
+                events.publish(RoomChangedEvent.destroyed(roomId));
+                log.info("Room destroyed (empty — no players/spectators): roomId={}", roomId);
+            }
+        });
     }
 
     /** 참여자 또는 관전자 여부. */

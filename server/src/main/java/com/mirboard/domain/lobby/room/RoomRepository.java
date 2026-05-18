@@ -23,6 +23,7 @@ public class RoomRepository {
     private final RedisScript<Long> leaveScript;
     private final RedisScript<Long> finishScript;
     private final RedisScript<Long> readyScript;
+    private final RedisScript<Long> deleteScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -32,6 +33,7 @@ public class RoomRepository {
             @Qualifier("roomLeaveScript") RedisScript<Long> leaveScript,
             @Qualifier("roomFinishScript") RedisScript<Long> finishScript,
             @Qualifier("roomReadyScript") RedisScript<Long> readyScript,
+            @Qualifier("roomDeleteScript") RedisScript<Long> deleteScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
@@ -39,7 +41,27 @@ public class RoomRepository {
         this.leaveScript = leaveScript;
         this.finishScript = finishScript;
         this.readyScript = readyScript;
+        this.deleteScript = deleteScript;
         this.bots = bots;
+    }
+
+    /**
+     * Phase 19(#1, D-75) — 방 무조건 소멸 (room_delete.lua). 호출 측이
+     * "플레이어 0 && 관전자 0" 을 보장해야 한다.
+     *
+     * @return 방이 존재해서 삭제됐으면 true.
+     */
+    public boolean deleteRoom(String roomId) {
+        Long result = redis.execute(
+                deleteScript,
+                List.of(
+                        "room:" + roomId,
+                        "room:" + roomId + ":players",
+                        readyKey(roomId),
+                        spectatorsKey(roomId),
+                        ROOMS_OPEN_KEY),
+                roomId);
+        return result != null && result == 1L;
     }
 
     public void create(String roomId, long hostUserId, String name, String gameType,
@@ -139,13 +161,14 @@ public class RoomRepository {
     }
 
     public void leave(String roomId, long userId) {
-        // D-74: leave 는 빈 방 destroy 시 ready SET 도 정리하므로 KEYS[4] 로
-        // ready 키를 추가 전달한다 (join/create 와 공유하는 keysFor 는 불변).
+        // D-74: ready SET, D-75: spectators SET 도 빈 방 destroy 시 정리하므로
+        // KEYS[4]/KEYS[5] 로 추가 전달 (join/create 와 공유하는 keysFor 는 불변).
         List<String> keys = List.of(
                 "room:" + roomId,
                 "room:" + roomId + ":players",
                 ROOMS_OPEN_KEY,
-                readyKey(roomId));
+                readyKey(roomId),
+                spectatorsKey(roomId));
         Long result = redis.execute(
                 leaveScript,
                 keys,
