@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ExternalLink, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
@@ -11,11 +12,39 @@ import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
 import { t } from '@/i18n/messages';
 import type { GameSummary, Room } from '@/types/api';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Avatar,
+  AvatarFallback,
+} from '@/components/ui/avatar';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { cn } from '@/lib/utils';
 
 /**
- * Phase 16(#5–#7) — 통합 메인페이지. 게임 소개 + 방 만들기(게임 선택) +
- * 열린 방 목록/입장 + 관전 + 로비 채팅 + 유저 랭킹. 게임별 로비 페이지는
- * 제거되고 모든 진입이 여기로 일원화된다.
+ * Phase 16(#5–#7) — 통합 메인페이지. Phase 20b(D-76): shadcn/ui + Slate
+ * 테마로 재디자인. 상태/effect/API/핸들러는 불변, 마크업만 교체.
  */
 export function GameHubPage() {
   const token = useAuthStore((s) => s.token);
@@ -100,164 +129,274 @@ export function GameHubPage() {
   const availableGames = (games ?? []).filter((g) => g.status === 'AVAILABLE');
 
   return (
-    <main className="hub-page">
-      <header>
-        <h1>{t('hub.title')}</h1>
-        <div className="user-bar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {user && <span>{user.username}</span>}
-          {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
-          {stats && (
-            <span style={{ fontSize: 12, opacity: 0.7 }}>
-              {stats.winCount}승 {stats.loseCount}패
-              {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
-            </span>
-          )}
-          <button type="button" onClick={() => { logout(); navigate('/login'); }}>
-            로그아웃
-          </button>
-        </div>
-      </header>
-
-      {error && <p className="error">{error}</p>}
-      {games === null && !error && <p>카탈로그 불러오는 중...</p>}
-
-      <section className="game-grid">
-        {games?.map((game) => (
-          <article
-            key={game.id}
-            className={`game-card ${game.status.toLowerCase()}`}
-            aria-disabled={game.status !== 'AVAILABLE'}
-          >
-            <h2>{game.displayName}</h2>
-            <p>{game.shortDescription}</p>
-            <p className="meta">
-              {game.minPlayers === game.maxPlayers
-                ? `${game.maxPlayers}인 플레이`
-                : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
-            </p>
-            <div className="game-card-foot">
-              {game.status !== 'AVAILABLE' && (
-                <span className="badge">Coming Soon</span>
-              )}
-              {gameWikiUrl(game.id) && (
-                <a
-                  className="game-wiki-link"
-                  href={gameWikiUrl(game.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  자세히 ↗
-                </a>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="rooms">
-        <div className="rooms-head">
-          <h2>대기 중인 방</h2>
-          <button
-            type="button"
-            className="create-room-btn"
-            onClick={() => setShowCreateModal(true)}
-            disabled={availableGames.length === 0}
-          >
-            + 새 방 만들기
-          </button>
-        </div>
-        <ul>
-          {rooms.length === 0 && <li className="empty">아직 방이 없습니다.</li>}
-          {rooms.map((room) => (
-            <li key={room.roomId}>
-              <span className="name">
-                {room.name}
-                {room.fillWithBots && (
-                  <span className="solo-badge" title="솔로 모드 — 빈 좌석은 봇이 자동 채움">🤖 솔로</span>
-                )}
+    <div className="app-shell min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
+        {/* 헤더 */}
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {t('hub.title')}
+          </h1>
+          <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex items-center gap-2">
+                <Avatar>
+                  <AvatarFallback>
+                    {user.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium">{user.username}</span>
+              </div>
+            )}
+            {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
+            {stats && (
+              <span className="text-xs text-muted-foreground">
+                {stats.winCount}승 {stats.loseCount}패
+                {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
               </span>
-              <span className="count">
-                {room.gameType} · {room.playerCount} / {room.capacity} · {room.status}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleJoin(room.roomId)}
-                disabled={room.status !== 'WAITING' || room.playerCount >= room.capacity}
-              >
-                입장
-              </button>
-            </li>
-          ))}
-        </ul>
+            )}
+            <ThemeToggle />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              로그아웃
+            </Button>
+          </div>
+        </header>
 
-        <form className="spectate" onSubmit={handleSpectate}>
-          <input
-            type="text"
-            value={spectateInput}
-            placeholder="방 ID 로 관전 진입"
-            onChange={(e) => setSpectateInput(e.target.value)}
-          />
-          <button type="submit" disabled={!spectateInput.trim()}>
-            구경하기
-          </button>
-        </form>
-      </section>
-
-      <section className="ranking">
-        <h2>랭킹</h2>
-        {ranking.length === 0 ? (
-          <p className="empty">아직 랭킹 데이터가 없습니다.</p>
-        ) : (
-          <table className="ranking-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>유저</th>
-                <th>티어</th>
-                <th>레이팅</th>
-                <th>전적</th>
-                <th>탈주</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranking.map((e) => (
-                <tr key={e.userId} className={user && e.userId === user.userId ? 'me' : ''}>
-                  <td>{e.rank}</td>
-                  <td>{e.username}</td>
-                  <td>{e.tier}</td>
-                  <td>{e.rating}</td>
-                  <td>{e.winCount}승 {e.loseCount}패</td>
-                  <td>{e.desertCount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-      </section>
 
-      <section className="chat">
-        <h2>로비 채팅 {connected ? '●' : '○'}</h2>
-        <ul>
-          {messages.map((m) => (
-            <li key={m.eventId}>
-              <strong>{m.username}</strong>
-              <span>{m.message}</span>
-            </li>
-          ))}
-        </ul>
-        <form onSubmit={handleSendChat}>
-          <input
-            type="text"
-            value={draft}
-            placeholder={connected ? '메시지' : '연결 중...'}
-            disabled={!connected}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button type="submit" disabled={!connected || !draft.trim()}>
-            전송
-          </button>
-        </form>
-      </section>
+        {/* 게임 카탈로그 */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {games === null && !error
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-4 w-full" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-24" />
+                  </CardContent>
+                </Card>
+              ))
+            : games?.map((game) => {
+                const available = game.status === 'AVAILABLE';
+                const wiki = gameWikiUrl(game.id);
+                return (
+                  <Card
+                    key={game.id}
+                    className={cn(
+                      'flex flex-col',
+                      !available && 'opacity-60',
+                    )}
+                  >
+                    <CardHeader>
+                      <CardTitle>{game.displayName}</CardTitle>
+                      <CardDescription>
+                        {game.shortDescription}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm text-muted-foreground">
+                      {game.minPlayers === game.maxPlayers
+                        ? `${game.maxPlayers}인 플레이`
+                        : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
+                    </CardContent>
+                    <CardFooter className="mt-auto gap-3">
+                      {!available && (
+                        <Badge variant="secondary">Coming Soon</Badge>
+                      )}
+                      {wiki && (
+                        <a
+                          className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+                          href={wiki}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          자세히 <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* 대기 중인 방 */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>대기 중인 방</CardTitle>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setShowCreateModal(true)}
+                disabled={availableGames.length === 0}
+              >
+                <Plus className="h-4 w-4" />새 방 만들기
+              </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-2">
+                {rooms.length === 0 && (
+                  <li className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                    아직 방이 없습니다.
+                  </li>
+                )}
+                {rooms.map((room) => (
+                  <li
+                    key={room.roomId}
+                    className="flex items-center gap-3 rounded-md border p-3"
+                  >
+                    <span className="flex flex-1 items-center gap-2 font-medium">
+                      {room.name}
+                      {room.fillWithBots && (
+                        <Badge
+                          variant="secondary"
+                          title="솔로 모드 — 빈 좌석은 봇이 자동 채움"
+                        >
+                          🤖 솔로
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {room.gameType} · {room.playerCount} / {room.capacity} ·{' '}
+                      {room.status}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleJoin(room.roomId)}
+                      disabled={
+                        room.status !== 'WAITING' ||
+                        room.playerCount >= room.capacity
+                      }
+                    >
+                      입장
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+
+              <Separator />
+
+              <form className="flex gap-2" onSubmit={handleSpectate}>
+                <Input
+                  type="text"
+                  value={spectateInput}
+                  placeholder="방 ID 로 관전 진입"
+                  onChange={(e) => setSpectateInput(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={!spectateInput.trim()}
+                >
+                  구경하기
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* 로비 채팅 */}
+          <Card className="flex flex-col">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>로비 채팅</CardTitle>
+              <Badge variant={connected ? 'default' : 'secondary'}>
+                {connected ? '연결됨' : '연결 중'}
+              </Badge>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-3">
+              <ScrollArea className="h-56 rounded-md border p-2">
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {messages.map((m) => (
+                    <li key={m.eventId} className="flex gap-2">
+                      <strong className="text-primary">{m.username}</strong>
+                      <span className="text-foreground/90">{m.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+              <form className="flex gap-2" onSubmit={handleSendChat}>
+                <Input
+                  type="text"
+                  value={draft}
+                  placeholder={connected ? '메시지' : '연결 중...'}
+                  disabled={!connected}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  disabled={!connected || !draft.trim()}
+                >
+                  전송
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 랭킹 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>랭킹</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ranking.length === 0 ? (
+              <p className="text-sm italic text-muted-foreground">
+                아직 랭킹 데이터가 없습니다.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead>유저</TableHead>
+                    <TableHead>티어</TableHead>
+                    <TableHead>레이팅</TableHead>
+                    <TableHead>전적</TableHead>
+                    <TableHead>탈주</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ranking.map((e) => (
+                    <TableRow
+                      key={e.userId}
+                      className={cn(
+                        user &&
+                          e.userId === user.userId &&
+                          'bg-accent font-semibold',
+                      )}
+                    >
+                      <TableCell>{e.rank}</TableCell>
+                      <TableCell>{e.username}</TableCell>
+                      <TableCell>
+                        <TierBadge tier={e.tier} />
+                      </TableCell>
+                      <TableCell>{e.rating}</TableCell>
+                      <TableCell>
+                        {e.winCount}승 {e.loseCount}패
+                      </TableCell>
+                      <TableCell>{e.desertCount}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {token && (
         <CreateRoomModal
@@ -271,6 +410,6 @@ export function GameHubPage() {
           }}
         />
       )}
-    </main>
+    </div>
   );
 }
