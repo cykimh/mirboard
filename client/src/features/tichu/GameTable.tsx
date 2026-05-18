@@ -404,7 +404,7 @@ export function GameTable({
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
         {!spectator && (
-          <div className="arena-actions">
+          <div className={`arena-actions${isInPassing ? ' passing' : ''}`}>
             {isInDealing && !iAmReady && (
               <>
                 {dealingCardCount === 8 && myDeclaration === 'NONE' && (
@@ -426,10 +426,45 @@ export function GameTable({
             )}
             {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
 
-            {isInPassing && !iAmPassSubmitted && (
-              <button type="button" onClick={clearPassSelection}>
-                {t('pass.clear')}
-              </button>
+            {isInPassing && !iAmPassSubmitted && privateHand && (
+              <div className="arena-pass">
+                <p className="pass-hint">
+                  {pendingPassCardKey
+                    ? '카드 선택됨 — 줄 사람(좌/파트너/우)을 누르세요'
+                    : '먼저 손패에서 카드를 고른 뒤 줄 사람을 누르세요'}
+                </p>
+                <div className="pass-slots">
+                  {(['left', 'partner', 'right'] as PassSlot[]).map((slot) => {
+                    const c = passCardsBySlot[slot];
+                    // Phase 15(#2) — 배정된 줄 사람은 선택지(버튼) 없애고 정적
+                    // 칩으로 고정. 잘못 골랐으면 "초기화" 로 다시.
+                    if (c) {
+                      return (
+                        <div key={slot} className="pass-slot filled">
+                          <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
+                          <CardChip card={c} />
+                          <span className="slot-done">✓</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        type="button"
+                        key={slot}
+                        className={`pass-slot ${pendingPassCardKey ? 'droppable' : ''}`}
+                        onClick={() => assignPassSlot(slot)}
+                        disabled={!pendingPassCardKey}
+                      >
+                        <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
+                        <span className="slot-empty">{t('pass.slot.empty')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button type="button" onClick={clearPassSelection}>
+                  {t('pass.clear')}
+                </button>
+              </div>
             )}
             {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
 
@@ -466,45 +501,6 @@ export function GameTable({
           </div>
         )}
       </div>
-
-      {!spectator && isInPassing && privateHand && !iAmPassSubmitted && (
-        <div className="pass-picker">
-          <h3>{t('pass.picker.title')}</h3>
-          <p className="pass-hint">
-            {pendingPassCardKey
-              ? '카드 선택됨 — 줄 사람(좌/파트너/우)을 누르세요'
-              : '먼저 손패에서 카드를 고른 뒤 줄 사람을 누르세요'}
-          </p>
-          <div className="pass-slots">
-            {(['left', 'partner', 'right'] as PassSlot[]).map((slot) => {
-              const c = passCardsBySlot[slot];
-              // Phase 15(#2) — 카드가 배정된 줄 사람은 선택지(버튼)를 없애고
-              // 정적 칩으로 고정 표시. 잘못 골랐으면 아래 "초기화" 로 다시.
-              if (c) {
-                return (
-                  <div key={slot} className="pass-slot filled">
-                    <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
-                    <CardChip card={c} />
-                    <span className="slot-done">✓</span>
-                  </div>
-                );
-              }
-              return (
-                <button
-                  type="button"
-                  key={slot}
-                  className={`pass-slot ${pendingPassCardKey ? 'droppable' : ''}`}
-                  onClick={() => assignPassSlot(slot)}
-                  disabled={!pendingPassCardKey}
-                >
-                  <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
-                  <span className="slot-empty">{t('pass.slot.empty')}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {!spectator && (
       <div className="my-hand">
