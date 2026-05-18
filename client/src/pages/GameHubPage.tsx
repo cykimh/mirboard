@@ -7,6 +7,9 @@ import { usersApi, type UserStats, type RankEntry } from '@/api/users';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useLobbyStomp } from '@/ws/useLobbyStomp';
 import { TierBadge } from '@/components/TierBadge';
+import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
+import { gameWikiUrl } from '@/features/lobby/gameWiki';
+import { t } from '@/i18n/messages';
 import type { GameSummary, Room } from '@/types/api';
 
 /**
@@ -25,12 +28,7 @@ export function GameHubPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedGame, setSelectedGame] = useState('');
-  const [roomName, setRoomName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [fillWithBots, setFillWithBots] = useState(false);
-  const [targetScore, setTargetScore] = useState(1000);
-  const [turnSeconds, setTurnSeconds] = useState(0);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
 
   const { messages, connected, send } = useLobbyStomp(token);
@@ -55,8 +53,6 @@ export function GameHubPage() {
       .catalog(token)
       .then((res) => {
         setGames(res.games);
-        const firstAvailable = res.games.find((g) => g.status === 'AVAILABLE');
-        if (firstAvailable) setSelectedGame(firstAvailable.id);
       })
       .catch((err: Error) => setError(err.message));
     usersApi.stats(token, user.userId).then(setStats).catch(() => {});
@@ -69,24 +65,6 @@ export function GameHubPage() {
     const id = window.setInterval(refreshRooms, 5000);
     return () => window.clearInterval(id);
   }, [token, refreshRooms]);
-
-  async function handleCreate(event: React.FormEvent) {
-    event.preventDefault();
-    if (!token || !roomName.trim() || !selectedGame) return;
-    setCreating(true);
-    try {
-      const room = await roomsApi.create(token, roomName.trim(), selectedGame.toUpperCase(), {
-        fillWithBots,
-        targetScore,
-        turnSeconds,
-      });
-      navigate(`/rooms/${room.roomId}`);
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function handleJoin(roomId: string) {
     if (!token) return;
@@ -124,7 +102,7 @@ export function GameHubPage() {
   return (
     <main className="hub-page">
       <header>
-        <h1>Game Hub</h1>
+        <h1>{t('hub.title')}</h1>
         <div className="user-bar" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {user && <span>{user.username}</span>}
           {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
@@ -146,9 +124,7 @@ export function GameHubPage() {
         {games?.map((game) => (
           <article
             key={game.id}
-            className={`game-card ${game.status.toLowerCase()} ${
-              selectedGame === game.id ? 'selected' : ''
-            }`}
+            className={`game-card ${game.status.toLowerCase()}`}
             aria-disabled={game.status !== 'AVAILABLE'}
           >
             <h2>{game.displayName}</h2>
@@ -158,24 +134,37 @@ export function GameHubPage() {
                 ? `${game.maxPlayers}인 플레이`
                 : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
             </p>
-            {game.status === 'AVAILABLE' ? (
-              <button
-                type="button"
-                className="play-button"
-                onClick={() => setSelectedGame(game.id)}
-                aria-pressed={selectedGame === game.id}
-              >
-                {selectedGame === game.id ? '선택됨' : '이 게임으로'}
-              </button>
-            ) : (
-              <span className="badge">Coming Soon</span>
-            )}
+            <div className="game-card-foot">
+              {game.status !== 'AVAILABLE' && (
+                <span className="badge">Coming Soon</span>
+              )}
+              {gameWikiUrl(game.id) && (
+                <a
+                  className="game-wiki-link"
+                  href={gameWikiUrl(game.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  자세히 ↗
+                </a>
+              )}
+            </div>
           </article>
         ))}
       </section>
 
       <section className="rooms">
-        <h2>대기 중인 방</h2>
+        <div className="rooms-head">
+          <h2>대기 중인 방</h2>
+          <button
+            type="button"
+            className="create-room-btn"
+            onClick={() => setShowCreateModal(true)}
+            disabled={availableGames.length === 0}
+          >
+            + 새 방 만들기
+          </button>
+        </div>
         <ul>
           {rooms.length === 0 && <li className="empty">아직 방이 없습니다.</li>}
           {rooms.map((room) => (
@@ -199,71 +188,6 @@ export function GameHubPage() {
             </li>
           ))}
         </ul>
-
-        <form className="create" onSubmit={handleCreate}>
-          <select
-            value={selectedGame}
-            onChange={(e) => setSelectedGame(e.target.value)}
-            aria-label="게임 선택"
-            required
-          >
-            <option value="" disabled>게임 선택</option>
-            {availableGames.map((g) => (
-              <option key={g.id} value={g.id}>{g.displayName}</option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={roomName}
-            placeholder="새 방 이름"
-            onChange={(e) => setRoomName(e.target.value)}
-            required
-          />
-          <div className="target-score-picker" role="group" aria-label="목표 점수">
-            <span className="target-score-label">목표 점수</span>
-            {[300, 500, 700, 1000].map((v) => (
-              <button
-                type="button"
-                key={v}
-                className={`target-score-opt ${targetScore === v ? 'active' : ''}`}
-                onClick={() => setTargetScore(v)}
-                aria-pressed={targetScore === v}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          <div className="target-score-picker" role="group" aria-label="턴 제한">
-            <span className="target-score-label">턴 제한</span>
-            {[
-              { v: 0, label: '끔' },
-              { v: 30, label: '30초' },
-              { v: 60, label: '60초' },
-              { v: 90, label: '90초' },
-            ].map((o) => (
-              <button
-                type="button"
-                key={o.v}
-                className={`target-score-opt ${turnSeconds === o.v ? 'active' : ''}`}
-                onClick={() => setTurnSeconds(o.v)}
-                aria-pressed={turnSeconds === o.v}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <label className="fill-bots-toggle" title="혼자 시연/연습할 때 빈 좌석을 봇으로 채움">
-            <input
-              type="checkbox"
-              checked={fillWithBots}
-              onChange={(e) => setFillWithBots(e.target.checked)}
-            />
-            <span>🤖 빈 좌석 봇으로 채우기</span>
-          </label>
-          <button type="submit" disabled={creating || !selectedGame}>
-            {creating ? '생성 중...' : '방 만들기'}
-          </button>
-        </form>
 
         <form className="spectate" onSubmit={handleSpectate}>
           <input
@@ -331,6 +255,19 @@ export function GameHubPage() {
           </button>
         </form>
       </section>
+
+      {token && (
+        <CreateRoomModal
+          open={showCreateModal}
+          token={token}
+          availableGames={availableGames}
+          onClose={() => setShowCreateModal(false)}
+          onError={(msg) => {
+            setError(msg);
+            setShowCreateModal(false);
+          }}
+        />
+      )}
     </main>
   );
 }

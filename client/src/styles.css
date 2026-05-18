@@ -111,16 +111,6 @@ a {
   opacity: 0.7;
 }
 
-.play-button {
-  align-self: flex-start;
-  padding: 6px 12px;
-  border: 1px solid #5a8;
-  border-radius: 6px;
-  text-decoration: none;
-  color: inherit;
-  background: var(--color-success-bg);
-}
-
 .badge {
   font-size: 0.75rem;
   background: #444;
@@ -128,15 +118,53 @@ a {
   border-radius: 4px;
 }
 
-/* Phase 16(#7) — 메인 통합: 게임 카드 선택 강조 + 방생성 select. */
-.play-button {
-  cursor: pointer;
-  font: inherit;
+/* Phase 18(#3) — 메인 카페: 카드 푸터(배지 + 외부 위키 "자세히"). */
+.game-card-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.game-card.selected {
-  border-color: var(--color-accent, #5b8def);
-  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.4);
+.game-wiki-link {
+  font-size: 0.85rem;
+  color: var(--color-accent, #5b8def);
+  text-decoration: none;
+}
+
+.game-wiki-link:hover {
+  text-decoration: underline;
+}
+
+/* Phase 18(#2) — 방 만들기 버튼 + 모달. */
+.rooms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.create-room-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent, #5b8def);
+  background: var(--color-accent, #5b8def);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.create-room-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal form.create {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 0;
+  flex-wrap: nowrap;
 }
 
 .hub-page .create select {

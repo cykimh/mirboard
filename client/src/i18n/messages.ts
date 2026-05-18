@@ -19,7 +19,7 @@ const KO = {
   'auth.password': '비밀번호',
 
   // --- 허브 / 로비 / 방 ---
-  'hub.title': '게임 허브',
+  'hub.title': '미르보드카페',
   'hub.logout': '로그아웃',
   'lobby.title': '대기실',
   'lobby.create': '방 만들기',
