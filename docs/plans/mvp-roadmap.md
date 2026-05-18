@@ -796,9 +796,9 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 
 | 항목 | 내용 | 상태 |
 | --- | --- | --- |
-| #1 | STOMP Subscribe/Disconnect 후킹(WsSessionRegistry) — WAITING 끊김 즉시 leave, 빈 방·관전자0 방 소멸, `room_leave`/`room_delete.lua` spectators 정리 | ⏳ |
-| #2 | 패스 카드 선택 UI 를 `arena-actions`(액션 버튼 영역)로 통합 — 상태/제출 로직 불변 | ⏳ |
-| #3 | 게임중 탈주(명시 leave / 끊김 후 미복귀 30s) → desert_count+1·lose+1·ELO−, 상대팀 승리. `V4__desert_count.sql`, 합성 TichuMatchCompleted 재사용 | ⏳ |
+| #1 | STOMP Subscribe/Disconnect 후킹(WsSessionRegistry) — WAITING 끊김 즉시 leave, 빈 방·관전자0 방 소멸, `room_leave`/`room_delete.lua` spectators 정리 | ✅ |
+| #2 | 패스 카드 선택 UI 를 `arena-actions`(액션 버튼 영역)로 통합 — 상태/제출 로직 불변 | ✅ |
+| #3 | 게임중 탈주(명시 leave / 끊김 후 미복귀 30s) → desert_count+1·lose+1·ELO−, 상대팀 승리. `V4__desert_count.sql`, 합성 TichuMatchCompleted 재사용 | ✅ |
 
 **Done 기준**: `check.sh fast` 그린, Desertion/Disconnect IT + 유닛 +
 회귀 IT 그린, 클라 build(tsc)+test 그린. D-02 재확인(desert_count 게임
