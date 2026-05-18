@@ -25,9 +25,12 @@ public class RoomDisconnectHandler {
     private static final Logger log = LoggerFactory.getLogger(RoomDisconnectHandler.class);
 
     private final RoomService roomService;
+    private final DesertionGraceScheduler graceScheduler;
 
-    public RoomDisconnectHandler(RoomService roomService) {
+    public RoomDisconnectHandler(RoomService roomService,
+                                 DesertionGraceScheduler graceScheduler) {
         this.roomService = roomService;
+        this.graceScheduler = graceScheduler;
     }
 
     public void onDisconnect(String roomId, long userId) {
@@ -48,9 +51,12 @@ public class RoomDisconnectHandler {
                 log.info("WS disconnect → WAITING cleanup: roomId={} userId={}", roomId, userId);
             }
             case IN_GAME -> {
-                // Phase 19#5 에서 DesertionGraceScheduler 로 유예 등록.
-                log.info("WS disconnect → IN_GAME grace pending: roomId={} userId={}",
-                        roomId, userId);
+                // 플레이어만 탈주 유예 대상 — 관전자 끊김은 게임 영향 없음.
+                if (room.playerIds().contains(userId)) {
+                    graceScheduler.scheduleGrace(roomId, userId);
+                } else if (room.spectatorIds().contains(userId)) {
+                    roomService.stopSpectating(roomId, userId);
+                }
             }
             case FINISHED -> {
                 /* no-op */
