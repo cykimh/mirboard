@@ -1,0 +1,97 @@
+/**
+ * Phase 20a (D-76) — shadcn/ui Slate 테마 토큰 + 라이트/다크.
+ *
+ * - shadcn HSL 변수: `:root`=light, `.dark`=dark (slate baseColor 표준값).
+ * - 레거시 의미 토큰(`--color-*`, tokens.css 의 :root=현행 다크값)은
+ *   **다크 기본 유지**. 라이트일 때만 `html:not(.dark)` 로 슬레이트 라이트
+ *   값으로 오버라이드 → 미전환 styles.css 화면도 토글 시 함께 라이트.
+ *   (import 순서상 tokens.css 다음에 로드되어 라이트 오버라이드가 이김.)
+ *
+ * 본 파일은 import 순서: tailwind.css → tokens.css → **theme.css** →
+ * styles.css. 20f 에서 tokens 통합 예정.
+ */
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+}
+
+/* 레거시 의미 토큰 — 라이트 모드 전용 오버라이드(Slate light).
+   다크(기본, .dark)는 tokens.css 의 현행 값을 그대로 사용 → 미전환
+   화면 다크 무회귀. */
+html:not(.dark) {
+  --color-bg-base: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-elevated: #f1f5f9;
+  --color-bg-input: #ffffff;
+  --color-bg-modal: #ffffff;
+
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-on-accent: #ffffff;
+
+  --color-border: #cbd5e1;
+  --color-border-strong: #94a3b8;
+  --color-border-subtle: #e2e8f0;
+
+  --color-accent: #2563eb;
+  --color-accent-link: #1d4ed8;
+  --color-success: #16a34a;
+  --color-success-bg: #dcfce7;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-warning: #d97706;
+  --color-warning-bg: rgba(217, 119, 6, 0.18);
+
+  --color-phoenix: #7c3aed;
+  --color-phoenix-fg: #f3e8ff;
+  --color-phoenix-border: #a78bfa;
+  --color-dragon: #dc2626;
+  --color-mahjong: #1d4ed8;
+
+  --shadow-modal: 0 12px 32px rgba(15, 23, 42, 0.18);
+  --shadow-overlay: rgba(15, 23, 42, 0.4);
+
+  color-scheme: light;
+}

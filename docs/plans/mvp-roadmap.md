@@ -804,6 +804,21 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 회귀 IT 그린, 클라 build(tsc)+test 그린. D-02 재확인(desert_count 게임
 스탯). in-memory 세션 레지스트리 단일 인스턴스 전제.
 
+## Phase 20 — shadcn/ui + Tailwind(Slate) + 라이트/다크 토글 (D-76, 클라 전체 단계적)
+
+| 단계 | 내용 | 상태 |
+| --- | --- | --- |
+| 20a | 기반: Tailwind v3(preflight off)+shadcn(slate,cssvars)+theme.css 라이트/다크+themeStore 토글+ui 프리미티브+기존 컴포넌트 어댑터 | ⏳ |
+| 20b | 메인 GameHubPage + CreateRoomModal shadcn 재디자인 | ⏳ |
+| 20c | LoginPage / RegisterPage | ⏳ |
+| 20d | RoomPage / 대기실 | ⏳ |
+| 20e | GameTable + 게임 모달 (대형, 최후) | ⏳ |
+| 20f | 정리(잔여 styles.css/legacy) + 문서 | ⏳ |
+
+**Done 기준(각 단계)**: `npm run build`(tsc+vite)+`test`(vitest 66)+
+`check.sh fast` 그린, 라이트/다크 토글·미전환 화면 무회귀, Phase 게이트
+사용자 검토 후 다음 단계. 서버/스키마/프로토콜 무변경.
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

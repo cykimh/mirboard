@@ -98,6 +98,25 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-76 (2026-05-18) — Phase 20: shadcn/ui + Tailwind(Slate) + 라이트/다크 토글, 클라이언트 전체 단계적 재디자인
+
+사용자 요청으로 클라이언트 UI 를 shadcn/ui 로 재디자인한다. 현재
+`client/` 는 Tailwind 무설치 + 손제작 `styles.css`(1218줄, 다크 단일
+토큰)이고 `button/input/a` 전역 reset 이 있어 Tailwind preflight 와
+충돌(특히 GameTable 회귀 위험). 결정: Tailwind v3 도입하되
+`corePlugins.preflight:false`(전역 reset 비활성, 기존 styles.css UI
+보호) + `darkMode:'class'`, shadcn baseColor **slate**, CSS variables.
+shadcn 토큰을 `:root`(light)/`.dark`(dark) 로 정의하고 기존
+`tokens.css` 의 의미 토큰도 라이트/다크 양값으로 확장해 일시 공존 후
+통합(도메인색 phoenix/dragon/mahjong 보존). 라이트/다크 **토글 완비**
+(zustand `themeStore` + localStorage `mirboard.theme`, 기본 dark,
+`<html>.dark`). 기존 `components/{Button,Badge,Input,Modal}` 은 shadcn
+백엔드 어댑터로 재구현(props 시그니처 보존 → 호출부 무수정). 범위는
+**클라이언트 전체**이나 **단계적**(20a 기반 → 20b 메인 → 20c 인증 →
+20d RoomPage → 20e GameTable(대형, 최후) → 20f 정리). preflight off
+덕분에 부분 마이그레이션 중 미전환 화면 안전. 각 Phase 끝 빌드/테스트
+그린 + Phase 게이트 사용자 검토. 서버/스키마/프로토콜 무변경.
+
 ## D-75 (2026-05-18) — Phase 19: WS 끊김 빈 방 정리 + 게임중 탈주 패널티 + 패스 UI 통합
 
 시연에서 (a) 새로고침/탭닫기 시 서버가 STOMP 끊김을 감지 못해 빈 방이

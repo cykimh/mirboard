@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Phase 20a (D-76) — preflight 비활성(tailwind.config) 상태에서 shadcn
+ * 컴포넌트가 의존하는 최소 base 만 .app-shell 스코프로 주입한다. 전역
+ * (body/*) reset 은 기존 styles.css 와 충돌하므로 금지 — shadcn 으로
+ * 재디자인된 화면은 최상위를 `.app-shell` 로 감싼다.
+ */
+@layer base {
+  .app-shell,
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: hsl(var(--border));
+  }
+
+  .app-shell {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
