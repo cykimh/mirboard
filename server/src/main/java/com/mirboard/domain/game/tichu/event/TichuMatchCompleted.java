@@ -8,6 +8,10 @@ import java.util.List;
  * 한 매치 전체가 종료되었음을 알리는 ApplicationEvent. STOMP inflight 이벤트
  * ({@link TichuEvent.MatchEnded}) 와 달리 본 이벤트는 영속화 / 전적 갱신을 위해
  * 발행된다. 라운드별 점수 누적이 1000점에 도달하고 양팀 점수가 다를 때 발행.
+ *
+ * <p>{@code deserterUserId}: Phase 19(#3, D-75) — 게임중 탈주로 강제 종료된
+ * 경우 탈주자 userId, 정상 종료면 {@code null}. 비-null 이면
+ * {@code MatchResultRecorder} 가 해당 유저 desert_count 를 추가 증분한다.
  */
 public record TichuMatchCompleted(
         String roomId,
@@ -15,7 +19,8 @@ public record TichuMatchCompleted(
         int cumulativeTeamAScore,
         int cumulativeTeamBScore,
         Team winningTeam,
-        List<RoundScore> roundScores) {
+        List<RoundScore> roundScores,
+        Long deserterUserId) {
 
     public TichuMatchCompleted {
         playerIds = List.copyOf(playerIds);

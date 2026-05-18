@@ -84,7 +84,8 @@ public class MatchProgressService {
                     afterRound.cumulativeA(),
                     afterRound.cumulativeB(),
                     afterRound.winningTeam(),
-                    afterRound.roundScores()));
+                    afterRound.roundScores(),
+                    null)); // 정상 종료 — 탈주자 없음 (Phase 19, D-75).
             metrics.matchCompleted();
             log.info("Match ended: winner={} rounds={} A={} B={}",
                     afterRound.winningTeam(), afterRound.roundScores().size(),

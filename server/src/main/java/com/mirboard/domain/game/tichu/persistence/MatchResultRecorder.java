@@ -114,6 +114,14 @@ public class MatchResultRecorder {
             }
         }
 
+        // Phase 19(#3, D-75) — 게임중 탈주로 종료된 매치면 탈주자 desert_count 도
+        // 같은 트랜잭션에서 증분 (win/lose/ELO 는 위 winner 기준으로 이미 반영).
+        if (event.deserterUserId() != null) {
+            userRepo.incrementDesertCount(event.deserterUserId());
+            log.info("Desertion recorded: room={} deserterUserId={}",
+                    event.roomId(), event.deserterUserId());
+        }
+
         log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, eloApplied={}, ratings={}",
                 event.roomId(), winner,
                 event.cumulativeTeamAScore(), event.cumulativeTeamBScore(),

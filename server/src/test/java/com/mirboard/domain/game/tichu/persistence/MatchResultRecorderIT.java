@@ -80,7 +80,7 @@ class MatchResultRecorderIT {
                 new RoundScore(500, 100, 0, false),
                 new RoundScore(600, 200, 0, false));
         publisher.publishEvent(new TichuMatchCompleted(
-                "room-X", ids, 1100, 300, Team.A, rounds));
+                "room-X", ids, 1100, 300, Team.A, rounds, null));
 
         // Match row — 누적 점수가 기록.
         var matches = matchRepo.findAll();
@@ -129,7 +129,7 @@ class MatchResultRecorderIT {
 
         publisher.publishEvent(new TichuMatchCompleted(
                 "room-bot", ids, 900, 200, Team.A,
-                List.of(new RoundScore(900, 200, 0, false))));
+                List.of(new RoundScore(900, 200, 0, false)), null));
 
         // match_result + participant 는 기록됨.
         assertThat(matchRepo.findAll()).anyMatch(m -> m.getRoomId().equals("room-bot"));

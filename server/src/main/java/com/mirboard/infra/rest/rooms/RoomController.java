@@ -11,9 +11,11 @@ import com.mirboard.domain.lobby.room.JoinOrReconnectResult;
 import com.mirboard.domain.lobby.room.NotInRoomException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.Room;
+import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.infra.ws.DesertionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
@@ -36,13 +38,16 @@ public class RoomController {
     private final RoomService rooms;
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
+    private final DesertionService desertion;
 
     public RoomController(RoomService rooms,
                           TichuGameStateStore stateStore,
-                          TichuMatchStateStore matchStateStore) {
+                          TichuMatchStateStore matchStateStore,
+                          DesertionService desertion) {
         this.rooms = rooms;
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
+        this.desertion = desertion;
     }
 
     @GetMapping
@@ -123,6 +128,18 @@ public class RoomController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void leave(@PathVariable String roomId,
                       @AuthenticationPrincipal AuthPrincipal me) {
+        // Phase 19(#3, D-75) — IN_GAME 중 플레이어의 명시적 '나가기' 는 탈주.
+        // DesertionService 가 상대팀 승리로 매치를 종료하고 패널티를 기록한다.
+        try {
+            Room room = rooms.getRoom(roomId);
+            if (room.status() == RoomStatus.IN_GAME
+                    && room.playerIds().contains(me.userId())) {
+                desertion.processDesertion(roomId, me.userId());
+                return;
+            }
+        } catch (RoomNotFoundException ignored) {
+            // 이미 소멸 — 아래 leaveRoom 이 RoomNotFound 를 동일 처리.
+        }
         rooms.leaveRoom(roomId, me.userId());
     }
 
