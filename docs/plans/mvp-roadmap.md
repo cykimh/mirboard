@@ -808,8 +808,8 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
-| 20a | 기반: Tailwind v3(preflight off)+shadcn(slate,cssvars)+theme.css 라이트/다크+themeStore 토글+ui 프리미티브+기존 컴포넌트 어댑터 | ⏳ |
-| 20b | 메인 GameHubPage + CreateRoomModal shadcn 재디자인 | ⏳ |
+| 20a | 기반: Tailwind v3(preflight off)+shadcn(slate,cssvars)+theme.css 라이트/다크+themeStore 토글+ui 프리미티브 (어댑터화는 20f 로 연기) | ✅ |
+| 20b | 메인 GameHubPage + CreateRoomModal shadcn 재디자인 | ✅ |
 | 20c | LoginPage / RegisterPage | ⏳ |
 | 20d | RoomPage / 대기실 | ⏳ |
 | 20e | GameTable + 게임 모달 (대형, 최후) | ⏳ |
