@@ -98,6 +98,22 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-74 (2026-05-18) — Phase 18: 메인 입장 멱등화 + room_leave ready 정리 + 방 만들기 모달 + "미르보드카페" 개편
+
+시연에서 "방 나갔다 다시 입장하면 '이미 들어가 있다'(ALREADY_IN_ROOM)" 재입장
+불가 버그 확인. 원인은 메인 `GameHubPage.handleJoin` 이 `roomsApi.join`(POST
+`/join`)을 써서 `room:{id}:players` 잔존 시 `room_join.lua` 가 -4 를 반환하는
+반면, `RoomPage` 진입은 멱등 `joinOrReconnect`(이미 참가면 RECONNECTED)를
+쓰는 경로 불일치. 메인 입장도 `joinOrReconnect` 로 통일해 증상 제거. 부차로
+`room_leave.lua` 가 방이 비어 destroy 할 때 `room:{id}:ready` SET 을 정리하지
+않아 고아 키가 남던 것을 함께 삭제하도록 보강(레포 호출부·RedisConfig KEYS
+동기화). `room_finish.lua` 는 결과 화면 resync 위한 600s 메타 보존이 의도라
+변경하지 않음. 더불어 방 만들기를 메인 인라인 폼에서 버튼+모달(`Modal`
+재사용)로 이동하고, 메인 제목을 "미르보드카페"로, 게임 카드의 선택 버튼을
+제거하고 요약 설명 + 외부 티츄 위키로 새 탭 여는 "자세히" 링크(위키 URL 은
+클라 측 게임별 하드코딩, 게임 카탈로그 API 계약 무변경)로 개편. 스키마/STOMP/
+REST 계약 변경 없음.
+
 ## D-73 (2026-05-18) — 연속 페어(CONSECUTIVE_PAIRS) 최소 길이 3페어→2페어 보정
 
 연속 페어는 이미 구현돼 있었으나 최소 길이가 3페어(6장)로 하드코딩

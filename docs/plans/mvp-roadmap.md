@@ -772,6 +772,26 @@ capacity 미시작, 봇매치 전적, 랭킹, fillWithBots→ready→start, 재�
 resync/team-policy/STOMP/bot-sim) 그린. 시작 트리거를 capacity→전원 ready
 로 이동했으므로 다수 IT 가 ready 단계 추가로 갱신됨.
 
+## Phase 17 — 연속 페어 보정 + 액션 버튼 정리 (D-73, 3건)
+
+| 항목 | 내용 | 상태 |
+| --- | --- | --- |
+| #1 | 연속 페어(CONSECUTIVE_PAIRS) 최소 길이 3페어→2페어(4장) 서버/클라 동기 | ✅ |
+| #2 | "선택 해제" 버튼 제거 | ✅ |
+| #3 | 티츄 선언 버튼은 가능할 때(14장+미선언)만 노출 | ✅ |
+
+## Phase 18 — 재입장 버그 + 방 만들기 모달 + 메인 카페 UI (D-74, 3건)
+
+| 항목 | 내용 | 상태 |
+| --- | --- | --- |
+| #1 | 메인 입장 `join`→`join-or-reconnect` 멱등화(ALREADY_IN_ROOM 재입장 버그 제거) + `room_leave.lua` 빈 방 destroy 시 `room:{id}:ready` 정리 + 회귀 IT | ✅ |
+| #2 | 방 만들기 인라인 폼 → 버튼 + 모달(`Modal` 재사용) | ✅ |
+| #3 | 메인 제목 "미르보드카페", 게임 카드 선택 버튼 제거, 요약+외부 위키 "자세히" 링크(위키 URL 클라 하드코딩) | ✅ |
+
+**Done 기준**: `check.sh fast` 그린, `RoomJoinOrReconnectIntegrationTest`/
+`RoomControllerIntegrationTest`(leave→재입장 케이스 포함) 그린, 클라
+build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 불변).
+
 ---
 
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

@@ -17,7 +17,7 @@
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함) | 직렬화 책임은 GameEngine |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore | Phase 5c 추가, 라운드 전환 시 유지 |
-| `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME |
+| `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `session:{userId}` | HASH | 30m | `currentRoomId`, `wsSessionId`, `lastSeenAt` | WS CONNECT 시 갱신 |
@@ -56,13 +56,15 @@
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
 
 ### `room_leave.lua`
-입력: `KEYS = [room, players]`, `ARGV = [userId, now]`.
+입력: `KEYS = [room, players, rooms:open, room:{id}:ready]`,
+`ARGV = [userId, roomId]`.
 
 처리:
-1. `LREM players 0 userId` (없으면 `"NOT_IN"`).
-2. `players` 빈 리스트면 `DEL room players state hand:* seq` 및 `ZREM rooms:open`
-   → `"EMPTY"`.
+1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM).
+2. `players` 빈 리스트면 `DEL room players ready` 및 `ZREM rooms:open`
+   → `0`(방 파괴). D-74: `room:{id}:ready` 도 함께 삭제(고아 키 방지).
 3. 호스트가 떠났다면 `LINDEX players 0` 으로 새 호스트 지정 후 `HSET room hostId`.
+   (state/hand/seq 키는 게임별 cleanup·TTL 로 소멸 — leave 스크립트 비관여.)
 4. `"OK"` 반환.
 
 ### `room_action_seq.lua` (선택)

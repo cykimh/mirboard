@@ -70,9 +70,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 사용자 플로우
 
 ```
-[로그인] → [Game Hub(메인)] → [Room(대기실: 준비)] → [Game Table]
-            └─ 게임 소개 + 방 만들기(게임 선택) + 열린 방 목록/입장
-               + 랭킹(GET /api/users/ranking) + 로비 채팅
+[로그인] → [미르보드카페(메인)] → [Room(대기실: 준비)] → [Game Table]
+            └─ 게임 소개(요약+위키 "자세히") + 방 만들기 버튼/모달(게임 선택)
+               + 열린 방 목록/입장 + 랭킹(GET /api/users/ranking) + 로비 채팅
 ```
 
 - Phase 16(#7): 게임별 로비 페이지(`/games/:id/lobby`) 폐지 — 메인페이지로
@@ -81,6 +81,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   봇은 join 시 서버가 자동 ready). capacity 자동시작 폐기.
 - 통합 대기실 채팅 (`/topic/lobby/chat`) 은 메인페이지 전역 채팅.
 - 게임별 격리 채팅은 MVP 범위 밖.
+- Phase 18(D-74): 메인 입장은 `join-or-reconnect`(멱등) — 나갔다 재입장
+  ALREADY_IN_ROOM 버그 제거. `room_leave.lua` 가 빈 방 destroy 시
+  `room:{id}:ready` 도 정리. 방 만들기는 버튼+모달. 메인 제목
+  "미르보드카페", 게임 카드는 요약+외부 위키 "자세히" 링크(위키 URL 클라
+  하드코딩, 카탈로그 API 무변경).
 
 ## 자주 쓰는 명령
 
