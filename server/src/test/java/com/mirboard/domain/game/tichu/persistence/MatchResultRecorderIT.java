@@ -144,6 +144,33 @@ class MatchResultRecorderIT {
         assertThat(refreshed).allMatch(u -> u.getRating() == 1000);
     }
 
+    @Test
+    @Transactional
+    void desertion_increments_desert_count_and_records_loss() {
+        // Phase 19(#3, D-75) — deserterUserId 비-null 이면 win/lose/ELO 외에
+        // 해당 유저 desert_count 도 같은 트랜잭션에서 +1.
+        var users = registerFour("mrd_a", "mrd_b", "mrd_c", "mrd_d");
+        var ids = users.stream().map(User::getId).toList();
+        long deserter = ids.get(1); // seat1 = Team B → 상대팀 A 승리.
+
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-desert", ids, 120, 80, Team.A,
+                List.of(new RoundScore(120, 80, 0, false)), deserter));
+
+        var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
+        // 탈주자(seat1, B) — 패배 + 탈주 카운트.
+        assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).getDesertCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).getRating()).isLessThan(1000);
+        // 상대팀(seat0,2 = A) — 승리, 탈주 카운트 없음.
+        assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
+        assertThat(refreshed.get(0).getDesertCount()).isZero();
+        assertThat(refreshed.get(0).getRating()).isGreaterThan(1000);
+        // 탈주자 파트너(seat3, B) — 같이 패배하지만 탈주 카운트 없음.
+        assertThat(refreshed.get(3).getLoseCount()).isEqualTo(1);
+        assertThat(refreshed.get(3).getDesertCount()).isZero();
+    }
+
     private List<User> registerFour(String... usernames) {
         List<User> created = new ArrayList<>();
         for (String u : usernames) {
