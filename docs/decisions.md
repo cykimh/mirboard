@@ -98,6 +98,17 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-77 (2026-05-27) — Phase 20 후속: styles.css dead 규칙 정리
+
+D-76 종료 직후 남긴 후속 항목(20f 메모 "styles.css 의 페이지-레벨 dead
+규칙은 무해하여 점진 정리로 남김")을 처리. 메인/인증/방 만들기 모달/
+공용 컴포넌트(Button/Badge/Input/Modal) 변형, 랭킹 테이블, target-score
+picker, dragon/wish/phoenix 모달 등 shadcn 으로 전환된 페이지가 더는
+참조하지 않는 약 70여 개 CSS 클래스 규칙을 제거. 게임판(GameTable,
+SortableHand, ArenaChatBubbles) 이 여전히 의존하는 좌석/카드/오버레이/
+패스 슬롯 규칙은 보존. styles.css 1218 → 660 줄(-558). 빌드(tsc+vite)
++ vitest 66 + check.sh fast 그린. 서버/스키마/프로토콜/UX 무변경.
+
 ## D-76 (2026-05-18) — Phase 20: shadcn/ui + Tailwind(Slate) + 라이트/다크 토글, 클라이언트 전체 단계적 재디자인
 
 사용자 요청으로 클라이언트 UI 를 shadcn/ui 로 재디자인한다. 현재

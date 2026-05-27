@@ -55,249 +55,10 @@ a {
   border-radius: 6px;
 }
 
-.auth-page form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 360px;
-}
-
-.auth-page label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.auth-page .hint {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.hub-page header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hub-page .user-bar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.game-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.game-card {
-  border: 1px solid #444;
-  border-radius: 10px;
-  padding: 16px;
-  background: var(--color-bg-surface);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.game-card.coming_soon {
-  opacity: 0.6;
-}
-
-.game-card .meta {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.badge {
-  font-size: 0.75rem;
-  background: #444;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-/* Phase 18(#3) — 메인 카페: 카드 푸터(배지 + 외부 위키 "자세히"). */
-.game-card-foot {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.game-wiki-link {
-  font-size: 0.85rem;
-  color: var(--color-accent, #5b8def);
-  text-decoration: none;
-}
-
-.game-wiki-link:hover {
-  text-decoration: underline;
-}
-
-/* Phase 18(#2) — 방 만들기 버튼 + 모달. */
-.rooms-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.create-room-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--color-accent, #5b8def);
-  background: var(--color-accent, #5b8def);
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-.create-room-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal form.create {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 0;
-  flex-wrap: nowrap;
-}
-
-.hub-page .create select {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #555;
-  background: var(--color-bg-surface-elevated);
-  color: inherit;
-  font: inherit;
-}
-
-/* Phase 16(#5) — 랭킹 테이블. */
-.ranking-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.ranking-table th,
-.ranking-table td {
-  border: 1px solid #3a3a44;
-  padding: 6px 12px;
-  text-align: left;
-}
-
-.ranking-table tr.me {
-  background: rgba(91, 141, 239, 0.16);
-  font-weight: 700;
-}
-
-.ranking .empty {
-  opacity: 0.6;
-  font-style: italic;
-}
-
-.hub-page,
 .room-page {
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-
-.hub-page .rooms ul,
-.room-page ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hub-page .rooms li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border: 1px solid #444;
-  border-radius: 6px;
-  background: var(--color-bg-surface);
-}
-
-.hub-page .rooms .name {
-  flex: 1;
-}
-
-.hub-page .create {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.hub-page .create input[type='text'] {
-  flex: 1;
-  min-width: 160px;
-}
-
-.target-score-picker {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.target-score-label {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  margin-right: 2px;
-}
-
-.target-score-opt {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid #555;
-  background: var(--color-bg-surface-elevated);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.target-score-opt.active {
-  border-color: var(--color-accent, #5b8def);
-  background: rgba(91, 141, 239, 0.18);
-  font-weight: 700;
-}
-
-.hub-page .chat ul {
-  max-height: 240px;
-  overflow-y: auto;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 8px;
-  background: #1c1c24;
-}
-
-.hub-page .chat li {
-  display: flex;
-  gap: 8px;
-}
-
-.hub-page .chat strong {
-  color: var(--color-accent-link);
-}
-
-.hub-page .chat form {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.hub-page .chat input {
-  flex: 1;
 }
 
 .game-table {
@@ -321,12 +82,6 @@ a {
   color: #1a1a1f;
   background: #ffb020;
   opacity: 1;
-}
-
-.table-seats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
 }
 
 /* Phase 8E — 보드 풍 원형 좌석 배치. 본인 시점 기준 S(하단)/W(우)/N(상단)/E(좌).
@@ -474,13 +229,6 @@ a {
   background: rgba(91, 141, 239, 0.12);
 }
 
-.trick {
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 12px;
-  background: #1c1c24;
-}
-
 /* Phase 12 (#3,#4) — 손패/낸 카드 살짝 포개기. gap 대신 음수 마진 + z-index. */
 .hand-cards {
   display: flex;
@@ -512,49 +260,33 @@ a {
   color: inherit;
   font: inherit;
   cursor: pointer;
+  user-select: none;
+  transition: transform 120ms ease, background 120ms ease;
 }
 
-.card-chip.selected {
-  background: #3a4a3a;
-  transform: translateY(-4px);
+.card-chip:hover:not(:disabled) {
+  background: #36363f;
 }
 
-/* Phase 8E — 본인 손패 카드 호버 시 살짝 떠오르기 + z-index 상승. SortableHand
-   의 .card-chip 에 적용. */
+/* Phase 8E — 본인 손패 카드 호버 시 살짝 떠오르기 + z-index 상승. */
 .card-chip:hover {
   transform: translateY(-6px) scale(1.05);
   z-index: 5;
   transition: transform 120ms ease-out;
 }
 
+.card-chip.selected {
+  background: #3a4a3a;
+  transform: translateY(-6px);
+  border-color: var(--color-success);
+}
+
 .card-chip.selected:hover {
   transform: translateY(-10px) scale(1.05);
 }
 
-/* Phase 8F — 이미지 모드 카드. <button> 안에 <img> 만, padding 제거 + 실제 카드
-   비율 (5:7) 유지. fallback 시에는 .card-chip-img className 이 없어 기존 텍스트
-   스타일이 그대로 적용됨. */
-.card-chip-img {
-  padding: 0;
-  border: none;
-  background: transparent;
-  width: 56px;
-  height: 78px;
-  overflow: hidden;
-  border-radius: 6px;
-}
-
-.card-chip-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.card-chip-img.selected {
-  outline: 3px solid var(--color-success, #3fb979);
-  outline-offset: -3px;
+.card-chip .rank {
+  font-weight: bold;
 }
 
 /* Phase 8G — 하이핸드 이펙트 keyframes. EffectsOverlay 에서 inline 으로 animation
@@ -579,21 +311,11 @@ a {
   100% { transform: scale(1.5); opacity: 0; }
 }
 
-.card-chip .rank {
-  font-weight: bold;
-}
-
 .my-hand {
   border: 1px solid #444;
   border-radius: 8px;
   padding: 12px;
   background: var(--color-bg-surface);
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .round-ended {
@@ -700,15 +422,15 @@ a {
   box-shadow: 0 0 8px rgba(255, 193, 7, 0.35);
 }
 
-.pass-slot.filled {
-  border-style: solid;
-  border-color: #4a5a85;
-}
-
 .pass-hint {
   font-size: 0.85rem;
   opacity: 0.75;
   margin: 4px 0 8px;
+}
+
+.pass-slot:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .pass-slot .slot-label {
@@ -721,13 +443,9 @@ a {
   font-style: italic;
 }
 
-.pass-slot:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* Phase 15(#2) — 배정 완료된 줄 사람은 정적(클릭 불가) + 완료 표시. */
 .pass-slot.filled {
+  border-style: solid;
   border-color: #3fae6b;
   background: #16321f;
   cursor: default;
@@ -877,256 +595,10 @@ a {
   color: var(--color-mahjong);
 }
 
-/* --- Phase 5e: 손패 툴바 + 드래그 --- */
-.hand-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.hand-toolbar h3 {
-  margin: 0;
-}
-
-.hand-sort-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.hand-sort-actions button {
-  font-size: 0.85rem;
-  padding: 4px 10px;
-}
-
-/* dnd-kit 드래그 시 카드 시각 효과 */
-.card-chip {
-  user-select: none;
-  transition: transform 120ms ease, background 120ms ease;
-}
-
-.card-chip:hover:not(:disabled) {
-  background: #36363f;
-}
-
-.card-chip.selected {
-  background: #3a4a3a;
-  transform: translateY(-6px);
-  border-color: var(--color-success);
-}
-
-/* dnd-kit dragOverlay 가 아닌 inline transform 처리 — SortableCard div 가 적용 */
-
-/* --- 모달 (Phase 6E) --- */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: var(--color-bg-modal);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 8px;
-  padding: 20px 24px;
-  max-width: 480px;
-  width: calc(100% - 32px);
-  color: var(--color-text-primary);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-}
-
-.modal h3 {
-  margin: 0 0 12px;
-}
-
-.modal-body {
-  margin: 0 0 16px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.modal-actions {
-  margin-top: 16px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.wish-rank-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
-
-.wish-rank-btn {
-  background: var(--color-bg-surface-elevated);
-  border: 1px solid #444;
-  color: var(--color-text-primary);
-  border-radius: 4px;
-  padding: 10px 0;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms;
-}
-
-.wish-rank-btn:hover {
-  background: #36363f;
-}
-
-.wish-rank-btn.selected {
-  background: #3a4a3a;
-  border-color: var(--color-success);
-  font-weight: 600;
-}
-
-/* Dragon 양도 모달 좌석 선택 */
-.dragon-seat-choices {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.dragon-seat-btn {
-  background: var(--color-bg-surface-elevated);
-  border: 1px solid #444;
-  color: var(--color-text-primary);
-  border-radius: 6px;
-  padding: 14px 24px;
-  font-size: 16px;
-  cursor: pointer;
-  flex: 1;
-  max-width: 160px;
-  transition: background 120ms, border-color 120ms;
-}
-
-.dragon-seat-btn:hover {
-  background: #36363f;
-}
-
-.dragon-seat-btn.selected {
-  background: #4a3a3a;
-  border-color: var(--color-dragon);
-  font-weight: 600;
-}
-
-/* Phoenix 단독 SINGLE 배지 */
-.phoenix-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  background: var(--color-phoenix);
-  color: var(--color-phoenix-fg);
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 10px;
-  border: 1px solid var(--color-phoenix-border);
-  cursor: help;
-}
-
-/* 관전 모드 배너 + LobbyPage 의 spectate 입력 (Phase 6A-6) */
-.spectator-banner {
-  background: #2a3a4a;
-  border-left: 3px solid var(--color-accent);
-  padding: 8px 12px;
-  margin: 12px 0;
-  color: #c5d5e8;
-  border-radius: 4px;
-}
-
-.hub-page .spectate {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.hub-page .spectate input {
-  flex: 1;
-}
-
-/* --- 공용 컴포넌트 (Phase 6C-2) --- */
-
-/* Button variants */
-.btn-primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-text-on-accent);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-link);
-  border-color: var(--color-accent-link);
-}
-.btn-danger {
-  background: var(--color-danger-bg);
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--color-danger);
-  color: var(--color-text-on-accent);
-}
-.btn-subtle {
-  background: transparent;
-  border-color: var(--color-border-subtle);
-  color: var(--color-text-secondary);
-}
-
-/* Input field with label */
-.input-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.input-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-/* Badge tones */
-.badge {
-  display: inline-block;
-  padding: 2px var(--space-2);
-  background: var(--color-bg-surface-elevated);
-  border-radius: var(--radius-pill);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-.badge-success {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-.badge-warning {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-.badge-danger {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-.badge-phoenix {
-  background: var(--color-phoenix);
-  color: var(--color-phoenix-fg);
-  border: 1px solid var(--color-phoenix-border);
-}
-.badge-accent {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-}
-
 /* --- 모바일 반응형 (Phase 6C-4) --- */
 @media (max-width: 720px) {
   #root {
     padding: var(--space-3);
-  }
-
-  /* 데스크탑 4열 좌석 그리드 → 모바일 2열. */
-  .table-seats {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   /* 헤더는 wrap 으로 줄바꿈. */
@@ -1139,11 +611,6 @@ a {
   .pass-slots {
     flex-wrap: wrap;
   }
-
-  /* 게임 카탈로그 그리드 — auto-fill minmax 가 자동 분해되지만 여백 정리. */
-  .game-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1151,16 +618,6 @@ a {
   .card-chip {
     padding: 4px 8px;
     gap: var(--space-1);
-  }
-
-  /* 모달 폭 더 줄임. */
-  .modal {
-    padding: var(--space-3) var(--space-4);
-  }
-
-  /* 소원 rank grid 7열 → 5열. */
-  .wish-rank-grid {
-    grid-template-columns: repeat(5, 1fr);
   }
 }
 
