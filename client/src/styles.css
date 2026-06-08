@@ -663,55 +663,52 @@ a {
   }
 }
 
-/* Phase 8E / 13(#4) — 모바일 폴백: 좁은 화면에서 absolute 원형 배치 해제 +
-   grid 2열 + 중앙 트릭은 행 전체. 768px 이하에서 발동 (스마트폰 세로/가로 +
-   좁은 창 모두 경기장이 항상 보이도록 — 기존 640 → 768 확대). */
+/* Phase 20(D-76) — 좁은 화면에서도 보드 메타포(상/하/좌/우 고정)를 유지.
+   기존엔 768px 이하에서 2×2 grid 로 무너져 본인(하단)/파트너(상단)/좌우
+   상대 위치가 사라졌다. absolute 원형 배치는 그대로 두고 좌석·중앙 트릭만
+   컴팩트하게 축소해 어느 폭에서도 자리가 고정되게 한다. */
 @media (max-width: 768px) {
   .table-arena {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-    min-height: auto;
-    width: 100%;
-    background: radial-gradient(ellipse at center, #1a3a2e 0%, #0e1e18 70%);
-    box-shadow: none;
-    border: 1px solid var(--color-border);
-    padding: 8px;
+    min-height: 360px;
   }
-
   .table-arena .seat {
-    position: static;
-    transform: none;
-    min-width: 0;
+    min-width: 88px;
+    padding: 6px 8px;
+    font-size: 0.9rem;
   }
-
+  .table-arena .seat-w {
+    right: 4px;
+  }
+  .table-arena .seat-e {
+    left: 4px;
+  }
   .table-center-trick {
-    position: static;
-    transform: none;
-    grid-column: 1 / -1;
-    background: rgba(0, 0, 0, 0.25);
+    min-width: 120px;
+    max-width: 52%;
+    padding: 8px 10px;
   }
-
-  /* Phase 15 — 모바일 grid 에선 절대배치 오버레이를 행 흐름으로 강등. */
-  .scoreboard,
-  .turn-countdown,
-  .arena-actions {
-    position: static;
-    transform: none;
-    grid-column: 1 / -1;
-    justify-self: center;
-  }
-
-  .arena-bubble {
-    display: none;
-  }
-
-  /* 아주 좁은 폭(<420)에서는 좌석 1열로 — 경기장이 잘리지 않도록. */
 }
 
-@media (max-width: 420px) {
+/* 아주 좁은 폭(휴대폰 세로) — 좌석/트릭을 한 단계 더 축소하되 위치는 유지. */
+@media (max-width: 440px) {
   .table-arena {
-    grid-template-columns: 1fr;
+    min-height: 320px;
+    padding: 6px;
+  }
+  .table-arena .seat {
+    min-width: 72px;
+    padding: 4px 6px;
+    font-size: 0.82rem;
+  }
+  .seat-id {
+    font-size: 0.75rem;
+  }
+  .hand-count {
+    font-size: 0.72rem;
+  }
+  .table-center-trick {
+    min-width: 96px;
+    max-width: 46%;
+    padding: 6px 8px;
   }
 }
