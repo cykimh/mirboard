@@ -84,6 +84,18 @@ a {
   opacity: 1;
 }
 
+/* Phase 20(D-76) — 헤더 솔로 모드 라벨. 헤더는 앱 배경 위(라이트/다크
+   전환)라 legacy 의미 토큰으로 muted pill. */
+.solo-banner {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  opacity: 1;
+}
+
 /* Phase 8E — 보드 풍 원형 좌석 배치. 본인 시점 기준 S(하단)/W(우)/N(상단)/E(좌).
    absolute positioning 으로 4개 좌석 + 중앙 currentTop. */
 .table-arena {
@@ -158,12 +170,26 @@ a {
   max-width: 60%;
 }
 
+/* Phase 20(D-76) — 트릭 패널은 rgba(0,0,0,.35)+녹색 펠트라 두 테마 모두
+   어두운 표면. 따라서 자식 텍스트는 (flip 되는 토큰이 아니라) 항상 밝게
+   고정해 라이트 모드에서도 읽히게 한다. */
+.table-center-trick {
+  color: #eef2f7;
+}
+
 .table-center-trick .trick-meta {
   display: flex;
   gap: 8px;
   align-items: center;
   font-size: 0.8rem;
   opacity: 0.85;
+}
+
+/* 낸 카드 조합명 — 살짝 강조(밝은 블루, 어두운 패널 위 가독). */
+.table-center-trick .hand-type {
+  font-weight: 600;
+  color: #9ec3ff;
+  opacity: 1;
 }
 
 .table-center-trick .trick-empty {
@@ -193,6 +219,14 @@ a {
   font-family: monospace;
   font-size: 0.85rem;
   opacity: 0.7;
+}
+
+/* Phase 20(D-76) — 좌석 손패 수 라벨. 좌석은 flip 되는 surface 박스라
+   legacy muted 토큰 사용. */
+.hand-count {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
 }
 
 .declared {
@@ -545,6 +579,14 @@ a {
   font-size: 0.68rem;
   font-weight: 700;
   opacity: 0.6;
+}
+
+/* Phase 20(D-76) — 말풍선 본문. 말풍선은 항상 흰 배경이라 색은 부모의
+   어두운 글자(#1a1a1f) 상속이 맞고, block + line-height 로 정렬만 보정. */
+.arena-bubble-text {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.3;
 }
 
 .arena-bubble-s {
