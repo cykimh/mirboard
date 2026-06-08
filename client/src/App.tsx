@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/authStore';
 import { LoginPage } from '@/pages/LoginPage';
@@ -12,11 +11,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
-  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
-  useEffect(() => {
-    loadFromStorage();
-  }, [loadFromStorage]);
-
+  // 세션 복원은 main.tsx 가 첫 렌더 전 동기로 수행(useAuthStore.loadFromStorage).
+  // 여기서 useEffect 로 복원하면 ProtectedRoute 가 먼저 /login 으로 보내는 레이스 발생.
   return (
     <Router>
       <Routes>

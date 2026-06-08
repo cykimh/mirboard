@@ -47,7 +47,7 @@ describe('authStore', () => {
     expect(useAuthStore.getState().user?.username).toBe('bob');
   });
 
-  it('loadFromStorage discards expired token', () => {
+  it('loadFromStorage discards expired token + clears storage', () => {
     localStorage.setItem(
       'mirboard.auth',
       JSON.stringify({
@@ -56,6 +56,18 @@ describe('authStore', () => {
         user: { userId: 7, username: 'bob' },
       }),
     );
+    useAuthStore.getState().loadFromStorage();
+    expect(useAuthStore.getState().token).toBeNull();
+    expect(localStorage.getItem('mirboard.auth')).toBeNull();
+  });
+
+  it('loadFromStorage ignores corrupt JSON without throwing', () => {
+    localStorage.setItem('mirboard.auth', '{not valid json');
+    expect(() => useAuthStore.getState().loadFromStorage()).not.toThrow();
+    expect(useAuthStore.getState().token).toBeNull();
+  });
+
+  it('loadFromStorage is a no-op when nothing is stored', () => {
     useAuthStore.getState().loadFromStorage();
     expect(useAuthStore.getState().token).toBeNull();
   });
