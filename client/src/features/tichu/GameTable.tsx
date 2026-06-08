@@ -16,6 +16,7 @@ import { SeatAvatar } from './SeatAvatar';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
+import { useEffectStore } from './effectStore';
 import { useSfx } from './useSfx';
 import { useCardAnimStore } from './cardAnimStore';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,8 @@ interface GameTableProps {
   fillWithBots?: boolean;
   /** Phase 13D — 개인 턴 제한 초 (0=끔). 헤더 배지. */
   turnSeconds?: number;
+  /** 현재 관전자 수 (room.spectatorIds.length). 헤더 배지. */
+  spectatorCount?: number;
   /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
   onExit?: () => void;
 }
@@ -67,6 +70,7 @@ export function GameTable({
   botSeats = [],
   fillWithBots = false,
   turnSeconds = 0,
+  spectatorCount = 0,
   onExit,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
@@ -76,6 +80,7 @@ export function GameTable({
   const { muted, toggleMute } = useSfx();
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
   const toggleCardAnim = useCardAnimStore((s) => s.toggle);
+  const triggerEffect = useEffectStore((s) => s.trigger);
   const tableView = useTichuStore((s) => s.tableView);
   const privateHand = useTichuStore((s) => s.privateHand);
   const selectedCardKeys = useTichuStore((s) => s.selectedCardKeys);
@@ -139,6 +144,18 @@ export function GameTable({
     tableView.currentTop !== null &&
     tableView.currentTop.cards.length === 1 &&
     tableView.currentTop.cards[0].special === 'DRAGON';
+
+  // 매치 종료 시 승리 연출 1회 트리거. mySeat 으로 승/패 문구 분기(관전자는 승리팀).
+  useEffect(() => {
+    if (!matchEnded) return;
+    const text =
+      mySeat >= 0
+        ? matchEnded.winningTeam === myTeam
+          ? '🏆 승리!'
+          : '아쉽게 패배'
+        : `Team ${matchEnded.winningTeam} 승리`;
+    triggerEffect('MATCH_VICTORY', text);
+  }, [matchEnded, myTeam, mySeat, triggerEffect]);
 
   const selectedCards = useMemo<Card[]>(() => {
     if (!privateHand) return [];
@@ -356,6 +373,9 @@ export function GameTable({
           {t('game.header.matchScore')} A {tableView.matchScores.A ?? 0} : {tableView.matchScores.B ?? 0} B
         </span>
         <span>{phaseLabel}</span>
+        {spectatorCount > 0 && (
+          <span title="관전자 수">👁 관전 {spectatorCount}</span>
+        )}
         {tableView.activeWishRank !== null && (
           <span>
             {t('game.header.activeWish')}: {tableView.activeWishRank}

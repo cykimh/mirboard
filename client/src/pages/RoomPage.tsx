@@ -170,6 +170,7 @@ export function RoomPage() {
           botSeats={room.botSeats ?? []}
           fillWithBots={room.fillWithBots ?? false}
           turnSeconds={room.turnSeconds ?? 0}
+          spectatorCount={(room.spectatorIds ?? []).length}
           onExit={handleLeave}
         />
       </main>
@@ -185,6 +186,8 @@ export function RoomPage() {
             <p className="text-sm text-muted-foreground">
               {room.gameType} · {room.status} · {room.playerCount}/
               {room.capacity}
+              {(room.spectatorIds ?? []).length > 0 &&
+                ` · 👁 관전 ${(room.spectatorIds ?? []).length}`}
             </p>
           </div>
           <div className="flex gap-2">

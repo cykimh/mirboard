@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import type { HandType } from '@/types/tichu';
 
-export type EffectKind = 'BOMB' | 'STRAIGHT_FLUSH_BOMB' | 'TICHU_DECLARED';
+export type EffectKind =
+  | 'BOMB'
+  | 'STRAIGHT_FLUSH_BOMB'
+  | 'TICHU_DECLARED'
+  | 'MATCH_VICTORY';
 
 export interface ActiveEffect {
   id: number;
@@ -23,6 +27,8 @@ const DURATION_BY_KIND: Record<EffectKind, number> = {
   BOMB: 1800,
   STRAIGHT_FLUSH_BOMB: 1800,
   TICHU_DECLARED: 2000,
+  // 매치 종료 승리 연출 — MVP 카드로 시선이 넘어갈 시간까지 약간 길게.
+  MATCH_VICTORY: 3500,
 };
 let nextId = 1;
 

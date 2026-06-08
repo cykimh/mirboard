@@ -25,6 +25,55 @@ export function EffectsOverlay() {
 
   if (!active) return null;
 
+  // 매치 종료 승리 연출 — 중앙 대형 트로피 배너. text 에 승/패 문구.
+  if (active.kind === 'MATCH_VICTORY') {
+    return (
+      <div
+        key={active.id}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          background:
+            'radial-gradient(ellipse at center, rgba(240,192,0,0.18) 0%, rgba(0,0,0,0) 60%)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 96,
+            lineHeight: 1,
+            animation: 'mirboard-fx-pop 3.5s ease-out forwards',
+            filter: 'drop-shadow(0 0 24px rgba(255,200,0,0.8))',
+          }}
+        >
+          🏆
+        </div>
+        <div
+          style={{
+            padding: '16px 40px',
+            borderRadius: 16,
+            background: 'rgba(240, 192, 0, 0.94)',
+            color: '#1a1a1f',
+            fontSize: 40,
+            fontWeight: 900,
+            letterSpacing: 1,
+            textAlign: 'center',
+            boxShadow: '0 0 40px 8px rgba(255, 200, 0, 0.7)',
+            animation: 'mirboard-fx-pop 3.5s ease-out forwards',
+          }}
+        >
+          {active.text ?? '승리!'}
+        </div>
+      </div>
+    );
+  }
+
   // Phase 15(#4) — 티츄/그랜드 선언: 중앙 대형 배너 (폭발 SVG 없이 골드 펄스).
   if (active.kind === 'TICHU_DECLARED') {
     return (
