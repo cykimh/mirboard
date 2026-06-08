@@ -115,7 +115,22 @@ export function useStompRoom(roomId: string, token: string | null) {
     });
     client.activate();
     clientRef.current = client;
+
+    // 모바일 백그라운드(앱 전환·화면 잠금) 시 OS 가 소켓을 죽이는데, 게임 소켓엔
+    // 하트비트가 없어 클라가 끊김을 모를 수 있다. 포그라운드 복귀/네트워크 회복 때
+    // 소켓을 즉시 재가동하고 권위 스냅샷으로 화면을 곧바로 최신화(resync 는 REST 라
+    // 소켓 상태와 무관). 이렇게 해야 탈주 유예가 끝나기 전에 빠르게 재접속된다.
+    const onResume = () => {
+      if (document.visibilityState !== 'visible') return;
+      client.activate(); // 이미 active 면 no-op, 끊겼으면 재연결을 앞당김
+      resync();
+    };
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('online', onResume);
+
     return () => {
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('online', onResume);
       client.deactivate();
       clientRef.current = null;
       setConnected(false);

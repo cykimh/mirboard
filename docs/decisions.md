@@ -98,6 +98,19 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-79 (2026-06-08) — 모바일 재접속 강건화: 탈주 유예 30→120s + 포그라운드 즉시 재연결
+
+모바일에서 게임 중 백그라운드(앱 전환·화면 잠금) 시 OS 가 ~10-15s 만에 WebSocket 을
+죽이는데, 게임 소켓엔 하트비트가 없어(로비 소켓과 달리) 잠깐 자리를 비워도 30s 유예를
+넘겨 탈주=패배로 처리되는 운영 위험이 있었다. **(A)** `mirboard.desertion.grace-seconds`
+기본값을 30→**120s** 로 상향(`application.yml`, env `MIRBOARD_DESERTION_GRACE_SECONDS`
+override; ReconnectBanner 3분 경고 안쪽). **(B)** `useStompRoom` 에 `visibilitychange`/
+`online` 핸들러 추가 — 포그라운드 복귀 시 소켓을 즉시 재가동하고 `/resync`(REST, 소켓
+상태 무관)로 화면을 곧바로 최신화해 유예 만료 전 빠르게 재접속. 명시적 '나가기' 는 여전히
+즉시 탈주(불변), WAITING 끊김 즉시 leave 도 불변. 서버 탈주 로직(D-75)·스키마 무변경 —
+설정값 + 클라 라이프사이클 핸들러만. 게임 소켓 하트비트 추가(좀비 소켓 감지)와 모바일
+친화 탈주 정책은 후속 과제로 남김. *D-75 의 grace 기본 30s → 본 항목으로 변경.*
+
 ## D-78 (2026-06-08) — 카드 제출 애니메이션 (옵션 토글, 클라 전용)
 
 카드 제출 시 중앙 트릭에 카드가 무애니로 툭 나타나던 것에 시각 피드백을 추가한다.

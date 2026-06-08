@@ -80,6 +80,12 @@ mirboard:
     # 봇 액션 사이 딜레이(ms) — 사람 페이스 흉내 + 클라 UI 따라잡기. 기본 200(거의
     # 즉시) 은 체감이 없어 700 으로 상향(D-76 후속). 봇 구동 IT 는 0 으로 override.
     delay-millis: ${MIRBOARD_BOT_DELAY_MILLIS:700}
+  desertion:
+    # IN_GAME 탈주(끊김 후 미복귀) 확정까지 유예(초). 모바일은 백그라운드(앱 전환·
+    # 화면 잠금) 시 소켓이 ~10-15s 만에 죽어, 30s 로는 잠깐 자리만 비워도 탈주로
+    # 처리될 위험이 크다. 모바일 운영을 감안해 120s 로 상향(D-79). ReconnectBanner 가
+    # 3분에 장시간 경고하므로 그 안쪽. 명시적 '나가기' 는 유예 없이 즉시 탈주(불변).
+    grace-seconds: ${MIRBOARD_DESERTION_GRACE_SECONDS:120}
 
 logging:
   pattern:

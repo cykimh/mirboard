@@ -89,7 +89,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Phase 19(D-75): 서버 STOMP Subscribe/Disconnect 후킹(in-memory
   `WsSessionRegistry`, 단일 인스턴스 전제). WAITING 끊김=즉시 leave(빈 방·
   관전자0 방 즉시 소멸). IN_GAME 탈주(명시 '나가기' / 끊김 후
-  `mirboard.desertion.grace-seconds` 기본 30s 미복귀)=상대팀 승리로
+  `mirboard.desertion.grace-seconds` 기본 120s(D-79, 모바일 관용; 구 30s) 미복귀)=상대팀 승리로
   매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
   D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
   재사용. 패스 카드 선택 UI 는 `arena-actions` 로 통합(로직 불변).
