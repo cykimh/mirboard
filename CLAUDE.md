@@ -39,7 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
-- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `created_at`.
+- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `created_at`. `rating`/`is_bot`/`desert_count` 는 게임 성적·행동 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산).
 - 로그인/회원가입 엔드포인트도 헤더/쿠키 식별자를 기록하지 않는다 (IP는 인프라 레벨만).
 
 ### 도메인 경계 (Modular Monolith)
