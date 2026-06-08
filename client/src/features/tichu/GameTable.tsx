@@ -321,7 +321,7 @@ export function GameTable({
                          ${submitted ? 'submitted' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                <SeatAvatar seat={seat} size={32} isBot={botSeats.includes(seat)} />
+                <SeatAvatar seat={seat} size={26} isBot={botSeats.includes(seat)} />
                 <span className="seat-id">#{uid}</span>
               </div>
               <div className="hand-count">

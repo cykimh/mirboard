@@ -115,8 +115,8 @@ a {
 
 .table-arena .seat {
   position: absolute;
-  min-width: 124px;
-  padding: 10px 14px;
+  min-width: 96px;
+  padding: 6px 10px;
 }
 
 .table-arena .seat-s {
@@ -147,13 +147,13 @@ a {
 }
 
 .table-arena .seat-w {
-  right: 12px;
+  right: 20px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .table-arena .seat-e {
-  left: 12px;
+  left: 20px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -206,21 +206,22 @@ a {
 
 .seat {
   border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 6px 10px;
   background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  /* transform 은 좌석 위치 정렬(translateX/Y(-50%)) 에 쓰이므로 turn 강조에는
+     쓰지 않는다 — 덮어쓰면 좌석이 밀려난다(D-76 후속 버그 수정). */
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-/* 현재 차례 좌석 — 또렷한 골드 글로우. */
+/* 현재 차례 좌석 — 또렷한 골드 글로우(테두리+그림자만, transform 미사용). */
 .seat.turn {
   border-color: var(--color-warning);
   box-shadow:
-      0 0 0 2px rgba(255, 193, 7, 0.4),
-      0 0 18px 2px rgba(255, 193, 7, 0.45);
-  transform: scale(1.03);
+      0 0 0 2px rgba(255, 193, 7, 0.45),
+      0 0 16px 2px rgba(255, 193, 7, 0.4);
 }
 
 .seat.finished {
