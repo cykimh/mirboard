@@ -40,8 +40,8 @@ export function CardChip({ card, selected, onClick }: CardChipProps) {
       aria-pressed={selected}
       aria-label={`${card.suit ?? card.special ?? ''} ${label}`}
     >
-      {glyph && <span style={{ color }}>{glyph}</span>}
-      <span className="rank">{label}</span>
+      {glyph && <span className="suit-glyph" style={{ color }}>{glyph}</span>}
+      <span className="rank" style={{ color }}>{label}</span>
     </button>
   );
 }

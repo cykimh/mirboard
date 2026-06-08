@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   useTichuStore,
@@ -17,6 +17,7 @@ import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
 import { useSfx } from './useSfx';
+import { useCardAnimStore } from './cardAnimStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
@@ -40,6 +41,18 @@ interface GameTableProps {
   onExit?: () => void;
 }
 
+/** Phase B(D-78) — 비행 카드 오버레이 상태. left/top 은 arena 기준 도착 중심,
+ *  dx/dy 는 출발 좌석 중심까지의 오프셋(여기서 0 으로 transition). */
+interface FlyState {
+  id: number;
+  cards: Card[];
+  left: number;
+  top: number;
+  dx: number;
+  dy: number;
+  settled: boolean;
+}
+
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
   left: t('pass.slot.left'),
   partner: t('pass.slot.partner'),
@@ -61,6 +74,8 @@ export function GameTable({
   const [chatOpen, setChatOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
   const { muted, toggleMute } = useSfx();
+  const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
+  const toggleCardAnim = useCardAnimStore((s) => s.toggle);
   const tableView = useTichuStore((s) => s.tableView);
   const privateHand = useTichuStore((s) => s.privateHand);
   const selectedCardKeys = useTichuStore((s) => s.selectedCardKeys);
@@ -159,6 +174,78 @@ export function GameTable({
         : orderedHand,
     [orderedHand, isInPassing, iAmPassSubmitted, assignedPassKeys],
   );
+
+  // Phase B(D-78) — 카드 제출 시 제출 좌석에서 중앙 트릭으로 날아오는 FLIP 애니.
+  // 토글(cardAnimEnabled) ON + reduced-motion 아님일 때만. 비행 중에는 중앙 정적
+  // 카드를 visibility:hidden(레이아웃 유지)으로 가려 이중 표시를 방지.
+  const arenaRef = useRef<HTMLDivElement | null>(null);
+  const centerTrickRef = useRef<HTMLDivElement | null>(null);
+  const prevTrickKeyRef = useRef<string | null>(null);
+  const flyIdRef = useRef(0);
+  const [fly, setFly] = useState<FlyState | null>(null);
+
+  const flyCurrentTop = tableView?.currentTop ?? null;
+  const flyCurrentTopSeat = tableView?.currentTopSeat ?? -1;
+  const trickPlayKey = flyCurrentTop
+    ? `${flyCurrentTopSeat}:${flyCurrentTop.cards.map(cardKey).join(',')}`
+    : null;
+
+  useEffect(() => {
+    const prev = prevTrickKeyRef.current;
+    prevTrickKeyRef.current = trickPlayKey;
+    if (!trickPlayKey || trickPlayKey === prev || !flyCurrentTop) return;
+    if (!cardAnimEnabled) return;
+    const reduce =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+
+    const arena = arenaRef.current;
+    const center = centerTrickRef.current;
+    if (!arena || !center) return;
+    const viewIdx = ((flyCurrentTopSeat - mySeat) + 4) % 4;
+    const viewPos = ['s', 'w', 'n', 'e'][viewIdx];
+    const seatEl = arena.querySelector(`.seat-${viewPos}`) as HTMLElement | null;
+    if (!seatEl) return;
+
+    const arenaRect = arena.getBoundingClientRect();
+    const centerRect = center.getBoundingClientRect();
+    const seatRect = seatEl.getBoundingClientRect();
+    const centerCx = centerRect.left + centerRect.width / 2;
+    const centerCy = centerRect.top + centerRect.height / 2;
+    const seatCx = seatRect.left + seatRect.width / 2;
+    const seatCy = seatRect.top + seatRect.height / 2;
+
+    setFly({
+      id: ++flyIdRef.current,
+      cards: flyCurrentTop.cards,
+      left: centerCx - arenaRect.left,
+      top: centerCy - arenaRect.top,
+      dx: seatCx - centerCx,
+      dy: seatCy - centerCy,
+      settled: false,
+    });
+  }, [trickPlayKey, cardAnimEnabled, flyCurrentTop, flyCurrentTopSeat, mySeat]);
+
+  // 비행 시작(다음 프레임에 settled=true 로 transition 발동) + 종료 후 정리.
+  useEffect(() => {
+    if (!fly || fly.settled) return;
+    const id = fly.id;
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setFly((f) => (f && f.id === id ? { ...f, settled: true } : f)),
+      ),
+    );
+    const timer = window.setTimeout(
+      () => setFly((f) => (f && f.id === id ? null : f)),
+      420,
+    );
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
+  }, [fly]);
 
   function handlePlay() {
     if (selectedCards.length === 0) {
@@ -289,6 +376,16 @@ export function GameTable({
           type="button"
           variant="outline"
           size="sm"
+          onClick={toggleCardAnim}
+          aria-label="카드 애니메이션 토글"
+          title={cardAnimEnabled ? '카드 애니 끄기' : '카드 애니 켜기'}
+        >
+          {cardAnimEnabled ? '🎴' : '⏸'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
           className="relative"
           onClick={() => setChatOpen((v) => !v)}
           aria-label="채팅 토글"
@@ -302,7 +399,7 @@ export function GameTable({
         </Button>
       </header>
 
-      <div className="table-arena">
+      <div className="table-arena" ref={arenaRef}>
         {playerIds.map((uid, seat) => {
           const ready = isInDealing && tableView.readySeats.includes(seat);
           const submitted =
@@ -344,10 +441,18 @@ export function GameTable({
           );
         })}
         {isInPlaying && (
-          <div className="table-center-trick">
+          <div className="table-center-trick" ref={centerTrickRef}>
             {tableView.currentTop ? (
               <>
-                <div className="hand-cards">
+                <div
+                  // 새 play 마다 key 변경 → 리마운트로 등장 애니 재생. 토글 ON 일 때만.
+                  // 비행 중(fly)에는 숨겨 이중 표시 방지(visibility 로 레이아웃 유지).
+                  key={`${tableView.currentTopSeat}:${tableView.currentTop.cards
+                    .map(cardKey)
+                    .join(',')}`}
+                  className={`hand-cards${cardAnimEnabled ? ' play-enter' : ''}`}
+                  style={fly ? { visibility: 'hidden' } : undefined}
+                >
                   {tableView.currentTop.cards.map((c) => (
                     <CardChip key={cardKey(c)} card={c} />
                   ))}
@@ -365,6 +470,30 @@ export function GameTable({
             ) : (
               <p className="trick-empty">{t('trick.leadWaiting')}</p>
             )}
+          </div>
+        )}
+        {fly && (
+          <div
+            className="trick-fly"
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: fly.left,
+              top: fly.top,
+              zIndex: 18,
+              pointerEvents: 'none',
+              transform: fly.settled
+                ? 'translate(-50%, -50%) scale(1)'
+                : `translate(calc(-50% + ${fly.dx}px), calc(-50% + ${fly.dy}px)) scale(0.92)`,
+              opacity: fly.settled ? 1 : 0.85,
+              transition: 'transform 350ms ease-out, opacity 350ms ease-out',
+            }}
+          >
+            <div className="hand-cards">
+              {fly.cards.map((c) => (
+                <CardChip key={cardKey(c)} card={c} />
+              ))}
+            </div>
           </div>
         )}
         <div className="scoreboard" aria-label="현재 점수">

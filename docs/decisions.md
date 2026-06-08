@@ -98,6 +98,19 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-78 (2026-06-08) — 카드 제출 애니메이션 (옵션 토글, 클라 전용)
+
+카드 제출 시 중앙 트릭에 카드가 무애니로 툭 나타나던 것에 시각 피드백을 추가한다.
+**Phase A**: 제출된 카드가 중앙에 페이드+업슬라이드+스케일로 등장(CSS `@keyframes
+card-play-enter`, `.table-center-trick .hand-cards.play-enter` + play마다 바뀌는
+React key 로 리마운트 재생). **Phase B**: 제출 좌석에서 중앙으로 날아오는 FLIP
+애니(GameTable 의 `fly` 상태 + arena/center `getBoundingClientRect` 델타,
+비행 중 정적 카드 `visibility:hidden` 으로 이중 표시 방지). on/off 는 `themeStore`/
+`useSfx` 패턴을 미러한 `cardAnimStore`(localStorage `mirboard.cardAnim`, 기본 ON,
+미저장+`prefers-reduced-motion` 시 기본 OFF, `main.tsx` 에서 `init()`)로 영속하고,
+GameTable 헤더의 사운드 버튼 옆 토글(🎴/⏸)로 제어. 기존 폭탄/티츄 이펙트·사운드는
+불변. 서버/스키마/STOMP 무변경 — 순수 클라. 빌드(tsc+vite) + vitest 73 그린.
+
 ## D-77 (2026-05-27) — Phase 20 후속: styles.css dead 규칙 정리
 
 D-76 종료 직후 남긴 후속 항목(20f 메모 "styles.css 의 페이지-레벨 dead

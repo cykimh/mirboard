@@ -297,10 +297,14 @@ a {
 }
 
 .card-chip {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
+  justify-content: center;
+  gap: 3px;
+  width: 42px;
+  height: 60px;
+  padding: 4px;
   border-radius: 6px;
   border: 2px solid #555;
   background: var(--color-bg-surface-elevated);
@@ -308,6 +312,8 @@ a {
   font: inherit;
   cursor: pointer;
   user-select: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition: transform 120ms ease, background 120ms ease;
 }
 
@@ -333,7 +339,14 @@ a {
 }
 
 .card-chip .rank {
+  font-size: 0.9rem;
   font-weight: bold;
+  line-height: 1;
+}
+
+.card-chip .suit-glyph {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 /* Phase 8G — 하이핸드 이펙트 keyframes. EffectsOverlay 에서 inline 으로 animation
@@ -356,6 +369,24 @@ a {
   30%  { transform: scale(1.2); opacity: 1; }
   70%  { transform: scale(1.0); opacity: 1; }
   100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* 카드 제출 등장 애니메이션. cardAnimStore 가 켜진 경우에만 GameTable 이
+   .play-enter 를 부여하고, 새 play 마다 key 변경으로 리마운트되어 재생. */
+@keyframes card-play-enter {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+.table-center-trick .hand-cards.play-enter {
+  animation: card-play-enter 250ms ease-out;
+}
+
+/* OS '동작 줄이기' 선호 시 토글과 별개의 안전장치로 애니 제거. */
+@media (prefers-reduced-motion: reduce) {
+  .table-center-trick .hand-cards.play-enter {
+    animation: none;
+  }
 }
 
 .my-hand {
@@ -669,10 +700,17 @@ a {
 }
 
 @media (max-width: 480px) {
-  /* 손패 카드 크기 살짝 축소 — 14장이 보이도록. */
+  /* 손패 카드 크기 축소 — 세로 직사각형 비율 유지. */
   .card-chip {
-    padding: 4px 8px;
-    gap: var(--space-1);
+    width: 34px;
+    height: 48px;
+    gap: 2px;
+  }
+  .card-chip .rank {
+    font-size: 0.78rem;
+  }
+  .card-chip .suit-glyph {
+    font-size: 0.9rem;
   }
 }
 

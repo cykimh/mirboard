@@ -8,9 +8,12 @@ import './styles/tokens.css';
 import './styles/theme.css';
 import './styles.css';
 import { useThemeStore } from './features/theme/themeStore';
+import { useCardAnimStore } from './features/tichu/cardAnimStore';
 
 // 첫 페인트 전 테마 클래스 적용(라이트↔다크 깜빡임 방지).
 useThemeStore.getState().init();
+// 카드 애니 토글 복원(저장값 / reduced-motion 선호 반영).
+useCardAnimStore.getState().init();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
