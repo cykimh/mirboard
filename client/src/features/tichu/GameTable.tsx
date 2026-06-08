@@ -322,7 +322,7 @@ export function GameTable({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                 <SeatAvatar seat={seat} size={32} isBot={botSeats.includes(seat)} />
-                <span className="seat-id">#{uid}{botSeats.includes(seat) && ' (봇)'}</span>
+                <span className="seat-id">#{uid}</span>
               </div>
               <div className="hand-count">
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}
