@@ -155,10 +155,15 @@ public sealed interface TichuEvent extends GameEvent
         }
     }
 
-    /** 매치 종료 (1000점 도달) 공개 알림. 동점일 때는 발행하지 않고 한 라운드 더 진행. */
+    /**
+     * 매치 종료 (1000점 도달) 공개 알림. 동점일 때는 발행하지 않고 한 라운드 더 진행.
+     * {@code mvpUserId}/{@code mvpStat}: 승리팀 MVP(P5). 탈주 종료 등 미산정 시 null.
+     */
     record MatchEnded(Team winningTeam,
                       Map<Team, Integer> finalScores,
-                      int roundsPlayed) implements TichuEvent {
+                      int roundsPlayed,
+                      Long mvpUserId,
+                      String mvpStat) implements TichuEvent {
         public MatchEnded {
             finalScores = Map.copyOf(finalScores);
         }

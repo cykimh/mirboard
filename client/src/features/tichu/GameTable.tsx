@@ -691,6 +691,28 @@ export function GameTable({
           <p>
             {t('match.ended.finalScore')} A {matchEnded.finalScores.A ?? 0} : {matchEnded.finalScores.B ?? 0} B
           </p>
+          {matchEnded.mvpUserId != null && (() => {
+            const mvpId = matchEnded.mvpUserId;
+            const mvpSeat = playerIds.indexOf(mvpId);
+            return (
+              <div className="match-mvp">
+                <span className="mvp-label">🏅 MVP</span>
+                <SeatAvatar
+                  seat={mvpSeat >= 0 ? mvpSeat : 0}
+                  userId={mvpId}
+                  size={44}
+                  isBot={botSeats.includes(mvpSeat)}
+                />
+                <span className="mvp-name">
+                  {usernames[mvpId] ?? `#${mvpId}`}
+                  {mvpId === myUserId ? ' (나!)' : ''}
+                </span>
+                {matchEnded.mvpStat && (
+                  <span className="mvp-stat">{matchEnded.mvpStat}</span>
+                )}
+              </div>
+            );
+          })()}
           {roundHistory.length > 0 && (
             <table className="score-history">
               <thead>

@@ -5,7 +5,10 @@ import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
+import com.mirboard.domain.game.tichu.scoring.MvpCalculator;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
+import com.mirboard.domain.game.tichu.scoring.SeatContribution;
+import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -65,7 +68,10 @@ public class MatchProgressService {
                 .findFirst()
                 .orElseGet(() -> new RoundScore(ended.teamAScore(), ended.teamBScore(), -1, false));
 
-        TichuMatchState afterRound = matchState.withRoundCompleted(lastScore);
+        // MVP 누적 — 종료된 라운드의 좌석별 기여(트릭/선언/완주)를 합산.
+        List<SeatContribution> roundContribs =
+                MvpCalculator.roundContributions(ended.players());
+        TichuMatchState afterRound = matchState.withRoundCompleted(lastScore, roundContribs);
         matchStateStore.save(roomId, afterRound);
 
         metrics.roundCompleted();
@@ -74,10 +80,15 @@ public class MatchProgressService {
                 afterRound.cumulativeA(), afterRound.cumulativeB());
 
         if (afterRound.isMatchOver()) {
+            Team winner = afterRound.winningTeam();
+            var mvp = MvpCalculator.select(
+                    afterRound.contributions(), room.playerIds(), winner, room.botSeats());
             outbound.add(new TichuEvent.MatchEnded(
-                    afterRound.winningTeam(),
+                    winner,
                     afterRound.scoresByTeam(),
-                    afterRound.roundScores().size()));
+                    afterRound.roundScores().size(),
+                    mvp.map(MvpCalculator.Mvp::userId).orElse(null),
+                    mvp.map(MvpCalculator.Mvp::stat).orElse(null)));
             events.publish(new TichuMatchCompleted(
                     roomId,
                     room.playerIds(),

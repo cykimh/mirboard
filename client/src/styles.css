@@ -438,6 +438,33 @@ a {
   color: #ffd180;
 }
 
+/* P5 — 승리 이펙트 뒤 매치 종료 패널의 MVP 강조 카드. */
+.match-mvp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(240, 192, 0, 0.12);
+  border: 1px solid rgba(255, 200, 0, 0.5);
+}
+
+.match-mvp .mvp-label {
+  font-weight: 900;
+  color: #ffd180;
+  letter-spacing: 0.5px;
+}
+
+.match-mvp .mvp-name {
+  font-weight: 700;
+}
+
+.match-mvp .mvp-stat {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
 /* Phase 16(#3) — 매치 종료 후 메인 복귀. */
 .match-exit {
   align-self: flex-start;

@@ -110,7 +110,9 @@ public class DesertionService {
                     List.<TichuEvent>of(new TichuEvent.MatchEnded(
                             winner,
                             matchState.scoresByTeam(),
-                            matchState.roundScores().size())),
+                            matchState.roundScores().size(),
+                            null,
+                            null)),
                     room.playerIds());
 
             roomService.markFinished(roomId);

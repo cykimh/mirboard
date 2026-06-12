@@ -2,11 +2,13 @@ package com.mirboard.domain.game.tichu.persistence;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
+import com.mirboard.domain.game.tichu.scoring.SeatContribution;
 import com.mirboard.domain.game.tichu.state.Team;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 /**
  * 한 매치 (여러 라운드 합산) 의 누적 상태. 라운드 단위 {@link
@@ -26,7 +28,8 @@ public record TichuMatchState(
         int cumulativeB,
         int roundNumber,
         List<RoundScore> roundScores,
-        int targetScore) {
+        int targetScore,
+        List<SeatContribution> contributions) {
 
     /** Phase 12 — 미지정/구 JSON 폴백 목표점수. */
     public static final int DEFAULT_TARGET = 1000;
@@ -34,6 +37,11 @@ public record TichuMatchState(
     public TichuMatchState {
         playerIds = List.copyOf(playerIds);
         roundScores = List.copyOf(roundScores);
+        // 구 JSON(누락) → 좌석별 0 으로 초기화. MVP 누적용(P5).
+        contributions = contributions == null
+                ? IntStream.range(0, playerIds.size())
+                        .mapToObj(SeatContribution::zero).toList()
+                : List.copyOf(contributions);
     }
 
     public static TichuMatchState initial(List<Long> playerIds) {
@@ -41,19 +49,34 @@ public record TichuMatchState(
     }
 
     public static TichuMatchState initial(List<Long> playerIds, int targetScore) {
-        return new TichuMatchState(playerIds, 0, 0, 1, List.of(), targetScore);
+        return new TichuMatchState(playerIds, 0, 0, 1, List.of(), targetScore, null);
     }
 
     public TichuMatchState withRoundCompleted(RoundScore score) {
+        return withRoundCompleted(score, List.of());
+    }
+
+    /** 라운드 종료 — 점수 누적 + 좌석별 기여도(MVP) 누적. */
+    public TichuMatchState withRoundCompleted(RoundScore score, List<SeatContribution> roundContribs) {
         List<RoundScore> next = new ArrayList<>(roundScores);
         next.add(score);
+        List<SeatContribution> mergedContribs = new ArrayList<>();
+        for (int seat = 0; seat < contributions.size(); seat++) {
+            int s = seat;
+            SeatContribution add = roundContribs.stream()
+                    .filter(c -> c.seat() == s)
+                    .findFirst()
+                    .orElse(SeatContribution.zero(s));
+            mergedContribs.add(contributions.get(seat).plus(add));
+        }
         return new TichuMatchState(
                 playerIds,
                 cumulativeA + score.teamAScore(),
                 cumulativeB + score.teamBScore(),
                 roundNumber + 1,
                 next,
-                targetScore);
+                targetScore,
+                mergedContribs);
     }
 
     /** 구 JSON (targetScore 누락 → 0) / 비정상 값은 1000 으로 폴백. */

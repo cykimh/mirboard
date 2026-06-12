@@ -29,6 +29,9 @@ export interface TichuRoomState {
     winningTeam: 'A' | 'B';
     finalScores: { A?: number; B?: number };
     roundsPlayed: number;
+    /** P5 — 승리팀 MVP userId/문구. 탈주 종료 등 미산정 시 null. */
+    mvpUserId?: number | null;
+    mvpStat?: string | null;
   } | null;
   /** Phase 15(#1): 매치 전체 라운드별 점수 누적 (ROUND_ENDED 누적; reset 시 비움). */
   roundHistory: {
@@ -111,6 +114,8 @@ interface MatchEndedPayload {
   winningTeam: 'A' | 'B';
   finalScores: { A?: number; B?: number };
   roundsPlayed: number;
+  mvpUserId?: number | null;
+  mvpStat?: string | null;
 }
 
 function teamOf(seat: number): 'A' | 'B' {
@@ -396,6 +401,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
             winningTeam: p.winningTeam,
             finalScores: p.finalScores,
             roundsPlayed: p.roundsPlayed,
+            mvpUserId: p.mvpUserId ?? null,
+            mvpStat: p.mvpStat ?? null,
           },
           lastSeq: seq ?? lastSeq,
         });

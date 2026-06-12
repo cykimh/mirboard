@@ -90,7 +90,7 @@ class TichuMatchStateTest {
     @Test
     void zero_target_falls_back_to_1000() {
         // 구 JSON 역직렬화 시 targetScore=0 → 1000 폴백.
-        TichuMatchState s = new TichuMatchState(IDS, 1100, 200, 5, java.util.List.of(), 0);
+        TichuMatchState s = new TichuMatchState(IDS, 1100, 200, 5, java.util.List.of(), 0, null);
         assertThat(s.effectiveTarget()).isEqualTo(1000);
         assertThat(s.isMatchOver()).isTrue();
     }
