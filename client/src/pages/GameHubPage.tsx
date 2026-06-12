@@ -30,7 +30,10 @@ import { Separator } from '@/components/ui/separator';
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
 } from '@/components/ui/avatar';
+import { avatarSrc } from '@/api/avatar';
+import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
 import {
   Table,
   TableBody,
@@ -59,6 +62,8 @@ export function GameHubPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
 
   const { messages, connected, send } = useLobbyStomp(token);
   const [draft, setDraft] = useState('');
@@ -139,11 +144,22 @@ export function GameHubPage() {
           <div className="flex items-center gap-3">
             {user && (
               <div className="flex items-center gap-2">
-                <Avatar>
-                  <AvatarFallback>
-                    {user.username.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <button
+                  type="button"
+                  onClick={() => setAvatarModalOpen(true)}
+                  title="아바타 설정"
+                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Avatar>
+                    <AvatarImage
+                      src={avatarSrc(user.userId, avatarVersion || undefined)}
+                      alt=""
+                    />
+                    <AvatarFallback>
+                      {user.username.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
                 <span className="text-sm font-medium">{user.username}</span>
               </div>
             )}
@@ -408,6 +424,17 @@ export function GameHubPage() {
             setError(msg);
             setShowCreateModal(false);
           }}
+        />
+      )}
+
+      {token && user && (
+        <AvatarSettingsModal
+          open={avatarModalOpen}
+          onClose={() => setAvatarModalOpen(false)}
+          token={token}
+          userId={user.userId}
+          username={user.username}
+          onChanged={() => setAvatarVersion((v) => v + 1)}
         />
       )}
     </div>

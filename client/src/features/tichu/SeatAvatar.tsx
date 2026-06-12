@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
+import { avatarSrc } from '@/api/avatar';
+
 interface SeatAvatarProps {
   seat: number;
-  /** 좌석에 앉은 사용자 id. 디폴트 동물 이모지를 결정적으로 고르는 데 사용. */
+  /** 좌석에 앉은 사용자 id. 업로드 아바타 조회 + 디폴트 동물 이모지 선택에 사용. */
   userId?: number;
   /** 표시 사이즈 (px). 기본 48. */
   size?: number;
@@ -20,12 +23,17 @@ function animalFor(userId: number | undefined, seat: number): string {
 }
 
 /**
- * 좌석 아바타 — userId 기반 디폴트 동물 이모지 + 팀 색(A=청, B=적) 링. 봇은 🤖.
- * (Phase 4: 업로드한 이미지가 있으면 그걸 우선 노출 예정 — 현재는 이모지 디폴트.)
+ * 좌석 아바타 — 업로드한 이미지가 있으면 그것(`/avatars/{userId}`), 없으면(404)
+ * userId 해시 동물 이모지로 폴백(D-80). 팀 색(A=청, B=적) 링. 봇은 🤖.
  */
 export function SeatAvatar({ seat, userId, size = 48, isBot = false }: SeatAvatarProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  // 좌석 주인이 바뀌면 이미지 시도를 다시 한다.
+  useEffect(() => setImgFailed(false), [userId]);
+
   const teamColor = seat % 2 === 0 ? '#5b8def' : '#e85d75';
   const glyph = isBot ? '🤖' : animalFor(userId, seat);
+  const showImg = !isBot && userId != null && !imgFailed;
 
   return (
     <span
@@ -44,7 +52,19 @@ export function SeatAvatar({ seat, userId, size = 48, isBot = false }: SeatAvata
       }}
       aria-label={isBot ? `Bot seat ${seat}` : `Seat ${seat}`}
     >
-      <span style={{ fontSize: size * 0.58 }}>{glyph}</span>
+      {showImg ? (
+        <img
+          src={avatarSrc(userId!)}
+          alt=""
+          width={size}
+          height={size}
+          onError={() => setImgFailed(true)}
+          draggable={false}
+          style={{ display: 'block', objectFit: 'cover', width: '100%', height: '100%' }}
+        />
+      ) : (
+        <span style={{ fontSize: size * 0.58 }}>{glyph}</span>
+      )}
     </span>
   );
 }

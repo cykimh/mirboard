@@ -6,6 +6,12 @@ spring:
     virtual:
       enabled: true
 
+  servlet:
+    multipart:
+      # 아바타 업로드(D-80). 서버에서 128px PNG 로 재인코딩하므로 원본 한도만 둔다.
+      max-file-size: 4MB
+      max-request-size: 5MB
+
   datasource:
     # Phase 7-1 (D-39) — PostgreSQL 16. MIRBOARD_DB_URL 로 전체 jdbc URL 을
     # 통째로 덮어쓸 수도 있고 (Fly/Supabase 형 secret), 그렇지 않으면 호스트/포트/디비
