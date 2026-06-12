@@ -38,6 +38,26 @@ public class UserController {
     }
 
     /**
+     * 좌석/참가자 표시용 userId→username 일괄 조회. `?ids=1,2,3` (최대 50개).
+     * username 은 공개 정보(랭킹에도 노출)이며 그 외 식별 정보는 반환하지 않음(D-02).
+     */
+    @GetMapping("/names")
+    public NamesResponse names(@RequestParam List<Long> ids) {
+        List<UserName> names = new ArrayList<>();
+        for (Long id : ids.stream().distinct().limit(50).toList()) {
+            userRepo.findById(id)
+                    .ifPresent(u -> names.add(new UserName(u.getId(), u.getUsername())));
+        }
+        return new NamesResponse(names);
+    }
+
+    public record UserName(long userId, String username) {
+    }
+
+    public record NamesResponse(List<UserName> names) {
+    }
+
+    /**
      * Phase 16(#5) — 유저 랭킹 (봇 제외, rating 내림차순). limit 1~100.
      * 식별 정보는 username 만 (D-02 schema constraint).
      */

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
+import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { useRoomMeta } from '@/ws/useRoomMeta';
@@ -37,6 +38,7 @@ export function RoomPage() {
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
+  const [usernames, setUsernames] = useState<Record<number, string>>({});
 
   // Phase 8A — 진입 시 1회만 join-or-reconnect 호출. 폴링과 분리.
   useEffect(() => {
@@ -72,6 +74,28 @@ export function RoomPage() {
     (r) => setRoom(r),
     () => setError('방이 종료되었습니다.'),
   );
+
+  // 좌석/참가자 표시용 username 일괄 조회. 참가자 집합이 바뀔 때만 재요청(최대 4명).
+  const playersKey = room?.playerIds.join(',') ?? '';
+  useEffect(() => {
+    if (!token || !room || room.playerIds.length === 0) return;
+    let cancelled = false;
+    usersApi
+      .names(token, room.playerIds)
+      .then((res) => {
+        if (cancelled) return;
+        setUsernames((prev) => {
+          const next = { ...prev };
+          for (const n of res.names) next[n.userId] = n.username;
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, playersKey]);
 
   const iAmPlayer = !!(room && user && room.playerIds.includes(user.userId));
   const iAmSpectator = !!(
@@ -171,6 +195,7 @@ export function RoomPage() {
           fillWithBots={room.fillWithBots ?? false}
           turnSeconds={room.turnSeconds ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
+          usernames={usernames}
           onExit={handleLeave}
         />
       </main>
@@ -230,7 +255,7 @@ export function RoomPage() {
                       className="flex items-center gap-2 rounded-md border p-2"
                     >
                       <code className="text-sm text-muted-foreground">
-                        #{id}
+                        {usernames[id] ?? `#${id}`}
                       </code>
                       {id === room.hostId && <Badge>호스트</Badge>}
                       {isBot && <Badge variant="secondary">봇</Badge>}

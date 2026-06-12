@@ -40,6 +40,8 @@ interface GameTableProps {
   turnSeconds?: number;
   /** 현재 관전자 수 (room.spectatorIds.length). 헤더 배지. */
   spectatorCount?: number;
+  /** userId→username 맵. 좌석에 #id 대신 닉네임 표시(없으면 #id 폴백). */
+  usernames?: Record<number, string>;
   /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
   onExit?: () => void;
 }
@@ -71,6 +73,7 @@ export function GameTable({
   fillWithBots = false,
   turnSeconds = 0,
   spectatorCount = 0,
+  usernames = {},
   onExit,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
@@ -438,8 +441,8 @@ export function GameTable({
                          ${submitted ? 'submitted' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                <SeatAvatar seat={seat} size={26} isBot={botSeats.includes(seat)} />
-                <span className="seat-id">#{uid}</span>
+                <SeatAvatar seat={seat} userId={uid} size={26} isBot={botSeats.includes(seat)} />
+                <span className="seat-id">{usernames[uid] ?? `#${uid}`}</span>
               </div>
               <div className="hand-count">
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}

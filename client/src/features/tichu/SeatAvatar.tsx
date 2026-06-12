@@ -1,21 +1,31 @@
-import { useState } from 'react';
-
 interface SeatAvatarProps {
   seat: number;
+  /** 좌석에 앉은 사용자 id. 디폴트 동물 이모지를 결정적으로 고르는 데 사용. */
+  userId?: number;
   /** 표시 사이즈 (px). 기본 48. */
   size?: number;
-  /** Phase 9D — 이 좌석이 봇이면 🤖 아이콘 + 봇 라벨로 차별화. */
+  /** Phase 9D — 이 좌석이 봇이면 🤖 아이콘으로 차별화. */
   isBot?: boolean;
 }
 
+/** 디폴트 동물 캐릭터 풀. userId 해시로 결정적 배정(에셋 파일 불필요). */
+const ANIMALS = [
+  '🐶', '🐱', '🦊', '🐼', '🐯', '🦁', '🐸', '🐵',
+  '🐰', '🐻', '🐨', '🐷', '🐹', '🐧', '🐢', '🐙',
+];
+
+function animalFor(userId: number | undefined, seat: number): string {
+  const n = userId ?? seat;
+  return ANIMALS[Math.abs(n) % ANIMALS.length];
+}
+
 /**
- * Phase 8F/9D — 좌석별 캐릭터 아바타. `/characters/seat-{0..3}.webp` 가 있으면 이미지,
- * 없으면 좌석 번호 숫자 fallback. 팀 색 (A=청, B=적) 으로 border. 봇이면 🤖 표시.
+ * 좌석 아바타 — userId 기반 디폴트 동물 이모지 + 팀 색(A=청, B=적) 링. 봇은 🤖.
+ * (Phase 4: 업로드한 이미지가 있으면 그걸 우선 노출 예정 — 현재는 이모지 디폴트.)
  */
-export function SeatAvatar({ seat, size = 48, isBot = false }: SeatAvatarProps) {
-  const [failed, setFailed] = useState(false);
+export function SeatAvatar({ seat, userId, size = 48, isBot = false }: SeatAvatarProps) {
   const teamColor = seat % 2 === 0 ? '#5b8def' : '#e85d75';
-  const src = `/characters/seat-${seat}.webp`;
+  const glyph = isBot ? '🤖' : animalFor(userId, seat);
 
   return (
     <span
@@ -29,28 +39,12 @@ export function SeatAvatar({ seat, size = 48, isBot = false }: SeatAvatarProps) 
         background: isBot ? '#2a2a30' : '#1a1a1f',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: size * 0.4,
-        fontWeight: 700,
-        color: teamColor,
+        lineHeight: 1,
         position: 'relative',
       }}
       aria-label={isBot ? `Bot seat ${seat}` : `Seat ${seat}`}
     >
-      {isBot ? (
-        <span style={{ fontSize: size * 0.55 }}>🤖</span>
-      ) : failed ? (
-        <span>{seat}</span>
-      ) : (
-        <img
-          src={src}
-          alt=""
-          width={size}
-          height={size}
-          onError={() => setFailed(true)}
-          draggable={false}
-          style={{ display: 'block', objectFit: 'cover', width: '100%', height: '100%' }}
-        />
-      )}
+      <span style={{ fontSize: size * 0.58 }}>{glyph}</span>
     </span>
   );
 }
