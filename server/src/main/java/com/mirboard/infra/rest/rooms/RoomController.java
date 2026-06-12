@@ -16,8 +16,10 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
+import com.mirboard.infra.ws.WsSessionRegistry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,15 +41,18 @@ public class RoomController {
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
     private final DesertionService desertion;
+    private final WsSessionRegistry sessions;
 
     public RoomController(RoomService rooms,
                           TichuGameStateStore stateStore,
                           TichuMatchStateStore matchStateStore,
-                          DesertionService desertion) {
+                          DesertionService desertion,
+                          WsSessionRegistry sessions) {
         this.rooms = rooms;
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.desertion = desertion;
+        this.sessions = sessions;
     }
 
     @GetMapping
@@ -178,7 +183,27 @@ public class RoomController {
                 TichuStateMapper.toTableView(state, matchState.scoresByTeam(),
                         matchState.roundNumber()),
                 // 관전자는 손패 없음 — TableView 만 받음.
-                seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null);
+                seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null,
+                disconnectedSeats(room, me.userId()));
+    }
+
+    /**
+     * 현재 끊겨 있는 플레이어 좌석 — resync 시 새 클라가 즉시 반영하도록. 라이브 세션이
+     * 없는 좌석을 끊김으로 본다. 봇 좌석(세션 없음)과 요청자 본인(지금 연결됨)은 제외.
+     */
+    private List<Integer> disconnectedSeats(Room room, long requesterId) {
+        List<Integer> result = new ArrayList<>();
+        List<Long> playerIds = room.playerIds();
+        for (int seat = 0; seat < playerIds.size(); seat++) {
+            long pid = playerIds.get(seat);
+            if (pid == requesterId || room.botSeats().contains(seat)) {
+                continue;
+            }
+            if (!sessions.hasLiveSession(pid, room.roomId())) {
+                result.add(seat);
+            }
+        }
+        return result;
     }
 
     public record CreateRequest(@NotBlank String name,
@@ -206,6 +231,7 @@ public class RoomController {
             String phase,
             long eventSeq,
             TableView tableView,
-            PrivateHand privateHand) {
+            PrivateHand privateHand,
+            List<Integer> disconnectedSeats) {
     }
 }

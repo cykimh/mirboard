@@ -19,7 +19,9 @@ class RoomDisconnectHandlerTest {
 
     private final RoomService roomService = mock(RoomService.class);
     private final DesertionGraceScheduler grace = mock(DesertionGraceScheduler.class);
-    private final RoomDisconnectHandler handler = new RoomDisconnectHandler(roomService, grace);
+    private final PlayerPresenceNotifier presence = mock(PlayerPresenceNotifier.class);
+    private final RoomDisconnectHandler handler =
+            new RoomDisconnectHandler(roomService, grace, presence);
 
     private static Room room(RoomStatus status, List<Long> players, Set<Long> spectators) {
         return new Room("r1", "방", "TICHU", players.isEmpty() ? 0L : players.get(0),
@@ -57,7 +59,30 @@ class RoomDisconnectHandlerTest {
         handler.onDisconnect("r1", 3L);
 
         verify(grace).scheduleGrace("r1", 3L);
+        // userId 3L = seat index 2 → 다른 좌석에 끊김 알림.
+        verify(presence).disconnected("r1", 2);
         verify(roomService, never()).leaveRoom("r1", 3L);
+    }
+
+    @Test
+    void reconnect_with_pending_grace_notifies_other_seats() {
+        when(grace.cancelIfPending("r1", 3L)).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(
+                room(RoomStatus.IN_GAME, List.of(1L, 2L, 3L, 4L), Set.of()));
+
+        handler.onReconnect("r1", 3L);
+
+        verify(presence).reconnected("r1", 2);
+    }
+
+    @Test
+    void reconnect_without_pending_grace_is_noop() {
+        when(grace.cancelIfPending("r1", 3L)).thenReturn(false);
+
+        handler.onReconnect("r1", 3L);
+
+        verifyNoInteractions(presence);
+        verify(roomService, never()).getRoom("r1");
     }
 
     @Test

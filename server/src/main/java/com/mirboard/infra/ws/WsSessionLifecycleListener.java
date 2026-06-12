@@ -54,7 +54,10 @@ public class WsSessionLifecycleListener {
         if (userId == null) {
             return;
         }
-        registry.register(sessionId, userId, m.group(1));
+        String roomId = m.group(1);
+        registry.register(sessionId, userId, roomId);
+        // 끊김 유예 중이던 플레이어가 방 토픽을 재구독 = 재접속 → 유예 취소 + 알림.
+        disconnectHandler.onReconnect(roomId, userId);
     }
 
     @EventListener

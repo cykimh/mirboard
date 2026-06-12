@@ -45,6 +45,38 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(useTichuStore.getState().tableView!.currentTurnSeat).toBe(0);
   });
 
+  it('PLAYER_DISCONNECTED/RECONNECTED toggles disconnectedSeats (seq 무관)', () => {
+    loadTable(baseTable(), 3);
+    const d = useTichuStore.getState().applyEvent({
+      type: 'PLAYER_DISCONNECTED',
+      payload: { seat: 2 },
+    });
+    expect(d).toBe('applied');
+    expect(useTichuStore.getState().disconnectedSeats.has(2)).toBe(true);
+    // seq 없는 메타 이벤트는 lastSeq 를 건드리지 않음.
+    expect(useTichuStore.getState().lastSeq).toBe(3);
+
+    const r = useTichuStore.getState().applyEvent({
+      type: 'PLAYER_RECONNECTED',
+      payload: { seat: 2 },
+    });
+    expect(r).toBe('applied');
+    expect(useTichuStore.getState().disconnectedSeats.has(2)).toBe(false);
+  });
+
+  it('applySnapshot seeds disconnectedSeats from resync', () => {
+    useTichuStore.getState().applySnapshot({
+      tableView: baseTable(),
+      privateHand: { seat: 0, cards: [] },
+      eventSeq: 5,
+      disconnectedSeats: [1, 3],
+    });
+    const s = useTichuStore.getState().disconnectedSeats;
+    expect(s.has(1)).toBe(true);
+    expect(s.has(3)).toBe(true);
+    expect(s.has(0)).toBe(false);
+  });
+
   it('detects gaps for resync fallback', () => {
     loadTable(baseTable(), 5);
     const r = useTichuStore.getState().applyEvent({

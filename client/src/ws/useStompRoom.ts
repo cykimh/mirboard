@@ -50,6 +50,7 @@ export function useStompRoom(roomId: string, token: string | null) {
         tableView: snap.tableView,
         privateHand: snap.privateHand,
         eventSeq: snap.eventSeq,
+        disconnectedSeats: snap.disconnectedSeats,
       });
     } catch (err) {
       setError((err as Error).message);

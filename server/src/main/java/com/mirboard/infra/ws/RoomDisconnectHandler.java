@@ -3,6 +3,7 @@ package com.mirboard.infra.ws;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.domain.lobby.room.RoomStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -26,11 +27,14 @@ public class RoomDisconnectHandler {
 
     private final RoomService roomService;
     private final DesertionGraceScheduler graceScheduler;
+    private final PlayerPresenceNotifier presence;
 
     public RoomDisconnectHandler(RoomService roomService,
-                                 DesertionGraceScheduler graceScheduler) {
+                                 DesertionGraceScheduler graceScheduler,
+                                 PlayerPresenceNotifier presence) {
         this.roomService = roomService;
         this.graceScheduler = graceScheduler;
+        this.presence = presence;
     }
 
     public void onDisconnect(String roomId, long userId) {
@@ -54,6 +58,10 @@ public class RoomDisconnectHandler {
                 // 플레이어만 탈주 유예 대상 — 관전자 끊김은 게임 영향 없음.
                 if (room.playerIds().contains(userId)) {
                     graceScheduler.scheduleGrace(roomId, userId);
+                    int seat = room.playerIds().indexOf(userId);
+                    if (seat >= 0) {
+                        presence.disconnected(roomId, seat);
+                    }
                 } else if (room.spectatorIds().contains(userId)) {
                     roomService.stopSpectating(roomId, userId);
                 }
@@ -61,6 +69,29 @@ public class RoomDisconnectHandler {
             case FINISHED -> {
                 /* no-op */
             }
+        }
+    }
+
+    /**
+     * 방 토픽 재구독(재접속) 시 호출. 해당 유저에 대기 중인 탈주 유예가 있었으면
+     * 취소하고 다른 좌석에 RECONNECTED 를 알린다(= 끊겼다가 돌아옴). 유예가 없었으면
+     * 일반 구독이므로 아무 것도 하지 않는다(getRoom 조회도 생략).
+     */
+    public void onReconnect(String roomId, long userId) {
+        if (!graceScheduler.cancelIfPending(roomId, userId)) {
+            return;
+        }
+        try {
+            Room room = roomService.getRoom(roomId);
+            if (room.status() != RoomStatus.IN_GAME) {
+                return;
+            }
+            int seat = room.playerIds().indexOf(userId);
+            if (seat >= 0) {
+                presence.reconnected(roomId, seat);
+            }
+        } catch (RoomNotFoundException ignored) {
+            // 이미 소멸 — 알릴 대상 없음.
         }
     }
 }

@@ -75,6 +75,21 @@ public class DesertionGraceScheduler {
         }
     }
 
+    /**
+     * 재접속 시 호출 — 해당 (room,user) 에 대기 중인 탈주 유예가 있으면 즉시 취소하고
+     * {@code true} 를 반환한다(= 실제로 끊겼다가 돌아온 경우). 유예가 없었으면
+     * {@code false}(일반 구독). 호출자는 true 일 때만 RECONNECTED 알림을 보낸다.
+     */
+    public boolean cancelIfPending(String roomId, long userId) {
+        ScheduledFuture<?> prev = futures.remove(key(roomId, userId));
+        if (prev == null) {
+            return false;
+        }
+        prev.cancel(false);
+        log.info("Desertion grace cancelled (reconnect): roomId={} userId={}", roomId, userId);
+        return true;
+    }
+
     private static String key(String roomId, long userId) {
         return roomId + ":" + userId;
     }

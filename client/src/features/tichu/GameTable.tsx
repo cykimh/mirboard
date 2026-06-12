@@ -100,6 +100,7 @@ export function GameTable({
   const roundEnded = useTichuStore((s) => s.roundEnded);
   const matchEnded = useTichuStore((s) => s.matchEnded);
   const roundHistory = useTichuStore((s) => s.roundHistory);
+  const disconnectedSeats = useTichuStore((s) => s.disconnectedSeats);
   const setError = useTichuStore((s) => s.setError);
   const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
 
@@ -428,6 +429,7 @@ export function GameTable({
           const submitted =
             isInPassing && tableView.passingSubmittedSeats.includes(seat);
           const turnHighlight = isInPlaying && seat === tableView.currentTurnSeat;
+          const disconnected = disconnectedSeats.has(seat);
           // Phase 8E — 본인 시점 좌석 매핑. mySeat 기준 회전 후 (S/W/N/E) 배치.
           // viewIdx 0=South(본인), 1=West(우적), 2=North(파트너), 3=East(좌적).
           const viewIdx = ((seat - mySeat) + 4) % 4;
@@ -438,7 +440,8 @@ export function GameTable({
               className={`seat seat-${viewPos} ${turnHighlight ? 'turn' : ''}
                          ${tableView.finishingOrder.includes(seat) ? 'finished' : ''}
                          ${ready ? 'ready' : ''}
-                         ${submitted ? 'submitted' : ''}`}
+                         ${submitted ? 'submitted' : ''}
+                         ${disconnected ? 'disconnected' : ''}`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                 <SeatAvatar seat={seat} userId={uid} size={26} isBot={botSeats.includes(seat)} />
@@ -460,6 +463,9 @@ export function GameTable({
               )}
               {ready && <div className="status-tag">{t('seat.ready')}</div>}
               {submitted && <div className="status-tag">{t('seat.submitted')}</div>}
+              {disconnected && (
+                <div className="status-tag disconnected-tag">🔌 연결 끊김</div>
+              )}
             </div>
           );
         })}

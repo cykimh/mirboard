@@ -39,12 +39,19 @@ export interface TichuRoomState {
   }[];
   /** Phase 15(#6): 현재 차례 시작 시각(클라 epoch ms). 턴 카운트다운 표시용. */
   turnStartedAt: number | null;
+  /** 현재 연결이 끊긴 플레이어 좌석 — PLAYER_DISCONNECTED/RECONNECTED + resync 로 동기화. */
+  disconnectedSeats: Set<number>;
 }
 
 export interface TichuActions {
   reset: (roomId: string) => void;
   applySnapshot: (
-    snapshot: { tableView: TableView; privateHand: PrivateHand; eventSeq: number },
+    snapshot: {
+      tableView: TableView;
+      privateHand: PrivateHand;
+      eventSeq: number;
+      disconnectedSeats?: number[];
+    },
   ) => void;
   applyTableView: (table: TableView, seq?: number) => void;
   applyPrivateHand: (hand: PrivateHand) => void;
@@ -193,6 +200,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   matchEnded: null,
   roundHistory: [],
   turnStartedAt: null,
+  disconnectedSeats: new Set(),
 
   reset(roomId) {
     set({
@@ -209,10 +217,11 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       matchEnded: null,
       roundHistory: [],
       turnStartedAt: null,
+      disconnectedSeats: new Set(),
     });
   },
 
-  applySnapshot({ tableView, privateHand, eventSeq }) {
+  applySnapshot({ tableView, privateHand, eventSeq, disconnectedSeats }) {
     set({
       tableView,
       privateHand,
@@ -220,6 +229,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       errorMessage: null,
       // 재동기화 시 카운트다운은 정확한 잔여시간을 알 수 없으므로 현재시각 기준 근사.
       turnStartedAt: Date.now(),
+      disconnectedSeats: new Set(disconnectedSeats ?? []),
     });
   },
 
@@ -363,6 +373,20 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
           ],
           lastSeq: seq ?? lastSeq,
         }));
+        return 'applied';
+      }
+      case 'PLAYER_DISCONNECTED': {
+        const p = envelope.payload as { seat: number };
+        const next = new Set(get().disconnectedSeats);
+        next.add(p.seat);
+        set({ disconnectedSeats: next, lastSeq: seq ?? lastSeq });
+        return 'applied';
+      }
+      case 'PLAYER_RECONNECTED': {
+        const p = envelope.payload as { seat: number };
+        const next = new Set(get().disconnectedSeats);
+        next.delete(p.seat);
+        set({ disconnectedSeats: next, lastSeq: seq ?? lastSeq });
         return 'applied';
       }
       case 'MATCH_ENDED': {
