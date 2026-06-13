@@ -49,6 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `domain.game.tichu` 는 `domain.game.core` 인터페이스만 의존.
 - `infra/ws/*`, `infra/rest/*` 컨트롤러는 도메인 서비스를 호출만 한다. **룰 로직 금지**.
 - 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록 → 카탈로그/방 생성/엔진 디스패치가 자동 연결됨. 로비/허브 컨트롤러 수정 불필요.
+- 정적·이미지 서빙 엔드포인트는 `/api/**` **밖**에 둔다 — `<img>`/브라우저 직접 요청은 Bearer 토큰(localStorage JWT)을 못 싣고, SecurityConfig 가 비-`/api` 를 default-permit. 민감 API 는 여전히 `/api/**` 하위(예: 아바타 조회 `/avatars/{userId}` 공개, 업로드 `/api/me/avatar` 인증).
 
 ## 기술 스택 결정사항
 
@@ -67,6 +68,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `HandType`, `GameAction`, `GameEvent` 는 **sealed interface** 로 정의 → `switch` 표현식 패턴 매칭으로 누락 케이스를 컴파일러가 강제 검출.
 - 상태 객체 (`TichuState`, `TrickState`, `Card`) 는 **record** + `with*` 메서드로 불변 전이.
 - WebSocket/STOMP 핸들러는 가상 스레드 위에서 실행되어 동시 게임 수 증가 시에도 스레드 풀 고갈 없음.
+- JPA `byte[]` 컬럼은 PostgreSQL 에서 `@JdbcTypeCode(SqlTypes.VARBINARY)` 명시(미지정 시 oid/Large Object 매핑 → `ddl-auto: validate` 기동 실패).
+- JSON 으로 영속되는 record(예: `TichuMatchState`)에 필드 추가 시 compact constructor 에서 null 정규화(구 JSON 역직렬화 호환).
 
 ## 사용자 플로우
 
@@ -120,6 +123,10 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ```bash
 ./gradlew :server:bootRun
 ./gradlew :server:test
+./gradlew :server:compileJava -q   # 테스트 없이 빠른 컴파일 확인 (편집 중 점검)
+# 커밋 시 pre-commit 훅 check:fast(클라 tsc + vitest + 서버 compile)가 자동 게이트.
+# 새 마이그레이션/엔티티는 IT 1개(예: AuthFlowIntegrationTest) 기동으로 검증 —
+# 풀 컨텍스트가 Flyway 적용 + Hibernate ddl-auto:validate 스키마 대조.
 ./gradlew :server:test --tests "com.mirboard.domain.lobby.auth.JwtServiceTest"
 ./gradlew :server:test --tests "com.mirboard.domain.lobby.auth.AuthServiceTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.core.GameRegistryTest"
@@ -228,5 +235,6 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 ## 기타 운영 메모
 
 - 한국어 사용자 — 응답/주석/문서는 한국어로 작성.
-- Windows 환경 (`C:\workspace\mirboard\`). 셸은 bash. 파일 경로는 forward slash 권장.
+- 환경: macOS (`/Users/yupchang/Developer/mirboard`). 셸은 zsh, Bash 작업디렉토리는 호출 간 유지되므로 `npm --prefix client` 등은 repo 루트 절대경로에서 실행.
+- 라우트 가드(ProtectedRoute)가 읽는 시작 상태는 `main.tsx` 에서 **렌더 전 동기** 복원(`init()`/`loadFromStorage()`) — useEffect 복원은 첫 렌더에서 `/login` 으로 튕기는 레이스. zustand 토글 스토어(theme/cardAnim/auth) 공통.
 - Phase 1 산출물(`docs/*.md`, `V1__init.sql`)을 변경하려면 그 자체가 설계 변경. 코드보다 먼저 docs를 고치고 사용자 승인을 받을 것.
