@@ -320,7 +320,7 @@ a {
   padding: 4px;
   border-radius: 6px;
   border: 2px solid #555;
-  background: var(--color-bg-surface-elevated);
+  background: #ffffff;
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -331,7 +331,7 @@ a {
 }
 
 .card-chip:hover:not(:disabled) {
-  background: #36363f;
+  background: #f0f0f0;
 }
 
 /* Phase 8E — 본인 손패 카드 호버 시 살짝 떠오르기 + z-index 상승. */
@@ -342,7 +342,7 @@ a {
 }
 
 .card-chip.selected {
-  background: #3a4a3a;
+  background: #e0f2e9;
   transform: translateY(-6px);
   border-color: var(--color-success);
 }
