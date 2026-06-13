@@ -38,3 +38,7 @@ logs/
 
 # Docker volume mounts created locally
 docker-data/
+
+# Claude Code (로컬 전용 — 공유 금지)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
