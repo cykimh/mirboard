@@ -43,11 +43,10 @@ public class UserController {
      */
     @GetMapping("/names")
     public NamesResponse names(@RequestParam List<Long> ids) {
-        List<UserName> names = new ArrayList<>();
-        for (Long id : ids.stream().distinct().limit(50).toList()) {
-            userRepo.findById(id)
-                    .ifPresent(u -> names.add(new UserName(u.getId(), u.getUsername())));
-        }
+        List<Long> distinct = ids.stream().distinct().limit(50).toList();
+        List<UserName> names = userRepo.findAllById(distinct).stream()
+                .map(u -> new UserName(u.getId(), u.getUsername()))
+                .toList();
         return new NamesResponse(names);
     }
 

@@ -13,12 +13,14 @@ import com.mirboard.domain.lobby.room.NotInRoomException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.RoomFullException;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
+import com.mirboard.infra.rest.me.InvalidAvatarException;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -113,6 +115,18 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorEnvelope.of("RESYNC_NOT_AVAILABLE",
                         "No active game state to resync",
                         Map.of("roomId", e.roomId())));
+    }
+
+    @ExceptionHandler(InvalidAvatarException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInvalidAvatar(InvalidAvatarException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("INVALID_AVATAR", e.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleMaxUpload(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(413) // 413 Content Too Large
+                .body(ApiErrorEnvelope.of("AVATAR_TOO_LARGE", "이미지가 너무 큽니다(최대 4MB)"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

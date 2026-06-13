@@ -7,18 +7,23 @@ export type EffectKind =
   | 'TICHU_DECLARED'
   | 'MATCH_VICTORY';
 
+/** MATCH_VICTORY 연출 톤 — 본인 승/패/관전(중립)에 따라 다르게 렌더. */
+export type EffectTone = 'win' | 'lose' | 'neutral';
+
 export interface ActiveEffect {
   id: number;
   kind: EffectKind;
   /** TICHU_DECLARED 전용 — 배너에 표시할 문구 (예: "🔔 티츄! · 시트 2"). */
   text?: string;
+  /** MATCH_VICTORY 전용 — 승/패/중립 톤. */
+  tone?: EffectTone;
   /** 자동 해제 epoch ms. */
   expiresAt: number;
 }
 
 interface EffectState {
   active: ActiveEffect | null;
-  trigger: (kind: EffectKind, text?: string) => void;
+  trigger: (kind: EffectKind, text?: string, tone?: EffectTone) => void;
   clear: () => void;
 }
 
@@ -39,10 +44,10 @@ let nextId = 1;
  */
 export const useEffectStore = create<EffectState>((set) => ({
   active: null,
-  trigger: (kind, text) => {
+  trigger: (kind, text, tone) => {
     const id = nextId++;
     set({
-      active: { id, kind, text, expiresAt: Date.now() + DURATION_BY_KIND[kind] },
+      active: { id, kind, text, tone, expiresAt: Date.now() + DURATION_BY_KIND[kind] },
     });
   },
   clear: () => set({ active: null }),

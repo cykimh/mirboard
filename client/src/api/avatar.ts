@@ -36,7 +36,7 @@ export const avatarApi = {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok && res.status !== 204) {
+    if (!res.ok) {
       throw new Error(await errorMessage(res, '아바타 삭제에 실패했습니다'));
     }
   },

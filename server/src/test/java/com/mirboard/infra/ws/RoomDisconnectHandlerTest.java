@@ -20,8 +20,9 @@ class RoomDisconnectHandlerTest {
     private final RoomService roomService = mock(RoomService.class);
     private final DesertionGraceScheduler grace = mock(DesertionGraceScheduler.class);
     private final PlayerPresenceNotifier presence = mock(PlayerPresenceNotifier.class);
+    private final WsSessionRegistry sessions = mock(WsSessionRegistry.class);
     private final RoomDisconnectHandler handler =
-            new RoomDisconnectHandler(roomService, grace, presence);
+            new RoomDisconnectHandler(roomService, grace, presence, sessions);
 
     private static Room room(RoomStatus status, List<Long> players, Set<Long> spectators) {
         return new Room("r1", "방", "TICHU", players.isEmpty() ? 0L : players.get(0),
@@ -62,6 +63,19 @@ class RoomDisconnectHandlerTest {
         // userId 3L = seat index 2 → 다른 좌석에 끊김 알림.
         verify(presence).disconnected("r1", 2);
         verify(roomService, never()).leaveRoom("r1", 3L);
+    }
+
+    @Test
+    void in_game_disconnect_with_live_session_skips_grace_and_notify() {
+        when(roomService.getRoom("r1")).thenReturn(
+                room(RoomStatus.IN_GAME, List.of(1L, 2L, 3L, 4L), Set.of()));
+        // 모바일 재접속: 새 세션이 먼저 등록된 상태에서 옛 소켓 close 가 도착.
+        when(sessions.hasLiveSession(3L, "r1")).thenReturn(true);
+
+        handler.onDisconnect("r1", 3L);
+
+        verify(grace, never()).scheduleGrace("r1", 3L);
+        verify(presence, never()).disconnected("r1", 2);
     }
 
     @Test

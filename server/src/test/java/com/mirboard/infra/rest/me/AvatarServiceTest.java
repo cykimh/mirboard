@@ -33,18 +33,27 @@ class AvatarServiceTest {
     @Test
     void rejects_non_image_bytes() {
         assertThatThrownBy(() -> service.normalizeToPng("not an image".getBytes()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidAvatarException.class);
     }
 
     @Test
     void rejects_empty() {
         assertThatThrownBy(() -> service.normalizeToPng(new byte[0]))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidAvatarException.class);
     }
 
     @Test
     void rejects_oversized() {
         assertThatThrownBy(() -> service.normalizeToPng(new byte[5 * 1024 * 1024]))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidAvatarException.class);
+    }
+
+    @Test
+    void rejects_oversized_dimensions_before_decoding() throws Exception {
+        // 압축 바이트는 작지만 헤더가 4096px 초과 → 디코드(거대 raster 할당) 전에 거부.
+        byte[] png = pngOf(AvatarService.MAX_DIMENSION + 4, 64);
+        assertThatThrownBy(() -> service.normalizeToPng(png))
+                .isInstanceOf(InvalidAvatarException.class)
+                .hasMessageContaining("해상도");
     }
 }

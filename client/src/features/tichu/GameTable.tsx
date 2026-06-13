@@ -149,16 +149,15 @@ export function GameTable({
     tableView.currentTop.cards.length === 1 &&
     tableView.currentTop.cards[0].special === 'DRAGON';
 
-  // 매치 종료 시 승리 연출 1회 트리거. mySeat 으로 승/패 문구 분기(관전자는 승리팀).
+  // 매치 종료 시 연출 1회 트리거. mySeat 으로 승/패/관전(중립) 분기 — 패배 시 트로피
+  // 축하가 아니라 차분한 muted 연출(EffectsOverlay 가 tone 으로 렌더).
   useEffect(() => {
     if (!matchEnded) return;
+    const won = mySeat >= 0 ? matchEnded.winningTeam === myTeam : null;
     const text =
-      mySeat >= 0
-        ? matchEnded.winningTeam === myTeam
-          ? '🏆 승리!'
-          : '아쉽게 패배'
-        : `Team ${matchEnded.winningTeam} 승리`;
-    triggerEffect('MATCH_VICTORY', text);
+      won === null ? `Team ${matchEnded.winningTeam} 승리` : won ? '🏆 승리!' : '아쉽게 패배';
+    const tone = won === null ? 'neutral' : won ? 'win' : 'lose';
+    triggerEffect('MATCH_VICTORY', text, tone);
   }, [matchEnded, myTeam, mySeat, triggerEffect]);
 
   const selectedCards = useMemo<Card[]>(() => {

@@ -50,15 +50,13 @@ public class AvatarController {
             throw new ResponseStatusException(UNAUTHORIZED);
         }
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다");
+            throw new InvalidAvatarException("파일이 비어 있습니다");
         }
         byte[] png;
         try {
             png = avatarService.normalizeToPng(file.getBytes());
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 읽을 수 없습니다");
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+            throw new InvalidAvatarException("파일을 읽을 수 없습니다");
         }
         // user_id 가 assigned PK 라 save() 는 upsert(없으면 insert / 있으면 merge).
         avatars.save(new UserAvatar(me.userId(), png, "image/png", Instant.now(clock)));

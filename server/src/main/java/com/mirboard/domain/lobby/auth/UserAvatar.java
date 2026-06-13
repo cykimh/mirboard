@@ -4,7 +4,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Clock;
 import java.time.Instant;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -42,12 +41,6 @@ public class UserAvatar {
         this.image = image;
         this.contentType = contentType;
         this.updatedAt = updatedAt;
-    }
-
-    public void update(byte[] image, String contentType, Clock clock) {
-        this.image = image;
-        this.contentType = contentType;
-        this.updatedAt = Instant.now(clock);
     }
 
     public Long getUserId() {

@@ -28,13 +28,16 @@ public class RoomDisconnectHandler {
     private final RoomService roomService;
     private final DesertionGraceScheduler graceScheduler;
     private final PlayerPresenceNotifier presence;
+    private final WsSessionRegistry sessions;
 
     public RoomDisconnectHandler(RoomService roomService,
                                  DesertionGraceScheduler graceScheduler,
-                                 PlayerPresenceNotifier presence) {
+                                 PlayerPresenceNotifier presence,
+                                 WsSessionRegistry sessions) {
         this.roomService = roomService;
         this.graceScheduler = graceScheduler;
         this.presence = presence;
+        this.sessions = sessions;
     }
 
     public void onDisconnect(String roomId, long userId) {
@@ -57,6 +60,13 @@ public class RoomDisconnectHandler {
             case IN_GAME -> {
                 // 플레이어만 탈주 유예 대상 — 관전자 끊김은 게임 영향 없음.
                 if (room.playerIds().contains(userId)) {
+                    // 모바일 재접속: 새 소켓 SUBSCRIBE 가 옛 소켓의 늦은 close 보다 먼저
+                    // 처리되면, 이 끊김 시점에 이미 같은 방의 라이브 세션이 있다. 그러면
+                    // 실제로는 접속 중이므로 유예/끊김 알림을 건너뛴다 — 거짓 '연결 끊김'
+                    // 배지가 다른 좌석에 영구히 남는 것을 방지(RECONNECTED 가 안 와서 안 지워짐).
+                    if (sessions.hasLiveSession(userId, roomId)) {
+                        return;
+                    }
                     graceScheduler.scheduleGrace(roomId, userId);
                     int seat = room.playerIds().indexOf(userId);
                     if (seat >= 0) {

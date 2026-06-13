@@ -25,8 +25,9 @@ export function EffectsOverlay() {
 
   if (!active) return null;
 
-  // 매치 종료 승리 연출 — 중앙 대형 트로피 배너. text 에 승/패 문구.
+  // 매치 종료 연출 — 본인 기준 승(금빛 트로피 축하)/패(차분한 muted)/관전(중립=승리팀).
   if (active.kind === 'MATCH_VICTORY') {
+    const lose = active.tone === 'lose';
     return (
       <div
         key={active.id}
@@ -40,31 +41,34 @@ export function EffectsOverlay() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: 12,
-          background:
-            'radial-gradient(ellipse at center, rgba(240,192,0,0.18) 0%, rgba(0,0,0,0) 60%)',
+          background: lose
+            ? 'radial-gradient(ellipse at center, rgba(80,90,110,0.22) 0%, rgba(0,0,0,0) 60%)'
+            : 'radial-gradient(ellipse at center, rgba(240,192,0,0.18) 0%, rgba(0,0,0,0) 60%)',
         }}
       >
         <div
           style={{
-            fontSize: 96,
+            fontSize: lose ? 64 : 96,
             lineHeight: 1,
             animation: 'mirboard-fx-pop 3.5s ease-out forwards',
-            filter: 'drop-shadow(0 0 24px rgba(255,200,0,0.8))',
+            filter: lose ? 'none' : 'drop-shadow(0 0 24px rgba(255,200,0,0.8))',
           }}
         >
-          🏆
+          {lose ? '🙇' : '🏆'}
         </div>
         <div
           style={{
             padding: '16px 40px',
             borderRadius: 16,
-            background: 'rgba(240, 192, 0, 0.94)',
-            color: '#1a1a1f',
-            fontSize: 40,
+            background: lose ? 'rgba(60, 68, 84, 0.92)' : 'rgba(240, 192, 0, 0.94)',
+            color: lose ? '#eef2f7' : '#1a1a1f',
+            fontSize: lose ? 32 : 40,
             fontWeight: 900,
             letterSpacing: 1,
             textAlign: 'center',
-            boxShadow: '0 0 40px 8px rgba(255, 200, 0, 0.7)',
+            boxShadow: lose
+              ? '0 0 24px 4px rgba(0, 0, 0, 0.4)'
+              : '0 0 40px 8px rgba(255, 200, 0, 0.7)',
             animation: 'mirboard-fx-pop 3.5s ease-out forwards',
           }}
         >
