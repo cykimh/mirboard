@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
+import { ReactionFloats } from './ReactionFloats';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 
 interface GameTableProps {
@@ -58,6 +59,9 @@ interface FlyState {
   settled: boolean;
 }
 
+/** P2(7) — 빠른 이모지 반응 팔레트(서버 화이트리스트와 일치). */
+const REACTIONS = ['👍', '😂', '😮', '😢', '🔥', '👏', '❤️', '🎉'];
+
 const PASS_SLOT_LABEL: Record<PassSlot, string> = {
   left: t('pass.slot.left'),
   partner: t('pass.slot.partner'),
@@ -77,8 +81,10 @@ export function GameTable({
   onExit,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(roomId, token);
+  const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
+    useStompRoom(roomId, token);
   const [chatOpen, setChatOpen] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
   const { muted, toggleMute } = useSfx();
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
@@ -413,6 +419,34 @@ export function GameTable({
         >
           {cardAnimEnabled ? '🎴' : '⏸'}
         </Button>
+        <div className="reaction-bar">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setReactionOpen((v) => !v)}
+            aria-label="이모지 반응"
+            title="이모지 반응"
+          >
+            😀
+          </Button>
+          {reactionOpen && (
+            <div className="reaction-palette">
+              {REACTIONS.map((e) => (
+                <button
+                  type="button"
+                  key={e}
+                  onClick={() => {
+                    sendReaction(e);
+                    setReactionOpen(false);
+                  }}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <Button
           type="button"
           variant="outline"
@@ -555,6 +589,7 @@ export function GameTable({
           <TurnCountdown turnSeconds={turnSeconds} />
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
+        <ReactionFloats mySeat={mySeat} />
       </div>
 
       {!spectator && (

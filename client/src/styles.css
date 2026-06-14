@@ -780,6 +780,66 @@ a {
   transform: translateY(-50%);
 }
 
+/* P2(7) — 좌석 이모지 반응. 발신 좌석에서 위로 떠오르며 사라짐(내부 glyph 가 애니,
+   외부 div 는 좌석 좌표 앵커 — 중심 정렬 transform 충돌 회피). */
+.reaction-float {
+  position: absolute;
+  z-index: 32;
+  pointer-events: none;
+}
+
+.reaction-s { left: 50%; bottom: 92px; transform: translateX(-50%); }
+.reaction-n { left: 50%; top: 70px; transform: translateX(-50%); }
+.reaction-w { right: 70px; top: 50%; transform: translateY(-50%); }
+.reaction-e { left: 70px; top: 50%; transform: translateY(-50%); }
+
+.reaction-glyph {
+  display: block;
+  font-size: 2.4rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: reaction-float-up 2.6s ease-out forwards;
+}
+
+@keyframes reaction-float-up {
+  0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+  15%  { transform: translateY(-8px) scale(1.15); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(-70px) scale(0.9); opacity: 0; }
+}
+
+/* 헤더 반응 버튼 + 팔레트. */
+.reaction-bar {
+  position: relative;
+}
+
+.reaction-palette {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.reaction-palette button {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 4px 5px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.reaction-palette button:hover {
+  background: var(--color-border-subtle);
+}
+
 /* --- Phase 5b: 좌석 상태 태그 --- */
 .seat.ready {
   border-color: #66bb6a;

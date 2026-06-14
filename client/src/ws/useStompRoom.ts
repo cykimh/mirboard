@@ -2,6 +2,7 @@ import { Client } from '@stomp/stompjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { roomsApi } from '@/api/rooms';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
+import { useReactionStore } from '@/features/chat/reactionStore';
 import { useTichuStore } from '@/features/tichu/tichuStore';
 import type { Card, ResyncResponse } from '@/types/tichu';
 import type { StompEnvelope } from '@/types/stomp';
@@ -39,6 +40,8 @@ export function useStompRoom(roomId: string, token: string | null) {
   const reset = useTichuStore((s) => s.reset);
   const resetChat = useRoomChatStore((s) => s.reset);
   const appendChat = useRoomChatStore((s) => s.appendIncoming);
+  const appendReaction = useReactionStore((s) => s.add);
+  const resetReactions = useReactionStore((s) => s.reset);
   /** GameTable 에서 채팅 패널 열림 여부를 ref 로 넘겨주면 appendChat 가 unreadCount 분기. */
   const chatPanelOpenRef = useRef(false);
 
@@ -60,8 +63,9 @@ export function useStompRoom(roomId: string, token: string | null) {
   useEffect(() => {
     reset(roomId);
     resetChat(roomId);
+    resetReactions();
     resync();
-  }, [roomId, reset, resetChat, resync]);
+  }, [roomId, reset, resetChat, resetReactions, resync]);
 
   useEffect(() => {
     if (!token) return;
@@ -109,6 +113,15 @@ export function useStompRoom(roomId: string, token: string | null) {
             },
             chatPanelOpenRef.current,
           );
+        });
+        // P2(7) — 이모지 반응 구독.
+        client.subscribe(`/topic/room/${roomId}/reaction`, (frame) => {
+          const env = JSON.parse(frame.body) as StompEnvelope<{
+            fromSeat: number;
+            emoji: string;
+          }>;
+          if (env.type !== 'REACTION') return;
+          appendReaction(env.payload.fromSeat, env.payload.emoji);
         });
       },
       onDisconnect: () => setConnected(false),
@@ -164,5 +177,17 @@ export function useStompRoom(roomId: string, token: string | null) {
     [roomId],
   );
 
-  return { connected, sendAction, sendChat, chatPanelOpenRef };
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      const client = clientRef.current;
+      if (!client?.connected) return;
+      client.publish({
+        destination: `/app/room/${roomId}/reaction`,
+        body: JSON.stringify({ emoji }),
+      });
+    },
+    [roomId],
+  );
+
+  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef };
 }
