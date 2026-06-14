@@ -344,6 +344,14 @@ export function GameTable({
       ? t('game.phase.playing')
       : t('game.phase.roundEnd');
 
+  // P3(8) — 티츄 선언 시 경기장 틴트: 그랜드=빨강 우선, 일반=파랑(라운드 동안 지속).
+  const declValues = Object.values(tableView.declarations ?? {});
+  const arenaTint = declValues.includes('GRAND_TICHU')
+    ? 'arena-tint-grand'
+    : declValues.includes('TICHU')
+    ? 'arena-tint-tichu'
+    : '';
+
   return (
     <div
       className="game-table-layout"
@@ -422,13 +430,21 @@ export function GameTable({
         </Button>
       </header>
 
-      <div className="table-arena" ref={arenaRef}>
+      <div className={`table-arena ${arenaTint}`} ref={arenaRef}>
         {playerIds.map((uid, seat) => {
           const ready = isInDealing && tableView.readySeats.includes(seat);
           const submitted =
             isInPassing && tableView.passingSubmittedSeats.includes(seat);
           const turnHighlight = isInPlaying && seat === tableView.currentTurnSeat;
           const disconnected = disconnectedSeats.has(seat);
+          // P3(8) — 선언 좌석 불타오르는 효과(그랜드=빨강, 일반=주황).
+          const decl = tableView.declarations[seat];
+          const flame =
+            decl && decl !== 'NONE'
+              ? decl === 'GRAND_TICHU'
+                ? 'flame flame-grand'
+                : 'flame'
+              : '';
           // Phase 8E — 본인 시점 좌석 매핑. mySeat 기준 회전 후 (S/W/N/E) 배치.
           // viewIdx 0=South(본인), 1=West(우적), 2=North(파트너), 3=East(좌적).
           const viewIdx = ((seat - mySeat) + 4) % 4;
@@ -440,7 +456,8 @@ export function GameTable({
                          ${tableView.finishingOrder.includes(seat) ? 'finished' : ''}
                          ${ready ? 'ready' : ''}
                          ${submitted ? 'submitted' : ''}
-                         ${disconnected ? 'disconnected' : ''}`}
+                         ${disconnected ? 'disconnected' : ''}
+                         ${flame}`}
             >
               <SeatAvatar seat={seat} userId={uid} size={34} isBot={botSeats.includes(seat)} />
               <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
