@@ -25,6 +25,34 @@ export function EffectsOverlay() {
 
   if (!active) return null;
 
+  // 내 차례 — 작은 비차단 펄스 배지(중앙 하단). 매 차례라 가볍게(#9).
+  if (active.kind === 'MY_TURN') {
+    return (
+      <div
+        key={active.id}
+        style={{
+          position: 'fixed',
+          left: '50%',
+          bottom: 96,
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          padding: '8px 22px',
+          borderRadius: 999,
+          background: 'rgba(255, 193, 7, 0.95)',
+          color: '#1a1a1f',
+          fontSize: 18,
+          fontWeight: 900,
+          letterSpacing: 0.5,
+          boxShadow: '0 0 24px 4px rgba(255, 193, 7, 0.6)',
+          animation: 'mirboard-fx-pop 1.3s ease-out forwards',
+        }}
+      >
+        🎯 내 차례!
+      </div>
+    );
+  }
+
   // 매치 종료 연출 — 본인 기준 승(금빛 트로피 축하)/패(차분한 muted)/관전(중립=승리팀).
   if (active.kind === 'MATCH_VICTORY') {
     const lose = active.tone === 'lose';

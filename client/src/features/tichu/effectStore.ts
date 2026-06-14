@@ -5,7 +5,8 @@ export type EffectKind =
   | 'BOMB'
   | 'STRAIGHT_FLUSH_BOMB'
   | 'TICHU_DECLARED'
-  | 'MATCH_VICTORY';
+  | 'MATCH_VICTORY'
+  | 'MY_TURN';
 
 /** MATCH_VICTORY 연출 톤 — 본인 승/패/관전(중립)에 따라 다르게 렌더. */
 export type EffectTone = 'win' | 'lose' | 'neutral';
@@ -34,6 +35,8 @@ const DURATION_BY_KIND: Record<EffectKind, number> = {
   TICHU_DECLARED: 2000,
   // 매치 종료 승리 연출 — MVP 카드로 시선이 넘어갈 시간까지 약간 길게.
   MATCH_VICTORY: 3500,
+  // 내 차례 — 매 차례라 짧고 비차단.
+  MY_TURN: 1300,
 };
 let nextId = 1;
 

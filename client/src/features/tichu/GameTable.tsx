@@ -87,7 +87,7 @@ export function GameTable({
   const [chatOpen, setChatOpen] = useState(false);
   const [reactionOpen, setReactionOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
-  const { muted, toggleMute } = useSfx();
+  const { muted, toggleMute, playChime } = useSfx();
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
   const toggleCardAnim = useCardAnimStore((s) => s.toggle);
   const triggerEffect = useEffectStore((s) => s.trigger);
@@ -166,6 +166,16 @@ export function GameTable({
     const tone = won === null ? 'neutral' : won ? 'win' : 'lose';
     triggerEffect('MATCH_VICTORY', text, tone);
   }, [matchEnded, myTeam, mySeat, triggerEffect]);
+
+  // P3(9) — 내 차례 진입(상승엣지)에 합성음 + 펄스 배지 1회.
+  const prevMyTurnRef = useRef(false);
+  useEffect(() => {
+    if (myTurn && !prevMyTurnRef.current) {
+      playChime();
+      triggerEffect('MY_TURN');
+    }
+    prevMyTurnRef.current = myTurn;
+  }, [myTurn, playChime, triggerEffect]);
 
   const selectedCards = useMemo<Card[]>(() => {
     if (!privateHand) return [];
