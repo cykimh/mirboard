@@ -1,11 +1,14 @@
 package com.mirboard.infra.ws;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import org.mockito.ArgumentCaptor;
 
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.room.Room;
@@ -43,7 +46,15 @@ class RoomReactionControllerTest {
                 new RoomReactionController.ReactionRequest("🔥"),
                 new AuthPrincipal(3L, "carol"));
 
-        verify(publisher).publishToTopic(eq("/topic/room/r1/reaction"), any());
+        ArgumentCaptor<StompEnvelope> cap = ArgumentCaptor.forClass(StompEnvelope.class);
+        verify(publisher).publishToTopic(eq("/topic/room/r1/reaction"), cap.capture());
+        // userId 3L = playerIds 인덱스 2 → fromSeat 2 가 실려야 한다(클라 좌석 회전 정확성 보호).
+        assertThat(cap.getValue().type()).isEqualTo("REACTION");
+        assertThat(cap.getValue().payload())
+                .isInstanceOf(RoomReactionController.ReactionMessage.class);
+        var msg = (RoomReactionController.ReactionMessage) cap.getValue().payload();
+        assertThat(msg.fromSeat()).isEqualTo(2);
+        assertThat(msg.emoji()).isEqualTo("🔥");
     }
 
     @Test

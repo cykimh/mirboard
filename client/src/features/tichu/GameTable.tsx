@@ -419,34 +419,36 @@ export function GameTable({
         >
           {cardAnimEnabled ? '🎴' : '⏸'}
         </Button>
-        <div className="reaction-bar">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setReactionOpen((v) => !v)}
-            aria-label="이모지 반응"
-            title="이모지 반응"
-          >
-            😀
-          </Button>
-          {reactionOpen && (
-            <div className="reaction-palette">
-              {REACTIONS.map((e) => (
-                <button
-                  type="button"
-                  key={e}
-                  onClick={() => {
-                    sendReaction(e);
-                    setReactionOpen(false);
-                  }}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {!spectator && (
+          <div className="reaction-bar">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setReactionOpen((v) => !v)}
+              aria-label="이모지 반응"
+              title="이모지 반응"
+            >
+              😀
+            </Button>
+            {reactionOpen && (
+              <div className="reaction-palette">
+                {REACTIONS.map((e) => (
+                  <button
+                    type="button"
+                    key={e}
+                    onClick={() => {
+                      sendReaction(e);
+                      setReactionOpen(false);
+                    }}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -612,7 +614,7 @@ export function GameTable({
       </div>
       )}
 
-      {!spectator && (
+      {!spectator && (isInDealing || isInPassing || isInPlaying) && (
           <div className={`action-bar${isInPassing ? ' passing' : ''}`}>
             {isInDealing && !iAmReady && (
               <>

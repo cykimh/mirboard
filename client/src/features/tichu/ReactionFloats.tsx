@@ -30,9 +30,13 @@ export function ReactionFloats({ mySeat }: { mySeat: number }) {
       {live.map((r) => {
         const viewIdx = ((r.fromSeat - mySeat) + 4) % 4;
         const viewPos = VIEW_POS[viewIdx];
+        // 같은 좌석에서 짧게 연속 도착한 반응이 정확히 겹치지 않도록 약간의 가로 분산.
+        const dx = ((r.id % 5) - 2) * 16;
         return (
           <div key={r.id} className={`reaction-float reaction-${viewPos}`}>
-            <span className="reaction-glyph">{r.emoji}</span>
+            <span className="reaction-glyph" style={{ marginLeft: dx }}>
+              {r.emoji}
+            </span>
           </div>
         );
       })}
