@@ -32,6 +32,7 @@ export function ArenaChatBubbles({ playerIds, mySeat }: ArenaChatBubblesProps) {
     if (now - m.ts > TTL_MS) continue;
     const seat = playerIds.indexOf(m.userId);
     if (seat < 0) continue;
+    if (seat === mySeat) continue; // 본인 말풍선은 제외 — 상대 채팅만 좌석에 노출.
     bySeat.set(seat, m); // messages 는 시간순 → 같은 좌석은 최신으로 덮어씀.
   }
   if (bySeat.size === 0) return null;

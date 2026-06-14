@@ -442,10 +442,8 @@ export function GameTable({
                          ${submitted ? 'submitted' : ''}
                          ${disconnected ? 'disconnected' : ''}`}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                <SeatAvatar seat={seat} userId={uid} size={26} isBot={botSeats.includes(seat)} />
-                <span className="seat-id">{usernames[uid] ?? `#${uid}`}</span>
-              </div>
+              <SeatAvatar seat={seat} userId={uid} size={34} isBot={botSeats.includes(seat)} />
+              <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
               <div className="hand-count">
                 {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}
               </div>
@@ -486,7 +484,10 @@ export function GameTable({
                   ))}
                 </div>
                 <div className="trick-meta">
-                  <span>시트 {tableView.currentTopSeat}</span>
+                  <span className="trick-player">
+                    {usernames[playerIds[tableView.currentTopSeat]] ??
+                      `#${playerIds[tableView.currentTopSeat] ?? tableView.currentTopSeat}`}
+                  </span>
                   <span className="hand-type">{comboLabel(tableView.currentTop.cards)}</span>
                   {tableView.currentTop.phoenixSingle && (
                     <Badge variant="secondary" title={t('phoenix.singleTooltip')}>
@@ -537,8 +538,30 @@ export function GameTable({
           <TurnCountdown turnSeconds={turnSeconds} />
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
-        {!spectator && (
-          <div className={`arena-actions${isInPassing ? ' passing' : ''}`}>
+      </div>
+
+      {!spectator && (
+      <div className="my-hand">
+        {privateHand ? (
+          <SortableHand
+            cards={handCards}
+            selectedKeys={getSelectedKeys(
+              selectedCardKeys,
+              passSelection,
+              isInPassing,
+              pendingPassCardKey,
+            )}
+            onCardClick={handleCardClick}
+            onReorder={reorderHand}
+          />
+        ) : (
+          <p>{t('hand.loading')}</p>
+        )}
+      </div>
+      )}
+
+      {!spectator && (
+          <div className={`action-bar${isInPassing ? ' passing' : ''}`}>
             {isInDealing && !iAmReady && (
               <>
                 {dealingCardCount === 8 && myDeclaration === 'NONE' && (
@@ -637,27 +660,6 @@ export function GameTable({
             )}
           </div>
         )}
-      </div>
-
-      {!spectator && (
-      <div className="my-hand">
-        {privateHand ? (
-          <SortableHand
-            cards={handCards}
-            selectedKeys={getSelectedKeys(
-              selectedCardKeys,
-              passSelection,
-              isInPassing,
-              pendingPassCardKey,
-            )}
-            onCardClick={handleCardClick}
-            onReorder={reorderHand}
-          />
-        ) : (
-          <p>{t('hand.loading')}</p>
-        )}
-      </div>
-      )}
 
       {errorMessage && (
         <p className="error" onClick={() => setError(null)}>
