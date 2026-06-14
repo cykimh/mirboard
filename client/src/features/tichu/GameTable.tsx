@@ -523,6 +523,18 @@ export function GameTable({
           <div className="table-center-trick" ref={centerTrickRef}>
             {tableView.currentTop ? (
               <>
+                <div className="trick-meta">
+                  <span className="trick-player">
+                    {usernames[playerIds[tableView.currentTopSeat]] ??
+                      `#${playerIds[tableView.currentTopSeat] ?? tableView.currentTopSeat}`}
+                  </span>
+                  <span className="hand-type">{comboLabel(tableView.currentTop.cards)}</span>
+                  {tableView.currentTop.phoenixSingle && (
+                    <Badge variant="secondary" title={t('phoenix.singleTooltip')}>
+                      {t('phoenix.singleBadge')}
+                    </Badge>
+                  )}
+                </div>
                 <div
                   // 새 play 마다 key 변경 → 리마운트로 등장 애니 재생. 토글 ON 일 때만.
                   // 비행 중(fly)에는 숨겨 이중 표시 방지(visibility 로 레이아웃 유지).
@@ -535,18 +547,6 @@ export function GameTable({
                   {tableView.currentTop.cards.map((c) => (
                     <CardChip key={cardKey(c)} card={c} />
                   ))}
-                </div>
-                <div className="trick-meta">
-                  <span className="trick-player">
-                    {usernames[playerIds[tableView.currentTopSeat]] ??
-                      `#${playerIds[tableView.currentTopSeat] ?? tableView.currentTopSeat}`}
-                  </span>
-                  <span className="hand-type">{comboLabel(tableView.currentTop.cards)}</span>
-                  {tableView.currentTop.phoenixSingle && (
-                    <Badge variant="secondary" title={t('phoenix.singleTooltip')}>
-                      {t('phoenix.singleBadge')}
-                    </Badge>
-                  )}
                 </div>
               </>
             ) : (
