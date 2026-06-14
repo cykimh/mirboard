@@ -166,6 +166,7 @@ public final class TichuEngine implements GameEngine {
                                        Map<Integer, PassCardsSelection> submitted,
                                        List<TichuEvent> events) {
         List<PlayerState> updatedPlayers = new ArrayList<>(TurnManager.SEATS);
+        List<TichuEvent> receivedEvents = new ArrayList<>(TurnManager.SEATS);
         for (int r = 0; r < TurnManager.SEATS; r++) {
             PlayerState p = currentPlayers.get(r);
             PassCardsSelection mine = submitted.get(r);
@@ -174,16 +175,28 @@ public final class TichuEngine implements GameEngine {
             newHand.remove(mine.toLeft());
             newHand.remove(mine.toPartner());
             newHand.remove(mine.toRight());
-            // 받은 3장 추가: (R+3)%4 의 toLeft, (R+2)%4 의 toPartner, (R+1)%4 의 toRight.
-            newHand.add(submitted.get((r + 3) % TurnManager.SEATS).toLeft());
-            newHand.add(submitted.get((r + 2) % TurnManager.SEATS).toPartner());
-            newHand.add(submitted.get((r + 1) % TurnManager.SEATS).toRight());
+            // 받은 3장 + 출처: (R+3)%4 의 toLeft, (R+2)%4 의 toPartner, (R+1)%4 의 toRight.
+            int leftFrom = (r + 3) % TurnManager.SEATS;
+            int partnerFrom = (r + 2) % TurnManager.SEATS;
+            int rightFrom = (r + 1) % TurnManager.SEATS;
+            Card recvLeft = submitted.get(leftFrom).toLeft();
+            Card recvPartner = submitted.get(partnerFrom).toPartner();
+            Card recvRight = submitted.get(rightFrom).toRight();
+            newHand.add(recvLeft);
+            newHand.add(recvPartner);
+            newHand.add(recvRight);
             updatedPlayers.add(p.withHand(newHand));
+            receivedEvents.add(new TichuEvent.CardsReceived(r, List.of(
+                    new TichuEvent.ReceivedCard(recvLeft, leftFrom),
+                    new TichuEvent.ReceivedCard(recvPartner, partnerFrom),
+                    new TichuEvent.ReceivedCard(recvRight, rightFrom))));
         }
         events.add(new TichuEvent.CardsPassed());
         for (PlayerState p : updatedPlayers) {
             events.add(new TichuEvent.HandDealt(p.seat(), p.hand(), 14));
         }
+        // 받은 카드 출처(본인 큐로만, #5).
+        events.addAll(receivedEvents);
         int leadSeat = mahjongHolder(updatedPlayers);
         TichuState.Playing playing = new TichuState.Playing(
                 updatedPlayers, TrickState.lead(leadSeat, null), -1);

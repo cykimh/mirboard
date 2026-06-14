@@ -896,6 +896,64 @@ a {
   background: var(--color-border-subtle);
 }
 
+/* P4(5) — 패스 직후 "받은 카드 ← 준 사람" 짧은 모달. */
+.pass-received-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.pass-received-modal {
+  background: rgba(20, 22, 28, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #eef2f7;
+  text-align: center;
+  max-width: 92vw;
+  animation: mirboard-fx-pop 0.3s ease-out;
+}
+
+.pass-received-modal h3 {
+  margin: 0 0 14px;
+  color: #ffd180;
+}
+
+.pass-received-list {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pass-received-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pass-received-from {
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.pass-received-close {
+  margin-top: 16px;
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-elevated);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
 /* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4). */
 .room-chat-panel {
   position: fixed;

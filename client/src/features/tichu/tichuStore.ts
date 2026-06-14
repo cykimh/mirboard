@@ -44,6 +44,8 @@ export interface TichuRoomState {
   turnStartedAt: number | null;
   /** 현재 연결이 끊긴 플레이어 좌석 — PLAYER_DISCONNECTED/RECONNECTED + resync 로 동기화. */
   disconnectedSeats: Set<number>;
+  /** P4(5) — 패스로 받은 3장 + 출처(본인 큐 CARDS_RECEIVED). 모달 표시용, reset/닫기 시 정리. */
+  lastReceived: { card: Card; fromSeat: number }[] | null;
 }
 
 export interface TichuActions {
@@ -70,6 +72,8 @@ export interface TichuActions {
   setError: (message: string | null) => void;
   setRoundEnded: (info: TichuRoomState['roundEnded']) => void;
   setMatchEnded: (info: TichuRoomState['matchEnded']) => void;
+  setReceived: (items: { card: Card; fromSeat: number }[]) => void;
+  clearReceived: () => void;
   toggleCardSelection: (card: Card) => void;
   clearSelection: () => void;
   /** Phase 13B(#1): 카드 클릭 → 슬롯 미배정 pending 선택 (같은 카드 재클릭 시 해제). */
@@ -206,6 +210,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   roundHistory: [],
   turnStartedAt: null,
   disconnectedSeats: new Set(),
+  lastReceived: null,
 
   reset(roomId) {
     set({
@@ -223,6 +228,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       roundHistory: [],
       turnStartedAt: null,
       disconnectedSeats: new Set(),
+      lastReceived: null,
     });
   },
 
@@ -425,6 +431,14 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
 
   setMatchEnded(info) {
     set({ matchEnded: info });
+  },
+
+  setReceived(items) {
+    set({ lastReceived: items });
+  },
+
+  clearReceived() {
+    set({ lastReceived: null });
   },
 
   toggleCardSelection(card) {

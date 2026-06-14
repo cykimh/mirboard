@@ -33,6 +33,7 @@ import java.util.Map;
         @JsonSubTypes.Type(value = TichuEvent.PassingStarted.class, name = "PASSING_STARTED"),
         @JsonSubTypes.Type(value = TichuEvent.PassingSubmitted.class, name = "PASSING_SUBMITTED"),
         @JsonSubTypes.Type(value = TichuEvent.CardsPassed.class, name = "CARDS_PASSED"),
+        @JsonSubTypes.Type(value = TichuEvent.CardsReceived.class, name = "CARDS_RECEIVED"),
         @JsonSubTypes.Type(value = TichuEvent.PlayingStarted.class, name = "PLAYING_STARTED"),
         @JsonSubTypes.Type(value = TichuEvent.RoundStarted.class, name = "ROUND_STARTED"),
         @JsonSubTypes.Type(value = TichuEvent.MatchEnded.class, name = "MATCH_ENDED")
@@ -53,6 +54,7 @@ public sealed interface TichuEvent extends GameEvent
                 TichuEvent.PassingStarted,
                 TichuEvent.PassingSubmitted,
                 TichuEvent.CardsPassed,
+                TichuEvent.CardsReceived,
                 TichuEvent.PlayingStarted,
                 TichuEvent.RoundStarted,
                 TichuEvent.MatchEnded {
@@ -75,6 +77,7 @@ public sealed interface TichuEvent extends GameEvent
             case PassingStarted __ -> "PASSING_STARTED";
             case PassingSubmitted __ -> "PASSING_SUBMITTED";
             case CardsPassed __ -> "CARDS_PASSED";
+            case CardsReceived __ -> "CARDS_RECEIVED";
             case PlayingStarted __ -> "PLAYING_STARTED";
             case RoundStarted __ -> "ROUND_STARTED";
             case MatchEnded __ -> "MATCH_ENDED";
@@ -83,7 +86,7 @@ public sealed interface TichuEvent extends GameEvent
 
     /** 본인 큐로만 보내야 하는 비공개 이벤트 여부. */
     default boolean isPrivate() {
-        return this instanceof HandDealt;
+        return this instanceof HandDealt || this instanceof CardsReceived;
     }
 
     record Played(int seat, Hand hand) implements TichuEvent {
@@ -141,6 +144,17 @@ public sealed interface TichuEvent extends GameEvent
 
     /** 4명 모두 PassCards 제출 후 동시 스왑 완료 공개 알림. 카드 자체는 비공개 큐 (HandDealt) 로. */
     record CardsPassed() implements TichuEvent {
+    }
+
+    /** 패스 스왑으로 받은 3장의 출처 — 본인 큐로만(#5). 상태은닉: 본인이 받은 것만 노출. */
+    record CardsReceived(int seat, List<ReceivedCard> received) implements TichuEvent {
+        public CardsReceived {
+            received = List.copyOf(received);
+        }
+    }
+
+    /** 받은 카드 한 장 + 준 좌석. */
+    record ReceivedCard(Card card, int fromSeat) {
     }
 
     /** Playing 단계 진입 공개 알림. Mahjong 보유자가 leadSeat 으로 첫 트릭 리드. */

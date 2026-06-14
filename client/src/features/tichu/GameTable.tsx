@@ -14,6 +14,7 @@ import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
 import { SeatCardStack } from './SeatCardStack';
+import { PassReceivedModal } from './PassReceivedModal';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
@@ -108,6 +109,8 @@ export function GameTable({
   const matchEnded = useTichuStore((s) => s.matchEnded);
   const roundHistory = useTichuStore((s) => s.roundHistory);
   const disconnectedSeats = useTichuStore((s) => s.disconnectedSeats);
+  const lastReceived = useTichuStore((s) => s.lastReceived);
+  const clearReceived = useTichuStore((s) => s.clearReceived);
   const setError = useTichuStore((s) => s.setError);
   const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
 
@@ -728,6 +731,15 @@ export function GameTable({
         <p className="error" onClick={() => setError(null)}>
           {errorMessage}
         </p>
+      )}
+
+      {lastReceived && lastReceived.length > 0 && (
+        <PassReceivedModal
+          received={lastReceived}
+          playerIds={playerIds}
+          usernames={usernames}
+          onClose={clearReceived}
+        />
       )}
 
       <MakeWishModal

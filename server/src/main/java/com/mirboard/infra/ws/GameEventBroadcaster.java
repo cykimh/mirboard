@@ -66,6 +66,7 @@ public class GameEventBroadcaster {
     private static int seatOf(TichuEvent ev) {
         return switch (ev) {
             case TichuEvent.HandDealt hd -> hd.seat();
+            case TichuEvent.CardsReceived cr -> cr.seat();
             default -> -1;
         };
     }

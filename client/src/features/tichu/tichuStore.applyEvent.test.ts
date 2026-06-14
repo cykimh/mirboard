@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useTichuStore } from './tichuStore';
-import type { Hand, TableView } from '@/types/tichu';
+import type { Card, Hand, TableView } from '@/types/tichu';
 
 function baseTable(overrides: Partial<TableView> = {}): TableView {
   return {
@@ -43,6 +43,20 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     });
     expect(r).toBe('duplicate');
     expect(useTichuStore.getState().tableView!.currentTurnSeat).toBe(0);
+  });
+
+  it('setReceived/clearReceived + reset 가 lastReceived 를 관리', () => {
+    const card: Card = { suit: 'JADE', rank: 5, special: null };
+    useTichuStore.getState().setReceived([{ card, fromSeat: 2 }]);
+    expect(useTichuStore.getState().lastReceived).toHaveLength(1);
+    expect(useTichuStore.getState().lastReceived?.[0].fromSeat).toBe(2);
+
+    useTichuStore.getState().clearReceived();
+    expect(useTichuStore.getState().lastReceived).toBeNull();
+
+    useTichuStore.getState().setReceived([{ card, fromSeat: 1 }]);
+    useTichuStore.getState().reset('room-x');
+    expect(useTichuStore.getState().lastReceived).toBeNull();
   });
 
   it('PLAYER_DISCONNECTED/RECONNECTED toggles disconnectedSeats (seq 무관)', () => {

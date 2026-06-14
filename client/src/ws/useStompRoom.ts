@@ -37,6 +37,7 @@ export function useStompRoom(roomId: string, token: string | null) {
   const applyPrivateHand = useTichuStore((s) => s.applyPrivateHand);
   const applyEvent = useTichuStore((s) => s.applyEvent);
   const setError = useTichuStore((s) => s.setError);
+  const setReceived = useTichuStore((s) => s.setReceived);
   const reset = useTichuStore((s) => s.reset);
   const resetChat = useRoomChatStore((s) => s.reset);
   const appendChat = useRoomChatStore((s) => s.appendIncoming);
@@ -94,6 +95,12 @@ export function useStompRoom(roomId: string, token: string | null) {
           if (env.type === 'HAND_DEALT') {
             const payload = env.payload as HandDealtPayload;
             applyPrivateHand(payload);
+          } else if (env.type === 'CARDS_RECEIVED') {
+            const payload = env.payload as {
+              seat: number;
+              received: { card: Card; fromSeat: number }[];
+            };
+            setReceived(payload.received);
           } else if (env.type === 'ERROR') {
             const payload = env.payload as ErrorPayload;
             setError(`${payload.code}: ${payload.message}`);
