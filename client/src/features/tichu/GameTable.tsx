@@ -13,6 +13,7 @@ import { comboLabel } from './handType';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
+import { SeatCardStack } from './SeatCardStack';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
@@ -497,9 +498,7 @@ export function GameTable({
             >
               <SeatAvatar seat={seat} userId={uid} size={34} isBot={botSeats.includes(seat)} />
               <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
-              <div className="hand-count">
-                {t('seat.handCount')} {tableView.handCounts[seat] ?? 0}{t('seat.handCardsSuffix')}
-              </div>
+              <SeatCardStack count={tableView.handCounts[seat] ?? 0} />
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
                 <div
                   className={`declared ${
@@ -827,6 +826,7 @@ export function GameTable({
           myUserId={myUserId}
           sendChat={sendChat}
           panelOpenRef={chatPanelOpenRef}
+          onClose={() => setChatOpen(false)}
         />
       )}
     </div>

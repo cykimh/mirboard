@@ -252,12 +252,13 @@ a {
 }
 
 .seat {
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  /* 기본 테두리 제거(#6) — 투명 테두리만 둬 turn/ready/flame 등 상태 색은 유지.
+     배경·그림자도 없애 펠트 위에 깔끔히 얹힌다. */
+  border: 2px solid transparent;
+  border-radius: 12px;
   padding: 6px 10px;
-  background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
+  background: transparent;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   /* transform 은 좌석 위치 정렬(translateX/Y(-50%)) 에 쓰이므로 turn 강조에는
      쓰지 않는다 — 덮어쓰면 좌석이 밀려난다(D-76 후속 버그 수정). */
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
@@ -336,12 +337,45 @@ a {
   opacity: 0.92;
 }
 
-/* Phase 20(D-76) — 좌석 손패 수 라벨. 좌석은 flip 되는 surface 박스라
-   legacy muted 토큰 사용. */
-.hand-count {
-  margin-top: 2px;
+/* 좌석 카드백 스택(#6) — back.svg 미니 카드백 부채꼴 + 정확한 숫자. */
+.seat-cardstack {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.seat-cardstack-empty {
+  opacity: 0.4;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+}
+
+.seat-cardstack-fan {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  height: 28px;
+}
+
+.seat-cardback {
+  width: 18px;
+  height: 26px;
+  border-radius: 3px;
+  margin-left: -11px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  transform: rotate(calc(var(--i, 0) * 7deg));
+  transform-origin: bottom center;
+}
+
+.seat-cardback:first-child {
+  margin-left: 0;
+}
+
+.seat-cardstack-count {
+  font-size: 0.82rem;
+  font-weight: 800;
+  opacity: 0.95;
 }
 
 .declared {
@@ -860,6 +894,82 @@ a {
 
 .reaction-palette button:hover {
   background: var(--color-border-subtle);
+}
+
+/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4). */
+.room-chat-panel {
+  position: fixed;
+  right: 16px;
+  top: 72px;
+  width: 300px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(18, 20, 26, 0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  color: #eef2f7;
+}
+
+.room-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.room-chat-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.7;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.room-chat-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+
+.room-chat-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-chat-form {
+  display: flex;
+  gap: 4px;
+}
+
+.room-chat-form input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .room-chat-panel {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    top: 64px;
+  }
 }
 
 /* --- Phase 5b: 좌석 상태 태그 --- */
