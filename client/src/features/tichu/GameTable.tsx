@@ -607,6 +607,31 @@ export function GameTable({
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
         <ReactionFloats mySeat={mySeat} />
+        {/* #6 — 내기/패스를 내 좌석(하단) 좌·우로 배치해 누르기 쉽게. */}
+        {!spectator && isInPlaying && (
+          <div className="arena-seat-actions" aria-label="내 차례 액션">
+            <Button
+              type="button"
+              className="seat-action-btn pass"
+              variant="secondary"
+              onClick={handlePass}
+              disabled={!myTurn || !tableView.currentTop}
+            >
+              {t('play.action.pass')}
+            </Button>
+            <Button
+              type="button"
+              className="seat-action-btn play"
+              onClick={handlePlay}
+              disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
+            >
+              {t('play.action.play')}
+              {selectedCards.length > 0
+                ? ` (${selectedCards.length}${t('seat.handCardsSuffix')})`
+                : ''}
+            </Button>
+          </div>
+        )}
       </div>
 
       {!spectator && (
@@ -631,7 +656,14 @@ export function GameTable({
       </div>
       )}
 
-      {!spectator && (isInDealing || isInPassing || isInPlaying) && (
+      {!spectator &&
+        (isInDealing ||
+          isInPassing ||
+          // 플레이 단계의 내기/패스는 경기장 좌석 좌우로 옮겼다(#6). 액션 바는
+          // 선택 조합 힌트·티츄 선언이 있을 때만 렌더(빈 바 방지).
+          (isInPlaying &&
+            (selectedCards.length > 0 ||
+              (myDeclaration === 'NONE' && (privateHand?.cards.length ?? 0) === 14)))) && (
           <div className={`action-bar${isInPassing ? ' passing' : ''}`}>
             {isInDealing && !iAmReady && (
               <>
@@ -704,23 +736,7 @@ export function GameTable({
                     {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
                   </span>
                 )}
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handlePlay}
-                  disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
-                >
-                  {t('play.action.play')} ({selectedCards.length}{t('seat.handCardsSuffix')})
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={handlePass}
-                  disabled={!myTurn || !tableView.currentTop}
-                >
-                  {t('play.action.pass')}
-                </Button>
+                {/* 내기/패스는 경기장 좌석 좌우 버튼으로 이동(#6). 여기엔 티츄 선언만. */}
                 {myDeclaration === 'NONE' &&
                   (privateHand?.cards.length ?? 0) === 14 && (
                     <Button type="button" size="sm" variant="outline" onClick={handleDeclareTichu}>

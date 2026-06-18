@@ -192,6 +192,34 @@ a {
   transform: translateY(-50%);
 }
 
+/* #6 — 내기/패스를 내 좌석(seat-s, 하단 중앙) 좌·우로 띄워 누르기 쉽게. 컨테이너는
+   클릭 통과(pointer-events:none), 버튼만 활성. 가운데 빈 자리에 seat-s 가 보인다. */
+.arena-seat-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 150px;
+  z-index: 16;
+  pointer-events: none;
+}
+
+.arena-seat-actions > * {
+  pointer-events: auto;
+}
+
+.seat-action-btn {
+  min-width: 88px;
+  height: 46px;
+  padding: 0 22px;
+  font-size: 1rem;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
 .table-center-trick {
   position: absolute;
   left: 50%;
@@ -1137,6 +1165,20 @@ a {
     max-width: 52%;
     padding: 8px 10px;
   }
+  /* 좁은 폭 — 좌석 좌우 버튼 간격을 줄여 좌석을 가리지 않게(#6). 긴 닉네임이
+     버튼과 겹치지 않도록 seat-id 폭도 함께 제한. */
+  .arena-seat-actions {
+    gap: 104px;
+  }
+  .seat-action-btn {
+    min-width: 72px;
+    height: 44px;
+    padding: 0 14px;
+    font-size: 0.92rem;
+  }
+  .seat-id {
+    max-width: 84px;
+  }
 }
 
 /* 아주 좁은 폭(휴대폰 세로) — 좌석/트릭을 한 단계 더 축소하되 위치는 유지. */
@@ -1152,6 +1194,7 @@ a {
   }
   .seat-id {
     font-size: 0.75rem;
+    max-width: 66px;
   }
   .hand-count {
     font-size: 0.72rem;
@@ -1160,5 +1203,12 @@ a {
     min-width: 96px;
     max-width: 46%;
     padding: 6px 8px;
+  }
+  .arena-seat-actions {
+    gap: 80px;
+  }
+  .seat-action-btn {
+    min-width: 62px;
+    padding: 0 10px;
   }
 }
