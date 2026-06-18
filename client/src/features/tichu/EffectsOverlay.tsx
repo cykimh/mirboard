@@ -25,30 +25,39 @@ export function EffectsOverlay() {
 
   if (!active) return null;
 
-  // 내 차례 — 작은 비차단 펄스 배지(중앙 하단). 매 차례라 가볍게(#9).
+  // 내 차례 — 작은 비차단 펄스 배지(화면 가운데, #5). 매 차례라 가볍게.
+  // 중앙 정렬은 flex 래퍼로 하고 pop 애니(transform:scale)는 안쪽 요소에만 — 같은
+  // 요소에 translate 중앙정렬 + scale 애니를 같이 주면 애니 transform 이 translate 를
+  // 덮어써서 중앙에서 벗어난다(다른 이펙트 분기와 동일한 래퍼 패턴).
   if (active.kind === 'MY_TURN') {
     return (
       <div
         key={active.id}
         style={{
           position: 'fixed',
-          left: '50%',
-          bottom: 96,
-          transform: 'translateX(-50%)',
+          inset: 0,
           pointerEvents: 'none',
           zIndex: 9999,
-          padding: '8px 22px',
-          borderRadius: 999,
-          background: 'rgba(255, 193, 7, 0.95)',
-          color: '#1a1a1f',
-          fontSize: 18,
-          fontWeight: 900,
-          letterSpacing: 0.5,
-          boxShadow: '0 0 24px 4px rgba(255, 193, 7, 0.6)',
-          animation: 'mirboard-fx-pop 1.3s ease-out forwards',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        🎯 내 차례!
+        <div
+          style={{
+            padding: '12px 30px',
+            borderRadius: 999,
+            background: 'rgba(255, 193, 7, 0.95)',
+            color: '#1a1a1f',
+            fontSize: 24,
+            fontWeight: 900,
+            letterSpacing: 0.5,
+            boxShadow: '0 0 32px 6px rgba(255, 193, 7, 0.6)',
+            animation: 'mirboard-fx-pop 1.3s ease-out forwards',
+          }}
+        >
+          🎯 내 차례!
+        </div>
       </div>
     );
   }
