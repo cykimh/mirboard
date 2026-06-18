@@ -487,14 +487,11 @@ export function GameTable({
             isInPassing && tableView.passingSubmittedSeats.includes(seat);
           const turnHighlight = isInPlaying && seat === tableView.currentTurnSeat;
           const disconnected = disconnectedSeats.has(seat);
-          // P3(8) — 선언 좌석 불타오르는 효과(그랜드=빨강, 일반=주황).
+          // 티츄 선언 시 좌석 사각형이 아니라 아바타 원이 깜빡이고 종(🔔) 배지가
+          // 흔들린다(#3,#4). 'grand'=적색, 'tichu'=금색.
           const decl = tableView.declarations[seat];
-          const flame =
-            decl && decl !== 'NONE'
-              ? decl === 'GRAND_TICHU'
-                ? 'flame flame-grand'
-                : 'flame'
-              : '';
+          const declared: 'tichu' | 'grand' | null =
+            decl && decl !== 'NONE' ? (decl === 'GRAND_TICHU' ? 'grand' : 'tichu') : null;
           // Phase 8E — 본인 시점 좌석 매핑. mySeat 기준 회전 후 (S/W/N/E) 배치.
           // viewIdx 0=South(본인), 1=West(우적), 2=North(파트너), 3=East(좌적).
           const viewIdx = ((seat - mySeat) + 4) % 4;
@@ -506,10 +503,15 @@ export function GameTable({
                          ${tableView.finishingOrder.includes(seat) ? 'finished' : ''}
                          ${ready ? 'ready' : ''}
                          ${submitted ? 'submitted' : ''}
-                         ${disconnected ? 'disconnected' : ''}
-                         ${flame}`}
+                         ${disconnected ? 'disconnected' : ''}`}
             >
-              <SeatAvatar seat={seat} userId={uid} size={34} isBot={botSeats.includes(seat)} />
+              <SeatAvatar
+                seat={seat}
+                userId={uid}
+                size={34}
+                isBot={botSeats.includes(seat)}
+                declared={declared}
+              />
               <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
               <SeatCardStack count={tableView.handCounts[seat] ?? 0} />
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
@@ -518,9 +520,10 @@ export function GameTable({
                     tableView.declarations[seat] === 'GRAND_TICHU' ? 'grand' : ''
                   }`}
                 >
+                  {/* 종(🔔)은 아바타 배지로 보여주므로(#4) 텍스트엔 아이콘 중복 제거. */}
                   {tableView.declarations[seat] === 'GRAND_TICHU'
-                    ? '👑 그랜드 티츄!'
-                    : '🔔 티츄!'}
+                    ? '그랜드 티츄!'
+                    : '티츄!'}
                 </div>
               )}
               {ready && <div className="status-tag">{t('seat.ready')}</div>}

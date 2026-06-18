@@ -252,8 +252,8 @@ a {
 }
 
 .seat {
-  /* 기본 테두리 제거(#6) — 투명 테두리만 둬 turn/ready/flame 등 상태 색은 유지.
-     배경·그림자도 없애 펠트 위에 깔끔히 얹힌다. */
+  /* 기본 테두리 제거 — 투명 테두리만 둬 turn/ready 등 상태 색은 유지.
+     배경·그림자도 없애 펠트 위에 깔끔히 얹힌다. (선언 강조는 아바타 원으로, #3) */
   border: 2px solid transparent;
   border-radius: 12px;
   padding: 6px 10px;
@@ -289,41 +289,56 @@ a {
   font-weight: 700;
 }
 
-/* P3(8) — 선언 좌석 불타오르는 효과(테두리·글로우 flicker + 🔥 악센트). */
-.seat.flame {
-  border-color: #ff7a18;
-  animation: flame-flicker 0.5s ease-in-out infinite alternate;
+/* 티츄 선언 시 좌석 사각형이 아니라 아바타 원이 깜빡이고 종(🔔) 배지가 흔들린다(#3,#4). */
+.seat-avatar.declared {
+  animation: seat-declared-blink 0.7s ease-in-out infinite;
 }
 
-.seat.flame.flame-grand {
-  border-color: #ff3b30;
-  animation: flame-flicker-grand 0.45s ease-in-out infinite alternate;
+.seat-avatar.declared-grand {
+  animation-name: seat-declared-blink-grand;
 }
 
-.seat.flame::before {
-  content: '🔥';
+/* 원형 링이 나타났다 사라지며 '깜빡'(금색). */
+@keyframes seat-declared-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 192, 0, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(240, 192, 0, 0.9), 0 0 16px 4px rgba(240, 192, 0, 0.7); }
+}
+
+/* 그랜드 — 적색 링. */
+@keyframes seat-declared-blink-grand {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.92), 0 0 18px 5px rgba(255, 59, 48, 0.72); }
+}
+
+/* 흔들리는 종 배지(원 우상단). */
+.seat-declared-bell {
   position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: -9px;
+  right: -9px;
   font-size: 15px;
+  line-height: 1;
   pointer-events: none;
-  animation: flame-bob 0.6s ease-in-out infinite alternate;
+  transform-origin: 50% 0;
+  animation: seat-bell-swing 0.6s ease-in-out infinite alternate;
 }
 
-@keyframes flame-flicker {
-  0%   { box-shadow: 0 0 0 2px rgba(255, 120, 20, 0.45), 0 0 12px 3px rgba(255, 90, 0, 0.40); }
-  100% { box-shadow: 0 0 0 2px rgba(255, 150, 40, 0.70), 0 0 24px 7px rgba(255, 110, 0, 0.62); }
+@keyframes seat-bell-swing {
+  0%   { transform: rotate(-20deg); }
+  100% { transform: rotate(20deg); }
 }
 
-@keyframes flame-flicker-grand {
-  0%   { box-shadow: 0 0 0 2px rgba(255, 60, 40, 0.50), 0 0 14px 4px rgba(255, 30, 0, 0.45); }
-  100% { box-shadow: 0 0 0 2px rgba(255, 90, 60, 0.78), 0 0 26px 8px rgba(255, 40, 0, 0.68); }
-}
-
-@keyframes flame-bob {
-  0%   { transform: translateX(-50%) translateY(0) scale(1); }
-  100% { transform: translateX(-50%) translateY(-3px) scale(1.12); }
+/* 동작 줄이기 — 깜빡임/흔들림 대신 정적 링만. */
+@media (prefers-reduced-motion: reduce) {
+  .seat-avatar.declared,
+  .seat-declared-bell {
+    animation: none;
+  }
+  .seat-avatar.declared {
+    box-shadow: 0 0 0 3px rgba(240, 192, 0, 0.85);
+  }
+  .seat-avatar.declared-grand {
+    box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.88);
+  }
 }
 
 .seat-id {
