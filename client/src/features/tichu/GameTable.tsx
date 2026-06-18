@@ -619,6 +619,8 @@ export function GameTable({
             )}
             onCardClick={handleCardClick}
             onReorder={reorderHand}
+            // 플레이 단계만 겹침 허용(공간 남으면 안 겹침, #1). 패스/딜링은 펼침(#2).
+            overlap={isInPlaying}
           />
         ) : (
           <p>{t('hand.loading')}</p>

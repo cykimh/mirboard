@@ -432,17 +432,28 @@ a {
   gap: 6px;
 }
 
-/* 손패는 카드가 많으면 살짝 겹쳐 보기 편하게(#8). hover/선택 시 떠오름(기존 규칙). */
-.my-hand .hand-cards {
-  gap: 8px 0;
+/* 손패 레이아웃: 공간이 남으면 겹치지 않고(양수 gap), 좁을 때만 측정값으로 한 줄에
+   맞춰 겹친다(#1). useHandOverlap 가 --hand-overlap 을 세팅. hover/선택 시 떠오름. */
+.my-hand .hand-cards.overlap {
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0;
 }
 
-.my-hand .hand-cards > * {
-  margin-left: -14px;
+.my-hand .hand-cards.overlap > * {
+  margin-left: var(--hand-overlap, 6px);
+  flex-shrink: 0;
 }
 
-.my-hand .hand-cards > *:first-child {
+.my-hand .hand-cards.overlap > *:first-child {
   margin-left: 0;
+}
+
+/* 패스/딜링 단계: 절대 겹치지 않게 — 고르기 쉽도록 펼치고 넘치면 줄바꿈(#2). */
+.my-hand .hand-cards:not(.overlap) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 .card-chip {

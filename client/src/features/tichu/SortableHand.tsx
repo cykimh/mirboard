@@ -16,6 +16,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { CardChip } from './CardChip';
+import { useHandOverlap } from './useHandOverlap';
 
 interface SortableCardProps {
   card: Card;
@@ -47,6 +48,9 @@ interface SortableHandProps {
   selectedKeys: Set<string>;
   onCardClick: (card: Card) => void;
   onReorder: (fromKey: string, toKey: string) => void;
+  /** true 면 한 줄에 맞춰 필요한 만큼만 겹친다(플레이 단계, #1). false 면 절대
+   *  겹치지 않고 넘치면 줄바꿈(패스/딜링 단계 — 고르기 쉽게, #2). 기본 true. */
+  overlap?: boolean;
 }
 
 /**
@@ -58,11 +62,14 @@ export function SortableHand({
   selectedKeys,
   onCardClick,
   onReorder,
+  overlap = true,
 }: SortableHandProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
   const ids = cards.map(cardKey);
+  // overlap=false 면 0 을 넘겨 측정/겹침 비활성(클래스도 안 붙음).
+  const handRef = useHandOverlap(overlap ? cards.length : 0);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -77,7 +84,7 @@ export function SortableHand({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-        <div className="hand-cards">
+        <div className={`hand-cards${overlap ? ' overlap' : ''}`} ref={handRef}>
           {cards.map((c) => {
             const key = cardKey(c);
             return (
