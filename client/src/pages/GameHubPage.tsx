@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
 import { usersApi, type UserStats, type RankEntry } from '@/api/users';
+import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useLobbyStomp } from '@/ws/useLobbyStomp';
 import { TierBadge } from '@/components/TierBadge';
@@ -77,6 +78,22 @@ export function GameHubPage() {
       if (err instanceof ApiError) setError(err.message);
     }
   }, [token]);
+
+  // D-81 — 가상 칩 잔액 갱신 + 무료 충전(잔액 낮을 때).
+  const refreshStats = useCallback(() => {
+    if (!token || !user) return;
+    usersApi.stats(token, user.userId).then(setStats).catch(() => {});
+  }, [token, user]);
+
+  const handleTopUp = useCallback(async () => {
+    if (!token) return;
+    try {
+      await authApi.topUpChips(token);
+      refreshStats();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+    }
+  }, [token, refreshStats]);
 
   useEffect(() => {
     if (!token || !user) {
@@ -169,6 +186,25 @@ export function GameHubPage() {
                 {stats.winCount}승 {stats.loseCount}패
                 {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
               </span>
+            )}
+            {stats && (
+              <span
+                className="text-xs font-semibold"
+                title="가상 칩 잔액 (현금 아님) — 내기 방 판돈에 사용"
+              >
+                💰 {stats.chipBalance.toLocaleString()}
+              </span>
+            )}
+            {stats && stats.chipBalance < 200 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTopUp}
+                title="잔액이 적을 때 무료 충전(가상 칩)"
+              >
+                무료 충전
+              </Button>
             )}
             <ThemeToggle />
             <Button

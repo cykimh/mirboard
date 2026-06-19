@@ -41,6 +41,8 @@ interface GameTableProps {
   fillWithBots?: boolean;
   /** Phase 13D — 개인 턴 제한 초 (0=끔). 헤더 배지. */
   turnSeconds?: number;
+  /** D-81 — 판돈(가상 칩, 0=내기 없음). 헤더 배지 + 매치 종료 칩 증감 표시. */
+  stake?: number;
   /** 현재 관전자 수 (room.spectatorIds.length). 헤더 배지. */
   spectatorCount?: number;
   /** userId→username 맵. 좌석에 #id 대신 닉네임 표시(없으면 #id 폴백). */
@@ -78,6 +80,7 @@ export function GameTable({
   botSeats = [],
   fillWithBots = false,
   turnSeconds = 0,
+  stake = 0,
   spectatorCount = 0,
   usernames = {},
   onExit,
@@ -396,6 +399,11 @@ export function GameTable({
         {turnSeconds > 0 && (
           <span className="turn-limit-badge" title="개인 턴 제한 — 초과 시 자동으로 다음 순서로 넘어갑니다">
             ⏱ 턴 제한 {turnSeconds}초
+          </span>
+        )}
+        {stake > 0 && (
+          <span className="turn-limit-badge" title="내기 방 — 판돈(가상 칩). 승팀이 가져갑니다">
+            💰 판돈 {stake}칩
           </span>
         )}
         <span>
@@ -815,6 +823,17 @@ export function GameTable({
           <p>
             {t('match.ended.finalScore')} A {matchEnded.finalScores.A ?? 0} : {matchEnded.finalScores.B ?? 0} B
           </p>
+          {stake > 0 && mySeat >= 0 && (
+            <p
+              className={`match-chip-delta ${
+                matchEnded.winningTeam === myTeam ? 'win' : 'lose'
+              }`}
+            >
+              {matchEnded.winningTeam === myTeam
+                ? `💰 +${stake}칩 획득!`
+                : `💸 −${stake}칩`}
+            </p>
+          )}
           {matchEnded.mvpUserId != null && (() => {
             const mvpId = matchEnded.mvpUserId;
             const mvpSeat = playerIds.indexOf(mvpId);

@@ -97,6 +97,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
   D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
   재사용. 패스 카드 선택 UI 는 `arena-actions` 로 통합(로직 불변).
+- D-81: **가상 칩 내기 모드**(현금 아님 — 현금은 도박·결제·KYC 문제로 배제). 방 생성 시
+  판돈 `{0,10,50,100,500}`(0=없음) 선택, **stake>0 방은 봇 금지**(파밍 방지). ready 시
+  잔액≥판돈 검증(`INSUFFICIENT_CHIPS`), 매치 종료 시 `MatchResultRecorder`(@Transactional)
+  에서 제로섬 정산(승팀 +판돈/패팀 −판돈, 봇 매치 ELO처럼 제외, 0까지만 차감). 판돈은
+  Redis room 해시 고정 → `TichuMatchCompleted.stake` 로 정산 전달(`GameStartingEvent`/
+  `TichuMatchState` 미경유). 잔액<200 시 `POST /api/me/chips/topup`(→500) 무료 충전.
+  클라: 방 만들기 판돈 셀렉터·방목록 💰배지·게임판 헤더 판돈/매치종료 칩 증감·허브 잔액.
 
 ## 자주 쓰는 명령
 

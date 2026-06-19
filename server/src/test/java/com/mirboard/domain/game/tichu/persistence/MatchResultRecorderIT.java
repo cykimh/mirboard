@@ -171,6 +171,59 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(3).getDesertCount()).isZero();
     }
 
+    @Test
+    @Transactional
+    void chip_settlement_winners_plus_stake_losers_minus_stake() {
+        // D-81 — 판돈 100, 사람 4인, Team A(seat 0,2) 승. 승팀 +100 / 패팀 −100.
+        var users = registerFour("mrc_a", "mrc_b", "mrc_c", "mrc_d");
+        var ids = users.stream().map(User::getId).toList();
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-chip", ids, 600, 200, Team.A,
+                List.of(new RoundScore(600, 200, 0, false)), null, 100));
+
+        var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
+        assertThat(refreshed.get(0).getChipBalance()).isEqualTo(1100);
+        assertThat(refreshed.get(2).getChipBalance()).isEqualTo(1100);
+        assertThat(refreshed.get(1).getChipBalance()).isEqualTo(900);
+        assertThat(refreshed.get(3).getChipBalance()).isEqualTo(900);
+    }
+
+    @Test
+    @Transactional
+    void staked_bot_match_skips_chip_settlement() {
+        // D-81 — 봇 포함 매치는 ELO 처럼 칩 정산 제외(파밍 방지). 잔액 불변.
+        var humans = registerFour("mrcb_a", "mrcb_b", "mrcb_c");
+        long botId = bots.getBotIds().get(0);
+        List<Long> ids = List.of(
+                humans.get(0).getId(), humans.get(1).getId(),
+                humans.get(2).getId(), botId);
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-chipbot", ids, 900, 200, Team.A,
+                List.of(new RoundScore(900, 200, 0, false)), null, 100));
+
+        var refreshed = humans.stream()
+                .map(u -> userRepo.findById(u.getId()).orElseThrow()).toList();
+        assertThat(refreshed).allMatch(u -> u.getChipBalance() == 1000);
+    }
+
+    @Test
+    @Transactional
+    void desertion_settles_chips_deserter_team_loses() {
+        // D-81 — 탈주 패배도 칩 정산: 탈주자 팀(B, seat1·3) −100, 상대팀(A) +100.
+        var users = registerFour("mrcd_a", "mrcd_b", "mrcd_c", "mrcd_d");
+        var ids = users.stream().map(User::getId).toList();
+        long deserter = ids.get(1); // seat1 = Team B → A 승.
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-chipdesert", ids, 120, 80, Team.A,
+                List.of(new RoundScore(120, 80, 0, false)), deserter, 100));
+
+        var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
+        assertThat(refreshed.get(0).getChipBalance()).isEqualTo(1100);
+        assertThat(refreshed.get(2).getChipBalance()).isEqualTo(1100);
+        assertThat(refreshed.get(1).getChipBalance()).isEqualTo(900);
+        assertThat(refreshed.get(3).getChipBalance()).isEqualTo(900);
+    }
+
     private List<User> registerFour(String... usernames) {
         List<User> created = new ArrayList<>();
         for (String u : usernames) {

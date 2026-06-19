@@ -194,6 +194,7 @@ export function RoomPage() {
           botSeats={room.botSeats ?? []}
           fillWithBots={room.fillWithBots ?? false}
           turnSeconds={room.turnSeconds ?? 0}
+          stake={room.stake ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
           usernames={usernames}
           onExit={handleLeave}

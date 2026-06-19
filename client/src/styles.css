@@ -663,6 +663,19 @@ a {
   color: #ffd180;
 }
 
+/* D-81 — 매치 종료 칩 증감(내기 방). */
+.match-chip-delta {
+  margin: 2px 0;
+  font-weight: 900;
+  font-size: 1.15rem;
+}
+.match-chip-delta.win {
+  color: #4ade80;
+}
+.match-chip-delta.lose {
+  color: #f87171;
+}
+
 /* P5 — 승리 이펙트 뒤 매치 종료 패널의 MVP 강조 카드. */
 .match-mvp {
   display: flex;
