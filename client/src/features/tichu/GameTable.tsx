@@ -9,7 +9,7 @@ import { useStompRoom } from '@/ws/useStompRoom';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
-import { comboLabel } from './handType';
+import { comboLabel, isSelectionPlayable } from './handType';
 import { CardChip } from './CardChip';
 import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
@@ -189,6 +189,13 @@ export function GameTable({
   const selectedCombo = useMemo(
     () => comboLabel(selectedCards),
     [selectedCards],
+  );
+
+  // 선택한 패를 "지금 진짜로 낼 수 있는지" — 서버 HandComparator 미러로 좁게 판정.
+  // 확실히 불가일 때만 false → 내기 버튼 비활성(거짓 비활성 회피, 위시는 서버 판정).
+  const selectedPlayable = useMemo(
+    () => isInPlaying && isSelectionPlayable(selectedCards, tableView?.currentTop ?? null),
+    [isInPlaying, selectedCards, tableView?.currentTop],
   );
 
   const passCardsBySlot = useMemo(() => {
@@ -607,29 +614,46 @@ export function GameTable({
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
         <ReactionFloats mySeat={mySeat} />
-        {/* #6 — 내기/패스를 내 좌석(하단) 좌·우로 배치해 누르기 쉽게. */}
+        {/* #6 — 내기(좌)/패스(우)를 내 좌석 양옆에. 패스 우측엔 선택 초기화(취소)
+            버튼. 내기는 "진짜로 낼 수 있을 때만" 활성(selectedPlayable). 두 그룹을
+            좌석 바깥으로 앵커해 취소가 늘어도 좌석/버튼을 침범하지 않는다. */}
         {!spectator && isInPlaying && (
           <div className="arena-seat-actions" aria-label="내 차례 액션">
-            <Button
-              type="button"
-              className="seat-action-btn pass"
-              variant="secondary"
-              onClick={handlePass}
-              disabled={!myTurn || !tableView.currentTop}
-            >
-              {t('play.action.pass')}
-            </Button>
-            <Button
-              type="button"
-              className="seat-action-btn play"
-              onClick={handlePlay}
-              disabled={!myTurn || selectedCards.length === 0 || selectedCombo === '?'}
-            >
-              {t('play.action.play')}
-              {selectedCards.length > 0
-                ? ` (${selectedCards.length}${t('seat.handCardsSuffix')})`
-                : ''}
-            </Button>
+            <div className="seat-action-group left">
+              <Button
+                type="button"
+                className="seat-action-btn play"
+                onClick={handlePlay}
+                disabled={!myTurn || !selectedPlayable}
+              >
+                {t('play.action.play')}
+                {selectedCards.length > 0
+                  ? ` (${selectedCards.length}${t('seat.handCardsSuffix')})`
+                  : ''}
+              </Button>
+            </div>
+            <div className="seat-action-group right">
+              <Button
+                type="button"
+                className="seat-action-btn pass"
+                variant="secondary"
+                onClick={handlePass}
+                disabled={!myTurn || !tableView.currentTop}
+              >
+                {t('play.action.pass')}
+              </Button>
+              {selectedCards.length > 0 && (
+                <Button
+                  type="button"
+                  className="seat-action-cancel"
+                  variant="outline"
+                  onClick={clearSelection}
+                  aria-label="선택 초기화"
+                >
+                  {t('play.action.clearSelection')}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -734,6 +758,9 @@ export function GameTable({
                   <span className="combo-hint" aria-live="polite">
                     선택: {selectedCombo}
                     {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
+                    {selectedCombo !== '?' && !selectedPlayable && (
+                      <span className="combo-illegal"> · 지금 낼 수 없음</span>
+                    )}
                   </span>
                 )}
                 {/* 내기/패스는 경기장 좌석 좌우 버튼으로 이동(#6). 여기엔 티츄 선언만. */}

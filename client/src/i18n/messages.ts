@@ -77,7 +77,7 @@ const KO = {
   'play.action.play': '내기',
   'play.action.pass': '패스',
   'play.action.declareTichu': '티츄 선언',
-  'play.action.clearSelection': '선택 해제',
+  'play.action.clearSelection': '취소',
   'play.error.pickCard': '카드를 한 장 이상 선택하세요',
   'play.error.passSlots': '3장(왼쪽/파트너/오른쪽) 모두 선택해야 합니다',
 
