@@ -12,6 +12,9 @@ import java.util.List;
  * <p>{@code deserterUserId}: Phase 19(#3, D-75) — 게임중 탈주로 강제 종료된
  * 경우 탈주자 userId, 정상 종료면 {@code null}. 비-null 이면
  * {@code MatchResultRecorder} 가 해당 유저 desert_count 를 추가 증분한다.
+ *
+ * <p>{@code stake}: D-81 — 방의 판돈(가상 칩). 0=내기 없음. {@code MatchResultRecorder}
+ * 가 정산 시 승팀 +stake / 패팀 −stake 로 칩을 이동한다(봇 매치 제외).
  */
 public record TichuMatchCompleted(
         String roomId,
@@ -20,7 +23,8 @@ public record TichuMatchCompleted(
         int cumulativeTeamBScore,
         Team winningTeam,
         List<RoundScore> roundScores,
-        Long deserterUserId) {
+        Long deserterUserId,
+        int stake) {
 
     public TichuMatchCompleted {
         playerIds = List.copyOf(playerIds);

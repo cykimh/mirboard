@@ -27,7 +27,7 @@ class RoomLobbyEventPublisherTest {
 
     private static Room room(String id) {
         return new Room(id, "방", "TICHU", 1L, RoomStatus.WAITING, 4, 1,
-                List.of(1L), Set.of(), TeamPolicy.SEQUENTIAL, 0L, false, List.of(), 1000, 0,
+                List.of(1L), Set.of(), TeamPolicy.SEQUENTIAL, 0L, false, List.of(), 1000, 0, 0,
                 Set.of());
     }
 

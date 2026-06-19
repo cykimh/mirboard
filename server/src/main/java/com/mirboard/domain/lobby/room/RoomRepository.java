@@ -66,7 +66,7 @@ public class RoomRepository {
 
     public void create(String roomId, long hostUserId, String name, String gameType,
                        int capacity, long createdAt, TeamPolicy teamPolicy,
-                       boolean fillWithBots, int targetScore, int turnSeconds) {
+                       boolean fillWithBots, int targetScore, int turnSeconds, int stake) {
         Long result = redis.execute(
                 createScript,
                 keysFor(roomId),
@@ -79,7 +79,8 @@ public class RoomRepository {
                 teamPolicy.name(),
                 Boolean.toString(fillWithBots),
                 Integer.toString(targetScore),
-                Integer.toString(turnSeconds));
+                Integer.toString(turnSeconds),
+                Integer.toString(stake));
         if (result == null || result != 1L) {
             throw new IllegalStateException("room_create.lua returned unexpected: " + result);
         }
@@ -209,6 +210,9 @@ public class RoomRepository {
         // Phase 13D — turnSeconds 없으면 (구방) 0 (끔) 기본값.
         String rawTurn = (String) hash.get("turnSeconds");
         int turnSeconds = rawTurn == null ? 0 : Integer.parseInt(rawTurn);
+        // D-81 — stake 없으면 (구방) 0 (내기 없음) 기본값.
+        String rawStake = (String) hash.get("stake");
+        int stake = rawStake == null ? 0 : Integer.parseInt(rawStake);
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -232,6 +236,7 @@ public class RoomRepository {
                 List.copyOf(botSeats),
                 targetScore,
                 turnSeconds,
+                stake,
                 readyUserIds));
     }
 

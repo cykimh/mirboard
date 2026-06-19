@@ -96,7 +96,8 @@ public class MatchProgressService {
                     afterRound.cumulativeB(),
                     afterRound.winningTeam(),
                     afterRound.roundScores(),
-                    null)); // 정상 종료 — 탈주자 없음 (Phase 19, D-75).
+                    null,            // 정상 종료 — 탈주자 없음 (Phase 19, D-75).
+                    room.stake()));  // D-81 — 칩 정산용 판돈.
             metrics.matchCompleted();
             log.info("Match ended: winner={} rounds={} A={} B={}",
                     afterRound.winningTeam(), afterRound.roundScores().size(),

@@ -11,7 +11,7 @@
 
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
-| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `seq` | 메타 |
+| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변 |
 | `room:{roomId}:players` | LIST | 6h | 입장 순서대로 `userId` push (capacity ≤ 4) | 자리 = index |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함) |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함) | 직렬화 책임은 GameEngine |

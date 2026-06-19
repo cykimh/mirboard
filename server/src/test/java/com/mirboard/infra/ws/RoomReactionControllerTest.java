@@ -34,7 +34,7 @@ class RoomReactionControllerTest {
     private static Room room() {
         return new Room("r1", "방", "TICHU", 1L, RoomStatus.IN_GAME, 4, 4,
                 List.of(1L, 2L, 3L, 4L), Set.of(), TeamPolicy.SEQUENTIAL,
-                0L, false, List.of(), 1000, 0, Set.of());
+                0L, false, List.of(), 1000, 0, 0, Set.of());
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
+import com.mirboard.domain.lobby.auth.UserRepository;
 import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.security.SecureRandom;
@@ -32,6 +33,7 @@ public class RoomService {
     private final MirboardMetrics metrics;
     private final Random random;
     private final BotUserRegistry bots;
+    private final UserRepository userRepository;
 
     @Autowired
     public RoomService(RoomRepository repository,
@@ -39,8 +41,9 @@ public class RoomService {
                        Clock clock,
                        DomainEventBus events,
                        MirboardMetrics metrics,
-                       BotUserRegistry bots) {
-        this(repository, games, clock, events, metrics, bots, new SecureRandom());
+                       BotUserRegistry bots,
+                       UserRepository userRepository) {
+        this(repository, games, clock, events, metrics, bots, userRepository, new SecureRandom());
     }
 
     /** Phase 8C — 테스트에서 시드 고정 Random 을 주입할 수 있도록 분리한 생성자. */
@@ -50,6 +53,7 @@ public class RoomService {
                        DomainEventBus events,
                        MirboardMetrics metrics,
                        BotUserRegistry bots,
+                       UserRepository userRepository,
                        Random random) {
         this.repository = repository;
         this.games = games;
@@ -57,6 +61,7 @@ public class RoomService {
         this.events = events;
         this.metrics = metrics;
         this.bots = bots;
+        this.userRepository = userRepository;
         this.random = random;
     }
 
@@ -64,6 +69,11 @@ public class RoomService {
     public static final int DEFAULT_TARGET_SCORE = 1000;
     /** Phase 13D — 기본 턴 제한 (0=끔). */
     public static final int DEFAULT_TURN_SECONDS = 0;
+    /** D-81 — 기본 판돈 (0=내기 없음). */
+    public static final int DEFAULT_STAKE = 0;
+    /** D-81 — 허용 판돈(가상 칩). 0=내기 없음. 임의값/음수 차단. */
+    public static final java.util.Set<Integer> ALLOWED_STAKES =
+            java.util.Set.of(0, 10, 50, 100, 500);
 
     public Room createRoom(long hostUserId, String name, String gameType) {
         return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false,
@@ -87,6 +97,13 @@ public class RoomService {
                 DEFAULT_TURN_SECONDS);
     }
 
+    public Room createRoom(long hostUserId, String name, String gameType,
+                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
+                           int turnSeconds) {
+        return createRoom(hostUserId, name, gameType, teamPolicy, fillWithBots, targetScore,
+                turnSeconds, DEFAULT_STAKE);
+    }
+
     /**
      * Phase 9B — `fillWithBots=true` 면 createRoom 직후 capacity 가 찰 때까지 시드 봇을
      * 자동 join. capacity 도달 시 일반 joinRoom 흐름과 동일하게 IN_GAME 전이 +
@@ -95,24 +112,32 @@ public class RoomService {
      * Phase 12 — `targetScore` 매치 종료 목표점수 (기본 1000).
      * Phase 13D — `turnSeconds` 개인 턴 제한 (0=끔). 타이머는 매치 상태가 아니라
      * 방 메타라 TichuMatchState 까진 흘리지 않고 스케줄러가 room 으로 참조.
+     * D-81 — `stake` 판돈(가상 칩, 0=내기 없음). 허용값 외/음수는 거절하고,
+     * stake>0 이면 봇 채우기 금지(봇=무한 잔액 → 칩 파밍 방지).
      */
     public Room createRoom(long hostUserId, String name, String gameType,
                            TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
-                           int turnSeconds) {
+                           int turnSeconds, int stake) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
         }
+        if (!ALLOWED_STAKES.contains(stake)) {
+            throw new InvalidStakeException(stake);
+        }
+        if (stake > 0 && fillWithBots) {
+            throw new StakedRoomNoBotsException();
+        }
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
         repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy,
-                fillWithBots, targetScore, turnSeconds);
+                fillWithBots, targetScore, turnSeconds, stake);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
         metrics.roomCreated();
-        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={}",
+        log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={} stake={}",
                 roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots,
-                targetScore, turnSeconds);
+                targetScore, turnSeconds, stake);
 
         if (fillWithBots) {
             int seatsToFill = def.maxPlayers() - 1;  // host 1 명 이미 들어가 있음.
@@ -180,7 +205,17 @@ public class RoomService {
      * NotInRoomException, 이미 시작/종료된 방이면 GameAlreadyStartedException.
      */
     public Room setReady(String roomId, long userId, boolean ready) {
-        getRoom(roomId); // 존재 확인 (없으면 RoomNotFound).
+        Room current = getRoom(roomId); // 존재 확인 (없으면 RoomNotFound).
+        // D-81 — 판돈 방은 ready 전에 잔액(≥판돈)을 확인. 부족하면 거절(무료 충전 유도).
+        // 매치 중 잔액은 줄지 않으므로(1인 1방) 이 시점 검증으로 패자도 정산 시 판돈 이상 보유.
+        if (ready && current.stake() > 0 && !bots.isBot(userId)) {
+            long balance = userRepository.findById(userId)
+                    .map(com.mirboard.domain.lobby.auth.User::getChipBalance)
+                    .orElse(0L);
+            if (balance < current.stake()) {
+                throw new InsufficientChipsException(roomId, current.stake(), balance);
+            }
+        }
         int code = repository.setReady(roomId, userId, ready);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));

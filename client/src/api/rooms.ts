@@ -21,6 +21,7 @@ export const roomsApi = {
         fillWithBots?: boolean;
         targetScore?: number;
         turnSeconds?: number;
+        stake?: number;
       },
   ): Promise<Room> {
     const body: Record<string, unknown> = { name, gameType };
@@ -28,6 +29,7 @@ export const roomsApi = {
     if (opts?.fillWithBots) body.fillWithBots = true;
     if (opts?.targetScore) body.targetScore = opts.targetScore;
     if (opts?.turnSeconds != null) body.turnSeconds = opts.turnSeconds;
+    if (opts?.stake != null) body.stake = opts.stake;
     return apiRequest('/api/rooms', { method: 'POST', token, body });
   },
 

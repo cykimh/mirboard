@@ -8,8 +8,11 @@ import com.mirboard.domain.lobby.auth.UsernameTakenException;
 import com.mirboard.domain.lobby.room.AlreadyInRoomException;
 import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.GameNotInProgressException;
+import com.mirboard.domain.lobby.room.InsufficientChipsException;
+import com.mirboard.domain.lobby.room.InvalidStakeException;
 import com.mirboard.domain.lobby.room.NotHostException;
 import com.mirboard.domain.lobby.room.NotInRoomException;
+import com.mirboard.domain.lobby.room.StakedRoomNoBotsException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.RoomFullException;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
@@ -121,6 +124,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorEnvelope> handleInvalidAvatar(InvalidAvatarException e) {
         return ResponseEntity.badRequest()
                 .body(ApiErrorEnvelope.of("INVALID_AVATAR", e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidStakeException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInvalidStake(InvalidStakeException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("INVALID_STAKE", "허용되지 않은 판돈입니다",
+                        Map.of("stake", e.stake())));
+    }
+
+    @ExceptionHandler(StakedRoomNoBotsException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleStakedRoomNoBots(StakedRoomNoBotsException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("STAKED_ROOM_NO_BOTS",
+                        "판돈 방은 봇으로 채울 수 없습니다"));
+    }
+
+    @ExceptionHandler(InsufficientChipsException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInsufficientChips(InsufficientChipsException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("INSUFFICIENT_CHIPS", "칩이 부족합니다",
+                        Map.of("required", e.required(), "balance", e.balance())));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

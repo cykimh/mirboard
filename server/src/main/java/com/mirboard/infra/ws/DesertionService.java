@@ -103,7 +103,8 @@ public class DesertionService {
                     matchState.cumulativeB(),
                     winner,
                     matchState.roundScores(),
-                    deserterUserId));
+                    deserterUserId,
+                    room.stake())); // D-81 — 탈주 패배 정산용 판돈.
 
             broadcaster.broadcast(
                     roomId,

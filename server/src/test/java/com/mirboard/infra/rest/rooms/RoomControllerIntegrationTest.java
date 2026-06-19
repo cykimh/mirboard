@@ -55,6 +55,12 @@ class RoomControllerIntegrationTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    com.mirboard.domain.lobby.auth.UserRepository userRepo;
+
+    @Autowired
+    org.springframework.transaction.PlatformTransactionManager txManager;
+
     @Test
     void create_then_list_then_get_then_leave() throws Exception {
         String token = registerAndLogin("rooms_user", "validpass1");
@@ -242,6 +248,96 @@ class RoomControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.targetScore").value(1000));
+    }
+
+    @Test
+    void create_with_stake_persists_and_defaults_to_zero() throws Exception {
+        String token = registerAndLogin("stake_user", "validpass1");
+        MvcResult staked = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "내기 방", "gameType", "TICHU", "stake", 100))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.stake").value(100))
+                .andReturn();
+
+        MvcResult plain = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "일반 방", "gameType", "TICHU"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.stake").value(0))
+                .andReturn();
+
+        // 공유 Redis 오염 방지 — 생성한 방 정리(다른 테스트의 목록 가정 보호).
+        leaveRoom(token, roomIdOf(staked));
+        leaveRoom(token, roomIdOf(plain));
+    }
+
+    @Test
+    void create_with_invalid_stake_returns_400() throws Exception {
+        String token = registerAndLogin("bad_stake_user", "validpass1");
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "이상한 판돈", "gameType", "TICHU", "stake", 7))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_STAKE"));
+    }
+
+    @Test
+    void create_staked_room_with_bots_returns_400() throws Exception {
+        String token = registerAndLogin("stake_bot_user", "validpass1");
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "판돈+봇", "gameType", "TICHU",
+                                "stake", 100, "fillWithBots", true))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("STAKED_ROOM_NO_BOTS"));
+    }
+
+    @Test
+    void ready_in_staked_room_without_enough_chips_is_rejected() throws Exception {
+        String token = registerAndLogin("broke_user", "validpass1");
+        MvcResult created = mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "고액 판돈", "gameType", "TICHU", "stake", 500))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.stake").value(500))
+                .andReturn();
+        JsonNode json = objectMapper.readTree(created.getResponse().getContentAsString());
+        long hostId = json.get("hostId").asLong();
+        String roomId = json.get("roomId").asText();
+
+        // 잔액을 판돈(500)보다 낮춤: 1000 → 50. @Modifying 쿼리라 트랜잭션 안에서 실행.
+        new org.springframework.transaction.support.TransactionTemplate(txManager)
+                .executeWithoutResult(s -> userRepo.decrementChipCapped(hostId, 950));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ready\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_CHIPS"));
+
+        leaveRoom(token, roomId); // 공유 Redis 오염 방지.
+    }
+
+    private String roomIdOf(MvcResult created) throws Exception {
+        return objectMapper.readTree(created.getResponse().getContentAsString())
+                .get("roomId").asText();
+    }
+
+    private void leaveRoom(String token, String roomId) throws Exception {
+        mockMvc.perform(post("/api/rooms/" + roomId + "/leave")
+                .header("Authorization", "Bearer " + token));
     }
 
     private String registerAndLogin(String username, String password) throws Exception {

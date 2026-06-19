@@ -38,7 +38,7 @@ class DesertionServiceTest {
     private static Room inGame(List<Long> players) {
         return new Room("r1", "방", "TICHU", players.get(0), RoomStatus.IN_GAME,
                 4, players.size(), players, Set.of(), TeamPolicy.SEQUENTIAL,
-                0L, false, List.of(), 1000, 0, Set.of());
+                0L, false, List.of(), 1000, 0, 0, Set.of());
     }
 
     @Test
@@ -81,7 +81,7 @@ class DesertionServiceTest {
         when(lock.tryAcquire("r1")).thenReturn(true);
         Room finished = new Room("r1", "방", "TICHU", 10L, RoomStatus.FINISHED,
                 4, 4, List.of(10L, 20L, 30L, 40L), Set.of(), TeamPolicy.SEQUENTIAL,
-                0L, false, List.of(), 1000, 0, Set.of());
+                0L, false, List.of(), 1000, 0, 0, Set.of());
         when(roomService.getRoom("r1")).thenReturn(finished);
 
         boolean processed = service.processDesertion("r1", 10L);

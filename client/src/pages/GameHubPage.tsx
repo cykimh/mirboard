@@ -284,6 +284,14 @@ export function GameHubPage() {
                           🤖 솔로
                         </Badge>
                       )}
+                      {room.stake > 0 && (
+                        <Badge
+                          variant="outline"
+                          title={`내기 방 — 판돈 ${room.stake}칩 (가상 칩)`}
+                        >
+                          💰 {room.stake}
+                        </Badge>
+                      )}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {room.gameType} · {room.playerCount} / {room.capacity} ·{' '}

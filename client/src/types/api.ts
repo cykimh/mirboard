@@ -39,6 +39,8 @@ export interface Room {
   targetScore: number;
   /** Phase 13D — 개인 턴 제한 초 (0=끔). */
   turnSeconds: number;
+  /** D-81 — 판돈(가상 칩). 0=내기 없음. 생성 시 고정. */
+  stake: number;
   /** Phase 16(#2) — 대기실에서 준비 완료한 플레이어 id (봇은 자동 포함). */
   readyUserIds: number[];
 }
@@ -62,6 +64,8 @@ export interface MeResponse {
   username: string;
   winCount: number;
   loseCount: number;
+  /** D-81 — 가상 칩 잔액(현금 아님). */
+  chipBalance: number;
 }
 
 export interface ApiErrorEnvelope {

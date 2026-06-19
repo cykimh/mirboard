@@ -27,7 +27,7 @@ class RoomDisconnectHandlerTest {
     private static Room room(RoomStatus status, List<Long> players, Set<Long> spectators) {
         return new Room("r1", "방", "TICHU", players.isEmpty() ? 0L : players.get(0),
                 status, 4, players.size(), players, spectators, TeamPolicy.SEQUENTIAL,
-                0L, false, List.of(), 1000, 0, Set.of());
+                0L, false, List.of(), 1000, 0, 0, Set.of());
     }
 
     @Test

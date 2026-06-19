@@ -50,6 +50,7 @@ export function CreateRoomModal({
   const [fillWithBots, setFillWithBots] = useState(false);
   const [targetScore, setTargetScore] = useState(1000);
   const [turnSeconds, setTurnSeconds] = useState(0);
+  const [stake, setStake] = useState(0);
 
   // 모달이 열릴 때 기본 게임을 첫 AVAILABLE 로 맞춘다.
   useEffect(() => {
@@ -67,7 +68,8 @@ export function CreateRoomModal({
         token,
         roomName.trim(),
         selectedGame.toUpperCase(),
-        { fillWithBots, targetScore, turnSeconds },
+        // 판돈 방은 봇 금지(서버도 거절) — 클라에서도 강제.
+        { fillWithBots: stake > 0 ? false : fillWithBots, targetScore, turnSeconds, stake },
       );
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
@@ -149,12 +151,47 @@ export function CreateRoomModal({
             </ToggleGroup>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <Label>💰 판돈 (가상 칩)</Label>
+            <ToggleGroup
+              type="single"
+              value={String(stake)}
+              onValueChange={(v) => {
+                if (v === '') return;
+                const s = Number(v);
+                setStake(s);
+                if (s > 0) setFillWithBots(false); // 판돈 방은 봇 금지
+              }}
+              className="justify-start"
+            >
+              {[
+                { v: 0, label: '없음' },
+                { v: 10, label: '10' },
+                { v: 50, label: '50' },
+                { v: 100, label: '100' },
+                { v: 500, label: '500' },
+              ].map((o) => (
+                <ToggleGroupItem key={o.v} value={String(o.v)}>
+                  {o.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {stake > 0 && (
+              <p className="text-xs text-muted-foreground">
+                내기 방: 승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님). 봇 참여 불가.
+              </p>
+            )}
+          </div>
+
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={fillWithBots}
+              disabled={stake > 0}
               onCheckedChange={(c) => setFillWithBots(c === true)}
             />
-            <span>🤖 빈 좌석 봇으로 채우기</span>
+            <span>
+              🤖 빈 좌석 봇으로 채우기{stake > 0 ? ' (판돈 방 불가)' : ''}
+            </span>
           </label>
 
           <DialogFooter className="gap-2">

@@ -4,7 +4,7 @@
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = rooms:open
--- ARGV    = roomId, hostId, name, gameType, capacity, createdAt, teamPolicy, fillWithBots, targetScore, turnSeconds
+-- ARGV    = roomId, hostId, name, gameType, capacity, createdAt, teamPolicy, fillWithBots, targetScore, turnSeconds, stake
 --
 -- Returns 1 on success. Caller generates a fresh UUID for roomId so duplicates
 -- should not occur; we still refuse to clobber an existing room key.
@@ -19,6 +19,7 @@ local teamPolicy   = ARGV[7]
 local fillWithBots = ARGV[8]  -- "true" / "false"
 local targetScore  = ARGV[9]   -- 매치 종료 목표점수 (예: 300/500/700/1000)
 local turnSeconds  = ARGV[10]  -- 개인 턴 제한 초 (0=끔)
+local stake        = ARGV[11]  -- D-81 판돈(가상 칩). 0=내기 없음. 불변.
 local ttl          = 21600  -- 6h
 
 if redis.call('EXISTS', KEYS[1]) == 1 then
@@ -36,7 +37,8 @@ redis.call('HSET', KEYS[1],
     'teamPolicy',   teamPolicy,
     'fillWithBots', fillWithBots,
     'targetScore',  targetScore,
-    'turnSeconds',  turnSeconds)
+    'turnSeconds',  turnSeconds,
+    'stake',        stake)
 redis.call('EXPIRE', KEYS[1], ttl)
 
 redis.call('RPUSH', KEYS[2], hostId)

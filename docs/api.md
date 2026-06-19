@@ -148,13 +148,17 @@
 ### POST `/api/rooms`
 요청
 ```json
-{ "name": "티츄 한 판", "gameType": "TICHU" }
+{ "name": "티츄 한 판", "gameType": "TICHU", "stake": 100 }
 ```
 - `gameType` 은 `GameRegistry` 에 등록되고 `status==AVAILABLE` 인 ID여야 한다.
 - `capacity` 는 서버가 `GameDefinition.maxPlayers()` 로 결정한다 (클라가 보내도 무시).
+- 선택: `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`(D-81).
+- `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
+  고정·불변. **stake>0 이면 `fillWithBots` 불가**(봇=무한 잔액 → 칩 파밍 방지).
 
 응답 `201` — Room (위 형식과 동일, 본인이 host로 자동 join 됨).
-에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태).
+에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태),
+`INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇 동시 요청).
 
 ### POST `/api/rooms/{roomId}/join`
 응답 `200` — Room 갱신본.
@@ -170,7 +174,8 @@
 (`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
-`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석).
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석),
+`INSUFFICIENT_CHIPS`(D-81 — 판돈 방인데 칩 잔액 < 판돈; 무료 충전 후 재시도).
 
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:

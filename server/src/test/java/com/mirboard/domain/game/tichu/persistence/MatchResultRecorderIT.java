@@ -80,7 +80,7 @@ class MatchResultRecorderIT {
                 new RoundScore(500, 100, 0, false),
                 new RoundScore(600, 200, 0, false));
         publisher.publishEvent(new TichuMatchCompleted(
-                "room-X", ids, 1100, 300, Team.A, rounds, null));
+                "room-X", ids, 1100, 300, Team.A, rounds, null, 0));
 
         // Match row — 누적 점수가 기록.
         var matches = matchRepo.findAll();
@@ -129,7 +129,7 @@ class MatchResultRecorderIT {
 
         publisher.publishEvent(new TichuMatchCompleted(
                 "room-bot", ids, 900, 200, Team.A,
-                List.of(new RoundScore(900, 200, 0, false)), null));
+                List.of(new RoundScore(900, 200, 0, false)), null, 0));
 
         // match_result + participant 는 기록됨.
         assertThat(matchRepo.findAll()).anyMatch(m -> m.getRoomId().equals("room-bot"));
@@ -155,7 +155,7 @@ class MatchResultRecorderIT {
 
         publisher.publishEvent(new TichuMatchCompleted(
                 "room-desert", ids, 120, 80, Team.A,
-                List.of(new RoundScore(120, 80, 0, false)), deserter));
+                List.of(new RoundScore(120, 80, 0, false)), deserter, 0));
 
         var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
         // 탈주자(seat1, B) — 패배 + 탈주 카운트.
