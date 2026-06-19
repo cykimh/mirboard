@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import type { Card } from '@/types/tichu';
-import { comboLabel, detectHandType, handTypeLabel } from './handType';
+import type { Card, Hand } from '@/types/tichu';
+import {
+  analyzeHand,
+  canBeat,
+  comboLabel,
+  detectHandType,
+  handTypeLabel,
+  isSelectionPlayable,
+} from './handType';
 
 const n = (suit: Card['suit'], rank: number): Card => ({ suit, rank, special: null });
 const sp = (special: Card['special']): Card => ({ suit: null, rank: 0, special });
+const hand = (
+  type: Hand['type'],
+  rank: number,
+  length: number,
+  cards: Card[] = [],
+  phoenixSingle = false,
+): Hand => ({ type, rank, length, cards, phoenixSingle });
 
 describe('detectHandType', () => {
   it('empty → null', () => {
@@ -138,5 +152,105 @@ describe('comboLabel (rank 포함)', () => {
 
   it('조합 불명 → ?', () => {
     expect(comboLabel([n('JADE', 5), n('SWORD', 9)])).toBe('?');
+  });
+});
+
+describe('analyzeHand (type/rank/length 분석)', () => {
+  it('싱글 — 일반/마작/드래곤 rank 센티넬, 피닉스 플래그', () => {
+    expect(analyzeHand([n('JADE', 9)])).toMatchObject({
+      type: 'SINGLE',
+      rank: 9,
+      length: 1,
+      phoenixSingle: false,
+    });
+    expect(analyzeHand([sp('MAHJONG')])).toMatchObject({ rank: 1 });
+    expect(analyzeHand([sp('DRAGON')])).toMatchObject({ rank: 100 });
+    expect(analyzeHand([sp('PHOENIX')])).toMatchObject({ phoenixSingle: true });
+  });
+
+  it('페어/트리플 rank = 자연 카드 rank (피닉스 와일드 포함)', () => {
+    expect(analyzeHand([n('JADE', 7), n('SWORD', 7)])).toMatchObject({ type: 'PAIR', rank: 7 });
+    expect(analyzeHand([sp('PHOENIX'), n('JADE', 9)])).toMatchObject({ type: 'PAIR', rank: 9 });
+    expect(analyzeHand([sp('PHOENIX'), n('JADE', 9), n('SWORD', 9)])).toMatchObject({
+      type: 'TRIPLE',
+      rank: 9,
+    });
+  });
+
+  it('인식 불가 → null', () => {
+    expect(analyzeHand([n('JADE', 5), n('SWORD', 9)])).toBeNull();
+  });
+});
+
+describe('canBeat (서버 HandComparator 미러)', () => {
+  const pair = (r: number) => analyzeHand([n('JADE', r), n('SWORD', r)])!;
+
+  it('같은 타입·길이 고랭크만 이김', () => {
+    expect(canBeat(pair(8), hand('PAIR', 7, 2))).toBe(true);
+    expect(canBeat(pair(7), hand('PAIR', 7, 2))).toBe(false);
+    expect(canBeat(pair(6), hand('PAIR', 7, 2))).toBe(false);
+  });
+
+  it('다른 길이 스트레이트는 못 이김(같은 길이 고랭크만)', () => {
+    const s5 = analyzeHand([
+      n('JADE', 5), n('SWORD', 6), n('STAR', 7), n('PAGODA', 8), n('JADE', 9),
+    ])!;
+    expect(canBeat(s5, hand('STRAIGHT', 10, 6))).toBe(false);
+    expect(canBeat(s5, hand('STRAIGHT', 8, 5))).toBe(true);
+  });
+
+  it('폭탄은 비폭탄 전부 이김, 폭탄끼리는 고랭크, 비폭탄은 폭탄 못 이김', () => {
+    const bomb7 = analyzeHand([
+      n('JADE', 7), n('SWORD', 7), n('STAR', 7), n('PAGODA', 7),
+    ])!;
+    expect(canBeat(bomb7, hand('PAIR', 14, 2))).toBe(true);
+    expect(canBeat(bomb7, hand('BOMB', 5, 4))).toBe(true);
+    expect(canBeat(bomb7, hand('BOMB', 9, 4))).toBe(false);
+    expect(canBeat(pair(14), hand('BOMB', 5, 4))).toBe(false);
+  });
+
+  it('스트레이트플러시폭탄은 일반 폭탄/모든 것을 이김', () => {
+    const sfb = analyzeHand([
+      n('JADE', 5), n('JADE', 6), n('JADE', 7), n('JADE', 8), n('JADE', 9),
+    ])!;
+    expect(canBeat(sfb, hand('BOMB', 14, 4))).toBe(true);
+    expect(canBeat(sfb, hand('PAIR', 3, 2))).toBe(true);
+  });
+
+  it('피닉스 싱글: 드래곤 빼고 모든 싱글 이김, 폭탄엔 짐', () => {
+    const ph = analyzeHand([sp('PHOENIX')])!;
+    expect(canBeat(ph, hand('SINGLE', 9, 1, [n('JADE', 9)]))).toBe(true);
+    expect(canBeat(ph, hand('SINGLE', 100, 1, [sp('DRAGON')]))).toBe(false);
+    expect(canBeat(ph, hand('BOMB', 5, 4))).toBe(false);
+  });
+});
+
+describe('isSelectionPlayable (내기 버튼 UI 게이트)', () => {
+  it('리드(currentTop 없음) → 인식된 조합 모두 가능(개 단독 포함)', () => {
+    expect(isSelectionPlayable([n('JADE', 3), n('SWORD', 3)], null)).toBe(true);
+    expect(isSelectionPlayable([sp('DOG')], null)).toBe(true);
+  });
+
+  it('follow: 못 이기면 false, 이기면 true', () => {
+    const top = hand('PAIR', 7, 2);
+    expect(isSelectionPlayable([n('JADE', 6), n('SWORD', 6)], top)).toBe(false);
+    expect(isSelectionPlayable([n('JADE', 8), n('SWORD', 8)], top)).toBe(true);
+  });
+
+  it('currentTop 이 피닉스 싱글: 싱글/폭탄은 허용(서버 위임), 그 외 타입은 불가', () => {
+    const top = hand('SINGLE', 10, 1, [sp('PHOENIX')], true);
+    expect(isSelectionPlayable([n('JADE', 5)], top)).toBe(true); // 싱글 → 서버 판정
+    expect(
+      isSelectionPlayable([n('JADE', 13), n('SWORD', 13), n('STAR', 13), n('PAGODA', 13)], top),
+    ).toBe(true); // 폭탄 → 싱글을 이김
+    expect(isSelectionPlayable([n('JADE', 6), n('SWORD', 6)], top)).toBe(false); // 페어는 싱글 못 이김
+  });
+
+  it('개 단독은 follow 불가', () => {
+    expect(isSelectionPlayable([sp('DOG')], hand('SINGLE', 5, 1, [n('JADE', 5)]))).toBe(false);
+  });
+
+  it('인식 못 한 조합 → false(어차피 selectedCombo "?" 로 비활성)', () => {
+    expect(isSelectionPlayable([n('JADE', 5), n('SWORD', 9)], null)).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import type { Card, HandType } from '@/types/tichu';
+import type { Card, Hand, HandType } from '@/types/tichu';
 
 /**
  * Phase 12C — 선택한 카드 조합을 표시용으로 판별하는 **경량 클라 hint**.
@@ -175,4 +175,135 @@ export function handTypeLabel(type: HandType | null): string {
     default:
       return '?';
   }
+}
+
+/** 선택 카드 분석 결과(서버 Hand 비교에 필요한 최소 정보). */
+export interface AnalyzedHand {
+  type: HandType;
+  rank: number;
+  length: number;
+  phoenixSingle: boolean;
+}
+
+/** 특수 싱글의 비교 rank — 서버 Card 센티넬과 일치(개 0·마작 1·드래곤 100). */
+function singleRank(c: Card): number {
+  switch (c.special) {
+    case 'DOG':
+      return 0;
+    case 'MAHJONG':
+      return 1;
+    case 'DRAGON':
+      return 100;
+    case 'PHOENIX':
+      return 0; // phoenixSingle 로 별도 처리
+    default:
+      return c.rank;
+  }
+}
+
+/** 인식된 조합의 대표 비교 rank(서버 Hand.rank 의미와 일치). 불확실하면 null. */
+function comboRank(type: HandType, cards: Card[]): number | null {
+  const nonPhoenix = cards.filter((c) => c.special !== 'PHOENIX');
+  const rankOf = (c: Card): number => (c.special === 'MAHJONG' ? 1 : c.rank);
+  const counts = new Map<number, number>();
+  for (const c of nonPhoenix) {
+    const r = rankOf(c);
+    counts.set(r, (counts.get(r) ?? 0) + 1);
+  }
+  switch (type) {
+    case 'PAIR':
+    case 'TRIPLE':
+    case 'BOMB':
+      // 동일 rank(피닉스는 자연 카드 rank 에 매칭) — 자연 카드가 모두 같은 rank.
+      return counts.size === 1 ? [...counts.keys()][0] : null;
+    case 'FULL_HOUSE':
+      for (const [r, count] of counts) if (count === 3) return r;
+      return null;
+    case 'STRAIGHT':
+    case 'CONSECUTIVE_PAIRS':
+    case 'STRAIGHT_FLUSH_BOMB': {
+      let max = -Infinity;
+      for (const r of counts.keys()) max = Math.max(max, r);
+      return Number.isFinite(max) ? max : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * 선택 카드를 {type, rank, length, phoenixSingle} 로 분석(서버 미러). detectHandType
+ * 가 인식 못 하는(피닉스 와일드 등) 경우 null → "불확실" 로 취급해 버튼을 막지 않는다.
+ */
+export function analyzeHand(cards: Card[]): AnalyzedHand | null {
+  const type = detectHandType(cards);
+  if (type === null) return null;
+  const length = cards.length;
+  if (type === 'SINGLE') {
+    const c = cards[0];
+    if (c.special === 'PHOENIX') {
+      return { type, rank: 0, length, phoenixSingle: true };
+    }
+    return { type, rank: singleRank(c), length, phoenixSingle: false };
+  }
+  const rank = comboRank(type, cards);
+  if (rank === null) return null;
+  return { type, rank, length, phoenixSingle: false };
+}
+
+function isBombType(t: HandType): boolean {
+  return t === 'BOMB' || t === 'STRAIGHT_FLUSH_BOMB';
+}
+
+/**
+ * 서버 `HandComparator.canBeat` 의 클라 미러 — challenger 가 current 를 이기는가.
+ * (피닉스 싱글, 폭탄/스트레이트플러시폭탄, 동일 타입·길이·고랭크 규칙)
+ */
+export function canBeat(challenger: AnalyzedHand, current: Hand): boolean {
+  if (challenger.phoenixSingle) {
+    if (current.type !== 'SINGLE') return false;
+    if (isBombType(current.type)) return false;
+    const top = current.cards[0];
+    return top?.special !== 'DRAGON';
+  }
+  const c = challenger.type;
+  const o = current.type;
+  if (c === 'STRAIGHT_FLUSH_BOMB') {
+    if (o === 'STRAIGHT_FLUSH_BOMB') {
+      if (challenger.length !== current.length) return challenger.length > current.length;
+      return challenger.rank > current.rank;
+    }
+    return true;
+  }
+  if (o === 'STRAIGHT_FLUSH_BOMB') return false;
+  if (c === 'BOMB') {
+    if (o === 'BOMB') return challenger.rank > current.rank;
+    return true;
+  }
+  if (o === 'BOMB') return false;
+  if (c !== o) return false;
+  if (challenger.length !== current.length) return false;
+  return challenger.rank > current.rank;
+}
+
+/**
+ * UI 게이트: 선택한 카드를 "지금" 합법적으로 낼 수 있는지(서버 미러, 좁게 판정).
+ * - 인식 못 한 조합 → false(어차피 selectedCombo '?' 로 비활성)
+ * - 리드(currentTop 없음) → 인식된 조합은 모두 가능(개 단독 포함). 위시 제약은 서버.
+ * - currentTop 이 피닉스 싱글 → 비교값(소수) 의미 불확실 → 허용(서버 판정에 위임)
+ * - follow → 개 단독은 불가, 그 외 canBeat 판정.
+ * 확실히 불가일 때만 false 라서, 서버가 허용할 수를 잘못 막지 않는다(거짓 비활성 회피).
+ */
+export function isSelectionPlayable(cards: Card[], currentTop: Hand | null): boolean {
+  const analyzed = analyzeHand(cards);
+  if (!analyzed) return false;
+  if (currentTop === null) return true;
+  const isDogSingle = cards.length === 1 && cards[0].special === 'DOG';
+  if (isDogSingle) return false; // 개는 단독 리드만 — follow 불가
+  if (currentTop.phoenixSingle) {
+    // 피닉스 싱글 위 비교값(소수)은 불확실 → 싱글/폭탄만 이길 가능성(서버가 최종 판정).
+    // 다른 타입은 싱글을 못 이기므로 확실히 불가.
+    return analyzed.type === 'SINGLE' || isBombType(analyzed.type);
+  }
+  return canBeat(analyzed, currentTop);
 }
