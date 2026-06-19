@@ -39,7 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
-- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `created_at`. `rating`/`is_bot`/`desert_count` 는 게임 성적·행동 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산).
+- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `chip_balance`(V6, D-81), `created_at`. `rating`/`is_bot`/`desert_count`/`chip_balance` 는 게임 성적·행동·재화 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산). `chip_balance` 는 **가상 칩**(현금 입출금 없음, D-81) — 내기 모드 판돈은 고정 allowlist `{0,10,50,100,500}`, 판돈 방은 봇 금지, 정산은 매치 종료 시 `MatchResultRecorder` 트랜잭션에서 제로섬(승팀 +판돈/패팀 −판돈).
 - 로그인/회원가입 엔드포인트도 헤더/쿠키 식별자를 기록하지 않는다 (IP는 인프라 레벨만).
 - 선택적 코스메틱 아바타는 `users` 가 아니라 **별도 테이블 `user_avatars`**(V5, BYTEA 128px PNG)에 저장(D-80). `users` 화이트리스트는 불변. 조회는 공개 `GET /avatars/{userId}`, 업로드/삭제는 `POST`/`DELETE /api/me/avatar`(본인).
 

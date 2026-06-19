@@ -66,7 +66,9 @@ class AuthFlowIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.username").value("alice_01"))
                 .andExpect(jsonPath("$.winCount").value(0))
-                .andExpect(jsonPath("$.loseCount").value(0));
+                .andExpect(jsonPath("$.loseCount").value(0))
+                // D-81 — 신규 가입 기본 칩 1000.
+                .andExpect(jsonPath("$.chipBalance").value(1000));
     }
 
     @Test

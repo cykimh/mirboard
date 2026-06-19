@@ -65,8 +65,14 @@
 ### GET `/api/me`
 응답 `200`
 ```json
-{ "userId": 17, "username": "alice_01", "winCount": 3, "loseCount": 4 }
+{ "userId": 17, "username": "alice_01", "winCount": 3, "loseCount": 4, "chipBalance": 1000 }
 ```
+`chipBalance` (D-81): 가상 칩 내기 재화 잔액(현금 아님). 신규 가입 기본 1000.
+
+### POST `/api/me/chips/topup` *(D-81)*
+가상 칩 무료 충전. 잔액이 200 미만일 때만 500 으로 올린다(이미 충분하면 no-op). 현금
+결제와 무관 — 빈털터리로 내기를 못 하는 상황 방지용. 인증 본인만.
+응답 `200`: `GET /api/me` 와 동일 형식(충전 후 잔액 반영).
 
 ---
 
@@ -191,9 +197,11 @@ schema constraint 유지.
   "loseCount": 3,
   "rating": 1120,
   "tier": "SILVER",
-  "desertCount": 1
+  "desertCount": 1,
+  "chipBalance": 1340
 }
 ```
+`chipBalance` (D-81): 가상 칩 잔액(게임 재화 derived — D-02 위반 아님).
 
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
@@ -210,7 +218,8 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 {
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
-      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
+      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0,
+      "chipBalance": 2150 }
   ]
 }
 ```

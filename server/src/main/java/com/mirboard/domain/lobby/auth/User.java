@@ -13,6 +13,9 @@ import java.time.Instant;
 @Table(name = "users")
 public class User {
 
+    /** D-81 — 신규 가입·기존 유저 기본 칩(V6 DEFAULT 와 동일). */
+    public static final long STARTING_CHIPS = 1000;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -41,6 +44,10 @@ public class User {
     @Column(name = "desert_count", nullable = false)
     private int desertCount;
 
+    /** D-81 — 가상 칩(내기 재화) 잔액. 기본 {@link #STARTING_CHIPS}. 현금 아님 — 매치 정산으로 +/-. */
+    @Column(name = "chip_balance", nullable = false)
+    private long chipBalance;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -55,6 +62,7 @@ public class User {
         this.loseCount = 0;
         this.rating = 1000;
         this.desertCount = 0;
+        this.chipBalance = STARTING_CHIPS;
         this.createdAt = createdAt;
     }
 
@@ -92,6 +100,10 @@ public class User {
 
     public int getDesertCount() {
         return desertCount;
+    }
+
+    public long getChipBalance() {
+        return chipBalance;
     }
 
     public Instant getCreatedAt() {
