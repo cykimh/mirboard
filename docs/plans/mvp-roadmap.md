@@ -834,7 +834,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M | 트랙 | 내용 | 상태 |
 | --- | --- | --- | --- |
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
-| M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 | ⬜ |
+| M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 | ✅ |
 | M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | ⬜ |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
@@ -845,6 +845,12 @@ D-84(`LoginAttemptService`·`AuthRateLimiter`·`rate_limit_fixed_window.lua`, �
 users 스키마 비침범). M0 범위에서 빠진 TurnTimeoutScheduler in-memory 누수 수정은 M3(스케줄러
 분산 재작성)로 이연. 검증: `SecurityHeadersAndCorsIntegrationTest`·`LoginAttemptServiceIT`·
 `AuthAbuseIntegrationTest` + 전체 서버 스위트·클라(tsc/build/vitest) 그린.
+
+**M1 상세(완료)**: A1 카드 이미지(`CardChip` img+onError 글리프 폴백, 특수 4종 SVG 신규),
+A2 온보딩 튜토리얼(`TutorialModal`/`PairPractice`/`useTutorialGate`), A3 모바일(손패 겹침
+`computeHandOverlap` 단위테스트 + 터치타겟 + `mobile-responsive-checklist.md`), A4 비밀번호
+변경/프로필(D-85, `PUT /api/me/password` + `/profile`), A5 접근성(색약 모드 토글·키보드 손패
+재배열·DialogDescription). 클라 vitest 120·서버 IT 그린.
 
 ---
 
