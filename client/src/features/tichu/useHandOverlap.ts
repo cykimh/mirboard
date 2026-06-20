@@ -1,7 +1,18 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
 /** 겹치지 않을 때 카드 사이 기본 간격(px). */
-const DESIRED_GAP = 6;
+export const DESIRED_GAP = 6;
+
+/**
+ * 손패 한 줄의 카드 간 마진(px) 계산 — 레이아웃 비의존 순수 함수(A3 테스트 대상).
+ * 공간이 남으면 양수(겹치지 않음, {@link DESIRED_GAP} 상한), 좁으면 음수(겹침)로
+ * 한 줄을 정확히 컨테이너 폭에 맞춘다. count<=1 또는 폭<=0 이면 기본 간격.
+ */
+export function computeHandOverlap(containerW: number, cardW: number, count: number): number {
+  if (count <= 1 || containerW <= 0) return DESIRED_GAP;
+  const fit = (containerW - count * cardW) / (count - 1);
+  return Math.min(DESIRED_GAP, fit);
+}
 
 /**
  * 손패 한 줄 레이아웃 측정 훅(#1).
@@ -31,8 +42,7 @@ export function useHandOverlap(count: number) {
     // 한 줄을 정확히 컨테이너 폭에 맞추는 카드 간 마진(음수면 겹침). 여유가 있으면
     // DESIRED_GAP 로만 띄우고(겹치지 않음), 좁으면 폭에 맞춰 겹친다 — 어느 경우에도
     // 한 줄을 넘지 않아 가장자리 카드가 잘리거나 화면 밖으로 나가지 않는다.
-    const fit = (containerW - count * cardW) / (count - 1);
-    const margin = Math.min(DESIRED_GAP, fit);
+    const margin = computeHandOverlap(containerW, cardW, count);
     el.style.setProperty('--hand-overlap', `${margin}px`);
   }, [count]);
 

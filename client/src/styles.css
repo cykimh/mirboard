@@ -1316,3 +1316,10 @@ a {
     padding: 0 8px;
   }
 }
+
+/* A3 — 터치 기기에서 보조 액션 버튼도 최소 44px 터치 타겟 확보(데스크톱 마우스 무영향). */
+@media (pointer: coarse) {
+  .seat-action-cancel {
+    min-height: 44px;
+  }
+}
