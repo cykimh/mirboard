@@ -39,20 +39,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.rating = :rating WHERE u.id = :id")
     int updateRating(@Param("id") long id, @Param("rating") int rating);
-
-    /** D-81 — 칩 적립(내기 승리 정산). */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.chipBalance = u.chipBalance + :amount WHERE u.id = :id")
-    int incrementChip(@Param("id") long id, @Param("amount") long amount);
-
-    /** D-81 — 칩 차감(내기 패배 정산). 0 까지만 차감해 음수 방지(Postgres GREATEST). */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE users SET chip_balance = GREATEST(0, chip_balance - :amount) WHERE id = :id",
-            nativeQuery = true)
-    int decrementChipCapped(@Param("id") long id, @Param("amount") long amount);
-
-    /** D-81 — 무료 충전: 잔액이 threshold 미만일 때만 base 로 올림(충분하면 0행, no-op). */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.chipBalance = :base WHERE u.id = :id AND u.chipBalance < :threshold")
-    int topUpChips(@Param("id") long id, @Param("threshold") long threshold, @Param("base") long base);
 }

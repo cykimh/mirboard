@@ -65,14 +65,10 @@
 ### GET `/api/me`
 응답 `200`
 ```json
-{ "userId": 17, "username": "alice_01", "winCount": 3, "loseCount": 4, "chipBalance": 1000 }
+{ "userId": 17, "username": "alice_01", "winCount": 3, "loseCount": 4 }
 ```
-`chipBalance` (D-81): 가상 칩 내기 재화 잔액(현금 아님). 신규 가입 기본 1000.
-
-### POST `/api/me/chips/topup` *(D-81)*
-가상 칩 무료 충전. 잔액이 200 미만일 때만 500 으로 올린다(이미 충분하면 no-op). 현금
-결제와 무관 — 빈털터리로 내기를 못 하는 상황 방지용. 인증 본인만.
-응답 `200`: `GET /api/me` 와 동일 형식(충전 후 잔액 반영).
+> D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
+> 응답에 칩 잔액 없음.
 
 ---
 
@@ -174,8 +170,7 @@
 (`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
-`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석),
-`INSUFFICIENT_CHIPS`(D-81 — 판돈 방인데 칩 잔액 < 판돈; 무료 충전 후 재시도).
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석).
 
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:
@@ -202,11 +197,9 @@ schema constraint 유지.
   "loseCount": 3,
   "rating": 1120,
   "tier": "SILVER",
-  "desertCount": 1,
-  "chipBalance": 1340
+  "desertCount": 1
 }
 ```
-`chipBalance` (D-81): 가상 칩 잔액(게임 재화 derived — D-02 위반 아님).
 
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
@@ -223,8 +216,7 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 {
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
-      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0,
-      "chipBalance": 2150 }
+      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
   ]
 }
 ```

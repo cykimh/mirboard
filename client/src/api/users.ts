@@ -16,8 +16,6 @@ export interface UserStats {
   rating: number;
   tier: Tier;
   desertCount: number;
-  /** D-81 — 가상 칩 잔액(현금 아님). */
-  chipBalance: number;
 }
 
 export interface RankEntry {
@@ -29,8 +27,6 @@ export interface RankEntry {
   winCount: number;
   loseCount: number;
   desertCount: number;
-  /** D-81 — 가상 칩 잔액. */
-  chipBalance: number;
 }
 
 export interface RankingResponse {

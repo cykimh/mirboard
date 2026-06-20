@@ -4,7 +4,6 @@ import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
-import com.mirboard.domain.lobby.auth.UserRepository;
 import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.security.SecureRandom;
@@ -33,7 +32,6 @@ public class RoomService {
     private final MirboardMetrics metrics;
     private final Random random;
     private final BotUserRegistry bots;
-    private final UserRepository userRepository;
 
     @Autowired
     public RoomService(RoomRepository repository,
@@ -41,9 +39,8 @@ public class RoomService {
                        Clock clock,
                        DomainEventBus events,
                        MirboardMetrics metrics,
-                       BotUserRegistry bots,
-                       UserRepository userRepository) {
-        this(repository, games, clock, events, metrics, bots, userRepository, new SecureRandom());
+                       BotUserRegistry bots) {
+        this(repository, games, clock, events, metrics, bots, new SecureRandom());
     }
 
     /** Phase 8C — 테스트에서 시드 고정 Random 을 주입할 수 있도록 분리한 생성자. */
@@ -53,7 +50,6 @@ public class RoomService {
                        DomainEventBus events,
                        MirboardMetrics metrics,
                        BotUserRegistry bots,
-                       UserRepository userRepository,
                        Random random) {
         this.repository = repository;
         this.games = games;
@@ -61,7 +57,6 @@ public class RoomService {
         this.events = events;
         this.metrics = metrics;
         this.bots = bots;
-        this.userRepository = userRepository;
         this.random = random;
     }
 
@@ -205,17 +200,8 @@ public class RoomService {
      * NotInRoomException, 이미 시작/종료된 방이면 GameAlreadyStartedException.
      */
     public Room setReady(String roomId, long userId, boolean ready) {
-        Room current = getRoom(roomId); // 존재 확인 (없으면 RoomNotFound).
-        // D-81 — 판돈 방은 ready 전에 잔액(≥판돈)을 확인. 부족하면 거절(무료 충전 유도).
-        // 매치 중 잔액은 줄지 않으므로(1인 1방) 이 시점 검증으로 패자도 정산 시 판돈 이상 보유.
-        if (ready && current.stake() > 0 && !bots.isBot(userId)) {
-            long balance = userRepository.findById(userId)
-                    .map(com.mirboard.domain.lobby.auth.User::getChipBalance)
-                    .orElse(0L);
-            if (balance < current.stake()) {
-                throw new InsufficientChipsException(roomId, current.stake(), balance);
-            }
-        }
+        getRoom(roomId); // 존재 확인 (없으면 RoomNotFound).
+        // D-82 — 방 단위 테이블 칩: ready 전 계정 잔액 검증 없음(게임 시작 시 전원 동일 칩).
         int code = repository.setReady(roomId, userId, ready);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));

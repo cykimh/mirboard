@@ -64,8 +64,6 @@ export interface MeResponse {
   username: string;
   winCount: number;
   loseCount: number;
-  /** D-81 — 가상 칩 잔액(현금 아님). */
-  chipBalance: number;
 }
 
 export interface ApiErrorEnvelope {

@@ -98,6 +98,20 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-82 (2026-06-20) — 내기 칩: 계정 지갑 → 방 단위 테이블 칩 (D-81 보정)
+
+D-81 의 계정 영속 지갑(`users.chip_balance`)을 **방 단위 테이블 칩**으로 바꾼다(사용자 요청).
+칩은 계정에 누적되지 않고 방 안에서만 존재·이동한다: 방 게임 시작 시 전원 동일 칩
+(`STARTING_STACK`, 기본 1000)으로 시작, 매치 종료마다 판돈이 승팀↔패팀으로 이동(제로섬, 패자
+보유분 한도 올인), '한 판 더'(리매치)로 같은 4명이 같은 테이블에서 계속 플레이하며 칩 누적,
+새 매치 시작 시 판돈 미만 보유자는 무료 재바이인, 방을 나가면 칩 소멸. **번복**:
+`users.chip_balance`(V7 DROP)·무료충전(`/api/me/chips/topup`)·ready-시-잔액검증·`/me`/ranking/
+stats 의 chipBalance 전부 제거 → 화이트리스트(D-02)에서 `chip_balance` 제외(계정엔 게임 재화
+컬럼도 두지 않음). **유지**: 판돈(stake) 필드·allowlist `{0,10,50,100,500}`·판돈 방 봇 금지·봇
+매치 정산 제외. 칩 스택은 `room:{id}:chips`(Redis HASH, 방 소멸 시 정리)에 두고 `CHIPS_SETTLED`
+공개 이벤트로 브로드캐스트(테이블 공개 정보). 정산은 `MatchResultRecorder`(DB)가 아니라 신규
+`RoomChipService`(Redis)가 담당.
+
 ## D-81 (2026-06-20) — 가상 칩 내기 모드 (현금 배제, D-02 보정)
 
 판당 판돈을 거는 내기 모드를 **가상 칩(미르 칩)** 으로만 제공한다 — 현금 입출금·환전
@@ -111,6 +125,7 @@ profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 정산 시 판돈 이상 보유, 미완료 매치는 칩 이동 없음), 제로섬(승팀 +판돈/패팀 −판돈, 0 까지만
 차감해 음수 방지). 잔액 부족 시 무료 충전(`POST /api/me/chips/topup`, 잔액<200→500). 정산은
 기존 `MatchResultRecorder`(@Transactional)에서 win/lose/rating 갱신과 같은 트랜잭션으로 원자적.
+*계정 지갑 파트 폐기 → D-82 (방 단위 테이블 칩). 판돈/검증 뼈대는 유지.*
 
 ## D-80 (2026-06-12) — 선택적 코스메틱 아바타 업로드 (별도 테이블, D-02 보정)
 

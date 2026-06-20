@@ -55,12 +55,6 @@ class RoomControllerIntegrationTest {
     @Autowired
     ObjectMapper objectMapper;
 
-    @Autowired
-    com.mirboard.domain.lobby.auth.UserRepository userRepo;
-
-    @Autowired
-    org.springframework.transaction.PlatformTransactionManager txManager;
-
     @Test
     void create_then_list_then_get_then_leave() throws Exception {
         String token = registerAndLogin("rooms_user", "validpass1");
@@ -299,35 +293,6 @@ class RoomControllerIntegrationTest {
                                 "stake", 100, "fillWithBots", true))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("STAKED_ROOM_NO_BOTS"));
-    }
-
-    @Test
-    void ready_in_staked_room_without_enough_chips_is_rejected() throws Exception {
-        String token = registerAndLogin("broke_user", "validpass1");
-        MvcResult created = mockMvc.perform(post("/api/rooms")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "name", "고액 판돈", "gameType", "TICHU", "stake", 500))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.stake").value(500))
-                .andReturn();
-        JsonNode json = objectMapper.readTree(created.getResponse().getContentAsString());
-        long hostId = json.get("hostId").asLong();
-        String roomId = json.get("roomId").asText();
-
-        // 잔액을 판돈(500)보다 낮춤: 1000 → 50. @Modifying 쿼리라 트랜잭션 안에서 실행.
-        new org.springframework.transaction.support.TransactionTemplate(txManager)
-                .executeWithoutResult(s -> userRepo.decrementChipCapped(hostId, 950));
-
-        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ready\":true}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("INSUFFICIENT_CHIPS"));
-
-        leaveRoom(token, roomId); // 공유 Redis 오염 방지.
     }
 
     private String roomIdOf(MvcResult created) throws Exception {

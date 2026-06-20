@@ -39,7 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
-- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `chip_balance`(V6, D-81), `created_at`. `rating`/`is_bot`/`desert_count`/`chip_balance` 는 게임 성적·행동·재화 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산). `chip_balance` 는 **가상 칩**(현금 입출금 없음, D-81) — 내기 모드 판돈은 고정 allowlist `{0,10,50,100,500}`, 판돈 방은 봇 금지, 정산은 매치 종료 시 `MatchResultRecorder` 트랜잭션에서 제로섬(승팀 +판돈/패팀 −판돈).
+- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `created_at`. `rating`/`is_bot`/`desert_count` 는 게임 성적·행동 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산). **내기 칩은 계정에 두지 않는다(D-82)** — 방 단위 테이블 칩(`room:{id}:chips`, Redis)으로만 존재. (`chip_balance` 컬럼은 D-81 에서 추가했다가 V7 에서 DROP.)
 - 로그인/회원가입 엔드포인트도 헤더/쿠키 식별자를 기록하지 않는다 (IP는 인프라 레벨만).
 - 선택적 코스메틱 아바타는 `users` 가 아니라 **별도 테이블 `user_avatars`**(V5, BYTEA 128px PNG)에 저장(D-80). `users` 화이트리스트는 불변. 조회는 공개 `GET /avatars/{userId}`, 업로드/삭제는 `POST`/`DELETE /api/me/avatar`(본인).
 
@@ -97,13 +97,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
   D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
   재사용. 패스 카드 선택 UI 는 `arena-actions` 로 통합(로직 불변).
-- D-81: **가상 칩 내기 모드**(현금 아님 — 현금은 도박·결제·KYC 문제로 배제). 방 생성 시
-  판돈 `{0,10,50,100,500}`(0=없음) 선택, **stake>0 방은 봇 금지**(파밍 방지). ready 시
-  잔액≥판돈 검증(`INSUFFICIENT_CHIPS`), 매치 종료 시 `MatchResultRecorder`(@Transactional)
-  에서 제로섬 정산(승팀 +판돈/패팀 −판돈, 봇 매치 ELO처럼 제외, 0까지만 차감). 판돈은
-  Redis room 해시 고정 → `TichuMatchCompleted.stake` 로 정산 전달(`GameStartingEvent`/
-  `TichuMatchState` 미경유). 잔액<200 시 `POST /api/me/chips/topup`(→500) 무료 충전.
-  클라: 방 만들기 판돈 셀렉터·방목록 💰배지·게임판 헤더 판돈/매치종료 칩 증감·허브 잔액.
+- D-82(D-81 보정): **방 단위 테이블 칩 내기 모드**(계정 지갑 아님 — 칩을 계정에 안 둠).
+  방 게임 시작 시 전원 동일 칩(`STARTING_STACK` 1000), 매치 종료마다 판돈
+  `{0,10,50,100,500}`(0=없음)이 승팀↔패팀으로 이동(제로섬, 패자 보유분 한도 올인, 봇 매치
+  제외). **'한 판 더'(리매치)** 로 같은 4명이 같은 테이블 계속 → 칩 누적, 판돈 미만 보유 시
+  무료 재바이인, 방 나가면 칩 소멸. **stake>0 방은 봇 금지**. 칩은 `room:{id}:chips`
+  (Redis HASH) + `CHIPS_SETTLED` 공개 이벤트(테이블 공개 정보), 정산은 신규 `RoomChipService`.
+  매치 정상 종료는 FINISHED 대신 WAITING 복귀(리매치), 탈주는 FINISHED 유지. 판돈은 Redis
+  room 해시 고정 → `TichuMatchCompleted.stake` 로 정산 전달.
 
 ## 자주 쓰는 명령
 
