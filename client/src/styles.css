@@ -572,6 +572,15 @@ a {
   transform: translateY(-10px) scale(1.05);
 }
 
+/* M1/A1 — 카드 이미지 모드. 자산 로드 실패 시 글리프 모드(.suit-glyph/.rank)로 폴백. */
+.card-chip .card-face {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
 .card-chip .rank {
   font-size: 1.2rem;
   font-weight: 800;
