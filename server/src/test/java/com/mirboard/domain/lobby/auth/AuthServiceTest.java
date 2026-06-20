@@ -25,13 +25,15 @@ class AuthServiceTest {
 
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
+    private LoginAttemptService loginAttempts;
     private AuthService service;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
         passwordEncoder = Mockito.mock(PasswordEncoder.class);
-        service = new AuthService(userRepository, passwordEncoder, CLOCK);
+        loginAttempts = Mockito.mock(LoginAttemptService.class);
+        service = new AuthService(userRepository, passwordEncoder, CLOCK, loginAttempts);
     }
 
     @Test

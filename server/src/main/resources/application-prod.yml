@@ -36,6 +36,9 @@ spring:
 mirboard:
   messaging:
     gateway: ${MIRBOARD_MESSAGING_GATEWAY:redis}
+  security:
+    # D-83 — prod origin 화이트리스트. 실제 배포 도메인을 MIRBOARD_ALLOWED_ORIGINS 로 주입.
+    allowed-origins: ${MIRBOARD_ALLOWED_ORIGINS:https://mirboard.fly.dev}
 
 server:
   forward-headers-strategy: framework

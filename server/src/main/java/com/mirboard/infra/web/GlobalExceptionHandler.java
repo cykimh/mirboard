@@ -1,6 +1,7 @@
 package com.mirboard.infra.web;
 
 import com.mirboard.domain.game.core.GameNotFoundException;
+import com.mirboard.domain.lobby.auth.AccountLockedException;
 import com.mirboard.domain.lobby.auth.InvalidCredentialsException;
 import com.mirboard.domain.lobby.auth.InvalidPasswordException;
 import com.mirboard.domain.lobby.auth.InvalidUsernameException;
@@ -52,6 +53,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorEnvelope> handleBadCredentials(InvalidCredentialsException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiErrorEnvelope.of("BAD_CREDENTIALS", "Invalid username or password"));
+    }
+
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleAccountLocked(AccountLockedException e) {
+        // D-84 — 로그인 실패 누적 잠금. 423 Locked.
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .body(ApiErrorEnvelope.of("ACCOUNT_LOCKED",
+                        "로그인 시도가 많아 계정이 일시적으로 잠겼습니다. 잠시 후 다시 시도하세요."));
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleTooManyRequests(TooManyRequestsException e) {
+        // D-84 — 인증 IP 레이트리밋 초과. 429 Too Many Requests.
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiErrorEnvelope.of("TOO_MANY_REQUESTS",
+                        "요청이 너무 많습니다. 잠시 후 다시 시도하세요."));
     }
 
     @ExceptionHandler(GameNotFoundException.class)

@@ -11,11 +11,14 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final LoginAttemptService loginAttempts;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, Clock clock) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, Clock clock,
+                       LoginAttemptService loginAttempts) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.loginAttempts = loginAttempts;
     }
 
     @Transactional
@@ -32,11 +35,14 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthenticatedUser authenticate(String username, String password) {
-        var user = userRepository.findByUsername(username)
-                .orElseThrow(InvalidCredentialsException::new);
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+        // D-84 — 실패 누적 잠금 검사 → 인증 → 결과에 따라 카운터 갱신.
+        loginAttempts.assertNotLocked(username);
+        var user = userRepository.findByUsername(username).orElse(null);
+        if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
+            loginAttempts.onFailure(username);
             throw new InvalidCredentialsException();
         }
+        loginAttempts.onSuccess(username);
         return new AuthenticatedUser(user.getId(), user.getUsername());
     }
 

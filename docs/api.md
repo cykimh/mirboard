@@ -23,7 +23,8 @@
 대표 코드: `INVALID_INPUT`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`,
 `USERNAME_TAKEN`, `BAD_CREDENTIALS`, `ROOM_FULL`, `ROOM_NOT_FOUND`,
 `ALREADY_IN_ROOM`, `NOT_IN_ROOM`, `GAME_ALREADY_STARTED`,
-`GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`.
+`GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`,
+`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*.
 
 ---
 
@@ -60,7 +61,8 @@
   "user": { "userId": 17, "username": "alice_01" }
 }
 ```
-에러: `BAD_CREDENTIALS`.
+에러: `BAD_CREDENTIALS`, `ACCOUNT_LOCKED` (423 — 실패 누적 잠금, D-84),
+`TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84).
 
 ### GET `/api/me`
 응답 `200`
@@ -318,3 +320,9 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - 로그인/회원가입 엔드포인트는 username/password 외 일체의 헤더/쿠키 식별자를
   기록하지 않는다 (IP 로깅은 운영 보안 차원에서 인프라 레이어에서만).
 - 모든 응답 헤더에 `Cache-Control: no-store` (인증/방 조회).
+- *(D-83)* CORS origin 은 `mirboard.security.allowed-origins` 화이트리스트로 고정
+  (전면 개방 `*` 폐지). 보안 헤더 `X-Content-Type-Options=nosniff`,
+  `X-Frame-Options=DENY`, `Referrer-Policy=strict-origin-when-cross-origin`, HSTS(HTTPS 한정).
+- *(D-84)* 로그인 brute-force 잠금 + 인증 엔드포인트 IP 레이트리밋. 잠금/카운터는
+  전부 Redis(휘발, TTL)에 두어 `users` 스키마 불변(D-02 준수). 레이트리밋 버킷 키에
+  쓰는 클라이언트 IP 는 TTL 휘발값이며 영속 로그가 아니다(위 IP 비기록 원칙과 일관).
