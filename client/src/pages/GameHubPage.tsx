@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, LogOut, Plus } from 'lucide-react';
+import { ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/avatar';
 import { avatarSrc } from '@/api/avatar';
 import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
+import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
+import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
 import {
   Table,
   TableBody,
@@ -63,6 +65,7 @@ export function GameHubPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const tutorial = useTutorialGate();
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   const { messages, connected, send } = useLobbyStomp(token);
@@ -170,6 +173,17 @@ export function GameHubPage() {
                 {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
               </span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={tutorial.show}
+              aria-label="게임 방법"
+              title="게임 방법"
+            >
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">게임 방법</span>
+            </Button>
             <ThemeToggle />
             <Button
               type="button"
@@ -445,6 +459,8 @@ export function GameHubPage() {
           onChanged={() => setAvatarVersion((v) => v + 1)}
         />
       )}
+
+      <TutorialModal open={tutorial.open} onClose={tutorial.close} />
     </div>
   );
 }
