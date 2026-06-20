@@ -9,6 +9,7 @@ import com.mirboard.domain.game.tichu.state.TichuStateMapper;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.room.JoinOrReconnectResult;
 import com.mirboard.domain.lobby.room.NotInRoomException;
+import com.mirboard.domain.lobby.room.RoomChipStore;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
@@ -42,17 +43,20 @@ public class RoomController {
     private final TichuMatchStateStore matchStateStore;
     private final DesertionService desertion;
     private final WsSessionRegistry sessions;
+    private final RoomChipStore chipStore;
 
     public RoomController(RoomService rooms,
                           TichuGameStateStore stateStore,
                           TichuMatchStateStore matchStateStore,
                           DesertionService desertion,
-                          WsSessionRegistry sessions) {
+                          WsSessionRegistry sessions,
+                          RoomChipStore chipStore) {
         this.rooms = rooms;
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.desertion = desertion;
         this.sessions = sessions;
+        this.chipStore = chipStore;
     }
 
     @GetMapping
@@ -187,7 +191,8 @@ public class RoomController {
                         matchState.roundNumber()),
                 // 관전자는 손패 없음 — TableView 만 받음.
                 seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null,
-                disconnectedSeats(room, me.userId()));
+                disconnectedSeats(room, me.userId()),
+                chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
     }
 
     /**
@@ -236,6 +241,8 @@ public class RoomController {
             long eventSeq,
             TableView tableView,
             PrivateHand privateHand,
-            List<Integer> disconnectedSeats) {
+            List<Integer> disconnectedSeats,
+            // D-82 — 방 단위 테이블 칩 스택(userId→칩). 내기 없는 방은 빈 맵.
+            java.util.Map<Long, Long> chips) {
     }
 }

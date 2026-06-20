@@ -112,6 +112,8 @@ export function GameTable({
   const matchEnded = useTichuStore((s) => s.matchEnded);
   const roundHistory = useTichuStore((s) => s.roundHistory);
   const disconnectedSeats = useTichuStore((s) => s.disconnectedSeats);
+  const chips = useTichuStore((s) => s.chips);
+  const chipDeltas = useTichuStore((s) => s.chipDeltas);
   const lastReceived = useTichuStore((s) => s.lastReceived);
   const clearReceived = useTichuStore((s) => s.clearReceived);
   const setError = useTichuStore((s) => s.setError);
@@ -528,6 +530,11 @@ export function GameTable({
                 declared={declared}
               />
               <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
+              {stake > 0 && (
+                <div className="seat-chips" title="테이블 칩">
+                  💰 {(chips[uid] ?? 0).toLocaleString()}
+                </div>
+              )}
               <SeatCardStack count={tableView.handCounts[seat] ?? 0} />
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
                 <div
@@ -823,16 +830,37 @@ export function GameTable({
           <p>
             {t('match.ended.finalScore')} A {matchEnded.finalScores.A ?? 0} : {matchEnded.finalScores.B ?? 0} B
           </p>
-          {stake > 0 && mySeat >= 0 && (
-            <p
-              className={`match-chip-delta ${
-                matchEnded.winningTeam === myTeam ? 'win' : 'lose'
-              }`}
-            >
-              {matchEnded.winningTeam === myTeam
-                ? `💰 +${stake}칩 획득!`
-                : `💸 −${stake}칩`}
-            </p>
+          {stake > 0 && (
+            <div className="match-chip-board">
+              {mySeat >= 0 && (chipDeltas[myUserId] ?? 0) !== 0 && (
+                <p
+                  className={`match-chip-delta ${
+                    (chipDeltas[myUserId] ?? 0) >= 0 ? 'win' : 'lose'
+                  }`}
+                >
+                  {(chipDeltas[myUserId] ?? 0) >= 0
+                    ? `💰 +${chipDeltas[myUserId]}칩`
+                    : `💸 ${chipDeltas[myUserId]}칩`}
+                </p>
+              )}
+              <table className="chip-standings">
+                <tbody>
+                  {playerIds
+                    .map((uid) => ({ uid, c: chips[uid] ?? 0, d: chipDeltas[uid] ?? 0 }))
+                    .sort((a, b) => b.c - a.c)
+                    .map((row, i) => (
+                      <tr key={row.uid} className={row.uid === myUserId ? 'me' : ''}>
+                        <td>{i + 1}</td>
+                        <td>{usernames[row.uid] ?? `#${row.uid}`}</td>
+                        <td>💰 {row.c.toLocaleString()}</td>
+                        <td className={row.d >= 0 ? 'win' : 'lose'}>
+                          {row.d > 0 ? `+${row.d}` : row.d < 0 ? `${row.d}` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {matchEnded.mvpUserId != null && (() => {
             const mvpId = matchEnded.mvpUserId;

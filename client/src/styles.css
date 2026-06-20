@@ -663,7 +663,17 @@ a {
   color: #ffd180;
 }
 
-/* D-81 — 매치 종료 칩 증감(내기 방). */
+/* D-82 — 방 단위 테이블 칩. 좌석 스택 + 매치 종료 순위표. */
+.seat-chips {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffd75e;
+}
+
+.match-chip-board {
+  margin: 4px 0;
+}
 .match-chip-delta {
   margin: 2px 0;
   font-weight: 900;
@@ -673,6 +683,25 @@ a {
   color: #4ade80;
 }
 .match-chip-delta.lose {
+  color: #f87171;
+}
+.chip-standings {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+.chip-standings td {
+  padding: 2px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.chip-standings tr.me {
+  font-weight: 800;
+  color: #ffd180;
+}
+.chip-standings td.win {
+  color: #4ade80;
+}
+.chip-standings td.lose {
   color: #f87171;
 }
 

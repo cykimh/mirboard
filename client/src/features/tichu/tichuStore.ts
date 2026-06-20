@@ -46,6 +46,10 @@ export interface TichuRoomState {
   disconnectedSeats: Set<number>;
   /** P4(5) — 패스로 받은 3장 + 출처(본인 큐 CARDS_RECEIVED). 모달 표시용, reset/닫기 시 정리. */
   lastReceived: { card: Card; fromSeat: number }[] | null;
+  /** D-82 — 방 단위 테이블 칩(userId→칩). resync + CHIPS_SETTLED 로 동기화. */
+  chips: Record<number, number>;
+  /** D-82 — 직전 매치 정산의 칩 증감(userId→±). 매치 종료 화면 표시용. */
+  chipDeltas: Record<number, number>;
 }
 
 export interface TichuActions {
@@ -56,6 +60,7 @@ export interface TichuActions {
       privateHand: PrivateHand;
       eventSeq: number;
       disconnectedSeats?: number[];
+      chips?: Record<number, number>;
     },
   ) => void;
   applyTableView: (table: TableView, seq?: number) => void;
@@ -211,6 +216,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   turnStartedAt: null,
   disconnectedSeats: new Set(),
   lastReceived: null,
+  chips: {},
+  chipDeltas: {},
 
   reset(roomId) {
     set({
@@ -229,10 +236,12 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       turnStartedAt: null,
       disconnectedSeats: new Set(),
       lastReceived: null,
+      chips: {},
+      chipDeltas: {},
     });
   },
 
-  applySnapshot({ tableView, privateHand, eventSeq, disconnectedSeats }) {
+  applySnapshot({ tableView, privateHand, eventSeq, disconnectedSeats, chips }) {
     set({
       tableView,
       privateHand,
@@ -241,6 +250,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       // 재동기화 시 카운트다운은 정확한 잔여시간을 알 수 없으므로 현재시각 기준 근사.
       turnStartedAt: Date.now(),
       disconnectedSeats: new Set(disconnectedSeats ?? []),
+      chips: chips ?? {},
     });
   },
 
@@ -398,6 +408,15 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         const next = new Set(get().disconnectedSeats);
         next.delete(p.seat);
         set({ disconnectedSeats: next, lastSeq: seq ?? lastSeq });
+        return 'applied';
+      }
+      case 'CHIPS_SETTLED': {
+        // D-82 — 방 칩 정산(공개 메타 이벤트, seq 무관). stacks/deltas 키는 userId 문자열.
+        const p = envelope.payload as {
+          stacks: Record<number, number>;
+          deltas: Record<number, number>;
+        };
+        set({ chips: p.stacks ?? {}, chipDeltas: p.deltas ?? {}, lastSeq: seq ?? lastSeq });
         return 'applied';
       }
       case 'MATCH_ENDED': {

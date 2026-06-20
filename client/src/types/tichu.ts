@@ -71,6 +71,8 @@ export interface ResyncResponse {
   privateHand: PrivateHand;
   /** 현재 끊겨 있는 플레이어 좌석 (봇·본인 제외). 재동기화 시 배지 즉시 반영. */
   disconnectedSeats?: number[];
+  /** D-82 — 방 단위 테이블 칩 스택(userId→칩). 내기 없는 방은 빈 맵. */
+  chips?: Record<number, number>;
 }
 
 /** 카드 비교/표시용 안정 키. */

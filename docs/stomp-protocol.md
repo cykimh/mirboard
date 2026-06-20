@@ -87,6 +87,7 @@
 | `PLAYER_DISCONNECTED` | `{ userId }` | 연결 끊김 |
 | `PLAYER_RECONNECTED` | `{ userId }` | 재접속 완료 |
 | `CHAT` | `{ userId, message }` | 방 채팅 |
+| `CHIPS_SETTLED` | `{ stacks:{userId:칩}, deltas:{userId:±} }` | D-82 방 단위 테이블 칩 정산(게임 시작 init·매치 종료 정산). seq 없는 메타 이벤트. 칩 스택은 `/api/rooms/{id}/resync` 의 `chips` 로도 제공 |
 
 ---
 
