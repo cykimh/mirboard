@@ -72,6 +72,15 @@
 > D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
 > 응답에 칩 잔액 없음.
 
+### PUT `/api/me/password` *(D-85 — 본인 비밀번호 변경)*
+요청 (인증 필요)
+```json
+{ "currentPassword": "old-pass-1", "newPassword": "new-pass-12" }
+```
+현재 비밀번호 재검증 → `PasswordPolicy`(8~64자) 검증 → BCrypt 재해시 후 `users.password_hash`
+갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
+에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반).
+
 ---
 
 ## 게임 카탈로그 (Game Hub)

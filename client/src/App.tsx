@@ -4,6 +4,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { GameHubPage } from '@/pages/GameHubPage';
 import { RoomPage } from '@/pages/RoomPage';
+import { ProfilePage } from '@/pages/ProfilePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -23,6 +24,14 @@ export function App() {
           element={
             <ProtectedRoute>
               <GameHubPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

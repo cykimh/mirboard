@@ -98,6 +98,16 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-85 (2026-06-21) — 셀프서비스 비밀번호 변경 (PUT /api/me/password, M1/A4)
+
+프로필/설정에서 본인 비밀번호를 바꿀 수 있게 한다. 신규 `PUT /api/me/password`(인증 필요)는
+현재 비밀번호를 재검증한 뒤 새 비밀번호를 `PasswordPolicy`(8~64자)로 검증하고 BCrypt 로
+재해시해 `users.password_hash` 만 갱신한다 — **스키마/마이그레이션 변경 없음**(기존 컬럼 재사용,
+D-02 화이트리스트 불변). 현재 비번 불일치는 401(`BAD_CREDENTIALS`), 정책 위반은 400(`INVALID_INPUT`).
+**토큰 정책(사용자 결정)**: 변경 후 기존 발급 JWT 를 그대로 **유지**(최대 12h)한다 — 단순성 우선,
+소규모/포트폴리오 범위. 즉시 무효화(토큰 버전/블랙리스트)는 트랙 C(M2) 인증 하드닝에서 재검토.
+클라는 `/profile` 라우트로 전적·아바타·비밀번호 변경을 통합한다.
+
 ## D-84 (2026-06-21) — 로그인 brute-force 잠금 + 인증 레이트리밋 (Redis 전용, M0)
 
 상용화(포트폴리오) M0 보안 하드닝. 로그인 무제한 시도를 막는다. 실패 카운터

@@ -166,7 +166,14 @@ export function GameHubPage() {
                     </AvatarFallback>
                   </Avatar>
                 </button>
-                <span className="text-sm font-medium">{user.username}</span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="text-sm font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  title="내 프로필"
+                >
+                  {user.username}
+                </button>
               </div>
             )}
             {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}

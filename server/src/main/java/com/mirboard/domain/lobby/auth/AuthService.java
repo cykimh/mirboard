@@ -46,6 +46,22 @@ public class AuthService {
         return new AuthenticatedUser(user.getId(), user.getUsername());
     }
 
+    /**
+     * D-85 — 본인 비밀번호 변경. 현재 비밀번호 재검증 → 새 비밀번호 정책 검증 → BCrypt 재해시.
+     * 현재 비번 불일치는 {@link InvalidCredentialsException}(401), 정책 위반은
+     * {@link InvalidPasswordException}(400). users 스키마 변경 없음(password_hash 갱신만).
+     */
+    @Transactional
+    public void changePassword(long userId, String currentPassword, String newPassword) {
+        var user = userRepository.findById(userId).orElseThrow(InvalidCredentialsException::new);
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
+        }
+        PasswordPolicy.validate(newPassword);
+        user.changePassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     public record RegisteredUser(long userId, String username) {
     }
 
