@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,6 +32,7 @@ export function TutorialModal({ open, onClose }: TutorialModalProps) {
       <DialogContent className="app-shell" style={{ maxWidth: 560 }}>
         <DialogHeader>
           <DialogTitle>{current.title}</DialogTitle>
+          <DialogDescription className="sr-only">티츄 기본 규칙 안내 튜토리얼</DialogDescription>
         </DialogHeader>
 
         <div className="tutorial-body" style={{ minHeight: 180 }}>

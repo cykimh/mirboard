@@ -1,12 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { CardChip } from './CardChip';
+import { useColorblindStore } from '@/features/theme/colorblindStore';
 import type { Card } from '@/types/tichu';
 
 const JADE_2: Card = { suit: 'JADE', rank: 2, special: null };
 const DRAGON: Card = { suit: null, rank: 0, special: 'DRAGON' };
 
 describe('CardChip', () => {
+  // 이전 테스트 언마운트(RTL cleanup) 후 리셋 → 마운트된 컴포넌트 재렌더 act 경고 방지.
+  beforeEach(() => useColorblindStore.setState({ enabled: false }));
   it('renders the card image by default (no glyph)', () => {
     render(<CardChip card={JADE_2} />);
     const img = screen.getByRole('img') as HTMLImageElement;
@@ -29,6 +32,13 @@ describe('CardChip', () => {
     expect(img.getAttribute('src')).toBe('/cards/dragon.svg');
     fireEvent.error(img);
     expect(screen.getByText('🐉')).toBeInTheDocument();
+  });
+
+  it('shows a suit glyph badge in colorblind mode (image still shown)', () => {
+    useColorblindStore.setState({ enabled: true });
+    render(<CardChip card={JADE_2} />);
+    expect(screen.getByRole('img')).toBeInTheDocument();
+    expect(screen.getByText('◆')).toBeInTheDocument();
   });
 
   it('preserves selected + aria semantics', () => {

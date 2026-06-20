@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
+import { Eye, ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
@@ -36,6 +36,7 @@ import { avatarSrc } from '@/api/avatar';
 import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
 import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
 import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
+import { useColorblindStore } from '@/features/theme/colorblindStore';
 import {
   Table,
   TableBody,
@@ -66,6 +67,8 @@ export function GameHubPage() {
   const [spectateInput, setSpectateInput] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const tutorial = useTutorialGate();
+  const colorblind = useColorblindStore((s) => s.enabled);
+  const toggleColorblind = useColorblindStore((s) => s.toggle);
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   const { messages, connected, send } = useLobbyStomp(token);
@@ -183,6 +186,18 @@ export function GameHubPage() {
             >
               <HelpCircle className="h-4 w-4" />
               <span className="hidden sm:inline">게임 방법</span>
+            </Button>
+            <Button
+              type="button"
+              variant={colorblind ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleColorblind}
+              aria-pressed={colorblind}
+              aria-label="색약 모드"
+              title="색약 모드 — 카드 슈트를 글리프로도 표시"
+            >
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">색약</span>
             </Button>
             <ThemeToggle />
             <Button

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Card, Suit } from '@/types/tichu';
 import { cardAssetSrc, cardLabel } from '@/types/tichu';
+import { useColorblindStore } from '@/features/theme/colorblindStore';
 
 const SUIT_COLOR: Record<Suit, string> = {
   JADE: '#3fb979',
@@ -29,6 +30,7 @@ interface CardChipProps {
  */
 export function CardChip({ card, selected, onClick }: CardChipProps) {
   const [imageFailed, setImageFailed] = useState(false);
+  const colorblind = useColorblindStore((s) => s.enabled);
   const color = card.suit ? SUIT_COLOR[card.suit] : '#aaa';
   const glyph = card.suit ? SUIT_GLYPH[card.suit] : '';
   const label = cardLabel(card);
@@ -48,13 +50,19 @@ export function CardChip({ card, selected, onClick }: CardChipProps) {
           <span className="rank" style={{ color }}>{label}</span>
         </>
       ) : (
-        <img
-          className="card-face"
-          src={cardAssetSrc(card)}
-          alt={label}
-          draggable={false}
-          onError={() => setImageFailed(true)}
-        />
+        <>
+          {/* A5 색약 모드 — 슈트를 색 외 글리프로도 식별. */}
+          {colorblind && glyph && (
+            <span className="cb-suit" style={{ color }} aria-hidden="true">{glyph}</span>
+          )}
+          <img
+            className="card-face"
+            src={cardAssetSrc(card)}
+            alt={label}
+            draggable={false}
+            onError={() => setImageFailed(true)}
+          />
+        </>
       )}
     </button>
   );

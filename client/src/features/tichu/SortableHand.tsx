@@ -1,5 +1,6 @@
 import {
   DndContext,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
@@ -10,6 +11,7 @@ import {
   SortableContext,
   arrayMove,
   horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -66,6 +68,8 @@ export function SortableHand({
 }: SortableHandProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // A5 — 키보드로도 손패 재배열 가능(Space 로 집고 화살표로 이동).
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const ids = cards.map(cardKey);
   // overlap=false 면 0 을 넘겨 측정/겹침 비활성(클래스도 안 붙음).
