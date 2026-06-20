@@ -822,4 +822,30 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 
 ---
 
+## 상용화(포트폴리오 쇼케이스) 로드맵 — 트랙 A/C/D/E/G
+
+MVP(Phase 1~20) 완료 후, **포트폴리오/기술 쇼케이스**를 목표로 한 후속 작업.
+타깃은 지인+소규모 KR 커뮤니티(다국어·실수익·법무 제외). 핵심 서사는 "분산 전환을
+실제로 증명한 서버-권위적 실시간 게임 서버". 선택 트랙: A(티츄 완성도)·C(운영 하드닝)·
+D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·소셜)·F(법무).
+
+각 마일스톤은 독립 출시 가능하며 동일 Phase Gate(설계변경 시 decisions.md D-NN 선행)를 따른다.
+
+| M | 트랙 | 내용 | 상태 |
+| --- | --- | --- | --- |
+| M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
+| M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 | ⬜ |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | ⬜ |
+| M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
+| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
+| M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
+
+**M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
+D-84(`LoginAttemptService`·`AuthRateLimiter`·`rate_limit_fixed_window.lua`, 전부 Redis 휘발 —
+users 스키마 비침범). M0 범위에서 빠진 TurnTimeoutScheduler in-memory 누수 수정은 M3(스케줄러
+분산 재작성)로 이연. 검증: `SecurityHeadersAndCorsIntegrationTest`·`LoginAttemptServiceIT`·
+`AuthAbuseIntegrationTest` + 전체 서버 스위트·클라(tsc/build/vitest) 그린.
+
+---
+
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.
