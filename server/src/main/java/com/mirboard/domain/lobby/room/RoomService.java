@@ -214,6 +214,23 @@ public class RoomService {
     }
 
     /**
+     * D-82 — 호스트가 매치 종료 후 같은 4명·같은 테이블에서 새 매치를 시작(리매치). 방 상태는
+     * IN_GAME 을 유지한 채 {@link #onGameStart} 를 재실행 → 새 GameStartingEvent → 새 라운드.
+     * 칩은 `room:{id}:chips` 에 남아 누적되고 RoomChipService 가 판돈 미만 보유자를 재바이인한다.
+     */
+    public Room rematch(String roomId, long requesterId) {
+        Room room = getRoom(roomId);
+        if (room.hostId() != requesterId) {
+            throw new NotHostException(roomId);
+        }
+        if (room.status() != RoomStatus.IN_GAME) {
+            throw new GameNotInProgressException(roomId);
+        }
+        log.info("Rematch: roomId={} host={} players={}", roomId, requesterId, room.playerIds());
+        return onGameStart(room);
+    }
+
+    /**
      * Phase 8C/16 — WAITING→IN_GAME 전이 직후 절차: RANDOM 정책이면 좌석 셔플,
      * GameStartingEvent 발행, metrics. (예전 joinRoom 의 capacity 자동시작
      * 분기에서 추출. 이제 전원 ready 시점에 한 번만 실행.)

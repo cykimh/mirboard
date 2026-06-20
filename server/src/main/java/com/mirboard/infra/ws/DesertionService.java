@@ -95,6 +95,11 @@ public class DesertionService {
                     .orElseGet(() -> TichuMatchState.initial(
                             room.playerIds(), room.targetScore()));
 
+            // D-82 — 매치가 이미 끝난(리매치 대기) 방의 끊김/나가기는 탈주가 아니다.
+            if (matchState.isMatchOver()) {
+                return false;
+            }
+
             // 누적 점수는 그대로 보존하고 winningTeam 만 상대팀으로 강제.
             events.publish(new TichuMatchCompleted(
                     roomId,

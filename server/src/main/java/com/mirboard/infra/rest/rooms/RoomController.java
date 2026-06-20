@@ -118,6 +118,20 @@ public class RoomController {
     }
 
     /**
+     * D-82 — 호스트가 매치 종료 후 같은 테이블에서 '한 판 더'(리매치). 칩은 누적되고
+     * 판돈 미만 보유자는 새 매치 시작 시 무료 재바이인된다. 매치가 끝난 상태에서만 허용.
+     */
+    @PostMapping("/{roomId}/rematch")
+    public Room rematch(@PathVariable String roomId,
+                        @AuthenticationPrincipal AuthPrincipal me) {
+        TichuMatchState ms = matchStateStore.load(roomId).orElse(null);
+        if (ms == null || !ms.isMatchOver()) {
+            throw new com.mirboard.domain.lobby.room.GameNotInProgressException(roomId);
+        }
+        return rooms.rematch(roomId, me.userId());
+    }
+
+    /**
      * Phase 8A — 직접 링크로 들어오는 사용자를 자동으로 분기. 본인이 원래 플레이어면
      * RECONNECTED, 빈 자리면 JOINED, IN_GAME 방에 처음 들어왔으면 SPECTATING.
      */
@@ -146,8 +160,10 @@ public class RoomController {
             Room room = rooms.getRoom(roomId);
             if (room.status() == RoomStatus.IN_GAME
                     && room.playerIds().contains(me.userId())) {
-                desertion.processDesertion(roomId, me.userId());
-                return;
+                // D-82 — 매치 종료 후(리매치 대기) 등 탈주 미해당이면 false → 일반 leave 로 폴백.
+                if (desertion.processDesertion(roomId, me.userId())) {
+                    return;
+                }
             }
         } catch (RoomNotFoundException ignored) {
             // 이미 소멸 — 아래 leaveRoom 이 RoomNotFound 를 동일 처리.

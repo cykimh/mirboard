@@ -62,6 +62,14 @@ export const roomsApi = {
     });
   },
 
+  /** D-82 — 호스트가 매치 종료 후 같은 테이블에서 '한 판 더'(리매치). 칩 누적. */
+  rematch(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/rematch`, {
+      method: 'POST',
+      token,
+    });
+  },
+
   /** Phase 8A — 직접 링크 진입 자동 분기 (JOINED / RECONNECTED / SPECTATING). */
   joinOrReconnect(token: string, roomId: string): Promise<JoinOrReconnectResponse> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join-or-reconnect`, {

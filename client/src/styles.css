@@ -732,6 +732,15 @@ a {
   opacity: 0.85;
 }
 
+/* D-82 — 매치 종료 화면 액션 행(한 판 더 / 떠나기). */
+.match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 /* Phase 16(#3) — 매치 종료 후 메인 복귀. */
 .match-exit {
   align-self: flex-start;

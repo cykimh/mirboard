@@ -160,6 +160,12 @@
 응답 `200` — Room 갱신본.
 에러: `ROOM_FULL`, `ROOM_NOT_FOUND`, `ALREADY_IN_ROOM`, `GAME_ALREADY_STARTED`.
 
+### POST `/api/rooms/{roomId}/rematch` *(D-82)*
+호스트가 매치 종료 후 같은 4명·같은 테이블에서 '한 판 더'(리매치). 방은 IN_GAME 을 유지한
+채 새 매치를 시작하고, 방 단위 테이블 칩(`room:{id}:chips`)은 누적되며 판돈 미만 보유자는
+무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). 응답 `200` — Room.
+에러: `NOT_HOST`, `GAME_NOT_IN_PROGRESS`(매치가 아직 안 끝났거나 진행 중 아님), `ROOM_NOT_FOUND`.
+
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
 > **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. 시작은

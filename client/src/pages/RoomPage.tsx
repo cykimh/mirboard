@@ -197,6 +197,7 @@ export function RoomPage() {
           stake={room.stake ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
           usernames={usernames}
+          isHost={iAmHost}
           onExit={handleLeave}
         />
       </main>

@@ -59,6 +59,26 @@ public class RoomChipStore {
         redis.expire(k, TTL);
     }
 
+    /**
+     * 판돈(threshold) 미만 보유자를 target 으로 무료 재바이인(프렌즈 모드). 리매치 새 매치
+     * 시작 시 호출 — 빈털터리가 계속 참여할 수 있게 한다. 변경 없으면 no-op.
+     */
+    public void rebuyBelow(String roomId, List<Long> userIds, long threshold, long target) {
+        Map<Long, Long> current = stacks(roomId);
+        Map<Long, Long> updated = null;
+        for (Long uid : userIds) {
+            if (current.getOrDefault(uid, 0L) < threshold) {
+                if (updated == null) {
+                    updated = new LinkedHashMap<>(current);
+                }
+                updated.put(uid, target);
+            }
+        }
+        if (updated != null) {
+            setStacks(roomId, updated);
+        }
+    }
+
     public void delete(String roomId) {
         redis.delete(key(roomId));
     }

@@ -67,6 +67,8 @@ public class RoomChipService {
             return;
         }
         store.initIfAbsent(event.roomId(), event.playerIds(), STARTING_STACK);
+        // D-82 — 리매치 새 매치 시작 시 판돈 미만 보유자(빈털터리)는 무료 재바이인.
+        store.rebuyBelow(event.roomId(), event.playerIds(), room.stake(), STARTING_STACK);
         broadcast(event.roomId(), store.stacks(event.roomId()), Map.of());
     }
 

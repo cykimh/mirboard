@@ -137,4 +137,22 @@ class RoomChipServiceIT {
         assertThat(store.stacks(room).get(9042L)).isEqualTo(700);
         store.delete(room);
     }
+
+    @Test
+    void rebuy_tops_up_only_players_below_stake() {
+        String room = "chip-room-6";
+        List<Long> ids = List.of(9051L, 9052L, 9053L, 9054L);
+        store.initIfAbsent(room, ids, 1000);
+        store.setStacks(room, Map.of(9051L, 30L, 9052L, 1500L, 9053L, 1000L, 9054L, 0L));
+
+        // 판돈 100 미만(9051=30, 9054=0)만 STARTING_STACK 으로 재바이인.
+        store.rebuyBelow(room, ids, 100, RoomChipService.STARTING_STACK);
+
+        Map<Long, Long> s = store.stacks(room);
+        assertThat(s.get(9051L)).isEqualTo(RoomChipService.STARTING_STACK);
+        assertThat(s.get(9054L)).isEqualTo(RoomChipService.STARTING_STACK);
+        assertThat(s.get(9052L)).isEqualTo(1500); // 충분 → 유지
+        assertThat(s.get(9053L)).isEqualTo(1000);
+        store.delete(room);
+    }
 }

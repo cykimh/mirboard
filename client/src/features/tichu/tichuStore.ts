@@ -251,6 +251,10 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       turnStartedAt: Date.now(),
       disconnectedSeats: new Set(disconnectedSeats ?? []),
       chips: chips ?? {},
+      // D-82 — 리매치로 새 매치가 시작되면 resync 가 들어오므로 종료 배너를 정리.
+      // (매치 중 재접속 시엔 어차피 null 이라 무해.)
+      matchEnded: null,
+      roundEnded: null,
     });
   },
 

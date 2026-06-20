@@ -6,6 +6,7 @@ import {
   type PassSlot,
 } from '@/features/tichu/tichuStore';
 import { useStompRoom } from '@/ws/useStompRoom';
+import { roomsApi } from '@/api/rooms';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
@@ -47,6 +48,8 @@ interface GameTableProps {
   spectatorCount?: number;
   /** userId→username 맵. 좌석에 #id 대신 닉네임 표시(없으면 #id 폴백). */
   usernames?: Record<number, string>;
+  /** D-82 — 내가 호스트인지 (매치 종료 화면 '한 판 더' 버튼 노출용). */
+  isHost?: boolean;
   /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
   onExit?: () => void;
 }
@@ -83,6 +86,7 @@ export function GameTable({
   stake = 0,
   spectatorCount = 0,
   usernames = {},
+  isHost = false,
   onExit,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
@@ -335,6 +339,17 @@ export function GameTable({
 
   function handleReady() {
     sendAction({ '@action': 'READY' });
+  }
+
+  // D-82 — 호스트가 매치 종료 후 '한 판 더'. 새 매치 이벤트→resync→applySnapshot 이
+  // matchEnded 를 정리하므로 별도 상태 처리 불필요.
+  async function handleRematch() {
+    if (!token) return;
+    try {
+      await roomsApi.rematch(token, roomId);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   // Phase 13(#2) — 패스 3장이 모두 배정되면 별도 제출 버튼 없이 자동 제출.
@@ -915,11 +930,21 @@ export function GameTable({
           <p>
             {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
           </p>
-          {onExit && (
-            <Button type="button" className="match-exit" onClick={onExit}>
-              메인으로
-            </Button>
-          )}
+          <div className="match-actions">
+            {!spectator && isHost && (
+              <Button type="button" onClick={handleRematch}>
+                🔄 한 판 더
+              </Button>
+            )}
+            {!spectator && !isHost && (
+              <p className="hint">호스트가 '한 판 더' 를 누르면 같은 테이블에서 다시 시작합니다.</p>
+            )}
+            {onExit && (
+              <Button type="button" variant="outline" className="match-exit" onClick={onExit}>
+                {stake > 0 ? '테이블 떠나기' : '메인으로'}
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         roundEnded && (

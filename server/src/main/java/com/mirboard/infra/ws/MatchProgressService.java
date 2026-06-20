@@ -102,10 +102,15 @@ public class MatchProgressService {
             log.info("Match ended: winner={} rounds={} A={} B={}",
                     afterRound.winningTeam(), afterRound.roundScores().size(),
                     afterRound.cumulativeA(), afterRound.cumulativeB());
-            try {
-                roomService.markFinished(roomId);
-            } catch (RuntimeException e) {
-                log.warn("Failed to mark room {} finished: {}", roomId, e.getMessage());
+            // D-82 — 사람 4인 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로
+            // 같은 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이
+            // 아니므로 기존대로 FINISHED. (matchState.isMatchOver() 이므로 끊김은 탈주 아님.)
+            if (!room.botSeats().isEmpty()) {
+                try {
+                    roomService.markFinished(roomId);
+                } catch (RuntimeException e) {
+                    log.warn("Failed to mark room {} finished: {}", roomId, e.getMessage());
+                }
             }
             return;
         }
