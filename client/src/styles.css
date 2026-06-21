@@ -678,30 +678,30 @@ a {
   pointer-events: none;
 }
 
-/* #1 — 좌상단 코너 인덱스(랭크+슈트). 실제 트럼프 코너처럼 겹쳐도 읽힌다. 흰 카드
-   위 가독성을 위해 옅은 흰 후광. A5 색약(.cb)은 슈트 글리프를 키우고 윤곽선으로
-   비색 단서를 강화(별도 배지 없이 코너 인덱스가 그 역할 흡수 — 이중 글리프 제거). */
-.card-chip .card-index {
+/* #1' — 직관적 숫자+슈트 카드(트럼프 핍 SVG 대체). 좌측 정렬 + 세로 중앙이라 손패가
+   겹쳐도 왼쪽 슬라이버에서 랭크/슈트가 읽힌다. A5 색약(.cb)은 슈트 글리프 윤곽 강조. */
+.card-chip .card-simple {
   position: absolute;
-  top: 2px;
-  left: 3px;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  line-height: 0.92;
-  font-weight: 900;
+  align-items: flex-start;
+  justify-content: center;
+  padding-left: 6px;
+  line-height: 1;
   pointer-events: none;
-  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff;
 }
-.card-chip .ci-rank {
-  font-size: 0.95rem;
+.card-chip .cs-rank {
+  font-size: 1.75rem;
+  font-weight: 900;
 }
-.card-chip .ci-suit {
-  font-size: 0.8rem;
+.card-chip .cs-suit {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 2px;
 }
-.card-chip .card-index.cb .ci-suit {
-  font-size: 0.98rem;
-  -webkit-text-stroke: 0.4px currentColor;
+.card-chip .card-simple.cb .cs-suit {
+  -webkit-text-stroke: 0.5px currentColor;
 }
 
 .card-chip .rank {
@@ -1367,11 +1367,11 @@ a {
     height: 68px;
     gap: 2px;
   }
-  .card-chip .ci-rank {
-    font-size: 0.82rem;
+  .card-chip .cs-rank {
+    font-size: 1.35rem;
   }
-  .card-chip .ci-suit {
-    font-size: 0.68rem;
+  .card-chip .cs-suit {
+    font-size: 1.05rem;
   }
   .card-chip .rank {
     font-size: 1rem;
