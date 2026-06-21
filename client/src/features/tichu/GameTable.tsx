@@ -555,7 +555,10 @@ export function GameTable({
                   💰 {(chips[uid] ?? 0).toLocaleString()}
                 </div>
               )}
-              <SeatCardStack count={tableView.handCounts[seat] ?? 0} />
+              <SeatCardStack
+                count={tableView.handCounts[seat] ?? 0}
+                viewPos={viewPos as 's' | 'w' | 'n' | 'e'}
+              />
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
                 <div
                   className={`declared ${

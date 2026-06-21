@@ -191,6 +191,8 @@ a {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
+  /* #2 — 내 좌석 콘텐츠(아바타/스택)를 액션 버튼(z16) 위로 — 혹시 모를 겹침 안전장치. */
+  z-index: 17;
 }
 
 /* 액션 바 — 경기장 밖(손패 아래) 고정 바. 모바일은 sticky 로 엄지 도달 쉽게. */
@@ -241,7 +243,7 @@ a {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 16px;
+  bottom: 10px;
   z-index: 16;
   pointer-events: none;
 }
@@ -283,6 +285,12 @@ a {
   padding: 0 14px;
   font-weight: 700;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* #2 — 내기(play)가 실제로 낼 수 있을 때만 골드 링으로 강조(거짓 활성 회피 +
+   '지금 낼 수 있다'를 한눈에 — 발견성↑). 비활성 시 링 없음. */
+.seat-action-btn.play:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 .table-center-trick {
@@ -505,6 +513,32 @@ a {
   opacity: 0.95;
 }
 
+/* #3 — 좌석별 부채 방향을 중앙 지향으로 회전(실제 보드게임처럼). s=위(기본),
+   n=아래, w=좌(우측 좌석이 중앙을 향함), e=우(좌측 좌석이 중앙을 향함).
+   w/e 는 ±90° 회전이라 '점유 박스≠시각 박스'가 되므로, 회전 전 행(≈53×28)을
+   height:54 박스에 세로 가운데 정렬해 회전 후 세로 footprint(≈30×53)를 박스가
+   품게 한다 → 위 라벨/아래 숫자와 겹치지 않는다. */
+.seat-cardstack.fan-n .seat-cardstack-fan {
+  transform: rotate(180deg);
+}
+.seat-cardstack.fan-w,
+.seat-cardstack.fan-e {
+  flex-direction: column;
+  gap: 2px;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan,
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  height: 54px;
+  align-items: center;
+  justify-content: center;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan {
+  transform: rotate(-90deg);
+}
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  transform: rotate(90deg);
+}
+
 .declared {
   margin-top: 4px;
   display: inline-block;
@@ -596,10 +630,12 @@ a {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  width: 48px;
-  height: 68px;
+  /* #1 — 카드 확대(48→62)로 가독성↑. 겹침 단계는 useHandOverlap 이 폭을 재측정해
+     한 줄을 유지하고, 좌상단 코너 인덱스가 겹친 슬라이버에서도 랭크/슈트를 보여준다. */
+  width: 62px;
+  height: 88px;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 2px solid #555;
   background: #ffffff;
   color: inherit;
@@ -642,16 +678,30 @@ a {
   pointer-events: none;
 }
 
-/* A5 색약 모드 — 이미지 위 좌상단 슈트 글리프 배지(색 외 단서). */
-.card-chip .cb-suit {
+/* #1 — 좌상단 코너 인덱스(랭크+슈트). 실제 트럼프 코너처럼 겹쳐도 읽힌다. 흰 카드
+   위 가독성을 위해 옅은 흰 후광. A5 색약(.cb)은 슈트 글리프를 키우고 윤곽선으로
+   비색 단서를 강화(별도 배지 없이 코너 인덱스가 그 역할 흡수 — 이중 글리프 제거). */
+.card-chip .card-index {
   position: absolute;
-  top: 1px;
+  top: 2px;
   left: 3px;
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1;
-  text-shadow: 0 0 2px #fff, 0 0 2px #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.92;
+  font-weight: 900;
   pointer-events: none;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff;
+}
+.card-chip .ci-rank {
+  font-size: 0.95rem;
+}
+.card-chip .ci-suit {
+  font-size: 0.8rem;
+}
+.card-chip .card-index.cb .ci-suit {
+  font-size: 0.98rem;
+  -webkit-text-stroke: 0.4px currentColor;
 }
 
 .card-chip .rank {
@@ -1311,11 +1361,17 @@ a {
 }
 
 @media (max-width: 480px) {
-  /* 손패 카드 크기 축소 — 세로 직사각형 비율 유지. */
+  /* 손패 카드 크기 축소 — 세로 직사각형 비율 유지(코너 인덱스 가독 최소치). */
   .card-chip {
-    width: 40px;
-    height: 56px;
+    width: 48px;
+    height: 68px;
     gap: 2px;
+  }
+  .card-chip .ci-rank {
+    font-size: 0.82rem;
+  }
+  .card-chip .ci-suit {
+    font-size: 0.68rem;
   }
   .card-chip .rank {
     font-size: 1rem;
@@ -1330,6 +1386,11 @@ a {
    상대 위치가 사라졌다. absolute 원형 배치는 그대로 두고 좌석·중앙 트릭만
    컴팩트하게 축소해 어느 폭에서도 자리가 고정되게 한다. */
 @media (max-width: 768px) {
+  /* #1 — 중간 폭에선 카드를 한 단계만 축소(데스크톱 62 → 54). */
+  .card-chip {
+    width: 54px;
+    height: 76px;
+  }
   .table-arena {
     min-height: 360px;
   }
@@ -1411,8 +1472,11 @@ a {
   }
 }
 
-/* A3 — 터치 기기에서 보조 액션 버튼도 최소 44px 터치 타겟 확보(데스크톱 마우스 무영향). */
+/* A3 — 터치 기기에서 액션 버튼 최소 터치 타겟 확보(데스크톱 마우스 무영향). */
 @media (pointer: coarse) {
+  .seat-action-btn {
+    min-height: 48px;
+  }
   .seat-action-cancel {
     min-height: 44px;
   }
