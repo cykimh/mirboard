@@ -98,6 +98,18 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-86 (2026-06-21) — 어드민/모더레이션: 역할 별도 테이블 (M2/C4)
+
+운영 신뢰성용 최소 어드민 기능. **규칙#3(D-02) 준수**: 권한을 `users` 에 두지 않고 신규
+`admin_roles`(Flyway V8: `user_id` PK FK→users, `granted_at`)로 분리한다. 권한 판정은 매 요청
+`admin_roles` 조회(소규모라 비용 무시·즉시 반영). `/api/admin/**` 는 어드민만(비어드민 403
+`NOT_ADMIN`). 어드민 부여는 DB insert(운영 스크립트)로만 — 자가 승격 엔드포인트 없음.
+**슬라이스 1(본 항목)**: 매치 강제 종료 — `RoomService.adminAbortGame`(host 검증 없이
+IN_GAME→FINISHED, 기존 host용 `abortGame` 과 분리). 컨트롤러는 `AdminAuthorization.requireAdmin`
+위임만(규칙#4 — 룰 로직 없음). **후속 슬라이스**: 유저 정지(Redis `suspend:user:{id}` TTL,
+로그인/CONNECT 차단 — users 비침범), 채팅 금칙어 마스킹/신고. 감사는 구조화 로그(MDC)로 시작,
+전용 테이블은 후속. Flyway-only(규칙#6).
+
 ## D-85 (2026-06-21) — 셀프서비스 비밀번호 변경 (PUT /api/me/password, M1/A4)
 
 프로필/설정에서 본인 비밀번호를 바꿀 수 있게 한다. 신규 `PUT /api/me/password`(인증 필요)는

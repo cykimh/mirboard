@@ -323,6 +323,17 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 
 ---
 
+## 어드민 / 모더레이션 *(D-86 — 어드민만)*
+
+`/api/admin/**` 은 `admin_roles` 에 등록된 사용자만 접근(매 요청 조회). 비어드민은
+`NOT_ADMIN` (403). 어드민 부여는 DB insert(운영 스크립트)로만.
+
+### POST `/api/admin/rooms/{roomId}/abort`
+어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
+와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+
+---
+
 ## 보안 / 운영 메모
 
 - JWT 시크릿은 환경변수 `MIRBOARD_JWT_SECRET` 로만 주입. 코드/리포에 하드코딩 금지.

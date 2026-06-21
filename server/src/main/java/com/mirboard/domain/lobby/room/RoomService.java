@@ -312,6 +312,21 @@ public class RoomService {
         log.warn("Room aborted by host: roomId={} hostUserId={}", roomId, userId);
     }
 
+    /**
+     * D-86 — 어드민이 진행 중 매치를 강제 종료. {@link #abortGame} 과 달리 host 검증이 없다.
+     * 권한 검사는 호출 측(AdminController → AdminAuthorization)이 수행한다(규칙#4).
+     */
+    public void adminAbortGame(String roomId) {
+        Room room = getRoom(roomId);
+        if (room.status() != RoomStatus.IN_GAME) {
+            throw new GameNotInProgressException(roomId);
+        }
+        repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
+        repository.findById(roomId)
+                .ifPresent(updated -> events.publish(RoomChangedEvent.updated(updated)));
+        log.warn("Room aborted by admin: roomId={}", roomId);
+    }
+
     /** 관전 추가. 이미 플레이어로 입장한 사용자는 거절. */
     public Room spectate(String roomId, long userId) {
         Room room = getRoom(roomId);

@@ -1,5 +1,6 @@
 package com.mirboard.infra.web;
 
+import com.mirboard.domain.admin.NotAdminException;
 import com.mirboard.domain.game.core.GameNotFoundException;
 import com.mirboard.domain.lobby.auth.AccountLockedException;
 import com.mirboard.domain.lobby.auth.InvalidCredentialsException;
@@ -69,6 +70,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiErrorEnvelope.of("TOO_MANY_REQUESTS",
                         "요청이 너무 많습니다. 잠시 후 다시 시도하세요."));
+    }
+
+    @ExceptionHandler(NotAdminException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleNotAdmin(NotAdminException e) {
+        // D-86 — 어드민 권한 없음. 403 Forbidden.
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorEnvelope.of("NOT_ADMIN", "관리자 권한이 필요합니다"));
     }
 
     @ExceptionHandler(GameNotFoundException.class)
