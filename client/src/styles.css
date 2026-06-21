@@ -1219,12 +1219,18 @@ a {
   font-size: 13px;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  /* UX-4 — 좁은 폭에선 채팅을 바텀시트로. 좌석/테이블을 가리지 않고 하단(손패/액션)만
+     덮는다(채팅 중에는 액션보다 읽기 우선, 닫으면 즉시 복귀). 상단 떠서 좌석 가리던
+     기존 동작 대체. */
   .room-chat-panel {
-    right: 8px;
-    left: 8px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
     width: auto;
-    top: 64px;
+    max-height: 55vh;
+    border-radius: 14px 14px 0 0;
   }
 }
 
