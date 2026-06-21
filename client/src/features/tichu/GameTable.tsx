@@ -690,7 +690,11 @@ export function GameTable({
       </div>
 
       {!spectator && (
-      <div className="my-hand">
+      <div
+        className={`my-hand${
+          isInPassing && !iAmPassSubmitted && !pendingPassCardKey ? ' pick-emphasis' : ''
+        }`}
+      >
         {privateHand ? (
           <SortableHand
             cards={handCards}
