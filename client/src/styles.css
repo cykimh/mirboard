@@ -445,6 +445,25 @@ a {
   opacity: 0.92;
 }
 
+/* UX-2 — 팀/역할 칩(나/파트너=우리, 상대). 2:2 즉시 식별. */
+.seat-team {
+  margin-top: 2px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0 7px;
+  border-radius: 999px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.seat-team.us {
+  color: #6fd3a0;
+  background: rgba(63, 185, 121, 0.16);
+}
+.seat-team.them {
+  color: #e08a8a;
+  background: rgba(232, 93, 117, 0.16);
+}
+
 /* 좌석 카드백 스택(#6) — back.svg 미니 카드백 부채꼴 + 정확한 숫자. */
 .seat-cardstack {
   margin-top: 4px;

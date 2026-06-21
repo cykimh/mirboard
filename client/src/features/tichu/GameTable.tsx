@@ -546,6 +546,10 @@ export function GameTable({
                 declared={declared}
               />
               <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
+              {/* UX-2 — 팀/역할 칩. 2:2 를 즉시 식별(나/파트너=우리, 좌·우=상대). */}
+              <div className={`seat-team ${viewPos === 'w' || viewPos === 'e' ? 'them' : 'us'}`}>
+                {viewPos === 's' ? '나' : viewPos === 'n' ? '파트너' : '상대'}
+              </div>
               {stake > 0 && (
                 <div className="seat-chips" title="테이블 칩">
                   💰 {(chips[uid] ?? 0).toLocaleString()}
