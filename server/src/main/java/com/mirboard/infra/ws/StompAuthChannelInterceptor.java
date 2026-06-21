@@ -3,6 +3,7 @@ package com.mirboard.infra.ws;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.auth.InvalidCredentialsException;
 import com.mirboard.domain.lobby.auth.JwtService;
+import com.mirboard.domain.lobby.auth.SuspensionService;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
@@ -19,9 +20,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String BEARER = "Bearer ";
 
     private final JwtService jwtService;
+    private final SuspensionService suspensions;
 
-    public StompAuthChannelInterceptor(JwtService jwtService) {
+    public StompAuthChannelInterceptor(JwtService jwtService, SuspensionService suspensions) {
         this.jwtService = jwtService;
+        this.suspensions = suspensions;
     }
 
     @Override
@@ -40,6 +43,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             }
             try {
                 AuthPrincipal principal = jwtService.parse(header.substring(BEARER.length()).trim());
+                // D-86 — 정지된 계정은 새 소켓 연결 차단(기존 소켓은 토큰 만료까지 유지).
+                if (suspensions.isSuspended(principal.userId())) {
+                    throw new MessageDeliveryException("Account suspended");
+                }
                 accessor.setUser(principal);
             } catch (InvalidCredentialsException e) {
                 throw new MessageDeliveryException("Invalid or expired JWT");

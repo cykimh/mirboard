@@ -23,7 +23,8 @@
 대표 코드: `INVALID_INPUT`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`,
 `USERNAME_TAKEN`, `BAD_CREDENTIALS`, `ROOM_FULL`, `ROOM_NOT_FOUND`,
 `ALREADY_IN_ROOM`, `NOT_IN_ROOM`, `GAME_ALREADY_STARTED`,
-`GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`.
+`GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`,
+`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*.
 
 ---
 
@@ -60,7 +61,9 @@
   "user": { "userId": 17, "username": "alice_01" }
 }
 ```
-에러: `BAD_CREDENTIALS`.
+에러: `BAD_CREDENTIALS`, `ACCOUNT_LOCKED` (423 — 실패 누적 잠금, D-84),
+`TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84),
+`ACCOUNT_SUSPENDED` (403 — 어드민 정지, D-86).
 
 ### GET `/api/me`
 응답 `200`
@@ -69,6 +72,15 @@
 ```
 > D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
 > 응답에 칩 잔액 없음.
+
+### PUT `/api/me/password` *(D-85 — 본인 비밀번호 변경)*
+요청 (인증 필요)
+```json
+{ "currentPassword": "old-pass-1", "newPassword": "new-pass-12" }
+```
+현재 비밀번호 재검증 → `PasswordPolicy`(8~64자) 검증 → BCrypt 재해시 후 `users.password_hash`
+갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
+에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반).
 
 ---
 
@@ -312,9 +324,35 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 
 ---
 
+## 어드민 / 모더레이션 *(D-86 — 어드민만)*
+
+`/api/admin/**` 은 `admin_roles` 에 등록된 사용자만 접근(매 요청 조회). 비어드민은
+`NOT_ADMIN` (403). 어드민 부여는 DB insert(운영 스크립트)로만.
+
+### POST `/api/admin/rooms/{roomId}/abort`
+어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
+와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+
+### POST `/api/admin/users/{userId}/suspend`
+유저 정지. 본문 `{ "minutes": 60 }`(선택, 기본 60분, 1~525600 클램프). 정지 상태는 Redis
+TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유저는 로그인·STOMP CONNECT
+차단(`ACCOUNT_SUSPENDED` 403). 기존 발급 토큰의 활성 소켓은 만료까지 유지. 응답 `204`.
+에러: `NOT_ADMIN` (403).
+
+### DELETE `/api/admin/users/{userId}/suspend`
+유저 정지 해제. 응답 `204`. 에러: `NOT_ADMIN` (403).
+
+---
+
 ## 보안 / 운영 메모
 
 - JWT 시크릿은 환경변수 `MIRBOARD_JWT_SECRET` 로만 주입. 코드/리포에 하드코딩 금지.
 - 로그인/회원가입 엔드포인트는 username/password 외 일체의 헤더/쿠키 식별자를
   기록하지 않는다 (IP 로깅은 운영 보안 차원에서 인프라 레이어에서만).
 - 모든 응답 헤더에 `Cache-Control: no-store` (인증/방 조회).
+- *(D-83)* CORS origin 은 `mirboard.security.allowed-origins` 화이트리스트로 고정
+  (전면 개방 `*` 폐지). 보안 헤더 `X-Content-Type-Options=nosniff`,
+  `X-Frame-Options=DENY`, `Referrer-Policy=strict-origin-when-cross-origin`, HSTS(HTTPS 한정).
+- *(D-84)* 로그인 brute-force 잠금 + 인증 엔드포인트 IP 레이트리밋. 잠금/카운터는
+  전부 Redis(휘발, TTL)에 두어 `users` 스키마 불변(D-02 준수). 레이트리밋 버킷 키에
+  쓰는 클라이언트 IP 는 TTL 휘발값이며 영속 로그가 아니다(위 IP 비기록 원칙과 일관).

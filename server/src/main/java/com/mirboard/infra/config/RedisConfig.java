@@ -40,6 +40,12 @@ public class RedisConfig {
         return scriptOf("lua/room_delete.lua");
     }
 
+    /** D-84 — 인증 IP 고정 윈도 레이트리밋 (INCR+EXPIRE 원자). */
+    @Bean
+    public RedisScript<Long> rateLimitFixedWindowScript() {
+        return scriptOf("lua/rate_limit_fixed_window.lua");
+    }
+
     private static RedisScript<Long> scriptOf(String classpath) {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource(classpath));

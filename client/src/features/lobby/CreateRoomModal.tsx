@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Select,
@@ -22,6 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+/** 내기(판돈) 토글 ON 시 기본 판돈(칩). 서버 허용 집합 {0,10,50,100,500} 중 하나. */
+const DEFAULT_STAKE = 100;
 
 interface CreateRoomModalProps {
   open: boolean;
@@ -152,33 +156,21 @@ export function CreateRoomModal({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>💰 판돈 (가상 칩)</Label>
-            <ToggleGroup
-              type="single"
-              value={String(stake)}
-              onValueChange={(v) => {
-                if (v === '') return;
-                const s = Number(v);
-                setStake(s);
-                if (s > 0) setFillWithBots(false); // 판돈 방은 봇 금지
-              }}
-              className="justify-start"
-            >
-              {[
-                { v: 0, label: '없음' },
-                { v: 10, label: '10' },
-                { v: 50, label: '50' },
-                { v: 100, label: '100' },
-                { v: 500, label: '500' },
-              ].map((o) => (
-                <ToggleGroupItem key={o.v} value={String(o.v)}>
-                  {o.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <Label>💰 판돈 (내기)</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={stake > 0}
+                onCheckedChange={(on) => {
+                  setStake(on ? DEFAULT_STAKE : 0);
+                  if (on) setFillWithBots(false); // 판돈 방은 봇 금지
+                }}
+                aria-label="판돈(내기) 켜기/끄기"
+              />
+              <span>{stake > 0 ? `내기 켜짐 — 판돈 ${stake}칩` : '내기 끔'}</span>
+            </label>
             {stake > 0 && (
               <p className="text-xs text-muted-foreground">
-                내기 방: 승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님). 봇 참여 불가.
+                승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님). 봇 참여 불가.
               </p>
             )}
           </div>

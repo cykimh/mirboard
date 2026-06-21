@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, LogOut, Plus } from 'lucide-react';
+import { Eye, ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
@@ -34,6 +34,9 @@ import {
 } from '@/components/ui/avatar';
 import { avatarSrc } from '@/api/avatar';
 import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
+import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
+import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
+import { useColorblindStore } from '@/features/theme/colorblindStore';
 import {
   Table,
   TableBody,
@@ -63,6 +66,9 @@ export function GameHubPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const tutorial = useTutorialGate();
+  const colorblind = useColorblindStore((s) => s.enabled);
+  const toggleColorblind = useColorblindStore((s) => s.toggle);
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   const { messages, connected, send } = useLobbyStomp(token);
@@ -160,7 +166,14 @@ export function GameHubPage() {
                     </AvatarFallback>
                   </Avatar>
                 </button>
-                <span className="text-sm font-medium">{user.username}</span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="text-sm font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  title="내 프로필"
+                >
+                  {user.username}
+                </button>
               </div>
             )}
             {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
@@ -170,6 +183,29 @@ export function GameHubPage() {
                 {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
               </span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={tutorial.show}
+              aria-label="게임 방법"
+              title="게임 방법"
+            >
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">게임 방법</span>
+            </Button>
+            <Button
+              type="button"
+              variant={colorblind ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleColorblind}
+              aria-pressed={colorblind}
+              aria-label="색약 모드"
+              title="색약 모드 — 카드 슈트를 글리프로도 표시"
+            >
+              <Eye className="h-4 w-4" />
+              <span className="hidden sm:inline">색약</span>
+            </Button>
             <ThemeToggle />
             <Button
               type="button"
@@ -445,6 +481,8 @@ export function GameHubPage() {
           onChanged={() => setAvatarVersion((v) => v + 1)}
         />
       )}
+
+      <TutorialModal open={tutorial.open} onClose={tutorial.close} />
     </div>
   );
 }

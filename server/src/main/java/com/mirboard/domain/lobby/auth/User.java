@@ -62,6 +62,14 @@ public class User {
         return new User(username, passwordHash, Instant.now(clock));
     }
 
+    /**
+     * D-85 — 비밀번호 변경(도메인 캡슐화). 새 해시는 호출 측이 BCrypt 로 인코딩해 전달한다.
+     * 무분별한 setter 노출을 피하기 위해 password_hash 갱신은 이 메서드로만 한다.
+     */
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
+
     public Long getId() {
         return id;
     }

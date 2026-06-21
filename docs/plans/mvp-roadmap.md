@@ -822,4 +822,59 @@ build(tsc)+test 그린. 스키마/STOMP/REST 계약 무변경(`room_finish.lua` 
 
 ---
 
+## 상용화(포트폴리오 쇼케이스) 로드맵 — 트랙 A/C/D/E/G
+
+MVP(Phase 1~20) 완료 후, **포트폴리오/기술 쇼케이스**를 목표로 한 후속 작업.
+타깃은 지인+소규모 KR 커뮤니티(다국어·실수익·법무 제외). 핵심 서사는 "분산 전환을
+실제로 증명한 서버-권위적 실시간 게임 서버". 선택 트랙: A(티츄 완성도)·C(운영 하드닝)·
+D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·소셜)·F(법무).
+
+각 마일스톤은 독립 출시 가능하며 동일 Phase Gate(설계변경 시 decisions.md D-NN 선행)를 따른다.
+
+| M | 트랙 | 내용 | 상태 |
+| --- | --- | --- | --- |
+| M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
+| M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C4 완료 / C1·C3·C5 남음 |
+| M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
+| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
+| M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
+
+**M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
+D-84(`LoginAttemptService`·`AuthRateLimiter`·`rate_limit_fixed_window.lua`, 전부 Redis 휘발 —
+users 스키마 비침범). M0 범위에서 빠진 TurnTimeoutScheduler in-memory 누수 수정은 M3(스케줄러
+분산 재작성)로 이연. 검증: `SecurityHeadersAndCorsIntegrationTest`·`LoginAttemptServiceIT`·
+`AuthAbuseIntegrationTest` + 전체 서버 스위트·클라(tsc/build/vitest) 그린.
+
+**M1 상세(완료)**: A1 카드 이미지(`CardChip` img+onError 글리프 폴백, 특수 4종 SVG 신규),
+A2 온보딩 튜토리얼(`TutorialModal`/`PairPractice`/`useTutorialGate`), A3 모바일(손패 겹침
+`computeHandOverlap` 단위테스트 + 터치타겟 + `mobile-responsive-checklist.md`), A4 비밀번호
+변경/프로필(D-85, `PUT /api/me/password` + `/profile`), A5 접근성(색약 모드 토글·키보드 손패
+재배열·DialogDescription). 클라 vitest 120·서버 IT 그린.
+
+**M1 후속 게임판 UX 폴리시(A6/A7, 클라 전용·스키마/프로토콜 무변경)**: 실제 플레이
+스크린샷 검토에서 드러난 게임판 UX 결함을 다듬음.
+- **A6 (UX-1~4)**: 헤더 reflow 고정·점수 중복 제거·내부 용어(STOMP/내 시트) 제거 +
+  연결 점 표시, 채팅 좁은폭 바텀시트 + 데스크톱 우하단 도크(좌석 비침범), 카드 패스
+  슬롯 컴팩트 + 손패 픽업 강조, 좌석 역할 칩(나/파트너/상대)로 2:2 즉시 식별.
+- **A7 (설계 워크플로 선택 메뉴 기반)**: 카드를 직관적 숫자+슈트 문양으로(트럼프 핍
+  SVG 대체, 좌측 정렬이라 겹쳐도 가독 · 색약 글리프 강조), 좌석 손패 스택 중앙
+  지향(좌·우 상대 ±90° 세로, 파트너 아래 부채), 내기/패스/취소 정밀 정제(좌석 비침범·
+  내기 활성 시 골드링·터치 ≥48px).
+- **A7 후속(방 만들기 모달)**: 목표점수/턴제한 옵션 선택 상태를 채움(primary)으로
+  가시화(hover 유지), 판돈을 5단 금액 선택 → on/off 토글(`Switch` 신규, ON=기본 100칩)로 단순화.
+
+검증: Playwright로 딜링/패스/플레이 × 좁은폭(600)/와이드(1366) + 방 만들기 모달 시각
+검증, CardChip/SeatCardStack 단위테스트. 클라 vitest 123·tsc·`check:fast` 그린.
+`mobile-responsive-checklist.md`에 A6/A7·모달 항목 추가.
+
+**M2 진행(C4 완료)**: D-86 어드민/모더레이션 — 역할 별도 테이블 `admin_roles`(Flyway V8,
+규칙#3), `/api/admin/**` 어드민 전용. 매치 강제종료(`adminAbortGame`), 유저 정지
+(`suspend:user:{id}` Redis TTL → 로그인/CONNECT 403), 채팅 금칙어 마스킹
+(`ChatModerationService`). 검증: `AdminControllerIT`·`AdminUserSuspensionIT`·`ChatModerationServiceTest`.
+**남은 M2**: C1 완성(전역/STOMP 레이트리밋 — 게임경로 위험), C3(Sentry+Grafana — 로컬
+스택/외부 SaaS 필요), C5(백업런북·k6 — 실행환경 필요). 채팅 신고 적재/조회(테이블)도 후속.
+
+---
+
 각 Phase 종료 시 변경사항 요약 + 다음 Phase 진입 동의를 사용자에게 요청.

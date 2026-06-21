@@ -6,24 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + 1차 게임으로 티츄(Tichu).
 
-현재는 **Phase 1 (설계) 단계 완료** 상태. 작성된 산출물은:
-- `docs/api.md` — REST 명세
-- `docs/stomp-protocol.md` — WebSocket/STOMP envelope, 토픽·큐 카탈로그
-- `docs/redis-keys.md` — Redis 키 타입/TTL/Lua 원자성 전략
-- `server/src/main/resources/db/migration/V1__init.sql` — Flyway 초기 스키마
+현재는 **동작하는 MVP** 상태다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 결정 이력 D-84까지). 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO 영속 → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다.
 
-**아직 작성되지 않은 것**: Gradle 빌드 파일, Java 소스, 클라이언트 프로젝트. Phase 2부터 추가됨. 새 코드를 쓸 때는 위 docs를 계약(contract)으로 취급.
+- **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
+- **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
+- **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
+- **현황 단일 진실원**: `docs/implementation-status.md`(기능별 ✅ 표). 이력 `docs/decisions.md`, 로드맵 `docs/plans/mvp-roadmap.md`.
+
+상용화(포트폴리오 쇼케이스) 후속은 트랙 A(티츄 완성도)·C(운영 하드닝)·D(수평 확장성)·E(멀티게임)·G(문서·데모)의 마일스톤으로 진행 중 — `docs/plans/mvp-roadmap.md` 참조.
 
 ## Phase Gate 작업 규칙
 
-작업은 4단계로 진행되며 **각 Phase 완료 시 반드시 사용자 검토/승인을 받은 후 다음 Phase로 진입한다.** Phase를 임의로 건너뛰지 말 것.
+**각 작업 단위(마일스톤) 완료 시 반드시 사용자 검토/승인을 받은 후 다음 단계로 진입한다.** 단계를 임의로 건너뛰지 말 것. 설계 변경을 동반하면 아래 "작업 체크리스트"의 docs-선행 절차(decisions.md D-NN 먼저)를 따른다.
 
-1. **Phase 1**: DB/API/프로토콜 설계 (완료)
-2. **Phase 2**: 로비 모듈 (회원가입, JWT, 방 생성/입장, 동시성)
-3. **Phase 3**: 티츄 룰 엔진 + 단위 테스트 ≥ 90%
-4. **Phase 4**: WebSocket 통합 + React 클라이언트 + 재접속 동기화
-
-상세는 플랜 파일 참조.
+초기 4-Phase(1 설계 → 2 로비 → 3 룰엔진 → 4 WS/클라)는 **전부 완료**, 이후 Phase 5~20(영속·배포·재접속·UI 등)까지 진행됐다(이력 `docs/decisions.md`, 현황 `docs/implementation-status.md`). 현재 후속은 상용화 트랙(A/C/D/E/G) 마일스톤으로 진행되며 동일한 Phase Gate 규칙을 적용한다. 상세는 `docs/plans/mvp-roadmap.md`.
 
 ## 절대 원칙 (위반 시 설계 무효)
 

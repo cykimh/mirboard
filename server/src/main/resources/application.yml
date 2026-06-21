@@ -78,6 +78,25 @@ mirboard:
     secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
     expires-in: 12h
     issuer: mirboard
+  security:
+    # D-83 — CORS/WS origin 화이트리스트(콤마 구분). 전면 개방(*) 폐지.
+    # dev=Vite(5173)/로컬(8080). prod 는 application-prod.yml 가 실도메인으로 override.
+    allowed-origins: ${MIRBOARD_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:8080}
+  auth:
+    lockout:
+      # D-84 — 로그인 brute-force 잠금(Redis 전용, users 비침범).
+      max-failures: ${MIRBOARD_LOGIN_MAX_FAILURES:5}
+      window: ${MIRBOARD_LOGIN_FAIL_WINDOW:15m}
+      lock-duration: ${MIRBOARD_LOGIN_LOCK_DURATION:15m}
+  ratelimit:
+    auth:
+      # D-84 — 인증 엔드포인트 IP 고정 윈도 레이트리밋(Lua 원자).
+      limit: ${MIRBOARD_RATELIMIT_AUTH_LIMIT:20}
+      window: ${MIRBOARD_RATELIMIT_AUTH_WINDOW:1m}
+  moderation:
+    # D-86 — 채팅 금칙어(같은 길이 '*' 마스킹, 대소문자 무시). 운영자가 콤마로 커스터마이즈.
+    # 자모 분리 우회 등 고급 회피 대응은 범위 밖. 비우면 마스킹 없음. (예시: 비속어)
+    banned-words: ${MIRBOARD_BANNED_WORDS:비속어}
   messaging:
     # Phase 6D — 멀티 인스턴스 fan-out 모드. in-memory (default, 단일 인스턴스) 또는 redis.
     # redis 로 전환 시 STOMP broadcast 와 도메인 이벤트가 Redis Pub/Sub 위에서 흐른다.

@@ -1,5 +1,6 @@
 package com.mirboard.infra.ws.lobby;
 
+import com.mirboard.domain.admin.ChatModerationService;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.infra.messaging.StompPublisher;
 import com.mirboard.infra.ws.StompEnvelope;
@@ -23,10 +24,13 @@ public class LobbyStompController {
 
     private final Clock clock;
     private final StompPublisher publisher;
+    private final ChatModerationService chatModeration;
 
-    public LobbyStompController(Clock clock, StompPublisher publisher) {
+    public LobbyStompController(Clock clock, StompPublisher publisher,
+                               ChatModerationService chatModeration) {
         this.clock = clock;
         this.publisher = publisher;
+        this.chatModeration = chatModeration;
     }
 
     @MessageMapping("/lobby/chat")
@@ -34,7 +38,7 @@ public class LobbyStompController {
         AuthPrincipal me = (AuthPrincipal) principal;
         var envelope = StompEnvelope.of(
                 "CHAT",
-                new ChatMessage(me.userId(), me.username(), req.message()),
+                new ChatMessage(me.userId(), me.username(), chatModeration.mask(req.message())),
                 clock);
         publisher.publishToTopic(LOBBY_CHAT_TOPIC, envelope);
     }

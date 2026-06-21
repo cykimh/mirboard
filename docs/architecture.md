@@ -293,6 +293,18 @@ JPA 엔티티는 `TichuMatchResult`, `TichuMatchParticipant`(복합키). `User` 
 
 - **인증**: `JwtAuthFilter`(REST) + STOMP CONNECT 인터셉터. JWT HS256 12h,
   시크릿 `MIRBOARD_JWT_SECRET`(≥32바이트).
+- **CORS/보안 헤더(D-83)**: origin 은 `mirboard.security.allowed-origins` 화이트리스트
+  (dev=localhost, prod=실도메인 env)로 고정 — WebSocket/HTTP 전면 개방 `*` 폐지.
+  `SecurityConfig` 가 `nosniff`/`X-Frame-Options=DENY`/`Referrer-Policy`/HSTS(HTTPS 한정) 부착.
+  CSP 는 정적 자산이 `/api` 밖이라 report-only 도입을 M2 로 보류. 비-API default-permit 불변.
+- **레이트리밋/계정 잠금(D-84)**: 인증 엔드포인트 IP 토큰버킷(Lua, 429) + 로그인 실패
+  누적 잠금(`login:fail`/`lock:login`, 423). 전부 Redis 휘발 — `users` 스키마 비침범(D-02).
+  STOMP/전역 HTTP 필터 확장은 M2(C1).
+- **어드민/모더레이션(D-86)**: 권한은 `users` 밖 `admin_roles`(V8) — `AdminAuthorization`
+  매 요청 조회, `/api/admin/**` 어드민 전용(403 `NOT_ADMIN`). 기능: 매치 강제종료
+  (`adminAbortGame`), 유저 정지(`suspend:user:{id}` Redis TTL → 로그인/CONNECT 403
+  `ACCOUNT_SUSPENDED`), 채팅 금칙어 마스킹(`ChatModerationService`, 같은 길이 '*').
+  컨트롤러는 권한판정/도메인서비스 위임만(규칙#4).
 - **예외 처리**: `GlobalExceptionHandler`(@ControllerAdvice) 가 도메인 예외 →
   `ApiErrorEnvelope` 로 변환. 401은 JSON.
 - **관측성**: Micrometer + Prometheus(`/actuator/prometheus`), `MirboardMetrics` 카운터.

@@ -68,14 +68,55 @@ a {
 }
 
 .game-table-header {
+  /* UX-1 — status(좌) / controls(우) 두 그룹. 단계별 텍스트 길이와 무관하게
+     컨트롤이 항상 한 덩어리로 우측 고정(좁은 폭에선 일관된 둘째 줄). */
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 12px;
   font-size: 0.85rem;
-  opacity: 0.8;
   /* 헤더가 arena(이후 페인트)보다 위에 오도록 stacking context 생성 — 반응
      팔레트(헤더 자식)가 경기장에 가리지 않게(#1). */
   position: relative;
   z-index: 20;
+}
+
+.header-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  opacity: 0.85;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* UX-1 — 연결 상태 점(내부 'STOMP' 용어 노출 제거). */
+.conn-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+.conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.conn-dot.on {
+  background: var(--color-success, #3fb979);
+  box-shadow: 0 0 6px rgba(63, 185, 121, 0.6);
+}
+.conn-dot.off {
+  background: #e85d75;
+  box-shadow: 0 0 6px rgba(232, 93, 117, 0.6);
 }
 
 /* Phase 13D — 턴 제한 배지. */
@@ -150,6 +191,8 @@ a {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
+  /* #2 — 내 좌석 콘텐츠(아바타/스택)를 액션 버튼(z16) 위로 — 혹시 모를 겹침 안전장치. */
+  z-index: 17;
 }
 
 /* 액션 바 — 경기장 밖(손패 아래) 고정 바. 모바일은 sticky 로 엄지 도달 쉽게. */
@@ -200,7 +243,7 @@ a {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 16px;
+  bottom: 10px;
   z-index: 16;
   pointer-events: none;
 }
@@ -242,6 +285,12 @@ a {
   padding: 0 14px;
   font-weight: 700;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* #2 — 내기(play)가 실제로 낼 수 있을 때만 골드 링으로 강조(거짓 활성 회피 +
+   '지금 낼 수 있다'를 한눈에 — 발견성↑). 비활성 시 링 없음. */
+.seat-action-btn.play:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 .table-center-trick {
@@ -404,6 +453,25 @@ a {
   opacity: 0.92;
 }
 
+/* UX-2 — 팀/역할 칩(나/파트너=우리, 상대). 2:2 즉시 식별. */
+.seat-team {
+  margin-top: 2px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 0 7px;
+  border-radius: 999px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.seat-team.us {
+  color: #6fd3a0;
+  background: rgba(63, 185, 121, 0.16);
+}
+.seat-team.them {
+  color: #e08a8a;
+  background: rgba(232, 93, 117, 0.16);
+}
+
 /* 좌석 카드백 스택(#6) — back.svg 미니 카드백 부채꼴 + 정확한 숫자. */
 .seat-cardstack {
   margin-top: 4px;
@@ -443,6 +511,32 @@ a {
   font-size: 0.82rem;
   font-weight: 800;
   opacity: 0.95;
+}
+
+/* #3 — 좌석별 부채 방향을 중앙 지향으로 회전(실제 보드게임처럼). s=위(기본),
+   n=아래, w=좌(우측 좌석이 중앙을 향함), e=우(좌측 좌석이 중앙을 향함).
+   w/e 는 ±90° 회전이라 '점유 박스≠시각 박스'가 되므로, 회전 전 행(≈53×28)을
+   height:54 박스에 세로 가운데 정렬해 회전 후 세로 footprint(≈30×53)를 박스가
+   품게 한다 → 위 라벨/아래 숫자와 겹치지 않는다. */
+.seat-cardstack.fan-n .seat-cardstack-fan {
+  transform: rotate(180deg);
+}
+.seat-cardstack.fan-w,
+.seat-cardstack.fan-e {
+  flex-direction: column;
+  gap: 2px;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan,
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  height: 54px;
+  align-items: center;
+  justify-content: center;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan {
+  transform: rotate(-90deg);
+}
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  transform: rotate(90deg);
 }
 
 .declared {
@@ -530,15 +624,18 @@ a {
 }
 
 .card-chip {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  width: 48px;
-  height: 68px;
+  /* #1 — 카드 확대(48→62)로 가독성↑. 겹침 단계는 useHandOverlap 이 폭을 재측정해
+     한 줄을 유지하고, 좌상단 코너 인덱스가 겹친 슬라이버에서도 랭크/슈트를 보여준다. */
+  width: 62px;
+  height: 88px;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 2px solid #555;
   background: #ffffff;
   color: inherit;
@@ -570,6 +667,41 @@ a {
 
 .card-chip.selected:hover {
   transform: translateY(-10px) scale(1.05);
+}
+
+/* M1/A1 — 카드 이미지 모드. 자산 로드 실패 시 글리프 모드(.suit-glyph/.rank)로 폴백. */
+.card-chip .card-face {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* #1' — 직관적 숫자+슈트 카드(트럼프 핍 SVG 대체). 좌측 정렬 + 세로 중앙이라 손패가
+   겹쳐도 왼쪽 슬라이버에서 랭크/슈트가 읽힌다. A5 색약(.cb)은 슈트 글리프 윤곽 강조. */
+.card-chip .card-simple {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding-left: 6px;
+  line-height: 1;
+  pointer-events: none;
+}
+.card-chip .cs-rank {
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+.card-chip .cs-suit {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.card-chip .card-simple.cb .cs-suit {
+  -webkit-text-stroke: 0.5px currentColor;
 }
 
 .card-chip .rank {
@@ -632,6 +764,13 @@ a {
       radial-gradient(ellipse 95% 130% at 50% 0%,
         #1f4636 0%, #163728 58%, #0e241b 100%);
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+/* UX-3 — 패스 단계에서 줄 카드를 아직 안 골랐을 때 손패를 강조(픽업 유도).
+   카드를 고르면(pending) 강조는 손패→슬롯(.droppable)으로 이동. */
+.my-hand.pick-emphasis {
+  border-color: var(--color-warning, #f0c000);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(240, 192, 0, 0.45);
 }
 
 .round-ended {
@@ -767,6 +906,9 @@ a {
   align-items: center;
   gap: 6px;
   width: 100%;
+  /* UX-3 — 슬롯이 전폭으로 퍼져 커 보이지 않게 폭 제한·중앙 정렬(컴팩트). */
+  max-width: 460px;
+  margin-inline: auto;
 }
 
 /* PASSING 동안 액션 바를 세로 스택(슬롯 3개가 펼쳐짐). */
@@ -784,8 +926,9 @@ a {
 
 /* arena 바닥은 좁으므로 슬롯을 컴팩트하게 다운스케일. */
 .arena-pass .pass-slot {
-  padding: 6px 8px;
-  gap: 3px;
+  padding: 6px;
+  gap: 2px;
+  min-height: 0;
 }
 
 .arena-pass .pass-hint {
@@ -833,6 +976,7 @@ a {
 .pass-slot .slot-empty {
   opacity: 0.6;
   font-style: italic;
+  font-size: 0.72rem;
 }
 
 /* Phase 15(#2) — 배정 완료된 줄 사람은 정적(클릭 불가) + 완료 표시. */
@@ -1089,13 +1233,16 @@ a {
   font-weight: 600;
 }
 
-/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4). */
+/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4).
+   UX-4: 데스크톱도 우하단 도크로(상단 우측 패널은 우측 좌석을 덮었음) — 하단(손패/액션)만
+   덮고 좌석은 가리지 않는다. 좁은 폭(≤768px)은 아래에서 전폭 바텀시트로 오버라이드. */
 .room-chat-panel {
   position: fixed;
   right: 16px;
-  top: 72px;
-  width: 300px;
-  max-height: 70vh;
+  bottom: 16px;
+  top: auto;
+  width: 340px;
+  max-height: 60vh;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1156,12 +1303,18 @@ a {
   font-size: 13px;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  /* UX-4 — 좁은 폭에선 채팅을 바텀시트로. 좌석/테이블을 가리지 않고 하단(손패/액션)만
+     덮는다(채팅 중에는 액션보다 읽기 우선, 닫으면 즉시 복귀). 상단 떠서 좌석 가리던
+     기존 동작 대체. */
   .room-chat-panel {
-    right: 8px;
-    left: 8px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
     width: auto;
-    top: 64px;
+    max-height: 55vh;
+    border-radius: 14px 14px 0 0;
   }
 }
 
@@ -1208,11 +1361,17 @@ a {
 }
 
 @media (max-width: 480px) {
-  /* 손패 카드 크기 축소 — 세로 직사각형 비율 유지. */
+  /* 손패 카드 크기 축소 — 세로 직사각형 비율 유지(코너 인덱스 가독 최소치). */
   .card-chip {
-    width: 40px;
-    height: 56px;
+    width: 48px;
+    height: 68px;
     gap: 2px;
+  }
+  .card-chip .cs-rank {
+    font-size: 1.35rem;
+  }
+  .card-chip .cs-suit {
+    font-size: 1.05rem;
   }
   .card-chip .rank {
     font-size: 1rem;
@@ -1227,6 +1386,11 @@ a {
    상대 위치가 사라졌다. absolute 원형 배치는 그대로 두고 좌석·중앙 트릭만
    컴팩트하게 축소해 어느 폭에서도 자리가 고정되게 한다. */
 @media (max-width: 768px) {
+  /* #1 — 중간 폭에선 카드를 한 단계만 축소(데스크톱 62 → 54). */
+  .card-chip {
+    width: 54px;
+    height: 76px;
+  }
   .table-arena {
     min-height: 360px;
   }
@@ -1305,5 +1469,15 @@ a {
   .seat-action-cancel {
     min-width: 0;
     padding: 0 8px;
+  }
+}
+
+/* A3 — 터치 기기에서 액션 버튼 최소 터치 타겟 확보(데스크톱 마우스 무영향). */
+@media (pointer: coarse) {
+  .seat-action-btn {
+    min-height: 48px;
+  }
+  .seat-action-cancel {
+    min-height: 44px;
   }
 }

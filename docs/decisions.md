@@ -98,6 +98,55 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-86 (2026-06-21) — 어드민/모더레이션: 역할 별도 테이블 (M2/C4)
+
+운영 신뢰성용 최소 어드민 기능. **규칙#3(D-02) 준수**: 권한을 `users` 에 두지 않고 신규
+`admin_roles`(Flyway V8: `user_id` PK FK→users, `granted_at`)로 분리한다. 권한 판정은 매 요청
+`admin_roles` 조회(소규모라 비용 무시·즉시 반영). `/api/admin/**` 는 어드민만(비어드민 403
+`NOT_ADMIN`). 어드민 부여는 DB insert(운영 스크립트)로만 — 자가 승격 엔드포인트 없음.
+**슬라이스 1(본 항목)**: 매치 강제 종료 — `RoomService.adminAbortGame`(host 검증 없이
+IN_GAME→FINISHED, 기존 host용 `abortGame` 과 분리). 컨트롤러는 `AdminAuthorization.requireAdmin`
+위임만(규칙#4 — 룰 로직 없음). **후속 슬라이스**: 유저 정지(Redis `suspend:user:{id}` TTL,
+로그인/CONNECT 차단 — users 비침범), 채팅 금칙어 마스킹/신고. 감사는 구조화 로그(MDC)로 시작,
+전용 테이블은 후속. Flyway-only(규칙#6).
+
+## D-85 (2026-06-21) — 셀프서비스 비밀번호 변경 (PUT /api/me/password, M1/A4)
+
+프로필/설정에서 본인 비밀번호를 바꿀 수 있게 한다. 신규 `PUT /api/me/password`(인증 필요)는
+현재 비밀번호를 재검증한 뒤 새 비밀번호를 `PasswordPolicy`(8~64자)로 검증하고 BCrypt 로
+재해시해 `users.password_hash` 만 갱신한다 — **스키마/마이그레이션 변경 없음**(기존 컬럼 재사용,
+D-02 화이트리스트 불변). 현재 비번 불일치는 401(`BAD_CREDENTIALS`), 정책 위반은 400(`INVALID_INPUT`).
+**토큰 정책(사용자 결정)**: 변경 후 기존 발급 JWT 를 그대로 **유지**(최대 12h)한다 — 단순성 우선,
+소규모/포트폴리오 범위. 즉시 무효화(토큰 버전/블랙리스트)는 트랙 C(M2) 인증 하드닝에서 재검토.
+클라는 `/profile` 라우트로 전적·아바타·비밀번호 변경을 통합한다.
+
+## D-84 (2026-06-21) — 로그인 brute-force 잠금 + 인증 레이트리밋 (Redis 전용, M0)
+
+상용화(포트폴리오) M0 보안 하드닝. 로그인 무제한 시도를 막는다. 실패 카운터
+`login:fail:{username}`(INCR, 윈도 TTL)가 임계(기본 5회) 초과 시 `lock:login:{username}`
+(짧은 TTL, 기본 15분) 으로 잠가 `ACCOUNT_LOCKED`/423 반환. 인증 엔드포인트(`/api/auth/login`,
+`/register`)는 IP 고정 윈도 카운터(Lua 원자 `INCR`+`EXPIRE`, `room_*.lua` 패턴 재사용)로
+레이트리밋해 초과 시 `TOO_MANY_REQUESTS`/429 (토큰버킷·전역 추상화는 M2). **규칙#3(D-02) 준수**: `users` 테이블에 `failed_attempt`/`locked_until`
+컬럼을 추가하지 **않고** 전부 Redis(휘발)로 둔다(스키마/마이그레이션 무변경). **DoS 완화**:
+username 단독 잠금은 타인 계정 잠금 공격이 가능하므로 잠금 TTL 을 짧게 두고 IP 레이트리밋을
+병행, 영구 잠금은 두지 않는다. 성공 로그인 시 두 키 삭제. 범위: 인증 표면만 — STOMP SEND/전역
+HTTP 필터로의 확장은 M2(C1 완성). in-memory degrade 추상화(`RateLimiter` 인터페이스 2구현)도
+M2 로 미룬다(Redis 는 이미 필수 의존이라 M0 은 Redis 직접 사용). 영향: `docs/redis-keys.md`
+(신규 키 3종), `docs/api.md`(429/423), `application.yml`(`mirboard.ratelimit.*` 기본값).
+
+## D-83 (2026-06-21) — CORS origin 화이트리스트 + 보안 헤더 (M0)
+
+상용화(포트폴리오) M0 보안 하드닝. WebSocket/HTTP origin 전면 개방
+(`setAllowedOriginPatterns("*")`, `WebSocketConfig` 2곳)을 환경별 화이트리스트
+(`mirboard.security.allowed-origins`, dev=localhost:5173/8080, prod=실도메인 env 주입)로 고정한다.
+`SecurityConfig` 에 `CorsConfigurationSource` 빈 + 보안 헤더: `X-Content-Type-Options=nosniff`,
+`X-Frame-Options=DENY`, `Referrer-Policy=strict-origin-when-cross-origin`, HSTS(스프링 기본 동작상
+HTTPS 요청에서만 송출돼 dev http 에 무해, 프로필 분기 불필요). **CSP 는 보류** — 정적 자산
+(`/cards`, `/avatars`, SPA)이 `/api` 밖(규칙#8)이라 잘못 좁히면 데모가 백지화될 위험이 커
+report-only 도입을 M2(C 트랙)로 미룬다. **불변**: 비-API default-permit(규칙#8)·`/ws` 핸드셰이크
+permitAll·STOMP CONNECT 인증(ChannelInterceptor)은 그대로. 영향: `docs/architecture.md` 보안 섹션,
+`application.yml`/`application-prod.yml`(`mirboard.security.allowed-origins` 키).
+
 ## D-82 (2026-06-20) — 내기 칩: 계정 지갑 → 방 단위 테이블 칩 (D-81 보정)
 
 D-81 의 계정 영속 지갑(`users.chip_balance`)을 **방 단위 테이블 칩**으로 바꾼다(사용자 요청).

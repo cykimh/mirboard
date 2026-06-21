@@ -13,9 +13,12 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor authInterceptor;
+    private final SecurityProperties securityProperties;
 
-    public WebSocketConfig(StompAuthChannelInterceptor authInterceptor) {
+    public WebSocketConfig(StompAuthChannelInterceptor authInterceptor,
+                           SecurityProperties securityProperties) {
         this.authInterceptor = authInterceptor;
+        this.securityProperties = securityProperties;
     }
 
     @Override
@@ -27,10 +30,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // D-83 — 핸드셰이크 origin 을 화이트리스트로 고정(전면 개방 폐지).
+        String[] origins = securityProperties.allowedOrigins().toArray(String[]::new);
         // Raw WS endpoint for native @stomp/stompjs clients.
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*");
+        registry.addEndpoint("/ws").setAllowedOrigins(origins);
         // SockJS fallback for environments without native WS support.
-        registry.addEndpoint("/ws").setAllowedOriginPatterns("*").withSockJS();
+        registry.addEndpoint("/ws").setAllowedOrigins(origins).withSockJS();
     }
 
     @Override
