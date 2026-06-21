@@ -1183,13 +1183,16 @@ a {
   font-weight: 600;
 }
 
-/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4). */
+/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4).
+   UX-4: 데스크톱도 우하단 도크로(상단 우측 패널은 우측 좌석을 덮었음) — 하단(손패/액션)만
+   덮고 좌석은 가리지 않는다. 좁은 폭(≤768px)은 아래에서 전폭 바텀시트로 오버라이드. */
 .room-chat-panel {
   position: fixed;
   right: 16px;
-  top: 72px;
-  width: 300px;
-  max-height: 70vh;
+  bottom: 16px;
+  top: auto;
+  width: 340px;
+  max-height: 60vh;
   display: flex;
   flex-direction: column;
   gap: 8px;
