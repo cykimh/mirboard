@@ -1,5 +1,6 @@
 package com.mirboard.infra.ws;
 
+import com.mirboard.domain.admin.ChatModerationService;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -31,11 +32,14 @@ public class RoomChatController {
     private final Clock clock;
     private final StompPublisher publisher;
     private final RoomService roomService;
+    private final ChatModerationService chatModeration;
 
-    public RoomChatController(Clock clock, StompPublisher publisher, RoomService roomService) {
+    public RoomChatController(Clock clock, StompPublisher publisher, RoomService roomService,
+                             ChatModerationService chatModeration) {
         this.clock = clock;
         this.publisher = publisher;
         this.roomService = roomService;
+        this.chatModeration = chatModeration;
     }
 
     @MessageMapping("/room/{roomId}/chat")
@@ -53,7 +57,7 @@ public class RoomChatController {
         }
         var envelope = StompEnvelope.of(
                 "CHAT",
-                new ChatMessage(me.userId(), me.username(), req.message()),
+                new ChatMessage(me.userId(), me.username(), chatModeration.mask(req.message())),
                 clock);
         publisher.publishToTopic("/topic/room/" + roomId + "/chat", envelope);
     }

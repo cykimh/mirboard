@@ -93,6 +93,10 @@ mirboard:
       # D-84 — 인증 엔드포인트 IP 고정 윈도 레이트리밋(Lua 원자).
       limit: ${MIRBOARD_RATELIMIT_AUTH_LIMIT:20}
       window: ${MIRBOARD_RATELIMIT_AUTH_WINDOW:1m}
+  moderation:
+    # D-86 — 채팅 금칙어(같은 길이 '*' 마스킹, 대소문자 무시). 운영자가 콤마로 커스터마이즈.
+    # 자모 분리 우회 등 고급 회피 대응은 범위 밖. 비우면 마스킹 없음. (예시: 비속어)
+    banned-words: ${MIRBOARD_BANNED_WORDS:비속어}
   messaging:
     # Phase 6D — 멀티 인스턴스 fan-out 모드. in-memory (default, 단일 인스턴스) 또는 redis.
     # redis 로 전환 시 STOMP broadcast 와 도메인 이벤트가 Redis Pub/Sub 위에서 흐른다.
