@@ -27,6 +27,7 @@
 | `login:fail:{username}` | STRING(INTEGER) | 윈도(기본 15m) | 로그인 연속 실패 횟수 | D-84. `INCR`+첫 실패 시 EXPIRE. 임계 초과 시 lock 설정, 성공 시 DEL |
 | `lock:login:{username}` | STRING | 잠금(기본 15m) | 잠금 마커 | D-84. 존재 시 423 ACCOUNT_LOCKED. users 스키마 비침범(휘발) |
 | `ratelimit:auth:ip:{ip}` | STRING(INTEGER) | 윈도(TTL) | 인증 IP 요청 카운터 | D-84. Lua 원자 고정 윈도(`INCR`+`EXPIRE`). 초과 시 429. 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
+| `suspend:user:{userId}` | STRING | 정지 기간(TTL) | 어드민 유저 정지 마커 | D-86. 존재 시 로그인/CONNECT 차단(403 ACCOUNT_SUSPENDED). users 스키마 비침범(휘발) |
 
 > Phase 19(#1, D-75): 세션→방 매핑은 Redis presence 키가 아니라 서버
 > in-memory `WsSessionRegistry`(SUBSCRIBE 등록 / DISCONNECT 제거)로 구현.

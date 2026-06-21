@@ -12,13 +12,15 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final LoginAttemptService loginAttempts;
+    private final SuspensionService suspensions;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, Clock clock,
-                       LoginAttemptService loginAttempts) {
+                       LoginAttemptService loginAttempts, SuspensionService suspensions) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
         this.loginAttempts = loginAttempts;
+        this.suspensions = suspensions;
     }
 
     @Transactional
@@ -41,6 +43,10 @@ public class AuthService {
         if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
             loginAttempts.onFailure(username);
             throw new InvalidCredentialsException();
+        }
+        // D-86 — 자격증명이 맞아도 정지된 계정은 로그인 불가.
+        if (suspensions.isSuspended(user.getId())) {
+            throw new AccountSuspendedException();
         }
         loginAttempts.onSuccess(username);
         return new AuthenticatedUser(user.getId(), user.getUsername());

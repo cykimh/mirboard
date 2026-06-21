@@ -26,6 +26,7 @@ class AuthServiceTest {
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
     private LoginAttemptService loginAttempts;
+    private SuspensionService suspensions;
     private AuthService service;
 
     @BeforeEach
@@ -33,7 +34,8 @@ class AuthServiceTest {
         userRepository = Mockito.mock(UserRepository.class);
         passwordEncoder = Mockito.mock(PasswordEncoder.class);
         loginAttempts = Mockito.mock(LoginAttemptService.class);
-        service = new AuthService(userRepository, passwordEncoder, CLOCK, loginAttempts);
+        suspensions = Mockito.mock(SuspensionService.class);
+        service = new AuthService(userRepository, passwordEncoder, CLOCK, loginAttempts, suspensions);
     }
 
     @Test

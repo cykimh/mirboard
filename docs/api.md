@@ -62,7 +62,8 @@
 }
 ```
 에러: `BAD_CREDENTIALS`, `ACCOUNT_LOCKED` (423 — 실패 누적 잠금, D-84),
-`TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84).
+`TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84),
+`ACCOUNT_SUSPENDED` (403 — 어드민 정지, D-86).
 
 ### GET `/api/me`
 응답 `200`
@@ -331,6 +332,15 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 ### POST `/api/admin/rooms/{roomId}/abort`
 어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
 와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+
+### POST `/api/admin/users/{userId}/suspend`
+유저 정지. 본문 `{ "minutes": 60 }`(선택, 기본 60분, 1~525600 클램프). 정지 상태는 Redis
+TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유저는 로그인·STOMP CONNECT
+차단(`ACCOUNT_SUSPENDED` 403). 기존 발급 토큰의 활성 소켓은 만료까지 유지. 응답 `204`.
+에러: `NOT_ADMIN` (403).
+
+### DELETE `/api/admin/users/{userId}/suspend`
+유저 정지 해제. 응답 `204`. 에러: `NOT_ADMIN` (403).
 
 ---
 
