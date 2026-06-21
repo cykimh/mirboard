@@ -31,10 +31,7 @@ const KO = {
   'room.loading': '방 정보 불러오는 중...',
 
   // --- 게임 헤더 / 상태 ---
-  'game.header.stomp': 'STOMP',
-  'game.header.mySeat': '내 시트',
   'game.header.round': '라운드',
-  'game.header.matchScore': '누적',
   'game.header.currentTurn': '현재 차례',
   'game.header.activeWish': '활성 소원',
   'game.phase.dealing': '분배 단계',
