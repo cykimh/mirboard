@@ -835,7 +835,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | --- | --- | --- | --- |
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 | ✅ |
-| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | ⬜ |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C4 완료 / C1·C3·C5 남음 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
 | M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
@@ -851,6 +851,13 @@ A2 온보딩 튜토리얼(`TutorialModal`/`PairPractice`/`useTutorialGate`), A3 
 `computeHandOverlap` 단위테스트 + 터치타겟 + `mobile-responsive-checklist.md`), A4 비밀번호
 변경/프로필(D-85, `PUT /api/me/password` + `/profile`), A5 접근성(색약 모드 토글·키보드 손패
 재배열·DialogDescription). 클라 vitest 120·서버 IT 그린.
+
+**M2 진행(C4 완료)**: D-86 어드민/모더레이션 — 역할 별도 테이블 `admin_roles`(Flyway V8,
+규칙#3), `/api/admin/**` 어드민 전용. 매치 강제종료(`adminAbortGame`), 유저 정지
+(`suspend:user:{id}` Redis TTL → 로그인/CONNECT 403), 채팅 금칙어 마스킹
+(`ChatModerationService`). 검증: `AdminControllerIT`·`AdminUserSuspensionIT`·`ChatModerationServiceTest`.
+**남은 M2**: C1 완성(전역/STOMP 레이트리밋 — 게임경로 위험), C3(Sentry+Grafana — 로컬
+스택/외부 SaaS 필요), C5(백업런북·k6 — 실행환경 필요). 채팅 신고 적재/조회(테이블)도 후속.
 
 ---
 
