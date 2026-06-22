@@ -42,7 +42,8 @@ export function SeatCardStack({
           />
         ))}
       </span>
-      <span className="seat-cardstack-count">{count}</span>
+      {/* 내 좌석(s)은 실제 손패가 아래에 보이므로 장수 숫자는 생략(요청). */}
+      {viewPos !== 's' && <span className="seat-cardstack-count">{count}</span>}
     </div>
   );
 }

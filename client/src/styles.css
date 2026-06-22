@@ -539,6 +539,23 @@ a {
   transform: rotate(90deg);
 }
 
+/* 요청 — 좌·우 좌석은 카드 스택을 아이콘 '옆'(중앙 쪽)에 둔다: 세로 흐름에서 빼서
+   아바타 옆에 절대배치. 우측 좌석(w)=아이콘 왼쪽, 좌측 좌석(e)=아이콘 오른쪽 →
+   둘 다 테이블 중앙 방향. (.seat 가 position:absolute 라 기준 박스가 됨.) */
+.table-arena .seat-w .seat-cardstack.fan-w,
+.table-arena .seat-e .seat-cardstack.fan-e {
+  position: absolute;
+  top: -2px;
+}
+.table-arena .seat-w .seat-cardstack.fan-w {
+  right: 100%;
+  margin-right: 2px;
+}
+.table-arena .seat-e .seat-cardstack.fan-e {
+  left: 100%;
+  margin-left: 2px;
+}
+
 .declared {
   margin-top: 4px;
   display: inline-block;

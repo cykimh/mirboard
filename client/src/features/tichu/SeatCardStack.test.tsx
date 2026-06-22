@@ -3,10 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { SeatCardStack } from './SeatCardStack';
 
 describe('SeatCardStack', () => {
-  it('shows the exact count and a fan of card backs (MAX 6)', () => {
-    const { container } = render(<SeatCardStack count={8} viewPos="s" />);
+  it('shows the exact count and a fan of card backs (MAX 6) for opponents', () => {
+    const { container } = render(<SeatCardStack count={8} viewPos="n" />);
     expect(screen.getByText('8')).toBeInTheDocument();
     expect(container.querySelectorAll('.seat-cardback')).toHaveLength(6);
+  });
+
+  it('hides the count number for my own seat (s) but keeps the fan', () => {
+    const { container } = render(<SeatCardStack count={11} viewPos="s" />);
+    // 내 손패는 아래에 실제로 보이므로 좌석 위 장수 숫자는 생략.
+    expect(screen.queryByText('11')).toBeNull();
+    expect(container.querySelectorAll('.seat-cardback').length).toBeGreaterThan(0);
   });
 
   it('renders fewer card backs than MAX when count is small', () => {
