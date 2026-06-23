@@ -271,10 +271,10 @@ a {
 }
 
 .seat-action-btn {
-  min-width: 88px;
-  height: 46px;
-  padding: 0 22px;
-  font-size: 1rem;
+  min-width: 108px;
+  height: 56px;
+  padding: 0 28px;
+  font-size: 1.08rem;
   font-weight: 800;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
@@ -1458,10 +1458,10 @@ a {
     margin-left: 80px;
   }
   .seat-action-btn {
-    min-width: 72px;
-    height: 44px;
-    padding: 0 14px;
-    font-size: 0.92rem;
+    min-width: 96px;
+    height: 52px;
+    padding: 0 20px;
+    font-size: 1rem;
   }
   .seat-action-cancel {
     height: 40px;
@@ -1502,8 +1502,8 @@ a {
     margin-left: 58px;
   }
   .seat-action-btn {
-    min-width: 62px;
-    padding: 0 10px;
+    min-width: 84px;
+    padding: 0 16px;
   }
   .seat-action-cancel {
     min-width: 0;
