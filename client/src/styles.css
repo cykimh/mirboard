@@ -258,12 +258,12 @@ a {
 
 .seat-action-group.left {
   right: 50%;
-  margin-right: 110px;
+  margin-right: 145px;
 }
 
 .seat-action-group.right {
   left: 50%;
-  margin-left: 110px;
+  margin-left: 145px;
 }
 
 .seat-action-group > * {
@@ -469,12 +469,17 @@ a {
 /* UX-2 — 팀/역할 칩(나/파트너=우리, 상대). 2:2 즉시 식별. */
 .seat-team {
   margin-top: 2px;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  padding: 0 7px;
+  padding: 0 8px;
   border-radius: 999px;
-  line-height: 1.5;
+  line-height: 1.6;
   letter-spacing: 0.02em;
+  /* 이제 배지에 계정명을 담으므로 폭 제한 + 말줄임(긴 닉네임이 좌석을 밀지 않게). */
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .seat-team.us {
   color: #6fd3a0;
@@ -1447,10 +1452,10 @@ a {
   /* 좁은 폭 — 좌석 좌우 버튼 간격을 줄여 좌석을 가리지 않게(#6). 긴 닉네임이
      버튼과 겹치지 않도록 seat-id 폭도 함께 제한. */
   .seat-action-group.left {
-    margin-right: 52px;
+    margin-right: 80px;
   }
   .seat-action-group.right {
-    margin-left: 52px;
+    margin-left: 80px;
   }
   .seat-action-btn {
     min-width: 72px;
@@ -1491,10 +1496,10 @@ a {
     padding: 6px 8px;
   }
   .seat-action-group.left {
-    margin-right: 40px;
+    margin-right: 58px;
   }
   .seat-action-group.right {
-    margin-left: 40px;
+    margin-left: 58px;
   }
   .seat-action-btn {
     min-width: 62px;

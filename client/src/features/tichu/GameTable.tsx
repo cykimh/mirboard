@@ -553,10 +553,13 @@ export function GameTable({
                 isBot={botSeats.includes(seat)}
                 declared={declared}
               />
-              <div className="seat-id">{usernames[uid] ?? `#${uid}`}</div>
-              {/* UX-2 — 팀/역할 칩. 2:2 를 즉시 식별(나/파트너=우리, 좌·우=상대). */}
-              <div className={`seat-team ${viewPos === 'w' || viewPos === 'e' ? 'them' : 'us'}`}>
-                {viewPos === 's' ? '나' : viewPos === 'n' ? '파트너' : '상대'}
+              {/* #2 내(남) 계정은 표시 안 함. #3 상대/파트너는 배지에 계정명 표시(팀색 유지:
+                  나·파트너=우리/초록, 좌·우=상대/빨강). 긴 이름은 말줄임 + title 로 풀네임. */}
+              <div
+                className={`seat-team ${viewPos === 'w' || viewPos === 'e' ? 'them' : 'us'}`}
+                title={viewPos === 's' ? undefined : usernames[uid] ?? `#${uid}`}
+              >
+                {viewPos === 's' ? '나' : usernames[uid] ?? `#${uid}`}
               </div>
               {stake > 0 && (
                 <div className="seat-chips" title="테이블 칩">
