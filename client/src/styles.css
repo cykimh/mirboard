@@ -301,13 +301,13 @@ a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 16px 20px;
+  gap: 8px;
+  padding: 12px 14px;
   border-radius: 16px;
   background: rgba(0, 0, 0, 0.42);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.36);
-  min-width: 220px;
+  min-width: 150px;
   max-width: 74%;
   /* 좌석(z auto)보다 위 — 좁은 해상도에서 좌우 좌석에 안 가리게(#2). */
   z-index: 15;
@@ -323,9 +323,9 @@ a {
 /* 카드 위 헤더 행 — "이름 · [조합]" 한 덩어리(#2). */
 .table-center-trick .trick-meta {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  font-size: 0.92rem;
+  font-size: 0.8rem;
   opacity: 1;
   flex-wrap: wrap;
   justify-content: center;
@@ -344,6 +344,19 @@ a {
 .table-center-trick .trick-player {
   font-weight: 600;
   opacity: 0.95;
+}
+
+/* 중앙 트릭 카드는 '무엇을 냈는지' 참조용 — 손패보다 작게 해서 패널을 컴팩트하게
+   유지(주변 좌석/측면 스택/파트너 부채 비침범). */
+.table-center-trick .card-chip {
+  width: 48px;
+  height: 68px;
+}
+.table-center-trick .cs-rank {
+  font-size: 1.3rem;
+}
+.table-center-trick .cs-suit {
+  font-size: 1.05rem;
 }
 
 .table-center-trick .trick-empty {
@@ -529,6 +542,9 @@ a {
 .seat-cardstack.fan-w .seat-cardstack-fan,
 .seat-cardstack.fan-e .seat-cardstack-fan {
   height: 54px;
+  /* 회전(±90°) 후 시각 폭(~30px)에 맞춰 박스 폭을 명시 — 안쪽(중앙) 과점유 방지
+     → 중앙 트릭 패널과 가로 겹침 감소. */
+  width: 30px;
   align-items: center;
   justify-content: center;
 }
@@ -1408,8 +1424,9 @@ a {
     width: 54px;
     height: 76px;
   }
+  /* 하단 빈 공간을 활용해 보드를 세로로 키워 상/하 좌석과 중앙 트릭 패널 간격 확보. */
   .table-arena {
-    min-height: 360px;
+    min-height: 430px;
   }
   .table-arena .seat {
     min-width: 88px;
@@ -1453,7 +1470,7 @@ a {
 /* 아주 좁은 폭(휴대폰 세로) — 좌석/트릭을 한 단계 더 축소하되 위치는 유지. */
 @media (max-width: 440px) {
   .table-arena {
-    min-height: 320px;
+    min-height: 380px;
     padding: 6px;
   }
   .table-arena .seat {

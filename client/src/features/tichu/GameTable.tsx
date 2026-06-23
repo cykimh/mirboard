@@ -563,10 +563,13 @@ export function GameTable({
                   💰 {(chips[uid] ?? 0).toLocaleString()}
                 </div>
               )}
-              <SeatCardStack
-                count={tableView.handCounts[seat] ?? 0}
-                viewPos={viewPos as 's' | 'w' | 'n' | 'e'}
-              />
+              {/* 내 좌석(남)은 실제 손패가 아래에 보이므로 좌석 카드 스택을 렌더하지 않음(요청). */}
+              {viewPos !== 's' && (
+                <SeatCardStack
+                  count={tableView.handCounts[seat] ?? 0}
+                  viewPos={viewPos as 's' | 'w' | 'n' | 'e'}
+                />
+              )}
               {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
                 <div
                   className={`declared ${
