@@ -23,19 +23,20 @@ export function GiveDragonTrickModal({
   return (
     <Dialog open={open}>
       <DialogContent
-        className="app-shell"
+        className="app-shell max-w-xs gap-3 p-4"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{t('dragon.title')}</DialogTitle>
-          <DialogDescription>{t('dragon.body')}</DialogDescription>
+          <DialogTitle className="text-base">{t('dragon.title')}</DialogTitle>
+          <DialogDescription className="text-xs">{t('dragon.body')}</DialogDescription>
         </DialogHeader>
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           {opponentSeats.map((seat) => (
             <Button
               key={seat}
               type="button"
+              size="sm"
               onClick={() => onConfirm(seat)}
             >
               {t('dragon.giveTo')} {seat}

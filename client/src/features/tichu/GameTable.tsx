@@ -652,34 +652,13 @@ export function GameTable({
         )}
         <ArenaChatBubbles playerIds={playerIds} mySeat={mySeat} />
         <ReactionFloats mySeat={mySeat} />
-        {/* #6 — 내기(좌)/패스(우)를 내 좌석 양옆에. 패스 우측엔 선택 초기화(취소)
-            버튼. 내기는 "진짜로 낼 수 있을 때만" 활성(selectedPlayable). 두 그룹을
-            좌석 바깥으로 앵커해 취소가 늘어도 좌석/버튼을 침범하지 않는다. */}
+        {/* 패스/취소(좌) · 내기(우)를 내 좌석 양옆에(요청: 내기↔패스 좌우 스왑). 왼쪽
+            그룹은 우측앵커라 패스를 안쪽(중앙 쪽)·취소를 바깥(왼쪽)에 둔다. 내기는
+            "진짜로 낼 수 있을 때만" 활성(selectedPlayable). 두 그룹을 좌석 바깥으로
+            앵커해 취소가 늘어도 좌석/버튼을 침범하지 않는다. */}
         {!spectator && isInPlaying && (
           <div className="arena-seat-actions" aria-label="내 차례 액션">
             <div className="seat-action-group left">
-              <Button
-                type="button"
-                className="seat-action-btn play"
-                onClick={handlePlay}
-                disabled={!myTurn || !selectedPlayable}
-              >
-                {t('play.action.play')}
-                {selectedCards.length > 0
-                  ? ` (${selectedCards.length}${t('seat.handCardsSuffix')})`
-                  : ''}
-              </Button>
-            </div>
-            <div className="seat-action-group right">
-              <Button
-                type="button"
-                className="seat-action-btn pass"
-                variant="secondary"
-                onClick={handlePass}
-                disabled={!myTurn || !tableView.currentTop}
-              >
-                {t('play.action.pass')}
-              </Button>
               {selectedCards.length > 0 && (
                 <Button
                   type="button"
@@ -691,6 +670,28 @@ export function GameTable({
                   {t('play.action.clearSelection')}
                 </Button>
               )}
+              <Button
+                type="button"
+                className="seat-action-btn pass"
+                variant="secondary"
+                onClick={handlePass}
+                disabled={!myTurn || !tableView.currentTop}
+              >
+                {t('play.action.pass')}
+              </Button>
+            </div>
+            <div className="seat-action-group right">
+              <Button
+                type="button"
+                className="seat-action-btn play"
+                onClick={handlePlay}
+                disabled={!myTurn || !selectedPlayable}
+              >
+                {t('play.action.play')}
+                {selectedCards.length > 0
+                  ? ` (${selectedCards.length}${t('seat.handCardsSuffix')})`
+                  : ''}
+              </Button>
             </div>
           </div>
         )}
