@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   useTichuStore,
@@ -316,6 +316,14 @@ export function GameTable({
     sendAction({ '@action': 'PASS_TRICK' });
   }
 
+  // 취소 버튼 대신 — 플레이 중 손패(.my-hand)·버튼 밖(빈 펠트/영역)을 클릭하면 선택 해제.
+  function handleBackgroundClick(e: MouseEvent) {
+    if (!isInPlaying || selectedCardKeys.size === 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.my-hand') || target.closest('button')) return;
+    clearSelection();
+  }
+
   function handleDeclareTichu() {
     sendAction({ '@action': 'DECLARE_TICHU' });
   }
@@ -404,7 +412,7 @@ export function GameTable({
       className="game-table-layout"
       style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}
     >
-    <section className="game-table" style={{ flex: 1, minWidth: 0 }}>
+    <section className="game-table" style={{ flex: 1, minWidth: 0 }} onClick={handleBackgroundClick}>
       <EffectsOverlay />
       <ReconnectBanner connected={connected} />
       <header className="game-table-header">
@@ -659,17 +667,6 @@ export function GameTable({
         {!spectator && isInPlaying && (
           <div className="arena-seat-actions" aria-label="내 차례 액션">
             <div className="seat-action-group left">
-              {selectedCards.length > 0 && (
-                <Button
-                  type="button"
-                  className="seat-action-cancel"
-                  variant="outline"
-                  onClick={clearSelection}
-                  aria-label="선택 초기화"
-                >
-                  {t('play.action.clearSelection')}
-                </Button>
-              )}
               <Button
                 type="button"
                 className="seat-action-btn pass"
