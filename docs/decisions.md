@@ -98,6 +98,18 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-87 (2026-07-29) — GameTable 컴포넌트 분해 (트랙 외 기술부채)
+
+M1 A6/A7 게임판 UX 폴리시가 연속으로 쌓이며 `GameTable.tsx` 의 단일 컴포넌트가
+915줄(파일 1030줄)까지 커졌고, 직접 테스트가 없어 다음 클라 UX 변경 시 회귀 위험이
+가장 높은 지점이 되었다. **동작·시각 변경 없이** 프레젠테이션 4개(`GameTableHeader`·
+`TableArena`·`MyHandPanel`·`MatchEndedPanel`)와 훅 2개(`useGameTableEffects`·
+`useGameActions`), 순수 함수 1개(`gameTableSelection`)로 분해하고, 추출 **전에**
+특성화 테스트를 먼저 붙여 안전망을 확보한다. 스타일 클래스명·STOMP 프로토콜·
+`tichuStore` 구조·서버 계약은 불변이며 성능 최적화(memo/useCallback)는 별건.
+상용화 트랙(M0~M5) 밖의 기술부채라 마일스톤 번호를 붙이지 않는다.
+상세는 `docs/plans/gametable-refactor.md`.
+
 ## D-86 (2026-06-21) — 어드민/모더레이션: 역할 별도 테이블 (M2/C4)
 
 운영 신뢰성용 최소 어드민 기능. **규칙#3(D-02) 준수**: 권한을 `users` 에 두지 않고 신규
