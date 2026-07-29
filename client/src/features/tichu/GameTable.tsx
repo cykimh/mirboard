@@ -1,11 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
-import { useTichuStore, sortedHand } from '@/features/tichu/tichuStore';
 import { useStompRoom } from '@/ws/useStompRoom';
-import type { Card } from '@/types/tichu';
-import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
-import { comboLabel, isSelectionPlayable } from './handType';
 import { PassReceivedModal } from './PassReceivedModal';
 import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
@@ -17,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
+import { useGameTableModel } from './useGameTableModel';
 import { useGameActions } from './useGameActions';
 import { useGameTableEffects } from './useGameTableEffects';
 import { MatchEndedPanel } from './MatchEndedPanel';
@@ -48,6 +45,14 @@ interface GameTableProps {
   onExit?: () => void;
 }
 
+/**
+ * 게임판 조립 루트. 직접 하는 일은 세 가지뿐이다 — 화면 전역 훅(소켓·사운드·
+ * 카드애니·이펙트)을 켜고, 뷰 모델(`m`)과 액션(`a`)을 만들고, 그 둘을 자식에 꽂는다.
+ *
+ * 상태·파생은 {@link useGameTableModel}, 부수효과는 {@link useGameTableEffects},
+ * 사용자 액션은 {@link useGameActions}, 마크업은 4개 프레젠테이션 컴포넌트가
+ * 나눠 갖는다 (D-87).
+ */
 export function GameTable({
   roomId,
   playerIds,
@@ -71,187 +76,55 @@ export function GameTable({
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
   const toggleCardAnim = useCardAnimStore((s) => s.toggle);
   const triggerEffect = useEffectStore((s) => s.trigger);
-  const tableView = useTichuStore((s) => s.tableView);
-  const privateHand = useTichuStore((s) => s.privateHand);
-  const selectedCardKeys = useTichuStore((s) => s.selectedCardKeys);
-  const toggleCardSelection = useTichuStore((s) => s.toggleCardSelection);
-  const clearSelection = useTichuStore((s) => s.clearSelection);
-  const passSelection = useTichuStore((s) => s.passSelection);
-  const pendingPassCardKey = useTichuStore((s) => s.pendingPassCardKey);
-  const selectPassCard = useTichuStore((s) => s.selectPassCard);
-  const assignPassSlot = useTichuStore((s) => s.assignPassSlot);
-  const clearPassSelection = useTichuStore((s) => s.clearPassSelection);
-  const reorderHand = useTichuStore((s) => s.reorderHand);
-  const orderedHand = useTichuStore(sortedHand);
-  const errorMessage = useTichuStore((s) => s.errorMessage);
-  const roundEnded = useTichuStore((s) => s.roundEnded);
-  const matchEnded = useTichuStore((s) => s.matchEnded);
-  const roundHistory = useTichuStore((s) => s.roundHistory);
-  const disconnectedSeats = useTichuStore((s) => s.disconnectedSeats);
-  const chips = useTichuStore((s) => s.chips);
-  const chipDeltas = useTichuStore((s) => s.chipDeltas);
-  const lastReceived = useTichuStore((s) => s.lastReceived);
-  const clearReceived = useTichuStore((s) => s.clearReceived);
-  const setError = useTichuStore((s) => s.setError);
-  const setRoundEnded = useTichuStore((s) => s.setRoundEnded);
 
-  const mySeat = playerIds.indexOf(myUserId);
-  const myTeam: 'A' | 'B' = mySeat >= 0 && mySeat % 2 === 1 ? 'B' : 'A';
-  const [wishModalDismissed, setWishModalDismissed] = useState(false);
-
-  const phase = tableView?.phase ?? null;
-  const dealingCardCount = tableView?.dealingCardCount ?? 0;
-  const isInDealing = phase === 'DEALING';
-  const isInPassing = phase === 'PASSING';
-  const isInPlaying = phase === 'PLAYING';
-  const iAmReady = isInDealing && (tableView?.readySeats ?? []).includes(mySeat);
-  const iAmPassSubmitted =
-    isInPassing && (tableView?.passingSubmittedSeats ?? []).includes(mySeat);
-  const myDeclaration = tableView?.declarations?.[mySeat] ?? 'NONE';
-  const myTurn = isInPlaying && tableView !== null && tableView.currentTurnSeat === mySeat;
-
-  const myMahjongLeadActive =
-    isInPlaying &&
-    tableView !== null &&
-    tableView.currentTopSeat === mySeat &&
-    tableView.currentTop !== null &&
-    tableView.currentTop.cards.length === 1 &&
-    tableView.currentTop.cards[0].special === 'MAHJONG' &&
-    tableView.activeWishRank === null;
-
-  const wishContextKey = myMahjongLeadActive
-    ? `${tableView.currentTopSeat}-mahjong`
-    : null;
-
-  const showWishModal = myMahjongLeadActive && !wishModalDismissed;
-
-  // Dragon 양도 강제 상태: Dragon 단독으로 내가 받았고, 서버가 TrickTaken 대신
-  // TurnChanged(taker=mySeat) 만 발행해서 currentTurnSeat 가 다시 본인.
-  const mustGiveDragon =
-    isInPlaying &&
-    tableView !== null &&
-    tableView.currentTopSeat === mySeat &&
-    tableView.currentTurnSeat === mySeat &&
-    tableView.currentTop !== null &&
-    tableView.currentTop.cards.length === 1 &&
-    tableView.currentTop.cards[0].special === 'DRAGON';
-
-  const selectedCards = useMemo<Card[]>(() => {
-    if (!privateHand) return [];
-    return privateHand.cards.filter((c) => selectedCardKeys.has(cardKey(c)));
-  }, [privateHand, selectedCardKeys]);
-
-  // Phase 12C/#2 — 선택 카드 조합명 ("페어2" 형식, 표시용 hint. 서버가 실제 검증).
-  const selectedCombo = useMemo(
-    () => comboLabel(selectedCards),
-    [selectedCards],
-  );
-
-  // 선택한 패를 "지금 진짜로 낼 수 있는지" — 서버 HandComparator 미러로 좁게 판정.
-  // 확실히 불가일 때만 false → 내기 버튼 비활성(거짓 비활성 회피, 위시는 서버 판정).
-  const selectedPlayable = useMemo(
-    () => isInPlaying && isSelectionPlayable(selectedCards, tableView?.currentTop ?? null),
-    [isInPlaying, selectedCards, tableView?.currentTop],
-  );
-
-  const passCardsBySlot = useMemo(() => {
-    if (!privateHand) return { left: null, partner: null, right: null };
-    const findByKey = (key: string | null): Card | null =>
-      key ? privateHand.cards.find((c) => cardKey(c) === key) ?? null : null;
-    return {
-      left: findByKey(passSelection.left),
-      partner: findByKey(passSelection.partner),
-      right: findByKey(passSelection.right),
-    };
-  }, [privateHand, passSelection]);
-
-  // Phase 15(#2) — 줄 사람에게 배정된 카드는 손패에서 제거(시각적으로도 사라짐).
-  const assignedPassKeys = useMemo(
-    () => new Set(Object.values(passSelection).filter((v): v is string => v !== null)),
-    [passSelection],
-  );
-  const handCards = useMemo(
-    () =>
-      isInPassing && !iAmPassSubmitted
-        ? orderedHand.filter((c) => !assignedPassKeys.has(cardKey(c)))
-        : orderedHand,
-    [orderedHand, isInPassing, iAmPassSubmitted, assignedPassKeys],
-  );
+  const m = useGameTableModel({ playerIds, myUserId });
 
   const { arenaRef, centerTrickRef, fly } = useGameTableEffects({
-    mySeat,
-    myTeam,
-    myTurn,
-    wishContextKey,
-    setWishModalDismissed,
-    matchEnded,
+    mySeat: m.mySeat,
+    myTeam: m.myTeam,
+    myTurn: m.myTurn,
+    wishContextKey: m.wishContextKey,
+    setWishModalDismissed: m.setWishModalDismissed,
+    matchEnded: m.matchEnded,
     triggerEffect,
     playChime,
     cardAnimEnabled,
-    currentTop: tableView?.currentTop ?? null,
-    currentTopSeat: tableView?.currentTopSeat ?? -1,
+    currentTop: m.tableView?.currentTop ?? null,
+    currentTopSeat: m.tableView?.currentTopSeat ?? -1,
     spectator,
-    isInPassing,
-    iAmPassSubmitted,
-    passCardsBySlot,
+    isInPassing: m.isInPassing,
+    iAmPassSubmitted: m.iAmPassSubmitted,
+    passCardsBySlot: m.passCardsBySlot,
     sendAction,
   });
 
-  const {
-    handlePlay,
-    handlePass,
-    handleBackgroundClick,
-    handleDeclareTichu,
-    handleDeclareGrandTichu,
-    handleMakeWish,
-    handleSkipWish,
-    handleGiveDragon,
-    handleReady,
-    handleRematch,
-    handleCardClick,
-  } = useGameActions({
+  const a = useGameActions({
     roomId,
     token,
     sendAction,
-    selectedCards,
-    selectedCardKeys,
-    isInPlaying,
-    isInPassing,
-    iAmPassSubmitted,
-    clearSelection,
-    toggleCardSelection,
-    selectPassCard,
-    setError,
-    setWishModalDismissed,
+    selectedCards: m.selectedCards,
+    selectedCardKeys: m.selectedCardKeys,
+    isInPlaying: m.isInPlaying,
+    isInPassing: m.isInPassing,
+    iAmPassSubmitted: m.iAmPassSubmitted,
+    clearSelection: m.clearSelection,
+    toggleCardSelection: m.toggleCardSelection,
+    selectPassCard: m.selectPassCard,
+    setError: m.setError,
+    setWishModalDismissed: m.setWishModalDismissed,
   });
 
+  const tableView = m.tableView;
   if (!tableView) {
     return <p>{t('common.loading')}</p>;
   }
-
-  const phaseLabel =
-    phase === 'DEALING'
-      ? `${t('game.phase.dealing')} (${dealingCardCount}${t('seat.handCardsSuffix')})`
-      : phase === 'PASSING'
-      ? t('game.phase.passing')
-      : phase === 'PLAYING'
-      ? t('game.phase.playing')
-      : t('game.phase.roundEnd');
-
-  // P3(8) — 티츄 선언 시 경기장 틴트: 그랜드=빨강 우선, 일반=파랑(라운드 동안 지속).
-  const declValues = Object.values(tableView.declarations ?? {});
-  const arenaTint = declValues.includes('GRAND_TICHU')
-    ? 'arena-tint-grand'
-    : declValues.includes('TICHU')
-    ? 'arena-tint-tichu'
-    : '';
 
   return (
     <div
       className="game-table-layout"
       style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}
     >
-    <section className="game-table" style={{ flex: 1, minWidth: 0 }} onClick={handleBackgroundClick}>
+    <section className="game-table" style={{ flex: 1, minWidth: 0 }} onClick={a.handleBackgroundClick}>
       <EffectsOverlay />
       <ReconnectBanner connected={connected} />
       <GameTableHeader
@@ -262,7 +135,7 @@ export function GameTable({
         spectatorCount={spectatorCount}
         connected={connected}
         roundNumber={tableView.roundNumber}
-        phaseLabel={phaseLabel}
+        phaseLabel={m.phaseLabel}
         activeWishRank={tableView.activeWishRank}
         spectator={spectator}
         muted={muted}
@@ -278,114 +151,114 @@ export function GameTable({
       <TableArena
         tableView={tableView}
         playerIds={playerIds}
-        mySeat={mySeat}
-        myTeam={myTeam}
-        myTurn={myTurn}
+        mySeat={m.mySeat}
+        myTeam={m.myTeam}
+        myTurn={m.myTurn}
         usernames={usernames}
         botSeats={botSeats}
         stake={stake}
-        chips={chips}
-        disconnectedSeats={disconnectedSeats}
+        chips={m.chips}
+        disconnectedSeats={m.disconnectedSeats}
         spectator={spectator}
         turnSeconds={turnSeconds}
-        isInDealing={isInDealing}
-        isInPassing={isInPassing}
-        isInPlaying={isInPlaying}
-        arenaTint={arenaTint}
+        isInDealing={m.isInDealing}
+        isInPassing={m.isInPassing}
+        isInPlaying={m.isInPlaying}
+        arenaTint={m.arenaTint}
         cardAnimEnabled={cardAnimEnabled}
         fly={fly}
         arenaRef={arenaRef}
         centerTrickRef={centerTrickRef}
-        selectedCards={selectedCards}
-        selectedPlayable={selectedPlayable}
-        onPass={handlePass}
-        onPlay={handlePlay}
+        selectedCards={m.selectedCards}
+        selectedPlayable={m.selectedPlayable}
+        onPass={a.handlePass}
+        onPlay={a.handlePlay}
       />
 
       {!spectator && (
         <MyHandPanel
-          privateHand={privateHand}
-          handCards={handCards}
-          selectedCardKeys={selectedCardKeys}
-          passSelection={passSelection}
-          pendingPassCardKey={pendingPassCardKey}
-          passCardsBySlot={passCardsBySlot}
-          selectedCards={selectedCards}
-          selectedCombo={selectedCombo}
-          selectedPlayable={selectedPlayable}
-          isInDealing={isInDealing}
-          isInPassing={isInPassing}
-          isInPlaying={isInPlaying}
-          iAmReady={iAmReady}
-          iAmPassSubmitted={iAmPassSubmitted}
-          dealingCardCount={dealingCardCount}
-          myDeclaration={myDeclaration}
-          onCardClick={handleCardClick}
-          onReorder={reorderHand}
-          onAssignPassSlot={assignPassSlot}
-          onClearPassSelection={clearPassSelection}
-          onDeclareTichu={handleDeclareTichu}
-          onDeclareGrandTichu={handleDeclareGrandTichu}
-          onReady={handleReady}
+          privateHand={m.privateHand}
+          handCards={m.handCards}
+          selectedCardKeys={m.selectedCardKeys}
+          passSelection={m.passSelection}
+          pendingPassCardKey={m.pendingPassCardKey}
+          passCardsBySlot={m.passCardsBySlot}
+          selectedCards={m.selectedCards}
+          selectedCombo={m.selectedCombo}
+          selectedPlayable={m.selectedPlayable}
+          isInDealing={m.isInDealing}
+          isInPassing={m.isInPassing}
+          isInPlaying={m.isInPlaying}
+          iAmReady={m.iAmReady}
+          iAmPassSubmitted={m.iAmPassSubmitted}
+          dealingCardCount={m.dealingCardCount}
+          myDeclaration={m.myDeclaration}
+          onCardClick={a.handleCardClick}
+          onReorder={m.reorderHand}
+          onAssignPassSlot={m.assignPassSlot}
+          onClearPassSelection={m.clearPassSelection}
+          onDeclareTichu={a.handleDeclareTichu}
+          onDeclareGrandTichu={a.handleDeclareGrandTichu}
+          onReady={a.handleReady}
         />
       )}
 
-      {errorMessage && (
-        <p className="error" onClick={() => setError(null)}>
-          {errorMessage}
+      {m.errorMessage && (
+        <p className="error" onClick={() => m.setError(null)}>
+          {m.errorMessage}
         </p>
       )}
 
-      {lastReceived && lastReceived.length > 0 && (
+      {m.lastReceived && m.lastReceived.length > 0 && (
         <PassReceivedModal
-          received={lastReceived}
+          received={m.lastReceived}
           playerIds={playerIds}
           usernames={usernames}
-          onClose={clearReceived}
+          onClose={m.clearReceived}
         />
       )}
 
       <MakeWishModal
-        open={showWishModal}
-        onConfirm={handleMakeWish}
-        onSkip={handleSkipWish}
+        open={m.showWishModal}
+        onConfirm={a.handleMakeWish}
+        onSkip={a.handleSkipWish}
       />
 
       <GiveDragonTrickModal
-        open={mustGiveDragon}
-        opponentSeats={opponentSeatsOf(mySeat)}
-        onConfirm={handleGiveDragon}
+        open={m.mustGiveDragon}
+        opponentSeats={opponentSeatsOf(m.mySeat)}
+        onConfirm={a.handleGiveDragon}
       />
 
-      {matchEnded ? (
+      {m.matchEnded ? (
         <MatchEndedPanel
-          matchEnded={matchEnded}
-          roundHistory={roundHistory}
+          matchEnded={m.matchEnded}
+          roundHistory={m.roundHistory}
           playerIds={playerIds}
           myUserId={myUserId}
-          mySeat={mySeat}
-          myTeam={myTeam}
+          mySeat={m.mySeat}
+          myTeam={m.myTeam}
           usernames={usernames}
           botSeats={botSeats}
           stake={stake}
-          chips={chips}
-          chipDeltas={chipDeltas}
+          chips={m.chips}
+          chipDeltas={m.chipDeltas}
           spectator={spectator}
           isHost={isHost}
-          onRematch={handleRematch}
+          onRematch={a.handleRematch}
           onExit={onExit}
         />
       ) : (
-        roundEnded && (
+        m.roundEnded && (
           <div className="round-ended">
             <h3>{t('round.ended.title')}</h3>
             <p>
-              Team A {roundEnded.teamAScore} : {roundEnded.teamBScore} Team B
+              Team A {m.roundEnded.teamAScore} : {m.roundEnded.teamBScore} Team B
             </p>
             <p>
-              {t('round.ended.firstFinisher')} {roundEnded.firstFinisherSeat}
+              {t('round.ended.firstFinisher')} {m.roundEnded.firstFinisherSeat}
             </p>
-            <Button type="button" onClick={() => setRoundEnded(null)}>
+            <Button type="button" onClick={() => m.setRoundEnded(null)}>
               {t('round.ended.continue')}
             </Button>
           </div>
