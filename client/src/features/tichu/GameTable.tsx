@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   useTichuStore,
@@ -6,7 +6,6 @@ import {
   type PassSlot,
 } from '@/features/tichu/tichuStore';
 import { useStompRoom } from '@/ws/useStompRoom';
-import { roomsApi } from '@/api/rooms';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
@@ -31,6 +30,7 @@ import { ReactionFloats } from './ReactionFloats';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TurnCountdown } from './TurnCountdown';
 import { getSelectedKeys } from './gameTableSelection';
+import { useGameActions } from './useGameActions';
 
 interface GameTableProps {
   roomId: string;
@@ -305,62 +305,33 @@ export function GameTable({
     };
   }, [fly]);
 
-  function handlePlay() {
-    if (selectedCards.length === 0) {
-      setError(t('play.error.pickCard'));
-      return;
-    }
-    sendAction({ '@action': 'PLAY_CARD', cards: selectedCards });
-    clearSelection();
-  }
-
-  function handlePass() {
-    sendAction({ '@action': 'PASS_TRICK' });
-  }
-
-  // 취소 버튼 대신 — 플레이 중 손패(.my-hand)·버튼 밖(빈 펠트/영역)을 클릭하면 선택 해제.
-  function handleBackgroundClick(e: MouseEvent) {
-    if (!isInPlaying || selectedCardKeys.size === 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('.my-hand') || target.closest('button')) return;
-    clearSelection();
-  }
-
-  function handleDeclareTichu() {
-    sendAction({ '@action': 'DECLARE_TICHU' });
-  }
-
-  function handleDeclareGrandTichu() {
-    sendAction({ '@action': 'DECLARE_GRAND_TICHU' });
-  }
-
-  function handleMakeWish(rank: number) {
-    sendAction({ '@action': 'MAKE_WISH', rank });
-    setWishModalDismissed(true);
-  }
-
-  function handleSkipWish() {
-    setWishModalDismissed(true);
-  }
-
-  function handleGiveDragon(toSeat: number) {
-    sendAction({ '@action': 'GIVE_DRAGON_TRICK', toSeat });
-  }
-
-  function handleReady() {
-    sendAction({ '@action': 'READY' });
-  }
-
-  // D-82 — 호스트가 매치 종료 후 '한 판 더'. 새 매치 이벤트→resync→applySnapshot 이
-  // matchEnded 를 정리하므로 별도 상태 처리 불필요.
-  async function handleRematch() {
-    if (!token) return;
-    try {
-      await roomsApi.rematch(token, roomId);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
+  const {
+    handlePlay,
+    handlePass,
+    handleBackgroundClick,
+    handleDeclareTichu,
+    handleDeclareGrandTichu,
+    handleMakeWish,
+    handleSkipWish,
+    handleGiveDragon,
+    handleReady,
+    handleRematch,
+    handleCardClick,
+  } = useGameActions({
+    roomId,
+    token,
+    sendAction,
+    selectedCards,
+    selectedCardKeys,
+    isInPlaying,
+    isInPassing,
+    iAmPassSubmitted,
+    clearSelection,
+    toggleCardSelection,
+    selectPassCard,
+    setError,
+    setWishModalDismissed,
+  });
 
   // Phase 13(#2) — 패스 3장이 모두 배정되면 별도 제출 버튼 없이 자동 제출.
   // 슬롯 재클릭으로 되돌릴 수 있는 단계가 끝난(3장 확정) 시점이라 안전.
@@ -378,15 +349,6 @@ export function GameTable({
     // sendAction 은 안정적 식별자가 아니라 의존성에서 제외 (passSelection 변화로만 트리거).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [passCardsBySlot, spectator, isInPassing, iAmPassSubmitted]);
-
-  function handleCardClick(c: Card) {
-    if (isInPassing && !iAmPassSubmitted) {
-      selectPassCard(c);
-    } else if (isInPlaying) {
-      toggleCardSelection(c);
-    }
-    // Dealing 단계에서는 카드 클릭은 의미 없음 (단지 시각 정보).
-  }
 
   if (!tableView) {
     return <p>{t('common.loading')}</p>;
