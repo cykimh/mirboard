@@ -28,6 +28,7 @@ import { useGameActions } from './useGameActions';
 import { useGameTableEffects } from './useGameTableEffects';
 import { MatchEndedPanel } from './MatchEndedPanel';
 import { MyHandPanel } from './MyHandPanel';
+import { GameTableHeader } from './GameTableHeader';
 
 interface GameTableProps {
   roomId: string;
@@ -53,9 +54,6 @@ interface GameTableProps {
   onExit?: () => void;
 }
 
-/** P2(7) — 빠른 이모지 반응 팔레트(서버 화이트리스트와 일치). */
-const REACTIONS = ['👍', '😂', '😮', '😢', '🔥', '👏', '❤️', '🎉'];
-
 export function GameTable({
   roomId,
   playerIds,
@@ -74,7 +72,6 @@ export function GameTable({
   const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
     useStompRoom(roomId, token);
   const [chatOpen, setChatOpen] = useState(false);
-  const [reactionOpen, setReactionOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
   const { muted, toggleMute, playChime } = useSfx();
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
@@ -263,111 +260,26 @@ export function GameTable({
     <section className="game-table" style={{ flex: 1, minWidth: 0 }} onClick={handleBackgroundClick}>
       <EffectsOverlay />
       <ReconnectBanner connected={connected} />
-      <header className="game-table-header">
-        <div className="header-status">
-          {fillWithBots && (
-            <span className="solo-banner" title="이 방은 솔로 모드 — 빈 좌석은 봇이 자동 진행합니다">
-              🤖 솔로 모드 (봇 {botSeats.length}명)
-            </span>
-          )}
-          {turnSeconds > 0 && (
-            <span className="turn-limit-badge" title="개인 턴 제한 — 초과 시 자동으로 다음 순서로 넘어갑니다">
-              ⏱ 턴 제한 {turnSeconds}초
-            </span>
-          )}
-          {stake > 0 && (
-            <span className="turn-limit-badge" title="내기 방 — 판돈(가상 칩). 승팀이 가져갑니다">
-              💰 판돈 {stake}칩
-            </span>
-          )}
-          <span
-            className="conn-indicator"
-            title={connected ? '서버 연결됨' : '서버 연결 끊김'}
-            aria-label={connected ? '서버 연결됨' : '서버 연결 끊김'}
-          >
-            <span className={`conn-dot ${connected ? 'on' : 'off'}`} aria-hidden="true" />
-          </span>
-          <span>
-            {t('game.header.round')} {tableView.roundNumber}
-          </span>
-          <span>{phaseLabel}</span>
-          {spectatorCount > 0 && (
-            <span title="관전자 수">👁 관전 {spectatorCount}</span>
-          )}
-          {tableView.activeWishRank !== null && (
-            <span>
-              {t('game.header.activeWish')}: {tableView.activeWishRank}
-            </span>
-          )}
-        </div>
-        <div className="header-controls">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={toggleMute}
-            aria-label="사운드 토글"
-            title={muted ? '사운드 켜기' : '사운드 끄기'}
-          >
-            {muted ? '🔇' : '🔊'}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={toggleCardAnim}
-            aria-label="카드 애니메이션 토글"
-            title={cardAnimEnabled ? '카드 애니 끄기' : '카드 애니 켜기'}
-          >
-            {cardAnimEnabled ? '🎴' : '⏸'}
-          </Button>
-          {!spectator && (
-            <div className="reaction-bar">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setReactionOpen((v) => !v)}
-                aria-label="이모지 반응"
-                title="이모지 반응"
-              >
-                😀
-              </Button>
-              {reactionOpen && (
-                <div className="reaction-palette">
-                  {REACTIONS.map((e) => (
-                    <button
-                      type="button"
-                      key={e}
-                      onClick={() => {
-                        sendReaction(e);
-                        setReactionOpen(false);
-                      }}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="relative"
-            onClick={() => setChatOpen((v) => !v)}
-            aria-label="채팅 토글"
-          >
-            💬 채팅
-            {unreadCount > 0 && !chatOpen && (
-              <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-destructive px-1.5 py-0.5 text-[10px] leading-none text-destructive-foreground">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </Button>
-        </div>
-      </header>
+      <GameTableHeader
+        fillWithBots={fillWithBots}
+        botSeats={botSeats}
+        turnSeconds={turnSeconds}
+        stake={stake}
+        spectatorCount={spectatorCount}
+        connected={connected}
+        roundNumber={tableView.roundNumber}
+        phaseLabel={phaseLabel}
+        activeWishRank={tableView.activeWishRank}
+        spectator={spectator}
+        muted={muted}
+        onToggleMute={toggleMute}
+        cardAnimEnabled={cardAnimEnabled}
+        onToggleCardAnim={toggleCardAnim}
+        onSendReaction={sendReaction}
+        chatOpen={chatOpen}
+        onToggleChat={() => setChatOpen((v) => !v)}
+        unreadCount={unreadCount}
+      />
 
       <div className={`table-arena ${arenaTint}`} ref={arenaRef}>
         {playerIds.map((uid, seat) => {
