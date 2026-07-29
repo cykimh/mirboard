@@ -1,17 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
-import {
-  useTichuStore,
-  sortedHand,
-  type PassSlot,
-} from '@/features/tichu/tichuStore';
+import { useTichuStore, sortedHand } from '@/features/tichu/tichuStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { t } from '@/i18n/messages';
 import { comboLabel, isSelectionPlayable } from './handType';
 import { CardChip } from './CardChip';
-import { SortableHand } from './SortableHand';
 import { SeatAvatar } from './SeatAvatar';
 import { SeatCardStack } from './SeatCardStack';
 import { PassReceivedModal } from './PassReceivedModal';
@@ -29,10 +24,10 @@ import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
 import { ReactionFloats } from './ReactionFloats';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TurnCountdown } from './TurnCountdown';
-import { getSelectedKeys } from './gameTableSelection';
 import { useGameActions } from './useGameActions';
 import { useGameTableEffects } from './useGameTableEffects';
 import { MatchEndedPanel } from './MatchEndedPanel';
+import { MyHandPanel } from './MyHandPanel';
 
 interface GameTableProps {
   roomId: string;
@@ -60,12 +55,6 @@ interface GameTableProps {
 
 /** P2(7) — 빠른 이모지 반응 팔레트(서버 화이트리스트와 일치). */
 const REACTIONS = ['👍', '😂', '😮', '😢', '🔥', '👏', '❤️', '🎉'];
-
-const PASS_SLOT_LABEL: Record<PassSlot, string> = {
-  left: t('pass.slot.left'),
-  partner: t('pass.slot.partner'),
-  right: t('pass.slot.right'),
-};
 
 export function GameTable({
   roomId,
@@ -560,125 +549,32 @@ export function GameTable({
       </div>
 
       {!spectator && (
-      <div
-        className={`my-hand${
-          isInPassing && !iAmPassSubmitted && !pendingPassCardKey ? ' pick-emphasis' : ''
-        }`}
-      >
-        {privateHand ? (
-          <SortableHand
-            cards={handCards}
-            selectedKeys={getSelectedKeys(
-              selectedCardKeys,
-              passSelection,
-              isInPassing,
-              pendingPassCardKey,
-            )}
-            onCardClick={handleCardClick}
-            onReorder={reorderHand}
-            // 플레이 단계만 겹침 허용(공간 남으면 안 겹침, #1). 패스/딜링은 펼침(#2).
-            overlap={isInPlaying}
-          />
-        ) : (
-          <p>{t('hand.loading')}</p>
-        )}
-      </div>
+        <MyHandPanel
+          privateHand={privateHand}
+          handCards={handCards}
+          selectedCardKeys={selectedCardKeys}
+          passSelection={passSelection}
+          pendingPassCardKey={pendingPassCardKey}
+          passCardsBySlot={passCardsBySlot}
+          selectedCards={selectedCards}
+          selectedCombo={selectedCombo}
+          selectedPlayable={selectedPlayable}
+          isInDealing={isInDealing}
+          isInPassing={isInPassing}
+          isInPlaying={isInPlaying}
+          iAmReady={iAmReady}
+          iAmPassSubmitted={iAmPassSubmitted}
+          dealingCardCount={dealingCardCount}
+          myDeclaration={myDeclaration}
+          onCardClick={handleCardClick}
+          onReorder={reorderHand}
+          onAssignPassSlot={assignPassSlot}
+          onClearPassSelection={clearPassSelection}
+          onDeclareTichu={handleDeclareTichu}
+          onDeclareGrandTichu={handleDeclareGrandTichu}
+          onReady={handleReady}
+        />
       )}
-
-      {!spectator &&
-        (isInDealing ||
-          isInPassing ||
-          // 플레이 단계의 내기/패스는 경기장 좌석 좌우로 옮겼다(#6). 액션 바는
-          // 선택 조합 힌트·티츄 선언이 있을 때만 렌더(빈 바 방지).
-          (isInPlaying &&
-            (selectedCards.length > 0 ||
-              (myDeclaration === 'NONE' && (privateHand?.cards.length ?? 0) === 14)))) && (
-          <div className={`action-bar${isInPassing ? ' passing' : ''}`}>
-            {isInDealing && !iAmReady && (
-              <>
-                {dealingCardCount === 8 && myDeclaration === 'NONE' && (
-                  <Button type="button" size="sm" variant="secondary" onClick={handleDeclareGrandTichu}>
-                    {t('dealing.declareGrand')}
-                  </Button>
-                )}
-                {dealingCardCount === 14 && myDeclaration === 'NONE' && (
-                  <Button type="button" size="sm" variant="secondary" onClick={handleDeclareTichu}>
-                    {t('dealing.declareTichu')}
-                  </Button>
-                )}
-                <Button type="button" size="sm" onClick={handleReady}>
-                  {myDeclaration === 'NONE'
-                    ? t('dealing.skip.noDeclare')
-                    : t('dealing.skip.declared')}
-                </Button>
-              </>
-            )}
-            {isInDealing && iAmReady && <p className="hint">{t('dealing.waiting')}</p>}
-
-            {isInPassing && !iAmPassSubmitted && privateHand && (
-              <div className="arena-pass">
-                <p className="pass-hint">
-                  {pendingPassCardKey
-                    ? '카드 선택됨 — 줄 사람(좌/파트너/우)을 누르세요'
-                    : '먼저 손패에서 카드를 고른 뒤 줄 사람을 누르세요'}
-                </p>
-                <div className="pass-slots">
-                  {(['left', 'partner', 'right'] as PassSlot[]).map((slot) => {
-                    const c = passCardsBySlot[slot];
-                    // Phase 15(#2) — 배정된 줄 사람은 선택지(버튼) 없애고 정적
-                    // 칩으로 고정. 잘못 골랐으면 "초기화" 로 다시.
-                    if (c) {
-                      return (
-                        <div key={slot} className="pass-slot filled">
-                          <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
-                          <CardChip card={c} />
-                          <span className="slot-done">✓</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-                        type="button"
-                        key={slot}
-                        className={`pass-slot ${pendingPassCardKey ? 'droppable' : ''}`}
-                        onClick={() => assignPassSlot(slot)}
-                        disabled={!pendingPassCardKey}
-                      >
-                        <div className="slot-label">{PASS_SLOT_LABEL[slot]}</div>
-                        <span className="slot-empty">{t('pass.slot.empty')}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <Button type="button" size="sm" variant="outline" onClick={clearPassSelection}>
-                  {t('pass.clear')}
-                </Button>
-              </div>
-            )}
-            {isInPassing && iAmPassSubmitted && <p className="hint">{t('pass.waiting')}</p>}
-
-            {isInPlaying && (
-              <>
-                {selectedCards.length > 0 && (
-                  <span className="combo-hint" aria-live="polite">
-                    선택: {selectedCombo}
-                    {' '}({selectedCards.length}{t('seat.handCardsSuffix')})
-                    {selectedCombo !== '?' && !selectedPlayable && (
-                      <span className="combo-illegal"> · 지금 낼 수 없음</span>
-                    )}
-                  </span>
-                )}
-                {/* 내기/패스는 경기장 좌석 좌우 버튼으로 이동(#6). 여기엔 티츄 선언만. */}
-                {myDeclaration === 'NONE' &&
-                  (privateHand?.cards.length ?? 0) === 14 && (
-                    <Button type="button" size="sm" variant="outline" onClick={handleDeclareTichu}>
-                      {t('play.action.declareTichu')}
-                    </Button>
-                  )}
-              </>
-            )}
-          </div>
-        )}
 
       {errorMessage && (
         <p className="error" onClick={() => setError(null)}>
