@@ -98,6 +98,28 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-87 (2026-07-29) — GameTable 컴포넌트 분해 (트랙 외 기술부채)
+
+M1 A6/A7 게임판 UX 폴리시가 연속으로 쌓이며 `GameTable.tsx` 의 단일 컴포넌트가
+915줄(파일 1030줄)까지 커졌고, 직접 테스트가 없어 다음 클라 UX 변경 시 회귀 위험이
+가장 높은 지점이 되었다. **동작·시각 변경 없이** 프레젠테이션 4개(`GameTableHeader`·
+`TableArena`·`MyHandPanel`·`MatchEndedPanel`)와 훅 3개(`useGameTableModel`·
+`useGameTableEffects`·`useGameActions`), 순수 함수 1개(`gameTableSelection`)로
+분해하고, 추출 **전에** 특성화 테스트를 먼저 붙여 안전망을 확보한다. 스타일
+클래스명·STOMP 프로토콜·`tichuStore` 구조·서버 계약은 불변이며 성능
+최적화(memo/useCallback)는 별건. 상용화 트랙(M0~M5) 밖의 기술부채라 마일스톤
+번호를 붙이지 않는다. 상세는 `docs/plans/gametable-refactor.md`.
+
+**계획 대비 두 가지 보정**: (1) 컴포넌트 4개를 뺀 뒤에도 GameTable 이 405줄이라
+스토어 구독·파생값을 담는 세 번째 훅 `useGameTableModel` 을 추가했다(계획서엔
+없던 파일). (2) 그래도 §6 의 "200줄 이하"는 못 맞춘다 — 최종 278줄이고, 남은 건
+전부 조립 코드(import 22 / props 인터페이스 23 / 훅 플러밍 45 / JSX prop 나열 161)라
+자식이 스토어를 직접 구독해야만 더 줄어든다. 그건 "프레젠테이션 컴포넌트" 설계와
+단독 렌더 테스트 용이성을 깨므로 하지 않았고, 기준을 "조립 루트만 남을 것
+(useEffect/useRef/핸들러/마크업 0)"으로 보정했다. 검증은 육안 대신 리팩토링 전후
+커밋에서 17개 시나리오의 렌더 DOM 을 덤프해 비교했고, `class` 속성 내부 공백
+개수(HTML 이 토큰 구분자로만 취급)를 정규화하면 **바이트 단위 완전 일치**했다.
+
 ## D-86 (2026-06-21) — 어드민/모더레이션: 역할 별도 테이블 (M2/C4)
 
 운영 신뢰성용 최소 어드민 기능. **규칙#3(D-02) 준수**: 권한을 `users` 에 두지 않고 신규
