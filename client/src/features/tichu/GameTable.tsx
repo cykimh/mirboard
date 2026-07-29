@@ -29,6 +29,8 @@ import { RoomChat } from '@/features/chat/RoomChat';
 import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
 import { ReactionFloats } from './ReactionFloats';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
+import { TurnCountdown } from './TurnCountdown';
+import { getSelectedKeys } from './gameTableSelection';
 
 interface GameTableProps {
   roomId: string;
@@ -987,44 +989,6 @@ export function GameTable({
           onClose={() => setChatOpen(false)}
         />
       )}
-    </div>
-  );
-}
-
-function getSelectedKeys(
-  selected: Set<string>,
-  passSelection: Record<PassSlot, string | null>,
-  isInPassing: boolean,
-  pendingPassCardKey: string | null,
-): Set<string> {
-  if (!isInPassing) return selected;
-  const merged = new Set(selected);
-  for (const v of Object.values(passSelection)) {
-    if (v) merged.add(v);
-  }
-  if (pendingPassCardKey) merged.add(pendingPassCardKey);
-  return merged;
-}
-
-/**
- * Phase 15(#6) — 경기장 내 턴 카운트다운. 서버 TURN_CHANGED 수신 시각
- * (store.turnStartedAt) + 방 turnSeconds 로 잔여 초를 클라가 로컬 계산.
- * 실제 타임아웃 강제는 서버(TurnTimeoutScheduler) 담당 — 표시는 근사.
- */
-function TurnCountdown({ turnSeconds }: { turnSeconds: number }) {
-  const turnStartedAt = useTichuStore((s) => s.turnStartedAt);
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, []);
-  if (turnStartedAt == null) return null;
-  const elapsed = Math.floor((now - turnStartedAt) / 1000);
-  const remaining = Math.max(0, turnSeconds - elapsed);
-  const urgent = remaining <= 5;
-  return (
-    <div className={`turn-countdown ${urgent ? 'urgent' : ''}`} aria-live="off">
-      ⏱ {remaining}
     </div>
   );
 }
