@@ -835,7 +835,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | --- | --- | --- | --- |
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
-| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4 완료 / C3·C5 남음 |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4·C5 완료 / C3 남음 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
 | M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
@@ -879,9 +879,15 @@ A2 온보딩 튜토리얼(`TutorialModal`/`PairPractice`/`useTutorialGate`), A3 
 `AuthRateLimiter` 흡수. 검증: `RateLimitRoutingTest`·`HttpRateLimitIntegrationTest`·
 `StompRateLimitIntegrationTest`.
 
-**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요), C5(백업런북·k6 — 실행환경
-필요). 채팅 신고 적재/조회(테이블)도 후속. C1 의 Micrometer 카운터는 `MirboardMetrics`
-공유 파일이라 C3 로 위임.
+**M2 진행(C5 완료)**: D-92 백업 런북 + k6 — `scripts/backup.sh`(dump/restore/list/verify/
+prune, 덤프 직후 자동 무결성 검증)와 `docs/runbooks/backup-restore.md`(절차보다 **복구 불가
+범위**를 먼저 명시 — 진행 중 방/게임/칩은 Redis 휘발이라 소실이 정상, 단 유저 정지만 예외).
+`scripts/k6/smoke.js` 는 REST 담당이고 인게임 부하는 기존 `bot-stress` 가 담당한다(STOMP 는
+xk6 확장 빌드가 필요해 제외). 임계값은 실측 역산. 서버 자바 소스 무변경.
+검증: dump→파괴→restore 왕복으로 전량 복원 확인.
+
+**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요). 채팅 신고 적재/조회(테이블)도
+후속. C1 의 Micrometer 카운터는 `MirboardMetrics` 공유 파일이라 C3 로 위임.
 
 **작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
 `docs/plans/parallel-tracks.md`(T0·T1 완료, T2~T8 대기).
