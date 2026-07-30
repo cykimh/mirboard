@@ -116,6 +116,42 @@ D-97 이 스컬킹을 2~8인으로 확정하면서 `capacity = def.maxPlayers()`
 (`GameEngine`·`GameStompController`·스케줄러)의 교집합이 없고 `game-port.md` §3 이 포트
 표면을 참조하지 않아 먼저 진행했다. D-98 은 S1 용으로 예약 상태를 유지한다.
 
+## D-98 (2026-07-30) — 포트 추출: 티츄를 `GameEngine` 뒤로 (M5/T7 S1, 동작 무변경)
+
+D-97 이 종이에 확정한 표면을 실제로 만들고 티츄를 그 뒤로 옮긴다. 게임은 하나 그대로이므로
+**동작 무변경 리팩토링**이고, 티츄 룰은 한 줄도 고치지 않는다 — 룰 변경이 섞이면 이후 회귀의
+원인 분리가 불가능해진다. 안전망은 서버 테스트 전량, 특히 `BotMatchSimulationIT`(봇 풀매치)·
+`TurnTimeoutSchedulerIT`·`TichuInvariantChecker`.
+
+**2계층으로 나눈다.** 순수 룰 엔진 `TichuEngine`(입력 상태 → 출력 상태, 저장소 없음)은 그대로
+두고, 포트 어댑터 `TichuGameEngine implements GameEngine` 를 새로 만들어 상태 I/O·뷰·라운드/
+매치 진행을 감싼다. 한 클래스로 합치면 룰 단위 테스트가 Redis 를 끌고 오게 되고, 포트에
+저장소를 넣지 않으면 `publicView`/`isMatchOver` 가 성립하지 않는다.
+
+**`newEngine()` 이 드디어 호출부를 갖는다.** infra 는 `GameEngineProvider.forRoom(room)` →
+`GameRegistry.require(gameType).newEngine(ctx)` 한 경로로만 엔진을 얻고, 게임 이름을 직접
+쓰지 않는다. `GameContext` 에 `targetScore`·`stake`·`botSeats` 를 실어 어댑터가 매치 종료를
+스스로 판정할 수 있게 한다(D-97 판단 (3)).
+
+**D-97 §1 표면에서 세 곳을 고쳤다.** ① `isMatchOver(state, MatchProgress)` → **`isMatchOver()`**:
+티츄 매치 상태는 팀 점수 + MVP 기여도라 게임 중립 `MatchProgress` 로 손실 없이 표현할 수
+없다. 매치 상태는 엔진이 소유하고 인프라에 노출하지 않는다. ② `pendingSeat` 단수 →
+**`pendingSeats` 복수**: Dealing/Passing 은 여러 좌석이 동시에 대기하므로 단수로는 봇이
+사람 좌석을 기다려 멈춘다(타임아웃은 첫 좌석만 쓰므로 `pendingSeat` 는 default 로 남긴다).
+③ `initialState(seatCount, seed)` **미채택**: 라운드 시작은 여전히 게임 도메인의
+`GameStartingEvent` 리스너가 맡아 호출부가 0건이다 — 호출부 없는 포트 메서드가 바로 D-97 이
+지적한 `newEngine()` 의 실패 모드였다.
+
+**액션 역직렬화 seam**(D-97 열린 질문 2)은 목적지에서 방 → gameType 분기로 확정했다.
+`GameStompController` 는 `@Payload JsonNode` 로 원본을 받고 `engine.actionType()` 으로
+`treeToValue` 한다. 하드타입 `@Payload TichuAction` 이 사라지고, 알 수 없는 액션은 프레임워크
+변환 실패(클라 무응답)가 아니라 `ERROR/INVALID_ACTION` 으로 응답한다. `GameState` 는 마커로
+시작한다(열린 질문 1) — 공통 필드를 처음부터 강요하면 요트가 깨진다.
+
+**의도적 잔여**: `RoomChipService` 는 `TichuMatchCompleted`/`TichuGameDefinition.ID` 를 계속
+참조한다. 칩·판돈은 D-97 §2 가 명시적으로 포트 **밖**에 둔 관심사이고, 신규 게임은
+`stake=0` 으로 시작하므로 지금 일반화하면 쓰이지 않는 추상이 된다.
+
 ## D-97 (2026-07-30) — GameEngine 포트 설계 (M5/T7 1단계, 코드 변경 0)
 
 멀티게임의 선행 설계. `docs/game-port.md` 가 산출물이고 **코드는 건드리지 않는다** —
