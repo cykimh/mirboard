@@ -99,6 +99,13 @@ public class RoomService {
                 turnSeconds, DEFAULT_STAKE);
     }
 
+    public Room createRoom(long hostUserId, String name, String gameType,
+                           TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
+                           int turnSeconds, int stake) {
+        return createRoom(hostUserId, name, gameType, teamPolicy, fillWithBots, targetScore,
+                turnSeconds, stake, null);
+    }
+
     /**
      * Phase 9B — `fillWithBots=true` 면 createRoom 직후 capacity 가 찰 때까지 시드 봇을
      * 자동 join. capacity 도달 시 일반 joinRoom 흐름과 동일하게 IN_GAME 전이 +
@@ -109,10 +116,13 @@ public class RoomService {
      * 방 메타라 TichuMatchState 까진 흘리지 않고 스케줄러가 room 으로 참조.
      * D-81 — `stake` 판돈(가상 칩, 0=내기 없음). 허용값 외/음수는 거절하고,
      * stake>0 이면 봇 채우기 금지(봇=무한 잔액 → 칩 파밍 방지).
+     * D-99 — `requestedCapacity` 방 인원. **null 이면 `def.maxPlayers()`**(현행 호환).
+     * 게임이 정한 `minPlayers()..maxPlayers()` 를 벗어나면 InvalidCapacityException.
+     * 티츄는 min=max=4 라 4 또는 미지정만 통과한다.
      */
     public Room createRoom(long hostUserId, String name, String gameType,
                            TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
-                           int turnSeconds, int stake) {
+                           int turnSeconds, int stake, Integer requestedCapacity) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
@@ -123,19 +133,23 @@ public class RoomService {
         if (stake > 0 && fillWithBots) {
             throw new StakedRoomNoBotsException();
         }
+        int capacity = requestedCapacity == null ? def.maxPlayers() : requestedCapacity;
+        if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
+            throw new InvalidCapacityException(capacity, def.minPlayers(), def.maxPlayers());
+        }
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
-        repository.create(roomId, hostUserId, name, gameType, def.maxPlayers(), now, teamPolicy,
+        repository.create(roomId, hostUserId, name, gameType, capacity, now, teamPolicy,
                 fillWithBots, targetScore, turnSeconds, stake);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
         metrics.roomCreated();
         log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={} stake={}",
-                roomId, gameType, hostUserId, def.maxPlayers(), teamPolicy, fillWithBots,
+                roomId, gameType, hostUserId, capacity, teamPolicy, fillWithBots,
                 targetScore, turnSeconds, stake);
 
         if (fillWithBots) {
-            int seatsToFill = def.maxPlayers() - 1;  // host 1 명 이미 들어가 있음.
+            int seatsToFill = capacity - 1;  // host 1 명 이미 들어가 있음.
             // 호스트가 봇일 수 있으므로 (테스트용 all-bot 시나리오) — 호스트와 다른 봇만 선택.
             List<Long> botIds = bots.getBotIds().stream()
                     .filter(id -> id != hostUserId)

@@ -9,8 +9,13 @@
 2. 아래 세션 블록 하나를 골라 **"시작 프롬프트"를 그대로 붙여넣기**
 3. 세션 끝에 Phase Gate(변경 요약 + 다음 진입 동의)
 
-**순서 의존을 무시하지 마라.** S2 는 S1 의 포트가 있어야 하고, S5 는 S2 의 인원 가변이
-있어야 스컬킹 4인 방을 만들 수 있다(없으면 항상 8인 방이 된다). 각 블록의 "선행" 참조.
+**순서 의존을 무시하지 마라.** S5 는 S2 의 인원 가변이 있어야 스컬킹 4인 방을 만들 수
+있다(없으면 항상 8인 방이 된다). 각 블록의 "선행" 참조.
+
+*정정 (D-99)*: 원래 S2 의 선행을 S1 로 적었으나 **실제 의존이 없었다** — S2 가 만지는
+파일(`RoomService`·`RoomController`·클라 모달)과 S1 이 만지는 파일(`GameEngine`·
+`GameStompController`·스케줄러)의 교집합이 0 이고 §3 이 포트 표면을 참조하지 않는다.
+그래서 S2 를 S1 보다 먼저 완료했다. S1 은 여전히 D-98 로 미착수.
 
 ## 전체 지도
 
@@ -18,7 +23,7 @@
 | --- | --- | --- | --- | --- | --- |
 | ~~S0~~ | 포트 설계 | — | D-97 | 0 (문서) | ✅ **완료** |
 | **S1** | 포트 추출 (티츄를 포트 뒤로) | S0 | D-98 | 서버 | ❌ 단독 |
-| **S2** | 인원 가변 (계약 변경) | S1 | D-99 | 서버+클라+docs | ❌ 단독 |
+| ~~S2~~ | 인원 가변 (계약 변경) | — | D-99 | 서버+클라+docs | ✅ **완료** |
 | **S3** | 스컬킹 룰 명세 | — | D-100 | 0 (문서) | ✅ 병행 가능 |
 | **S4** | 스컬킹 도메인 (카드·트릭·입찰·점수) | S1·S3 | D-101 | 서버(신규 패키지) | ✅ 병행 가능 |
 | **S5** | 스컬킹 통합 (엔진·봇·디스패치) | S2·S4 | D-102 | 서버 | ❌ 단독 |
@@ -69,30 +74,31 @@ docs/plans/multi-game-sessions.md 의 S1 블록이 범위다.
 
 ---
 
-## S2 — 인원 가변 (계약 변경)
+## ~~S2 — 인원 가변 (계약 변경)~~ — ✅ 완료 (D-99)
 
-**선행**: S1. **D-99**. **단독 세션**(`RoomService` + 클라 모달 + docs).
+**선행**: 없었음(위 *정정* 참조). **D-99**. 계약 슬라이스 한 커밋으로 완료.
 
-### 시작 프롬프트
-```
-docs/game-port.md §3 을 읽고 S2(인원 가변)를 진행해줘.
-docs/plans/multi-game-sessions.md 의 S2 블록이 범위다.
-계약 변경이니 서버 DTO + 클라 미러 + docs 를 한 커밋으로 묶어줘.
-```
-
-### 왜 필요한가
+### 왜 필요했나
 스컬킹이 **2~8인**이라 `capacity = def.maxPlayers()` 고정이면 항상 8인 방이 된다.
 
-### 범위
+### 한 것
 - `POST /api/rooms` 에 `capacity` 선택 필드 (미지정 시 `maxPlayers()` — 현행 호환)
 - 검증 `minPlayers() <= capacity <= maxPlayers()`, 위반 시 `INVALID_CAPACITY`
-- `RoomService.createRoom` / `fillWithBots` 좌석 계산이 capacity 를 따르도록
-- 클라 방 만들기 모달에 인원 선택 (가변 게임일 때만 노출)
-- `docs/api.md` 갱신
+  (`InvalidCapacityException` → `GlobalExceptionHandler`, details 에 허용 범위)
+- `RoomService.createRoom` / `fillWithBots` 좌석 계산이 capacity 를 따름
+- 클라 방 만들기 모달에 인원 선택 (`minPlayers < maxPlayers` 일 때만 노출, 기본값은
+  서버 기본과 같은 `maxPlayers`). 고정 인원 게임은 `capacity` 를 **보내지 않음**
+- `docs/api.md` · `implementation-status.md` · `redis-keys.md` · `game-port.md` §3 갱신
 
-### 검증
-티츄(min=max=4)는 **UI·동작 무변경**이어야 한다 — 기존 방 생성 IT 전량 그린이 그 증거.
-가변 게임은 스컬킹이 아직 없으므로 테스트용 fake `GameDefinition` 으로 검증.
+### 검증 결과
+`RoomCapacityIntegrationTest` 8건(가변 게임은 테스트용 fake `GameDefinition` 2~8인) +
+`CreateRoomModal.test.tsx` 5건 신규. 서버 399건·클라 144건 전량 그린 — 티츄 방 생성 IT
+무변경 통과가 곧 **UI·동작 무변경**의 증거.
+
+### 여기서 발견한 것 → S5 로 이월
+시드 봇은 4명(V3)뿐이라 `capacity - 1 > 4` 인 방은 `fillWithBots` 가 실패한다. 티츄
+4인에선 도달 불가였고 **스컬킹 6~8인 방에서 처음 문제가 된다** — S5 봇 정책에 봇 풀
+확장을 포함할 것.
 
 ---
 
@@ -194,6 +200,8 @@ S4 의 SkullKingEngine 을 GameDefinition 으로 등록하고 인게임 디스�
 - `SkullKingGameDefinition` `@Component` 등록 (id `SKULL_KING`, min 2 / max 8)
 - 액션 역직렬화 seam 에 스컬킹 액션 등록
 - 봇 정책(`LegalActionEnumerator` 대응) + 타임아웃 안전 액션
+  - ⚠ **봇 풀 확장 필수** (D-99 발견): 시드 봇 4명(V3)이라 `capacity - 1 > 4` 인
+    6~8인 방은 `fillWithBots` 가 `IllegalStateException` 으로 실패한다
 - 상태 저장/뷰 매퍼
 - 4인·6인 봇 풀매치 시뮬레이션 IT
 

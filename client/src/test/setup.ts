@@ -25,6 +25,21 @@ class MemoryStorage implements Storage {
   }
 }
 
+// jsdom 에는 ResizeObserver 가 없다. Radix 의 use-size (Switch/Checkbox 등의 내부)가
+// 마운트 시 즉시 생성하므로 없으면 컴포넌트 렌더 자체가 터진다. 레이아웃 측정은
+// jsdom 에서 어차피 0 이라 no-op 스텁으로 충분하다.
+if (!('ResizeObserver' in globalThis)) {
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    value: class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+    configurable: true,
+    writable: true,
+  });
+}
+
 Object.defineProperty(globalThis, 'localStorage', {
   value: new MemoryStorage(),
   configurable: true,
