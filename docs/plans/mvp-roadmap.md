@@ -835,7 +835,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | --- | --- | --- | --- |
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
-| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C4 완료 / C1·C3·C5 남음 |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4 완료 / C3·C5 남음 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
 | M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
@@ -872,8 +872,19 @@ A2 온보딩 튜토리얼(`TutorialModal`/`PairPractice`/`useTutorialGate`), A3 
 규칙#3), `/api/admin/**` 어드민 전용. 매치 강제종료(`adminAbortGame`), 유저 정지
 (`suspend:user:{id}` Redis TTL → 로그인/CONNECT 403), 채팅 금칙어 마스킹
 (`ChatModerationService`). 검증: `AdminControllerIT`·`AdminUserSuspensionIT`·`ChatModerationServiceTest`.
-**남은 M2**: C1 완성(전역/STOMP 레이트리밋 — 게임경로 위험), C3(Sentry+Grafana — 로컬
-스택/외부 SaaS 필요), C5(백업런북·k6 — 실행환경 필요). 채팅 신고 적재/조회(테이블)도 후속.
+**M2 진행(C1 완료)**: D-90 전역/STOMP 레이트리밋 — 범용 `RateLimiter`(버킷 카탈로그 +
+기존 Lua 재사용) 위에 HTTP 필터·STOMP 인터셉터 2 어댑터. 키는 인증되면 userId/아니면 IP,
+라우팅 표 + 기본 버킷 fallback 으로 route-drift 차단. 최대 위험이던 게임 경로는 포함하되
+관대한 한도(30/10s)로 두고 `BotMatchSimulationIT` + 라이브 실주행으로 무영향 확인.
+`AuthRateLimiter` 흡수. 검증: `RateLimitRoutingTest`·`HttpRateLimitIntegrationTest`·
+`StompRateLimitIntegrationTest`.
+
+**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요), C5(백업런북·k6 — 실행환경
+필요). 채팅 신고 적재/조회(테이블)도 후속. C1 의 Micrometer 카운터는 `MirboardMetrics`
+공유 파일이라 C3 로 위임.
+
+**작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
+`docs/plans/parallel-tracks.md`(T0·T1 완료, T2~T8 대기).
 
 **트랙 외 기술부채(미착수)**: A6/A7 폴리시가 쌓이며 `GameTable.tsx` 단일 컴포넌트가
 915줄까지 커졌고 직접 테스트가 없다. 동작·시각 무변경 전제의 분해 계획은
