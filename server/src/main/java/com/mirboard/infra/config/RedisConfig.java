@@ -1,5 +1,6 @@
 package com.mirboard.infra.config;
 
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -44,6 +45,25 @@ public class RedisConfig {
     @Bean
     public RedisScript<Long> rateLimitFixedWindowScript() {
         return scriptOf("lua/rate_limit_fixed_window.lua");
+    }
+
+    /** D-96 — 방 프레즌스 세션 카운터 감소(0 이면 필드 삭제). */
+    @Bean
+    public RedisScript<Long> presenceLeaveScript() {
+        return scriptOf("lua/presence_leave.lua");
+    }
+
+    /**
+     * D-96 — 만료 데드라인 원자 pop. 모든 인스턴스가 같은 ZSET 을 폴링하므로
+     * ZRANGEBYSCORE+ZREM 이 한 덩어리여야 한 항목이 한 인스턴스에만 간다.
+     * 반환이 배열이라 결과 타입이 List 다.
+     */
+    @Bean
+    public RedisScript<List> deadlinePollScript() {
+        DefaultRedisScript<List> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("lua/deadline_poll.lua"));
+        script.setResultType(List.class);
+        return script;
     }
 
     private static RedisScript<Long> scriptOf(String classpath) {
