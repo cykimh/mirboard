@@ -63,11 +63,17 @@ export function useHandOverlap(count: number) {
     // 단, 겹침이 랭크 가독 하한(MIN_VISIBLE_STEP)을 깨는 좁은 폭에서는 한 줄을
     // 포기하고 줄바꿈으로 펼친다(data-hand-wrap, CSS 가 소비) — "10" 잘림 방지.
     const margin = computeHandOverlap(containerW, cardW, count);
-    el.style.setProperty('--hand-overlap', `${margin}px`);
-    if (shouldWrapHand(containerW, cardW, count)) {
-      el.dataset.handWrap = '1';
-    } else {
-      delete el.dataset.handWrap;
+    // 값이 같으면 쓰지 않는다 — data-hand-wrap 이 flex-wrap 을 바꿔 컨테이너 높이가
+    // 변하고, 그게 다시 ResizeObserver 를 깨우기 때문. 무변경 write 를 걸러 RO 루프
+    // 경고("loop completed with undelivered notifications")를 막는다.
+    const next = `${margin}px`;
+    if (el.style.getPropertyValue('--hand-overlap') !== next) {
+      el.style.setProperty('--hand-overlap', next);
+    }
+    const wrap = shouldWrapHand(containerW, cardW, count) ? '1' : undefined;
+    if (el.dataset.handWrap !== wrap) {
+      if (wrap) el.dataset.handWrap = wrap;
+      else delete el.dataset.handWrap;
     }
   }, [count]);
 
@@ -79,6 +85,11 @@ export function useHandOverlap(count: number) {
     if (!el || count <= 1 || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(recompute);
     ro.observe(el);
+    // 카드 폭은 미디어 쿼리로도 바뀌므로(≤768px 62→54, ≤480px →48) 첫 카드도 같이
+    // 관찰한다 — 컨테이너 폭 변화 없이 카드만 바뀌는 경우(폰트 스케일·줌 등)까지
+    // 커버하는 방어적 관찰. 실기기 회전은 컨테이너도 같이 변해 el 관찰만으로도 잡힌다.
+    const first = el.firstElementChild;
+    if (first) ro.observe(first);
     return () => ro.disconnect();
   }, [recompute, count]);
 
