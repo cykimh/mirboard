@@ -836,7 +836,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
 | M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4·C5 완료 / C3 남음 |
-| M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/lease/deadline, 2-인스턴스 IT·failover(**D-03 번복**). M0 이연분 포함 | ⬜ |
+| M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
 | M5 | E | 멀티게임(후순위): GameEngine 포트 졸업 → 인게임 디스패치 seam 포트화 → 2번째 게임 | ⬜ |
 
@@ -895,8 +895,16 @@ broadcast 시 Redis 링버퍼(`chatlog:*`, 최근 100개·TTL 2h) 보관으로 �
 **남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요)만. C1 의 Micrometer 카운터는
 `MirboardMetrics` 공유 파일이라 C3 로 위임.
 
+**M3 완료(D-96)**: 단일 인스턴스 전제 3곳(`WsSessionRegistry`·`TurnTimeoutScheduler`·
+`DesertionGraceScheduler`)을 모두 Redis 로 이전. 프레즌스는 세션 카운터 HASH, 타이머는
+ZSET + Lua 원자 pop + 전 인스턴스 폴링(**리더 선출 없음** — 리더 사망이 곧 전체 타이머
+정지라서). 두 방어가 서로 다른 경합을 담당한다: 원자 pop 이 "두 인스턴스가 같은 타이머를
+잡는 것"을, Redis generation 이 "pop 과 락 획득 사이 행동"을 막는다. M0 이연 누수는 TTL 로
+원천 해소. 증명은 `TwoInstanceHandoffIT`(독립 컨텍스트 2개, **A 종료 후 B 인계** 포함).
+트레이드오프로 폴링 지연이 생겨 기본 주기를 250ms 로 잡았다 — 상세는 D-96.
+
 **작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
-`docs/plans/parallel-tracks.md`(T0·T1 완료, T2~T8 대기).
+`docs/plans/parallel-tracks.md`(T0·T1·T3·T4·T6 완료, T5 1차 완료).
 
 **트랙 외 기술부채(미착수)**: A6/A7 폴리시가 쌓이며 `GameTable.tsx` 단일 컴포넌트가
 915줄까지 커졌고 직접 테스트가 없다. 동작·시각 무변경 전제의 분해 계획은
