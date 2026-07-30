@@ -1,0 +1,179 @@
+.arena-bubble {
+  position: absolute;
+  max-width: 200px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1a1a1f;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+  pointer-events: none;
+  transition: opacity 1s ease-out;
+}
+
+.arena-bubble.fading {
+  opacity: 0;
+}
+
+.arena-bubble-name {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.6;
+}
+
+/* Phase 20(D-76) — 말풍선 본문. 말풍선은 항상 흰 배경이라 색은 부모의
+   어두운 글자(#1a1a1f) 상속이 맞고, block + line-height 로 정렬만 보정. */
+.arena-bubble-text {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.arena-bubble-s {
+  left: 50%;
+  bottom: 128px;
+  transform: translateX(-50%);
+}
+
+.arena-bubble-n {
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+}
+
+.arena-bubble-w {
+  right: 76px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.arena-bubble-e {
+  left: 76px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* P2(7) — 좌석 이모지 반응. 발신 좌석에서 위로 떠오르며 사라짐(내부 glyph 가 애니,
+   외부 div 는 좌석 좌표 앵커 — 중심 정렬 transform 충돌 회피). */
+.reaction-float {
+  position: absolute;
+  z-index: 32;
+  pointer-events: none;
+}
+
+.reaction-s { left: 50%; bottom: 92px; transform: translateX(-50%); }
+.reaction-n { left: 50%; top: 70px; transform: translateX(-50%); }
+.reaction-w { right: 70px; top: 50%; transform: translateY(-50%); }
+.reaction-e { left: 70px; top: 50%; transform: translateY(-50%); }
+
+.reaction-glyph {
+  display: block;
+  font-size: 2.4rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: reaction-float-up 2.6s ease-out forwards;
+}
+
+@keyframes reaction-float-up {
+  0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+  15%  { transform: translateY(-8px) scale(1.15); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translateY(-70px) scale(0.9); opacity: 0; }
+}
+
+/* 헤더 반응 버튼 + 팔레트. */
+.reaction-bar {
+  position: relative;
+}
+
+.reaction-palette {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.reaction-palette button {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 4px 5px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.reaction-palette button:hover {
+  background: var(--color-border-subtle);
+}
+
+/* P4(5) — 패스 직후 "받은 카드 ← 준 사람" 짧은 모달. */
+.pass-received-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.pass-received-modal {
+  background: rgba(20, 22, 28, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #eef2f7;
+  text-align: center;
+  max-width: 92vw;
+  animation: mirboard-fx-pop 0.3s ease-out;
+}
+
+.pass-received-modal h3 {
+  margin: 0 0 14px;
+  color: #ffd180;
+}
+
+.pass-received-list {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pass-received-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pass-received-from {
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.pass-received-close {
+  margin-top: 16px;
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-elevated);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* 인-게임 채팅 — 보드 위 반투명 fixed 오버레이(보드를 밀지 않음, #4).
+   UX-4: 데스크톱도 우하단 도크로(상단 우측 패널은 우측 좌석을 덮었음) — 하단(손패/액션)만
+   덮고 좌석은 가리지 않는다. 좁은 폭(≤768px)은 아래에서 전폭 바텀시트로 오버라이드. */

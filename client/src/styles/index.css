@@ -1,0 +1,54 @@
+/* Mirboard 스타일 진입점 (D-94).
+ *
+ * ⚠ 이 파일의 @import **순서가 곧 캐스케이드 순서**다. 재배열하지 말 것.
+ *   styles.css(1569줄)를 연속 파티션으로 자른 것이므로, 아래 순서대로 이어붙이면
+ *   분할 이전 파일과 바이트 단위로 동일하다(scripts/verify-css-split.cjs 가 검증).
+ *
+ * ⚠ 폭 미디어(@media max-width)는 전량 17-responsive.css 에 모여 있고 **반드시
+ *   마지막**이어야 한다. 컴포넌트별로 흩으면 조용히 깨진다 — D-88 이 정확히 그 사고
+ *   (480 블록이 768 에 덮여 사문화)였고, .table-center-trick{max-width} 는
+ *   480(44%)→440(46%) 로 비단조라 순서가 값 자체를 바꾼다.
+ *
+ * ⚠ tailwind → tokens → theme → parts 순서도 고정이다. theme 이 tailwind 뒤여야
+ *   라이트 오버라이드가 이기고, parts 가 tailwind 뒤여야 터치타겟 min-height 보정이
+ *   shadcn Button(h-8)을 이긴다.
+ */
+
+@import './tailwind.css';
+@import './tokens.css';
+@import './theme.css';
+
+/* 전역 리셋·토큰·기본 엘리먼트(button/input/a)·.error·.room-page */
+@import './parts/01-base.css';
+/* 게임판 셸 + 헤더(상태 배지·연결점·컨트롤) */
+@import './parts/02-game-table-header.css';
+/* 경기장 판·좌석 위치(s/w/n/e)·좌석 좌우 액션 버튼 */
+@import './parts/03-table-arena.css';
+/* 중앙 트릭 패널(메타·조합명·플레이어) */
+@import './parts/04-center-trick.css';
+/* 좌석 박스·상태 모디파이어(turn/finished/disconnected)·아바타 선언 연출·팀 칩 */
+@import './parts/05-seat.css';
+/* 좌석 카드 팬(방향별 회전 ±90°) */
+@import './parts/06-seat-cardstack.css';
+/* 티츄 선언 배지 + 선택 조합명 힌트 */
+@import './parts/07-badges.css';
+/* 손패 레이아웃(겹침/줄바꿈) + 카드 칩 */
+@import './parts/08-hand.css';
+/* 하이핸드 이펙트·카드 등장 keyframes (이름은 전역) */
+@import './parts/09-keyframes-fx.css';
+/* 내 손패 컨테이너 */
+@import './parts/10-my-hand.css';
+/* 라운드/매치 종료 패널·칩 정산·MVP */
+@import './parts/11-match-end.css';
+/* 카드 패스 슬롯·힌트 */
+@import './parts/12-pass.css';
+/* 스코어보드·턴 카운트다운·라운드 점수표 */
+@import './parts/13-scoreboard.css';
+/* 채팅 말풍선·이모지 반응·패스 수신 모달 */
+@import './parts/14-arena-overlays.css';
+/* 채팅 패널(자체 @media 포함 — 바텀시트 전환이 base 뒤여야 성립) */
+@import './parts/15-room-chat.css';
+/* 좌석 ready/submitted + 상태 태그 */
+@import './parts/16-seat-status.css';
+/* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
+@import './parts/17-responsive.css';

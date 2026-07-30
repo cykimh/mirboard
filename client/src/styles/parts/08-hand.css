@@ -1,0 +1,144 @@
+.hand-cards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hand-cards > * {
+  position: relative;
+}
+
+.hand-cards > *:hover {
+  z-index: 20;
+}
+
+/* Phase 15 (#3) — 센터에 낸 카드도 겹치지 않게 (기본 gap 사용). */
+.table-center-trick .hand-cards {
+  gap: 6px;
+}
+
+/* 손패 레이아웃: 공간이 남으면 겹치지 않고(양수 gap), 좁을 때만 측정값으로 한 줄에
+   맞춰 겹친다(#1). useHandOverlap 가 --hand-overlap 을 세팅. hover/선택 시 떠오름. */
+.my-hand .hand-cards.overlap {
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0;
+}
+
+.my-hand .hand-cards.overlap > * {
+  margin-left: var(--hand-overlap, 6px);
+  flex-shrink: 0;
+}
+
+.my-hand .hand-cards.overlap > *:first-child {
+  margin-left: 0;
+}
+
+/* 한 줄 겹침이 랭크 가독 하한(MIN_VISIBLE_STEP, useHandOverlap)을 못 지키는
+   좁은 폭 — 훅이 data-hand-wrap 을 세우면 겹침을 해제하고 여러 줄로 펼친다.
+   아주 좁은 화면에서 두 자리 랭크("10")가 잘리는 것 방지. 모바일은 세로 여백이
+   충분해(하단 ~36% 공백 실측) 줄이 늘어나도 안전하다. */
+.my-hand .hand-cards.overlap[data-hand-wrap='1'] {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.my-hand .hand-cards.overlap[data-hand-wrap='1'] > * {
+  margin-left: 0;
+}
+
+/* 패스/딜링 단계: 절대 겹치지 않게 — 고르기 쉽도록 펼치고 넘치면 줄바꿈(#2). */
+.my-hand .hand-cards:not(.overlap) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.card-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  /* #1 — 카드 확대(48→62)로 가독성↑. 겹침 단계는 useHandOverlap 이 폭을 재측정해
+     한 줄을 유지하고, 좌상단 코너 인덱스가 겹친 슬라이버에서도 랭크/슈트를 보여준다. */
+  width: 62px;
+  height: 88px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 2px solid #555;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.card-chip:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+/* Phase 8E — 본인 손패 카드 호버 시 살짝 떠오르기 + z-index 상승. */
+.card-chip:hover {
+  transform: translateY(-6px) scale(1.05);
+  z-index: 5;
+  transition: transform 120ms ease-out;
+}
+
+.card-chip.selected {
+  background: #e0f2e9;
+  transform: translateY(-6px);
+  border-color: var(--color-success);
+}
+
+.card-chip.selected:hover {
+  transform: translateY(-10px) scale(1.05);
+}
+
+/* M1/A1 — 카드 이미지 모드. 자산 로드 실패 시 글리프 모드(.rank)로 폴백. */
+.card-chip .card-face {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* #1' — 직관적 숫자+슈트 카드(트럼프 핍 SVG 대체). 좌측 정렬 + 세로 중앙이라 손패가
+   겹쳐도 왼쪽 슬라이버에서 랭크/슈트가 읽힌다. A5 색약(.cb)은 슈트 글리프 윤곽 강조. */
+.card-chip .card-simple {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding-left: 6px;
+  line-height: 1;
+  pointer-events: none;
+}
+.card-chip .cs-rank {
+  font-size: 1.75rem;
+  font-weight: 900;
+}
+.card-chip .cs-suit {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.card-chip .card-simple.cb .cs-suit {
+  -webkit-text-stroke: 0.5px currentColor;
+}
+
+.card-chip .rank {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Phase 8G — 하이핸드 이펙트 keyframes. EffectsOverlay 에서 inline 으로 animation
+   참조. */

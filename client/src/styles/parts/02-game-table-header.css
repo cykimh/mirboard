@@ -1,0 +1,82 @@
+.game-table {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.game-table-header {
+  /* UX-1 — status(좌) / controls(우) 두 그룹. 단계별 텍스트 길이와 무관하게
+     컨트롤이 항상 한 덩어리로 우측 고정(좁은 폭에선 일관된 둘째 줄). */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 12px;
+  font-size: 0.85rem;
+  /* 헤더가 arena(이후 페인트)보다 위에 오도록 stacking context 생성 — 반응
+     팔레트(헤더 자식)가 경기장에 가리지 않게(#1). */
+  position: relative;
+  z-index: 20;
+}
+
+.header-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  opacity: 0.85;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* UX-1 — 연결 상태 점(내부 'STOMP' 용어 노출 제거). */
+.conn-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+.conn-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.conn-dot.on {
+  background: var(--color-success, #3fb979);
+  box-shadow: 0 0 6px rgba(63, 185, 121, 0.6);
+}
+.conn-dot.off {
+  background: #e85d75;
+  box-shadow: 0 0 6px rgba(232, 93, 117, 0.6);
+}
+
+/* Phase 13D — 턴 제한 배지. */
+.turn-limit-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #1a1a1f;
+  background: #ffb020;
+  opacity: 1;
+}
+
+/* Phase 20(D-76) — 헤더 솔로 모드 라벨. 헤더는 앱 배경 위(라이트/다크
+   전환)라 legacy 의미 토큰으로 muted pill. */
+.solo-banner {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  opacity: 1;
+}
+
+/* Phase 8E — 보드 풍 원형 좌석 배치. 본인 시점 기준 S(하단)/W(우)/N(상단)/E(좌).
+   absolute positioning 으로 4개 좌석 + 중앙 currentTop. */

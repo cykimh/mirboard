@@ -1,0 +1,127 @@
+.round-ended {
+  border: 1px solid var(--color-warning);
+  border-radius: 8px;
+  padding: 12px;
+  background: #2a2a16;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.round-ended button {
+  align-self: flex-start;
+}
+
+.match-ended {
+  border: 1px solid #ff7043;
+  border-radius: 10px;
+  padding: 16px;
+  background: linear-gradient(135deg, #3a1f14, #2a1410);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-ended h3 {
+  margin: 0;
+  color: #ffd180;
+}
+
+/* D-82 — 방 단위 테이블 칩. 좌석 스택 + 매치 종료 순위표. */
+.seat-chips {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffd75e;
+}
+
+.match-chip-board {
+  margin: 4px 0;
+}
+.match-chip-delta {
+  margin: 2px 0;
+  font-weight: 900;
+  font-size: 1.15rem;
+}
+.match-chip-delta.win {
+  color: #4ade80;
+}
+.match-chip-delta.lose {
+  color: #f87171;
+}
+.chip-standings {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+.chip-standings td {
+  padding: 2px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.chip-standings tr.me {
+  font-weight: 800;
+  color: #ffd180;
+}
+.chip-standings td.win {
+  color: #4ade80;
+}
+.chip-standings td.lose {
+  color: #f87171;
+}
+
+/* P5 — 승리 이펙트 뒤 매치 종료 패널의 MVP 강조 카드. */
+.match-mvp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(240, 192, 0, 0.12);
+  border: 1px solid rgba(255, 200, 0, 0.5);
+}
+
+.match-mvp .mvp-label {
+  font-weight: 900;
+  color: #ffd180;
+  letter-spacing: 0.5px;
+}
+
+.match-mvp .mvp-name {
+  font-weight: 700;
+}
+
+.match-mvp .mvp-stat {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* D-82 — 매치 종료 화면 액션 행(한 판 더 / 떠나기). */
+.match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Phase 16(#3) — 매치 종료 후 메인 복귀. */
+.match-exit {
+  align-self: flex-start;
+  margin-top: 8px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #ff7043;
+  background: #ff7043;
+  color: #1a1a1f;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+/* Phase 19(#2) — 패스 픽커를 별도 박스에서 경기장 액션 영역으로 통합.
+   외곽 박스 제거 — arena-actions 안에서 투명하게 컴팩트 표시. */
