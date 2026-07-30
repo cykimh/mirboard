@@ -14,6 +14,7 @@ import com.mirboard.domain.lobby.auth.UsernameTakenException;
 import com.mirboard.domain.lobby.room.AlreadyInRoomException;
 import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.GameNotInProgressException;
+import com.mirboard.domain.lobby.room.InvalidCapacityException;
 import com.mirboard.domain.lobby.room.InvalidStakeException;
 import com.mirboard.domain.lobby.room.NotHostException;
 import com.mirboard.domain.lobby.room.NotInRoomException;
@@ -186,6 +187,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiErrorEnvelope.of("INVALID_STAKE", "허용되지 않은 판돈입니다",
                         Map.of("stake", e.stake())));
+    }
+
+    /** D-99 — 게임이 정한 인원 범위를 벗어난 방 생성 요청. */
+    @ExceptionHandler(InvalidCapacityException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInvalidCapacity(InvalidCapacityException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("INVALID_CAPACITY", "허용되지 않은 방 인원입니다",
+                        Map.of("capacity", e.capacity(),
+                                "minPlayers", e.minPlayers(),
+                                "maxPlayers", e.maxPlayers())));
     }
 
     @ExceptionHandler(StakedRoomNoBotsException.class)

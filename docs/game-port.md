@@ -97,18 +97,22 @@ public interface GameEngine {
 | 좌석 수 4 고정 | 가변으로 감 — §3 |
 | 트릭·리드수트 | 트릭테이킹 계열만의 개념. 스컬킹은 **티츄와 공유하는 내부 모듈**로 뽑되 포트는 아님 |
 
-## 3. 인원 가변 (스컬킹 2~8 결정의 파급)
+## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 
 스컬킹을 **2~8인**(BGG 추천 4~6)으로 확정하면서 인원 가변이 **필수**가 됐다.
-
-현재 `RoomService.createRoom` 은 `capacity = def.maxPlayers()` 로 고정한다. 이대로면
-스컬킹 방은 항상 8인이 되어 4인 게임을 만들 수 없다.
+구현 전 `RoomService.createRoom` 은 `capacity = def.maxPlayers()` 로 고정했고, 이대로면
+스컬킹 방은 항상 8인이 되어 4인 게임을 만들 수 없었다.
 
 **변경 범위** (계약 슬라이스 — 서버 DTO + 클라 미러 + docs 한 커밋):
 - `POST /api/rooms` 에 `capacity` 선택 필드. 미지정 시 `def.maxPlayers()`(현행 호환).
 - 검증: `def.minPlayers() <= capacity <= def.maxPlayers()`. 위반 시 `INVALID_CAPACITY`.
 - 클라 방 만들기 모달에 인원 선택(게임이 가변일 때만 노출).
 - 티츄는 `min=max=4` 라 UI 가 안 바뀐다 — **기존 동작 무변경**.
+
+**구현 후 확인된 제약**: `fillWithBots` 는 시드 봇 4명(V3)만 쓰므로 `capacity - 1 > 4`
+인 방은 봇으로 채울 수 없다(`IllegalStateException`). 티츄 4인에서는 도달 불가라
+지금까지 드러나지 않았고, 스컬킹 6~8인 방에서 처음 문제가 된다 — **S5 의 봇 정책
+작업에 봇 풀 확장이 포함되어야 한다**. 계약(`api.md`)에 제약으로 명시해 두었다.
 
 ## 4. 검증 전략
 

@@ -22,6 +22,8 @@ export const roomsApi = {
         targetScore?: number;
         turnSeconds?: number;
         stake?: number;
+        /** D-99 — 방 인원. 생략하면 서버가 GameDefinition.maxPlayers() 로 결정. */
+        capacity?: number;
       },
   ): Promise<Room> {
     const body: Record<string, unknown> = { name, gameType };
@@ -30,6 +32,7 @@ export const roomsApi = {
     if (opts?.targetScore) body.targetScore = opts.targetScore;
     if (opts?.turnSeconds != null) body.turnSeconds = opts.turnSeconds;
     if (opts?.stake != null) body.stake = opts.stake;
+    if (opts?.capacity != null) body.capacity = opts.capacity;
     return apiRequest('/api/rooms', { method: 'POST', token, body });
   },
 

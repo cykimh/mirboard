@@ -83,8 +83,9 @@ public class RoomController {
         int stake = req.stake() == null
                 ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_STAKE
                 : req.stake();
+        // D-99 — capacity 는 선택. null 이면 RoomService 가 def.maxPlayers() 로 채운다.
         return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy,
-                fillWithBots, targetScore, turnSeconds, stake);
+                fillWithBots, targetScore, turnSeconds, stake, req.capacity());
     }
 
     /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
@@ -236,7 +237,9 @@ public class RoomController {
                                 Boolean fillWithBots,
                                 Integer targetScore,
                                 Integer turnSeconds,
-                                Integer stake) {
+                                Integer stake,
+                                // D-99 — 방 인원. null 이면 GameDefinition.maxPlayers().
+                                Integer capacity) {
     }
 
     public record UpdateTeamPolicyRequest(@jakarta.validation.constraints.NotNull TeamPolicy teamPolicy) {

@@ -174,14 +174,22 @@
 { "name": "티츄 한 판", "gameType": "TICHU", "stake": 100 }
 ```
 - `gameType` 은 `GameRegistry` 에 등록되고 `status==AVAILABLE` 인 ID여야 한다.
-- `capacity` 는 서버가 `GameDefinition.maxPlayers()` 로 결정한다 (클라가 보내도 무시).
-- 선택: `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`(D-81).
+- 선택: `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`(D-81),
+  `capacity`(D-99).
+- `capacity`(D-99): 방 인원. **생략하면 `GameDefinition.maxPlayers()`**. 게임이 정한
+  `minPlayers() <= capacity <= maxPlayers()` 를 벗어나면 `INVALID_CAPACITY`. 인원이
+  고정된 게임(티츄는 `min=max=4`)은 그 값 하나만 통과하므로 사실상 생략과 동일하다 —
+  클라는 `minPlayers === maxPlayers` 인 게임에서 이 필드를 아예 보내지 않는다.
+  `fillWithBots` 의 좌석 채우기도 확정된 `capacity` 를 따른다(시드 봇은 4명뿐이므로
+  `capacity - 1 > 4` 인 방은 봇으로 채울 수 없다 — 봇 풀 확장은 스컬킹 통합 시 별건).
 - `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
   고정·불변. **stake>0 이면 `fillWithBots` 불가**(봇=무한 잔액 → 칩 파밍 방지).
 
 응답 `201` — Room (위 형식과 동일, 본인이 host로 자동 join 됨).
 에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태),
-`INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇 동시 요청).
+`INVALID_CAPACITY` (게임 허용 인원 범위 밖 — `details` 에 `capacity`/`minPlayers`/
+`maxPlayers`), `INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇
+동시 요청).
 
 ### POST `/api/rooms/{roomId}/join`
 응답 `200` — Room 갱신본.

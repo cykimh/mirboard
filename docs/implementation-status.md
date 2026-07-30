@@ -60,8 +60,10 @@
 
 ## 3. 방 관리 (Phase 2d, 16, 18)
 
-- **생성** `POST /api/rooms` {name, gameType} — 생성자가 호스트. 정원은
-  `GameDefinition.maxPlayers()`(티츄 4). Redis `room:{id}` + `room:{id}:players` 저장.
+- **생성** `POST /api/rooms` {name, gameType} — 생성자가 호스트. 정원은 선택 필드
+  `capacity`(D-99), 생략하면 `GameDefinition.maxPlayers()`. 게임이 정한
+  `minPlayers()..maxPlayers()` 밖이면 `INVALID_CAPACITY` — 티츄는 4~4 라 무변경.
+  Redis `room:{id}` + `room:{id}:players` 저장.
 - **목록** `GET /api/rooms?gameType=&status=` — status로 필터.
 - **입장** `POST /api/rooms/{id}/join` — `room_join.lua` 원자 검증(정원/멤버십).
   **capacity 자동시작 폐기**(Phase 16): 입장만으로는 시작하지 않는다.
@@ -77,7 +79,8 @@
 - **재동기화** `GET /api/rooms/{id}/resync` — tableView + privateHand + seq(§7).
 
 동시성 보장: capacity 위반 0건(`RoomServiceConcurrencyIT`, 멀티스레드 join).
-관련 테스트: `RoomControllerIntegrationTest`, `RoomResyncIntegrationTest`.
+관련 테스트: `RoomControllerIntegrationTest`, `RoomResyncIntegrationTest`,
+`RoomCapacityIntegrationTest`(D-99 인원 가변 — 가변 게임은 테스트용 fake `GameDefinition`).
 
 ---
 

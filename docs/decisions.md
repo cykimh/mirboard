@@ -98,6 +98,24 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-99 (2026-07-30) — 방 인원 가변: `POST /api/rooms` 의 `capacity` 선택 필드 (M5/T7 S2)
+
+D-97 이 스컬킹을 2~8인으로 확정하면서 `capacity = def.maxPlayers()` 고정이 병목이 됐다 —
+그대로면 스컬킹 방은 항상 8인이 되어 4인 게임을 만들 수 없다. `POST /api/rooms` 에
+`capacity` **선택** 필드를 추가하고(미지정 시 `def.maxPlayers()` — 현행 호환),
+`def.minPlayers() <= capacity <= def.maxPlayers()` 를 벗어나면 `INVALID_CAPACITY` 로 거절한다.
+`fillWithBots` 의 좌석 계산도 `maxPlayers` 대신 확정된 capacity 를 따른다.
+
+티츄는 `min=max=4` 라 요청 본문·UI·동작이 모두 **무변경**이다 — 기존 방 생성 IT 전량 그린이
+그 증거다. 클라 방 만들기 모달의 인원 선택은 `minPlayers !== maxPlayers` 인 게임에서만
+노출하므로 티츄 모달은 그대로다. 계약 변경이라 서버 DTO + 클라 미러 + `docs/api.md` 를
+한 커밋으로 묶는다(parallel-tracks 직렬화 4).
+
+**순서**: 계획(`docs/plans/multi-game-sessions.md`)은 S2 의 선행을 S1(D-98, 포트 추출)로
+적었으나, S2 가 만지는 파일(`RoomService`·`RoomController`·클라 모달)과 S1 이 만지는 파일
+(`GameEngine`·`GameStompController`·스케줄러)의 교집합이 없고 `game-port.md` §3 이 포트
+표면을 참조하지 않아 먼저 진행했다. D-98 은 S1 용으로 예약 상태를 유지한다.
+
 ## D-97 (2026-07-30) — GameEngine 포트 설계 (M5/T7 1단계, 코드 변경 0)
 
 멀티게임의 선행 설계. `docs/game-port.md` 가 산출물이고 **코드는 건드리지 않는다** —
