@@ -1,5 +1,6 @@
 package com.mirboard.infra.config;
 
+import com.mirboard.infra.ratelimit.HttpRateLimitFilter;
 import com.mirboard.infra.web.JsonAuthenticationEntryPoint;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthFilter jwtAuthFilter,
+                                                   HttpRateLimitFilter rateLimitFilter,
                                                    JsonAuthenticationEntryPoint entryPoint) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -57,6 +59,9 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 .exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // D-90 — 레이트리밋은 JwtAuthFilter **뒤**여야 한다: 그래야 인증된 요청이
+                // IP 가 아니라 userId 키를 쓴다(NAT 뒤 지인들이 서로 할당량을 안 깎음).
+                .addFilterAfter(rateLimitFilter, JwtAuthFilter.class)
                 .build();
     }
 

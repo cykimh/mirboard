@@ -1,5 +1,6 @@
 package com.mirboard.infra.config;
 
+import com.mirboard.infra.ratelimit.StompRateLimitInterceptor;
 import com.mirboard.infra.ws.StompAuthChannelInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -13,11 +14,14 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor authInterceptor;
+    private final StompRateLimitInterceptor rateLimitInterceptor;
     private final SecurityProperties securityProperties;
 
     public WebSocketConfig(StompAuthChannelInterceptor authInterceptor,
+                           StompRateLimitInterceptor rateLimitInterceptor,
                            SecurityProperties securityProperties) {
         this.authInterceptor = authInterceptor;
+        this.rateLimitInterceptor = rateLimitInterceptor;
         this.securityProperties = securityProperties;
     }
 
@@ -40,6 +44,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(authInterceptor);
+        // D-90 — 순서 고정: auth 가 먼저여야 CONNECT 에서 Principal 이 세팅되고,
+        // 그 뒤에 레이트리밋이 userId 를 키로 쓸 수 있다.
+        registration.interceptors(authInterceptor, rateLimitInterceptor);
     }
 }

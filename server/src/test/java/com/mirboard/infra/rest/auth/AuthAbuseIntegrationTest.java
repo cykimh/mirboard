@@ -35,8 +35,13 @@ import org.testcontainers.utility.DockerImageName;
         "mirboard.auth.lockout.max-failures=3",
         "mirboard.auth.lockout.window=15m",
         "mirboard.auth.lockout.lock-duration=15m",
-        "mirboard.ratelimit.auth.limit=5",
-        "mirboard.ratelimit.auth.window=1m"
+        // D-90 — 테스트는 기본 비활성이라 여기서 명시적으로 켠다. api-default 는 넉넉히
+        // 둬서 auth 버킷만 시험한다.
+        "mirboard.ratelimit.enabled=true",
+        "mirboard.ratelimit.buckets.auth.limit=5",
+        "mirboard.ratelimit.buckets.auth.window=1m",
+        "mirboard.ratelimit.buckets.api-default.limit=1000",
+        "mirboard.ratelimit.buckets.api-default.window=1m"
 })
 class AuthAbuseIntegrationTest {
 

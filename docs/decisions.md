@@ -98,6 +98,32 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-90 (2026-07-30) — 전역/STOMP 레이트리밋 완성 (M2-C1, T1)
+
+D-84 가 인증 2개 엔드포인트에만 걸어둔 레이트리밋을 전역 HTTP + STOMP 로 일반화한다.
+**알고리즘은 고정 윈도 유지** — D-84 주석의 "토큰버킷" 예고는 철회한다. 목표가 정밀한
+쉐이핑이 아니라 스팸 차단이고 한도를 관대하게 잡으므로 경계 2배 버스트는 무해하며,
+이미 동작하는 `rate_limit_fixed_window.lua` 를 그대로 재사용한다.
+**키는 인증되면 `u:{userId}`, 아니면 `ip:{addr}`** — 지인/카페 Wi-Fi·모바일 캐리어 NAT
+뒤에서 공인 IP 가 겹쳐도 서로의 할당량을 깎지 않게. 계정 다중생성 우회는 가입 IP 리밋이
+이미 막는다. **구조**: 범용 `RateLimiter`(정책 카탈로그 + Lua) 위에 HTTP 필터와 STOMP
+인터셉터 2개 어댑터. 각 어댑터는 선언적 라우팅 표 + **기본 버킷 fallback** 을 두어 새
+엔드포인트가 조용히 무보호로 태어나는 route-drift 를 차단한다(D-61 과 같은 취지).
+**게임 액션 경로도 포함하되 관대한 한도**(정상 연타·봇매치가 절대 안 걸리는 수준) —
+초과 시 본인 큐 `ERROR(RATE_LIMITED)` 로 기존 `sendErrorTo` 패턴 재사용. 봇
+(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`)은 STOMP 를 경유하지 않고
+`engine.apply` 를 직접 호출하므로 영향 없음(실측 확인). `AuthRateLimiter`/
+`AuthRateLimitProperties` 는 신규 추상화로 흡수해 제거하고 환경변수 이름은 보존한다.
+전부 Redis 휘발 — users 스키마 비침범(D-02 유지). Redis 장애 시 **fail-open**(레이트리밋
+때문에 게임이 멈추는 편이 훨씬 나쁘다 — 로그인 brute-force 는 `LoginAttemptService` 가 별도 담당).
+테스트는 `mirboard.ratelimit.enabled=false` 가 전역 기본이고 레이트리밋 검증 테스트만 켠다
+(D-84 는 `auth.limit` 을 크게 잡았는데 버킷 카탈로그로 옮기며 그 키가 무의미해져 IT 13건이
+429 로 깨졌다 — 개별 값이 아니라 기능 스위치를 써야 새 버킷이 생겨도 안 깨진다).
+검증: 서버 377건 그린, 라우팅 단위 13건 + HTTP IT 2건 + STOMP IT 2건 신규. 사용자 간 할당량
+격리는 같은 IP 에서 두 계정으로 HTTP·STOMP 양쪽 회귀 고정. 게임 무영향은 `BotMatchSimulationIT`
+풀매치 + 라이브 서버 딜링→패스→플레이 실주행으로 확인. **후속**: Micrometer 카운터는
+`MirboardMetrics`(T2 소유 파일)라 이번 트랙에서 건드리지 않고 M2-C3 에 위임.
+
 ## D-89 (2026-07-30) — 계약 문서 기준선 정정 (T0, 코드 변경 0)
 
 `CLAUDE.md` 가 `docs/*.md` 를 계약 정본으로 못 박았으나 실제로는 드리프트가 누적돼,
