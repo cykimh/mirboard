@@ -4,6 +4,14 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 export const DESIRED_GAP = 6;
 
 /**
+ * 겹침 한 줄에서 카드마다 최소로 보여야 하는 좌측 슬라이버 폭(px).
+ * 좌상단 코너 인덱스(랭크+슈트)가 읽히는 하한 — 두 자리 랭크("10")가
+ * padding 6px + 굵은 1.35rem 글리프로 약 30px 을 차지한다. 이보다 좁게
+ * 겹치면 랭크가 잘리므로 한 줄을 포기하고 줄바꿈으로 폴백한다.
+ */
+export const MIN_VISIBLE_STEP = 30;
+
+/**
  * 손패 한 줄의 카드 간 마진(px) 계산 — 레이아웃 비의존 순수 함수(A3 테스트 대상).
  * 공간이 남으면 양수(겹치지 않음, {@link DESIRED_GAP} 상한), 좁으면 음수(겹침)로
  * 한 줄을 정확히 컨테이너 폭에 맞춘다. count<=1 또는 폭<=0 이면 기본 간격.
@@ -12,6 +20,15 @@ export function computeHandOverlap(containerW: number, cardW: number, count: num
   if (count <= 1 || containerW <= 0) return DESIRED_GAP;
   const fit = (containerW - count * cardW) / (count - 1);
   return Math.min(DESIRED_GAP, fit);
+}
+
+/**
+ * 한 줄 겹침을 유지할 수 없을 만큼 좁은가 — 카드당 보이는 폭(cardW+마진)이
+ * {@link MIN_VISIBLE_STEP} 미만이면 true(줄바꿈 폴백). 순수 함수(테스트 대상).
+ */
+export function shouldWrapHand(containerW: number, cardW: number, count: number): boolean {
+  if (count <= 1 || containerW <= 0) return false;
+  return cardW + computeHandOverlap(containerW, cardW, count) < MIN_VISIBLE_STEP;
 }
 
 /**
@@ -36,14 +53,22 @@ export function useHandOverlap(count: number) {
     const containerW = el.clientWidth;
     if (!first || count <= 1 || containerW <= 0) {
       el.style.setProperty('--hand-overlap', `${DESIRED_GAP}px`);
+      delete el.dataset.handWrap;
       return;
     }
     const cardW = first.getBoundingClientRect().width;
     // 한 줄을 정확히 컨테이너 폭에 맞추는 카드 간 마진(음수면 겹침). 여유가 있으면
     // DESIRED_GAP 로만 띄우고(겹치지 않음), 좁으면 폭에 맞춰 겹친다 — 어느 경우에도
     // 한 줄을 넘지 않아 가장자리 카드가 잘리거나 화면 밖으로 나가지 않는다.
+    // 단, 겹침이 랭크 가독 하한(MIN_VISIBLE_STEP)을 깨는 좁은 폭에서는 한 줄을
+    // 포기하고 줄바꿈으로 펼친다(data-hand-wrap, CSS 가 소비) — "10" 잘림 방지.
     const margin = computeHandOverlap(containerW, cardW, count);
     el.style.setProperty('--hand-overlap', `${margin}px`);
+    if (shouldWrapHand(containerW, cardW, count)) {
+      el.dataset.handWrap = '1';
+    } else {
+      delete el.dataset.handWrap;
+    }
   }, [count]);
 
   useLayoutEffect(() => {
