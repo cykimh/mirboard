@@ -74,12 +74,6 @@ public class TichuGameStateStore {
         }
     }
 
-    /** 마지막으로 발행된 이벤트의 seq. 한 번도 발행 전이면 0. */
-    public long currentSeq(String roomId) {
-        String val = redis.opsForValue().get("room:" + roomId + ":seq");
-        return val == null ? 0L : Long.parseLong(val);
-    }
-
     private static String stateKey(String roomId) {
         return "room:" + roomId + ":state";
     }

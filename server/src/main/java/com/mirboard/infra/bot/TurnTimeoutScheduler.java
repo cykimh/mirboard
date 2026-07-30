@@ -1,17 +1,14 @@
 package com.mirboard.infra.bot;
 
-import com.mirboard.domain.game.core.GameContext;
-import com.mirboard.domain.game.tichu.TichuEngine;
-import com.mirboard.domain.game.tichu.action.TichuAction;
-import com.mirboard.domain.game.tichu.action.TichuActionRejectedException;
-import com.mirboard.domain.game.tichu.bot.TimeoutActionPolicy;
-import com.mirboard.domain.game.tichu.card.Special;
-import com.mirboard.domain.game.tichu.event.TichuEvent;
-import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
-import com.mirboard.domain.game.tichu.state.TichuState;
+import com.mirboard.domain.game.core.GameAction;
+import com.mirboard.domain.game.core.GameActionRejectedException;
+import com.mirboard.domain.game.core.GameEngine;
+import com.mirboard.domain.game.core.GameEvent;
+import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
 import com.mirboard.infra.scheduling.DeadlineHandler;
@@ -31,7 +28,7 @@ import org.springframework.stereotype.Component;
  * 순서로 넘긴다.
  *
  * <p>구조는 {@link BotScheduler} 와 동일한 lock 공유 패턴. 차이: 가상스레드 즉시
- * 실행이 아니라 {@link ScheduledExecutorService} 지연 실행.
+ * 실행이 아니라 Redis 데드라인 큐의 지연 실행.
  *
  * <p>매 액션 적용 후 (인간/봇/타임아웃) {@link #onTurnAdvanced(String)} 가 호출되어
  * per-room generation 을 증가시키고 새 타이머를 (re)스케줄한다. 발화된 task 는
@@ -44,6 +41,10 @@ import org.springframework.stereotype.Component;
  * "두 인스턴스가 같은 타이머를 잡는 것"을, {@link RoomGeneration} 이 "pop 과 락 획득
  * 사이에 누가 행동한 것"을 막는다. 구 generation 은 in-memory 라 2인스턴스에서는
  * 가드 자체가 작동하지 않았다.
+ *
+ * <p>D-98 — 게임을 모른다. 겨눌 좌석은 {@link GameEngine#pendingSeat}, 적용할 안전
+ * 액션은 {@link GameEngine#timeoutAction} 이 결정한다 (과거 이 클래스가 티츄 단계별
+ * switch 와 {@code TimeoutActionPolicy} 를 직접 들고 있었다).
  */
 @Component
 public class TurnTimeoutScheduler implements DeadlineHandler {
@@ -56,7 +57,7 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
     private static final Duration LOCK_RETRY = Duration.ofMillis(200);
 
     private final RoomService roomService;
-    private final TichuGameStateStore stateStore;
+    private final GameEngineProvider engines;
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
     private final MatchProgressService matchProgress;
@@ -65,7 +66,7 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
     private final RoomGeneration generations;
 
     public TurnTimeoutScheduler(RoomService roomService,
-                                TichuGameStateStore stateStore,
+                                GameEngineProvider engines,
                                 GameEventBroadcaster broadcaster,
                                 RoomActionLock lock,
                                 MatchProgressService matchProgress,
@@ -73,7 +74,7 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
                                 DeadlineQueue deadlines,
                                 RoomGeneration generations) {
         this.roomService = roomService;
-        this.stateStore = stateStore;
+        this.engines = engines;
         this.broadcaster = broadcaster;
         this.lock = lock;
         this.matchProgress = matchProgress;
@@ -153,19 +154,20 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
             // 락 안에서 gen 재확인 (락 대기 중 누가 행동했을 수 있음).
             if (generations.current(roomId) != capturedGen) return;
 
-            TichuState state = stateStore.load(roomId).orElse(null);
-            if (state == null || state instanceof TichuState.RoundEnd) return;
+            GameEngine engine = engines.forRoom(room);
+            GameState state = engine.loadState().orElse(null);
+            if (state == null || engine.isRoundOver(state)) return;
 
-            int seat = pendingSeat(state);
+            int seat = engine.pendingSeat(state);
             if (seat < 0) return;
 
-            TichuAction action = TimeoutActionPolicy.choose(state, seat);
+            GameAction action = engine.timeoutAction(state, seat);
             if (action == null) {
                 log.warn("Turn timeout: no legal action. roomId={} seat={} phase={}",
-                        roomId, seat, state.getClass().getSimpleName());
+                        roomId, seat, engine.phaseName(state));
                 return;
             }
-            applyAndBroadcast(roomId, room, seat, action, state);
+            applyAndBroadcast(roomId, room, engine, seat, action, state);
             acted = true;
             log.info("Turn timeout auto-action: roomId={} seat={} action={}",
                     roomId, seat, action.getClass().getSimpleName());
@@ -181,47 +183,19 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         }
     }
 
-    /** 현재 행동을 기다리는 좌석 (Dealing 안-ready / Passing 안-submitted / Playing 차례). */
-    private static int pendingSeat(TichuState state) {
-        return switch (state) {
-            case TichuState.Dealing d -> {
-                for (int s = 0; s < 4; s++) if (!d.ready().contains(s)) yield s;
-                yield -1;
-            }
-            case TichuState.Passing p -> {
-                for (int s = 0; s < 4; s++) if (!p.submitted().containsKey(s)) yield s;
-                yield -1;
-            }
-            case TichuState.Playing pl -> {
-                var trick = pl.trick();
-                if (trick.currentTop() != null
-                        && trick.currentTop().cards().size() == 1
-                        && trick.currentTop().cards().get(0).is(Special.DRAGON)) {
-                    yield trick.currentTopSeat();
-                }
-                int cur = trick.currentTurnSeat();
-                yield pl.players().get(cur).isFinished() ? -1 : cur;
-            }
-            case TichuState.RoundEnd __ -> -1;
-        };
-    }
-
-    private void applyAndBroadcast(String roomId, Room room, int seat,
-                                   TichuAction action, TichuState state) {
-        TichuEngine engine = new TichuEngine(new GameContext(roomId, room.playerIds()));
-        TichuEngine.Result result;
+    private void applyAndBroadcast(String roomId, Room room, GameEngine engine, int seat,
+                                   GameAction action, GameState state) {
+        GameEngine.Result result;
         try {
             result = engine.apply(state, seat, action);
-        } catch (TichuActionRejectedException rejected) {
-            log.warn("Turn timeout action rejected: roomId={} seat={} action={} reason={}",
-                    roomId, seat, action.getClass().getSimpleName(), rejected.reason());
+        } catch (GameActionRejectedException rejected) {
+            log.warn("Turn timeout action rejected: roomId={} seat={} action={} code={}",
+                    roomId, seat, action.getClass().getSimpleName(), rejected.code());
             return;
         }
-        stateStore.save(roomId, result.newState());
-        List<TichuEvent> outbound = new ArrayList<>(result.events());
-        if (result.newState() instanceof TichuState.RoundEnd ended) {
-            matchProgress.onRoundEnd(roomId, room, ended, outbound);
-        }
+        engine.saveState(result.newState());
+        List<GameEvent> outbound = new ArrayList<>(result.events());
+        matchProgress.advance(engine, room, result.newState(), outbound);
         broadcaster.broadcast(roomId, outbound, room.playerIds());
     }
 

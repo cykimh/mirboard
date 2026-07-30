@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * 태어나지 않는다.
  *
  * <p><b>봇·턴 타임아웃은 영향 없다</b> — {@code BotScheduler}/{@code TurnTimeoutScheduler}
- * 는 STOMP 인바운드를 타지 않고 {@code TichuEngine.apply} 를 직접 호출한다(실측 확인).
+ * 는 STOMP 인바운드를 타지 않고 {@code GameEngine.apply} 를 직접 호출한다(실측 확인).
  *
  * <p>한도 초과 시 메시지를 드롭한다. 액션 경로는 본인 큐로 `ERROR(RATE_LIMITED)` 를
  * 보내 클라가 이유를 알 수 있게 하고(기존 에러 표시 경로 재사용), 채팅/리액션은 조용히

@@ -1,11 +1,7 @@
 package com.mirboard.infra.rest.rooms;
 
-import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
-import com.mirboard.domain.game.tichu.state.PrivateHand;
-import com.mirboard.domain.game.tichu.state.TableView;
-import com.mirboard.domain.game.tichu.state.TichuStateMapper;
+import com.mirboard.domain.game.core.GameEngine;
+import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.room.JoinOrReconnectResult;
 import com.mirboard.domain.lobby.room.NotInRoomException;
@@ -17,7 +13,9 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
+import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.RoomPresence;
+import com.mirboard.infra.ws.RoomSeq;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
@@ -39,21 +37,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoomController {
 
     private final RoomService rooms;
-    private final TichuGameStateStore stateStore;
-    private final TichuMatchStateStore matchStateStore;
+    private final GameEngineProvider engines;
+    private final RoomSeq seqs;
     private final DesertionService desertion;
     private final RoomPresence sessions;
     private final RoomChipStore chipStore;
 
     public RoomController(RoomService rooms,
-                          TichuGameStateStore stateStore,
-                          TichuMatchStateStore matchStateStore,
+                          GameEngineProvider engines,
+                          RoomSeq seqs,
                           DesertionService desertion,
                           RoomPresence sessions,
                           RoomChipStore chipStore) {
         this.rooms = rooms;
-        this.stateStore = stateStore;
-        this.matchStateStore = matchStateStore;
+        this.engines = engines;
+        this.seqs = seqs;
         this.desertion = desertion;
         this.sessions = sessions;
         this.chipStore = chipStore;
@@ -125,8 +123,8 @@ public class RoomController {
     @PostMapping("/{roomId}/rematch")
     public Room rematch(@PathVariable String roomId,
                         @AuthenticationPrincipal AuthPrincipal me) {
-        TichuMatchState ms = matchStateStore.load(roomId).orElse(null);
-        if (ms == null || !ms.isMatchOver()) {
+        // 매치가 실제로 끝났는지는 게임이 판정한다 (티츄=목표점수 도달, D-98).
+        if (!engines.forRoom(rooms.getRoom(roomId)).isMatchOver()) {
             throw new com.mirboard.domain.lobby.room.GameNotInProgressException(roomId);
         }
         return rooms.rematch(roomId, me.userId());
@@ -196,18 +194,16 @@ public class RoomController {
         if (seat < 0 && !isSpectator) {
             throw new NotInRoomException(roomId);
         }
-        var state = stateStore.load(roomId)
+        GameEngine engine = engines.forRoom(room);
+        GameState state = engine.loadState()
                 .orElseThrow(() -> new ResyncNotAvailableException(roomId));
-        TichuMatchState matchState = matchStateStore.load(roomId)
-                .orElseGet(() -> TichuMatchState.initial(room.playerIds(), room.targetScore()));
         return new ResyncResponse(
                 roomId,
-                TichuStateMapper.phaseName(state),
-                stateStore.currentSeq(roomId),
-                TichuStateMapper.toTableView(state, matchState.scoresByTeam(),
-                        matchState.roundNumber()),
-                // 관전자는 손패 없음 — TableView 만 받음.
-                seat >= 0 ? TichuStateMapper.toPrivateHand(state, seat) : null,
+                engine.phaseName(state),
+                seqs.current(roomId),
+                engine.publicView(state),
+                // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
+                seat >= 0 ? engine.privateView(state, seat).orElse(null) : null,
                 disconnectedSeats(room, me.userId()),
                 chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
     }
@@ -254,12 +250,16 @@ public class RoomController {
     public record JoinOrReconnectResponse(String mode, Room room) {
     }
 
+    /**
+     * D-98 — `tableView`/`privateHand` 는 게임별 뷰 타입이라 {@code Object} 다. Jackson 이
+     * 런타임 타입으로 직렬화하므로 응답 JSON 은 종전과 동일하다 (티츄: TableView/PrivateHand).
+     */
     public record ResyncResponse(
             String roomId,
             String phase,
             long eventSeq,
-            TableView tableView,
-            PrivateHand privateHand,
+            Object tableView,
+            Object privateHand,
             List<Integer> disconnectedSeats,
             // D-82 — 방 단위 테이블 칩 스택(userId→칩). 내기 없는 방은 빈 맵.
             java.util.Map<Long, Long> chips) {
