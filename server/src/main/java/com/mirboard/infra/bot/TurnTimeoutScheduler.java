@@ -14,16 +14,13 @@ import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
+import com.mirboard.infra.scheduling.DeadlineHandler;
+import com.mirboard.infra.scheduling.DeadlineQueue;
+import com.mirboard.infra.scheduling.RoomGeneration;
 import com.mirboard.infra.ws.RoomActionLock;
-import jakarta.annotation.PreDestroy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -42,13 +39,21 @@ import org.springframework.stereotype.Component;
  * (중복 자동행동 방지). {@link RoomActionLock} 2초 TTL 로 human/bot/timeout 3자
  * 경합을 직렬화.
  *
- * <p>단일 머신 배포 전제 — generation/future 맵이 in-memory. 다중 인스턴스 전환
- * 시 Redis 동기화 필요 (Phase 6D 패턴, 본 범위 외).
+ * <p>D-96 — 타이머를 in-memory {@code ScheduledFuture} 에서 <b>Redis 데드라인 큐</b>로
+ * 옮겼다. 두 방어가 서로 다른 경합을 담당한다: {@link DeadlineQueue} 의 원자 pop 이
+ * "두 인스턴스가 같은 타이머를 잡는 것"을, {@link RoomGeneration} 이 "pop 과 락 획득
+ * 사이에 누가 행동한 것"을 막는다. 구 generation 은 in-memory 라 2인스턴스에서는
+ * 가드 자체가 작동하지 않았다.
  */
 @Component
-public class TurnTimeoutScheduler {
+public class TurnTimeoutScheduler implements DeadlineHandler {
 
     private static final Logger log = LoggerFactory.getLogger(TurnTimeoutScheduler.class);
+
+    /** `deadlines:turn` 큐. */
+    public static final String KIND = "turn";
+    /** 락 경합 시 재시도 간격 — 폴링 주기보다 짧게 잡아 즉시 다음 사이클에 걸리게. */
+    private static final Duration LOCK_RETRY = Duration.ofMillis(200);
 
     private final RoomService roomService;
     private final TichuGameStateStore stateStore;
@@ -56,34 +61,38 @@ public class TurnTimeoutScheduler {
     private final RoomActionLock lock;
     private final MatchProgressService matchProgress;
     private final BotScheduler botScheduler;
-    private final ScheduledExecutorService scheduler;
-
-    private final ConcurrentHashMap<String, AtomicLong> generations = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, ScheduledFuture<?>> futures = new ConcurrentHashMap<>();
+    private final DeadlineQueue deadlines;
+    private final RoomGeneration generations;
 
     public TurnTimeoutScheduler(RoomService roomService,
                                 TichuGameStateStore stateStore,
                                 GameEventBroadcaster broadcaster,
                                 RoomActionLock lock,
                                 MatchProgressService matchProgress,
-                                @Lazy BotScheduler botScheduler) {
+                                @Lazy BotScheduler botScheduler,
+                                DeadlineQueue deadlines,
+                                RoomGeneration generations) {
         this.roomService = roomService;
         this.stateStore = stateStore;
         this.broadcaster = broadcaster;
         this.lock = lock;
         this.matchProgress = matchProgress;
         this.botScheduler = botScheduler;
-        this.scheduler = Executors.newScheduledThreadPool(2,
-                r -> {
-                    Thread t = new Thread(r, "mirboard-turn-timeout");
-                    t.setDaemon(true);
-                    return t;
-                });
+        this.deadlines = deadlines;
+        this.generations = generations;
+    }
+
+    @Override
+    public String kind() {
+        return KIND;
     }
 
     /**
      * 턴이 진행됐을 때 (액션 적용 직후) 호출. generation++ 후 turnSeconds>0 이면
      * 타이머 재스케줄. turnSeconds=0 (끔) 이면 기존 타이머만 취소하고 종료.
+     *
+     * <p>member 에 generation 을 실어 보내므로 이전 generation 항목은 발화해도
+     * gen 불일치로 버려진다. 그래도 ZSET 을 작게 유지하려고 명시적으로 취소한다.
      */
     public void onTurnAdvanced(String roomId) {
         Room room;
@@ -93,21 +102,38 @@ public class TurnTimeoutScheduler {
             cleanup(roomId);
             return;
         }
-        long gen = generations.computeIfAbsent(roomId, k -> new AtomicLong())
-                .incrementAndGet();
-        cancelFuture(roomId);
+        long prevGen = generations.current(roomId);
+        long gen = generations.bump(roomId);
+        deadlines.cancel(KIND, member(roomId, prevGen));
 
         int turnSeconds = room.turnSeconds();
         if (turnSeconds <= 0) return;  // 타이머 끔 — 기존 동작 호환.
 
-        ScheduledFuture<?> f = scheduler.schedule(
-                () -> fire(roomId, gen), turnSeconds, TimeUnit.SECONDS);
-        futures.put(roomId, f);
+        deadlines.schedule(KIND, member(roomId, gen), Duration.ofSeconds(turnSeconds));
+    }
+
+    /** 폴러가 만료된 항목을 넘겨준다. 이 인스턴스가 단독 소유한 상태로 들어온다. */
+    @Override
+    public void handle(String member) {
+        int sep = member.lastIndexOf('#');
+        if (sep < 0) {
+            log.warn("턴 데드라인 member 형식 오류: {}", member);
+            return;
+        }
+        String roomId = member.substring(0, sep);
+        long gen;
+        try {
+            gen = Long.parseLong(member.substring(sep + 1));
+        } catch (NumberFormatException e) {
+            log.warn("턴 데드라인 generation 파싱 실패: {}", member);
+            return;
+        }
+        fire(roomId, gen);
     }
 
     private void fire(String roomId, long capturedGen) {
-        AtomicLong g = generations.get(roomId);
-        if (g == null || g.get() != capturedGen) return;  // 그 사이 누가 행동 — abort.
+        // 그 사이 누가 행동했으면 generation 이 올라가 있다 — 버린다.
+        if (generations.current(roomId) != capturedGen) return;
 
         Room room;
         try {
@@ -119,13 +145,13 @@ public class TurnTimeoutScheduler {
 
         if (!lock.tryAcquire(roomId)) {
             // 다른 액션 처리 중 — 짧게 뒤로 미뤄 재시도 (gen 재확인은 그때).
-            scheduler.schedule(() -> fire(roomId, capturedGen), 200, TimeUnit.MILLISECONDS);
+            deadlines.schedule(KIND, member(roomId, capturedGen), LOCK_RETRY);
             return;
         }
         boolean acted = false;
         try {
             // 락 안에서 gen 재확인 (락 대기 중 누가 행동했을 수 있음).
-            if (g.get() != capturedGen) return;
+            if (generations.current(roomId) != capturedGen) return;
 
             TichuState state = stateStore.load(roomId).orElse(null);
             if (state == null || state instanceof TichuState.RoundEnd) return;
@@ -199,18 +225,18 @@ public class TurnTimeoutScheduler {
         broadcaster.broadcast(roomId, outbound, room.playerIds());
     }
 
-    private void cancelFuture(String roomId) {
-        ScheduledFuture<?> prev = futures.remove(roomId);
-        if (prev != null) prev.cancel(false);
-    }
-
+    /**
+     * 방이 사라졌을 때 정리. 구현이 in-memory 였을 때는 여기서 안 지우면 맵이
+     * 영원히 커졌다(M0 이연 누수). 지금은 Redis 키에 TTL 이 있어 누수가 원천 차단되고,
+     * 이 호출은 즉시 회수를 위한 것이다.
+     */
     private void cleanup(String roomId) {
-        cancelFuture(roomId);
-        generations.remove(roomId);
+        deadlines.cancel(KIND, member(roomId, generations.current(roomId)));
+        generations.clear(roomId);
     }
 
-    @PreDestroy
-    void shutdown() {
-        scheduler.shutdownNow();
+    /** 데드라인 member = `{roomId}#{generation}`. roomId 에 '#' 이 없으므로 lastIndexOf 로 분리 가능. */
+    static String member(String roomId, long generation) {
+        return roomId + "#" + generation;
     }
 }

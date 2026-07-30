@@ -20,7 +20,7 @@ class RoomDisconnectHandlerTest {
     private final RoomService roomService = mock(RoomService.class);
     private final DesertionGraceScheduler grace = mock(DesertionGraceScheduler.class);
     private final PlayerPresenceNotifier presence = mock(PlayerPresenceNotifier.class);
-    private final WsSessionRegistry sessions = mock(WsSessionRegistry.class);
+    private final RoomPresence sessions = mock(RoomPresence.class);
     private final RoomDisconnectHandler handler =
             new RoomDisconnectHandler(roomService, grace, presence, sessions);
 

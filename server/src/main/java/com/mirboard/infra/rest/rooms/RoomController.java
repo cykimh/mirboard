@@ -17,7 +17,7 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
-import com.mirboard.infra.ws.WsSessionRegistry;
+import com.mirboard.infra.ws.RoomPresence;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
@@ -42,14 +42,14 @@ public class RoomController {
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
     private final DesertionService desertion;
-    private final WsSessionRegistry sessions;
+    private final RoomPresence sessions;
     private final RoomChipStore chipStore;
 
     public RoomController(RoomService rooms,
                           TichuGameStateStore stateStore,
                           TichuMatchStateStore matchStateStore,
                           DesertionService desertion,
-                          WsSessionRegistry sessions,
+                          RoomPresence sessions,
                           RoomChipStore chipStore) {
         this.rooms = rooms;
         this.stateStore = stateStore;

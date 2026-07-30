@@ -98,6 +98,52 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-96 (2026-07-30) — 수평 확장: in-memory 스케줄러/프레즌스 → Redis (M3, T6) · **D-03 전제 번복**
+
+프로젝트 서사("분산 전환을 실제로 증명한 서버-권위적 실시간 게임 서버")의 핵심. 실측 결과
+단일 인스턴스 전제는 **정확히 세 곳**에 있고 전부 in-memory 맵이다.
+
+| 대상 | 보유 상태 | 깨지는 방식(2인스턴스) |
+| --- | --- | --- |
+| `WsSessionRegistry` | `Map<sessionId, (userId, roomId)>` | A 인스턴스에 붙은 세션을 B 가 모른다 → `hasLiveSession` 이 거짓 음성 → **재접속했는데 탈주 처리** |
+| `TurnTimeoutScheduler` | `generations`(room→AtomicLong) + `futures` | 두 인스턴스가 각자 타이머를 걸어 **중복 자동행동**, generation 가드는 프로세스 안에서만 유효 |
+| `DesertionGraceScheduler` | `futures`((room,user)→future) | 유예를 건 인스턴스가 죽으면 **탈주가 영원히 확정 안 됨** |
+
+**D-03 번복 범위**: Lua 원자화 자체는 유지하며 오히려 더 중요해진다. 번복하는 것은 그
+결정에 붙은 **전제** — "단일 인스턴스 Redis 원자성으로 충분하므로 애플리케이션 상태를
+in-memory 에 둬도 된다" — 쪽이다(D-75·Phase 13D 주석이 이 전제를 명시적으로 인용하고 있다).
+
+**타이머 모델은 ZSET 폴링 + 락으로 한다.** 리더 선출은 쓰지 않는다 — 리더가 죽는 순간
+모든 타이머가 멈추고, 선출 자체가 새로운 장애 모드다. 대신 만료 시각을 Redis ZSET
+(`deadlines:{kind}`, score=epochMs)에 두고 **모든 인스턴스가 주기적으로 폴링**해 Lua 로
+"만료분 원자 pop" 한 뒤 `RoomActionLock` 아래서 처리한다. 인스턴스가 죽어도 다른
+인스턴스가 같은 ZSET 을 보므로 **자동 인계**되고, 중복 실행은 pop 원자성 + 기존 generation
+가드가 막는다. 폴링 주기 1s 는 턴 제한(30~90s)·탈주 유예(120s) 정밀도에 충분하다.
+
+**프레즌스는 세션 카운터로 한다.** `presence:room:{roomId}` HASH(userId→세션 수)에
+SUBSCRIBE 시 INCR / DISCONNECT 시 DECR(0 이면 필드 삭제). 한 유저가 탭 두 개를 열어도
+하나만 닫히면 여전히 접속 중이어야 하므로 boolean 이 아니라 카운터다. TTL 로 고아 정리.
+
+**M0 이연분 포함**: `TurnTimeoutScheduler` 의 in-memory 누수(방이 끝나도 generations/
+futures 엔트리가 남는 경로) — Redis 이전으로 자연 해소되며 키에 TTL 을 건다.
+
+**검증은 2-인스턴스 통합 테스트로 한다.** "단일 인스턴스에서 안 깨졌다"는 증명이 아니다.
+`TwoInstanceHandoffIT` 가 같은 Redis/Postgres 를 물린 독립 Spring 컨텍스트 2개를 띄워
+① 한쪽이 건 데드라인이 실행됨 ② **A 를 종료해도 B 가 인계**(구 구현이 탈주를 영영 확정
+못 하던 형태) ③ 두 인스턴스 동시 폴링에도 중복 실행 0 ④ A 의 프레즌스를 B 가 조회 —
+4건 모두 통과.
+
+**트레이드오프 — 폴링 지연**: 정확한 시각에 깨는 `ScheduledExecutorService` 와 달리
+타이머마다 **최대 한 폴링 주기의 지연**이 붙는다. 운영 값(턴 30~90s, 유예 120s)에는
+무의미하지만, 실측에서 `TurnTimeoutSchedulerIT`(turnSeconds=1)가 지연 증폭으로 120초
+안에 매치를 못 끝내 **실제로 실패했다**. 기본 주기를 1s→**250ms** 로 낮추고(인스턴스·kind
+당 초당 4회 — 무시할 부하), 초 단위 타이머를 쓰는 그 테스트만 50ms 로 더 낮췄다.
+정확도가 필요한 타이머가 생기면 이 특성을 먼저 고려할 것.
+
+**검증 결과**: 서버 391건 그린(기존 383 + 신규 8: `DistributedInfraIT` 7 · 2인스턴스 4 중
+일부 중복 제외). `WsSessionRegistryTest` 는 삭제 — 탭 카운팅 포함 의미를 실제 Redis 를 쓰는
+`DistributedInfraIT` 가 더 강하게 덮는다.
+
 ## D-94 (2026-07-30) — 클라 기술부채: styles.css 분할 1차 + 사문화 제거 (T5)
 
 `parallel-tracks.md` §1 이 지목한 병목 해소. 목적은 가독성이 아니라 **두 번째 클라 트랙을
