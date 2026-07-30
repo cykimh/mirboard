@@ -114,7 +114,15 @@ D-84 가 인증 2개 엔드포인트에만 걸어둔 레이트리밋을 전역 H
 (`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`)은 STOMP 를 경유하지 않고
 `engine.apply` 를 직접 호출하므로 영향 없음(실측 확인). `AuthRateLimiter`/
 `AuthRateLimitProperties` 는 신규 추상화로 흡수해 제거하고 환경변수 이름은 보존한다.
-전부 Redis 휘발 — users 스키마 비침범(D-02 유지).
+전부 Redis 휘발 — users 스키마 비침범(D-02 유지). Redis 장애 시 **fail-open**(레이트리밋
+때문에 게임이 멈추는 편이 훨씬 나쁘다 — 로그인 brute-force 는 `LoginAttemptService` 가 별도 담당).
+테스트는 `mirboard.ratelimit.enabled=false` 가 전역 기본이고 레이트리밋 검증 테스트만 켠다
+(D-84 는 `auth.limit` 을 크게 잡았는데 버킷 카탈로그로 옮기며 그 키가 무의미해져 IT 13건이
+429 로 깨졌다 — 개별 값이 아니라 기능 스위치를 써야 새 버킷이 생겨도 안 깨진다).
+검증: 서버 377건 그린, 라우팅 단위 13건 + HTTP IT 2건 + STOMP IT 2건 신규. 사용자 간 할당량
+격리는 같은 IP 에서 두 계정으로 HTTP·STOMP 양쪽 회귀 고정. 게임 무영향은 `BotMatchSimulationIT`
+풀매치 + 라이브 서버 딜링→패스→플레이 실주행으로 확인. **후속**: Micrometer 카운터는
+`MirboardMetrics`(T2 소유 파일)라 이번 트랙에서 건드리지 않고 M2-C3 에 위임.
 
 ## D-89 (2026-07-30) — 계약 문서 기준선 정정 (T0, 코드 변경 0)
 
