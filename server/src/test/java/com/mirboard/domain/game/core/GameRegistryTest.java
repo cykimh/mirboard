@@ -11,7 +11,7 @@ class GameRegistryTest {
 
     @Test
     void catalog_sorts_available_before_coming_soon_then_by_displayName() {
-        var tichu = new TichuGameDefinition();   // AVAILABLE, "티츄"
+        var tichu = tichuMetadataOnly();         // AVAILABLE, "티츄"
         var goSoon = stub("GO", "바둑", GameStatus.COMING_SOON);
         var chessSoon = stub("CHESS", "체스", GameStatus.COMING_SOON);
 
@@ -43,7 +43,7 @@ class GameRegistryTest {
 
     @Test
     void require_throws_for_unknown_id() {
-        var registry = new GameRegistry(List.of(new TichuGameDefinition()));
+        var registry = new GameRegistry(List.of(tichuMetadataOnly()));
 
         assertThatThrownBy(() -> registry.require("UNKNOWN"))
                 .isInstanceOf(GameNotFoundException.class);
@@ -69,10 +69,15 @@ class GameRegistryTest {
     }
 
     /**
-     * 테스트 전용 {@link GameDefinition} stub. permits 절은 {@link TichuGameDefinition}
-     * 만 허용하므로 본 헬퍼는 별도 final 클래스가 아니라 동적 위임으로 만들 수 없음 →
-     * 테스트만 쓸 수 있도록 {@link FakeGameDefinition} 으로 분리.
+     * 카탈로그 정렬은 <b>실제</b> 티츄 메타데이터(AVAILABLE / "티츄")로 검증해야 의미가
+     * 있으므로 stub 으로 바꾸지 않는다. D-98 이후 생성자가 엔진용 협력자를 받지만
+     * {@code id()/displayName()/status()} 는 그것들을 건드리지 않으므로 null 로 충분하다.
      */
+    private static GameDefinition tichuMetadataOnly() {
+        return new TichuGameDefinition(null, null, null, null);
+    }
+
+    /** 테스트 전용 {@link GameDefinition} stub — {@link FakeGameDefinition} 로 분리. */
     private static GameDefinition stub(String id, String name, GameStatus status) {
         return new FakeGameDefinition(id, name, status);
     }

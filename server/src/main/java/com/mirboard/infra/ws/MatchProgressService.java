@@ -1,18 +1,10 @@
 package com.mirboard.infra.ws;
 
-import com.mirboard.domain.game.tichu.event.TichuEvent;
-import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
-import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
-import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
-import com.mirboard.domain.game.tichu.scoring.MvpCalculator;
-import com.mirboard.domain.game.tichu.scoring.RoundScore;
-import com.mirboard.domain.game.tichu.scoring.SeatContribution;
-import com.mirboard.domain.game.tichu.state.Team;
-import com.mirboard.domain.game.tichu.state.TichuState;
+import com.mirboard.domain.game.core.GameEngine;
+import com.mirboard.domain.game.core.GameEvent;
+import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
-import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.util.List;
 import org.slf4j.Logger;
@@ -20,103 +12,53 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Phase 9C — RoundEnd 도달 후 매치 진행 / 종료 처리. GameStompController 와
- * BotScheduler 모두 같은 후속 절차 (점수 누적, 다음 라운드 자동 시작 또는 매치 종료
- * 이벤트 발행, 룸 finished 마킹) 를 따르도록 공유 서비스로 추출.
+ * Phase 9C — 액션 적용 후 라운드/매치 진행. GameStompController · BotScheduler ·
+ * TurnTimeoutScheduler 세 호출자가 같은 후속 절차를 따르도록 하는 공유 지점.
  *
- * <p>호출자는 RoomActionLock 을 이미 보유하고 있어야 한다 — 본 서비스는 락을 직접
- * 다루지 않는다.
+ * <p>D-98 이후 <b>게임 판단은 여기 없다</b>. "라운드가 끝났나 / 점수를 어떻게 누적하나 /
+ * 매치가 끝났나 / 다음 라운드를 어떻게 시작하나"는 전부 {@link GameEngine#advance} 가
+ * 답하고, 본 서비스는 그 결과로 <b>인프라 관심사</b>만 처리한다 — 메트릭과 방 상태.
+ *
+ * <p>호출자는 {@link RoomActionLock} 을 이미 보유하고 있어야 한다 — 본 서비스는 락을
+ * 직접 다루지 않는다.
  */
 @Service
 public class MatchProgressService {
 
     private static final Logger log = LoggerFactory.getLogger(MatchProgressService.class);
 
-    private final TichuMatchStateStore matchStateStore;
-    private final TichuRoundStarter roundStarter;
     private final RoomService roomService;
-    private final DomainEventBus events;
     private final MirboardMetrics metrics;
 
-    public MatchProgressService(TichuMatchStateStore matchStateStore,
-                                TichuRoundStarter roundStarter,
-                                RoomService roomService,
-                                DomainEventBus events,
-                                MirboardMetrics metrics) {
-        this.matchStateStore = matchStateStore;
-        this.roundStarter = roundStarter;
+    public MatchProgressService(RoomService roomService, MirboardMetrics metrics) {
         this.roomService = roomService;
-        this.events = events;
         this.metrics = metrics;
     }
 
     /**
-     * RoundEnd 상태 직후 호출. 점수 누적 + 매치 종료 / 다음 라운드 시작 분기.
-     * `outbound` 리스트에 MatchEnded 또는 RoundStarted 이벤트를 in-place 로 추가.
+     * 액션 적용 직후 호출. 엔진이 라운드 종료를 감지하면 추가 이벤트(매치 종료 / 다음
+     * 라운드 시작)를 {@code outbound} 에 append 하므로, 호출자는 이 다음에 한 번만
+     * 브로드캐스트하면 된다. 라운드가 안 끝났으면 no-op.
      */
-    public void onRoundEnd(String roomId,
-                           Room room,
-                           TichuState.RoundEnd ended,
-                           List<TichuEvent> outbound) {
-        TichuMatchState matchState = matchStateStore.load(roomId)
-                .orElseGet(() -> TichuMatchState.initial(room.playerIds(), room.targetScore()));
-
-        RoundScore lastScore = outbound.stream()
-                .filter(TichuEvent.RoundEnded.class::isInstance)
-                .map(TichuEvent.RoundEnded.class::cast)
-                .map(TichuEvent.RoundEnded::score)
-                .findFirst()
-                .orElseGet(() -> new RoundScore(ended.teamAScore(), ended.teamBScore(), -1, false));
-
-        // MVP 누적 — 종료된 라운드의 좌석별 기여(트릭/선언/완주)를 합산.
-        List<SeatContribution> roundContribs =
-                MvpCalculator.roundContributions(ended.players());
-        TichuMatchState afterRound = matchState.withRoundCompleted(lastScore, roundContribs);
-        matchStateStore.save(roomId, afterRound);
-
-        metrics.roundCompleted();
-        log.info("Round completed: round={} A={} B={} cumulativeA={} cumulativeB={}",
-                afterRound.roundNumber() - 1, lastScore.teamAScore(), lastScore.teamBScore(),
-                afterRound.cumulativeA(), afterRound.cumulativeB());
-
-        if (afterRound.isMatchOver()) {
-            Team winner = afterRound.winningTeam();
-            var mvp = MvpCalculator.select(
-                    afterRound.contributions(), room.playerIds(), winner, room.botSeats());
-            outbound.add(new TichuEvent.MatchEnded(
-                    winner,
-                    afterRound.scoresByTeam(),
-                    afterRound.roundScores().size(),
-                    mvp.map(MvpCalculator.Mvp::userId).orElse(null),
-                    mvp.map(MvpCalculator.Mvp::stat).orElse(null)));
-            events.publish(new TichuMatchCompleted(
-                    roomId,
-                    room.playerIds(),
-                    afterRound.cumulativeA(),
-                    afterRound.cumulativeB(),
-                    afterRound.winningTeam(),
-                    afterRound.roundScores(),
-                    null,            // 정상 종료 — 탈주자 없음 (Phase 19, D-75).
-                    room.stake()));  // D-81 — 칩 정산용 판돈.
-            metrics.matchCompleted();
-            log.info("Match ended: winner={} rounds={} A={} B={}",
-                    afterRound.winningTeam(), afterRound.roundScores().size(),
-                    afterRound.cumulativeA(), afterRound.cumulativeB());
-            // D-82 — 사람 4인 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로
-            // 같은 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이
-            // 아니므로 기존대로 FINISHED. (matchState.isMatchOver() 이므로 끊김은 탈주 아님.)
-            if (!room.botSeats().isEmpty()) {
-                try {
-                    roomService.markFinished(roomId);
-                } catch (RuntimeException e) {
-                    log.warn("Failed to mark room {} finished: {}", roomId, e.getMessage());
-                }
-            }
+    public void advance(GameEngine engine, Room room, GameState newState, List<GameEvent> outbound) {
+        GameEngine.Advance advance = engine.advance(newState, outbound);
+        if (!advance.roundCompleted()) {
             return;
         }
-        // 매치 계속 — 다음 라운드 Dealing(8) 생성 + RoundStarted 알림.
-        roundStarter.startRound(roomId, room.playerIds(), afterRound.roundNumber());
-        outbound.add(new TichuEvent.RoundStarted(
-                afterRound.roundNumber(), afterRound.scoresByTeam()));
+        metrics.roundCompleted();
+        if (!advance.matchCompleted()) {
+            return;
+        }
+        metrics.matchCompleted();
+        // D-82 — 사람만의 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로
+        // 같은 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이
+        // 아니므로 기존대로 FINISHED.
+        if (!room.botSeats().isEmpty()) {
+            try {
+                roomService.markFinished(room.roomId());
+            } catch (RuntimeException e) {
+                log.warn("Failed to mark room {} finished: {}", room.roomId(), e.getMessage());
+            }
+        }
     }
 }

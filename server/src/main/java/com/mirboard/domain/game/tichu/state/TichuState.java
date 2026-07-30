@@ -2,6 +2,7 @@ package com.mirboard.domain.game.tichu.state;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.tichu.card.Card;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import java.util.Set;
         @JsonSubTypes.Type(value = TichuState.Playing.class, name = "PLAYING"),
         @JsonSubTypes.Type(value = TichuState.RoundEnd.class, name = "ROUND_END")
 })
-public sealed interface TichuState
+public sealed interface TichuState extends GameState
         permits TichuState.Dealing, TichuState.Passing, TichuState.Playing, TichuState.RoundEnd {
 
     List<PlayerState> players();

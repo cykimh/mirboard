@@ -84,9 +84,20 @@ public sealed interface TichuEvent extends GameEvent
         };
     }
 
-    /** 본인 큐로만 보내야 하는 비공개 이벤트 여부. */
-    default boolean isPrivate() {
-        return this instanceof HandDealt || this instanceof CardsReceived;
+    /**
+     * 본인 큐로만 보내야 하는 비공개 이벤트의 대상 좌석. 공개 이벤트는 -1.
+     *
+     * <p>D-98: 과거 `isPrivate()` + 브로드캐스터 안의 `seatOf(ev)` switch 두 곳으로
+     * 나뉘어 있던 판단을 하나로 합쳤다 — "비공개인가"와 "누구에게"가 갈라져 있으면
+     * 새 비공개 이벤트를 추가할 때 한쪽만 고치는 사고가 난다.
+     */
+    @Override
+    default int privateSeat() {
+        return switch (this) {
+            case HandDealt hd -> hd.seat();
+            case CardsReceived cr -> cr.seat();
+            default -> -1;
+        };
     }
 
     record Played(int seat, Hand hand) implements TichuEvent {

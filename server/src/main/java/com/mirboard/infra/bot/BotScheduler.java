@@ -1,17 +1,15 @@
 package com.mirboard.infra.bot;
 
-import com.mirboard.domain.game.core.GameContext;
-import com.mirboard.domain.game.tichu.TichuEngine;
-import com.mirboard.domain.game.tichu.action.TichuAction;
-import com.mirboard.domain.game.tichu.action.TichuActionRejectedException;
-import com.mirboard.domain.game.tichu.bot.RandomBotPolicy;
-import com.mirboard.domain.game.tichu.event.TichuEvent;
-import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
-import com.mirboard.domain.game.tichu.state.TichuState;
+import com.mirboard.domain.game.core.GameAction;
+import com.mirboard.domain.game.core.GameActionRejectedException;
+import com.mirboard.domain.game.core.GameEngine;
+import com.mirboard.domain.game.core.GameEvent;
+import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
 import com.mirboard.infra.ws.RoomActionLock;
@@ -32,8 +30,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>호출 트리거:
  * <ul>
- *   <li>{@link com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter} 가 라운드 시작
- *       (Dealing 으로 전이) 직후</li>
+ *   <li>게임 도메인의 라운드 시작 직후 (티츄: {@code TichuRoundStarter})</li>
  *   <li>{@link com.mirboard.infra.ws.GameStompController} 가 인간 액션 처리 직후</li>
  *   <li>본인이 봇 액션을 처리한 후 재귀 — 다음 봇이 있으면 이어서</li>
  * </ul>
@@ -44,20 +41,24 @@ import org.springframework.stereotype.Component;
  *     ↓
  *   lock.tryAcquire(roomId)
  *     ↓
- *   state = stateStore.load(roomId)
+ *   engine = engines.forRoom(room);  state = engine.loadState()
  *     ↓
- *   bot seat = 첫 봇 seat (있으면)
+ *   bot seat = engine.pendingSeats(state) ∩ room.botSeats() 의 첫 좌석
  *     ↓
- *   policy.choose(state, seat) → action
+ *   engine.botAction(state, seat, random) → action
  *     ↓ (null 이면 종료)
  *   engine.apply(state, seat, action) → newState + events
  *     ↓
- *   stateStore.save + matchProgress.onRoundEnd (필요 시) + broadcaster.broadcast
+ *   engine.saveState + matchProgress.advance + broadcaster.broadcast
  *     ↓
  *   lock.release
  *     ↓
  *   self-recurse (남은 봇 액션 있을 때까지)
  * </pre>
+ *
+ * <p>D-98: 게임을 모른다. "이 좌석이 지금 행동해야 하나"(과거 이 클래스 안의
+ * {@code hasPendingAction} switch)와 "무엇을 낼까"(과거 {@code RandomBotPolicy} 직접 호출)를
+ * 모두 포트에 물어본다. 시드 재현성은 여기서 보유하는 {@link Random} 이 유지한다.
  *
  * <p>안전망: 1 라운드 내 봇 액션 최대 {@value #MAX_BOT_ACTIONS_PER_ROOM} 회. 초과 시
  * 경고 로그 + 스케줄 중단 (무한 루프 방어).
@@ -69,18 +70,18 @@ public class BotScheduler {
     private static final int MAX_BOT_ACTIONS_PER_ROOM = 5000;
 
     private final RoomService roomService;
-    private final TichuGameStateStore stateStore;
+    private final GameEngineProvider engines;
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
     private final MatchProgressService matchProgress;
     private final BotUserRegistry bots;
-    private final RandomBotPolicy policy;
     private final TurnTimeoutScheduler turnTimeout;
     private final ExecutorService executor;
+    private final Random random;
     private final long botDelayMillis;
 
     public BotScheduler(RoomService roomService,
-                        TichuGameStateStore stateStore,
+                        GameEngineProvider engines,
                         GameEventBroadcaster broadcaster,
                         RoomActionLock lock,
                         MatchProgressService matchProgress,
@@ -89,14 +90,13 @@ public class BotScheduler {
                         @Value("${mirboard.bot.seed:-1}") long seed,
                         @Value("${mirboard.bot.delay-millis:200}") long botDelayMillis) {
         this.roomService = roomService;
-        this.stateStore = stateStore;
+        this.engines = engines;
         this.broadcaster = broadcaster;
         this.lock = lock;
         this.matchProgress = matchProgress;
         this.bots = bots;
         this.turnTimeout = turnTimeout;
-        Random random = seed < 0 ? new SecureRandom() : new Random(seed);
-        this.policy = new RandomBotPolicy(random);
+        this.random = seed < 0 ? new SecureRandom() : new Random(seed);
         this.botDelayMillis = botDelayMillis;
         this.executor = Executors.newThreadPerTaskExecutor(
                 Thread.ofVirtual().name("mirboard-bot-", 0).factory());
@@ -147,33 +147,35 @@ public class BotScheduler {
             return;
         }
         try {
-            TichuState state = stateStore.load(roomId).orElse(null);
+            GameEngine engine = engines.forRoom(room);
+            GameState state = engine.loadState().orElse(null);
             if (state == null) {
                 log.warn("Bot loop: state is null, returning. roomId={}", roomId);
                 return;
             }
-            if (state instanceof TichuState.RoundEnd re) {
-                log.warn("Bot loop: state is RoundEnd unexpectedly (matchProgress should have advanced). roomId={} A={} B={}",
-                        roomId, re.teamAScore(), re.teamBScore());
+            if (engine.isRoundOver(state)) {
+                log.warn("Bot loop: round is already over (matchProgress should have advanced). roomId={} phase={}",
+                        roomId, engine.phaseName(state));
                 return;
             }
 
-            int botSeat = nextBotSeat(room, state);
+            int botSeat = nextBotSeat(room, engine, state);
             if (botSeat < 0) {
-                log.warn("Bot loop: no pending bot action. roomId={} phase={} botSeats={} state={}",
-                        roomId, state.getClass().getSimpleName(), room.botSeats(), state);
+                log.warn("Bot loop: no pending bot action. roomId={} phase={} botSeats={} pending={}",
+                        roomId, engine.phaseName(state), room.botSeats(),
+                        engine.pendingSeats(state));
                 return;
             }
 
-            TichuAction action = policy.choose(state, botSeat);
+            GameAction action = engine.botAction(state, botSeat, random);
             if (action == null) {
                 // 봇 차례인데 합법 액션 0개 — 데드락 위험. 진단 정보 dump.
                 log.warn("Bot has no legal action: roomId={} seat={} phase={} state={}",
-                        roomId, botSeat, state.getClass().getSimpleName(), state);
+                        roomId, botSeat, engine.phaseName(state), state);
                 return;
             }
 
-            applyAndBroadcast(roomId, room, botSeat, action, state);
+            applyAndBroadcast(roomId, room, engine, botSeat, action, state);
         } catch (RuntimeException e) {
             log.error("BotScheduler error in room {}: {}", roomId, e.getMessage(), e);
             return;
@@ -184,51 +186,33 @@ public class BotScheduler {
         runRoom(roomId, iterations + 1);
     }
 
-    /** 현재 봇이 액션을 취해야 하는 seat. 없으면 -1. */
-    private int nextBotSeat(Room room, TichuState state) {
+    /**
+     * 현재 봇이 액션을 취해야 하는 seat. 없으면 -1.
+     *
+     * <p>봇 좌석 순서로 훑는다 (pending 순서가 아니라) — 여러 좌석이 동시에 대기하는
+     * 단계에서 어느 봇이 먼저 움직이는지가 시드 재현성에 걸리기 때문.
+     */
+    private static int nextBotSeat(Room room, GameEngine engine, GameState state) {
+        List<Integer> pending = engine.pendingSeats(state);
         for (int seat : room.botSeats()) {
-            if (hasPendingAction(state, seat)) return seat;
+            if (pending.contains(seat)) return seat;
         }
         return -1;
     }
 
-    private static boolean hasPendingAction(TichuState state, int seat) {
-        return switch (state) {
-            case TichuState.Dealing d -> !d.ready().contains(seat);
-            case TichuState.Passing p -> !p.submitted().containsKey(seat);
-            case TichuState.Playing pl -> {
-                var trick = pl.trick();
-                // Dragon trick 양도 보류
-                if (trick.currentTop() != null
-                        && trick.currentTop().cards().size() == 1
-                        && trick.currentTop().cards().get(0).is(
-                                com.mirboard.domain.game.tichu.card.Special.DRAGON)
-                        && trick.currentTopSeat() == seat) {
-                    yield true;
-                }
-                yield trick.currentTurnSeat() == seat
-                        && !pl.players().get(seat).isFinished();
-            }
-            case TichuState.RoundEnd __ -> false;
-        };
-    }
-
-    private void applyAndBroadcast(String roomId, Room room, int seat,
-                                   TichuAction action, TichuState state) {
-        TichuEngine engine = new TichuEngine(new GameContext(roomId, room.playerIds()));
-        TichuEngine.Result result;
+    private void applyAndBroadcast(String roomId, Room room, GameEngine engine, int seat,
+                                   GameAction action, GameState state) {
+        GameEngine.Result result;
         try {
             result = engine.apply(state, seat, action);
-        } catch (TichuActionRejectedException rejected) {
-            log.warn("Bot action rejected: roomId={} seat={} action={} reason={}",
-                    roomId, seat, action.getClass().getSimpleName(), rejected.reason());
+        } catch (GameActionRejectedException rejected) {
+            log.warn("Bot action rejected: roomId={} seat={} action={} code={}",
+                    roomId, seat, action.getClass().getSimpleName(), rejected.code());
             return;
         }
-        stateStore.save(roomId, result.newState());
-        List<TichuEvent> outbound = new ArrayList<>(result.events());
-        if (result.newState() instanceof TichuState.RoundEnd ended) {
-            matchProgress.onRoundEnd(roomId, room, ended, outbound);
-        }
+        engine.saveState(result.newState());
+        List<GameEvent> outbound = new ArrayList<>(result.events());
+        matchProgress.advance(engine, room, result.newState(), outbound);
         broadcaster.broadcast(roomId, outbound, room.playerIds());
         // Phase 13D — 봇 액션 후에도 다음 턴 타임아웃 (re)스케줄 (인간 차례면 카운트 시작).
         turnTimeout.onTurnAdvanced(roomId);
