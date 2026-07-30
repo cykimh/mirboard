@@ -98,6 +98,21 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-92 (2026-07-30) — 백업 런북 + k6 부하 시나리오 (M2-C5, T3)
+
+운영 하드닝의 마지막 조각. **서버 자바 소스 무변경** — `scripts/`·`docs/runbooks/` 만
+추가한다. 핵심 판단 두 가지. **(1) 백업 대상은 Postgres 뿐이다.** Redis 는 설계상
+휘발(방/게임 상태·칩·세션·레이트리밋 카운터 전부 TTL 6h 이하)이고 D-82 가 칩을 계정에
+두지 않기로 한 이상 "복구해야 할 Redis 데이터"는 존재하지 않는다. 런북은 백업 절차보다
+**무엇이 복구 불가인지**를 먼저 못 박는다 — 진행 중 매치는 소실되며 그게 정상 동작이다.
+`--appendonly yes` 는 재시작 생존용이지 백업이 아니다. **(2) k6 는 REST 만 친다.**
+STOMP 부하는 k6 확장(xk6-websockets) 빌드가 필요해 "설치 한 줄"이 깨지는데, 서버에는
+이미 `BotMatchSimulationIT`(`check.sh bot-stress N`)라는 인게임 부하 수단이 있다 —
+둘을 합쳐 "REST 는 k6, 인게임은 봇 시뮬"로 역할을 나눈다. 임계값은 추측하지 않고 실제
+측정치에서 역산해 회귀 가드로만 쓴다. k6 미설치 환경에서는 Docker 이미지로 폴백한다.
+**D-90 후속 정정**: `docs/redis-keys.md` 의 `ratelimit:auth:ip:{ip}` 를 실제 키 형식
+`ratelimit:{bucket}:{subject}` 로 수정(T0 이 stomp-protocol/api 만 훑어 누락됐던 드리프트).
+
 ## D-90 (2026-07-30) — 전역/STOMP 레이트리밋 완성 (M2-C1, T1)
 
 D-84 가 인증 2개 엔드포인트에만 걸어둔 레이트리밋을 전역 HTTP + STOMP 로 일반화한다.
