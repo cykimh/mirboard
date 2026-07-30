@@ -1,0 +1,156 @@
+@media (max-width: 720px) {
+  #root {
+    padding: var(--space-3);
+  }
+
+  /* 헤더는 wrap 으로 줄바꿈. */
+  .game-table-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* 카드 패스 슬롯이 가로로 너무 좁아지지 않게 wrap. */
+  .pass-slots {
+    flex-wrap: wrap;
+  }
+}
+
+/* Phase 20(D-76) — 좁은 화면에서도 보드 메타포(상/하/좌/우 고정)를 유지.
+   기존엔 768px 이하에서 2×2 grid 로 무너져 본인(하단)/파트너(상단)/좌우
+   상대 위치가 사라졌다. absolute 원형 배치는 그대로 두고 좌석·중앙 트릭만
+   컴팩트하게 축소해 어느 폭에서도 자리가 고정되게 한다. */
+@media (max-width: 768px) {
+  /* #1 — 중간 폭에선 카드를 한 단계만 축소(데스크톱 62 → 54). */
+  .card-chip {
+    width: 54px;
+    height: 76px;
+  }
+  /* 하단 빈 공간을 활용해 보드를 세로로 키워 상/하 좌석과 중앙 트릭 패널 간격 확보. */
+  .table-arena {
+    min-height: 430px;
+  }
+  .table-arena .seat {
+    min-width: 88px;
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+  .table-arena .seat-w {
+    right: 4px;
+  }
+  .table-arena .seat-e {
+    left: 4px;
+  }
+  .table-center-trick {
+    min-width: 120px;
+    max-width: 52%;
+    padding: 8px 10px;
+  }
+  /* 좁은 폭 — 좌석 좌우 버튼 간격을 줄여 좌석을 가리지 않게(#6). 긴 닉네임이
+     버튼과 겹치지 않게 간격을 줄인다. */
+  .seat-action-group.left {
+    margin-right: 80px;
+  }
+  .seat-action-group.right {
+    margin-left: 80px;
+  }
+  .seat-action-btn {
+    min-width: 96px;
+    height: 52px;
+    padding: 0 20px;
+    font-size: 1rem;
+  }
+}
+
+/* 손패 카드 축소 — 세로 직사각형 비율 유지(코너 인덱스 가독 최소치).
+   주의: 반드시 위 768px 블록보다 **뒤**에 둘 것 — 같은 특이도라 순서가 곧
+   승부다(앞에 있으면 768 블록의 width:54 가 덮어써 사문화, 실측으로 확인). */
+@media (max-width: 480px) {
+  .card-chip {
+    width: 48px;
+    height: 68px;
+    gap: 2px;
+  }
+  .card-chip .cs-rank {
+    font-size: 1.35rem;
+  }
+  .card-chip .cs-suit {
+    font-size: 1.05rem;
+  }
+  .card-chip .rank {
+    font-size: 1rem;
+  }
+  /* #2 — 좌우 좌석 카드 팬 축소 + 좌석을 바깥 모서리로 — 중앙 트릭 패널과의
+     면적 겹침을 z-index 레이어링에 기대지 않고 실제로 제거한다. */
+  .seat-cardback {
+    width: 13px;
+    height: 19px;
+    margin-left: -8px;
+  }
+  .seat-cardstack.fan-w .seat-cardstack-fan,
+  .seat-cardstack.fan-e .seat-cardstack-fan {
+    height: 40px;
+    width: 22px;
+  }
+  .table-arena .seat-w {
+    right: 0;
+  }
+  .table-arena .seat-e {
+    left: 0;
+  }
+  .table-center-trick {
+    max-width: 44%;
+  }
+}
+
+/* 아주 좁은 폭(휴대폰 세로) — 좌석/트릭을 한 단계 더 축소하되 위치는 유지. */
+@media (max-width: 440px) {
+  .table-arena {
+    min-height: 380px;
+    padding: 6px;
+  }
+  .table-arena .seat {
+    min-width: 72px;
+    padding: 4px 6px;
+    font-size: 0.82rem;
+  }
+  .table-center-trick {
+    min-width: 96px;
+    max-width: 46%;
+    padding: 6px 8px;
+  }
+  .seat-action-group.left {
+    margin-right: 58px;
+  }
+  .seat-action-group.right {
+    margin-left: 58px;
+  }
+  .seat-action-btn {
+    min-width: 84px;
+    padding: 0 16px;
+  }
+}
+
+/* A3 — 터치 기기에서 액션 버튼 최소 터치 타겟 확보(데스크톱 마우스 무영향). */
+@media (pointer: coarse) {
+  .seat-action-btn {
+    min-height: 48px;
+  }
+}
+
+/* A3 후속 — 헤더 토글(사운드/애니/이모지/채팅)·액션 바(선언/준비)·이모지 팔레트도
+   44px 하한. shadcn size="sm"(h-8=32px)을 컴포넌트 수정 없이 min-height 로 보정
+   (min-height 가 height 를 이긴다). 터치 기기 또는 좁은 폭에서만 — 데스크톱
+   마우스+넓은 폭은 무영향. */
+@media (pointer: coarse), (max-width: 768px) {
+  .game-table-header .header-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .action-bar button {
+    min-height: 44px;
+  }
+  .reaction-palette button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

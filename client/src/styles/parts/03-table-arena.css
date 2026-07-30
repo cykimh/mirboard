@@ -1,0 +1,150 @@
+.table-arena {
+  position: relative;
+  min-height: 540px;
+  border: 1px solid rgba(120, 200, 160, 0.18);
+  border-radius: 24px;
+  background:
+      radial-gradient(ellipse 78% 68% at 50% 44%,
+        #1f4636 0%, #15382b 46%, #0b1f18 100%);
+  box-shadow:
+      inset 0 0 90px rgba(0, 0, 0, 0.5),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 10px 34px rgba(0, 0, 0, 0.38);
+  padding: 16px;
+}
+
+/* P3(8) — 티츄 선언 경기장 틴트(가장자리 vignette + 글로우, 중앙은 투명해 카드
+   가독성 유지). 그랜드=빨강, 일반=파랑. ::before 라 좌석/카드 뒤에 깔린다. */
+.table-arena.arena-tint-grand::before,
+.table-arena.arena-tint-tichu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+.table-arena.arena-tint-grand::before {
+  background: radial-gradient(ellipse 82% 72% at 50% 50%,
+      transparent 42%, rgba(220, 40, 40, 0.30) 100%);
+  box-shadow: inset 0 0 70px 12px rgba(220, 40, 40, 0.38);
+}
+
+.table-arena.arena-tint-tichu::before {
+  background: radial-gradient(ellipse 82% 72% at 50% 50%,
+      transparent 42%, rgba(50, 110, 240, 0.28) 100%);
+  box-shadow: inset 0 0 70px 12px rgba(60, 120, 240, 0.34);
+}
+
+.table-arena .seat {
+  position: absolute;
+  min-width: 112px;
+  padding: 6px 10px;
+}
+
+.table-arena .seat-s {
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  /* #2 — 내 좌석 콘텐츠(아바타/스택)를 액션 버튼(z16) 위로 — 혹시 모를 겹침 안전장치. */
+  z-index: 17;
+}
+
+/* 액션 바 — 경기장 밖(손패 아래) 고정 바. 모바일은 sticky 로 엄지 도달 쉽게. */
+.action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 768px) {
+  .action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+  }
+}
+
+.table-arena .seat-n {
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+}
+
+.table-arena .seat-w {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.table-arena .seat-e {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* #6 — 내기(좌)/패스(우)를 내 좌석(seat-s) 양옆에 누르기 쉽게. 두 그룹을 중앙에서
+   바깥으로 앵커: 왼쪽 그룹은 오른쪽 끝을, 오른쪽 그룹은 왼쪽 끝을 좌석 옆에 고정하고
+   바깥으로 자란다 → 패스 우측 취소 버튼이 늘어도 좌석/내기 버튼을 침범하지 않는다.
+   컨테이너는 클릭 통과(pointer-events:none), 버튼만 활성. (그룹 간 거리 ≈ 220px) */
+.arena-seat-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  z-index: 16;
+  pointer-events: none;
+}
+
+.seat-action-group {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seat-action-group.left {
+  right: 50%;
+  margin-right: 145px;
+}
+
+.seat-action-group.right {
+  left: 50%;
+  margin-left: 145px;
+}
+
+.seat-action-group > * {
+  pointer-events: auto;
+}
+
+.seat-action-btn {
+  min-width: 108px;
+  height: 56px;
+  padding: 0 28px;
+  font-size: 1.08rem;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* #2 — 내기(play)가 실제로 낼 수 있을 때만 골드 링으로 강조(거짓 활성 회피 +
+   '지금 낼 수 있다'를 한눈에 — 발견성↑). 비활성 시 링 없음. */
+.seat-action-btn.play:not(:disabled) {
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* 어포던스 역전 방지 — 비활성 '내기'(primary=밝은 표면)가 opacity 0.5 로도
+   활성 '패스'(secondary=어두운 표면)보다 밝게 남는 문제. 비활성은 secondary
+   표면으로 내려 앉혀 "지금 누를 수 있는 쪽"이 항상 더 도드라지게 한다. */
+.seat-action-btn.play:disabled {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}

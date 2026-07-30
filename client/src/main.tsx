@@ -1,12 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
-// 순서 중요: tailwind base/utilities → 레거시 토큰(다크) → theme(라이트/다크
-// 오버라이드) → 손제작 styles. (Phase 20a, D-76)
-import './styles/tailwind.css';
-import './styles/tokens.css';
-import './styles/theme.css';
-import './styles.css';
+// D-94 — CSS 진입점 단일화. 로드 순서(tailwind → tokens → theme → parts 17개)는
+// styles/index.css 안에 @import 로 명시돼 있다. 여기서 개별 import 하지 않는 이유는
+// 순서가 곧 캐스케이드이고, 그 근거를 CSS 파일 한 곳에 모아두기 위해서다.
+import './styles/index.css';
 import { useThemeStore } from './features/theme/themeStore';
 import { useCardAnimStore } from './features/tichu/cardAnimStore';
 import { useColorblindStore } from './features/theme/colorblindStore';

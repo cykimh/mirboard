@@ -1,0 +1,24 @@
+.seat.ready {
+  border-color: #66bb6a;
+}
+
+.seat.submitted {
+  border-color: var(--color-accent);
+}
+
+.status-tag {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #2a3a2a;
+  color: #c8e6c9;
+}
+
+.seat.submitted .status-tag {
+  background: #1a2a3a;
+  color: var(--color-mahjong);
+}
+
+/* --- 모바일 반응형 (Phase 6C-4) --- */

@@ -1,0 +1,85 @@
+.seat-cardstack {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.seat-cardstack-empty {
+  opacity: 0.4;
+  font-size: 0.8rem;
+}
+
+.seat-cardstack-fan {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  height: 28px;
+}
+
+.seat-cardback {
+  width: 18px;
+  height: 26px;
+  border-radius: 3px;
+  margin-left: -11px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  transform: rotate(calc(var(--i, 0) * 7deg));
+  transform-origin: bottom center;
+}
+
+.seat-cardback:first-child {
+  margin-left: 0;
+}
+
+.seat-cardstack-count {
+  font-size: 0.82rem;
+  font-weight: 800;
+  opacity: 0.95;
+}
+
+/* #3 — 좌석별 부채 방향을 중앙 지향으로 회전(실제 보드게임처럼). s=위(기본),
+   n=아래, w=좌(우측 좌석이 중앙을 향함), e=우(좌측 좌석이 중앙을 향함).
+   w/e 는 ±90° 회전이라 '점유 박스≠시각 박스'가 되므로, 회전 전 행(≈53×28)을
+   height:54 박스에 세로 가운데 정렬해 회전 후 세로 footprint(≈30×53)를 박스가
+   품게 한다 → 위 라벨/아래 숫자와 겹치지 않는다. */
+.seat-cardstack.fan-n .seat-cardstack-fan {
+  transform: rotate(180deg);
+}
+.seat-cardstack.fan-w,
+.seat-cardstack.fan-e {
+  flex-direction: column;
+  gap: 2px;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan,
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  height: 54px;
+  /* 회전(±90°) 후 시각 폭(~30px)에 맞춰 박스 폭을 명시 — 안쪽(중앙) 과점유 방지
+     → 중앙 트릭 패널과 가로 겹침 감소. */
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+}
+.seat-cardstack.fan-w .seat-cardstack-fan {
+  transform: rotate(-90deg);
+}
+.seat-cardstack.fan-e .seat-cardstack-fan {
+  transform: rotate(90deg);
+}
+
+/* 요청 — 좌·우 좌석은 카드 스택을 아이콘 '옆'(중앙 쪽)에 둔다: 세로 흐름에서 빼서
+   아바타 옆에 절대배치. 우측 좌석(w)=아이콘 왼쪽, 좌측 좌석(e)=아이콘 오른쪽 →
+   둘 다 테이블 중앙 방향. (.seat 가 position:absolute 라 기준 박스가 됨.) */
+.table-arena .seat-w .seat-cardstack.fan-w,
+.table-arena .seat-e .seat-cardstack.fan-e {
+  position: absolute;
+  top: -2px;
+}
+.table-arena .seat-w .seat-cardstack.fan-w {
+  right: 100%;
+  margin-right: 2px;
+}
+.table-arena .seat-e .seat-cardstack.fan-e {
+  left: 100%;
+  margin-left: 2px;
+}

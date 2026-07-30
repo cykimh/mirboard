@@ -1,0 +1,64 @@
+.scoreboard {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.scoreboard-round {
+  opacity: 0.7;
+}
+
+.scoreboard-team.us {
+  color: #6fd3a0;
+}
+
+.scoreboard-team.them {
+  color: #e08a8a;
+}
+
+/* Phase 15(#6) — 경기장 턴 카운트다운 (우상단). */
+.turn-countdown {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.turn-countdown.urgent {
+  color: #1a1a1f;
+  background: var(--color-warning, #f0c000);
+  animation: declared-pulse 1s ease-in-out infinite;
+}
+
+/* Phase 15(#1) — 매치 종료 라운드별 점수표. */
+.score-history {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.score-history th,
+.score-history td {
+  border: 1px solid #5a3a2a;
+  padding: 3px 10px;
+  text-align: center;
+}
+
+.score-history-total {
+  font-weight: 800;
+  background: rgba(255, 209, 128, 0.12);
+}
+
+/* Phase 15(#5) — 경기장 채팅 말풍선 (발신자 좌석 근처, 잠깐 노출 후 fade). */
