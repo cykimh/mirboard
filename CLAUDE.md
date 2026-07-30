@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + 1차 게임으로 티츄(Tichu).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1 완료·M2 진행 중, 결정 이력 D-87까지). 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO 영속 → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1·M3 완료·M2 진행 중, 결정 이력 D-99까지). 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO 영속 → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **포트 추출 완료**(D-98) — 인게임이 `GameEngine` 포트 뒤로 들어갔고 두 번째 게임(스컬킹) 도메인이 다음 단계다.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
-- **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
+- **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `docs/game-port.md`(`GameEngine` 포트), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
 - **현황 단일 진실원**: `docs/implementation-status.md`(기능별 ✅ 표). 이력 `docs/decisions.md`, 로드맵 `docs/plans/mvp-roadmap.md`.
 
 상용화(포트폴리오 쇼케이스) 후속은 트랙 A(티츄 완성도)·C(운영 하드닝)·D(수평 확장성)·E(멀티게임)·G(문서·데모)의 마일스톤으로 진행 중 — `docs/plans/mvp-roadmap.md` 참조.
@@ -44,7 +44,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 게임 디스패치는 반드시 `domain.game.core.GameRegistry` 를 거친다 (`GameDefinition` Bean 자동 수집).
 - `domain.game.tichu` 는 `domain.game.core` 인터페이스만 의존.
 - `infra/ws/*`, `infra/rest/*` 컨트롤러는 도메인 서비스를 호출만 한다. **룰 로직 금지**.
-- 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록 → 카탈로그/방 생성/엔진 디스패치가 자동 연결됨. 로비/허브 컨트롤러 수정 불필요.
+- **인게임은 `GameEngine` 포트만 본다 (D-98)**: 인프라는 `GameEngineProvider.forRoom(room)` →
+  `GameRegistry.require(gameType).newEngine(ctx)` 한 경로로 엔진을 얻고 게임 이름을 쓰지 않는다.
+  포트 계약 정본은 `docs/game-port.md`. 게임별 구현은 **2계층** — 순수 룰 엔진(`TichuEngine`,
+  저장소 없음)을 포트 어댑터(`TichuGameEngine`)가 감싼다. 룰 단위 테스트가 Redis 를 끌고
+  오지 않게 하려는 분리이므로 새 게임도 이 형태를 따를 것.
+  유일한 예외: `RoomChipService` 는 칩 정산이 팀 승패에 묶여 있어 티츄를 직접 참조한다
+  (칩은 포트 밖 — `docs/game-port.md` §2).
+- 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록
+  (+ `GameEngine` 구현, `GameStartingEvent` 리스너로 라운드 시작) → 카탈로그/방 생성/인게임
+  디스패치/봇/타임아웃/resync 가 자동 연결됨. 로비·허브 컨트롤러와 스케줄러 수정 불필요.
 - 정적·이미지 서빙 엔드포인트는 `/api/**` **밖**에 둔다 — `<img>`/브라우저 직접 요청은 Bearer 토큰(localStorage JWT)을 못 싣고, SecurityConfig 가 비-`/api` 를 default-permit. 민감 API 는 여전히 `/api/**` 하위(예: 아바타 조회 `/avatars/{userId}` 공개, 업로드 `/api/me/avatar` 인증).
 
 ## 기술 스택 결정사항
@@ -144,6 +153,7 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.action.*"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.scoring.*"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest"
+./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuGameEngine*Test"   # 포트 어댑터 (D-98)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarterIT"

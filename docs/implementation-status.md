@@ -28,6 +28,7 @@
 | 11 | UI 리디자인 (Tailwind+shadcn, 다크) | ✅ | `client` (Phase 20, D-76/77) |
 | 12 | 멀티 인스턴스 (opt-in) | ✅(opt-in) | `infra.messaging.RedisMessageGateway` |
 | 13 | 관측성 (Prometheus, MDC 로그) | ✅ | `infra.metrics`, `infra.web.MdcKeys` |
+| 14 | **`GameEngine` 포트 (멀티게임 기반)** | ✅ | `domain.game.core.GameEngine`, `infra.ws.GameEngineProvider`, `TichuGameEngine` |
 
 설계 단계(Phase 1)부터 클라이언트 통합·UI 리디자인(Phase 20)까지 로드맵 항목이 완료
 표시되어 있다(`docs/plans/mvp-roadmap.md`).
@@ -53,6 +54,7 @@
 - `GET /api/games/{id}` — 단일 게임 상세.
 - **확장성**: 새 게임은 `domain.game.{newgame}` + `GameDefinition @Component` 등록만으로
   카탈로그·방 생성·엔진 디스패치에 자동 연결(REST/로비 코드 무변경).
+  D-98 이후 이 문장은 **인게임까지 참**이다 — §14 참조.
 
 관련 테스트: `GameRegistryTest`, `GameCatalogIntegrationTest`.
 
@@ -218,17 +220,41 @@
 
 ## 13. 테스트 현황
 
-- **서버**: 44개 테스트 클래스. 단위(룰 엔진·족보·ELO·JWT·카탈로그) + 통합
-  (Testcontainers PostgreSQL 16/Redis — auth/rooms/STOMP/봇/동시성/매치 영속).
+- **서버**: 69개 테스트 클래스 / 412건 (D-98 시점 실측). 단위(룰 엔진·족보·ELO·JWT·
+  카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/Redis — auth/rooms/STOMP/봇/
+  동시성/매치 영속/2-인스턴스 인계).
 - **클라이언트**: Vitest + RTL — 스토어 리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 
 ---
 
-## 14. 미구현 / 범위 밖 (참고)
+## 14. `GameEngine` 포트 (멀티게임 기반, D-98)
+
+인게임 진행이 게임별 타입 대신 **포트 뒤**에서 돌아간다. 계약 정본은 `docs/game-port.md`.
+
+- **포트**: `domain.game.core.GameEngine` — 상태 I/O, 액션 적용, 단계 이름, 대기 좌석,
+  공개/비공개 뷰, 합법 액션·봇·타임아웃 액션, 라운드/매치 진행(`advance`)·탈주(`desert`).
+  `GameState`/`GameAction` 은 마커, `GameEvent` 는 `envelopeType()`+`privateSeat()` 만 노출.
+- **디스패치**: `infra.ws.GameEngineProvider.forRoom(room)` →
+  `GameRegistry.require(gameType).newEngine(ctx)`. 인프라 코드에 게임 이름이 없다.
+- **티츄 구현은 2계층**: 순수 룰 엔진 `TichuEngine`(저장소 없음) + 포트 어댑터
+  `TichuGameEngine`. 룰 단위 테스트가 Redis 를 끌고 오지 않게 하는 분리.
+- **액션 역직렬화**: 목적지(`/app/room/{id}/action`)는 하나이고 방의 `gameType` 으로
+  `engine.actionType()` 을 골라 변환한다. 알 수 없는 액션은 `ERROR(INVALID_ACTION)`.
+- **알려진 잔여**: `infra.ws.RoomChipService` 만 티츄를 직접 참조한다(칩 정산이 팀 승패에
+  묶여 있고 칩은 의도적으로 포트 밖 — `docs/game-port.md` §2).
+
+관련 테스트: `TichuGameEngineDesertionTest`, `TichuGameEnginePendingSeatsTest`,
+`GameStompControllerIntegrationTest`(실제 WS 프레임), `BotMatchSimulationIT`,
+`TurnTimeoutSchedulerIT`.
+
+---
+
+## 15. 미구현 / 범위 밖 (참고)
 
 - 게임별 격리 채팅(로비/방 채팅만 존재).
-- 티츄 외 게임(카탈로그는 확장 가능하나 등록된 게임은 TICHU 1종).
+- 티츄 외 게임 — 포트(§14)와 인원 가변(D-99)은 준비됐고, 등록된 게임은 아직 TICHU 1종.
+  두 번째 게임(스컬킹)은 `docs/plans/multi-game-sessions.md` S3~S6.
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
 - 멀티 인스턴스 세션 레지스트리(`WsSessionRegistry` 는 단일 인스턴스 전제).
 

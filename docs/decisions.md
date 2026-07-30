@@ -143,14 +143,29 @@ D-97 이 종이에 확정한 표면을 실제로 만들고 티츄를 그 뒤로 
 지적한 `newEngine()` 의 실패 모드였다.
 
 **액션 역직렬화 seam**(D-97 열린 질문 2)은 목적지에서 방 → gameType 분기로 확정했다.
-`GameStompController` 는 `@Payload JsonNode` 로 원본을 받고 `engine.actionType()` 으로
-`treeToValue` 한다. 하드타입 `@Payload TichuAction` 이 사라지고, 알 수 없는 액션은 프레임워크
-변환 실패(클라 무응답)가 아니라 `ERROR/INVALID_ACTION` 으로 응답한다. `GameState` 는 마커로
-시작한다(열린 질문 1) — 공통 필드를 처음부터 강요하면 요트가 깨진다.
+`GameStompController` 는 원본 payload 를 받아 `engine.actionType()` 으로 변환한다. 하드타입
+`@Payload TichuAction` 이 사라지고, 알 수 없는 액션은 프레임워크 변환 실패(클라 무응답)가
+아니라 `ERROR/INVALID_ACTION` 으로 응답한다. 목적지 자체는 하나로 유지되므로 **클라 계약은
+무변경**이다. `GameState` 는 마커로 시작한다(열린 질문 1) — 공통 필드를 처음부터 강요하면
+요트가 깨진다. 봇 정책(열린 질문 3)은 포트 기본 구현(합법 액션 균등 분포) + 게임별
+override 로 갈랐고, 시드 `Random` 은 스케줄러가 계속 보유해 재현성이 유지된다.
 
-**의도적 잔여**: `RoomChipService` 는 `TichuMatchCompleted`/`TichuGameDefinition.ID` 를 계속
-참조한다. 칩·판돈은 D-97 §2 가 명시적으로 포트 **밖**에 둔 관심사이고, 신규 게임은
-`stake=0` 으로 시작하므로 지금 일반화하면 쓰이지 않는 추상이 된다.
+**payload 타입은 `Map` 이어야 했다** — 원본을 `JsonNode` 로 받으려 했으나 Spring Framework 7
+의 STOMP 브로커 컨버터는 **Jackson 3** 기반이라 Jackson 2 의 `JsonNode` 를 대상 타입으로
+받지 못한다(`MessageConversionException: Cannot construct instance of JsonNode`, 실측).
+버전 중립인 `Map<String,Object>` 로 받아 우리 `ObjectMapper`(Redis 상태 직렬화와 동일
+인스턴스)로 변환한다 — 부수 효과로 액션 역직렬화와 상태 직렬화가 같은 매퍼를 쓰게 됐다.
+
+**의도적 잔여**: `RoomChipService` 는 `TichuMatchCompleted`/`TichuGameDefinition.ID`/`Team` 을
+계속 참조한다(infra 10파일 → **1파일**). 칩·판돈은 D-97 §2 가 명시적으로 포트 **밖**에 둔
+관심사이고, 정산이 "어느 팀이 이겼는가"에 붙어 있어 포트로 올리려면 방금 뺀 팀 개념을 다시
+끌어올려야 한다. 신규 게임은 `stake=0` 으로 시작하므로 지금 일반화하면 쓰이지 않는 추상이
+된다 — 스컬킹에 내기를 붙이는 시점에 "승자 집합"만 다루는 중립 정산 이벤트를 별건으로.
+
+**검증**: 서버 412건 전량 그린 + `bot-stress 5`(봇 풀매치 5회). 티츄 룰 코드는 무변경
+(`TichuEngine` diff 는 javadoc + `implements` 절뿐). 동작 변경은 1건 — 존재하지 않는 방
+`POST /rooms/{id}/rematch` 가 409 `GAME_NOT_IN_PROGRESS` 대신 404 `ROOM_NOT_FOUND`
+(엔진을 얻으려면 방이 필요해서). 기존 테스트 없고 후자가 더 정확하다.
 
 ## D-97 (2026-07-30) — GameEngine 포트 설계 (M5/T7 1단계, 코드 변경 0)
 

@@ -126,6 +126,10 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 `@JsonTypeInfo(property = "@action")`). 잘못된 액션은 본인 큐 `ERROR` 로만
 회신되고 다른 플레이어 상태는 변하지 않는다.
 
+목적지는 게임별로 갈리지 않는다 — 서버가 방의 `gameType` 으로 역직렬화 대상 타입을
+고른다(D-98). 아래 표는 **티츄**의 `@action` 목록이며, 알 수 없는 판별자는
+`ERROR(INVALID_ACTION)` 으로 회신된다.
+
 | @action | 추가 필드 | 비고 |
 | --- | --- | --- |
 | `DECLARE_GRAND_TICHU` | — | Dealing(phaseCardCount=8), 아직 ready 아닐 때만 |
@@ -144,13 +148,16 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 ```
 
 ### 액션 처리 단계 (서버)
-1. 방 락 획득 (`SET NX room:{id}:lock TTL=2s`) — 실패 시 본인 큐 `ERROR(BUSY)`.
-2. `room:{id}:state` 로드 (JSON 역직렬화).
-3. `TichuEngine.apply(state, seat, action)` — 내부 `ActionValidator` 실패 시
-   본인 큐 `ERROR`, 락 해제.
-4. 새 상태 저장, 이벤트마다 `room:{id}:seq` INCR, envelope 을 공개/비공개로 분기 전송.
-5. RoundEnd 전이 시 매치 누적/종료 분기(`MatchProgressService`), 락 해제.
-6. 락 해제 후 봇 스케줄(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`) 트리거.
+1. 방 조회 → 좌석 도출(비참가자는 `ERROR(NOT_IN_ROOM)`), `gameType` 으로 엔진 획득
+   (`GameEngineProvider.forRoom`).
+2. `engine.actionType()` 으로 payload 역직렬화 — 실패 시 `ERROR(INVALID_ACTION)`.
+3. 방 락 획득 (`SET NX room:{id}:lock TTL=2s`) — 실패 시 본인 큐 `ERROR(BUSY)`.
+4. `engine.loadState()` (`room:{id}:state` JSON 역직렬화). 없으면 `ERROR(GAME_NOT_STARTED)`.
+5. `engine.apply(state, seat, action)` — 룰 위반 시 `GameActionRejectedException.code()`
+   를 그대로 본인 큐 `ERROR` 코드로, 락 해제.
+6. 새 상태 저장, `engine.advance(...)` 로 라운드/매치 진행 이벤트 합류,
+   이벤트마다 `room:{id}:seq` INCR, envelope 을 공개/비공개로 분기 전송.
+7. 락 해제 후 봇 스케줄(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`) 트리거.
 
 ---
 

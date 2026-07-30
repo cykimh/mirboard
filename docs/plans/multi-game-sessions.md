@@ -15,22 +15,29 @@
 *정정 (D-99)*: 원래 S2 의 선행을 S1 로 적었으나 **실제 의존이 없었다** — S2 가 만지는
 파일(`RoomService`·`RoomController`·클라 모달)과 S1 이 만지는 파일(`GameEngine`·
 `GameStompController`·스케줄러)의 교집합이 0 이고 §3 이 포트 표면을 참조하지 않는다.
-그래서 S2 를 S1 보다 먼저 완료했다. S1 은 여전히 D-98 로 미착수.
+그래서 S2 를 S1 보다 먼저 완료했다.
+
+*추가 (D-98)*: S1 도 완료. 다만 **교집합 0 은 사실이 아니었다** — S1 이 `RoomController` 의
+resync/rematch 를 포트로 옮겨야 했다(S2 는 같은 파일의 create 를 만졌다). 두 세션이 같은
+워킹 트리에서 동시에 돌아 실제로 충돌 위험이 있었고, S1 은 별도 git worktree 로 격리해
+진행했다. **같은 계열 세션을 병행할 땐 worktree 로 분리할 것.**
 
 ## 전체 지도
 
 | 세션 | 범위 | 선행 | D 번호 | 코드 변경 | 병렬 |
 | --- | --- | --- | --- | --- | --- |
 | ~~S0~~ | 포트 설계 | — | D-97 | 0 (문서) | ✅ **완료** |
-| **S1** | 포트 추출 (티츄를 포트 뒤로) | S0 | D-98 | 서버 | ❌ 단독 |
+| ~~S1~~ | 포트 추출 (티츄를 포트 뒤로) | S0 | D-98 | 서버 | ✅ **완료** |
 | ~~S2~~ | 인원 가변 (계약 변경) | — | D-99 | 서버+클라+docs | ✅ **완료** |
 | **S3** | 스컬킹 룰 명세 | — | D-100 | 0 (문서) | ✅ 병행 가능 |
 | **S4** | 스컬킹 도메인 (카드·트릭·입찰·점수) | S1·S3 | D-101 | 서버(신규 패키지) | ✅ 병행 가능 |
 | **S5** | 스컬킹 통합 (엔진·봇·디스패치) | S2·S4 | D-102 | 서버 | ❌ 단독 |
 | **S6** | 스컬킹 클라 | S5 | D-103 | 클라 | ❌ 클라 1트랙 |
 
-**병렬 가능 조합**: S3 는 언제든(문서 전용). S4 는 신규 패키지라 S2 와 병행 가능.
+**병렬 가능 조합**: S3 는 언제든(문서 전용). S4 는 신규 패키지라 병행 가능.
 그 외는 공유 파일(`GameStompController`·`RoomService`·`styles/parts`)이 겹쳐 단독.
+**병행할 땐 git worktree 로 트리를 분리**한다 — 같은 워킹 트리에서 두 세션이 돌면 커밋 안 된
+편집을 서로 덮어쓴다(S1·S2 에서 실제로 발생).
 
 ## 공통 규약 (모든 세션)
 
@@ -42,35 +49,35 @@
 
 ---
 
-## S1 — 포트 추출 (티츄를 포트 뒤로)
+## ~~S1 — 포트 추출 (티츄를 포트 뒤로)~~ — ✅ 완료 (D-98)
 
-**선행**: 없음(S0 완료). **D-98**. **단독 세션**(공유 파일 다수).
+**D-98**. 별도 git worktree 에서 진행(같은 트리에서 S2 세션이 동시 작업 중이었음).
 
-### 시작 프롬프트
-```
-docs/game-port.md 를 읽고 S1(포트 추출)을 진행해줘.
-docs/plans/multi-game-sessions.md 의 S1 블록이 범위다.
-티츄 룰은 손대지 말고, 동작 무변경 리팩토링으로.
-```
+### 한 것
+`docs/game-port.md` §1 의 인터페이스를 실제로 만들고 티츄를 그 뒤로 옮겼다.
 
-### 범위
-`docs/game-port.md` §1 의 인터페이스를 실제로 만들고 티츄를 그 뒤로 옮긴다.
+- `GameEngine`·`GameAction`·`GameEvent` 빈 마커 → 실제 표면 (+ `GameState`·
+  `GameActionRejectedException` 신설, `GameContext` 에 targetScore/stake/botSeats 추가)
+- `GameDefinition.newEngine()` 이 실제 디스패치에 쓰인다 — `GameEngineProvider.forRoom` 단일 경로
+- `GameStompController` 하드타입 제거 → 방 → gameType → `engine.actionType()` 로 역직렬화
+- `MatchProgressService`·`BotScheduler`·`TurnTimeoutScheduler`·`DesertionService`·
+  `GameEventBroadcaster`·`RoomController`(resync/rematch) 전부 포트 뒤로
+- 매치 종료/탈주 판정을 인프라 → 엔진으로 이동 (`advance` / `desert`)
+- 티츄는 **2계층**: 순수 `TichuEngine` + 포트 어댑터 `TichuGameEngine`
 
-- `GameEngine`·`GameAction`·`GameEvent` 빈 마커 → 실제 표면
-- `GameDefinition.newEngine()` 을 **실제 디스패치에 사용**(현재 호출부 0건)
-- `GameStompController` 의 `@Payload TichuAction` 하드타입 제거 → 게임별 액션 역직렬화
-- `MatchProgressService`·`BotScheduler`·`TurnTimeoutScheduler` 를 포트 뒤로
-- 매치 종료 판정을 인프라 → 엔진으로 이동
+### 결과
+- **완료 기준 달성**: infra → `domain.game.tichu` 의존 **10파일 → 1파일**.
+  남은 `RoomChipService` 의 이유는 `docs/game-port.md` §2 에 기록(칩은 포트 밖).
+- **검증**: 서버 **412건 전량 그린** + `check.sh bot-stress 5`. 티츄 룰 코드 무변경.
+- D-97 §1 설계에서 3곳을 고쳤다(`isMatchOver` 무인자 / `pendingSeats` 복수 /
+  `initialState` 미채택) — 근거는 `docs/game-port.md` §1.
+- 함정 기록: Spring Framework 7 브로커 컨버터는 Jackson **3** 기반이라 `@Payload` 대상으로
+  Jackson 2 `JsonNode` 를 쓸 수 없다. payload 는 `Map<String,Object>` 로 받는다.
 
-### 하지 않을 것
-- 티츄 룰 변경 · 새 게임 추가 · 인원 가변(S2) · 팀/칩/ELO 일반화
-
-### 검증
-서버 391건 전량 그린. 특히 `BotMatchSimulationIT`·`TurnTimeoutSchedulerIT`·
-`TichuInvariantChecker`. 라이브 봇 솔로 풀매치 1판.
-
-### 완료 기준
-`infra` 에서 `Tichu` 직접 참조가 **0에 수렴**(현재 10파일 123회). 남으면 그 이유를 기록.
+### S4/S5 에 넘기는 것
+- 새 게임은 `GameEngine` 구현 + `GameDefinition @Component` + `GameStartingEvent` 리스너
+  세 개면 인게임까지 자동 연결된다(스케줄러·브로드캐스터·resync 수정 불필요).
+- `initialState` 가 포트에 없으므로 스컬킹도 라운드 시작은 `GameStartingEvent` 리스너로.
 
 ---
 
@@ -161,7 +168,7 @@ D-56 의 `rules-tichu.md` 가 "룰 코드 1:1 매핑의 단일 진실원"으로 
 
 ## S4 — 스컬킹 도메인 (신규 패키지)
 
-**선행**: S1(포트) · S3(명세). **D-101**. **S2 와 병행 가능**(신규 패키지라 충돌면 없음).
+**선행**: S1(포트) ✅ · S3(명세). **D-101**. 신규 패키지라 충돌면 없음 → 언제든 병행 가능.
 
 ### 시작 프롬프트
 ```

@@ -838,7 +838,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4·C5 완료 / C3 남음 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
-| M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | 🔶 설계 완료(D-97) — 실행 단위 `docs/plans/multi-game-sessions.md` S1~S6 |
+| M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | 🔶 진행 중 — S0 설계(D-97)·S1 포트 추출(D-98)·S2 인원 가변(D-99) 완료, 남은 것 S3~S6(스컬킹). 실행 단위 `docs/plans/multi-game-sessions.md` |
 
 **M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
 D-84(`LoginAttemptService`·`AuthRateLimiter`·`rate_limit_fixed_window.lua`, 전부 Redis 휘발 —

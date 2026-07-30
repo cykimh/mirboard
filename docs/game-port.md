@@ -1,22 +1,23 @@
-# GameEngine 포트 설계 (D-97)
+# GameEngine 포트 설계 (D-97 설계 · D-98 구현)
 
-> 상태: **설계 확정 — 구현 대기** · 작성 2026-07-30
+> 상태: **구현 완료** (S1, D-98) · 설계 2026-07-30 · 반영 2026-07-30
 > 이 문서는 **계약 정본**이다. 포트를 바꾸면 여기를 먼저 고친다.
 > 구현 순서와 세션 분할은 `docs/plans/multi-game-sessions.md`.
 
-## 0. 현재 상태 (착수 전 사실)
+## 0. 착수 전 → 현재
 
-`CLAUDE.md` 와 D-06/D-11 은 "새 게임 = 패키지 + `GameDefinition` Bean 등록"이라고 적고
-있지만, **카탈로그(`GET /api/games`)까지만 사실**이다.
+D-97 시점에 `CLAUDE.md` 와 D-06/D-11 의 "새 게임 = 패키지 + `GameDefinition` Bean 등록"은
+**카탈로그(`GET /api/games`)까지만 사실**이었다. S1(D-98)이 그 간극을 닫았다.
 
-| 확인 | 실제 |
-| --- | --- |
-| `GameEngine` / `GameAction` / `GameEvent` | 메서드 **0개** (빈 마커) |
-| `GameDefinition.newEngine()` | 호출부 **0건** (죽은 코드) |
-| infra 의 Tichu 직접 참조 | **10파일 · 123회** |
-| `GameStompController` | `@Payload TichuAction` 으로 **타입 고정** |
+| 확인 | D-97 시점 | 현재 (D-98) |
+| --- | --- | --- |
+| `GameEngine` / `GameAction` / `GameEvent` | 메서드 **0개** (빈 마커) | 실제 표면 (§1) |
+| `GameDefinition.newEngine()` | 호출부 **0건** (죽은 코드) | `GameEngineProvider.forRoom` 단일 경로 |
+| infra → `domain.game.tichu` 의존 | **10파일** | **1파일** (`RoomChipService` — §2 의도적 잔여) |
+| `GameStompController` | `@Payload TichuAction` 타입 고정 | `engine.actionType()` 로 게임별 분기 |
 
-문서가 코드보다 앞서 있다. 2단계(포트 추출)가 끝나야 CLAUDE.md 문구가 참이 된다.
+CLAUDE.md 의 "새 게임 = Bean 추가" 문구는 이제 **인게임까지 참**이다. 남은 잔여 1파일의
+근거는 §2(칩은 포트 밖) 에 있다.
 
 ## 1. 포트 표면 — 티츄 구현에서 역산
 
@@ -36,40 +37,59 @@
 ### 확정한 인터페이스
 
 ```java
-public interface GameEngine {
-    /** 액션 적용. 룰 위반은 GameActionRejectedException. */
-    Result apply(GameState state, int seat, GameAction action);
+public interface GameEngine {                       // per-room. newEngine(ctx) 로만 생성.
+    GameContext context();
 
-    /** 새 매치/라운드 시작 상태. seatCount 는 방 인원(가변). */
-    GameState initialState(int seatCount, long seed);
+    // ② 상태 직렬화 — 저장 위치/포맷은 게임이 정한다.
+    Optional<GameState> loadState();
+    void saveState(GameState state);
 
-    /** 공개 뷰 — 모든 참가자·관전자가 본다. */
-    Object publicView(GameState state);
+    // ① 액션
+    Class<? extends GameAction> actionType();       // 역직렬화 seam (§5 열린 질문 2)
+    Result apply(GameState state, int seat, GameAction action);   // 위반 → GameActionRejectedException
 
-    /** 본인 전용 뷰. 비공개 상태가 없는 게임(요트)은 Optional.empty(). */
-    Optional<Object> privateView(GameState state, int seat);
-
-    /** 클라 분기용 단계 이름. */
+    // ④ 단계 이름 / 진행 질의
     String phaseName(GameState state);
+    List<Integer> pendingSeats(GameState state);    // 오름차순. 동시 대기 가능(티츄 Dealing/Passing)
+    default int pendingSeat(GameState state) { ... } // 첫 좌석 또는 -1 (타임아웃 타이머용)
+    boolean isRoundOver(GameState state);
+    boolean isMatchOver();                          // 매치 상태는 엔진이 소유 — 인자 없음
 
-    /** 지금 행동을 기다리는 좌석. 없으면 -1 (자동 진행 대상 없음). */
-    int pendingSeat(GameState state);
+    // ③ 뷰
+    Object publicView(GameState state);
+    Optional<Object> privateView(GameState state, int seat);  // 요트는 empty
 
-    /** 라운드가 끝났는가 — 끝났으면 좌석별 점수. */
-    Optional<Map<Integer, Integer>> roundScores(GameState state);
-
-    /** 매치가 끝났는가. 티츄=목표점수, 스컬킹=10라운드, 요트=12칸. */
-    boolean isMatchOver(GameState state, MatchProgress progress);
-
-    /** 봇·타임아웃용. 비어 있으면 그 좌석은 지금 할 수 있는 게 없다. */
+    // ⑥ 봇 / 타임아웃
     List<GameAction> legalActions(GameState state, int seat);
-
-    /** 타임아웃 시 적용할 안전 액션. null 이면 아무것도 안 함. */
+    default GameAction botAction(GameState state, int seat, Random random) { ... }  // 기본 균등분포
     GameAction timeoutAction(GameState state, int seat);
 
+    // ⑤ 라운드 · 매치 진행
+    Advance advance(GameState newState, List<GameEvent> outbound);
+    boolean desert(int seat, long deserterUserId, List<GameEvent> outbound);
+
     record Result(GameState newState, List<GameEvent> events) {}
+    record Advance(boolean roundCompleted, boolean matchCompleted) {}
 }
 ```
+
+`GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
+노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
+`(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
+
+### D-98 구현에서 고친 3곳
+
+설계(D-97)와 다른 부분. 이 문서가 계약 정본이므로 표면은 위 코드가 정본이다.
+
+| 설계 | 구현 | 이유 |
+| --- | --- | --- |
+| `isMatchOver(state, MatchProgress)` | `isMatchOver()` | 티츄 매치 상태는 **팀 점수 + MVP 기여도**라 게임 중립 `MatchProgress` 로 손실 없이 표현 불가. 매치 상태를 엔진이 소유하고 인프라에 노출하지 않는다 |
+| `pendingSeat` 단수 | `pendingSeats` 복수 (+ `pendingSeat` default) | Dealing/Passing 은 **여러 좌석 동시 대기**. 단수면 좌석 3 봇이 좌석 1 사람의 선언을 기다리며 멈춘다 |
+| `initialState(seatCount, seed)` | **미채택** | 라운드 시작은 게임 도메인의 `GameStartingEvent` 리스너가 계속 맡아 호출부가 0건. 호출부 없는 포트 메서드가 바로 `newEngine()` 의 실패 모드였다 |
+
+`roundScores(state)` 도 두지 않았다 — 좌석별 점수를 인프라가 쓸 일이 없고, 라운드 점수
+누적은 `advance` 안에서 게임이 자기 매치 상태에 직접 한다. 대신 `desert`(탈주 강제 종료)와
+`advance`(진행 결과 통보)가 들어왔다.
 
 ### 설계 판단 세 가지
 
@@ -97,6 +117,12 @@ public interface GameEngine {
 | 좌석 수 4 고정 | 가변으로 감 — §3 |
 | 트릭·리드수트 | 트릭테이킹 계열만의 개념. 스컬킹은 **티츄와 공유하는 내부 모듈**로 뽑되 포트는 아님 |
 
+**칩을 뺀 결과 — infra 의 유일한 티츄 잔여**: `RoomChipService`(infra.ws)는
+`TichuGameDefinition.ID` / `TichuMatchCompleted` / `Team` 을 계속 직접 참조한다. 칩 정산은
+"어느 팀이 이겼는가"에 붙어 있어서 포트로 올리려면 팀 개념을 다시 끌어올려야 하고, 신규
+게임은 `stake=0` 으로 시작하므로 지금 일반화하면 **쓰이지 않는 추상**이 된다. 스컬킹에
+내기를 붙이는 시점에 "승자 집합"만 다루는 게임 중립 정산 이벤트를 별건으로 검토한다.
+
 ## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 
 스컬킹을 **2~8인**(BGG 추천 4~6)으로 확정하면서 인원 가변이 **필수**가 됐다.
@@ -114,21 +140,34 @@ public interface GameEngine {
 지금까지 드러나지 않았고, 스컬킹 6~8인 방에서 처음 문제가 된다 — **S5 의 봇 정책
 작업에 봇 풀 확장이 포함되어야 한다**. 계약(`api.md`)에 제약으로 명시해 두었다.
 
-## 4. 검증 전략
+## 4. 검증 전략 — **실행 결과 (S1)**
 
 포트 추출은 **게임이 하나 그대로**이므로 D-87 과 같은 "동작 무변경 리팩토링"이다.
 
-- **안전망**: 서버 391건 전량. 특히 `BotMatchSimulationIT`(풀매치)·`TurnTimeoutSchedulerIT`·
-  `TichuInvariantChecker` 가 룰 회귀를 잡는다.
-- **금지**: 포트 추출 커밋에서 티츄 룰을 손대지 않는다. 룰 변경이 섞이면 이후 회귀의
-  원인 분리가 불가능해진다.
+- **안전망**: 서버 **412건 전량 그린**(69 클래스, 실패 0). `BotMatchSimulationIT`(봇 풀매치)·
+  `TurnTimeoutSchedulerIT`·`TichuInvariantChecker` 가 룰 회귀를 잡는다. 추가로
+  `check.sh bot-stress 5` (봇 풀매치 5회) 통과.
+- **금지 준수**: 티츄 룰 코드는 한 줄도 바뀌지 않았다 — `TichuEngine`·`ActionValidator`·
+  `Hand*`·`ScoreCalculator` 무변경(diff 상 `TichuEngine` 은 javadoc + `implements` 절 뿐).
+- **와이어 계약 무변경 증거**: `GameStompControllerIntegrationTest` 가 실제 WebSocket 으로
+  `PLAY_CARD` 프레임을 보내 `PLAYED` 브로드캐스트를 확인하고, `RoomResyncIntegrationTest` 가
+  resync JSON 을 jsonPath 로 검증한다(`tableView`/`privateHand` 필드 타입이 `Object` 가
+  됐지만 직렬화 결과는 동일).
 - **포트가 티츄 모양으로 굳었는지는 요트에서 드러난다.** 스컬킹만으로는 검증되지 않으므로,
   스컬킹 완료 시점에 "요트를 넣는다면 어디가 막히나"를 종이로 한 번 통과시킨다.
 
-## 5. 열린 질문 (구현 중 결정)
+**구현 중 걸린 함정 하나** (기록용): Spring Framework 7 의 STOMP 브로커 메시지 컨버터는
+**Jackson 3** 기반이라 Jackson 2 의 `JsonNode` 를 `@Payload` 대상 타입으로 받지 못한다
+(`MessageConversionException: Cannot construct instance of JsonNode`). 게임별 액션을 원본으로
+받으려면 버전 중립인 `Map<String,Object>` 로 받아 우리 `ObjectMapper` 로 변환해야 한다.
 
-1. `GameState` 를 마커 인터페이스로 둘지, 공통 필드(라운드 번호 등)를 요구할지.
-   → 마커로 시작하고 중복이 보이면 올린다. 처음부터 공통 필드를 강요하면 요트가 깨진다.
-2. 액션 역직렬화 seam — `@JsonTypeInfo` 판별자를 게임별로 어떻게 고를지.
-   목적지(`/app/room/{roomId}/action`)에서 방 → gameType 을 조회해 분기하는 방식이 유력.
-3. 봇 정책의 게임별 분리 — `RandomBotPolicy` 는 티츄 액션에 묶여 있다.
+## 5. 열린 질문 — **전부 결정 (S1)**
+
+1. **`GameState` 는 마커로 확정.** 공통 필드 0개. 라운드 번호 같은 걸 요구하면 그 개념이
+   없는 게임(요트=12칸 기록표)이 거짓 구현을 강요당한다. 중복이 실제로 보이면 그때 올린다.
+2. **액션 역직렬화 seam = 목적지에서 방 → gameType 분기** (유력했던 안 그대로).
+   `engine.actionType()` 이 대상 타입을 주고 컨트롤러가 변환한다. 목적지는 하나로 유지되어
+   클라 계약은 바뀌지 않았다. 알 수 없는 판별자는 `ERROR(INVALID_ACTION)`.
+3. **봇 정책은 포트 메서드 + 게임별 override 로 분리.** `botAction(state, seat, random)` 의
+   기본 구현이 "합법 액션 균등 분포"이고 티츄는 `RandomBotPolicy` 로 override 한다. 시드
+   `Random` 은 스케줄러가 계속 보유하므로 `mirboard.bot.seed` 재현성이 유지된다.
