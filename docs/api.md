@@ -375,6 +375,35 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 
 ---
 
+## 채팅 신고 *(D-93)*
+
+### POST `/api/chat/reports`
+채팅 메시지 신고. **본문(message)을 보내지 않는다** — `eventId` 로 "어느 메시지"만
+지목하고 원문·작성자는 서버가 Redis 링버퍼(`chatlog:*`, TTL 2h·최근 100개) 보관분에서
+확정한다. 클라가 본문을 제출하면 "상대가 이런 말을 했다"를 위조할 수 있기 때문
+(Server-Authoritative). 신고된 메시지만 `chat_reports`(V9)로 승격되며 상시 채팅 로그는
+영속화하지 않는다.
+
+요청
+```json
+{ "eventId": "9d6f-...", "scope": "ROOM", "roomId": "8f1e..." }
+```
+- `eventId`: STOMP `CHAT` envelope 의 `eventId` (클라 `roomChatStore` 가 보관 중)
+- `scope`: `"ROOM"` | `"LOBBY"` (대소문자 무시). `ROOM` 이면 `roomId` 필수.
+
+응답 `201`
+```json
+{ "reportId": 12, "eventId": "9d6f-..." }
+```
+
+에러:
+- `CHAT_MESSAGE_NOT_FOUND` (404) — 링버퍼에 없음. 대개 너무 오래된 메시지(TTL 2h·100개 초과).
+- `SELF_REPORT` (400) — 자기 메시지 신고.
+- `DUPLICATE_REPORT` (409) — 같은 사람이 같은 메시지 재신고(`UNIQUE(event_id, reporter_user_id)`).
+- `TOO_MANY_REQUESTS` (429) — D-90 `expensive-write` 버킷.
+
+---
+
 ## 어드민 / 모더레이션 *(D-86 — 어드민만)*
 
 `/api/admin/**` 은 `admin_roles` 에 등록된 사용자만 접근(매 요청 조회). 비어드민은
@@ -392,6 +421,36 @@ TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유�
 
 ### DELETE `/api/admin/users/{userId}/suspend`
 유저 정지 해제. 응답 `204`. 에러: `NOT_ADMIN` (403).
+
+### GET `/api/admin/chat-reports` *(D-93)*
+채팅 신고 목록(최신순). 쿼리 `limit` 기본 50, 1~200 clamp.
+각 항목에 피신고자의 **누적 신고 수**(`totalAgainstReported`)를 함께 실어 정지 판단을
+한 화면에서 할 수 있게 한다.
+
+응답 `200`
+```json
+{
+  "reports": [
+    {
+      "reportId": 12,
+      "eventId": "9d6f-...",
+      "scope": "ROOM",
+      "roomId": "8f1e...",
+      "reportedUserId": 18,
+      "reporterUserId": 17,
+      "message": "신고된 메시지 본문",
+      "messageAt": 1715600000000,
+      "createdAt": 1715600030000,
+      "totalAgainstReported": 3
+    }
+  ]
+}
+```
+- `message` 는 broadcast 된 본문 그대로다 — D-86 금칙어 마스킹이 이미 적용된 상태.
+  어드민이 보는 것과 사용자가 본 것을 일치시키기 위함.
+- 처리 상태(resolve/dismiss)는 **미구현**(D-93 범위 밖).
+
+에러: `NOT_ADMIN` (403).
 
 ---
 

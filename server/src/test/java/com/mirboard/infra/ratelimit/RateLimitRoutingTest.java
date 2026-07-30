@@ -34,6 +34,9 @@ class RateLimitRoutingTest {
                 .isEqualTo(RateLimitProperties.EXPENSIVE_WRITE);
         assertThat(httpBucket("PUT", "/api/me/password"))
                 .isEqualTo(RateLimitProperties.EXPENSIVE_WRITE);
+        // D-93 — 채팅 신고도 고비용 쓰기(DB write + 링버퍼 스캔 + 남용 여지).
+        assertThat(httpBucket("POST", "/api/chat/reports"))
+                .isEqualTo(RateLimitProperties.EXPENSIVE_WRITE);
     }
 
     @Test

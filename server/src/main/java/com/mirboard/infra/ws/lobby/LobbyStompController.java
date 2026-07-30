@@ -1,5 +1,6 @@
 package com.mirboard.infra.ws.lobby;
 
+import com.mirboard.domain.admin.ChatLogStore;
 import com.mirboard.domain.admin.ChatModerationService;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.infra.messaging.StompPublisher;
@@ -25,22 +26,29 @@ public class LobbyStompController {
     private final Clock clock;
     private final StompPublisher publisher;
     private final ChatModerationService chatModeration;
+    private final ChatLogStore chatLog;
 
     public LobbyStompController(Clock clock, StompPublisher publisher,
-                               ChatModerationService chatModeration) {
+                               ChatModerationService chatModeration,
+                               ChatLogStore chatLog) {
         this.clock = clock;
         this.publisher = publisher;
         this.chatModeration = chatModeration;
+        this.chatLog = chatLog;
     }
 
     @MessageMapping("/lobby/chat")
     public void handleLobbyChat(@Payload ChatRequest req, Principal principal) {
         AuthPrincipal me = (AuthPrincipal) principal;
+        String masked = chatModeration.mask(req.message());
         var envelope = StompEnvelope.of(
                 "CHAT",
-                new ChatMessage(me.userId(), me.username(), chatModeration.mask(req.message())),
+                new ChatMessage(me.userId(), me.username(), masked),
                 clock);
         publisher.publishToTopic(LOBBY_CHAT_TOPIC, envelope);
+        // D-93 — 신고 시 서버가 원문을 확정할 근거(TTL 2h, 최근 100개). 영속 로그 아님.
+        chatLog.record(ChatLogStore.SCOPE_LOBBY, null, new ChatLogStore.Entry(
+                envelope.eventId(), me.userId(), me.username(), masked, envelope.ts()));
     }
 
     public record ChatRequest(@NotBlank @Size(max = 500) String message) {

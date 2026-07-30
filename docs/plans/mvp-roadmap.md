@@ -886,8 +886,14 @@ prune, 덤프 직후 자동 무결성 검증)와 `docs/runbooks/backup-restore.m
 xk6 확장 빌드가 필요해 제외). 임계값은 실측 역산. 서버 자바 소스 무변경.
 검증: dump→파괴→restore 왕복으로 전량 복원 확인.
 
-**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요). 채팅 신고 적재/조회(테이블)도
-후속. C1 의 Micrometer 카운터는 `MirboardMetrics` 공유 파일이라 C3 로 위임.
+**M2 진행(채팅 신고 완료)**: D-93 — 채팅이 인메모리 broadcast 라 서버에 원문이 없던 문제를,
+broadcast 시 Redis 링버퍼(`chatlog:*`, 최근 100개·TTL 2h) 보관으로 풀었다. 신고는 `eventId`
+만 지목하고 원문·작성자는 **서버가 확정**한다(클라 본문 제출은 무고 가능 — Server-Authoritative).
+신고된 것만 `chat_reports`(V9)로 승격돼 상시 로그 영속화가 아니다. `POST /api/chat/reports` +
+어드민 `GET /api/admin/chat-reports`. 처리 상태(resolve)는 범위 밖.
+
+**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요)만. C1 의 Micrometer 카운터는
+`MirboardMetrics` 공유 파일이라 C3 로 위임.
 
 **작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
 `docs/plans/parallel-tracks.md`(T0·T1 완료, T2~T8 대기).
