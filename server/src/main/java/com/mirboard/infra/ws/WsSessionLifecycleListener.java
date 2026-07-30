@@ -16,7 +16,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
  * Phase 19(#1, D-75) — STOMP SUBSCRIBE/DISCONNECT 후킹.
  *
  * <p>방 화면(대기실 `/topic/room/{id}/meta`, 게임 `/topic/room/{id}` 및
- * `/chat`)을 구독할 때 세션→방을 {@link WsSessionRegistry} 에 기록하고,
+ * `/chat`)을 구독할 때 세션→방을 {@link RoomPresence}(Redis) 에 기록하고,
  * 끊김 시 제거 후 {@link RoomDisconnectHandler} 로 정리/유예를 위임한다.
  * 로비 채팅(`/topic/lobby/chat`) 등 방과 무관한 구독은 무시한다.
  */
@@ -29,12 +29,12 @@ public class WsSessionLifecycleListener {
     private static final Pattern ROOM_TOPIC =
             Pattern.compile("^/topic/room/([^/]+)(?:/.*)?$");
 
-    private final WsSessionRegistry registry;
+    private final RoomPresence presence;
     private final RoomDisconnectHandler disconnectHandler;
 
-    public WsSessionLifecycleListener(WsSessionRegistry registry,
+    public WsSessionLifecycleListener(RoomPresence presence,
                                       RoomDisconnectHandler disconnectHandler) {
-        this.registry = registry;
+        this.presence = presence;
         this.disconnectHandler = disconnectHandler;
     }
 
@@ -55,7 +55,7 @@ public class WsSessionLifecycleListener {
             return;
         }
         String roomId = m.group(1);
-        registry.register(sessionId, userId, roomId);
+        presence.join(sessionId, userId, roomId);
         // 끊김 유예 중이던 플레이어가 방 토픽을 재구독 = 재접속 → 유예 취소 + 알림.
         disconnectHandler.onReconnect(roomId, userId);
     }
@@ -66,7 +66,7 @@ public class WsSessionLifecycleListener {
         if (sessionId == null) {
             return;
         }
-        registry.remove(sessionId).ifPresent(info -> {
+        presence.leave(sessionId).ifPresent(info -> {
             try {
                 disconnectHandler.onDisconnect(info.roomId(), info.userId());
             } catch (RuntimeException e) {

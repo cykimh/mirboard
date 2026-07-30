@@ -28,12 +28,12 @@ public class RoomDisconnectHandler {
     private final RoomService roomService;
     private final DesertionGraceScheduler graceScheduler;
     private final PlayerPresenceNotifier presence;
-    private final WsSessionRegistry sessions;
+    private final RoomPresence sessions;
 
     public RoomDisconnectHandler(RoomService roomService,
                                  DesertionGraceScheduler graceScheduler,
                                  PlayerPresenceNotifier presence,
-                                 WsSessionRegistry sessions) {
+                                 RoomPresence sessions) {
         this.roomService = roomService;
         this.graceScheduler = graceScheduler;
         this.presence = presence;

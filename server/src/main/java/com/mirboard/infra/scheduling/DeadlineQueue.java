@@ -59,6 +59,16 @@ public class DeadlineQueue {
     }
 
     /**
+     * 취소하되 <b>실제로 대기 중이었는지</b>를 반환한다. `ZREM` 의 제거 개수가 곧
+     * in-memory 시절의 "future 가 null 이 아니었나"와 같은 의미다 — 탈주 유예처럼
+     * "정말 끊겼다가 돌아온 경우에만 알림"을 구분해야 하는 곳에서 쓴다.
+     */
+    public boolean cancelExisting(String kind, String member) {
+        Long removed = redis.opsForZSet().remove(key(kind), member);
+        return removed != null && removed > 0;
+    }
+
+    /**
      * 만료분을 원자적으로 pop. 반환된 항목은 <b>이 인스턴스가 단독 소유</b>하므로
      * 호출자가 반드시 처리해야 한다(다시 큐에 없음).
      */
