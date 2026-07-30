@@ -57,6 +57,10 @@ Usage: ./scripts/check.sh <subcommand> [args]
   all               server + client (~1m30s)
   bot-stress [N]    BotMatchSimulationIT N회 시뮬레이션 (기본 10, ~5s/매치)
   infra             docker compose ps + Postgres/Redis 헬스 (~2s)
+  load [VUs]        k6 REST 스모크 부하 (기본 5 VU, ~35s). 서버가 :8080 에 떠 있어야 함.
+                    k6 미설치면 Docker 이미지로 폴백 (M2-C5, D-92).
+                    인게임 부하는 bot-stress 담당 — 역할 분담은 scripts/k6/README.md.
+  backup ...        백업/복구는 ./scripts/backup.sh 로 위임 (dump/restore/list/verify/prune)
   -h, --help        본 메시지
 
 OrbStack/Colima Docker socket 자동 감지 — DOCKER_HOST 수동 설정 불필요.
@@ -150,6 +154,51 @@ case "$SUBCMD" in
         docker compose exec -T redis redis-cli PING 2>&1 || \
             { echo "${RED}Redis unhealthy${RESET}" >&2; exit 1; }
         log "infra 정상"
+        ;;
+
+    load)
+        VUS="${2:-5}"
+        if ! [[ "$VUS" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: load 인자는 양의 정수여야 합니다 (받은 값: '$VUS')" >&2
+            exit 1
+        fi
+        BASE_URL="${MIRBOARD_BASE_URL:-http://localhost:8080}"
+
+        # 서버가 안 떠 있으면 k6 가 전부 실패로 도배되므로 먼저 확인한다.
+        # 인증 필요 엔드포인트라 401 이 정상 응답.
+        CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/games" 2>/dev/null || echo "000")
+        if [ "$CODE" != "401" ] && [ "$CODE" != "200" ]; then
+            echo "${RED}ERROR: 서버 응답 없음 ($BASE_URL → $CODE)${RESET}" >&2
+            echo "  './scripts/dev.sh server' 로 먼저 띄우세요." >&2
+            exit 1
+        fi
+
+        # 재실행 시 계정 충돌을 피하려고 실행마다 태그를 바꾼다(409 는 허용이지만
+        # 매번 새 계정이 부하 특성에 더 가깝다).
+        TAG="$(date +%H%M%S)"
+        if command -v k6 >/dev/null 2>&1; then
+            log "k6 (로컬) — ${VUS} VU, base=$BASE_URL"
+            MIRBOARD_BASE_URL="$BASE_URL" MIRBOARD_LOAD_VUS="$VUS" K6_RUN_TAG="$TAG" \
+                k6 run scripts/k6/smoke.js
+        else
+            log "k6 미설치 → Docker 이미지로 실행 (${VUS} VU)"
+            # 컨테이너에서 호스트 서버를 보려면 localhost 를 host.docker.internal 로.
+            DOCKER_BASE="${BASE_URL/localhost/host.docker.internal}"
+            DOCKER_BASE="${DOCKER_BASE/127.0.0.1/host.docker.internal}"
+            docker run --rm -i --add-host=host.docker.internal:host-gateway \
+                -e MIRBOARD_BASE_URL="$DOCKER_BASE" \
+                -e MIRBOARD_LOAD_VUS="$VUS" \
+                -e K6_RUN_TAG="$TAG" \
+                -v "$REPO_ROOT/scripts/k6:/scripts:ro" \
+                grafana/k6:latest run /scripts/smoke.js
+        fi
+        log "부하 시나리오 통과 (임계값 위반 시 k6 가 비정상 종료)"
+        ;;
+
+    backup)
+        log "백업/복구는 전용 스크립트로 위임합니다"
+        echo ""
+        exec "$REPO_ROOT/scripts/backup.sh" "${@:2}"
         ;;
 
     -h|--help|help)
