@@ -1,7 +1,6 @@
 package com.mirboard.domain.game.tichu;
 
 import com.mirboard.domain.game.core.GameContext;
-import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.tichu.action.ActionValidator;
 import com.mirboard.domain.game.tichu.action.TichuAction;
 import com.mirboard.domain.game.tichu.card.Card;
@@ -31,8 +30,12 @@ import java.util.Set;
  *
  * <p>본 클래스는 의도적으로 stateless — `context` 만 보유하고 모든 호출은 입력
  * 상태에서 출력 상태로의 순수 함수. 동시성 직렬화는 컨트롤러/락이 담당.
+ *
+ * <p>D-98: {@code GameEngine} 포트를 <b>직접 구현하지 않는다</b>. 포트는 상태 저장·매치
+ * 진행까지 요구하는데 그걸 여기 넣으면 룰 단위 테스트가 Redis 를 끌고 온다. 포트 구현은
+ * 본 클래스를 감싸는 {@link TichuGameEngine} 어댑터가 맡는다.
  */
-public final class TichuEngine implements GameEngine {
+public final class TichuEngine {
 
     private final GameContext context;
 
