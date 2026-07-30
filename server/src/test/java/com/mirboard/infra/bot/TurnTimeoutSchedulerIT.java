@@ -49,7 +49,12 @@ import org.testcontainers.utility.DockerImageName;
 @TestPropertySource(properties = {
         "mirboard.jwt.secret=turn-timeout-test-secret-must-be-32-bytes-or-more",
         "mirboard.bot.seed=777",
-        "mirboard.bot.delay-millis=0"
+        "mirboard.bot.delay-millis=0",
+        // D-96 — 데드라인은 폴링이라 타이머마다 최대 한 주기의 지연이 붙는다.
+        // 이 테스트는 turnSeconds=1 이라 그 지연이 그대로 증폭돼(매 턴 +주기)
+        // 기본 250ms 로도 매치 완주가 느려진다. 폴링 지연이 아니라 타임아웃
+        // 자동진행을 검증하는 테스트이므로 주기를 최소로 낮춘다.
+        "mirboard.scheduling.poll-interval-millis=50"
 })
 class TurnTimeoutSchedulerIT {
 
