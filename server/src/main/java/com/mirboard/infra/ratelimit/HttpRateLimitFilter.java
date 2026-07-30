@@ -37,6 +37,8 @@ public class HttpRateLimitFilter extends OncePerRequestFilter {
             new Route("POST", "/api/auth/", RateLimitProperties.AUTH),
             new Route(null, "/api/me/avatar", RateLimitProperties.EXPENSIVE_WRITE),
             new Route("PUT", "/api/me/password", RateLimitProperties.EXPENSIVE_WRITE),
+            // D-93 — 신고는 DB write + 링버퍼 스캔이라 고비용, 남용 여지도 크다.
+            new Route("POST", "/api/chat/reports", RateLimitProperties.EXPENSIVE_WRITE),
             new Route("POST", "/api/rooms", RateLimitProperties.ROOM_CREATE));
 
     private final RateLimiter rateLimiter;

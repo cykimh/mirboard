@@ -1,5 +1,6 @@
 package com.mirboard.infra.ws;
 
+import com.mirboard.domain.admin.ChatLogStore;
 import com.mirboard.domain.admin.ChatModerationService;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
@@ -33,13 +34,15 @@ public class RoomChatController {
     private final StompPublisher publisher;
     private final RoomService roomService;
     private final ChatModerationService chatModeration;
+    private final ChatLogStore chatLog;
 
     public RoomChatController(Clock clock, StompPublisher publisher, RoomService roomService,
-                             ChatModerationService chatModeration) {
+                             ChatModerationService chatModeration, ChatLogStore chatLog) {
         this.clock = clock;
         this.publisher = publisher;
         this.roomService = roomService;
         this.chatModeration = chatModeration;
+        this.chatLog = chatLog;
     }
 
     @MessageMapping("/room/{roomId}/chat")
@@ -55,11 +58,16 @@ public class RoomChatController {
         } catch (RoomNotFoundException e) {
             return;
         }
+        String masked = chatModeration.mask(req.message());
         var envelope = StompEnvelope.of(
                 "CHAT",
-                new ChatMessage(me.userId(), me.username(), chatModeration.mask(req.message())),
+                new ChatMessage(me.userId(), me.username(), masked),
                 clock);
         publisher.publishToTopic("/topic/room/" + roomId + "/chat", envelope);
+        // D-93 — 신고 시 서버가 원문을 확정할 수 있도록 링버퍼에 보관(TTL 2h, 최근 100개).
+        // broadcast 된 본문 그대로 남긴다 — 어드민이 보는 것과 사용자가 본 것을 일치시킨다.
+        chatLog.record(ChatLogStore.SCOPE_ROOM, roomId, new ChatLogStore.Entry(
+                envelope.eventId(), me.userId(), me.username(), masked, envelope.ts()));
     }
 
     public record ChatRequest(@NotBlank @Size(max = 500) String message) {

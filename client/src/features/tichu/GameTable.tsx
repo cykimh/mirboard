@@ -271,6 +271,7 @@ export function GameTable({
           sendChat={sendChat}
           panelOpenRef={chatPanelOpenRef}
           onClose={() => setChatOpen(false)}
+          roomId={roomId}
         />
       )}
     </div>

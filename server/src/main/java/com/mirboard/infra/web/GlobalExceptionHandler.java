@@ -1,6 +1,9 @@
 package com.mirboard.infra.web;
 
+import com.mirboard.domain.admin.ChatMessageNotFoundException;
+import com.mirboard.domain.admin.DuplicateReportException;
 import com.mirboard.domain.admin.NotAdminException;
+import com.mirboard.domain.admin.SelfReportException;
 import com.mirboard.domain.game.core.GameNotFoundException;
 import com.mirboard.domain.lobby.auth.AccountLockedException;
 import com.mirboard.domain.lobby.auth.AccountSuspendedException;
@@ -78,6 +81,26 @@ public class GlobalExceptionHandler {
         // D-86 — 정지된 계정. 403 Forbidden.
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorEnvelope.of("ACCOUNT_SUSPENDED", "정지된 계정입니다. 관리자에게 문의하세요."));
+    }
+
+    @ExceptionHandler(ChatMessageNotFoundException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleChatMessageNotFound(ChatMessageNotFoundException e) {
+        // D-93 — 링버퍼(최근 100개·TTL 2h)에 없음. 대개 "너무 오래된 메시지".
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrorEnvelope.of("CHAT_MESSAGE_NOT_FOUND",
+                        "신고할 메시지를 찾을 수 없습니다. 너무 오래된 메시지일 수 있습니다."));
+    }
+
+    @ExceptionHandler(SelfReportException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleSelfReport(SelfReportException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiErrorEnvelope.of("SELF_REPORT", "자기 메시지는 신고할 수 없습니다."));
+    }
+
+    @ExceptionHandler(DuplicateReportException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleDuplicateReport(DuplicateReportException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("DUPLICATE_REPORT", "이미 신고한 메시지입니다."));
     }
 
     @ExceptionHandler(NotAdminException.class)
