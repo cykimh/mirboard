@@ -50,7 +50,7 @@ Usage: ./scripts/check.sh <subcommand> [args]
 
   fast              빠른 회귀 (클라 tsc+vitest + 서버 compile, ~30s)
                     pre-commit hook 과 동일 로직.
-  rules             서버 룰 도메인 단위 (card/hand/scoring/action/invariant, ~3s)
+  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량, ~5s)
                     Docker 불필요.
   server            서버 풀 (단위 + IT, Docker 필요, ~1m20s)
   client            클라 풀 (build:check + test + build, ~10s)
@@ -99,7 +99,8 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest" \
             --tests "com.mirboard.domain.game.tichu.TichuSpecialCardScenarioTest" \
             --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
-            --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest"
+            --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
+            --tests "com.mirboard.domain.game.skullking.*"
         log "모두 통과"
         ;;
 
