@@ -1,7 +1,12 @@
-# Mirboard REST API 명세 (Phase 1)
+# Mirboard REST API 명세
 
 본 문서는 로비/인증/방 관리/재접속에 대한 REST 엔드포인트 계약이다. 인게임 실시간
 이벤트는 STOMP 채널에서 처리되며 `docs/stomp-protocol.md` 를 참조한다.
+
+> 정본(계약). 2026-07-30 컨트롤러 전수 대조로 정합화(T0) — 응답 형태는 서버 record
+> 및 클라 `types/api.ts`·`types/tichu.ts` 미러와 1:1 이다. 코드생성기가 없어 미러가
+> 수동이므로, 계약 변경은 **서버 DTO + 클라 타입 + 본 문서를 같은 커밋**으로 처리한다
+> (`docs/plans/parallel-tracks.md` 직렬화 지점 4).
 
 ## 공통
 
@@ -135,23 +140,33 @@
 `gameType` 값은 `GameRegistry` 에 등록된 ID여야 하며, 미등록 값이면 `INVALID_INPUT`
 응답.
 
-응답 `200`
+응답 `200` — `{ "rooms": Room[] }`.
+
+**`Room` 형태** (서버 `Room` record 전체 — 목록·상세·join·ready 등 Room 을 돌려주는
+모든 응답이 동일):
 ```json
 {
-  "rooms": [
-    {
-      "roomId": "8f1e...",
-      "name": "티츄 한 판",
-      "gameType": "TICHU",
-      "status": "WAITING",
-      "hostId": 17,
-      "playerCount": 2,
-      "capacity": 4,
-      "createdAt": 1715599900000
-    }
-  ]
+  "roomId": "8f1e...",
+  "name": "티츄 한 판",
+  "gameType": "TICHU",
+  "hostId": 17,
+  "status": "WAITING",
+  "capacity": 4,
+  "playerCount": 2,
+  "playerIds": [17, 18],
+  "spectatorIds": [],
+  "teamPolicy": "SEQUENTIAL",
+  "createdAt": 1715599900000,
+  "fillWithBots": false,
+  "botSeats": [],
+  "targetScore": 1000,
+  "turnSeconds": 0,
+  "stake": 0,
+  "readyUserIds": []
 }
 ```
+- 좌석(seat)은 `playerIds` 의 인덱스다 — STOMP 이벤트의 `seat` 와 같은 축.
+- `botSeats` 는 `playerIds` 인덱스 기준 봇 좌석(D-50).
 
 ### POST `/api/rooms`
 요청
@@ -239,6 +254,15 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 }
 ```
 
+### GET `/api/users/names` *(A6 — 좌석 닉네임 표시)*
+쿼리 `ids` (userId 콤마 목록, 중복 제거 후 최대 50). 존재하지 않는 id 는 조용히
+누락 — 클라는 `#id` 폴백.
+
+응답 `200`
+```json
+{ "names": [ { "userId": 17, "username": "alice" } ] }
+```
+
 ### PUT `/api/rooms/{roomId}/team-policy` *(Phase 8C — 호스트 전용)*
 WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
 
@@ -272,55 +296,82 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   D-71). WAITING/FINISHED 이거나 관전자면 일반 leave/stopSpectating.
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
   은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
-  기본 30s) 후 미복귀 시 탈주.
+  기본 **120s**, D-79) 후 미복귀 시 탈주.
 
 ### GET `/api/rooms/{roomId}`
 응답 `200` — 단일 Room 상세.
 
-### GET `/api/rooms/{roomId}/resync` *(인게임 재접속)*
-방 참가자만 호출 가능. 응답에는 본인 손패가 포함되므로 절대 다른 유저에게 노출
-금지.
+### POST `/api/rooms/{roomId}/spectate` *(Phase 6A-5 — 관전 진입)*
+응답 `200` — Room (spectatorIds 에 본인 추가). 플레이어로 이미 참가 중이면 에러.
 
-응답 `200`
+### DELETE `/api/rooms/{roomId}/spectate`
+관전 종료. 등록 안 되어 있어도 `204`.
+
+### GET `/api/rooms/{roomId}/resync` *(인게임 재접속·관전 동기화)*
+**참가자 + 관전자** 호출 가능(그 외 `NOT_IN_ROOM`). 관전자는 `privateHand: null`
+— 본인 손패는 참가자 본인에게만 (State Hiding).
+
+응답 `200` (필드는 서버 `ResyncResponse`/`TableView`/`PrivateHand` record,
+클라 `types/tichu.ts` 미러와 1:1)
 ```json
 {
   "roomId": "8f1e...",
   "phase": "PLAYING",
   "eventSeq": 142,
   "tableView": {
-    "currentTurnUserId": 19,
-    "scores": { "A": 240, "B": 100 },
-    "handCounts": { "17": 5, "18": 8, "19": 11, "20": 9 },
-    "currentTrick": { "leadUserId": 18, "plays": [ /* 카드 공개 */ ] },
-    "tichuDeclarations": { "17": "TICHU", "20": "GRAND" },
-    "activeWish": 7
+    "phase": "PLAYING",
+    "dealingCardCount": 14,
+    "readySeats": [],
+    "passingSubmittedSeats": [],
+    "currentTurnSeat": 2,
+    "handCounts": { "0": 5, "1": 8, "2": 11, "3": 9 },
+    "currentTop": { "type": "PAIR", "cards": [/* Card[] */], "rank": 7,
+                    "length": 2, "phoenixSingle": false },
+    "currentTopSeat": 1,
+    "declarations": { "0": "TICHU", "3": "GRAND_TICHU" },
+    "roundScores": { "A": 40, "B": 15 },
+    "matchScores": { "A": 240, "B": 100 },
+    "roundNumber": 3,
+    "finishingOrder": [],
+    "activeWishRank": 7
   },
-  "privateHand": {
-    "cards": [
-      { "suit": "JADE", "rank": 9 },
-      { "special": "PHOENIX" }
-    ]
-  }
+  "privateHand": { "seat": 0, "cards": [
+    { "suit": "JADE", "rank": 9, "special": null },
+    { "suit": null, "rank": 0, "special": "PHOENIX" }
+  ]},
+  "disconnectedSeats": [3],
+  "chips": { "17": 1000, "18": 900, "19": 1100, "20": 1000 }
 }
 ```
+- 좌석 식별은 **seat(0~3, playerIds 인덱스)**, `handCounts`/`declarations` 키도 seat.
+- `disconnectedSeats`: 현재 끊긴 플레이어 좌석(재접속 배지 즉시 반영, D-75).
+- `chips`: D-82 방 단위 테이블 칩(userId→칩). 내기 없는 방은 빈 맵.
+
 에러: `NOT_IN_ROOM`, `RESYNC_NOT_AVAILABLE` (게임 진행 중이 아님).
 
 ---
 
 ## 사용자 통계
 
-### GET `/api/me/stats`
-응답 `200`
-```json
-{
-  "winCount": 3,
-  "loseCount": 4,
-  "lastMatches": [
-    { "matchId": 88, "finishedAt": 1715000000000, "team": "A",
-      "isWin": true, "teamAScore": 1050, "teamBScore": 720 }
-  ]
-}
-```
+본인 전적은 별도 엔드포인트가 아니라 `GET /api/users/{userId}/stats` 를 본인 id 로
+호출한다(위). 매치 이력 목록(`lastMatches`) 은 **미구현** — `tichu_match_results` /
+`tichu_match_participants` 에 적재는 되고 있으나 조회 API 는 없다.
+
+---
+
+## 아바타 *(D-80 — 선택적 코스메틱, 별도 테이블 `user_avatars`)*
+
+### POST `/api/me/avatar`
+multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 응답 `204`.
+에러: `INVALID_AVATAR` (빈 파일/미지원 형식), 업로드 크기 초과.
+
+### DELETE `/api/me/avatar`
+응답 `204` (없어도 204).
+
+### GET `/avatars/{userId}` *(공개, 비-`/api`)*
+`image/png` 바이너리 (`Cache-Control: max-age=60`), 없으면 `404`. `<img>` 직접
+요청은 Bearer 를 못 실으므로 의도적으로 `/api/**` 밖(D-61 default-permit) —
+`users` 화이트리스트 불변(D-02).
 
 ---
 

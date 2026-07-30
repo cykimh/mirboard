@@ -98,6 +98,24 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-89 (2026-07-30) — 계약 문서 기준선 정정 (T0, 코드 변경 0)
+
+`CLAUDE.md` 가 `docs/*.md` 를 계약 정본으로 못 박았으나 실제로는 드리프트가 누적돼,
+병렬 트랙을 띄우면 각 트랙이 서로 다른(둘 다 틀린) 정본을 갖게 되는 상태였다
+(`docs/plans/parallel-tracks.md` T0). 컨트롤러·`TichuEvent`·각 Publisher·클라
+`useStompRoom`/`tichuStore` 를 전수 대조해 정정했다. **STOMP**: 문서에만 있던 이벤트
+6종(`GAME_STARTED` `HAND_DEALT_COUNT` `WISH_FULFILLED` `BOMB_USED` `GAME_ENDED`
+`HAND_DEALT_FULL`) 제거, 코드에만 있던 5종(`REACTION` `ROOM_META_UPDATED`
+`ROOM_DESTROYED` `PLAYER_FINISHED` `CARDS_RECEIVED`) 추가, payload 식별자를
+`userId`→**seat** 로 통일, 누락 토픽 2종(`/meta` `/reaction`) 추가, 판별자
+(`@action`)·"클라→서버는 envelope 미사용"·"seq 는 게임 이벤트에만" 명문화,
+`RESYNC` 가 WS 이벤트가 아니라 REST 전용임을 반영, 탈주 유예 30s→**120s**(D-79) 정정.
+**REST**: `Room` 응답을 record 전체(18필드)로 교체, `resync` 응답을 실제
+`TableView`/`PrivateHand` 형태로 교체(관전자 `privateHand: null`·`disconnectedSeats`·
+`chips` 포함), 미문서 엔드포인트 4종(`spectate` POST/DELETE, `users/names`, 아바타
+3종) 추가, **구현 없는 `GET /api/me/stats` 섹션 삭제**. 검증: 엔드포인트 24종·이벤트
+28종 양방향 기계 대조 0건 불일치.
+
 ## D-88 (2026-07-30) — 게임판 UI 결함 4건 보정 (라이브 실측 후속, 클라 전용)
 
 D-87 병합 직후 라이브 서버 + 내장 브라우저 실측(401px)에서 확인된 결함 4건을 보정.
