@@ -218,10 +218,18 @@ S4 의 SkullKingEngine 을 GameDefinition 으로 등록하고 인게임 디스�
   - `actionType()` → `SkullKingAction.class`
   - `publicView`/`privateView` → **뷰 매퍼 신규**. `privateView` 는 손패 + *제출 전* 본인
     예측만 (§5 경계). 전원 제출 후 예측·획득 승수는 `publicView`
-  - `advance` → 순수 엔진의 `settleRound` + 다음 라운드 `startRound` 를 엮는다
+  - `advance` → 순수 엔진의 `settleRound` + `startRoundAndDrain` 을 엮는다 — 탈주가 있는
+    방은 **반드시 드레인 변형**(`applyAndDrain`/`startRoundAndDrain`)을 쓴다 (D-104 계약).
+    잊으면 유령 차례에서 예외 없이 조용히 멈춘다 — 2-인자 불변식 체커가 그 상태를 잡는다
   - `isMatchOver` → `SkullKingMatchState.isMatchOver()` (매치 상태 스토어 필요)
-  - `desert` → **정책 미결정**. 티츄의 "상대팀 승리"가 개인전엔 안 맞는다 — 남은 사람끼리
-    계속할지, 매치를 무효로 할지 먼저 정하고 D 항목을 남길 것
+  - `desert` → **D-104 로 확정·구현 완료** (유령 좌석 자동조종, "남은 사람끼리 계속").
+    어댑터는 순수 `SkullKingEngine.desert(state, match, seat, humanSeats)` 를 부르고
+    `Outcome`(NOT_APPLICABLE/CONTINUED/MATCH_ENDED)을 포트 boolean 에 매핑한다 — 포트
+    javadoc 이 "매치를 강제 종료"라고 티츄 전제로 쓰여 있으므로 S5 에서 "탈주 처리 적용됨"
+    으로 일반화할 것. `humanSeats` 는 방 점유자에서 봇을 뺀 좌석. **주의**: 탈주 확정 좌석의
+    사람 액션은 SEAT_DESERTED 로 거절되므로 재접속 복귀는 관전자로만. 끊김 유예(120s)
+    구간의 정지(탈주 확정 전이라 자동조종 미작동)는 미해결 — 스컬킹 방 turnSeconds 기본값
+    또는 유예 중 임시 자동조종을 S5 에서 결정
 - `SkullKingGameDefinition` `@Component` 등록 (id `SKULL_KING`, min 2 / max 8)
 - 액션 역직렬화 seam 에 스컬킹 액션 등록 (`@JsonTypeInfo` 는 이미 붙어 있음)
 - 봇 정책 — 순수 엔진의 `legalActions`/`timeoutAction` 이 이미 있으므로 배선만 하면 된다

@@ -221,10 +221,10 @@
 
 ## 13. 테스트 현황
 
-- **서버**: **687건** (D-101 시점 실측, 실패 0). 티츄·인프라 412건 + 스컬킹 275건.
+- **서버**: **717건** (D-104 시점 실측, 실패 0). 티츄·인프라 412건 + 스컬킹 305건.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
-- 스컬킹 275건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
+- 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
   묶여 있다(티츄 룰 단위와 함께 ~5s).
 - **클라이언트**: Vitest + RTL — 스토어 리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
@@ -274,11 +274,16 @@
 - **인원 2~8 가변**, 10라운드 고정, 라운드 N = N장 (8인 9·10 라운드만 8장 — 덱 70장 한계).
 - **비추이적 3자 순환**(해적>인어>스컬킹>해적 + "셋이 다 나오면 인어")을 6단 우선순위
   사다리 테이블로 환원 — `TrickResolver.LADDER`. §7 표 8조합 전수 테스트로 고정.
-- **검증**: 275건, Docker 불필요. 2~8인 전 좌석 수가 무작위 합법수만으로 10라운드를
-  완주하며 매 액션 직후 `SkullKingInvariantChecker` 를 통과한다.
+- **탈주(D-104)**: 개인전이라 티츄의 "상대팀 승리"(D-75)를 쓰지 않고 **남은 사람끼리
+  계속** — 탈주 좌석은 유령으로 남아 자동조종(최약수, `timeoutAction` 과 정책 공유)이
+  대신 둔다. 잔존 좌석 <2 또는 잔존 사람 0 이면 조기 종료, 탈주 좌석은 승자 후보 제외.
+  순수 엔진 `desert`/`applyAndDrain`/`startRoundAndDrain` 구현 완료.
+- **검증**: 305건, Docker 불필요. 2~8인 전 좌석 수가 무작위 합법수만으로 10라운드를
+  완주하며(탈주 포함 시나리오 별도) 매 액션 직후 `SkullKingInvariantChecker` 를 통과한다.
 - **아직 없는 것 (S5/D-102)**: 포트 어댑터 `SkullKingGameEngine implements GameEngine`,
   `SkullKingGameDefinition` @Component 등록, Redis 상태 저장, 공개/비공개 뷰 매퍼,
-  봇 정책, STOMP 디스패치 연결, 탈주(`desert`) 정책. **그래서 카탈로그에 안 뜬다.**
+  봇 정책, STOMP 디스패치 연결, 포트 `desert` → 순수 `desert` 배선. **그래서 카탈로그에
+  안 뜬다.**
 - **S5 선행 과제**: 시드 봇이 4명(V3)뿐이라 6~8인 방은 `fillWithBots` 가 실패한다
   (`rules-skullking.md` §2).
 

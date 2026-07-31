@@ -96,8 +96,8 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
 - 라운드 안에서는 **직전 트릭 승자가 다음 트릭을 리드**한다.
 
 - **코드:** `state/SkullKingState.java:28` sealed(Bidding/Playing/RoundEnd),
-  `SkullKingEngine.java:89`(apply), `SkullKingEngine.java:76`(startRound),
-  `SkullKingEngine.java:180`(settleRound), 시작 좌석 회전은
+  `SkullKingEngine.java:120`(apply), `SkullKingEngine.java:96`(startRound),
+  `SkullKingEngine.java:297`(settleRound), 시작 좌석 회전은
   `state/SkullKingMatchState.withRoundScored`
 - **테스트:** `SkullKingMatchSimulationTest`(2~8인 전 좌석 수 10라운드 완주 + 시작 좌석
   회전), `SkullKingEngineTest`(라이프사이클 26건)
@@ -135,7 +135,7 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 > 최대 예측치는 **손패 장수**를 따르고, 0승 보너스만 **라운드 번호**를 따른다(§10).
 
 - **코드:** `Dealer.java:33`(`handSize = min(round, Deck.SIZE / seatCount)`),
-  `Dealer.java:52`(분배)
+  `Dealer.java:46`(분배)
 - **테스트:** `DealerTest`(15건) — **인원 2~8 × 라운드 1~10 전수 70건**을 한 테스트에서
   돌리고, 8인 9·10 특례와 "7인 라운드 10 이 70장을 정확히 소진"을 따로 고정
 - **갭:** 없음
@@ -162,7 +162,7 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 
 - **코드:** `bid/BidRules.java:23`(상한=handSize), `bid/BidRules.java:32`(봇용 합법 예측),
   `action/ActionValidator.java:32`(범위·중복 거절),
-  `SkullKingEngine.java:98`(전원 제출 전까지 값 미공개)
+  `SkullKingEngine.java:129`(전원 제출 전까지 값 미공개)
 - **테스트:** `bid/BidRulesTest`(10건), `action/ActionValidatorTest$PlaceBid`(7건),
   `SkullKingEngineTest$Bidding`(4건 — 값 비공개 → 동시 공개 전이)
 - **갭:** 없음. 동시 공개는 **이벤트 분리**로 강제한다 — `BidSubmitted` 는 좌석만 싣고
@@ -207,8 +207,8 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 - 리드 수트가 **확정되지 않은 동안**에는 제약이 없다.
 
 - **코드:** `trick/LeadSuitResolver.java:43`(지연 확정 파생),
-  `action/ActionValidator.java:97`(`followsLeadSuit`),
-  `SkullKingEngine.java:242`(`legalPlayActions` — 손패 필터),
+  `action/ActionValidator.java:102`(`followsLeadSuit`),
+  `SkullKingEngine.java:361`(`legalPlayActions` — 손패 필터),
   `state/TrickState.leadSuit()`(저장하지 않고 매번 파생)
 - **테스트:** `trick/LeadSuitResolverTest`(15건 — 색상/캐릭터/탈출 리드 3갈래 + §13-⑤
   연쇄), `action/ActionValidatorTest$FollowObligation`(양성 4 / 음성 3),
@@ -422,12 +422,15 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
   (진행 중 라운드 폐기). 탈주 좌석은 승자 후보에서 제외된다.
 
 - **코드:** `state/SkullKingMatchState.java`(`TOTAL_ROUNDS=10`, `isMatchOver()`,
-  `winners()` 가 공동 승리라 리스트를 돌려준다), `SkullKingEngine.java:180`(`settleRound`)
-- **테스트:** `state/SkullKingMatchStateTest`(8건 — 10라운드 종료·공동 승리·전원 음수),
-  `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`(완주 22건)
-- **갭:** 매치 결과 영속화(`match_results` 적재)와 ELO 는 S5 범위다. 탈주 처리
-  (`GameEngine.desert`)도 어댑터 계층이라 S5 — 개인전에서 한 명이 빠지면 어떻게 되는지는
-  아직 결정되지 않았다(티츄의 "상대팀 승리"가 그대로 적용되지 않는다)
+  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외),
+  `SkullKingEngine.java:297`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
+  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`)
+- **테스트:** `state/SkullKingMatchStateTest`(15건 — 10라운드 종료·공동 승리·전원 음수·
+  탈주 제외/누적), `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`
+  (완주 22건), `SkullKingDesertionTest`(17건 — 탈주 포함 풀매치 완주)
+- **갭:** 매치 결과 영속화(`match_results` 적재)와 ELO 는 S5 범위다. 탈주는 D-104 로
+  확정·구현됐다(순수 엔진 `desert`) — S5 는 포트 `GameEngine.desert` 를 이 메서드에
+  연결만 한다. 끊김 유예(120s) 구간의 정지는 미해결 한계로 S5 별건
 
 ---
 
@@ -524,5 +527,6 @@ S4 가 조용히 틀리기 쉬운 지점만 모았다.
 - 각 §13 항목은 대응 테스트가 있다. 해석을 바꾸면 그 테스트가 먼저 빨개진다 — 테스트를
   지우지 말고 새 해석으로 고쳐 쓸 것.
 
-마지막 갱신: S4 (D-101). **순수 룰 엔진 구현 완료** — 테스트 275건.
+마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영. **순수 룰 엔진 구현 완료**
+— 테스트 305건.
 통합(포트 어댑터·`GameDefinition` 등록·상태 저장·뷰 매퍼·봇 정책·STOMP)은 S5(D-102).
