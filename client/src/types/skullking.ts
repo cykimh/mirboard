@@ -77,12 +77,27 @@ export interface PlayedCardView {
   declaredAs: TigressMode | null;
 }
 
+/** resync `tableView.roundScores` 용 — 서버가 `total` 을 명시 컴포넌트로 담는다. */
 export interface RoundScoreView {
   bid: number;
   won: number;
   base: number;
   bonus: number;
   total: number;
+}
+
+/**
+ * `ROUND_ENDED` **이벤트** payload 용 — 서버 `RoundScore` record 의 컴포넌트는
+ * `{bid,won,base,bonus}` 4개뿐이고 `total()` 은 컴포넌트가 아니라 메서드라 Jackson 이
+ * 직렬화하지 않는다. 즉 같은 개념인데 resync 경로에만 `total` 이 온다 — 리듀서가
+ * `total ?? base + bonus` 로 파생해 흡수한다.
+ */
+export interface RoundScorePayload {
+  bid: number;
+  won: number;
+  base: number;
+  bonus: number;
+  total?: number;
 }
 
 /** 서버 `SkullKingStateMapper.TableView` 와 1:1. */
@@ -152,7 +167,8 @@ export interface TrickTakenPayload {
 }
 export interface RoundEndedPayload {
   roundNumber: number;
-  scores: Record<number, RoundScoreView>;
+  /** `total` 이 없을 수 있다 — {@link RoundScorePayload} 주석 참조. */
+  scores: Record<number, RoundScorePayload>;
   cumulativeScores: Record<number, number>;
 }
 export interface SeatDesertedPayload {
