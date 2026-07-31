@@ -50,5 +50,9 @@
 @import './parts/15-room-chat.css';
 /* 좌석 ready/submitted + 상태 태그 */
 @import './parts/16-seat-status.css';
+/* 스컬킹 게임판(D-103) — `.sk-` 접두 전용, 공용 클래스 재정의 금지, 폭 미디어 0개.
+ * 17 앞에 두는 이유: 17 이 마지막이라는 불변식을 유지하기 위함이고, 18 에 폭 규칙이
+ * 없으므로 순서 때문에 사문화되는 규칙이 없다. */
+@import './parts/18-skullking-table.css';
 /* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
 @import './parts/17-responsive.css';

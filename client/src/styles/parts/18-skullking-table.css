@@ -1,0 +1,516 @@
+/* 스컬킹 게임판 (D-103, S6) — Row-Flow 가변 좌석 기하.
+ *
+ * ⚠ 캐스케이드 제약: 이 파일은 index.css 에서 **17-responsive 앞**에 import 된다.
+ *   따라서 여기에 폭 미디어(@media max-width)를 두면 17 에 덮인다. 이 파일에는 폭 미디어가
+ *   **0개**이고 그게 설계 의도다 — 좌석은 auto-fit 그리드라 브레이크포인트 없이 줄바꿈되고,
+ *   카드/버튼 축소는 17 의 공용 규칙(.card-chip, .action-bar)을 상속한다.
+ *   폭 규칙이 불가피해지면 17-responsive.css **맨 끝**에 .sk-* 블록만 추가할 것
+ *   (기존 블록 사이 삽입 금지 — 480/440 순서 의존, D-88).
+ *
+ * ⚠ 네임스페이스: 모든 선택자는 `.sk-` 클래스를 포함한다. 공용 클래스(.seat, .card-chip,
+ *   .my-hand, .action-bar)를 단독으로 재정의하지 않는다 — 티츄 게임판이 같은 클래스를
+ *   쓰므로 재정의하면 조용히 번진다. (styles/skullkingCssNamespace.test.ts 가 기계로 검사.)
+ */
+
+/* ── 토큰 ─────────────────────────────────────────────────────────── */
+.sk-table {
+  --sk-seat-min: 132px;
+  --sk-accent: #7c8ea0;
+  --sk-suit-green: #3fa45b;
+  --sk-suit-purple: #7b5cd6;
+  --sk-suit-yellow: #e0b32a;
+  --sk-suit-black: #23242b;
+  --sk-special-bg: #f4f1e8;
+  --sk-special-fg: #2a2620;
+  --sk-accent-0: #5b8def;
+  --sk-accent-1: #e85d75;
+  --sk-accent-2: #3fa45b;
+  --sk-accent-3: #e0b32a;
+  --sk-accent-4: #7b5cd6;
+  --sk-accent-5: #2fb5c0;
+  --sk-accent-6: #f08a3c;
+  --sk-accent-7: #a0a4b8;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  min-height: 100vh;
+}
+
+/* ── 헤더 / 메타 줄 ───────────────────────────────────────────────── */
+.sk-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sk-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sk-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sk-badge-round {
+  font-weight: 700;
+}
+
+/* ── 상대 좌석 그리드 — 폭 미디어 없이 2~8인 대응 ─────────────────── */
+.sk-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--sk-seat-min), 168px));
+  justify-content: center;
+  gap: 8px;
+}
+
+.sk-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--sk-accent);
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+
+.sk-seat-turn {
+  box-shadow: 0 0 0 2px var(--sk-accent);
+}
+
+.sk-seat-deserted {
+  opacity: 0.55;
+}
+
+.sk-seat-offline {
+  border-style: dashed;
+}
+
+.sk-seat-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sk-seat-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 16px;
+}
+
+.sk-seat-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sk-seat-glyph {
+  line-height: 1;
+}
+
+.sk-seat-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sk-seat-stats {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.sk-stat {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.sk-stat-key {
+  opacity: 0.6;
+}
+
+.sk-stat-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sk-seat-tag {
+  align-self: flex-start;
+}
+
+/* ── 트릭 레일 (재생순) ───────────────────────────────────────────── */
+.sk-trick-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sk-trick-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.sk-trick {
+  /* min-height 예약 — 카드가 들고 날 때 아래 손패가 밀리는 레이아웃 점프를 막는다. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  min-height: 104px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.sk-trick-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px 2px;
+  border-radius: 8px;
+  border-top: 3px solid var(--sk-accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sk-trick-slot.won {
+  box-shadow: 0 0 0 2px #e0b32a;
+}
+
+.sk-trick-slot.waiting {
+  border-top-style: dashed;
+  opacity: 0.7;
+}
+
+.sk-trick-order {
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--sk-accent);
+  color: #10131a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sk-trick-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.sk-trick-tag {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 10px;
+}
+
+.sk-trick-placeholder {
+  width: 40px;
+  height: 57px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+.sk-trick-empty {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+/* ── 카드 ─────────────────────────────────────────────────────────── */
+.sk-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  font-weight: 700;
+  cursor: default;
+}
+
+button.sk-card {
+  cursor: pointer;
+}
+
+.sk-card-rank {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sk-card-glyph {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sk-card-name {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.sk-card-declared {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 9px;
+}
+
+.sk-card-selected {
+  outline: 3px solid #e0b32a;
+  transform: translateY(-6px);
+}
+
+.sk-card-dimmed {
+  opacity: 0.4;
+}
+
+.sk-card-compact {
+  width: clamp(38px, 12vw, 48px);
+  height: auto;
+  aspect-ratio: 62 / 88;
+}
+
+/* ── 내 요약 줄 / 손패 / 액션 ─────────────────────────────────────── */
+.sk-me {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 4px solid var(--sk-accent);
+}
+
+.sk-me-turn {
+  box-shadow: 0 0 0 2px var(--sk-accent);
+}
+
+.sk-hand-cards {
+  min-height: 96px;
+}
+
+.sk-hand-empty {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.sk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sk-play {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #5b8def;
+  color: #fff;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.sk-play:disabled {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sk-tigress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px dashed #e0b32a;
+}
+
+.sk-tigress-label {
+  font-size: 12px;
+}
+
+.sk-tigress-opt {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  min-height: 36px;
+}
+
+.sk-tigress-opt.selected {
+  background: #e0b32a;
+  color: #2a2405;
+  font-weight: 700;
+}
+
+/* ── 입찰 패널 ────────────────────────────────────────────────────── */
+.sk-bid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(91, 141, 239, 0.12);
+  border: 1px solid rgba(91, 141, 239, 0.35);
+}
+
+.sk-bid-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sk-bid-hint {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sk-bid-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sk-bid-option {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sk-bid-option.selected {
+  background: #5b8def;
+  color: #fff;
+}
+
+.sk-bid-option:disabled {
+  opacity: 0.5;
+}
+
+.sk-bid-note {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* ── 정산 / 종료 패널 ─────────────────────────────────────────────── */
+.sk-score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sk-score-table th,
+.sk-score-table td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sk-score-table th:first-child,
+.sk-score-table td:first-child {
+  text-align: left;
+}
+
+.sk-hit td {
+  color: #7ee2a0;
+}
+
+.sk-miss td {
+  color: #f3a0ac;
+}
+
+.sk-round-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sk-match-winners {
+  margin: 4px 0;
+  font-weight: 700;
+}
+
+.sk-final-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sk-final-scores li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sk-final-scores li.sk-winner {
+  background: rgba(224, 179, 42, 0.22);
+  font-weight: 700;
+}
+
+.sk-error {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(232, 93, 117, 0.18);
+  border: 1px solid rgba(232, 93, 117, 0.5);
+  font-size: 13px;
+}
