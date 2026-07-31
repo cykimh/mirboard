@@ -20,6 +20,7 @@
 | 3 | 방 생성/입장/준비/퇴장/관전 | ✅ | `domain.lobby.room`, `infra.rest.rooms`, `lua/room_*.lua` |
 | 4 | WebSocket/STOMP 실시간 | ✅ | `infra.ws`, `infra.config.WebSocketConfig` |
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
+| 5b | 스컬킹 룰 엔진 (순수 — 통합은 S5) | 🔶 | `domain.game.skullking` (§16) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -220,9 +221,11 @@
 
 ## 13. 테스트 현황
 
-- **서버**: 69개 테스트 클래스 / 412건 (D-98 시점 실측). 단위(룰 엔진·족보·ELO·JWT·
-  카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/Redis — auth/rooms/STOMP/봇/
-  동시성/매치 영속/2-인스턴스 인계).
+- **서버**: **717건** (D-104 시점 실측, 실패 0). 티츄·인프라 412건 + 스컬킹 305건.
+  단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
+  Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
+- 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
+  묶여 있다(티츄 룰 단위와 함께 ~5s).
 - **클라이언트**: Vitest + RTL — 스토어 리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 
@@ -253,10 +256,38 @@
 ## 15. 미구현 / 범위 밖 (참고)
 
 - 게임별 격리 채팅(로비/방 채팅만 존재).
-- 티츄 외 게임 — 포트(§14)와 인원 가변(D-99)은 준비됐고, 등록된 게임은 아직 TICHU 1종.
-  두 번째 게임(스컬킹)은 `docs/plans/multi-game-sessions.md` S3~S6.
+- 티츄 외 게임 — 포트(§14)·인원 가변(D-99)·스컬킹 룰 엔진(§16)까지 준비됐지만
+  **등록된 게임은 아직 TICHU 1종**이다. 스컬킹 통합은 `multi-game-sessions.md` S5~S6.
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
 - 멀티 인스턴스 세션 레지스트리(`WsSessionRegistry` 는 단일 인스턴스 전제).
+
+---
+
+## 16. 스컬킹 룰 엔진 (S4, D-101 — 순수 도메인만)
+
+`domain.game.skullking` 에 **순수 룰 엔진까지** 구현됐다. 룰 정본은
+`docs/rules-skullking.md`(절마다 `코드:`/`테스트:` 로 코드와 1:1 매핑).
+
+- **패키지**: `card/`(70장 덱) · `state/`(sealed `SkullKingState`: Bidding/Playing/RoundEnd)
+  · `trick/`(`LeadSuitResolver`·`TrickResolver`) · `bid/` · `action/` · `scoring/` ·
+  `event/` · `invariant/` · `Dealer` · `SkullKingEngine`.
+- **인원 2~8 가변**, 10라운드 고정, 라운드 N = N장 (8인 9·10 라운드만 8장 — 덱 70장 한계).
+- **비추이적 3자 순환**(해적>인어>스컬킹>해적 + "셋이 다 나오면 인어")을 6단 우선순위
+  사다리 테이블로 환원 — `TrickResolver.LADDER`. §7 표 8조합 전수 테스트로 고정.
+- **탈주(D-104)**: 개인전이라 티츄의 "상대팀 승리"(D-75)를 쓰지 않고 **남은 사람끼리
+  계속** — 탈주 좌석은 유령으로 남아 자동조종(최약수, `timeoutAction` 과 정책 공유)이
+  대신 둔다. 잔존 좌석 <2 또는 잔존 사람 0 이면 조기 종료, 탈주 좌석은 승자 후보 제외.
+  순수 엔진 `desert`/`applyAndDrain`/`startRoundAndDrain` 구현 완료.
+- **검증**: 305건, Docker 불필요. 2~8인 전 좌석 수가 무작위 합법수만으로 10라운드를
+  완주하며(탈주 포함 시나리오 별도) 매 액션 직후 `SkullKingInvariantChecker` 를 통과한다.
+- **아직 없는 것 (S5/D-102)**: 포트 어댑터 `SkullKingGameEngine implements GameEngine`,
+  `SkullKingGameDefinition` @Component 등록, Redis 상태 저장, 공개/비공개 뷰 매퍼,
+  봇 정책, STOMP 디스패치 연결, 포트 `desert` → 순수 `desert` 배선. **그래서 카탈로그에
+  안 뜬다.**
+- **S5 선행 과제**: 시드 봇이 4명(V3)뿐이라 6~8인 방은 `fillWithBots` 가 실패한다
+  (`rules-skullking.md` §2).
+
+---
 
 > 최신 결정/번복은 `docs/decisions.md`, 진행 단계는 `docs/plans/mvp-roadmap.md` 가 정본.
 > 본 문서와 어긋날 경우 그쪽을 신뢰한다.
@@ -264,4 +295,4 @@
 ---
 
 *문서 생성: 코드베이스 정적 분석 기반(서버 155 클래스 / 테스트 55 클래스, 마이그레이션 V1~V8 확인).*
-*최종 대조: 2026-07-29. 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*
+*최종 대조: 2026-07-31 (D-101, §13·§16 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*

@@ -4,11 +4,16 @@
 (single source of truth) — 코드와 본 문서가 어긋나면 코드를 수정하거나 본 문서의
 룰 결정 항목 (`docs/decisions.md` D-NN) 을 갱신한다.
 
-> **작성 시점에 코드는 없다 (D-100, S3).** 구현은 S4(D-101)에서 한다. 그래서 각 절의
-> 표기가 `rules-tichu.md` 와 다르다:
-> - **구현 대상:** 이 절을 구현할 예정 위치 — S4 가 실제 경로로 치환한다
-> - **검증 대상:** 이 절을 지킬 테스트 — S4 가 작성한다
+> **코드는 S4(D-101)에서 구현됐다.** 표기는 `rules-tichu.md` 와 같다:
+> - **코드:** 핵심 구현 위치 (`path:line`)
+> - **테스트:** 검증하는 테스트 파일
+> - **갭:** 현재 미검증/미구현 영역 (있을 경우)
 > - **미규정:** 원문이 답하지 않아 **우리가 정한** 항목. §13 에 전부 모아 뒀다
+>
+> 경로는 전부 `server/src/{main,test}/java/com/mirboard/domain/game/skullking/` 기준의
+> 상대 경로다. S4 는 **순수 룰 엔진까지**이며, 포트 어댑터
+> (`SkullKingGameEngine implements GameEngine`)·`GameDefinition` 등록·상태 저장·뷰 매퍼·
+> 봇 정책·STOMP 디스패치는 **S5(D-102)** 범위다.
 
 > **출처 신뢰도 경고.** 근거는 나무위키 스컬킹 문서(볼트
 > `inbox/clippings/스컬킹.md`, 최종 수정 2026-04-02)다. 집단 편집 문서라 검증되지 않은
@@ -46,8 +51,12 @@
 > **유도값 주의.** 원문은 카테고리별 장수(56/14/4)만 적고 **합계를 적지 않는다**.
 > 70 = 56 + 14 는 산술 합이다. 각 카테고리 장수가 규칙서와 다르면 §4 가 통째로 흔들린다.
 
-- **구현 대상:** `domain/game/skullking/card/` — `SuitCard`, `SpecialCard`, `Deck`
-- **검증 대상:** 덱 70장, 색별 14장, 특수 카드 종류별 장수
+- **코드:** `card/SkullCard.java`, `card/SkullSuit.java`, `card/SpecialKind.java`(장수는
+  `countInDeck()` 에 붙어 있다), `card/Deck.java:22`(SIZE=70), `card/Deck.java:62`(조립)
+- **테스트:** `card/SkullCardTest`(24건), `card/DeckTest`(17건) — 70장·색별 14장·특수
+  종류별 장수를 §1 표 그대로 고정
+- **갭:** 없음. 단 **중복 특수 카드를 개체로 구분하지 않는다**(D-101) — 해적 5장은 게임상
+  교환 가능하므로 값이 같다. 카드 보존 검사가 Set 이 아니라 multiset 인 이유다
 
 ---
 
@@ -86,8 +95,14 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
   읽은 결과다(§13-⑮).
 - 라운드 안에서는 **직전 트릭 승자가 다음 트릭을 리드**한다.
 
-- **구현 대상:** `SkullKingState` sealed + `SkullKingEngine.apply`
-- **검증 대상:** 10라운드 완주 시뮬레이션, 시작 플레이어 이동
+- **코드:** `state/SkullKingState.java:28` sealed(Bidding/Playing/RoundEnd),
+  `SkullKingEngine.java:120`(apply), `SkullKingEngine.java:96`(startRound),
+  `SkullKingEngine.java:297`(settleRound), 시작 좌석 회전은
+  `state/SkullKingMatchState.withRoundScored`
+- **테스트:** `SkullKingMatchSimulationTest`(2~8인 전 좌석 수 10라운드 완주 + 시작 좌석
+  회전), `SkullKingEngineTest`(라이프사이클 26건)
+- **갭:** **Dealing 이 상태가 아니다**(D-101) — 액션 0개인 통과 지점이라 `Dealer` 가
+  분배하고 곧장 Bidding 을 만든다. 티츄의 Dealing 은 선언 윈도우라 상태였던 것과 다르다
 
 ---
 
@@ -119,8 +134,11 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 > **함정.** 이 예외 때문에 `트릭 수 = 라운드 번호` 로 짜면 8인에서 깨진다. 트릭 수와
 > 최대 예측치는 **손패 장수**를 따르고, 0승 보너스만 **라운드 번호**를 따른다(§10).
 
-- **구현 대상:** `SkullKingEngine.initialState` / `Dealer`
-- **검증 대상:** 인원 2~8 × 라운드 1~10 전수로 handSize 검증, 8인 9·10 라운드 특례
+- **코드:** `Dealer.java:33`(`handSize = min(round, Deck.SIZE / seatCount)`),
+  `Dealer.java:46`(분배)
+- **테스트:** `DealerTest`(15건) — **인원 2~8 × 라운드 1~10 전수 70건**을 한 테스트에서
+  돌리고, 8인 9·10 특례와 "7인 라운드 10 이 70장을 정확히 소진"을 따로 고정
+- **갭:** 없음
 
 ---
 
@@ -142,8 +160,13 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 > 전까지만 비공개다. 즉 `PrivateView` 에 담을 것은 **제출 대기 중인 본인 예측값**과
 > **손패**뿐이고, 공개 후의 예측 승수·획득 트릭 수는 `PublicView` 로 간다.
 
-- **구현 대상:** `domain/game/skullking/bid/`
-- **검증 대상:** 범위 밖 예측 거부(음수·handSize 초과), 전원 제출 전 미공개, 중복 제출 거부
+- **코드:** `bid/BidRules.java:23`(상한=handSize), `bid/BidRules.java:32`(봇용 합법 예측),
+  `action/ActionValidator.java:32`(범위·중복 거절),
+  `SkullKingEngine.java:129`(전원 제출 전까지 값 미공개)
+- **테스트:** `bid/BidRulesTest`(10건), `action/ActionValidatorTest$PlaceBid`(7건),
+  `SkullKingEngineTest$Bidding`(4건 — 값 비공개 → 동시 공개 전이)
+- **갭:** 없음. 동시 공개는 **이벤트 분리**로 강제한다 — `BidSubmitted` 는 좌석만 싣고
+  값이 없으며, `BidsRevealed` 는 전원 제출 후에만 나간다 (`event/SkullKingEvent.java`)
 
 ---
 
@@ -183,8 +206,14 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
   카드더라도, 특수 카드는 언제든지 낼 수 있다."
 - 리드 수트가 **확정되지 않은 동안**에는 제약이 없다.
 
-- **구현 대상:** `SkullKingEngine.legalActions` — 손패 필터
-- **검증 대상:** follow 강제(양성/음성 각 ≥3), 특수 카드 항상 합법, 지연 확정 연쇄
+- **코드:** `trick/LeadSuitResolver.java:43`(지연 확정 파생),
+  `action/ActionValidator.java:102`(`followsLeadSuit`),
+  `SkullKingEngine.java:361`(`legalPlayActions` — 손패 필터),
+  `state/TrickState.leadSuit()`(저장하지 않고 매번 파생)
+- **테스트:** `trick/LeadSuitResolverTest`(15건 — 색상/캐릭터/탈출 리드 3갈래 + §13-⑤
+  연쇄), `action/ActionValidatorTest$FollowObligation`(양성 4 / 음성 3),
+  `action/ActionValidatorTest$NoLeadSuitYet`(4건 — §13-⑥ 도중 확정 포함)
+- **갭:** 없음
 
 ---
 
@@ -254,8 +283,14 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 - **전원이 탈출**이면 가장 먼저 낸 탈출이 승리한다.
 - 티그리스를 탈출로 선언하면 탈출과 동일하게 취급한다 — "전원 탈출" 판정에도 포함한다(§13-④).
 
-- **구현 대상:** `domain/game/skullking/trick/TrickResolver`
-- **검증 대상:** 8조합 전수 + 동점(§8) + 각 사다리 단의 양성/음성 각 ≥3
+- **코드:** `trick/TrickResolver.java:52`(`LADDER` — 사다리 6단이 그대로 테이블),
+  `trick/TrickResolver.java:116`(§7.1 색상 판정), 티그리스 해소는
+  `state/PlayedCard.java:44`(`kind()`)
+- **테스트:** `trick/TrickResolverTest`(38건) —
+  `$ExhaustiveEightCombinations`(§7 표 8조합 전수), `$LadderRungs`(각 단 양성/음성 3건씩),
+  `$SuitOnly`(7건), `$Ties`(4건 — §13-① 포함), `$Tigress`(7건 — §13-②③④)
+- **갭:** 없음. 동점(§8)은 사다리가 따로 처리하지 않는다 — 각 단의 선택자가 전부
+  "먼저 낸 그 종류"라 §13-①③ 이 별도 분기 없이 성립한다
 
 ---
 
@@ -322,11 +357,14 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 > ②의 귀결이 어색하다는 점은 알고 간다: 8인 라운드 9·10 은 **손패가 둘 다 8장인데**
 > 0 예측 성공 점수는 90점 / 100점으로 갈린다. 원문 문면을 따른 결과다.
 
-- **구현 대상:** `domain/game/skullking/scoring/RoundScorer`
-- **검증 대상:** 위 4경우 × 경계값, 8인 라운드 9·10 의 0 예측 점수.
-  **판별 테스트 필수** — `라운드 3, bid=0, won=1`: 일반칙 해석이면 −10, 특칙 해석이면
-  −30 이다. 이 케이스를 고정해야 두 해석이 구분된다. (`라운드 10, bid=0, won=10` 은
-  두 해석이 −100 으로 우연히 같아져 회귀를 못 잡는다.)
+- **코드:** `scoring/RoundScorer.java:60`(`baseScore` — §10 표 4경우),
+  `scoring/RoundScorer.java:42`(보너스 게이트), `scoring/RoundScore.java`(적중 실패 시
+  보너스가 붙으면 생성자가 거부)
+- **테스트:** `scoring/RoundScorerTest`(23건) — `$SpecTable` 이 4경우 × 경계 12건,
+  `$ZeroBidFailure` 가 **판별 테스트**, `$RoundNumberNotTrickCount` 가 8인 9·10 비대칭
+- **갭:** 없음. 판별 테스트가 실제로 들어 있다 — `라운드 3, bid=0, won=1 → −30`
+  (일반칙 해석이면 −10). `라운드 10, bid=0, won=10` 은 두 해석이 −100 으로 우연히
+  같아져 회귀를 못 잡으므로, 그 사실 자체를 별도 테스트로 남겨 뒀다
 
 ---
 
@@ -363,7 +401,13 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 > 세고, 그 티그리스로 인어를 잡아 이겼으면 20점도 성립한다. 탈출로 선언했으면 해적으로
 > 세지 않는다.
 
-- **검증 대상:** 예측 실패 시 보너스 0, 인어 2장 동시 포획(40점), 티그리스 포획
+- **코드:** `scoring/BonusCalculator.java:59`(색상 14 — 단순 포함),
+  `scoring/BonusCalculator.java:70`(캐릭터 포획 — 관계 기준),
+  `state/TrickResult.defeated()`(관계 기준이 성립하는 지점: 승리 카드를 뺀 나머지만 센다)
+- **테스트:** `scoring/BonusCalculatorTest`(20건) — 3자 트릭 **40점**(90점 아님),
+  인어 2장 동시 포획, 티그리스 선언별 계수, `$MultipleTricks` 합산.
+  `SkullKingMatchSimulationTest` 가 매치 전체에 걸쳐 "적중 실패 → 보너스 0" 을 훑는다
+- **갭:** 없음
 
 ---
 
@@ -373,6 +417,20 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 (티츄와 다른 지점 — `GameEngine.isMatchOver` 를 엔진이 답해야 하는 이유, D-97).
 
 - 동점 처리: **공동 승리** → §13-⑰
+- **게임 중 탈주: 남은 사람끼리 계속** → §13-⑱⑲⑳ (D-104). 탈주 좌석은 유령으로 남아
+  자동조종으로 완주하고, 잔존 좌석 2 미만 또는 잔존 사람 0 이면 그 시점에 조기 종료한다
+  (진행 중 라운드 폐기). 탈주 좌석은 승자 후보에서 제외된다.
+
+- **코드:** `state/SkullKingMatchState.java`(`TOTAL_ROUNDS=10`, `isMatchOver()`,
+  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외),
+  `SkullKingEngine.java:297`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
+  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`)
+- **테스트:** `state/SkullKingMatchStateTest`(15건 — 10라운드 종료·공동 승리·전원 음수·
+  탈주 제외/누적), `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`
+  (완주 22건), `SkullKingDesertionTest`(17건 — 탈주 포함 풀매치 완주)
+- **갭:** 매치 결과 영속화(`match_results` 적재)와 ELO 는 S5 범위다. 탈주는 D-104 로
+  확정·구현됐다(순수 엔진 `desert`) — S5 는 포트 `GameEngine.desert` 를 이 메서드에
+  연결만 한다. 끊김 유예(120s) 구간의 정지는 미해결 한계로 S5 별건
 
 ---
 
@@ -417,6 +475,9 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 | ⑮ | 라운드 시작 플레이어가 옮겨가는 "왼쪽"의 방향 | **턴 순서 +1** (시계 방향 진행의 다음 좌석) | 원문이 카드 진행은 "시계 방향", 시작 플레이어 이동은 "왼쪽"이라는 **서로 다른 좌표계**를 쓴다. 역방향 개념을 따로 도입하지 않으므로 같은 방향으로 읽는다 |
 | ⑯ | 1라운드 첫 리드 플레이어 결정 | **서버 균일 무작위 + 시드 로깅** | 원문이 "적당한 방법으로 정한다"라고만 쓴다. 어떤 방법도 룰 위반이 아니므로 재현 가능성을 우선한다 |
 | ⑰ | 최종 누적 점수 동점 | **공동 승리** | 원문에 타이브레이크 지표가 없다. 임의 지표를 만드는 것보다 무승부가 안전 |
+| ⑱ | 게임 중 탈주 | **남은 사람끼리 계속** — 탈주 좌석은 제거하지 않고 유령으로 남겨 자동조종이 대신 플레이한다 (미제출 예측은 0 고정 — 이미 제출한 예측은 불변, 카드는 최약수: 탈출 > 비검정 저랭크 > 검정 저랭크 > 인어 > 해적 > 스컬킹, 티그리스는 탈출 선언) | 원문에 탈주 규정이 없다. 좌석 제거는 트릭 크기(§9)·분배(§4)·카드 보존을 라운드 도중 깨므로, 좌석·손패를 보존한 채 정상 apply 경로로만 진행하는 것이 판정을 하나도 바꾸지 않는 유일한 방법 (D-104) |
+| ⑲ | 탈주 후 잔존 좌석 < 2 또는 잔존 사람 0 | **매치 조기 종료** — 진행 중 라운드는 점수 미반영 폐기, 완주한 라운드까지의 누적으로 종료 | §2 의 최소 인원 2 를 매치 지속 조건으로 읽는다. 사람이 0 이면 봇만 남은 매치를 완주시킬 이유가 없다 (D-104) |
+| ⑳ | 탈주 좌석의 최종 순위 | **승자 후보에서 제외** — 누적 점수 궤적은 계속 기록·공개 | 끝까지 플레이한 사람이 이겨야 한다. 점수 기록을 지우면 RoundEnded/MatchEnded 의 누적 표가 라운드마다 어긋난다 (D-104) |
 
 ---
 
@@ -462,8 +523,10 @@ S4 가 조용히 틀리기 쉬운 지점만 모았다.
 ## 본 문서 ↔ 코드 동기화 규칙
 
 - 룰 변경 시 본 문서 + `docs/decisions.md` D-NN + 코드 + 테스트를 같은 commit 으로 묶는다.
-- S4(D-101) 구현 시 각 절의 **구현 대상 / 검증 대상**을 실제 경로(`path:line`)로
-  치환하고, `rules-tichu.md` 와 같은 **코드: / 테스트: / 갭:** 표기로 바꾼다.
 - §13 의 확정 해석을 바꾸려면 새 D 항목이 필요하다. 코드만 고치지 말 것.
+- 각 §13 항목은 대응 테스트가 있다. 해석을 바꾸면 그 테스트가 먼저 빨개진다 — 테스트를
+  지우지 말고 새 해석으로 고쳐 쓸 것.
 
-마지막 갱신: S3 (D-100). **코드 미구현 상태.**
+마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영. **순수 룰 엔진 구현 완료**
+— 테스트 305건.
+통합(포트 어댑터·`GameDefinition` 등록·상태 저장·뷰 매퍼·봇 정책·STOMP)은 S5(D-102).

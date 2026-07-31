@@ -30,7 +30,7 @@ resync/rematch 를 포트로 옮겨야 했다(S2 는 같은 파일의 create 를
 | ~~S1~~ | 포트 추출 (티츄를 포트 뒤로) | S0 | D-98 | 서버 | ✅ **완료** |
 | ~~S2~~ | 인원 가변 (계약 변경) | — | D-99 | 서버+클라+docs | ✅ **완료** |
 | ~~S3~~ | 스컬킹 룰 명세 | — | D-100 | 0 (문서) | ✅ **완료** |
-| **S4** | 스컬킹 도메인 (카드·트릭·입찰·점수) | S1·S3 | D-101 | 서버(신규 패키지) | ✅ 병행 가능 |
+| ~~S4~~ | 스컬킹 도메인 (카드·트릭·입찰·점수) | S1·S3 | D-101+D-104 | 서버(신규 패키지) | ✅ **완료** — 순수 엔진 305건(탈주 포함) |
 | **S5** | 스컬킹 통합 (엔진·봇·디스패치) | S2·S4 | D-102 | 서버 | ❌ 단독 |
 | **S6** | 스컬킹 클라 | S5 | D-103 | 클라 | ❌ 클라 1트랙 |
 
@@ -183,31 +183,38 @@ D-56 의 `rules-tichu.md` 가 "룰 코드 1:1 매핑의 단일 진실원"으로 
 
 ---
 
-## S4 — 스컬킹 도메인 (신규 패키지)
+## ~~S4~~ — 스컬킹 도메인 (신규 패키지) ✅ 완료 (D-101)
 
-**선행**: S1(포트) ✅ · S3(명세) ✅ — **둘 다 완료, 착수 가능**. **D-101**.
-신규 패키지라 충돌면 없음 → 언제든 병행 가능.
+**선행**: S1(포트) ✅ · S3(명세) ✅. 신규 패키지라 충돌면 0 이었다 — 기존 파일 수정은
+`scripts/check.sh`(rules 타깃에 스컬킹 추가) 한 줄과 docs 뿐.
 
-### 시작 프롬프트
-```
-docs/rules-skullking.md 와 docs/game-port.md 를 읽고 S4 를 진행해줘.
-docs/plans/multi-game-sessions.md 의 S4 블록이 범위다.
-domain/game/skullking 신규 패키지에 룰만 구현하고, 통합(S5)은 하지 마.
-```
+### 한 것
+1. `card/` — `SkullCard`·`SkullSuit`·`SpecialKind`·`TigressMode`·`Deck`(70장)
+2. `state/` — sealed `SkullKingState`(Bidding/Playing/RoundEnd) · `PlayedCard`(티그리스
+   해소) · `TrickState`(리드 수트 파생) · `TrickResult` · `PlayerState` · `SkullKingMatchState`
+3. `trick/` — `LeadSuitResolver`(지연 확정) · `TrickResolver`(6단 사다리 테이블)
+4. `action/` + `bid/` — sealed `SkullKingAction`(PlaceBid/PlayCard) · `ActionValidator` ·
+   `BidRules`
+5. `scoring/` — `RoundScorer` · `BonusCalculator` · `RoundScore`
+6. `Dealer` · `SkullKingEngine`(순수) · `event/SkullKingEvent` · `invariant/`
 
-### 범위 (티츄와 같은 순서 — Phase 3 선례)
-1. `card/` — 카드 모델 + 덱 (색상 4종 + 특수 카드)
-2. `trick/` — 트릭 승자 판정 (**비추이적 삼각관계가 최대 난관**)
-3. `bid/` — 입찰 단계
-4. `scoring/` — 예측 적중 기반 점수 + 보너스
-5. `SkullKingEngine` — 포트 구현
+**테스트 275건, Docker 불필요** (`./scripts/check.sh rules` 에 편입). 2~8인 전 좌석 수가
+무작위 합법수만으로 10라운드 완주하며 매 액션 직후 불변식 통과. 서버 전체 687건 그린.
 
-### 검증
-티츄와 같은 밀도로 단위 테스트. 특히 트릭 판정은 **양성/음성 각 ≥3**, 삼각관계 전 조합.
-`TichuInvariantChecker` 에 대응하는 `SkullKingInvariantChecker`(카드 보존·좌석 순서).
+### 경계를 "순수 엔진까지"로 확정한 이유 (D-101)
+원래 항목 5가 "`SkullKingEngine` — 포트 구현"이었는데, `GameEngine` 포트는
+`loadState`/`saveState`/`actionType`/`advance`/`desert` 를 요구해 Redis·Spring 이 딸려 오고
+**S5 범위("상태 저장/뷰 매퍼")와 겹친다**. 티츄가 순수 `TichuEngine` + 어댑터
+`TichuGameEngine` 로 이미 푼 문제라 같은 선을 그었다. 덕분에 S4 산출물이 Docker 없이 전량
+검증된다.
 
-### 하지 않을 것
-STOMP·봇·클라·디스패치 — 전부 S5.
+### 세 가지 설계 판단 (S5·S6 가 알아야 함)
+- **티그리스 정체성을 `PlayedCard.kind()` 에서 1회 해소** — 강약·동점·보너스가 같은 값을
+  읽으므로 명세 함정 #10("한 군데만 빠뜨리면 조용히 어긋난다")의 경로가 없다.
+- **리드 수트를 저장하지 않고 파생** — 지연 확정(§6.1) 때문에 필드로 들면 stale 해진다.
+- **불변식 기준이 70이 아니라 `handSize × seatCount`** — 8인 9·10 라운드는 6장을 안 쓴다.
+- **중복 특수 카드에 copy 인덱스 없음** — 해적 5장은 값이 같다. 클라(S6)가 "몇 번째
+  해적"을 왕복시킬 필요가 없다는 뜻이다.
 
 ---
 
@@ -221,14 +228,37 @@ docs/plans/multi-game-sessions.md 의 S5 를 진행해줘.
 S4 의 SkullKingEngine 을 GameDefinition 으로 등록하고 인게임 디스패치에 연결해줘.
 ```
 
-### 범위
+### 범위 — S4 가 남긴 것 정확히 (D-101 확인)
+- **포트 어댑터** `SkullKingGameEngine implements GameEngine` — 순수 `SkullKingEngine` 을
+  감싼다. 티츄의 `TichuGameEngine`(323줄)이 그대로 본보기다. 채워야 하는 포트 메서드:
+  - `loadState`/`saveState` → Redis 스토어 (`SkullKingGameStateStore`)
+  - `actionType()` → `SkullKingAction.class`
+  - `publicView`/`privateView` → **뷰 매퍼 신규**. `privateView` 는 손패 + *제출 전* 본인
+    예측만 (§5 경계). 전원 제출 후 예측·획득 승수는 `publicView`
+  - `advance` → 순수 엔진의 `settleRound` + `startRoundAndDrain` 을 엮는다 — 탈주가 있는
+    방은 **반드시 드레인 변형**(`applyAndDrain`/`startRoundAndDrain`)을 쓴다 (D-104 계약).
+    잊으면 유령 차례에서 예외 없이 조용히 멈춘다 — 2-인자 불변식 체커가 그 상태를 잡는다
+  - `isMatchOver` → `SkullKingMatchState.isMatchOver()` (매치 상태 스토어 필요)
+  - `desert` → **D-104 로 확정·구현 완료** (유령 좌석 자동조종, "남은 사람끼리 계속").
+    어댑터는 순수 `SkullKingEngine.desert(state, match, seat, humanSeats)` 를 부르고
+    `Outcome`(NOT_APPLICABLE/CONTINUED/MATCH_ENDED)을 포트 boolean 에 매핑한다 — 포트
+    javadoc 이 "매치를 강제 종료"라고 티츄 전제로 쓰여 있으므로 S5 에서 "탈주 처리 적용됨"
+    으로 일반화할 것. `humanSeats` 는 방 점유자에서 봇을 뺀 좌석. **주의**: 탈주 확정 좌석의
+    사람 액션은 SEAT_DESERTED 로 거절되므로 재접속 복귀는 관전자로만. 끊김 유예(120s)
+    구간의 정지(탈주 확정 전이라 자동조종 미작동)는 미해결 — 스컬킹 방 turnSeconds 기본값
+    또는 유예 중 임시 자동조종을 S5 에서 결정
 - `SkullKingGameDefinition` `@Component` 등록 (id `SKULL_KING`, min 2 / max 8)
-- 액션 역직렬화 seam 에 스컬킹 액션 등록
-- 봇 정책(`LegalActionEnumerator` 대응) + 타임아웃 안전 액션
+- 액션 역직렬화 seam 에 스컬킹 액션 등록 (`@JsonTypeInfo` 는 이미 붙어 있음)
+- 봇 정책 — 순수 엔진의 `legalActions`/`timeoutAction` 이 이미 있으므로 배선만 하면 된다
   - ⚠ **봇 풀 확장 필수** (D-99 발견): 시드 봇 4명(V3)이라 `capacity - 1 > 4` 인
     6~8인 방은 `fillWithBots` 가 `IllegalStateException` 으로 실패한다
-- 상태 저장/뷰 매퍼
+- `docs/stomp-protocol.md` 에 스컬킹 이벤트 10종·액션 2종 추가 (계약 문서 정본)
 - 4인·6인 봇 풀매치 시뮬레이션 IT
+
+### 이미 되어 있는 것 (다시 만들지 말 것)
+룰 전부 + 라운드/매치 라이프사이클 + 합법 액션 + 타임아웃 액션 + 이벤트 sealed 계층 +
+불변식 체커. 순수 시뮬레이션(`SkullKingMatchSimulationTest`)이 2~8인 완주를 이미 증명한다 —
+S5 의 IT 는 **배선이 맞는지**를 보는 것이지 룰을 다시 검증하는 게 아니다.
 
 ### 완료 기준
 **봇만으로 스컬킹 10라운드 완주**가 IT 로 통과. 티츄 회귀 전량 그린.

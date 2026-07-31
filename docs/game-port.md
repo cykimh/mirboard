@@ -115,7 +115,7 @@ public interface GameEngine {                       // per-room. newEngine(ctx) 
 | 칩/판돈(D-82) | 티츄 매치 종료에 묶인 별건. 신규 게임은 `stake=0` 으로 시작 |
 | ELO | `users.rating` 단일 컬럼이라 게임별 분리는 스키마 결정(D-02 검토 필요) |
 | 좌석 수 4 고정 | 가변으로 감 — §3 |
-| 트릭·리드수트 | 트릭테이킹 계열만의 개념. 스컬킹은 **티츄와 공유하는 내부 모듈**로 뽑되 포트는 아님 |
+| 트릭·리드수트 | 트릭테이킹 계열만의 개념 — 포트에 없음. *(D-101 정정: 티츄 트릭 모델은 조합 기반(`Hand`·passedSeats·wish)이고 리드수트 개념이 없어 교집합 0 — 공유 모듈 없이 스컬킹 전용 `domain/game/skullking/trick/` 으로 구현됐다)* |
 
 **칩을 뺀 결과 — infra 의 유일한 티츄 잔여**: `RoomChipService`(infra.ws)는
 `TichuGameDefinition.ID` / `TichuMatchCompleted` / `Team` 을 계속 직접 참조한다. 칩 정산은
