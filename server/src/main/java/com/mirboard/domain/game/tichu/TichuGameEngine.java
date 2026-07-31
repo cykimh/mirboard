@@ -232,11 +232,11 @@ public final class TichuGameEngine implements GameEngine {
      * win/lose/ELO + 탈주자 desert_count 를 한 트랜잭션에 기록하게 한다.
      */
     @Override
-    public boolean desert(int seat, long deserterUserId, List<GameEvent> outbound) {
+    public DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound) {
         TichuMatchState matchState = matchState();
         // D-82 — 매치가 이미 끝난(리매치 대기) 방의 끊김/나가기는 탈주가 아니다.
         if (matchState.isMatchOver()) {
-            return false;
+            return DesertOutcome.NOT_APPLICABLE;
         }
         Team winner = Team.ofSeat(seat).opponent();
         events.publish(new TichuMatchCompleted(
@@ -256,7 +256,7 @@ public final class TichuGameEngine implements GameEngine {
                 null));
         log.warn("Desertion: roomId={} seat={} deserterUserId={} winner={}",
                 context.roomId(), seat, deserterUserId, winner);
-        return true;
+        return DesertOutcome.MATCH_ENDED;
     }
 
     // ---------- internals ----------

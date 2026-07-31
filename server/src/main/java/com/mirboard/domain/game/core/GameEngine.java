@@ -111,12 +111,27 @@ public interface GameEngine {
     Advance advance(GameState newState, List<GameEvent> outbound);
 
     /**
-     * 게임중 탈주로 매치를 강제 종료 (D-75). 종료 이벤트를 {@code outbound} 에 append.
+     * 게임중 탈주 처리 (D-75). 발행할 이벤트를 {@code outbound} 에 append.
      *
-     * <p>"한 명이 빠지면 어떻게 되는가"는 게임 규칙이다 — 티츄는 2:2 라 상대팀 승리,
-     * 개인전 게임은 다른 답을 낼 수 있다. 이미 끝난 매치 등 해당 없으면 false.
+     * <p>"한 명이 빠지면 어떻게 되는가"는 게임 규칙이다 — 티츄는 2:2 라 상대팀 승리로
+     * 매치를 끝내고({@link DesertOutcome#MATCH_ENDED}), 스컬킹 같은 개인전은 남은
+     * 사람끼리 계속한다({@link DesertOutcome#MATCH_CONTINUES}, D-104). 이미 끝난 매치 등
+     * 해당 없으면 {@link DesertOutcome#NOT_APPLICABLE}.
+     *
+     * <p>D-102: 원래 boolean("매치를 강제 종료했는가")이었으나 티츄 전제가 계약에 박혀
+     * 인프라가 무조건 방을 FINISHED 로 만들었다 — "계속"을 표현할 수 있게 3치로 바꿨다.
      */
-    boolean desert(int seat, long deserterUserId, List<GameEvent> outbound);
+    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
+
+    /** {@link #desert} 결과 — 인프라는 이걸로 방 상태(유지/종료)만 결정한다. */
+    enum DesertOutcome {
+        /** 탈주로 보지 않음 (이미 끝난 매치 등) — 상태 무변경. */
+        NOT_APPLICABLE,
+        /** 매치 계속 — 방을 IN_GAME 으로 유지하고 봇/타임아웃을 재무장한다. */
+        MATCH_CONTINUES,
+        /** 매치 종료 — 방을 FINISHED 로 전이한다. */
+        MATCH_ENDED
+    }
 
     /** 액션 적용 결과 — 새 상태 + 발행할 이벤트. */
     record Result(GameState newState, List<GameEvent> events) {

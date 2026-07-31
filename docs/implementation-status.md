@@ -20,7 +20,7 @@
 | 3 | 방 생성/입장/준비/퇴장/관전 | ✅ | `domain.lobby.room`, `infra.rest.rooms`, `lua/room_*.lua` |
 | 4 | WebSocket/STOMP 실시간 | ✅ | `infra.ws`, `infra.config.WebSocketConfig` |
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
-| 5b | 스컬킹 룰 엔진 (순수 — 통합은 S5) | 🔶 | `domain.game.skullking` (§16) |
+| 5b | 스컬킹 (룰 엔진 + 인게임 배선, 클라는 S6) | ✅ | `domain.game.skullking` (§16) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -221,7 +221,7 @@
 
 ## 13. 테스트 현황
 
-- **서버**: **717건** (D-104 시점 실측, 실패 0). 티츄·인프라 412건 + 스컬킹 305건.
+- **서버**: **727건** (D-102 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
@@ -256,14 +256,14 @@
 ## 15. 미구현 / 범위 밖 (참고)
 
 - 게임별 격리 채팅(로비/방 채팅만 존재).
-- 티츄 외 게임 — 포트(§14)·인원 가변(D-99)·스컬킹 룰 엔진(§16)까지 준비됐지만
-  **등록된 게임은 아직 TICHU 1종**이다. 스컬킹 통합은 `multi-game-sessions.md` S5~S6.
+- 스컬킹 클라 게임판 — 서버는 완성(§16), 클라는 S6(D-103). 그 전까지 스컬킹 방에
+  들어가면 게임 화면이 없다.
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
 - 멀티 인스턴스 세션 레지스트리(`WsSessionRegistry` 는 단일 인스턴스 전제).
 
 ---
 
-## 16. 스컬킹 룰 엔진 (S4, D-101 — 순수 도메인만)
+## 16. 스컬킹 (S4 룰 엔진 + S5 통합, D-101·D-104·D-102)
 
 `domain.game.skullking` 에 **순수 룰 엔진까지** 구현됐다. 룰 정본은
 `docs/rules-skullking.md`(절마다 `코드:`/`테스트:` 로 코드와 1:1 매핑).
@@ -280,12 +280,13 @@
   순수 엔진 `desert`/`applyAndDrain`/`startRoundAndDrain` 구현 완료.
 - **검증**: 305건, Docker 불필요. 2~8인 전 좌석 수가 무작위 합법수만으로 10라운드를
   완주하며(탈주 포함 시나리오 별도) 매 액션 직후 `SkullKingInvariantChecker` 를 통과한다.
-- **아직 없는 것 (S5/D-102)**: 포트 어댑터 `SkullKingGameEngine implements GameEngine`,
-  `SkullKingGameDefinition` @Component 등록, Redis 상태 저장, 공개/비공개 뷰 매퍼,
-  봇 정책, STOMP 디스패치 연결, 포트 `desert` → 순수 `desert` 배선. **그래서 카탈로그에
-  안 뜬다.**
-- **S5 선행 과제**: 시드 봇이 4명(V3)뿐이라 6~8인 방은 `fillWithBots` 가 실패한다
-  (`rules-skullking.md` §2).
+- **통합(S5, D-102) 완료**: `SkullKingGameDefinition`(SKULL_KING, 2~8, AVAILABLE) 등록 →
+  카탈로그·방 생성·디스패치·봇·타임아웃·resync 자동 연결. 어댑터 `SkullKingGameEngine` 이
+  상태 I/O(티츄와 같은 Redis 키)·뷰(입찰 은닉 §5)·advance(라운드 연쇄)·desert(3치 포트,
+  드레인 계약 내장)를 붙인다. 봇 풀 4→8(V10). 완료 기준: **4인·6인 봇 풀매치 10라운드
+  완주 IT** (`SkullKingBotMatchSimulationIT`).
+- **남은 것**: 클라 게임판(S6/D-103) — 카탈로그에는 뜨지만 게임 화면이 없다. 매치 결과
+  영속·ELO·desert_count 는 D-02 스키마 결정 선행으로 별건(D-102 보류).
 
 ---
 

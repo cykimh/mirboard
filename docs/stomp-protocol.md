@@ -147,6 +147,46 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 { "suit": null,   "rank": 0,  "special": "PHOENIX" }
 ```
 
+---
+
+## 스컬킹 (gameType=SKULL_KING, D-102)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~8 가변, D-99).
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `PLACE_BID` | `bid: 0..handSize` | Bidding 단계, 좌석당 1회 (변경 불가) |
+| `PLAY_CARD` | `card: SkullCard`, `declaredAs?: "PIRATE"\|"ESCAPE"` | 단수 카드. `declaredAs` 는 티그리스에만 (없으면 `INVALID_TIGRESS_DECLARATION`) |
+
+`SkullCard` 직렬화: `{ "suit": "GREEN"|"PURPLE"|"YELLOW"|"BLACK", "rank": 1..14, "special": null }`
+또는 `{ "suit": null, "rank": 0, "special": "PIRATE"|"MERMAID"|"SKULL_KING"|"TIGRESS"|"ESCAPE" }`.
+
+**서버 → 클라 (공개)** — `SkullKingEvent.envelopeType()` 과 1:1:
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `BIDDING_STARTED` | `{ roundNumber, handSize }` | 라운드 진입 (handSize = 이 라운드 트릭 수·예측 상한) |
+| `BID_SUBMITTED` | `{ seat }` | 예측 제출 사실만 — **값 없음** (§5 동시 공개) |
+| `BIDS_REVEALED` | `{ bids: {seat: bid} }` | 전원 제출 → 값 동시 공개 |
+| `PLAYING_STARTED` | `{ leadSeat }` | 플레이 단계 진입 |
+| `CARD_PLAYED` | `{ seat, card, declaredAs? }` | 카드 제출 (티그리스 선언 포함 — 판정 근거) |
+| `TURN_CHANGED` | `{ currentTurnSeat }` | 턴 전환 |
+| `TRICK_TAKEN` | `{ winnerSeat, winningCard, trickNumber }` | 트릭 종료 — 이긴 카드 명시(비추이적 판정 표시용) |
+| `ROUND_ENDED` | `{ roundNumber, scores: {seat: {bid,won,base,bonus}}, cumulativeScores: {seat: 점수} }` | 라운드 정산 |
+| `SEAT_DESERTED` | `{ seat }` | 탈주 확정 (D-104) — 이후 그 좌석은 자동조종 |
+| `MATCH_ENDED` | `{ winners: [seat], finalScores: {seat: 점수}, roundsPlayed }` | 10라운드 완주 또는 탈주 조기 종료 (winners 는 공동 승리 가능, 탈주 좌석 제외) |
+
+**서버 → 클라 (비공개)**: `HAND_DEALT` `{ seat, cards: SkullCard[], roundNumber }` —
+라운드마다 손패 장수가 다르다(§4). `ERROR` 는 티츄와 공통이며 스컬킹 고유 코드:
+`NOT_IN_BIDDING_PHASE`·`NOT_IN_PLAYING_PHASE`·`ALREADY_BID`·`BID_OUT_OF_RANGE`·
+`NOT_YOUR_TURN`·`CARD_NOT_OWNED`·`INVALID_TIGRESS_DECLARATION`·`MUST_FOLLOW_LEAD_SUIT`·
+`INVALID_STATE_FOR_ACTION`·`SEAT_DESERTED`.
+
+> 이벤트 type 문자열은 게임 간 재사용된다(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
+> 게임을 하나만 가지므로 충돌이 없다. 클라(S6)는 방의 `gameType` 으로 스토어를 고른다.
+
 ### 액션 처리 단계 (서버)
 1. 방 조회 → 좌석 도출(비참가자는 `ERROR(NOT_IN_ROOM)`), `gameType` 으로 엔진 획득
    (`GameEngineProvider.forRoom`).

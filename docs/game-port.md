@@ -66,12 +66,19 @@ public interface GameEngine {                       // per-room. newEngine(ctx) 
 
     // ⑤ 라운드 · 매치 진행
     Advance advance(GameState newState, List<GameEvent> outbound);
-    boolean desert(int seat, long deserterUserId, List<GameEvent> outbound);
+    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
 
     record Result(GameState newState, List<GameEvent> events) {}
     record Advance(boolean roundCompleted, boolean matchCompleted) {}
+    enum DesertOutcome { NOT_APPLICABLE, MATCH_CONTINUES, MATCH_ENDED }
 }
 ```
+
+*(D-102 변경)* `desert` 는 원래 `boolean`("매치를 강제 종료했는가")이었다 — 티츄의 2:2
+전제(탈주=상대팀 승리 종료)가 계약에 박혀 있어 `DesertionService` 가 true 면 무조건 방을
+FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2치로 표현할 수 없어 3치로
+바꿨다: `MATCH_CONTINUES` 면 인프라는 이벤트만 브로드캐스트하고 방을 IN_GAME 으로 유지한
+채 봇/타임아웃을 재무장한다. 티츄는 `MATCH_ENDED`/`NOT_APPLICABLE` 만 쓴다.
 
 `GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는

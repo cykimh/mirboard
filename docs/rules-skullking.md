@@ -11,9 +11,9 @@
 > - **미규정:** 원문이 답하지 않아 **우리가 정한** 항목. §13 에 전부 모아 뒀다
 >
 > 경로는 전부 `server/src/{main,test}/java/com/mirboard/domain/game/skullking/` 기준의
-> 상대 경로다. S4 는 **순수 룰 엔진까지**이며, 포트 어댑터
-> (`SkullKingGameEngine implements GameEngine`)·`GameDefinition` 등록·상태 저장·뷰 매퍼·
-> 봇 정책·STOMP 디스패치는 **S5(D-102)** 범위다.
+> 상대 경로다. 순수 룰 엔진(S4, D-101) 위에 포트 어댑터 `SkullKingGameEngine`·
+> `GameDefinition` 등록·상태 저장·뷰 매퍼·봇/디스패치 배선(S5, D-102)까지 완료됐다.
+> 남은 것은 클라 게임판(S6, D-103)뿐이다.
 
 > **출처 신뢰도 경고.** 근거는 나무위키 스컬킹 문서(볼트
 > `inbox/clippings/스컬킹.md`, 최종 수정 2026-04-02)다. 집단 편집 문서라 검증되지 않은
@@ -68,8 +68,8 @@
 방 정원은 D-99 의 가변 capacity 로 정한다 — 스컬킹은 `min < max` 이므로 방 만들기
 모달에 인원 선택이 노출된다.
 
-> ⚠ **봇 풀 부족** (D-99 에서 발견): 시드 봇은 4명(V3)뿐이라 `capacity - 1 > 4` 인
-> 6~8인 방은 `fillWithBots` 가 실패한다. S5(D-102)에서 봇 풀을 확장해야 한다.
+> ~~봇 풀 부족~~ (D-99 발견 → **D-102 해소**): V10 이 시드 봇을 8명으로 늘려
+> 8인 방(호스트+봇 7)까지 `fillWithBots` 가 동작한다.
 
 ---
 
@@ -428,7 +428,8 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 - **테스트:** `state/SkullKingMatchStateTest`(15건 — 10라운드 종료·공동 승리·전원 음수·
   탈주 제외/누적), `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`
   (완주 22건), `SkullKingDesertionTest`(17건 — 탈주 포함 풀매치 완주)
-- **갭:** 매치 결과 영속화(`match_results` 적재)와 ELO 는 S5 범위다. 탈주는 D-104 로
+- **갭:** 매치 결과 영속화와 ELO 는 D-02 스키마 결정(게임별 rating 분리) 선행으로
+  **별건 보류**(D-102). 탈주는 D-104 로
   확정·구현됐다(순수 엔진 `desert`) — S5 는 포트 `GameEngine.desert` 를 이 메서드에
   연결만 한다. 끊김 유예(120s) 구간의 정지는 미해결 한계로 S5 별건
 

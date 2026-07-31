@@ -46,18 +46,25 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
+    /** D-102 — 카탈로그 2게임 체제. 정렬은 status → displayName 이라 "스컬킹" 이 먼저다. */
     @Test
-    void catalog_returns_tichu_as_available_when_authenticated() throws Exception {
+    void catalog_returns_both_games_when_authenticated() throws Exception {
         String token = authenticate();
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games").isArray())
-                .andExpect(jsonPath("$.games[0].id").value("TICHU"))
-                .andExpect(jsonPath("$.games[0].displayName").value("티츄"))
-                .andExpect(jsonPath("$.games[0].minPlayers").value(4))
-                .andExpect(jsonPath("$.games[0].maxPlayers").value(4))
-                .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"));
+                .andExpect(jsonPath("$.games.length()").value(2))
+                .andExpect(jsonPath("$.games[0].id").value("SKULL_KING"))
+                .andExpect(jsonPath("$.games[0].displayName").value("스컬킹"))
+                .andExpect(jsonPath("$.games[0].minPlayers").value(2))
+                .andExpect(jsonPath("$.games[0].maxPlayers").value(8))
+                .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[1].id").value("TICHU"))
+                .andExpect(jsonPath("$.games[1].displayName").value("티츄"))
+                .andExpect(jsonPath("$.games[1].minPlayers").value(4))
+                .andExpect(jsonPath("$.games[1].maxPlayers").value(4))
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"));
     }
 
     @Test

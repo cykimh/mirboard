@@ -98,6 +98,26 @@ Server-Authoritative / State Hiding / 모듈러 모놀리스 경계. 본 변경�
 배포 작업의 첫 청크이며, 7-2 (Dockerfile + fly.toml), 7-3 (Upstash + prod
 profile + Spring static serving), 7-4 (클라 번들 통합) 이 뒤따른다.
 
+## D-102 (2026-07-31) — 스컬킹 통합: 포트 배선 + desert 3치화 + 봇 풀 확장 (M5/T7 S5)
+
+S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE)으로 등록하고
+어댑터 `SkullKingGameEngine` 이 포트를 구현한다. 스토어는 티츄와 같은 Redis 키
+(`room:{id}:state`·`room:{id}:matchState`)를 재사용한다 — 방당 게임이 하나라 충돌이 없다.
+공개 뷰는 입찰 은닉 경계(§5)를 지킨다: Bidding 중에는 좌석별 제출 여부만, 전원 제출 후
+값 공개. 비공개 뷰는 손패 + 제출 전 본인 예측.
+
+**포트 계약 변경 — `desert` boolean → 3치 `DesertOutcome`.** 기존 계약은 티츄 전제
+(탈주=매치 종료)가 박혀 있어 `DesertionService` 가 true 면 무조건 방을 FINISHED 로
+만들었다. "남은 사람끼리 계속"(D-104)은 2치로 표현 불가 — `MATCH_CONTINUES` 면 방을
+유지한 채 봇/타임아웃만 재무장한다. `game-port.md` 갱신 동반.
+
+**봇 풀 4→8 (V10).** 시드 봇 4명으로는 8인 방(호스트+봇 7)을 못 채운다(D-99 발견).
+`BotUserRegistry` 는 최소 4 검증만 남기고 전체 로드로 일반화한다.
+
+보류 3건: ① 스컬킹 매치 결과 영속·ELO·desert_count 는 `users.rating` 단일 컬럼(D-02)의
+게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
+후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
+
 ## D-104 (2026-07-31) — 스컬킹 개인전 탈주: 유령 좌석 자동조종으로 "남은 사람끼리 계속"
 
 티츄의 탈주 처리(D-75, 상대팀 승리로 매치 즉시 종료)는 2:2 팀전 전제라 개인전에 옮길 수

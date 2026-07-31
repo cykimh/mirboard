@@ -62,12 +62,14 @@ class BotUserRegistryTest {
     }
 
     @Test
-    void caps_at_four_when_extra_bots_present() {
-        // 운영 중 누군가 시드 봇을 5번째 INSERT 해도 4명만 사용.
+    void loads_every_seeded_bot_beyond_four() {
+        // D-102 — 스컬킹 8인 방(호스트+봇 7)을 위해 V10 이 봇을 8명으로 늘렸다.
+        // 과거의 "4명 캡"은 폐기: 시드된 봇 전원을 로드한다.
         BotUserRegistry registry = registryWith(1L, 2L, 3L, 4L, 5L, 6L);
 
-        assertThat(registry.getBotIds()).hasSize(4).containsExactly(1L, 2L, 3L, 4L);
-        assertThat(registry.isBot(5L)).isFalse();
+        assertThat(registry.getBotIds()).hasSize(6).containsExactly(1L, 2L, 3L, 4L, 5L, 6L);
+        assertThat(registry.isBot(5L)).isTrue();
+        assertThat(registry.takeBots(6)).hasSize(6);
     }
 
     private static BotUserRegistry registryWith(long... ids) {

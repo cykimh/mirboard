@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mirboard.domain.game.core.GameContext;
+import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.game.tichu.event.TichuEvent;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
@@ -54,9 +55,9 @@ class TichuGameEngineDesertionTest {
         givenMatchInProgress();
         List<GameEvent> outbound = new ArrayList<>();
 
-        boolean processed = engineWithStake(0).desert(0, 10L, outbound);
+        GameEngine.DesertOutcome processed = engineWithStake(0).desert(0, 10L, outbound);
 
-        assertThat(processed).isTrue();
+        assertThat(processed).isEqualTo(GameEngine.DesertOutcome.MATCH_ENDED);
         TichuMatchCompleted published = capturePublished();
         assertThat(published.winningTeam()).isEqualTo(Team.B); // seat0 = Team A → 상대 B 승.
         assertThat(published.deserterUserId()).isEqualTo(10L);
@@ -73,7 +74,8 @@ class TichuGameEngineDesertionTest {
         givenMatchInProgress();
         List<GameEvent> outbound = new ArrayList<>();
 
-        assertThat(engineWithStake(0).desert(1, 20L, outbound)).isTrue();
+        assertThat(engineWithStake(0).desert(1, 20L, outbound))
+                .isEqualTo(GameEngine.DesertOutcome.MATCH_ENDED);
 
         assertThat(capturePublished().winningTeam()).isEqualTo(Team.A);
     }
@@ -87,9 +89,9 @@ class TichuGameEngineDesertionTest {
         when(matchStateStore.load("r1")).thenReturn(Optional.of(over));
         List<GameEvent> outbound = new ArrayList<>();
 
-        boolean processed = engineWithStake(0).desert(0, 10L, outbound);
+        GameEngine.DesertOutcome processed = engineWithStake(0).desert(0, 10L, outbound);
 
-        assertThat(processed).isFalse();
+        assertThat(processed).isEqualTo(GameEngine.DesertOutcome.NOT_APPLICABLE);
         verify(events, never()).publish(any());
         assertThat(outbound).isEmpty();
     }
@@ -101,7 +103,8 @@ class TichuGameEngineDesertionTest {
                 TichuMatchState.initial(PLAYERS, 1000)
                         .withRoundCompleted(new RoundScore(120, 80, -1, false))));
 
-        assertThat(engineWithStake(0).desert(0, 10L, new ArrayList<>())).isTrue();
+        assertThat(engineWithStake(0).desert(0, 10L, new ArrayList<>()))
+                .isEqualTo(GameEngine.DesertOutcome.MATCH_ENDED);
 
         TichuMatchCompleted published = capturePublished();
         assertThat(published.cumulativeTeamAScore()).isEqualTo(120);
@@ -113,7 +116,8 @@ class TichuGameEngineDesertionTest {
     void room_stake_is_carried_to_settlement_event() {
         givenMatchInProgress();
 
-        assertThat(engineWithStake(100).desert(0, 10L, new ArrayList<>())).isTrue();
+        assertThat(engineWithStake(100).desert(0, 10L, new ArrayList<>()))
+                .isEqualTo(GameEngine.DesertOutcome.MATCH_ENDED);
 
         assertThat(capturePublished().stake()).isEqualTo(100);
     }
