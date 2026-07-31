@@ -168,6 +168,24 @@ describe('BIDDING_STARTED — 판정과 무관한 라운드 스크럽 (D-103)', 
     expect(store().lastSeq).toBe(10); // gap 이므로 전진하지 않는다 (resync 가 권위)
   });
 
+  /**
+   * C5 실측에서 잡은 것 — 스크럽이 handCount 를 남겨두면 지난 라운드 끝의 0 이 새 라운드
+   * 화면에 그대로 보이고, 내 손패에는 이미 없는 카드가 남아 클릭하면 CARD_NOT_OWNED 를 받는다.
+   */
+  it('새 라운드의 손패 장수를 payload 로 즉시 맞추고 내 손패를 비운다', () => {
+    store().applyPrivateHand({
+      seat: 2,
+      cards: [suit('GREEN', 1), suit('GREEN', 2), suit('GREEN', 3)],
+      roundNumber: 3,
+    });
+
+    store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 99));
+
+    expect(store().seats.every((s) => s.handCount === 4)).toBe(true);
+    expect(store().hand).toEqual([]);
+    expect(store().selectedIndex).toBeNull();
+  });
+
   it('연속 seq 면 applied 이고 lastSeq 도 전진한다', () => {
     const verdict = store().applyEvent(
       ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 11),

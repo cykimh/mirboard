@@ -54,6 +54,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록
   (+ `GameEngine` 구현, `GameStartingEvent` 리스너로 라운드 시작) → 카탈로그/방 생성/인게임
   디스패치/봇/타임아웃/resync 가 자동 연결됨. 로비·허브 컨트롤러와 스케줄러 수정 불필요.
+  (D-102 스컬킹이 이 약속을 실증 — 인프라 코드 수정 0.)
+- **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
+  `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
+  하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고, 각 게임판이
+  자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다.
 - 정적·이미지 서빙 엔드포인트는 `/api/**` **밖**에 둔다 — `<img>`/브라우저 직접 요청은 Bearer 토큰(localStorage JWT)을 못 싣고, SecurityConfig 가 비-`/api` 를 default-permit. 민감 API 는 여전히 `/api/**` 하위(예: 아바타 조회 `/avatars/{userId}` 공개, 업로드 `/api/me/avatar` 인증).
 
 ## 기술 스택 결정사항
@@ -65,7 +71,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 8.10+, Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles.css` 유지 |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-`, D-103) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
@@ -186,9 +192,19 @@ npm --prefix client run test -- authStore   # 특정 테스트만
   "payload": { ... } }
 ```
 
-- 서버 → 클라 공개: `/topic/room/{roomId}` (이벤트: `ROOM_UPDATED`, `GAME_STARTED`, `PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `GAME_ENDED` 등)
-- 서버 → 클라 비공개: `/user/queue/room/{roomId}` (이벤트: `HAND_DEALT`, `HAND_DEALT_FULL`, `RESYNC`, `ERROR`)
-- 클라 → 서버: `/app/room/{roomId}/action` (액션: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `PASS_CARDS`, `PLAY_CARD`, `PASS`, `MAKE_WISH`, `GIVE_DRAGON_TRICK`)
+목적지는 게임별로 갈리지 않는다 — 서버가 방의 `gameType` 으로 역직렬화 타입을 고른다(D-98).
+**이벤트 type 문자열은 게임 간 재사용된다**(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
+게임을 하나만 가지므로 충돌이 없다.
+
+- 서버 → 클라 공개 `/topic/room/{roomId}`
+  - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `ROUND_ENDED`, `MATCH_ENDED` 등
+  - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
+- 서버 → 클라 비공개 `/user/queue/room/{roomId}`
+  - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
+  - 스컬킹: `HAND_DEALT`, `ERROR`
+- 클라 → 서버 `/app/room/{roomId}/action`
+  - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`, `PASS_TRICK`, `MAKE_WISH`, `GIVE_DRAGON_TRICK`
+  - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
 
 전체 카탈로그: `docs/stomp-protocol.md`.
 

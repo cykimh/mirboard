@@ -182,8 +182,9 @@ describe('State Hiding — 입찰 (§5)', () => {
     const seats = [...container.querySelectorAll('.sk-seat')];
     seats.forEach((el) => {
       // 제출한 좌석은 '제출', 아닌 좌석은 '—' — 숫자가 노출되면 회귀다.
-      const val = within(el as HTMLElement).getAllByTitle('예측 승수')[0];
-      expect(['제출', '—']).toContain(val.textContent?.replace('예측', '').trim());
+      const stat = within(el as HTMLElement).getAllByTitle('예측 승수')[0];
+      const val = stat.querySelector('.sk-stat-val')!.textContent?.trim();
+      expect(['제출', '—']).toContain(val);
     });
   });
 

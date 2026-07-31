@@ -197,11 +197,17 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
           myBid: null,
           selectedIndex: null,
           tigressDeclaration: null,
+          // 손패도 비운다 — 이전 라운드 카드를 남기면 그 사이 클릭해서 CARD_NOT_OWNED 를
+          // 받는다. HAND_DEALT(또는 resync)가 곧 새 손패를 채운다.
+          hand: [],
           seats: state.seats.map((s) => ({
             ...s,
             hasBid: false,
             bid: null,
             tricksWon: 0,
+            // handSize 는 payload 로 이미 알고 있으므로 과도기에도 정확한 값을 보여준다
+            // (남겨두면 지난 라운드 끝의 0 이 그대로 보인다 — C5 실측).
+            handCount: p.handSize,
           })),
           ...(verdict === 'applied' && seq !== undefined ? { lastSeq: seq } : {}),
         });

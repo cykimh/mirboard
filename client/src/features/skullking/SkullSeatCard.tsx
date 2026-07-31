@@ -69,7 +69,7 @@ export function SkullSeatCard({
 
       <div className="sk-seat-stats">
         <span className="sk-stat" title="예측 승수">
-          <span className="sk-stat-key">예측</span>
+          <span className="sk-stat-key" aria-hidden>예</span>
           <span className="sk-stat-val">
             {bidsRevealed && seat.bid !== null
               ? seat.bid
@@ -79,11 +79,11 @@ export function SkullSeatCard({
           </span>
         </span>
         <span className="sk-stat" title="획득 트릭">
-          <span className="sk-stat-key">획득</span>
+          <span className="sk-stat-key" aria-hidden>획</span>
           <span className="sk-stat-val">{seat.tricksWon}</span>
         </span>
         <span className="sk-stat" title="남은 손패">
-          <span className="sk-stat-key">손패</span>
+          <span className="sk-stat-key" aria-hidden>손</span>
           <span className="sk-stat-val">{seat.handCount}</span>
         </span>
       </div>
