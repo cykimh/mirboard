@@ -2,7 +2,9 @@ package com.mirboard.domain.game.skullking;
 
 import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.skullking.action.ActionValidator;
+import com.mirboard.domain.game.skullking.action.RejectionReason;
 import com.mirboard.domain.game.skullking.action.SkullKingAction;
+import com.mirboard.domain.game.skullking.action.SkullKingActionRejectedException;
 import com.mirboard.domain.game.skullking.bid.BidRules;
 import com.mirboard.domain.game.skullking.card.SkullCard;
 import com.mirboard.domain.game.skullking.card.SpecialKind;
@@ -18,10 +20,12 @@ import com.mirboard.domain.game.skullking.state.TrickResult;
 import com.mirboard.domain.game.skullking.state.TrickState;
 import com.mirboard.domain.game.skullking.trick.TrickResolver;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * 스컬킹 <b>순수 룰 엔진</b> (`docs/rules-skullking.md`).
@@ -61,6 +65,26 @@ public final class SkullKingEngine {
         }
     }
 
+    /** {@link #desert} 결과 — 라운드/매치 상태 + 무엇이 일어났는가 + 발행할 이벤트. */
+    public record Desertion(SkullKingState newState,
+                            SkullKingMatchState matchState,
+                            Outcome outcome,
+                            List<SkullKingEvent> events) {
+
+        public enum Outcome {
+            /** 가드에 걸림(멱등) — 상태 무변경, 이벤트 0건. */
+            NOT_APPLICABLE,
+            /** 남은 사람끼리 계속 — 유령 차례는 드레인 완료 (§13-⑱). */
+            CONTINUED,
+            /** 잔존 좌석/사람 부족으로 조기 종료 — 진행 라운드 폐기 (§13-⑲). */
+            MATCH_ENDED
+        }
+
+        public Desertion {
+            events = List.copyOf(events);
+        }
+    }
+
     // ---------- 라운드 시작 (§3, §4) ----------
 
     /**
@@ -71,6 +95,13 @@ public final class SkullKingEngine {
      */
     public Result startRound(SkullKingMatchState match, Random rng) {
         int seatCount = context.seatCount();
+        // S5 배선 오류 조기 검출 — 방 인원과 매치 참가자 수가 어긋난 채 분배하면 이후
+        // 모든 좌석 산술이 조용히 틀린다. (테스트용 빈 맵은 예외적으로 허용.)
+        if (!match.cumulativeScores().isEmpty()
+                && match.cumulativeScores().size() != seatCount) {
+            throw new IllegalStateException("Match participants " + match.cumulativeScores().size()
+                    + " != room seats " + seatCount);
+        }
         int roundNumber = match.roundNumber();
         List<PlayerState> players = Dealer.deal(roundNumber, seatCount, rng);
         int handSize = Dealer.handSize(roundNumber, seatCount);
@@ -159,6 +190,100 @@ public final class SkullKingEngine {
         Map<Integer, RoundScore> scores = RoundScorer.scoreAll(players, state.roundNumber());
         return new Result(new SkullKingState.RoundEnd(state.roundNumber(), players,
                 state.startSeat(), scores), events);
+    }
+
+    // ---------- 탈주 (D-104, §13-⑱⑲⑳) ----------
+
+    /**
+     * 좌석 탈주 확정 — "남은 사람끼리 계속". 좌석은 제거하지 않고 매치에 유령 표식만 남긴
+     * 뒤, 계속이면 그 좌석의 대기 차례를 즉시 드레인해 진행을 재개시킨다.
+     *
+     * <p>멱등: 이미 끝난 매치·이미 탈주한 좌석·매치 참가자가 아닌 좌석은
+     * {@link Desertion.Outcome#NOT_APPLICABLE} (상태 무변경, 이벤트 0건).
+     *
+     * @param humanSeats 사람이 점유한 좌석들(탈주자 포함). 잔존 사람 0 판정에만 쓴다 —
+     *                   봇 좌석의 탈주 처리 여부는 인프라 책임이다
+     */
+    public Desertion desert(SkullKingState state, SkullKingMatchState match,
+                            int seat, Set<Integer> humanSeats) {
+        if (match.isMatchOver()
+                || match.desertedSeats().contains(seat)
+                || !match.cumulativeScores().containsKey(seat)) {
+            return new Desertion(state, match, Desertion.Outcome.NOT_APPLICABLE, List.of());
+        }
+        SkullKingMatchState next = match.withSeatDeserted(seat);
+        List<SkullKingEvent> events = new ArrayList<>();
+        events.add(new SkullKingEvent.SeatDeserted(seat));
+
+        boolean humanLeft = humanSeats.stream().anyMatch(s -> !next.desertedSeats().contains(s));
+        if (next.activeSeats().size() < SkullKingMatchState.MIN_SEATS_TO_CONTINUE || !humanLeft) {
+            // 조기 종료 — 진행 중 라운드는 점수 미반영 폐기 (§13-⑲). 완주 수는 점프 전에 읽는다.
+            int roundsPlayed = next.roundNumber() - 1;
+            SkullKingMatchState ended = next.abandoned();
+            events.add(new SkullKingEvent.MatchEnded(
+                    ended.winners(), ended.cumulativeScores(), roundsPlayed));
+            return new Desertion(state, ended, Desertion.Outcome.MATCH_ENDED, events);
+        }
+        SkullKingState drained = drainGhosts(state, next.desertedSeats(), events);
+        return new Desertion(drained, next, Desertion.Outcome.CONTINUED, events);
+    }
+
+    /**
+     * 사람 액션 적용 + 유령 차례 드레인. 탈주 좌석의 사람 액션은
+     * {@link RejectionReason#SEAT_DESERTED} 로 거절한다 — 유예 중 재접속한 stale 클라의
+     * 늦은 액션이 자동조종과 경합하는 것을 막는다.
+     *
+     * <p>탈주가 있는 방의 어댑터는 {@code apply} 대신 반드시 이걸 쓴다 — 드레인을 빠뜨리면
+     * 유령 차례에서 예외 없이 조용히 멈춘다 (2-인자 불변식 체커가 그 상태를 잡는다).
+     */
+    public Result applyAndDrain(SkullKingState state, SkullKingMatchState match,
+                                int seat, SkullKingAction action) {
+        if (match.desertedSeats().contains(seat)) {
+            throw new SkullKingActionRejectedException(
+                    RejectionReason.SEAT_DESERTED, "seat " + seat);
+        }
+        Result applied = apply(state, seat, action);
+        List<SkullKingEvent> events = new ArrayList<>(applied.events());
+        SkullKingState drained = drainGhosts(applied.newState(), match.desertedSeats(), events);
+        return new Result(drained, events);
+    }
+
+    /** 라운드 시작 + 유령 입찰 드레인 — 새 라운드가 유령에서 막히지 않게 한다 (§13-⑱). */
+    public Result startRoundAndDrain(SkullKingMatchState match, Random rng) {
+        Result started = startRound(match, rng);
+        List<SkullKingEvent> events = new ArrayList<>(started.events());
+        SkullKingState drained = drainGhosts(started.newState(), match.desertedSeats(), events);
+        return new Result(drained, events);
+    }
+
+    /**
+     * 대기 좌석이 사람에게 돌아오거나 라운드가 끝날 때까지 유령의 액션을 결정적으로
+     * 적용한다. 정책은 {@link #timeoutAction} 과 공유(최약수) — 두 경로 불일치 회귀를
+     * 원천 차단한다.
+     */
+    private SkullKingState drainGhosts(SkullKingState state, Set<Integer> deserted,
+                                       List<SkullKingEvent> events) {
+        if (deserted.isEmpty()) {
+            return state;
+        }
+        while (true) {
+            List<Integer> ghosts = pendingSeats(state).stream()
+                    .filter(deserted::contains)
+                    .toList();
+            if (ghosts.isEmpty()) {
+                return state;
+            }
+            int seat = ghosts.get(0);
+            SkullKingAction auto = timeoutAction(state, seat);
+            if (auto == null) {
+                // 도달 불가 방어선 — 대기 좌석은 항상 합법수가 있다 (입찰 0은 무조건,
+                // 플레이는 특수 카드 상시 합법 + follow 필터가 공집합을 만들지 않음).
+                return state;
+            }
+            Result applied = apply(state, seat, auto);
+            state = applied.newState();
+            events.addAll(applied.events());
+        }
     }
 
     // ---------- 라운드 정산 (§10, §12) ----------
@@ -255,10 +380,11 @@ public final class SkullKingEngine {
     }
 
     /**
-     * 턴 제한 초과 시 적용할 <b>결정적</b> 안전 액션. 없으면 null.
+     * 턴 제한 초과·유령 자동조종(D-104)이 <b>공유하는 결정적 최약수</b> 정책. 없으면 null.
      *
-     * <p>입찰은 0 예측 — 손패와 무관하게 항상 합법이다. 플레이는 합법수 중 첫 번째(손패
-     * 순서 기준)이고, 티그리스는 탈출로 선언한다 (반드시 지므로 남의 판을 흔들지 않는다).
+     * <p>입찰은 0 예측 — 손패와 무관하게 항상 합법이다. 플레이는 합법수 중 가장 약한 카드
+     * (탈출 > 비검정 저랭크 > 검정 저랭크 > 인어 > 해적 > 스컬킹, 티그리스는 탈출 선언) —
+     * 대신 두는 수가 트릭을 이겨 판을 흔드는 빈도를 최소화한다 (§13-⑱).
      */
     public SkullKingAction timeoutAction(SkullKingState state, int seat) {
         if (seat < 0 || seat >= state.seatCount()) {
@@ -268,20 +394,29 @@ public final class SkullKingEngine {
                 && !bidding.players().get(seat).hasBid()) {
             return new SkullKingAction.PlaceBid(BidRules.MIN_BID);
         }
-        List<SkullKingAction> legal = legalActions(state, seat);
-        return legal.isEmpty() ? null : legal.get(preferSafe(legal));
+        return legalActions(state, seat).stream()
+                .min(Comparator.comparingInt(SkullKingEngine::weakness))
+                .orElse(null);
     }
 
-    /** 탈출/탈출 선언 티그리스가 있으면 그것을, 없으면 첫 합법수를. */
-    private int preferSafe(List<SkullKingAction> legal) {
-        for (int i = 0; i < legal.size(); i++) {
-            if (legal.get(i) instanceof SkullKingAction.PlayCard play
-                    && (play.card().is(SpecialKind.ESCAPE)
-                        || play.declaredAs() == TigressMode.ESCAPE)) {
-                return i;
-            }
+    /** 최약수 전순서 — 낮을수록 약하다. 동률은 손패 순서상 앞선 액션 (min 이 첫 최소 유지). */
+    private static int weakness(SkullKingAction action) {
+        if (!(action instanceof SkullKingAction.PlayCard play)) {
+            return Integer.MAX_VALUE;
         }
-        return 0;
+        if (play.card().is(SpecialKind.ESCAPE) || play.declaredAs() == TigressMode.ESCAPE) {
+            return 0;
+        }
+        SkullCard card = play.card();
+        if (card.isSuit()) {
+            return card.isTrump() ? 200 + card.rank() : 100 + card.rank();
+        }
+        return switch (card.special()) {
+            case MERMAID -> 300;
+            case TIGRESS, PIRATE -> 400;   // 해적 선언 티그리스 = 해적 (탈출 선언은 위에서 0)
+            case SKULL_KING -> 500;
+            case ESCAPE -> 0;              // 위에서 걸렸지만 switch 완전성
+        };
     }
 
     // ---------- helpers ----------

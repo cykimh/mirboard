@@ -84,4 +84,73 @@ class SkullKingMatchStateTest {
 
         assertThat(state.winners()).containsExactly(1);
     }
+
+    // ---------- 탈주 (D-104, §13-⑱⑲⑳) ----------
+
+    @Test
+    void the_three_arg_constructor_keeps_an_empty_deserted_set() {
+        SkullKingMatchState state = new SkullKingMatchState(3, 1, Map.of(0, 10, 1, 20));
+
+        assertThat(state.desertedSeats()).isEmpty();
+    }
+
+    @Test
+    void a_null_deserted_set_normalises_to_empty_for_old_json() {
+        SkullKingMatchState state = new SkullKingMatchState(1, 0, Map.of(0, 0), null);
+
+        assertThat(state.desertedSeats()).isEmpty();
+    }
+
+    @Test
+    void deserted_seats_accumulate_and_survive_round_boundaries() {
+        SkullKingMatchState state = SkullKingMatchState.initial(4, 0)
+                .withSeatDeserted(2)
+                .withRoundScored(Map.of(0, 10, 1, 0, 2, -10, 3, 0), 4)
+                .withSeatDeserted(0);
+
+        assertThat(state.desertedSeats()).containsExactly(0, 2);
+        assertThat(state.activeSeats()).containsExactly(1, 3);
+    }
+
+    @Test
+    void winners_exclude_deserted_seats_even_at_the_top_of_the_board() {
+        SkullKingMatchState state = SkullKingMatchState.initial(3, 0)
+                .withRoundScored(Map.of(0, 90, 1, 20, 2, 40), 3)
+                .withSeatDeserted(0);
+
+        assertThat(state.winners()).containsExactly(2);
+        assertThat(state.cumulativeScores())
+                .as("점수 궤적은 계속 기록된다 (§13-⑳)")
+                .containsEntry(0, 90);
+    }
+
+    @Test
+    void surviving_ties_still_share_the_win() {
+        SkullKingMatchState state = SkullKingMatchState.initial(4, 0)
+                .withRoundScored(Map.of(0, 99, 1, 40, 2, 40, 3, 10), 4)
+                .withSeatDeserted(0);
+
+        assertThat(state.winners()).containsExactly(1, 2);
+    }
+
+    @Test
+    void winners_is_empty_when_everyone_has_deserted() {
+        SkullKingMatchState state = SkullKingMatchState.initial(2, 0)
+                .withSeatDeserted(0)
+                .withSeatDeserted(1);
+
+        assertThat(state.winners()).isEmpty();
+    }
+
+    @Test
+    void abandoned_jumps_past_the_last_round_and_keeps_scores() {
+        SkullKingMatchState state = SkullKingMatchState.initial(2, 0)
+                .withRoundScored(Map.of(0, 10, 1, 20), 2)
+                .withSeatDeserted(0)
+                .abandoned();
+
+        assertThat(state.isMatchOver()).isTrue();
+        assertThat(state.cumulativeScores()).containsEntry(0, 10).containsEntry(1, 20);
+        assertThat(state.desertedSeats()).containsExactly(0);
+    }
 }

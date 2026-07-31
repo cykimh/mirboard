@@ -31,5 +31,8 @@ public enum RejectionReason {
     MUST_FOLLOW_LEAD_SUIT,
 
     /** 라운드가 이미 끝난 상태라 어떤 액션도 받지 않는다. */
-    INVALID_STATE_FOR_ACTION
+    INVALID_STATE_FOR_ACTION,
+
+    /** 탈주 확정 좌석의 사람 액션 — 그 좌석은 자동조종 전용이다 (D-104). */
+    SEAT_DESERTED
 }

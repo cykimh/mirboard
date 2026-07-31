@@ -6,12 +6,14 @@ import com.mirboard.domain.game.skullking.card.SkullCard;
 import com.mirboard.domain.game.skullking.card.SpecialKind;
 import com.mirboard.domain.game.skullking.state.PlayedCard;
 import com.mirboard.domain.game.skullking.state.PlayerState;
+import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
 import com.mirboard.domain.game.skullking.state.SkullKingState;
 import com.mirboard.domain.game.skullking.state.TrickResult;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 스컬킹 상태의 cross-cutting invariant 검증 (티츄 {@code TichuInvariantChecker} 대응).
@@ -40,6 +42,42 @@ import java.util.Map;
 public final class SkullKingInvariantChecker {
 
     private SkullKingInvariantChecker() {
+    }
+
+    /**
+     * 탈주(D-104)까지 포함한 검증 — 상태 불변식 + 매치·상태 정합. 핵심은 <b>드레인 누락
+     * 감지</b>다: 유령이 대기 좌석에 남아 있으면 게임이 예외 없이 조용히 멈춘 것이다.
+     */
+    public static void check(SkullKingState state, SkullKingMatchState match) {
+        check(state);
+        Set<Integer> deserted = match.desertedSeats();
+        if (deserted.isEmpty()) {
+            return;
+        }
+        if (!match.cumulativeScores().isEmpty()
+                && !match.cumulativeScores().keySet().containsAll(deserted)) {
+            throw new IllegalStateException("Invariant violation: desertedSeats " + deserted
+                    + " not a subset of participants " + match.cumulativeScores().keySet());
+        }
+        switch (state) {
+            case SkullKingState.Bidding bidding -> {
+                for (int seat : bidding.awaitingSeats()) {
+                    if (deserted.contains(seat)) {
+                        throw new IllegalStateException("Invariant violation: deserted seat "
+                                + seat + " still awaiting a bid (drain missing)");
+                    }
+                }
+            }
+            case SkullKingState.Playing playing -> {
+                int turn = playing.currentTurnSeat();
+                if (turn >= 0 && deserted.contains(turn)) {
+                    throw new IllegalStateException("Invariant violation: deserted seat "
+                            + turn + " is on turn (drain missing)");
+                }
+            }
+            case SkullKingState.RoundEnd __ -> {
+            }
+        }
     }
 
     /** 깨진 invariant 발견 시 {@link IllegalStateException}. */

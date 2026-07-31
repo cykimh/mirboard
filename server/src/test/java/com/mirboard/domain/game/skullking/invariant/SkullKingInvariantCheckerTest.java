@@ -8,12 +8,14 @@ import com.mirboard.domain.game.skullking.card.SkullCard;
 import com.mirboard.domain.game.skullking.card.SkullSuit;
 import com.mirboard.domain.game.skullking.state.PlayedCard;
 import com.mirboard.domain.game.skullking.state.PlayerState;
+import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
 import com.mirboard.domain.game.skullking.state.SkullKingState;
 import com.mirboard.domain.game.skullking.state.TrickResult;
 import com.mirboard.domain.game.skullking.state.TrickState;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -202,6 +204,60 @@ class SkullKingInvariantCheckerTest {
 
             assertThatCode(() -> SkullKingInvariantChecker.check(
                     new SkullKingState.Bidding(1, players, 0)))
+                    .doesNotThrowAnyException();
+        }
+
+        /** 드레인 누락 감지 (D-104) — 유령이 입찰 대기에 남아 있으면 조용한 정지다. */
+        @Test
+        void a_deserted_seat_still_awaiting_a_bid_is_caught() {
+            List<PlayerState> players = List.of(
+                    PlayerState.initial(0, List.of(green(1))),
+                    PlayerState.initial(1, List.of(green(2))));
+            SkullKingState state = new SkullKingState.Bidding(1, players, 0);
+            SkullKingMatchState match = SkullKingMatchState.initial(2, 0).withSeatDeserted(0);
+
+            assertThatThrownBy(() -> SkullKingInvariantChecker.check(state, match))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("still awaiting a bid");
+        }
+
+        @Test
+        void a_deserted_seat_on_turn_is_caught() {
+            List<PlayerState> players = List.of(
+                    PlayerState.initial(0, List.of(green(1))).withBid(0),
+                    PlayerState.initial(1, List.of(green(2))).withBid(0));
+            SkullKingState state = new SkullKingState.Playing(1, players, 0,
+                    com.mirboard.domain.game.skullking.state.TrickState.lead(0));
+            SkullKingMatchState match = SkullKingMatchState.initial(2, 0).withSeatDeserted(0);
+
+            assertThatThrownBy(() -> SkullKingInvariantChecker.check(state, match))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("is on turn");
+        }
+
+        @Test
+        void a_deserted_seat_outside_the_participants_is_caught() {
+            List<PlayerState> players = List.of(
+                    PlayerState.initial(0, List.of(green(1))),
+                    PlayerState.initial(1, List.of(green(2))));
+            SkullKingState state = new SkullKingState.Bidding(1, players, 0);
+            SkullKingMatchState match = new SkullKingMatchState(1, 0, Map.of(0, 0, 1, 0), Set.of(7));
+
+            assertThatThrownBy(() -> SkullKingInvariantChecker.check(state, match))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("not a subset");
+        }
+
+        @Test
+        void a_drained_state_with_desertion_passes_the_two_arg_check() {
+            List<PlayerState> players = List.of(
+                    PlayerState.initial(0, List.of(green(1))).withBid(0),
+                    PlayerState.initial(1, List.of(green(2))));
+            SkullKingState state = new SkullKingState.Bidding(1, players, 0);
+            SkullKingMatchState match = SkullKingMatchState.initial(2, 0).withSeatDeserted(0);
+
+            org.assertj.core.api.Assertions.assertThatCode(
+                    () -> SkullKingInvariantChecker.check(state, match))
                     .doesNotThrowAnyException();
         }
 

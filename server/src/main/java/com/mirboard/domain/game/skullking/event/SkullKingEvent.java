@@ -34,6 +34,7 @@ import java.util.Map;
         @JsonSubTypes.Type(value = SkullKingEvent.TurnChanged.class, name = "TURN_CHANGED"),
         @JsonSubTypes.Type(value = SkullKingEvent.TrickTaken.class, name = "TRICK_TAKEN"),
         @JsonSubTypes.Type(value = SkullKingEvent.RoundEnded.class, name = "ROUND_ENDED"),
+        @JsonSubTypes.Type(value = SkullKingEvent.SeatDeserted.class, name = "SEAT_DESERTED"),
         @JsonSubTypes.Type(value = SkullKingEvent.MatchEnded.class, name = "MATCH_ENDED")
 })
 public sealed interface SkullKingEvent extends GameEvent
@@ -46,6 +47,7 @@ public sealed interface SkullKingEvent extends GameEvent
                 SkullKingEvent.TurnChanged,
                 SkullKingEvent.TrickTaken,
                 SkullKingEvent.RoundEnded,
+                SkullKingEvent.SeatDeserted,
                 SkullKingEvent.MatchEnded {
 
     @Override
@@ -60,6 +62,7 @@ public sealed interface SkullKingEvent extends GameEvent
             case TurnChanged __ -> "TURN_CHANGED";
             case TrickTaken __ -> "TRICK_TAKEN";
             case RoundEnded __ -> "ROUND_ENDED";
+            case SeatDeserted __ -> "SEAT_DESERTED";
             case MatchEnded __ -> "MATCH_ENDED";
         };
     }
@@ -122,7 +125,18 @@ public sealed interface SkullKingEvent extends GameEvent
         }
     }
 
-    /** 10라운드 종료 (§12). 동점이면 공동 승리라 {@code winners} 가 복수다 (§13-⑰). */
+    /**
+     * 좌석 탈주 확정 (D-104, §13-⑱) — 이후 이 좌석은 자동조종으로 계속 플레이된다.
+     * 조기 종료 여부는 뒤따르는 {@link MatchEnded} 유무로 구분한다.
+     */
+    record SeatDeserted(int seat) implements SkullKingEvent {
+    }
+
+    /**
+     * 매치 종료 (§12). 10라운드 완주 또는 탈주 조기 종료(§13-⑲ — 이때 {@code roundsPlayed}
+     * 는 완주한 라운드 수). 동점이면 공동 승리라 {@code winners} 가 복수다 (§13-⑰);
+     * 탈주 좌석은 후보에서 제외된다 (§13-⑳).
+     */
     record MatchEnded(List<Integer> winners,
                       Map<Integer, Integer> finalScores,
                       int roundsPlayed) implements SkullKingEvent {
