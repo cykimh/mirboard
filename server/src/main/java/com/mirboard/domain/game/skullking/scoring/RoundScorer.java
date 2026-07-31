@@ -1,7 +1,7 @@
 package com.mirboard.domain.game.skullking.scoring;
 
 import com.mirboard.domain.game.skullking.state.PlayerState;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,9 +47,9 @@ public final class RoundScorer {
         return new RoundScore(bid, won, base, bonus);
     }
 
-    /** 좌석 → 라운드 점수. 좌석 순서를 보존한다. */
+    /** 좌석 → 라운드 점수. 키 조회 전용 — 순회 순서는 비보장 ({@code Map.copyOf}). */
     public static Map<Integer, RoundScore> scoreAll(List<PlayerState> players, int roundNumber) {
-        Map<Integer, RoundScore> scores = new LinkedHashMap<>();
+        Map<Integer, RoundScore> scores = new HashMap<>();
         for (PlayerState player : players) {
             scores.put(player.seat(), score(player, roundNumber));
         }

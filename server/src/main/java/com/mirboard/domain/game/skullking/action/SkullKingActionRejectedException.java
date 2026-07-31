@@ -9,7 +9,7 @@ import com.mirboard.domain.game.core.GameActionRejectedException;
  */
 public final class SkullKingActionRejectedException extends GameActionRejectedException {
 
-    private final transient RejectionReason reason;
+    private final RejectionReason reason;
 
     public SkullKingActionRejectedException(RejectionReason reason) {
         super(reason.name(), "Skull King action rejected: " + reason);

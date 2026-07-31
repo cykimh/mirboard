@@ -190,6 +190,20 @@ class ActionValidatorTest {
                     .isEqualTo(RejectionReason.NOT_IN_PLAYING_PHASE);
         }
 
+        /**
+         * card=null 은 불변 리스트 contains(null) NPE 로 새지 않고 거절 코드로 나가야
+         * 한다 — S5 배선 후 클라가 card 필드를 빠뜨린 PLAY_CARD 를 보내는 경로.
+         */
+        @Test
+        void a_null_card_is_rejected_with_a_client_code_not_an_npe() {
+            SkullKingState.Playing state = playing(
+                    List.of(List.of(green(1)), List.of(yellow(1))), List.of());
+
+            assertThat(reasonOf(() -> ActionValidator.validate(state, 0,
+                    new SkullKingAction.PlayCard(null, null))))
+                    .isEqualTo(RejectionReason.CARD_NOT_OWNED);
+        }
+
         @Test
         void tigress_without_a_declaration_is_rejected_with_a_client_code() {
             SkullKingState.Playing state = playing(

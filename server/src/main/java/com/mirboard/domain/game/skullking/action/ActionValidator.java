@@ -55,6 +55,11 @@ public final class ActionValidator {
             throw reject(RejectionReason.NOT_YOUR_TURN,
                     "expected " + trick.currentTurnSeat(playing.seatCount()) + " got " + seat);
         }
+        // null 을 여기서 먼저 거절한다 — 아래 hand().contains(null) 는 불변 리스트라 NPE 를
+        // 던져 거절 코드가 클라에 나가지 못한다 (티츄의 HashMap 기반 검사와 다른 지점).
+        if (action.card() == null) {
+            throw reject(RejectionReason.CARD_NOT_OWNED, "card is null");
+        }
         validateTigressDeclaration(action);
         if (!player.hand().contains(action.card())) {
             throw reject(RejectionReason.CARD_NOT_OWNED, String.valueOf(action.card()));

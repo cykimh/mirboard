@@ -87,12 +87,6 @@ public sealed interface SkullKingState extends GameState
         public int currentTurnSeat() {
             return trick.currentTurnSeat(seatCount());
         }
-
-        /** 손패가 전부 비었는가 — 라운드 종료 조건 (§9). */
-        @JsonIgnore
-        public boolean handsExhausted() {
-            return players.stream().allMatch(p -> p.hand().isEmpty());
-        }
     }
 
     /** 라운드 종료 + 좌석별 점수 산출 완료 (§10, §11). */

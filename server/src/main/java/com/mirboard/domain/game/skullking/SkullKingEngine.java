@@ -18,7 +18,7 @@ import com.mirboard.domain.game.skullking.state.TrickResult;
 import com.mirboard.domain.game.skullking.state.TrickState;
 import com.mirboard.domain.game.skullking.trick.TrickResolver;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -109,8 +109,9 @@ public final class SkullKingEngine {
             return new Result(updated, events);
         }
 
-        // 전원 제출 — 여기서 처음으로 값이 공개된다.
-        Map<Integer, Integer> bids = new LinkedHashMap<>();
+        // 전원 제출 — 여기서 처음으로 값이 공개된다. (BidsRevealed 의 Map.copyOf 가 순회
+        // 순서를 보존하지 않으므로 순서 있는 맵을 쓰지 않는다 — 소비자는 좌석 키 조회만.)
+        Map<Integer, Integer> bids = new HashMap<>();
         players.forEach(p -> bids.put(p.seat(), p.bid()));
         events.add(new SkullKingEvent.BidsRevealed(bids));
         events.add(new SkullKingEvent.PlayingStarted(state.startSeat()));
@@ -142,7 +143,8 @@ public final class SkullKingEngine {
         // 트릭 완성 — 승자가 카드 전부를 가져간다 (§9).
         TrickResult result = TrickResolver.resolve(trick.played());
         players = replace(players, result.winnerSeat(), p -> p.withTrickWon(result));
-        int trickNumber = trickNumberOf(state);
+        // 방금 적립분 포함 전체 승수 합 = 이번이 몇 번째 트릭인가 (트릭마다 정확히 1 증가).
+        int trickNumber = players.stream().mapToInt(PlayerState::tricksWonCount).sum();
         events.add(new SkullKingEvent.TrickTaken(
                 result.winnerSeat(), result.winningCard().card(), trickNumber));
 
@@ -157,14 +159,6 @@ public final class SkullKingEngine {
         Map<Integer, RoundScore> scores = RoundScorer.scoreAll(players, state.roundNumber());
         return new Result(new SkullKingState.RoundEnd(state.roundNumber(), players,
                 state.startSeat(), scores), events);
-    }
-
-    /** 이번이 이 라운드의 몇 번째 트릭인가 (1부터). 손패 소진량으로 역산한다. */
-    private int trickNumberOf(SkullKingState.Playing state) {
-        int total = Dealer.handSize(state.roundNumber(), state.seatCount());
-        int remainingBeforeThisPlay = state.players().stream()
-                .mapToInt(PlayerState::handSize).max().orElse(0);
-        return total - remainingBeforeThisPlay + 1;
     }
 
     // ---------- 라운드 정산 (§10, §12) ----------
@@ -267,12 +261,15 @@ public final class SkullKingEngine {
      * 순서 기준)이고, 티그리스는 탈출로 선언한다 (반드시 지므로 남의 판을 흔들지 않는다).
      */
     public SkullKingAction timeoutAction(SkullKingState state, int seat) {
+        if (seat < 0 || seat >= state.seatCount()) {
+            return null;
+        }
         if (state instanceof SkullKingState.Bidding bidding
                 && !bidding.players().get(seat).hasBid()) {
             return new SkullKingAction.PlaceBid(BidRules.MIN_BID);
         }
         List<SkullKingAction> legal = legalActions(state, seat);
-        return legal.isEmpty() ? null : legal.get(legal.size() == 1 ? 0 : preferSafe(legal));
+        return legal.isEmpty() ? null : legal.get(preferSafe(legal));
     }
 
     /** 탈출/탈출 선언 티그리스가 있으면 그것을, 없으면 첫 합법수를. */

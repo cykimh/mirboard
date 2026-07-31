@@ -319,6 +319,17 @@ class SkullKingEngineTest {
                     .isEqualTo(new SkullKingAction.PlaceBid(0));
         }
 
+        /** 범위 밖 좌석은 단계와 무관하게 null — Bidding 만 IOOBE 로 터지던 비대칭 회귀 가드. */
+        @Test
+        void timeout_for_an_out_of_range_seat_is_null_in_every_phase() {
+            SkullKingEngine engine = engineFor(4);
+            SkullKingState bidding =
+                    engine.startRound(SkullKingMatchState.initial(4, 0), new Random(1)).newState();
+
+            assertThat(engine.timeoutAction(bidding, -1)).isNull();
+            assertThat(engine.timeoutAction(bidding, 4)).isNull();
+        }
+
         @Test
         void timeout_during_play_prefers_an_escape() {
             SkullKingEngine engine = engineFor(2);

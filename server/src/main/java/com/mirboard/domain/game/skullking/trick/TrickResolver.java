@@ -38,7 +38,7 @@ import java.util.function.ToIntFunction;
 public final class TrickResolver {
 
     /** 사다리 한 단 — 적용 조건 + 승자 선택. */
-    private record Rung(String name, Predicate<Context> applies, ToIntFunction<Context> pick) {
+    private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {
     }
 
     /** 한 트릭의 판정 입력. 사다리 각 단이 공유한다. */
@@ -50,23 +50,23 @@ public final class TrickResolver {
     }
 
     private static final List<Rung> LADDER = List.of(
-            new Rung("스컬킹+인어 → 인어 (3자 예외)",
-                    c -> c.has(EffectiveKind.SKULL_KING) && c.has(EffectiveKind.MERMAID),
+            // 1. 스컬킹+인어 → 인어 (3자 예외)
+            new Rung(c -> c.has(EffectiveKind.SKULL_KING) && c.has(EffectiveKind.MERMAID),
                     c -> firstOfKind(c, EffectiveKind.MERMAID)),
-            new Rung("스컬킹 → 스컬킹",
-                    c -> c.has(EffectiveKind.SKULL_KING),
+            // 2. 스컬킹 → 스컬킹
+            new Rung(c -> c.has(EffectiveKind.SKULL_KING),
                     c -> firstOfKind(c, EffectiveKind.SKULL_KING)),
-            new Rung("해적 → 해적",
-                    c -> c.has(EffectiveKind.PIRATE),
+            // 3. 해적 → 해적
+            new Rung(c -> c.has(EffectiveKind.PIRATE),
                     c -> firstOfKind(c, EffectiveKind.PIRATE)),
-            new Rung("인어 → 인어",
-                    c -> c.has(EffectiveKind.MERMAID),
+            // 4. 인어 → 인어
+            new Rung(c -> c.has(EffectiveKind.MERMAID),
                     c -> firstOfKind(c, EffectiveKind.MERMAID)),
-            new Rung("색상 카드 → §7.1",
-                    c -> c.has(EffectiveKind.SUIT),
+            // 5. 색상 카드 → §7.1
+            new Rung(c -> c.has(EffectiveKind.SUIT),
                     TrickResolver::highestSuitCard),
-            new Rung("전원 탈출 → 먼저 낸 탈출",
-                    c -> true,
+            // 6. (전부 탈출) → 먼저 낸 탈출
+            new Rung(c -> true,
                     c -> firstOfKind(c, EffectiveKind.ESCAPE)));
 
     private TrickResolver() {
