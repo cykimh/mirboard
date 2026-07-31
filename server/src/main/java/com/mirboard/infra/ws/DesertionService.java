@@ -1,5 +1,6 @@
 package com.mirboard.infra.ws;
 
+import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.room.Room;
@@ -40,17 +41,25 @@ public class DesertionService {
     private final GameEventBroadcaster broadcaster;
     private final RoomActionLock lock;
     private final BotUserRegistry bots;
+    private final com.mirboard.infra.bot.BotScheduler botScheduler;
+    private final com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout;
 
     public DesertionService(RoomService roomService,
                             GameEngineProvider engines,
                             GameEventBroadcaster broadcaster,
                             RoomActionLock lock,
-                            BotUserRegistry bots) {
+                            BotUserRegistry bots,
+                            @org.springframework.context.annotation.Lazy
+                            com.mirboard.infra.bot.BotScheduler botScheduler,
+                            @org.springframework.context.annotation.Lazy
+                            com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout) {
         this.roomService = roomService;
         this.engines = engines;
         this.broadcaster = broadcaster;
         this.lock = lock;
         this.bots = bots;
+        this.botScheduler = botScheduler;
+        this.turnTimeout = turnTimeout;
     }
 
     /**
@@ -67,6 +76,9 @@ public class DesertionService {
                     roomId, deserterUserId);
             return false;
         }
+        // MATCH_CONTINUES 재무장은 락 해제 후 — BotScheduler 계약(호출자 락 비점유).
+        boolean needsReschedule = false;
+        boolean processed;
         try {
             Room room;
             try {
@@ -83,23 +95,36 @@ public class DesertionService {
             }
 
             List<GameEvent> outbound = new ArrayList<>();
-            if (!engines.forRoom(room).desert(seat, deserterUserId, outbound)) {
+            GameEngine.DesertOutcome outcome =
+                    engines.forRoom(room).desert(seat, deserterUserId, outbound);
+            if (outcome == GameEngine.DesertOutcome.NOT_APPLICABLE) {
                 // 게임이 탈주로 보지 않음 (티츄: 매치가 이미 끝난 리매치 대기 방, D-82).
                 return false;
             }
 
             broadcaster.broadcast(roomId, outbound, room.playerIds());
-            roomService.markFinished(roomId);
-            log.warn("Desertion processed: roomId={} deserterUserId={} seat={}",
-                    roomId, deserterUserId, seat);
-            return true;
+            if (outcome == GameEngine.DesertOutcome.MATCH_ENDED) {
+                roomService.markFinished(roomId);
+            } else {
+                // D-102/D-104 — 남은 사람끼리 계속. 방은 IN_GAME 유지, 다음 차례가
+                // 사람이면 타이머, 봇이면 봇 루프가 이어받도록 재무장한다.
+                needsReschedule = true;
+            }
+            log.warn("Desertion processed: roomId={} deserterUserId={} seat={} outcome={}",
+                    roomId, deserterUserId, seat, outcome);
+            processed = true;
         } catch (RuntimeException e) {
             log.error("Desertion processing error: roomId={} userId={} err={}",
                     roomId, deserterUserId, e.getMessage(), e);
-            return false;
+            processed = false;
         } finally {
             lock.release(roomId);
         }
+        if (needsReschedule) {
+            botScheduler.scheduleBots(roomId);
+            turnTimeout.onTurnAdvanced(roomId);
+        }
+        return processed;
     }
 
     private boolean acquireLock(String roomId) {

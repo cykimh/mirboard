@@ -38,8 +38,13 @@ class DesertionServiceTest {
     private final BotUserRegistry bots = mock(BotUserRegistry.class);
     private final GameEngine engine = mock(GameEngine.class);
 
+    private final com.mirboard.infra.bot.BotScheduler botScheduler =
+            mock(com.mirboard.infra.bot.BotScheduler.class);
+    private final com.mirboard.infra.bot.TurnTimeoutScheduler turnTimeout =
+            mock(com.mirboard.infra.bot.TurnTimeoutScheduler.class);
+
     private final DesertionService service = new DesertionService(
-            roomService, engines, broadcaster, lock, bots);
+            roomService, engines, broadcaster, lock, bots, botScheduler, turnTimeout);
 
     private static Room inGame(List<Long> players) {
         return new Room("r1", "방", "TICHU", players.get(0), RoomStatus.IN_GAME,
@@ -54,13 +59,35 @@ class DesertionServiceTest {
         when(lock.tryAcquire("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(players));
         when(engines.forRoom(any())).thenReturn(engine);
-        when(engine.desert(eq(0), eq(10L), any())).thenReturn(true);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_ENDED);
 
         boolean processed = service.processDesertion("r1", 10L);
 
         assertThat(processed).isTrue();
         verify(broadcaster).broadcast(eq("r1"), any(), eq(players));
         verify(roomService).markFinished("r1");
+        verify(lock).release("r1");
+    }
+
+    /** D-102/D-104 — 개인전 '남은 사람끼리 계속': 방 유지 + 봇/타이머 재무장. */
+    @Test
+    void continued_desertion_keeps_the_room_and_rearms_schedulers() {
+        List<Long> players = List.of(10L, 20L, 30L, 40L);
+        when(bots.isBot(10L)).thenReturn(false);
+        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(inGame(players));
+        when(engines.forRoom(any())).thenReturn(engine);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_CONTINUES);
+
+        boolean processed = service.processDesertion("r1", 10L);
+
+        assertThat(processed).isTrue();
+        verify(broadcaster).broadcast(eq("r1"), any(), eq(players));
+        verify(roomService, never()).markFinished(any());
+        verify(botScheduler).scheduleBots("r1");
+        verify(turnTimeout).onTurnAdvanced("r1");
         verify(lock).release("r1");
     }
 
@@ -71,7 +98,8 @@ class DesertionServiceTest {
         when(lock.tryAcquire("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(List.of(10L, 20L, 30L, 40L)));
         when(engines.forRoom(any())).thenReturn(engine);
-        when(engine.desert(anyInt(), anyLong(), any())).thenReturn(false);
+        when(engine.desert(anyInt(), anyLong(), any()))
+                .thenReturn(GameEngine.DesertOutcome.NOT_APPLICABLE);
 
         boolean processed = service.processDesertion("r1", 10L);
 
