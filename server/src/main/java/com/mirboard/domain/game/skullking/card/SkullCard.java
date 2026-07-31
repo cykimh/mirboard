@@ -2,7 +2,6 @@ package com.mirboard.domain.game.skullking.card;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
 
 /**
@@ -70,12 +69,13 @@ public record SkullCard(SkullSuit suit, int rank, SpecialKind special) {
         return special(SpecialKind.ESCAPE);
     }
 
-    @JsonIgnore
+    // ⚠ is-getter 들에 @JsonIgnore 를 붙이면 안 된다 — isSuit/isSpecial 이 컴포넌트
+    // suit/special 과 같은 논리 프로퍼티로 병합되어 프로퍼티 전체가 직렬화에서 사라진다
+    // (D-102 에서 실제 발생). 억제는 클래스의 isGetterVisibility=NONE 이 담당한다(티츄 동일).
     public boolean isSuit() {
         return special == null;
     }
 
-    @JsonIgnore
     public boolean isSpecial() {
         return special != null;
     }
@@ -85,13 +85,11 @@ public record SkullCard(SkullSuit suit, int rank, SpecialKind special) {
     }
 
     /** 검정(으뜸패) 색상 카드인가. 오프수트여도 3색을 이긴다 (§7.1). */
-    @JsonIgnore
     public boolean isTrump() {
         return suit != null && suit.isTrump();
     }
 
     /** 14 카드 보너스 대상인가 (§11). 검정 14 는 20점, 나머지 3색 14 는 10점. */
-    @JsonIgnore
     public boolean isBonusFourteen() {
         return isSuit() && rank == SkullSuit.MAX_RANK;
     }
