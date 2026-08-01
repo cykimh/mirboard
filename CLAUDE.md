@@ -55,6 +55,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   오지 않게 하려는 분리이므로 새 게임도 이 형태를 따를 것.
   유일한 예외: `RoomChipService` 는 칩 정산이 팀 승패에 묶여 있어 티츄를 직접 참조한다
   (칩은 포트 밖 — `docs/game-port.md` §2).
+- **방 옵션도 게임이 선언한다 (D-106)**: `GameDefinition.supportedRoomOptions()` →
+  `Set<RoomOption>`(`TARGET_SCORE`·`TEAMS`·`BETTING`). **기본은 빈 집합(옵트인)**이라 새 게임은
+  아무것도 안 써야 맞다 — 안 쓰는 설정이 방 만들기·대기실에 뜨지 않는다. 티츄만 셋 다 선언.
+  서버도 같은 집합으로 검증한다(미지원 옵션에 기본값 아닌 값 → `UNSUPPORTED_ROOM_OPTION`).
+  모든 게임에 통하는 설정(인원·턴 제한·봇 채우기)은 여기 넣지 말 것.
 - 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록
   (+ `GameEngine` 구현, `GameStartingEvent` 리스너로 라운드 시작) → 카탈로그/방 생성/인게임
   디스패치/봇/타임아웃/resync 가 자동 연결됨. 로비·허브 컨트롤러와 스케줄러 수정 불필요.

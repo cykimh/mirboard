@@ -23,6 +23,18 @@ public interface GameDefinition {
 
     GameStatus status();
 
+    /**
+     * 이 게임이 실제로 쓰는 방 설정 (D-106). 방 생성 UI·대기실이 이걸 보고 무엇을 노출할지
+     * 정하고, 서버는 미지원 옵션에 기본값 아닌 값이 오면 거절한다.
+     *
+     * <p><b>기본은 빈 집합 — 옵트인이다.</b> 새 게임은 한 줄도 쓰지 않아도 자기가 안 쓰는
+     * 설정이 화면에 뜨지 않는다. "새 게임 = 패키지 + `GameDefinition` Bean"(D-102) 약속을
+     * 깨지 않으려는 것이고, 반대 방향(기본 전체 허용)이면 새 게임마다 이 결함이 재생산된다.
+     */
+    default java.util.Set<RoomOption> supportedRoomOptions() {
+        return java.util.EnumSet.noneOf(RoomOption.class);
+    }
+
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
     GameEngine newEngine(GameContext ctx);
 }

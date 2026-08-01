@@ -4,10 +4,13 @@ import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.domain.game.core.RoomOption;
 import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.infra.messaging.DomainEventBus;
+import java.util.EnumSet;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
@@ -65,6 +68,15 @@ public final class TichuGameDefinition implements GameDefinition {
     @Override
     public GameStatus status() {
         return GameStatus.AVAILABLE;
+    }
+
+    /**
+     * D-106 — 세 옵션을 모두 쓰는 유일한 게임이다. 목표 점수로 매치가 끝나고(라운드 수 무제한),
+     * 2:2 팀전이라 팀 배정이 있고, 칩 정산이 팀 승패에 묶여 있어 내기가 성립한다.
+     */
+    @Override
+    public Set<RoomOption> supportedRoomOptions() {
+        return EnumSet.of(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
     @Override
