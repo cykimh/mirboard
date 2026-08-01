@@ -105,15 +105,17 @@
       "shortDescription": "4인 파트너 카드 게임. 56장 덱과 4장의 특수카드.",
       "minPlayers": 4,
       "maxPlayers": 4,
-      "status": "AVAILABLE"
+      "status": "AVAILABLE",
+      "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"]
     },
     {
-      "id": "GO",
-      "displayName": "바둑",
-      "shortDescription": "추후 추가 예정",
+      "id": "SKULL_KING",
+      "displayName": "스컬킹",
+      "shortDescription": "2~8인 트릭테이킹. 매 라운드 자기 승수를 예측한다.",
       "minPlayers": 2,
-      "maxPlayers": 2,
-      "status": "COMING_SOON"
+      "maxPlayers": 8,
+      "status": "AVAILABLE",
+      "supportedRoomOptions": []
     }
   ]
 }
@@ -121,6 +123,13 @@
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
 - 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순.
+- `supportedRoomOptions`(D-106): 이 게임이 **실제로 쓰는** 방 설정. 값은
+  `TARGET_SCORE`·`TEAMS`·`BETTING` 이고 enum 선언 순서로 정렬된다. 방 만들기 UI 와
+  대기실은 여기 있는 것만 노출하고, 서버도 같은 집합으로 검증한다
+  (`UNSUPPORTED_ROOM_OPTION`). **기본은 빈 배열** — 게임이 선언하지 않으면 안 쓰는
+  것이므로, 새 게임은 아무것도 안 써도 무관한 설정이 화면에 뜨지 않는다.
+  모든 게임에 통하는 설정(방 이름·`capacity`·`turnSeconds`·`fillWithBots`)은 여기
+  들어가지 않는다.
 
 ### GET `/api/games/{gameId}`
 단일 게임 상세. 응답은 위 항목 형식과 동일하되 룰 요약 등 추가 필드가 들어갈 수 있다
@@ -184,12 +193,18 @@
   `capacity - 1 > 4` 인 방은 봇으로 채울 수 없다 — 봇 풀 확장은 스컬킹 통합 시 별건).
 - `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
   고정·불변. **stake>0 이면 `fillWithBots` 불가**(봇=무한 잔액 → 칩 파밍 방지).
+- **게임별 옵션 게이팅(D-106)**: `targetScore`·`teamPolicy`·`stake` 는 게임의
+  `supportedRoomOptions` 에 그 옵션이 있을 때만 쓸 수 있다. 없는데 **기본값이 아닌 값**
+  (`targetScore != 1000`, `teamPolicy != SEQUENTIAL`, `stake != 0`)을 보내면
+  `UNSUPPORTED_ROOM_OPTION`. 기본값은 통과한다 — 옛 클라가 늘 `targetScore:1000` 을
+  보냈고 그 방은 정상이기 때문. D-106 이후 클라는 미지원 옵션을 아예 생략한다.
 
 응답 `201` — Room (위 형식과 동일, 본인이 host로 자동 join 됨).
 에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태),
 `INVALID_CAPACITY` (게임 허용 인원 범위 밖 — `details` 에 `capacity`/`minPlayers`/
 `maxPlayers`), `INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇
-동시 요청).
+동시 요청), `UNSUPPORTED_ROOM_OPTION` (게임이 안 쓰는 방 설정 — `details` 에
+`gameType`/`option`, D-106).
 
 ### POST `/api/rooms/{roomId}/join`
 응답 `200` — Room 갱신본.
@@ -273,6 +288,9 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 
 ### PUT `/api/rooms/{roomId}/team-policy` *(Phase 8C — 호스트 전용)*
 WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
+**팀이 없는 게임(`supportedRoomOptions` 에 `TEAMS` 없음)은 값과 무관하게 거절**
+(`UNSUPPORTED_ROOM_OPTION`, D-106) — 생성 경로와 달리 기본값 카브아웃이 없다.
+팀 없는 방에 정책을 "바꾸는" 요청은 전부 무의미하기 때문.
 
 요청
 ```json
@@ -280,7 +298,7 @@ WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
 ```
 
 응답 `200` — Room 갱신본. 에러: `NOT_HOST` (403), `GAME_ALREADY_STARTED` (409),
-`ROOM_NOT_FOUND` (404).
+`ROOM_NOT_FOUND` (404), `UNSUPPORTED_ROOM_OPTION` (400, 팀 없는 게임).
 
 본 청크 (Phase 8C) 에서는 `RANDOM` 만 서버 동작 분기 (4번째 join 직후 좌석 셔플).
 `MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트

@@ -2,6 +2,12 @@
 
 export type GameStatus = 'AVAILABLE' | 'COMING_SOON' | 'DISABLED';
 
+/**
+ * D-106 — 게임에 따라 뜻이 있기도 없기도 한 방 설정. 서버 `RoomOption` 미러.
+ * 방 만들기·대기실은 이 목록에 있는 것만 노출한다.
+ */
+export type RoomOption = 'TARGET_SCORE' | 'TEAMS' | 'BETTING';
+
 export interface GameSummary {
   id: string;
   displayName: string;
@@ -9,6 +15,7 @@ export interface GameSummary {
   minPlayers: number;
   maxPlayers: number;
   status: GameStatus;
+  supportedRoomOptions: RoomOption[];
 }
 
 export interface CatalogResponse {

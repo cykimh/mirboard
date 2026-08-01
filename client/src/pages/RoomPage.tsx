@@ -3,11 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
 import { usersApi } from '@/api/users';
+import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
 import { useRoomMeta } from '@/ws/useRoomMeta';
-import type { Room, TeamPolicy } from '@/types/api';
+import type { Room, RoomOption, TeamPolicy } from '@/types/api';
 import {
   Card,
   CardContent,
@@ -40,6 +41,29 @@ export function RoomPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [usernames, setUsernames] = useState<Record<number, string>>({});
+  // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 팀 배정 노출 여부에만 쓴다.
+  // null = 아직 모름(요청 중) → 노출하지 않는다. 팀 없는 게임에서 잠깐 떴다 사라지는
+  // 것보다, 팀 있는 게임에서 한 박자 늦게 나타나는 편이 낫다.
+  const [roomOptions, setRoomOptions] = useState<RoomOption[] | null>(null);
+
+  // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
+  // 같은 게임의 방을 여러 번 드나들어도 요청은 한 번이다.
+  useEffect(() => {
+    const gameType = room?.gameType;
+    if (!token || !gameType) return;
+    let cancelled = false;
+    loadGame(token, gameType)
+      .then((g) => {
+        if (!cancelled) setRoomOptions(g.supportedRoomOptions ?? []);
+      })
+      .catch(() => {
+        // 게임 메타를 못 받아도 대기실은 동작해야 한다 — 옵션만 숨긴 채 둔다.
+        if (!cancelled) setRoomOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, room?.gameType]);
 
   // Phase 8A — 진입 시 1회만 join-or-reconnect 호출. 폴링과 분리.
   useEffect(() => {
@@ -293,6 +317,8 @@ export function RoomPage() {
                 })}
               </ul>
 
+              {(roomOptions ?? []).includes('TEAMS') && (
+              <>
               <Separator />
 
               <div className="flex items-center gap-3">
@@ -322,6 +348,8 @@ export function RoomPage() {
                   </Badge>
                 )}
               </div>
+              </>
+              )}
 
               {iAmPlayer && (
                 <div>

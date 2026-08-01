@@ -3,6 +3,7 @@ package com.mirboard.domain.lobby.room;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.domain.game.core.RoomOption;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
@@ -133,6 +134,7 @@ public class RoomService {
         if (stake > 0 && fillWithBots) {
             throw new StakedRoomNoBotsException();
         }
+        requireSupportedRoomOptions(def, teamPolicy, targetScore, stake);
         int capacity = requestedCapacity == null ? def.maxPlayers() : requestedCapacity;
         if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
             throw new InvalidCapacityException(capacity, def.minPlayers(), def.maxPlayers());
@@ -175,6 +177,29 @@ public class RoomService {
         return room;
     }
 
+    /**
+     * D-106 — 게임이 쓰지 않는 방 설정에 <b>기본값 아닌 값</b>이 오면 거절한다.
+     *
+     * <p>기본값은 통과시킨다. 클라가 늘 `targetScore:1000` 을 보내던 시절의 호출부와
+     * 기존 테스트를 깨지 않으면서, "의도적으로 설정한 값"만 잡기 위해서다. 예컨대 스컬킹
+     * 방에 stake=100 이 오면 여기서 막힌다 — 예전엔 통과한 뒤 `RoomChipService` 가 조용히
+     * return 해서 칩 없이 봇만 금지된 방이 만들어졌다.
+     */
+    private static void requireSupportedRoomOptions(GameDefinition def, TeamPolicy teamPolicy,
+                                                    int targetScore, int stake) {
+        var supported = def.supportedRoomOptions();
+        if (targetScore != DEFAULT_TARGET_SCORE && !supported.contains(RoomOption.TARGET_SCORE)) {
+            throw new UnsupportedRoomOptionException(def.id(), RoomOption.TARGET_SCORE);
+        }
+        if (teamPolicy != null && teamPolicy != TeamPolicy.SEQUENTIAL
+                && !supported.contains(RoomOption.TEAMS)) {
+            throw new UnsupportedRoomOptionException(def.id(), RoomOption.TEAMS);
+        }
+        if (stake != DEFAULT_STAKE && !supported.contains(RoomOption.BETTING)) {
+            throw new UnsupportedRoomOptionException(def.id(), RoomOption.BETTING);
+        }
+    }
+
     /** Phase 8C — WAITING 중 호스트가 팀 정책을 변경. IN_GAME 이후엔 호출 불가. */
     public Room updateTeamPolicy(String roomId, long requesterId, TeamPolicy newPolicy) {
         Room room = getRoom(roomId);
@@ -183,6 +208,11 @@ public class RoomService {
         }
         if (room.status() != RoomStatus.WAITING) {
             throw new GameAlreadyStartedException(roomId);
+        }
+        // D-106 — 팀이 없는 게임에서는 정책 변경 자체가 성립하지 않는다. 생성 경로와 달리
+        // 여기선 기본값 카브아웃이 없다: 팀 없는 방에 정책을 "바꾸는" 요청은 전부 무의미하다.
+        if (!games.require(room.gameType()).supportedRoomOptions().contains(RoomOption.TEAMS)) {
+            throw new UnsupportedRoomOptionException(room.gameType(), RoomOption.TEAMS);
         }
         repository.updateTeamPolicy(roomId, newPolicy);
         Room updated = getRoom(roomId);

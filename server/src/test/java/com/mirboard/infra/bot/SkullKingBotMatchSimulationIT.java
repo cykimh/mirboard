@@ -76,8 +76,12 @@ class SkullKingBotMatchSimulationIT {
 
     private void runAllBotMatch(int capacity) {
         long hostBotId = bots.getBotIds().get(0);
+        // D-106 — 스컬킹은 목표 점수·팀·내기를 안 쓴다. 예전엔 targetScore 에 0(뜻 없는 값)을
+        // 넘겼는데, 이제 미지원 옵션에 기본값 아닌 값이 오면 서버가 거절한다. "요청 안 함"을
+        // 그대로 표현하려면 기본값을 넘긴다.
         Room room = roomService.createRoom(hostBotId, "sk-bot-sim-" + capacity, "SKULL_KING",
-                TeamPolicy.SEQUENTIAL, true, 0, 0, 0, capacity);
+                TeamPolicy.SEQUENTIAL, true, RoomService.DEFAULT_TARGET_SCORE,
+                0, RoomService.DEFAULT_STAKE, capacity);
         String roomId = room.roomId();
 
         // capacity 도달 + 봇 전원 자동 ready → IN_GAME → 리스너가 1라운드 분배.

@@ -27,6 +27,9 @@ import {
 /** 내기(판돈) 토글 ON 시 기본 판돈(칩). 서버 허용 집합 {0,10,50,100,500} 중 하나. */
 const DEFAULT_STAKE = 100;
 
+/** 서버 `RoomService.DEFAULT_TARGET_SCORE` 와 같은 값 — 갈리면 안 된다. */
+const DEFAULT_TARGET_SCORE = 1000;
+
 interface CreateRoomModalProps {
   open: boolean;
   token: string;
@@ -78,10 +81,21 @@ export function CreateRoomModal({
   // 서버 기본값(maxPlayers)과 같은 값을 기본 선택으로 — 클라·서버 기본이 갈리지 않게.
   const selectedSeats = capacity ?? game?.maxPlayers ?? 0;
 
+  // D-106 — 게임이 선언한 옵션만 노출한다. 스컬킹은 10라운드 고정(목표 점수 무의미)·
+  // 개인전(팀 없음)·칩 정산 미지원(내기 불가)이라 셋 다 안 뜬다. 서버도 같은 집합으로
+  // 검증하므로 여기서 숨기는 것은 UX 이고 강제는 서버가 한다.
+  const options = game?.supportedRoomOptions ?? [];
+  const usesTargetScore = options.includes('TARGET_SCORE');
+  const usesBetting = options.includes('BETTING');
+
   // 게임을 바꾸면 이전 게임의 좌석 수는 무효 — 새 게임의 기본값으로 되돌린다.
+  // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
+  // 입력은 사라지지만 state 는 남아, 그대로 보내면 서버가 거절한다.
   useEffect(() => {
     setCapacity(null);
-  }, [selectedGame]);
+    if (!usesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
+    if (!usesBetting) setStake(0);
+  }, [selectedGame, usesTargetScore, usesBetting]);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -95,9 +109,11 @@ export function CreateRoomModal({
         {
           // 판돈 방은 봇 금지(서버도 거절) — 클라에서도 강제.
           fillWithBots: stake > 0 ? false : fillWithBots,
-          targetScore,
+          // D-106 — 게임이 안 쓰는 옵션은 아예 보내지 않는다(D-99 의 capacity 와 같은 방식).
+          // 서버는 기본값 아닌 값이 오면 UNSUPPORTED_ROOM_OPTION 으로 거절한다.
+          targetScore: usesTargetScore ? targetScore : undefined,
           turnSeconds,
-          stake,
+          stake: usesBetting ? stake : undefined,
           capacity: seatChoices.length > 0 ? selectedSeats : undefined,
         },
       );
@@ -163,6 +179,7 @@ export function CreateRoomModal({
             </div>
           )}
 
+          {usesTargetScore && (
           <div className="flex flex-col gap-1.5">
             <Label>목표 점수</Label>
             <ToggleGroup
@@ -178,6 +195,7 @@ export function CreateRoomModal({
               ))}
             </ToggleGroup>
           </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>턴 제한</Label>
@@ -200,6 +218,7 @@ export function CreateRoomModal({
             </ToggleGroup>
           </div>
 
+          {usesBetting && (
           <div className="flex flex-col gap-1.5">
             <Label>💰 판돈 (내기)</Label>
             <label className="flex items-center gap-2 text-sm">
@@ -219,6 +238,7 @@ export function CreateRoomModal({
               </p>
             )}
           </div>
+          )}
 
           <label className="flex items-center gap-2 text-sm">
             <Checkbox

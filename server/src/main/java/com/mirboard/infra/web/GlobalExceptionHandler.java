@@ -16,6 +16,7 @@ import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.GameNotInProgressException;
 import com.mirboard.domain.lobby.room.InvalidCapacityException;
 import com.mirboard.domain.lobby.room.InvalidStakeException;
+import com.mirboard.domain.lobby.room.UnsupportedRoomOptionException;
 import com.mirboard.domain.lobby.room.NotHostException;
 import com.mirboard.domain.lobby.room.NotInRoomException;
 import com.mirboard.domain.lobby.room.StakedRoomNoBotsException;
@@ -187,6 +188,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiErrorEnvelope.of("INVALID_STAKE", "허용되지 않은 판돈입니다",
                         Map.of("stake", e.stake())));
+    }
+
+    /**
+     * D-106 — 게임이 쓰지 않는 방 설정에 기본값 아닌 값이 왔다. 클라가 안 보내게 고쳐도
+     * 서버는 검증한다 — 예전엔 통과시킨 뒤 `RoomChipService` 가 조용히 return 해서
+     * 칩 없이 봇만 금지된 스컬킹 방이 만들어졌다.
+     */
+    @ExceptionHandler(UnsupportedRoomOptionException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleUnsupportedRoomOption(
+            UnsupportedRoomOptionException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("UNSUPPORTED_ROOM_OPTION",
+                        "이 게임에서 쓸 수 없는 방 설정입니다",
+                        Map.of("gameType", e.gameType(), "option", e.option().name())));
     }
 
     /** D-99 — 게임이 정한 인원 범위를 벗어난 방 생성 요청. */

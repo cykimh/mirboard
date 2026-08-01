@@ -15,6 +15,11 @@ import org.springframework.stereotype.Component;
  * (D-06/D-11/D-98 의 약속).
  *
  * <p>인원 2~8 가변 — 방 만들기의 capacity 선택(D-99)이 처음으로 실사용된다.
+ *
+ * <p><b>{@code supportedRoomOptions()} 를 재정의하지 않는다</b>(D-106). 목표 점수는
+ * 10라운드 고정이라 뜻이 없고, 팀 배정은 개인전이라 없고, 내기는 칩 정산이 팀 승패에
+ * 묶여 있어 성립하지 않는다. 기본값이 빈 집합이라 <b>아무것도 안 쓰는 것이 곧 올바른
+ * 선언</b>이다 — 새 게임이 자기와 무관한 설정을 실수로 노출하지 않게 한 옵트인 설계.
  */
 @Component
 public final class SkullKingGameDefinition implements GameDefinition {
