@@ -1,17 +1,19 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-77),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-105),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
-> `docs/rules-tichu.md`(룰)가 정본이다.
+> `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
+> 정본이다.
 
 ---
 
 ## 0. 한눈에 보기
 
-플랫폼은 **동작하는 MVP** 상태다. 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO
-영속 → 봇 자동 채움 → 재접속/탈주 처리 → UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
+플랫폼은 **동작하는 MVP** 상태다. 로비/방 → **게임 2종**(티츄 4인 2:2 팀전 / 스컬킹
+2~8인 개인전) 풀게임 → 점수·ELO 영속(티츄) → 봇 자동 채움 → 재접속/탈주 처리 →
+UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 | # | 기능 | 상태 | 핵심 위치 |
 |---|------|------|-----------|
@@ -51,7 +53,8 @@
 
 ## 2. 게임 카탈로그 (Phase 2c)
 
-- `GET /api/games` — 등록된 `GameDefinition` 목록(상태순 정렬). 현재 **TICHU(AVAILABLE)**.
+- `GET /api/games` — 등록된 `GameDefinition` 목록(상태순 정렬). 현재 **TICHU**·**SKULL_KING**
+  둘 다 AVAILABLE.
 - `GET /api/games/{id}` — 단일 게임 상세.
 - **확장성**: 새 게임은 `domain.game.{newgame}` + `GameDefinition @Component` 등록만으로
   카탈로그·방 생성·엔진 디스패치에 자동 연결(REST/로비 코드 무변경).
@@ -161,16 +164,26 @@
 
 ---
 
-## 8. 탈주 / 끊김 처리 (Phase 19, D-75)
+## 8. 탈주 / 끊김 처리 (Phase 19 D-75, 확장 D-96·D-104)
 
-- 서버가 STOMP Subscribe/Disconnect 후킹(in-memory `WsSessionRegistry`, 단일 인스턴스 전제).
+- 서버가 STOMP Subscribe/Disconnect 를 후킹한다. 프레즌스는 **Redis `RoomPresence`**
+  (세션 카운터 HASH) — D-75 의 in-memory `WsSessionRegistry` 는 D-96 에서 대체됐다.
+  in-memory 로는 인스턴스 A 에 붙은 재접속을 B 가 못 봐서 "재접속했는데 탈주 처리"가 난다.
 - **WAITING 끊김** = 즉시 leave(빈 방·관전자 0 방 즉시 소멸).
-- **IN_GAME 탈주** = 명시 '나가기' 또는 끊김 후 `mirboard.desertion.grace-seconds`(기본 30s)
-  미복귀 → **상대팀 승리**로 매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−
-  (봇 매치 ELO 제외). 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder` 재사용.
+- **IN_GAME 탈주** = 명시 '나가기' 또는 끊김 후 `mirboard.desertion.grace-seconds`
+  (**기본 120s**, D-79 에서 모바일 백그라운드 전환을 감안해 30s→120s) 미복귀.
+  처리는 게임이 정한다 — 포트가 3치 `DesertOutcome` 를 돌려준다(D-102/D-104):
+  - **티츄**(2:2 팀전) → `MATCH_ENDED`. 상대팀 승리로 매치 종료. 합성
+    `TichuMatchCompleted` 로 기존 `MatchResultRecorder` 재사용.
+  - **스컬킹**(개인전) → `MATCH_CONTINUES`. 좌석을 지우지 않고 **유령 좌석 + 자동조종**
+    으로 남은 사람끼리 계속한다(`seatCount` 가 트릭 크기·턴 모듈러·카드 보존 불변식에
+    동시에 묶여 있어 좌석 제거가 불가). 잔존 좌석 < 2 이거나 잔존 사람 0 이면 조기 종료.
+- 탈주자 패널티(`desert_count`+1·lose+1·ELO−, 봇 매치 ELO 제외)는 영속이 있는
+  티츄에만 적용된다 — 스컬킹 매치 영속은 D-02 게임별 rating 분리 선행으로 별건.
 - 유예 내 복귀 시 세션 복원.
 
-관련 클래스/테스트: `DesertionService`, 끊김/탈주 유닛 + `MatchResultRecorder` 탈주 IT.
+관련 클래스/테스트: `DesertionService`, `RoomPresence`, `SkullKingDesertionTest`,
+끊김/탈주 유닛 + `MatchResultRecorder` 탈주 IT.
 
 ---
 
@@ -215,13 +228,16 @@
 - **관측성**: Prometheus(`/actuator/prometheus`, `MirboardMetrics`), MDC 로그
   (`userId`/`roomId`/`eventId`, `MdcKeys`).
 - **배포**: `client` 빌드를 서버 정적 리소스로 번들해 단일 jar 서빙, `Dockerfile`/`fly.toml`
-  멀티스테이지로 Fly.io.
+  멀티스테이지로 Fly.io. CD 는 `.github/workflows/deploy.yml`(main 푸시 + 수동 트리거) —
+  `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. 라이브 인스턴스는 아직 없다(D-105).
+- **데모 계정**: `DemoAccountSeeder`, `mirboard.demo.enabled` **기본 false**. 공개 비밀번호
+  계정이 로컬·CI 에 생기지 않도록 마이그레이션이 아닌 환경변수 게이트 시더로 둔다(D-105).
 
 ---
 
 ## 13. 테스트 현황
 
-- **서버**: **727건** (D-102 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **733건** (D-105 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
@@ -259,13 +275,15 @@
 - 스컬킹 매치 결과 영속·ELO — D-02 의 게임별 rating 분리 결정이 선행(D-102 보류).
 - 스컬킹 손패 dnd 정렬·특수 카드 SVG 에셋·i18n 이관 — S6 범위 밖(D-103 이월).
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
-- 멀티 인스턴스 세션 레지스트리(`WsSessionRegistry` 는 단일 인스턴스 전제).
+- Sentry/Grafana 관측성(M2 C3) — 로컬 스택 또는 외부 SaaS 필요.
+- 라이브 배포 — CD 워크플로는 준비됐고 `FLY_API_TOKEN` 설정만 남았다(D-105).
+  (멀티 인스턴스 세션 레지스트리는 D-96 에서 해소 — §8 참조.)
 
 ---
 
-## 16. 스컬킹 (S4 룰 엔진 + S5 통합, D-101·D-104·D-102)
+## 16. 스컬킹 (S4 룰 엔진 + S5 통합 + S6 클라, D-101·D-104·D-102·D-103)
 
-`domain.game.skullking` 에 **순수 룰 엔진까지** 구현됐다. 룰 정본은
+`domain.game.skullking` 에 **룰 엔진·인게임 배선·클라 게임판까지** 구현됐다. 룰 정본은
 `docs/rules-skullking.md`(절마다 `코드:`/`테스트:` 로 코드와 1:1 매핑).
 
 - **패키지**: `card/`(70장 덱) · `state/`(sealed `SkullKingState`: Bidding/Playing/RoundEnd)
@@ -300,5 +318,5 @@
 
 ---
 
-*문서 생성: 코드베이스 정적 분석 기반(서버 155 클래스 / 테스트 55 클래스, 마이그레이션 V1~V8 확인).*
-*최종 대조: 2026-07-31 (D-101, §13·§16 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*
+*문서 생성: 코드베이스 정적 분석 기반(서버 프로덕션 210 파일 / 테스트 81 파일, 마이그레이션 V1~V10 확인).*
+*최종 대조: 2026-08-01 (D-105, §12 배포·데모 계정 + 실측 수치 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*

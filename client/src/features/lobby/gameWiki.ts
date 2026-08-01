@@ -5,6 +5,8 @@
  */
 const GAME_WIKI_URL: Record<string, string> = {
   tichu: 'https://en.wikipedia.org/wiki/Tichu',
+  // 스컬킹은 영문 위키백과에 문서가 없다(2026-08 확인, `Skull_King` → 404). BGG 를 쓴다.
+  skull_king: 'https://boardgamegeek.com/boardgame/150145/skull-king',
 };
 
 export function gameWikiUrl(gameId: string): string | undefined {

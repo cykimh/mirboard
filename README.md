@@ -1,615 +1,199 @@
 # Mirboard
 
-웹 기반 턴제 **보드게임 플랫폼**. 여러 보드게임을 호스팅하는 허브를 갖되, 첫 출시
-게임으로 **티츄(Tichu)** 를 구현한다.
+**티츄·스컬킹 두 개의 턴제 보드게임이 실제로 돌아가는 서버 권위(server-authoritative)
+실시간 웹 플랫폼.** 셔플·족보 판별·점수 계산·차례 결정은 전부 서버가 하고, 클라이언트는
+입력기와 뷰어입니다.
 
-## 사용자 플로우
+[![CI](https://github.com/cykimh/mirboard/actions/workflows/ci.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/ci.yml)
+[![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
-```
-[로그인]  →  [Game Hub: 게임 선택]  →  [Lobby: 방 목록/생성]  →  [방]  →  [게임]
-              └─ /api/games            └─ /api/rooms?gameType=TICHU
-```
-
-- **Game Hub**: 플레이 가능한 게임 카탈로그를 보여주는 화면. 서버의
-  `GameRegistry` 가 진실 공급원. 미구현 게임은 `COMING_SOON` 으로 비활성화 표시.
-- **Game Lobby**: 선택된 게임 타입으로 필터링된 방 목록과 통합 채팅.
-- **새 게임 추가**: `domain.game.{newgame}` 패키지 신설 + `GameDefinition` Bean
-  등록만으로 카탈로그/방 생성/룰 디스패치가 자동 연결. 로비/허브 코드 수정 불필요.
-
-## 아키텍처 요약
-
-- **Modular Monolith** — 단일 Spring Boot 서버, 도메인 패키지 경계로 분리.
-- **Server-Authoritative** — 셔플/분배/족보판별/점수계산은 전부 서버. 클라이언트는
-  입력기 + 뷰어 역할.
-- **State Hiding** — 본인 손패는 본인 STOMP 큐로만, 공개 정보는 토픽으로.
-- **개인정보 최소** — `users` 테이블은 `username`, `password_hash`, 전적만 저장.
-
-## 런타임 요구사항
-
-| 구성 요소 | 버전 |
-| --- | --- |
-| JDK | **Java 25 (LTS)** |
-| Build | Gradle 8.10+ (Kotlin DSL) |
-| Backend | Spring Boot **4.0.1** (Jakarta EE 11 / Spring Framework 7) |
-| Frontend | Node 20+ , Vite + React 18 + TypeScript |
-| Infra | PostgreSQL 16, Redis 7 (docker-compose 제공) |
-
-> Virtual Threads 기본 활성화(`spring.threads.virtual.enabled=true`) 및
-> sealed/pattern-switch 적극 사용. 모든 import는 `jakarta.*` (javax 금지).
-
-자세한 Phase별 계획은 [`docs/plans/mvp-roadmap.md`](docs/plans/mvp-roadmap.md).
-주요 설계 결정/번복은 [`docs/decisions.md`](docs/decisions.md) 에 "제목 한 줄 +
-짧은 문단" 형식으로 기록한다. 미래 작업자(사람/AI)가 본인 작업 전에 먼저 훑어볼 곳.
-
-## 디렉토리
-
-```
-mirboard/
-├── docker-compose.yml          # PostgreSQL 16, Redis 7, (선택) Flyway
-├── docs/                       # 설계 명세 (Phase 1 산출물) + 이력 + 플랜
-│   ├── api.md                  # REST 명세
-│   ├── stomp-protocol.md       # WebSocket/STOMP envelope & 이벤트
-│   ├── redis-keys.md           # Redis 키/TTL/Lua 원자성
-│   ├── decisions.md            # 설계 결정 이력 (한 줄 제목 + 짧은 문단)
-│   └── plans/
-│       └── mvp-roadmap.md      # Phase별 상세 계획 (canonical)
-├── server/                     # Spring Boot 백엔드 (Phase 2~ 에서 구현)
-│   └── src/main/resources/db/migration/V1__init.sql
-│   # 패키지:
-│   #   domain.lobby.*           (회원/방/채팅 — 게임 도메인 미의존)
-│   #   domain.game.core.*       (GameDefinition, GameRegistry, GameEngine 인터페이스)
-│   #   domain.game.tichu.*      (TichuGameDefinition + 룰 엔진)
-└── client/                     # React 프론트엔드 (Phase 4 에서 구현)
-    # 페이지: Login → GameHub → Lobby → Room → GameTable
-```
-
-## 로컬 실행 (빠른 시작)
-
-`scripts/dev.sh` 로 인프라+서버+클라를 한 번에 (Phase 14 — D-68). dev env
-(JWT/DB/Redis) 는 `application.yml` 기본값이 내장되어 **추가 export 불필요**.
-
-```bash
-./scripts/dev.sh up         # 인프라(postgres+redis) + Flyway 마이그레이션
-./scripts/dev.sh server     # 서버 (:8080)              ┐ 각각 별도 터미널
-./scripts/dev.sh client     # 클라 dev (:5173 → :8080)  ┘
-# 또는 한 방에 (서버 백그라운드 + 클라 포그라운드, Ctrl-C 시 함께 정리):
-./scripts/dev.sh all
-# 단일 프로세스(번들) — localhost:8080 만으로 prod 유사 확인:
-./scripts/dev.sh bundled
-./scripts/dev.sh down            # 중지(데이터 보존), --purge 면 DB 초기화
-./scripts/dev.sh --help
-```
-
-> 호스트 5432/6379 를 **다른 프로젝트 컨테이너**가 점유 중이면 `up` 이 어떤
-> 컨테이너인지 명시하고 중단한다. 그 컨테이너를 끄고 재시도하거나
-> `docker-compose.override.yml` 로 mirboard 로컬 포트를 바꾼다.
-
-역할 구분: 실행=`scripts/dev.sh`, 검증/테스트=`scripts/check.sh`.
-gradle 데몬 완전 종료는 `./gradlew --stop`.
+Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
+서버 테스트 733건 / 클라 239건
 
 ---
 
-### 수동/디버깅용 (직접 명령)
+![미르보드카페](docs/assets/screenshots/01-hub.png)
+*미르보드카페 — 게임 카탈로그·방 목록/생성·관전·랭킹·로비 채팅이 한 화면*
 
-```bash
-# Postgres + Redis 만 띄움
-docker compose up -d postgres redis
+![스컬킹](docs/assets/screenshots/02-skullking.png)
+*스컬킹 — 6인 트릭테이킹. 예측은 전원 제출 후 동시 공개, 트릭은 재생순으로 늘어놓는다*
 
-# 처음 한 번 Flyway 마이그레이션 적용
-docker compose --profile migrate run --rm flyway
-```
+![티츄](docs/assets/screenshots/03-tichu.png)
+*티츄 — 4인 2:2 팀전. 특수 카드 4종(마작·개·봉황·용)과 그랜드 티츄 선언*
 
-기본 자격증명(개발 한정):
+---
 
-| 항목 | 값 |
-| --- | --- |
-| Postgres host | `127.0.0.1:5432` |
-| Postgres database | `mirboard` |
-| Postgres user / pw | `mirboard` / `mirboardpw` |
-| Redis | `127.0.0.1:6379` |
+## 무엇이 되는가
 
-운영 자격증명은 `.env` 파일 또는 배포 시크릿으로만 주입. JWT 서명 키는
-`MIRBOARD_JWT_SECRET` 환경변수로 전달한다.
-
-## 로컬 환경 부트스트랩 (한 번만)
-
-> Phase 5e 까지 진행된 후 실제 macOS (Apple Silicon, Java 26 기본) 환경에서 검증된
-> 셋업입니다. Gradle wrapper (`gradlew`) 와 build.gradle.kts 는 이미 리포에 포함.
-
-### 1. JDK 25 LTS 설치
-
-```bash
-brew install --cask corretto@25       # 또는 SDKMAN, foojay 등
-# 확인
-/usr/libexec/java_home -V             # corretto-25.0.3 가 보여야 함
-export JAVA_HOME="$(/usr/libexec/java_home -v 25)"
-```
-
-### 2. 컨테이너 런타임 (OrbStack 권장)
-
-**OrbStack (권장):**
-```bash
-brew install --cask orbstack
-open -a OrbStack                       # 최초 1회 기동
-docker version                         # Client + Server 둘 다 OK 출력
-```
-
-**Colima (대안):**
-```bash
-brew install colima docker docker-compose
-mkdir -p ~/.docker && cat > ~/.docker/config.json <<'EOF'
-{
-  "cliPluginsExtraDirs": [
-    "/opt/homebrew/lib/docker/cli-plugins"
-  ]
-}
-EOF
-colima start --cpu 2 --memory 4 --disk 20
-docker version                         # Client + Server 둘 다 OK 출력
-```
-
-`scripts/dev.sh` · `scripts/check.sh` 는 `DOCKER_HOST` 미설정 시
-OrbStack(`~/.orbstack/run/docker.sock`) → Colima(`~/.colima/default/docker.sock`)
-순으로 소켓을 자동 감지한다 (D-72). Docker Desktop 은 기본 context 로 그대로 동작.
-둘 다 떠 있으면 OrbStack 이 우선이며, Colima 를 강제하려면
-`export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"`.
-
-### 3. 인프라 + 마이그레이션
-
-```bash
-cd /path/to/mirboard
-docker compose up -d postgres redis    # Postgres 16 + Redis 7 기동
-docker compose --profile migrate run --rm flyway  # V1__init.sql 적용
-```
-
-### 4. 환경변수
-
-JWT 시크릿은 32바이트 이상 필요:
-
-```bash
-export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
-```
-
-### 5. (옵션) Gradle wrapper 재생성
-
-리포에 `gradlew` 가 이미 있지만 손상 시:
-
-```bash
-gradle wrapper --gradle-version 9.4.1   # 또는 기존 wrapper 사용
-```
-
-JDK 25 가 로컬에 없으면 Gradle 의 foojay 리졸버가 자동으로 받아온다 (인터넷 필요).
-
-## 서버 빌드 / 실행
-
-```bash
-# (필수) 인프라가 떠 있어야 함
-docker compose up -d postgres redis
-
-# (필수) JWT 시크릿
-export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
-
-# 서버 기동 (port 8080, dev 환경)
-./gradlew :server:bootRun
-
-# 별도 터미널 — 클라이언트 dev (port 5173, /api & /ws 는 8080 으로 proxy)
-npm --prefix client install     # 처음 한 번
-npm --prefix client run dev
-```
-
-브라우저로 http://localhost:5173 접속 → 회원가입 → 4 탭 띄워서 4명 모이면 자동 시작.
-
-### 테스트
-
-```bash
-# 단위 테스트 (Docker 불필요, 빠름)
-./gradlew :server:test \
-  --tests "com.mirboard.domain.game.tichu.card.*" \
-  --tests "com.mirboard.domain.game.tichu.hand.*" \
-  --tests "com.mirboard.domain.game.tichu.scoring.*" \
-  --tests "com.mirboard.domain.game.tichu.action.*" \
-  --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest" \
-  --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
-  --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
-  --tests "com.mirboard.domain.lobby.auth.*"
-
-# 통합 테스트 (Testcontainers). scripts/check.sh 가 Colima/OrbStack socket 을
-# 자동 감지하므로 wrapper 사용 시 아래 export 불필요. raw gradlew 직접 호출 시만:
-export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"   # Colima: ~/.colima/default/docker.sock
-export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
-./gradlew :server:test
-
-# 클라이언트
-npm --prefix client run test
-```
-
-### 코드 수정 검증 흐름
-
-**`scripts/check.sh` wrapper** (Phase 11 — D-60) — 자주 쓰는 검증 명령 단축 +
-Colima/OrbStack Docker socket 자동 감지 (`DOCKER_HOST=...` prefix 불필요).
-
-```bash
-./scripts/check.sh fast              # 빠른 회귀 (~30s, pre-commit 과 동일)
-./scripts/check.sh rules             # 룰 도메인 단위 (~3s, Docker 불필요)
-./scripts/check.sh server            # 서버 풀 (단위 + IT, ~1m20s)
-./scripts/check.sh client            # 클라 풀 (build:check + test + build, ~10s)
-./scripts/check.sh all               # server + client (~1m30s)
-./scripts/check.sh bot-stress 50     # 봇 시뮬레이션 50 매치
-./scripts/check.sh infra             # docker compose + Postgres/Redis 헬스
-./scripts/check.sh --help
-```
-
-**3 단계 자동화**:
-
-| 단계 | 트리거 | 범위 | 시간 |
-| --- | --- | --- | --- |
-| pre-commit | `git commit` | `check fast` 위임 | ~30s |
-| 로컬 풀 검증 | 수동 | `check server` / `check all` / `check bot-stress N` | ~1~5m |
-| GitHub Actions CI | push / PR | server 풀 + client 풀 + bundle-jar smoke 3 job 병렬 | ~5~10m |
-
-**pre-commit 활성화** (repo clone 후 한 번만):
-```bash
-git config core.hooksPath .husky
-chmod +x .husky/pre-commit scripts/check.sh
-
-# 우회 (긴급 수정 시)
-git commit --no-verify
-```
-
-기존 raw 명령 (`./gradlew :server:test --tests "..."` / `npm --prefix client run test`)
-은 그대로 유지 — wrapper 가 위에 얇게 얹힌 형태. 디버깅 시 직접 호출 가능.
-
-**Phase 2a 동작 확인 포인트**
-- 로그에 `Started MirboardApplication` 와 Flyway `Successfully applied N migration(s)` 출력.
-- Postgres 에 `users`, `tichu_match_results`, `tichu_match_participants`,
-  `flyway_schema_history` 테이블 존재.
-- 8080 포트 listening (Spring Security 기본값에 의해 모든 요청 401 — 정상).
-
-## Phase 2b — 인증 (Auth) 동작 확인
-
-회원가입 → 로그인 → 본인 정보 조회:
-
-```bash
-# 1) 회원가입
-curl -s -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice_01","password":"validpass1"}'
-# → {"userId":1,"username":"alice_01"}
-
-# 2) 로그인 (JWT 획득)
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice_01","password":"validpass1"}' | jq -r .accessToken)
-
-# 3) 본인 정보 조회
-curl -s http://localhost:8080/api/me -H "Authorization: Bearer $TOKEN"
-# → {"userId":1,"username":"alice_01","winCount":0,"loseCount":0}
-```
-
-예외 케이스:
-- 같은 username 재등록 → `409 USERNAME_TAKEN`
-- 비밀번호 오류 → `401 BAD_CREDENTIALS`
-- 토큰 없는 `/api/me` → `401 UNAUTHORIZED`
-- username 규칙 위반 (`^[A-Za-z0-9_]{3,20}$`) → `400 INVALID_INPUT`
-
-## Phase 2c — 게임 카탈로그
-
-```bash
-# 카탈로그 조회 (인증 필요)
-curl -s http://localhost:8080/api/games -H "Authorization: Bearer $TOKEN"
-# → {"games":[{"id":"TICHU","displayName":"티츄",
-#              "shortDescription":"4인 파트너 카드 게임. 56장 덱과 4장의 특수 카드...",
-#              "minPlayers":4,"maxPlayers":4,"status":"AVAILABLE"}]}
-
-# 단일 게임
-curl -s http://localhost:8080/api/games/TICHU -H "Authorization: Bearer $TOKEN"
-
-# 미등록 게임 → 404 GAME_NOT_AVAILABLE
-curl -s http://localhost:8080/api/games/UNKNOWN -H "Authorization: Bearer $TOKEN"
-```
-
-새 게임 추가 절차: `domain.game.{newgame}` 패키지에 `GameDefinition` 구현체를
-`@Component` 로 만들면 카탈로그/단일조회 자동 노출. 로비/허브/REST 코드 수정 불필요.
-
-## Phase 2d — 방(Room)
-
-```bash
-# 방 생성 (자동으로 본인이 host로 입장)
-ROOM=$(curl -s -X POST http://localhost:8080/api/rooms \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"친구들 한 판","gameType":"TICHU"}' | jq -r .roomId)
-
-# 방 목록 (WAITING 만, gameType 필터 가능)
-curl -s "http://localhost:8080/api/rooms?gameType=TICHU" \
-  -H "Authorization: Bearer $TOKEN"
-
-# 입장 / 단일 조회 / 퇴장
-curl -s -X POST http://localhost:8080/api/rooms/$ROOM/join  -H "Authorization: Bearer $TOKEN"
-curl -s        http://localhost:8080/api/rooms/$ROOM        -H "Authorization: Bearer $TOKEN"
-curl -s -X POST http://localhost:8080/api/rooms/$ROOM/leave -H "Authorization: Bearer $TOKEN"
-```
-
-예외 케이스:
-- 방 만석 입장 → `409 ROOM_FULL`
-- 이미 입장한 방 재입장 → `409 ALREADY_IN_ROOM`
-- IN_GAME 으로 전환된 방 입장 → `409 GAME_ALREADY_STARTED`
-- 등록 안 된 gameType → `404 GAME_NOT_AVAILABLE`
-- 모르는 roomId → `404 ROOM_NOT_FOUND`
-
-**원자성 보증**: `room_create.lua` / `room_join.lua` / `room_leave.lua` 가 Redis
-단일 스레드 위에서 capacity 체크 → players push → 메타 갱신을 한 번에 처리.
-`RoomServiceConcurrencyIT` 가 9 스레드 동시 입장으로 capacity=4 위반 0건을 검증.
-
-## Phase 2e — WebSocket / STOMP
-
-- 엔드포인트: `ws://<host>/ws` (raw) + SockJS fallback.
-- CONNECT 시 `Authorization: Bearer <JWT>` 헤더 필수 — 없거나 위조면 거절.
-- 채널:
-  - `/topic/lobby/chat` — 로비 채팅 (서버 발행)
-  - `/topic/lobby/rooms` — 방 변경 알림 (`ROOM_UPDATED` / `ROOM_DESTROYED`)
-  - 클라 발행: `/app/lobby/chat` `{ "message": "..." }`
-- 메시지 envelope: `{ "eventId", "type", "ts", "payload" }`. 상세는
-  [`docs/stomp-protocol.md`](docs/stomp-protocol.md).
-
-브라우저에서 빠른 검증 (`@stomp/stompjs` 기준):
-```js
-import { Client } from '@stomp/stompjs';
-const client = new Client({
-  brokerURL: 'ws://localhost:8080/ws',
-  connectHeaders: { Authorization: `Bearer ${token}` },
-  onConnect: () => {
-    client.subscribe('/topic/lobby/chat', (m) => console.log(JSON.parse(m.body)));
-    client.publish({ destination: '/app/lobby/chat', body: JSON.stringify({ message: 'hi' }) });
-  },
-});
-client.activate();
-```
-
-## 전체 시연 (End-to-End)
-
-```bash
-# 1) 인프라
-docker compose up -d postgres redis
-
-# 2) 백엔드 (Spring Boot 4.0.1, Java 25)
-./gradlew :server:bootRun
-# → http://localhost:8080
-
-# 3) 프론트엔드 (Vite, 새 터미널)
-npm --prefix client install   # 처음 한 번
-npm --prefix client run dev
-# → http://localhost:5173 — Vite 가 /api 와 /ws 를 8080 으로 proxy
-```
-
-브라우저 4개(또는 incognito 창 4개) 로:
-1. `/register` 에서 4명의 사용자 가입 (예: `p1` ~ `p4`).
-2. 각자 로그인 → `Game Hub` 에서 티츄 선택 → 로비 진입.
-3. p1 이 새 방 생성 → p2, p3, p4 가 입장.
-4. 4번째 입장 시 백엔드가 자동으로 `GameStartingEvent` → `TichuRoundStarter` 가 셔플 +
-   분배 + Redis 저장 → RoomPage 가 폴링으로 `IN_GAME` 감지 → `GameTable` 마운트 →
-   STOMP CONNECT + `/api/rooms/{id}/resync` → 본인 손패 수신.
-5. Mahjong 보유자가 첫 리드. 카드 클릭으로 선택 → "내기" → 다른 클라들이 자동 갱신.
-
-**재접속 시나리오**: 게임 중 한 명이 새로고침 / 탭 닫고 다시 열기 → 동일 토큰으로
-복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
-복원. 다른 플레이어 상태는 변하지 않음.
-
-## 분산 시연 (멀티 인스턴스, Phase 6D)
-
-기본은 단일 인스턴스 + `mirboard.messaging.gateway=in-memory`. 멀티 인스턴스에서
-STOMP broadcast / 도메인 이벤트를 Redis Pub/Sub 위에서 흐르게 하려면:
-
-```bash
-# 터미널 1 — 8080 인스턴스
-export MIRBOARD_MESSAGING_GATEWAY=redis
-export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
-MIRBOARD_PORT=8080 ./gradlew :server:bootRun
-
-# 터미널 2 — 8081 인스턴스 (같은 Redis 사용)
-export MIRBOARD_MESSAGING_GATEWAY=redis
-export MIRBOARD_JWT_SECRET="local-dev-secret-must-be-at-least-32-bytes-long-please"
-MIRBOARD_PORT=8081 ./gradlew :server:bootRun
-```
-
-검증 시나리오:
-1. 클라 A 가 `ws://localhost:8080/ws`, 클라 B 가 `ws://localhost:8081/ws` 로 STOMP 연결.
-2. 둘 다 `/topic/lobby/rooms` 구독.
-3. 클라 A 가 `POST http://localhost:8080/api/rooms` 로 방 생성.
-4. 클라 B 가 `ROOM_UPDATED` 이벤트 수신 — Redis Pub/Sub 으로 다른 인스턴스에 전파됨.
-
-Sticky session 불필요 — 사용자가 어느 인스턴스에 붙어 있든 자신의 인스턴스 broker
-가 STOMP 프레임을 전달. 방 입장 시 `room:{id}` HASH / `room:{id}:players` LIST 가
-Redis 단일 진실 공급원이라 두 인스턴스가 같은 상태를 본다.
-
-**한계 (현재 시점)**:
-- ApplicationEvent 의 인스턴스 간 fan-out 은 `DomainEventBus` 가 처리하지만 동일
-  이벤트가 두 번 처리되지 않게 `instanceId` 만으로 dedup — 발행 인스턴스 재시작 시
-  유실 가능성 있음 (현재 MVP 범위에선 무시).
-- 게임 액션 처리 락 (`room:{id}:lock`) 은 Redis SET NX 라 이미 분산 안전.
-
-## Phase 6 시연 체크리스트
-
-Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 검증할 시나리오 모음.
-사전 코드 점검은 완료 — 모든 시나리오 진행 가능. 실패 시 디버깅 포인트는 각 항목
-끝에 명시.
-
-### 시나리오 1 — Mahjong 소원 (6E-1)
-
-1. 4탭으로 게임 시작 (4명 모이면 자동 IN_GAME).
-2. Dealing(8) → Dealing(14) → Passing → Playing 진입까지 Ready/카드 패스 진행.
-3. 첫 리드 차례 (헤더 `현재 차례`) 가 Mahjong 보유자 (손패에 rank=1 카드) 인 탭에서
-   Mahjong 단독 클릭 → "내기".
-4. **기대**: `MakeWishModal` 자동 노출. rank 2~14 그리드 + 건너뛰기 / 소원 지정.
-5. rank 선택 후 "소원 지정" → 헤더의 `활성 소원: N` 표시.
-6. 다른 클라 탭 헤더에서도 동일 `활성 소원: N` 확인 → STOMP fan-out 정상.
-7. **실패 시**: 서버 로그 `Action rejected: MAKE_WISH reason=WISH_OUT_OF_CONTEXT` 검색.
-   currentTopSeat 이 본인이고 currentTop 이 Mahjong 단독이어야 함.
-
-### 시나리오 2 — Dragon 트릭 양도 (6E-2)
-
-1. Dragon 보유자가 단독 리드 또는 다른 카드 위에 Dragon 단독 플레이.
-2. 다른 3명이 모두 PASS → 트릭이 본인에게 닫힘.
-3. **기대**: `GiveDragonTrickModal` 자동 노출. 상대팀 두 좌석만 표시.
-4. 한 좌석 선택 후 "양도" → 헤더 `누적 A:B` 변화 (Dragon +25 + 트릭 카드 점수).
-5. **실패 시**: BOMB 으로 누가 깼다면 currentTop 이 Dragon 아님 → 모달 안 뜸. 정상.
-   currentTurnSeat 이 본인이 아니면 트릭이 아직 안 닫힌 상태.
-
-### 시나리오 3 — Phoenix 단독 SINGLE (6E-3)
-
-1. 다른 단일 카드 위에 Phoenix 단독 SINGLE 플레이.
-2. **기대**: 트릭 영역에 보라색 "Phoenix +0.5" 배지 + 호버 시 비교 룰 툴팁
-   (Dragon 만 못 이김).
-3. 다음 플레이어가 더 높은 SINGLE 로 이기면 currentTop 변경 + 배지 사라짐.
-
-### 시나리오 4 — 관전 모드 (6A-5/6A-6)
-
-1. 5번째 사용자 (예: `spec_user`) 가 로비 진입 → "방 ID 로 관전 진입" 입력 박스에
-   IN_GAME 방 ID 붙여넣기 → "구경하기".
-2. **기대**: GameTable 표시되되 손패 영역 / 액션 버튼 / 모달 모두 숨김.
-   "관전 중 — 본인 손패는 표시되지 않습니다." 배너 노출.
-3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 로비로 복귀.
-4. **추가 보안 검증** (옵션): 관전자가 `curl -X POST /app/room/{id}/action` 직접
-   호출 시 `NOT_IN_ROOM` 에러 (실제 UI 에선 액션 버튼 자체가 안 보임).
-
-### 시나리오 5 — 멀티 인스턴스 Redis fan-out (6D)
-
-위 "분산 시연 (멀티 인스턴스, Phase 6D)" 섹션의 단계 따라 진행.
-
-추가 확인: `redis-cli MONITOR` 로 `PUBLISH stomp:routes ...` 와 `PUBLISH domain:event
-...` 명령이 흐르는지 관찰.
-
-### 운영 카운터 점검 (시연 도중)
-
-```bash
-curl -s http://localhost:8080/actuator/prometheus | grep '^mirboard_'
-```
-
-기대 출력:
-- `mirboard_room_created_total`
-- `mirboard_room_joined_total`
-- `mirboard_game_started_total{gameType="TICHU"}`
-- `mirboard_round_completed_total`
-- `mirboard_match_completed_total`
-- `mirboard_action_rejected_total`
-
-각 카운터가 0 이상의 값으로 나오면 6A-3/6A-4 정상.
-
-### 로그 MDC 확인
-
-서버 stdout 의 로그 라인이 `HH:mm:ss.SSS LEVEL [thread] logger [user=N room=R event=-]
-- msg` 형식인지 확인. 액션 처리 / 방 변경 시 `user=` 와 `room=` 가 채워지면 6A-1 성공.
-
-### 시연 실패 시 보고 가이드
-
-각 시나리오 실패 시 다음 4가지를 함께 보고:
-1. 실패한 시나리오 번호 + 단계.
-2. 서버 stdout 의 마지막 ~30줄 (특히 `Action rejected` 또는 `Failed to ...`).
-3. 브라우저 콘솔의 STOMP 메시지 / API 응답 에러.
-4. 재현 가능한지 (1회성 / 반복).
-
-## 작업 흐름 (Phase Gate)
-
-1. **Phase 1 — 설계**: 본 문서 + `docs/*.md` + Flyway V1. ✅
-2. **Phase 2 — 로비 모듈**: 회원가입/로그인/방 입장. ✅
-3. **Phase 3 — 티츄 룰 엔진** (+ 단위 테스트 ≥ 90%). ✅
-4. **Phase 4 — 실시간 통합 + 재접속 동기화**. ✅
-
-각 Phase 종료 시 사용자 검토/승인 후 다음 Phase로 진입. 모든 Phase 완료 — 1게임
-End-to-End 시연 가능. 후속 작업 후보: Dealing/Passing 프리뤼드(Grand Tichu, 카드
-패스), 라운드 반복(여러 라운드 누적 점수), 대전 결과 영속 (`tichu_match_results`
-기록), dnd-kit 손패 드래그 정렬, UI 디자인 개선.
-
-## 배포 (Phase 7 — Fly.io + Postgres + Upstash Redis)
-
-친구 5~10 명 시연용 단일 머신 배포. Tokyo (`nrt`) 리전, 비용 약 $5~10/mo.
-
-### 0. 사용자 사전 셋업 (한 번)
-
-```bash
-# 1) Fly.io
-brew install flyctl                      # macOS
-flyctl auth signup                       # 또는 flyctl auth login
-flyctl apps create mirboard              # 앱 이름은 fly.toml 의 app= 값과 일치 (전역 유니크)
-
-# 2) Postgres (Fly Postgres / Supabase / Neon 중 택1)
-#    Fly Postgres 예시 — Tokyo, dev preset:
-flyctl postgres create --name mirboard-db --region nrt --initial-cluster-size 1 \
-        --vm-size shared-cpu-1x --volume-size 1
-flyctl postgres attach --app mirboard mirboard-db
-#    → 자동으로 DATABASE_URL secret 이 셋됨. 본 앱은 별도 명명을 쓰므로 아래
-#       MIRBOARD_DB_URL 로 다시 설정한다 (Postgres URI → jdbc URL 변환).
-
-# 3) Upstash Redis (Tokyo 리전, TLS)
-#    https://console.upstash.com 에서 "Create Database" → Region: ap-northeast-1
-#    → host/port/password 메모.
-```
-
-### 1. Secret 셋업
-
-```bash
-# JWT 시크릿 (32바이트 이상)
-flyctl secrets set MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)"
-
-# Postgres
-flyctl secrets set \
-  MIRBOARD_DB_URL="jdbc:postgresql://<pg-host>:5432/mirboard?sslmode=require" \
-  MIRBOARD_DB_USER="<user>" \
-  MIRBOARD_DB_PASSWORD="<password>"
-
-# Upstash Redis (TLS 포트 보통 6380)
-flyctl secrets set \
-  MIRBOARD_REDIS_HOST="<your-db>.upstash.io" \
-  MIRBOARD_REDIS_PORT="6380" \
-  MIRBOARD_REDIS_PASSWORD="<password>" \
-  MIRBOARD_REDIS_SSL="true"
-```
-
-### 2. 첫 배포
-
-```bash
-# 리포 루트에서:
-flyctl deploy
-
-# 헬스 체크
-flyctl status
-flyctl logs
-
-# 도메인 (기본 https://mirboard.fly.dev) 접속해 회원가입 → 게임 시작.
-```
-
-### 3. 로컬에서 prod jar 검증 (옵션)
-
-Docker 빌드 없이도 Spring Boot 의 정적 서빙을 한 번에 검증할 수 있다:
-
-```bash
-# 클라 번들 + Spring bootJar 같이 빌드 (단일 jar 안에 React 포함)
-./gradlew :server:bootJar -PbundleClient
-
-# 실행
-SPRING_PROFILES_ACTIVE=prod \
-MIRBOARD_DB_URL="jdbc:postgresql://127.0.0.1:5432/mirboard" \
-MIRBOARD_REDIS_SSL=false \
-MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)" \
-java -jar server/build/libs/server-0.1.0-SNAPSHOT.jar
-# → http://localhost:8080 에 React + REST + STOMP 모두 같은 origin
-```
-
-### 환경 변수 한눈에
-
-| 변수 | 용도 | 예시 |
+| | 티츄 | 스컬킹 |
 | --- | --- | --- |
-| `MIRBOARD_JWT_SECRET` | JWT HS256 키 (≥32 bytes) | `openssl rand -hex 32` |
-| `MIRBOARD_DB_URL` | jdbc Postgres URL | `jdbc:postgresql://host:5432/mirboard?sslmode=require` |
-| `MIRBOARD_DB_USER` / `_PASSWORD` | Postgres 자격 | `mirboard` / `xxxxx` |
-| `MIRBOARD_REDIS_HOST` / `_PORT` | Redis 엔드포인트 | `xxx.upstash.io` / `6380` |
-| `MIRBOARD_REDIS_PASSWORD` | Upstash auth | `xxxxx` |
-| `MIRBOARD_REDIS_SSL` | TLS 사용 여부 | `true` (Upstash) / `false` (local) |
-| `MIRBOARD_MESSAGING_GATEWAY` | `in-memory` (1대) / `redis` (N대) | `redis` (prod 기본) |
-| `SPRING_PROFILES_ACTIVE` | `prod` 시 `application-prod.yml` 활성 | `prod` |
+| 인원 | 4인 고정, 2:2 팀전 | **2~8인 가변**, 개인전 |
+| 덱 | 56장 + 특수 카드 4종 | 70장(4색 × 1~14 + 특수 5종) |
+| 매치 | 목표 점수(기본 1000점) | 10라운드 고정 |
+| 특징 | 족보 조합, 폭탄 인터럽트, 카드 패스 | 승수 예측 후 동시 공개, 비추이적 트릭 판정 |
 
-### 비용 절감 팁
+- **로비/방** — 방 생성(인원 선택)·입장·관전·랭킹·채팅. 게임 시작은 정원 충족 + **전원 준비**
+- **봇** — 빈 좌석을 합법 수 균등 분포 봇으로 자동 충족 (휴리스틱은 의도적 후속 과제)
+- **재접속·탈주** — 끊김 유예 후 미복귀 시 게임별 규칙으로 처리
+- **UI** — 라이트/다크 토글, 모바일 반응형, 색약 모드
 
-- `fly.toml` 의 `auto_stop_machines = "stop"` + `min_machines_running = 0` 이라
-  트래픽 없는 시간엔 머신이 꺼져 0원. 첫 접속에 약 5초 콜드 스타트.
-- Fly Postgres `dev preset` (256MB / 1GB 볼륨) + Upstash Free Tier (10K
-  commands/day) 면 친구 시연 규모에서 $0 ~ 수 달러 수준.
+ELO·전적 영속은 **티츄 전용**입니다. 스컬킹은 `users.rating` 을 게임별로 분리할지가
+선행 결정이라 의도적으로 보류했습니다 ([D-102](docs/decisions.md)).
+
+전체 기능 표: [docs/implementation-status.md](docs/implementation-status.md)
+
+---
+
+## 기술적으로 흥미로운 지점
+
+### 1. 두 번째 게임이 추상화의 결함을 정확히 한 곳 찾아냈다
+
+`GameEngine` 포트(149줄) 뒤에 티츄 4,042줄과 스컬킹 2,919줄이 꽂힙니다. 스컬킹을 붙일 때
+**REST/WS 컨트롤러·스케줄러·브로드캐스터·로비는 한 줄도 바뀌지 않았고**, 인프라에
+`skullking` 참조는 0건입니다.
+
+바뀐 건 포트 계약 한 곳입니다 — `boolean desert(...)` 는 "매치를 강제 종료했는가"라는
+2치라서, 개인전의 "남은 사람끼리 계속"을 표현할 수 없었습니다. 티츄만 있을 때 이 계약은
+완벽해 보였습니다.
+
+**추상이 어디서 샜는지 말할 수 있다는 것**이 "처음부터 완벽했다"보다 강한 증거라고 봅니다.
+
+→ [케이스 스터디: 두 번째 게임을 붙이기까지](docs/case-study-multi-game.md) ·
+[포트 계약](docs/game-port.md)
+
+### 2. 비추이적 트릭 판정을 6단 사다리로
+
+스컬킹의 해적 > 인어 > 스컬킹 > 해적 은 **3자 순환**이라 `Comparator` 로 표현할 수 없고,
+거기에 "셋이 다 나오면 인어 승"이라는 예외까지 얹힙니다.
+
+```java
+// 실제 코드에서 EffectiveKind. 접두만 생략
+private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
+
+private static final List<Rung> LADDER = List.of(
+        // 1. 스컬킹+인어 → 인어 (3자 예외)
+        new Rung(c -> c.has(SKULL_KING) && c.has(MERMAID), c -> firstOfKind(c, MERMAID)),
+        // 2~4. 스컬킹 → 해적 → 인어
+        new Rung(c -> c.has(SKULL_KING), c -> firstOfKind(c, SKULL_KING)),
+        new Rung(c -> c.has(PIRATE),     c -> firstOfKind(c, PIRATE)),
+        new Rung(c -> c.has(MERMAID),    c -> firstOfKind(c, MERMAID)),
+        // 5. 색상 카드 (검정 우선, 없으면 리드 수트)
+        new Rung(c -> c.has(SUIT),       TrickResolver::highestSuitCard),
+        // 6. 전부 탈출 → 먼저 낸 사람
+        new Rung(c -> true,              c -> firstOfKind(c, ESCAPE)));
+```
+
+모든 단의 selector 가 `firstOfKind` 라서 **동점 처리("그 종류를 먼저 낸 사람")가 분기 없이
+공짜로 성립**합니다. 검증은 스컬킹/해적/인어 존재 여부 8조합 전수 대조입니다.
+
+→ [코드](server/src/main/java/com/mirboard/domain/game/skullking/trick/TrickResolver.java) ·
+[테스트](server/src/test/java/com/mirboard/domain/game/skullking/trick/TrickResolverTest.java) ·
+[룰 명세](docs/rules-skullking.md)
+
+### 3. 상태 은닉을 런타임 필터가 아니라 타입으로
+
+스컬킹의 "예측은 전원 제출 후 동시 공개" 룰은 **값을 실을 자리가 없어서** 지켜집니다.
+
+```java
+/** 예측을 냈다는 사실만 공개 — 값은 담지 않는다 (§5 동시 공개). */
+record BidSubmitted(int seat) implements SkullKingEvent {}
+record BidsRevealed(Map<Integer, Integer> bids) implements SkullKingEvent {}
+```
+
+손패도 같은 원리입니다 — 공개 `TableView` 와 본인용 `PrivateHand` 를 **다른 타입**으로
+두고, 라우팅은 `GameEvent.privateSeat()` 단일 지점에서만 갈립니다. 좌석이 방 범위 밖이면
+토픽으로 폴백하지 않고 **버립니다**. 새는 경로 자체가 없는 구조입니다.
+
+→ [포트](server/src/main/java/com/mirboard/domain/game/core/GameEvent.java) ·
+[STOMP 계약](docs/stomp-protocol.md)
+
+### 4. 수평 확장을 "증명"으로 다뤘다
+
+> 단일 인스턴스에서 안 깨졌다는 건 증명이 아니다.
+
+같은 Redis/Postgres 를 문 **독립 Spring 컨텍스트 2개**를 띄워 교차 발화, A 종료 후 B 인계,
+중복 실행 0건을 통합 테스트로 검증했습니다. in-memory 였던 3곳(세션 레지스트리·턴 타임아웃·
+탈주 유예)을 Redis 로 옮기면서 초기 전제([D-03](docs/decisions.md))를 D-96 에서 명시적으로
+번복했습니다. 리더 선출 대신 원자 pop + generation 이중 방어를 택한 논거는 코드 주석에
+남겼습니다.
+
+이 과정에서 폴링 지연 때문에 타임아웃 IT 가 **실제로 깨져** 주기를 1s → 250ms 로 내렸습니다.
+
+→ [Redis 키 설계](docs/redis-keys.md)
+
+---
+
+## 아키텍처 4원칙
+
+각 원칙 뒤에 **무엇이 그것을 강제하는가**를 함께 적습니다.
+
+- **Modular Monolith** — `domain.lobby` → `domain.game.tichu` 직접 의존 금지.
+  강제: 게임 디스패치가 `GameRegistry` 를 반드시 거친다.
+- **Server-Authoritative** — 셔플·족보·점수·차례가 전부 서버.
+  강제: 클라가 보낸 `seq` 는 무시하고 `room:{id}:seq` INCR 만 신뢰.
+- **State Hiding** — 손패는 `/user/queue` 로만.
+  강제: 타입 분리 + 단일 라우팅 지점(폴백 경로 없음).
+- **개인정보 최소화** — `users` 에 email·phone·real_name 등은 **스키마 레벨에서 추가 금지**.
+  증거: 칩 잔액을 `users` 에 넣었다가(V6) 원칙 위배로 **DROP 하고**(V7) Redis 방 단위로
+  옮겼습니다. 원칙이 이미 배포된 스키마를 되돌리게 만든 사례입니다.
+
+```
+로그인 → 미르보드카페(/games) → 대기실(전원 준비) → 게임판
+          방 목록·생성·관전·랭킹·채팅
+```
+
+상세: [docs/architecture.md](docs/architecture.md)
+
+---
+
+## 기술 스택
+
+| 영역 | 선택 |
+| --- | --- |
+| Backend | Spring Boot 4.0.1 / Java 25 (Virtual Threads), Gradle 9.4.1 |
+| Data | PostgreSQL 16 (Flyway V1~V10), Redis 7 + **Lua 원자 스크립트 9개** |
+| Realtime | WebSocket + STOMP (SockJS 폴백) |
+| Frontend | Vite + React 18 + TypeScript, Zustand, Tailwind + shadcn/ui |
+| Test | JUnit 5 + Mockito + Testcontainers / Vitest + RTL |
+
+`HandType`·`GameAction`·`GameEvent` 는 **sealed interface** 로 두어 `switch` 패턴 매칭이
+누락 케이스를 컴파일 타임에 잡게 했고, 상태 객체는 record + `with*` 불변 전이입니다.
+
+---
+
+## 30초 실행
+
+```bash
+./scripts/dev.sh all
+```
+
+Postgres·Redis 기동 → 마이그레이션 → 서버(:8080) → 클라(:5173) 까지 한 번에 올라갑니다.
+개별 실행은 `./scripts/dev.sh up | server | client`.
+
+환경 설치·테스트 실행·검증 스크립트는 → **[CONTRIBUTING.md](CONTRIBUTING.md)**
+
+---
+
+## 문서
+
+**훑어보기** — [아키텍처](docs/architecture.md) ·
+[포트 설계](docs/game-port.md) ·
+[케이스 스터디](docs/case-study-multi-game.md) ·
+[의사결정 이력](docs/decisions.md)
+
+**깊이 보기** — [REST API](docs/api.md) ·
+[STOMP 프로토콜](docs/stomp-protocol.md) ·
+[Redis 키](docs/redis-keys.md) ·
+[티츄 룰](docs/rules-tichu.md) ·
+[스컬킹 룰](docs/rules-skullking.md) ·
+[구현 현황](docs/implementation-status.md)
+
+**돌려보기** — [기여 가이드](CONTRIBUTING.md) ·
+[배포](docs/deploy.md) ·
+[수동 검증 시나리오](docs/qa-scenarios.md) ·
+[백업 런북](docs/runbooks/) ·
+[부하 테스트](scripts/k6/)
+
+의사결정 이력은 100여 건이고, **번복을 지우지 않고 마커로 남깁니다** — 예를 들어
+"단일 인스턴스 전제"(D-03)는 D-96 에서, "칩을 계정에 둔다"(D-81)는 D-82 에서 뒤집혔습니다.
+진행 단계는 [로드맵](docs/plans/mvp-roadmap.md).

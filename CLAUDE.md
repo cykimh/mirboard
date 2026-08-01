@@ -4,14 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 현황
 
-**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + 1차 게임으로 티츄(Tichu).
+**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1·M3 완료·M2 진행 중, 결정 이력 D-99까지). 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO 영속 → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **포트 추출 완료**(D-98) — 인게임이 `GameEngine` 포트 뒤로 들어갔고 두 번째 게임(스컬킹) 도메인이 다음 단계다.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1·M3·M4·M5 완료·M2 진행 중(C3만 남음), 결정 이력 D-105까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(티츄만) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 `users.rating` 게임별 분리(D-02) 선행이라 의도적 별건.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
 - **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `docs/game-port.md`(`GameEngine` 포트), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
 - **현황 단일 진실원**: `docs/implementation-status.md`(기능별 ✅ 표). 이력 `docs/decisions.md`, 로드맵 `docs/plans/mvp-roadmap.md`.
+- **쇼케이스 문서(D-105)**: `README.md`(진입점), `docs/case-study-multi-game.md`(포트 서사).
+  둘 다 **수치를 인용하고 재현 명령을 싣는다** — 코드가 바뀌어 수치가 흔들리면 두 문서를
+  같이 고칠 것(케이스 스터디 §부록 명령을 돌려 대조). 실무 절차는 `CONTRIBUTING.md`(환경·
+  테스트)·`docs/deploy.md`(배포)·`docs/qa-scenarios.md`(수동 검증).
 
 상용화(포트폴리오 쇼케이스) 후속은 트랙 A(티츄 완성도)·C(운영 하드닝)·D(수평 확장성)·E(멀티게임)·G(문서·데모)의 마일스톤으로 진행 중 — `docs/plans/mvp-roadmap.md` 참조.
 
@@ -54,7 +58,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록
   (+ `GameEngine` 구현, `GameStartingEvent` 리스너로 라운드 시작) → 카탈로그/방 생성/인게임
   디스패치/봇/타임아웃/resync 가 자동 연결됨. 로비·허브 컨트롤러와 스케줄러 수정 불필요.
-  (D-102 스컬킹이 이 약속을 실증 — 인프라 코드 수정 0.)
+  (D-102 스컬킹이 이 약속을 실증 — REST/WS 컨트롤러·스케줄러·브로드캐스터·로비 **수정 0**.
+  인프라 변경은 포트 계약 확장 1건(`desert` boolean→3치 `DesertOutcome`)뿐이고, 인프라에
+  게임 이름 분기는 한 줄도 늘지 않았다. `grep -rn skullking .../infra` → 0건.)
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
@@ -68,7 +74,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |-----------|--------------------------------------------------------------------------------------------|
 | JDK       | **Java 25 (LTS)** — Virtual Threads 기본 활성화 (`spring.threads.virtual.enabled=true`)         |
 | Backend   | **Spring Boot 4.0.1** (Jakarta EE 11 / Spring Framework 7). `javax.*` 금지, `jakarta.*` 만 사용 |
-| Build     | Gradle 8.10+, Kotlin DSL                                                                   |
+| Build     | Gradle 9.4.1 (wrapper), Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
 | Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-`, D-103) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
