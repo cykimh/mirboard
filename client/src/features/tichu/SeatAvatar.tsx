@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { avatarSrc } from '@/api/avatar';
+import { animalFor } from '@/components/avatarGlyph';
 
 interface SeatAvatarProps {
   seat: number;
@@ -12,17 +13,6 @@ interface SeatAvatarProps {
   /** 티츄 선언 시 원형 아바타가 깜빡이고 종(🔔) 배지가 흔들린다(#3,#4).
    *  'tichu'=금색, 'grand'=적색. null 이면 표시 없음. */
   declared?: 'tichu' | 'grand' | null;
-}
-
-/** 디폴트 동물 캐릭터 풀. userId 해시로 결정적 배정(에셋 파일 불필요). */
-const ANIMALS = [
-  '🐶', '🐱', '🦊', '🐼', '🐯', '🦁', '🐸', '🐵',
-  '🐰', '🐻', '🐨', '🐷', '🐹', '🐧', '🐢', '🐙',
-];
-
-function animalFor(userId: number | undefined, seat: number): string {
-  const n = userId ?? seat;
-  return ANIMALS[Math.abs(n) % ANIMALS.length];
 }
 
 /**

@@ -20,7 +20,7 @@
 | 3 | 방 생성/입장/준비/퇴장/관전 | ✅ | `domain.lobby.room`, `infra.rest.rooms`, `lua/room_*.lua` |
 | 4 | WebSocket/STOMP 실시간 | ✅ | `infra.ws`, `infra.config.WebSocketConfig` |
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
-| 5b | 스컬킹 (룰 엔진 + 인게임 배선, 클라는 S6) | ✅ | `domain.game.skullking` (§16) |
+| 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -256,8 +256,8 @@
 ## 15. 미구현 / 범위 밖 (참고)
 
 - 게임별 격리 채팅(로비/방 채팅만 존재).
-- 스컬킹 클라 게임판 — 서버는 완성(§16), 클라는 S6(D-103). 그 전까지 스컬킹 방에
-  들어가면 게임 화면이 없다.
+- 스컬킹 매치 결과 영속·ELO — D-02 의 게임별 rating 분리 결정이 선행(D-102 보류).
+- 스컬킹 손패 dnd 정렬·특수 카드 SVG 에셋·i18n 이관 — S6 범위 밖(D-103 이월).
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
 - 멀티 인스턴스 세션 레지스트리(`WsSessionRegistry` 는 단일 인스턴스 전제).
 
@@ -285,8 +285,13 @@
   상태 I/O(티츄와 같은 Redis 키)·뷰(입찰 은닉 §5)·advance(라운드 연쇄)·desert(3치 포트,
   드레인 계약 내장)를 붙인다. 봇 풀 4→8(V10). 완료 기준: **4인·6인 봇 풀매치 10라운드
   완주 IT** (`SkullKingBotMatchSimulationIT`).
-- **남은 것**: 클라 게임판(S6/D-103) — 카탈로그에는 뜨지만 게임 화면이 없다. 매치 결과
-  영속·ELO·desert_count 는 D-02 스키마 결정 선행으로 별건(D-102 보류).
+- **클라(S6, D-103) 완료**: `useStompRoom` 을 `RoomEventSink` 주입으로 게임 중립화하고
+  (`tichuStore` 0줄 수정) `features/skullking/` 에 게임판을 새로 만들었다. 2~8 가변 좌석은
+  **Row-Flow**(auto-fit 좌석 그리드 + 재생순 트릭 레일)로 폭 미디어 쿼리 0개. CSS 는
+  `styles/parts/18-skullking-table.css` 에 `.sk-` 접두로 격리하고 네임스페이스 규칙을
+  테스트로 기계화했다. 375×667 8인 실측 완료.
+- **남은 것**: 매치 결과 영속·ELO·desert_count 는 D-02 스키마 결정(게임별 rating 분리) 선행으로
+  별건(D-102 보류). 끊김 유예 구간 정지(D-104 한계)도 미해결.
 
 ---
 

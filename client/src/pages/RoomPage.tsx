@@ -5,6 +5,7 @@ import { roomsApi } from '@/api/rooms';
 import { usersApi } from '@/api/users';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
+import { SkullKingTable } from '@/features/skullking/SkullKingTable';
 import { useRoomMeta } from '@/ws/useRoomMeta';
 import type { Room, TeamPolicy } from '@/types/api';
 import {
@@ -182,7 +183,27 @@ export function RoomPage() {
     );
   }
 
-  // IN_GAME — GameTable 은 20e 범위(레거시 레이아웃). .app-shell 밖.
+  // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
+  // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
+  // 다른 게임의 코드 경로는 실행조차 되지 않는다.
+  if (room.status === 'IN_GAME' && room.gameType === 'SKULL_KING') {
+    return (
+      <main className="room-page">
+        <SkullKingTable
+          roomId={room.roomId}
+          playerIds={room.playerIds}
+          myUserId={user.userId}
+          spectator={iAmSpectator}
+          botSeats={room.botSeats ?? []}
+          usernames={usernames}
+          turnSeconds={room.turnSeconds ?? 0}
+          spectatorCount={(room.spectatorIds ?? []).length}
+          onExit={handleLeave}
+        />
+      </main>
+    );
+  }
+
   if (room.status === 'IN_GAME') {
     return (
       <main className="room-page">

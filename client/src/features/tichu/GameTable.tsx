@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
+import { tichuRoomSink } from './tichuRoomSink';
 import { t } from '@/i18n/messages';
 import { PassReceivedModal } from './PassReceivedModal';
 import { MakeWishModal } from './MakeWishModal';
@@ -69,7 +70,7 @@ export function GameTable({
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
-    useStompRoom(roomId, token);
+    useStompRoom(roomId, token, tichuRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
   const { muted, toggleMute, playChime } = useSfx();
