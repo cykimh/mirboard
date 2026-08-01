@@ -5,6 +5,7 @@
  */
 const GAME_WIKI_URL: Record<string, string> = {
   tichu: 'https://en.wikipedia.org/wiki/Tichu',
+  skull_king: 'https://en.wikipedia.org/wiki/Skull_King',
 };
 
 export function gameWikiUrl(gameId: string): string | undefined {
