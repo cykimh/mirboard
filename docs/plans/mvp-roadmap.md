@@ -837,7 +837,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
 | M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4·C5 완료 / C3 남음 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
-| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ⬜ |
+| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | 🔶 D-105: README·케이스 스터디·스크린샷·데모 계정 시더·CD 워크플로 완료 / **라이브 배포는 사용자 실행 대기**(`FLY_API_TOKEN`), GIF 는 정적 스크린샷으로 대체 |
 | M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | ✅ S0~S6 완료(D-97~D-104): 포트·인원 가변·룰 명세·순수 엔진(305건)·탈주(유령 좌석)·인게임 배선(봇 풀매치 IT)·클라 게임판(Row-Flow, 실측 완료). 실행 단위 `docs/plans/multi-game-sessions.md`. **잔여 별건**: 스컬킹 매치 영속·ELO(D-02 게임별 rating 분리 선행), 끊김 유예 구간 정지(D-104 한계), 요트/할리갈리 |
 
 **M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
@@ -902,6 +902,22 @@ ZSET + Lua 원자 pop + 전 인스턴스 폴링(**리더 선출 없음** — 리
 잡는 것"을, Redis generation 이 "pop 과 락 획득 사이 행동"을 막는다. M0 이연 누수는 TTL 로
 원천 해소. 증명은 `TwoInstanceHandoffIT`(독립 컨텍스트 2개, **A 종료 후 B 인계** 포함).
 트레이드오프로 폴링 지연이 생겨 기본 주기를 250ms 로 잡았다 — 상세는 D-96.
+
+**M4 진행(D-105)**: README 615줄 → 198줄 재편(진입점화) + 밀려난 런북을 성격별로 분리
+(`CONTRIBUTING.md`·`docs/deploy.md`·`docs/qa-scenarios.md`). `docs/case-study-multi-game.md`
+신규 — 포트 추출부터 두 번째 게임까지를 `문제/후보/선택/배제 논거/대가` 로 쪼개고 절마다
+`코드:/테스트:/결정:` 앵커를 달았다. 부록 재현 명령은 전량 실행해 본문 수치와 대조했다.
+데모 계정은 마이그레이션이 아니라 `mirboard.demo.enabled` **기본 false** 시더(로컬·CI 무영향),
+CD 는 `FLY_API_TOKEN` 미설정 시 잡이 스스로 건너뛴다.
+
+이 작업에서 **기존 문서의 사실 오류 4건을 실측으로 잡았다** — CLAUDE.md 의 "인프라 코드
+수정 0"(실제로는 `DesertionService` +32/−7), 로드맵 M5 미반영, `HAND_DEALT_FULL` 죽은 참조,
+Gradle 버전 표기 드리프트(8.10.2 → 실제 wrapper 9.4.1). 쇼케이스 문서가 검증 가능성을
+파는 이상, 인용 수치는 전부 명령으로 재현되어야 한다.
+
+**남은 M4**: 라이브 배포 1건. `flyctl auth token` → `gh secret set FLY_API_TOKEN` 은
+계정 소유자만 할 수 있고 배포 자체가 되돌리기 어려운 외부 행위라, 워크플로만 준비하고
+실행은 사용자에게 남긴다.
 
 **작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
 `docs/plans/parallel-tracks.md`(T0·T1·T3·T4·T6 완료, T5 1차 완료).

@@ -215,7 +215,10 @@
 - **관측성**: Prometheus(`/actuator/prometheus`, `MirboardMetrics`), MDC 로그
   (`userId`/`roomId`/`eventId`, `MdcKeys`).
 - **배포**: `client` 빌드를 서버 정적 리소스로 번들해 단일 jar 서빙, `Dockerfile`/`fly.toml`
-  멀티스테이지로 Fly.io.
+  멀티스테이지로 Fly.io. CD 는 `.github/workflows/deploy.yml`(main 푸시 + 수동 트리거) —
+  `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. 라이브 인스턴스는 아직 없다(D-105).
+- **데모 계정**: `DemoAccountSeeder`, `mirboard.demo.enabled` **기본 false**. 공개 비밀번호
+  계정이 로컬·CI 에 생기지 않도록 마이그레이션이 아닌 환경변수 게이트 시더로 둔다(D-105).
 
 ---
 
@@ -300,5 +303,5 @@
 
 ---
 
-*문서 생성: 코드베이스 정적 분석 기반(서버 155 클래스 / 테스트 55 클래스, 마이그레이션 V1~V8 확인).*
-*최종 대조: 2026-07-31 (D-101, §13·§16 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*
+*문서 생성: 코드베이스 정적 분석 기반(서버 프로덕션 210 파일 / 테스트 81 파일, 마이그레이션 V1~V10 확인).*
+*최종 대조: 2026-08-01 (D-105, §12 배포·데모 계정 + 실측 수치 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*

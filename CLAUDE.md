@@ -12,6 +12,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
 - **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `docs/game-port.md`(`GameEngine` 포트), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
 - **현황 단일 진실원**: `docs/implementation-status.md`(기능별 ✅ 표). 이력 `docs/decisions.md`, 로드맵 `docs/plans/mvp-roadmap.md`.
+- **쇼케이스 문서(D-105)**: `README.md`(진입점), `docs/case-study-multi-game.md`(포트 서사).
+  둘 다 **수치를 인용하고 재현 명령을 싣는다** — 코드가 바뀌어 수치가 흔들리면 두 문서를
+  같이 고칠 것(케이스 스터디 §부록 명령을 돌려 대조). 실무 절차는 `CONTRIBUTING.md`(환경·
+  테스트)·`docs/deploy.md`(배포)·`docs/qa-scenarios.md`(수동 검증).
 
 상용화(포트폴리오 쇼케이스) 후속은 트랙 A(티츄 완성도)·C(운영 하드닝)·D(수평 확장성)·E(멀티게임)·G(문서·데모)의 마일스톤으로 진행 중 — `docs/plans/mvp-roadmap.md` 참조.
 
