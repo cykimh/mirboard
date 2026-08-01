@@ -15,9 +15,8 @@ jobs:
     name: Server (unit + IT)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      # Testcontainers 가 자체 컨테이너를 띄우므로 별도 services 불필요 —
-      # Docker daemon 은 Ubuntu runner 에 기본 설치되어 있음.
+    # Testcontainers 가 자체 컨테이너를 띄우므로 `services:` 블록이 필요 없다 —
+    # Docker daemon 은 Ubuntu runner 에 기본 설치되어 있다.
     steps:
       - uses: actions/checkout@v4
 
