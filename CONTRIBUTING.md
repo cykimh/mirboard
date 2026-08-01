@@ -6,6 +6,21 @@ Mirboard 를 로컬에서 돌리고 검증하는 방법. 프로젝트가 무엇�
 > 검증 환경: macOS (Apple Silicon). Gradle wrapper(`gradlew`)와 `build.gradle.kts` 는
 > 리포에 포함돼 있습니다.
 
+## 런타임 요구사항
+
+| 구성 요소 | 버전 |
+| --- | --- |
+| JDK | **Java 25 (LTS)** |
+| Build | Gradle 9.4.1 (wrapper 동봉, Kotlin DSL) |
+| Backend | Spring Boot **4.0.1** (Jakarta EE 11 / Spring Framework 7) |
+| Frontend | **Node 20+**, Vite + React 18 + TypeScript |
+| Infra | PostgreSQL 16, Redis 7 (docker-compose 제공) |
+
+Virtual Threads 가 기본 활성(`spring.threads.virtual.enabled=true`)이고 sealed
+interface + pattern-switch 를 적극 쓴다. 모든 import 는 `jakarta.*` — `javax.*` 금지.
+
+---
+
 ### 1. JDK 25 LTS 설치
 
 ```bash
@@ -70,7 +85,31 @@ gradle wrapper --gradle-version 9.4.1   # 또는 기존 wrapper 사용
 
 JDK 25 가 로컬에 없으면 Gradle 의 foojay 리졸버가 자동으로 받아온다 (인터넷 필요).
 
-## 서버 빌드 / 실행
+---
+
+## 빠른 실행 — `scripts/dev.sh`
+
+아래 "서버 빌드 / 실행"의 수동 절차를 감싼 래퍼. 어느 디렉터리에서 실행해도 repo 루트로
+이동하고, dev 환경변수(JWT/DB/Redis)는 `application.yml` 기본값이 들어 있어 추가 export 가
+필요 없다.
+
+| 서브커맨드 | 하는 일 |
+| --- | --- |
+| `up` | postgres+redis 기동 + Flyway 마이그레이션. 멱등 |
+| `server` | `up` 보장 후 `./gradlew :server:bootRun` (:8080) |
+| `client` | Vite dev (:5173, `/api`·`/ws` → :8080 proxy) |
+| `bundled` | React 번들 동봉 **단일 프로세스** — :8080 만으로 prod 유사 확인 |
+| `all` | `up` + 서버(백그라운드 로그) + 클라(포그라운드). Ctrl-C 로 정리 |
+| `down [--purge]` | 컨테이너 중지(데이터 보존). `--purge` 면 볼륨까지 삭제 = **DB 초기화** |
+
+```bash
+./scripts/dev.sh all            # 로컬 풀스택 한 방에
+./scripts/dev.sh bundled        # localhost:8080 단독 확인
+./scripts/dev.sh down --purge   # DB 초기화 후 처음부터
+```
+
+로컬 개발 자격증명(개발 한정): Postgres `mirboard / mirboardpw`, DB `mirboard`, :5432 /
+Redis 비밀번호 없음, :6379. 검증·테스트는 `scripts/check.sh` 가 담당한다.
 
 ---
 
@@ -91,7 +130,12 @@ npm --prefix client install     # 처음 한 번
 npm --prefix client run dev
 ```
 
-브라우저로 http://localhost:5173 접속 → 회원가입 → 4 탭 띄워서 4명 모이면 자동 시작.
+브라우저로 http://localhost:5173 접속 → 회원가입 → 방 만들기 → **정원이 차고 전원이 준비**를
+누르면 시작한다. 빈 좌석은 봇이 채우고 봇은 입장 즉시 자동 준비되므로, 혼자서도 준비만
+누르면 바로 시작된다. (정원만 차면 자동 시작하던 방식은 Phase 16(#2)에서 폐기됐다.)
+
+포트가 이미 쓰이는 중이면 `MIRBOARD_PORT` 로 서버 포트를, `npm --prefix client run dev --
+--port 5174` 로 클라 포트를 바꾼다. Gradle 데몬이 옛 설정을 물고 있으면 `./gradlew --stop`.
 
 ### 테스트
 
@@ -105,6 +149,7 @@ npm --prefix client run dev
   --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest" \
   --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
   --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
+  --tests "com.mirboard.domain.game.skullking.*" \
   --tests "com.mirboard.domain.lobby.auth.*"
 
 # 통합 테스트 (Testcontainers). scripts/check.sh 가 Colima/OrbStack socket 을

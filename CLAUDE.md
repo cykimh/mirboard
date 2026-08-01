@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 현황
 
-**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + 1차 게임으로 티츄(Tichu).
+**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1·M3 완료·M2 진행 중, 결정 이력 D-99까지). 로비/방 → 티츄 풀게임(특수 카드 포함) → 점수·ELO 영속 → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **포트 추출 완료**(D-98) — 인게임이 `GameEngine` 포트 뒤로 들어갔고 두 번째 게임(스컬킹) 도메인이 다음 단계다.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0·M1·M3·M4·M5 완료·M2 진행 중(C3만 남음), 결정 이력 D-105까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(티츄만) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 `users.rating` 게임별 분리(D-02) 선행이라 의도적 별건.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).

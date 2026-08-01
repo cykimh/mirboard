@@ -205,6 +205,20 @@ GIF 를 만들 수 없다. 다만 정적 이미지가 README 에서 더 나은 �
 무너지기 때문이다(실제로 인프라 티츄 잔여 참조 grep 은 `MirboardMetrics` 의 대문자
 `"TICHU"` 때문에 `-i` 가 없으면 본문과 다른 수를 낸다).
 
+**데모 시더의 실패는 절대 기동을 막지 않는다(리뷰 후 보정).** 최초 구현은
+`UsernameTakenException` 만 잡았는데, `AuthService.register` 는 `InvalidUsernameException`·
+`InvalidPasswordException` 도 던지고 이들은 전부 `AuthException extends RuntimeException` 의
+형제라 컴파일러가 잡아주지 않는다. `ApplicationRunner` 밖으로 나가면 Spring 이 컨텍스트를
+닫아 프로세스가 죽으므로, `MIRBOARD_DEMO_PASSWORD` 를 7자로 넣는 오타 하나가 서비스 전체를
+크래시 루프에 빠뜨린다(Fly 헬스체크 실패). 데모 계정은 쇼케이스용 부가 기능이라 **실패는
+경고 로그로만** 남기고 기동을 계속한다 — 두 인스턴스 동시 최초 부팅 시의 username 유니크
+충돌도 같은 경로다. `DemoAccountSeederTest` 6건이 이 계약을 고정한다(다음 리팩터에서 catch
+절이 조용히 좁아지는 것을 막는 목적).
+
+같은 리뷰에서 배포 잡의 서드파티 액션을 `@master` → 커밋 SHA 로 고정했다. 이 잡은
+`FLY_API_TOKEN` 을 쥐고 있고 설치한 바이너리를 바로 다음 스텝이 토큰과 함께 실행하므로,
+이동 가능한 ref 가 오염되면 토큰이 그대로 넘어간다.
+
 **이 과정에서 기존 문서의 사실 오류 4건을 실측으로 정정했다.** CLAUDE.md 의 "인프라 코드
 수정 0"(D-102) 은 거짓이었다 — `git diff --name-status 725a9ad^ 7ab7171` 이
 `infra/ws/DesertionService.java` +32/−7 을 보여준다. "컨트롤러·스케줄러·브로드캐스터·로비

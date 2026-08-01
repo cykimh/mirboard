@@ -41,10 +41,15 @@ curl -s http://localhost:8080/api/me -H "Authorization: Bearer $TOKEN"
 curl -s http://localhost:8080/api/games -H "Authorization: Bearer $TOKEN"
 # → {"games":[{"id":"TICHU","displayName":"티츄",
 #              "shortDescription":"4인 파트너 카드 게임. 56장 덱과 4장의 특수 카드...",
-#              "minPlayers":4,"maxPlayers":4,"status":"AVAILABLE"}]}
+#              "minPlayers":4,"maxPlayers":4,"status":"AVAILABLE"},
+#             {"id":"SKULL_KING","displayName":"스컬킹",
+#              "shortDescription":"2~8인 트릭테이킹. 매 라운드 자기 승수를 예측하고...",
+#              "minPlayers":2,"maxPlayers":8,"status":"AVAILABLE"}]}
+# 순서는 보장하지 않는다 — GameRegistry 가 GameDefinition Bean 을 모아 만든다.
 
 # 단일 게임
 curl -s http://localhost:8080/api/games/TICHU -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:8080/api/games/SKULL_KING -H "Authorization: Bearer $TOKEN"
 
 # 미등록 게임 → 404 GAME_NOT_AVAILABLE
 curl -s http://localhost:8080/api/games/UNKNOWN -H "Authorization: Bearer $TOKEN"
@@ -125,12 +130,17 @@ npm --prefix client run dev
 
 브라우저 4개(또는 incognito 창 4개) 로:
 1. `/register` 에서 4명의 사용자 가입 (예: `p1` ~ `p4`).
-2. 각자 로그인 → `Game Hub` 에서 티츄 선택 → 로비 진입.
-3. p1 이 새 방 생성 → p2, p3, p4 가 입장.
-4. 4번째 입장 시 백엔드가 자동으로 `GameStartingEvent` → `TichuRoundStarter` 가 셔플 +
-   분배 + Redis 저장 → RoomPage 가 폴링으로 `IN_GAME` 감지 → `GameTable` 마운트 →
-   STOMP CONNECT + `/api/rooms/{id}/resync` → 본인 손패 수신.
+2. 각자 로그인 → **미르보드카페(`/games`)** 진입. 게임 카탈로그·방 목록·랭킹·로비 채팅이
+   한 화면에 있다 (게임별 로비 페이지 `/games/:id/lobby` 는 Phase 16(#1)에서 폐지).
+3. p1 이 "방 만들기" → 모달에서 티츄 선택 → 생성. p2, p3, p4 가 목록에서 입장.
+4. **전원이 "준비"** 를 누르면 `room_ready.lua` 가 WAITING→IN_GAME 을 원자 전이시키고
+   `GameStartingEvent` → `TichuRoundStarter` 가 셔플 + 분배 + Redis 저장 → RoomPage 가
+   `IN_GAME` 감지 → `GameTable` 마운트 → STOMP CONNECT + `/api/rooms/{id}/resync` →
+   본인 손패 수신. (정원만 차면 자동 시작하던 방식은 Phase 16(#2)에서 폐기됐다.)
 5. Mahjong 보유자가 첫 리드. 카드 클릭으로 선택 → "내기" → 다른 클라들이 자동 갱신.
+
+스컬킹은 같은 화면에서 방 만들기 시 인원(2~8)을 고르고, 시작하면 예측 제출 → 전원 제출 후
+동시 공개 → 트릭 플레이 순서로 진행된다.
 
 **재접속 시나리오**: 게임 중 한 명이 새로고침 / 탭 닫고 다시 열기 → 동일 토큰으로
 복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
@@ -177,7 +187,7 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 ### 시나리오 1 — Mahjong 소원 (6E-1)
 
-1. 4탭으로 게임 시작 (4명 모이면 자동 IN_GAME).
+1. 4탭으로 게임 시작 (정원 4 + 전원 준비 → IN_GAME).
 2. Dealing(8) → Dealing(14) → Passing → Playing 진입까지 Ready/카드 패스 진행.
 3. 첫 리드 차례 (헤더 `현재 차례`) 가 Mahjong 보유자 (손패에 rank=1 카드) 인 탭에서
    Mahjong 단독 클릭 → "내기".
@@ -205,11 +215,11 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 ### 시나리오 4 — 관전 모드 (6A-5/6A-6)
 
-1. 5번째 사용자 (예: `spec_user`) 가 로비 진입 → "방 ID 로 관전 진입" 입력 박스에
+1. 5번째 사용자 (예: `spec_user`) 가 미르보드카페(`/games`) 진입 → "방 ID 로 관전 진입" 입력 박스에
    IN_GAME 방 ID 붙여넣기 → "구경하기".
 2. **기대**: GameTable 표시되되 손패 영역 / 액션 버튼 / 모달 모두 숨김.
    "관전 중 — 본인 손패는 표시되지 않습니다." 배너 노출.
-3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 로비로 복귀.
+3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 미르보드카페로 복귀.
 4. **추가 보안 검증** (옵션): 관전자가 `curl -X POST /app/room/{id}/action` 직접
    호출 시 `NOT_IN_ROOM` 에러 (실제 UI 에선 액션 버튼 자체가 안 보임).
 

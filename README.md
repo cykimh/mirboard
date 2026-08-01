@@ -4,8 +4,8 @@
 실시간 웹 플랫폼.** 셔플·족보 판별·점수 계산·차례 결정은 전부 서버가 하고, 클라이언트는
 입력기와 뷰어입니다.
 
-[![CI](https://github.com/yupchang/mirboard/actions/workflows/ci.yml/badge.svg)](https://github.com/yupchang/mirboard/actions/workflows/ci.yml)
-[![Deploy](https://github.com/yupchang/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/yupchang/mirboard/actions/workflows/deploy.yml)
+[![CI](https://github.com/cykimh/mirboard/actions/workflows/ci.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/ci.yml)
+[![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 서버 테스트 727건 / 클라 239건

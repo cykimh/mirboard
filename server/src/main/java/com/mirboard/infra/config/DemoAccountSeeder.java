@@ -23,6 +23,9 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>이미 있으면 아무것도 하지 않는다(재기동 안전). 계정은 일반 사용자와 동일하게 취급되어
  * 레이트리밋·정지·모더레이션이 그대로 적용된다.
+ *
+ * <p><b>시딩 실패는 절대 기동을 막지 않는다.</b> 잘못된 설정값 하나로 서비스 전체가 뜨지
+ * 못하는 것이 데모 계정이 없는 것보다 훨씬 나쁘다 — 실패는 경고 로그로만 남긴다.
  */
 @Configuration
 @ConditionalOnProperty(name = "mirboard.demo.enabled", havingValue = "true")
@@ -47,6 +50,14 @@ public class DemoAccountSeeder {
                 log.info("데모 계정 생성: username={} userId={}", user.username(), user.userId());
             } catch (UsernameTakenException e) {
                 log.info("데모 계정이 이미 있다: username={} (건너뜀)", username);
+            } catch (Exception e) {
+                // 데모 계정은 부가 기능이다 — 어떤 이유로든 실패해도 서버 기동을 막지 않는다.
+                // ApplicationRunner 에서 예외가 새 나가면 Spring 이 컨텍스트를 닫고 프로세스가
+                // 죽는다. 실제 경로가 있다: 정책 위반 값(UsernamePolicy `[A-Za-z0-9_]{3,20}`,
+                // PasswordPolicy 8~64자)은 InvalidUsername/InvalidPasswordException 을 던지고,
+                // 두 인스턴스가 동시에 최초 부팅하면 username 유니크 제약이 걸린다. 어느 쪽이든
+                // 데모 계정 하나 때문에 서비스 전체가 크래시 루프에 빠지는 것이 훨씬 나쁘다.
+                log.warn("데모 계정 시딩 실패 — 건너뜀 (서버는 정상 기동한다): {}", e.toString());
             }
         };
     }
