@@ -8,7 +8,7 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 727건 / 클라 239건
+서버 테스트 733건 / 클라 239건
 
 ---
 
