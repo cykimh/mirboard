@@ -74,6 +74,12 @@ management:
         enabled: true
 
 mirboard:
+  demo:
+    # D-105 — 쇼케이스용 데모 계정. **기본 꺼짐**: 공개 비밀번호 계정이 로컬·CI 에
+    # 생기면 안 된다. 배포 환경에서만 MIRBOARD_DEMO_ENABLED=true + 비밀번호를 준다.
+    enabled: ${MIRBOARD_DEMO_ENABLED:false}
+    username: ${MIRBOARD_DEMO_USERNAME:demo}
+    password: ${MIRBOARD_DEMO_PASSWORD:}
   jwt:
     secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
     expires-in: 12h
