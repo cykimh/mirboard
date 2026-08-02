@@ -87,6 +87,12 @@ export function CreateRoomModal({
   const options = game?.supportedRoomOptions ?? [];
   const usesTargetScore = options.includes('TARGET_SCORE');
   const usesBetting = options.includes('BETTING');
+  // 리셋 effect 는 페인트 **뒤에** 돌기 때문에, 티츄에서 판돈을 켜고 스컬킹으로 바꾸면
+  // stake 가 100 으로 남은 프레임이 생긴다. 그 사이 판돈 블록은 usesBetting 으로 이미
+  // 사라졌는데 봇 체크박스만 stake>0 을 보고 잠긴 채 "(판돈 방 불가)" 를 띄운다 —
+  // 화면 어디에도 이유가 없는 잠금이다(실측 54ms, 60fps 기준 3프레임).
+  // usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰면 state 와 무관하게 꺼짐.
+  const stakeOn = usesBetting && stake > 0;
 
   // 게임을 바꾸면 이전 게임의 좌석 수는 무효 — 새 게임의 기본값으로 되돌린다.
   // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
@@ -108,7 +114,7 @@ export function CreateRoomModal({
         selectedGame.toUpperCase(),
         {
           // 판돈 방은 봇 금지(서버도 거절) — 클라에서도 강제.
-          fillWithBots: stake > 0 ? false : fillWithBots,
+          fillWithBots: stakeOn ? false : fillWithBots,
           // D-106 — 게임이 안 쓰는 옵션은 아예 보내지 않는다(D-99 의 capacity 와 같은 방식).
           // 서버는 기본값 아닌 값이 오면 UNSUPPORTED_ROOM_OPTION 으로 거절한다.
           targetScore: usesTargetScore ? targetScore : undefined,
@@ -223,16 +229,16 @@ export function CreateRoomModal({
             <Label>💰 판돈 (내기)</Label>
             <label className="flex items-center gap-2 text-sm">
               <Switch
-                checked={stake > 0}
+                checked={stakeOn}
                 onCheckedChange={(on) => {
                   setStake(on ? DEFAULT_STAKE : 0);
                   if (on) setFillWithBots(false); // 판돈 방은 봇 금지
                 }}
                 aria-label="판돈(내기) 켜기/끄기"
               />
-              <span>{stake > 0 ? `내기 켜짐 — 판돈 ${stake}칩` : '내기 끔'}</span>
+              <span>{stakeOn ? `내기 켜짐 — 판돈 ${stake}칩` : '내기 끔'}</span>
             </label>
-            {stake > 0 && (
+            {stakeOn && (
               <p className="text-xs text-muted-foreground">
                 승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님). 봇 참여 불가.
               </p>
@@ -243,11 +249,11 @@ export function CreateRoomModal({
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={fillWithBots}
-              disabled={stake > 0}
+              disabled={stakeOn}
               onCheckedChange={(c) => setFillWithBots(c === true)}
             />
             <span>
-              🤖 빈 좌석 봇으로 채우기{stake > 0 ? ' (판돈 방 불가)' : ''}
+              🤖 빈 좌석 봇으로 채우기{stakeOn ? ' (판돈 방 불가)' : ''}
             </span>
           </label>
 
