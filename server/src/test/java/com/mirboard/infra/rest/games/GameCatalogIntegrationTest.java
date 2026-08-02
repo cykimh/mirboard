@@ -59,11 +59,21 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].displayName").value("스컬킹"))
                 .andExpect(jsonPath("$.games[0].minPlayers").value(2))
                 .andExpect(jsonPath("$.games[0].maxPlayers").value(8))
+                // D-106 — 스컬킹은 10라운드 고정·개인전·칩 미지원이라 쓰는 옵션이 없다.
+                .andExpect(jsonPath("$.games[0].supportedRoomOptions").isArray())
+                .andExpect(jsonPath("$.games[0].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[1].id").value("TICHU"))
                 .andExpect(jsonPath("$.games[1].displayName").value("티츄"))
                 .andExpect(jsonPath("$.games[1].minPlayers").value(4))
                 .andExpect(jsonPath("$.games[1].maxPlayers").value(4))
+                // D-106 — 배열 순서는 RoomOption 선언 순서다. 클라가 인덱스가 아니라
+                // includes() 로 읽으므로 순서 자체가 기능은 아니지만, 카탈로그는 계약이라
+                // 필드명·값 집합·순서가 말없이 바뀌면 클라가 조용히 어긋난다.
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions.length()").value(3))
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions[0]").value("TARGET_SCORE"))
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions[1]").value("TEAMS"))
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions[2]").value("BETTING"))
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"));
     }
 
@@ -74,6 +84,8 @@ class GameCatalogIntegrationTest {
         mockMvc.perform(get("/api/games/TICHU").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("TICHU"))
+                // D-106 — 목록과 단건이 같은 record 를 쓴다. 한쪽만 필드가 빠지는 회귀 방지.
+                .andExpect(jsonPath("$.supportedRoomOptions.length()").value(3))
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
     }
 
