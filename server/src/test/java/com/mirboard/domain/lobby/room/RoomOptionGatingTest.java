@@ -78,6 +78,19 @@ class RoomOptionGatingTest {
     }
 
     @Test
+    @DisplayName("TEAMS 는 '팀이 있는가'만 뜻한다 — 좌석 정책 게이트가 아니다 (D-106 정정)")
+    void teamsMeansHasTeamsNotGate() {
+        // 티츄는 2:2 팀전이라 TEAMS 를 선언하고, 스컬킹은 개인전이라 안 한다.
+        // 그러나 둘 다 좌석 정책(SEQUENTIAL/RANDOM)은 쓸 수 있다 — RoomService 가
+        // teamPolicy 를 검사하지 않는 것이 그 증거이고, RoomOptionRejectionIntegrationTest
+        // 의 acceptsRandomSeatPolicyOnSkullKing 이 REST 로 확인한다.
+        assertThat(new TichuGameDefinition(null, null, null, null).supportedRoomOptions())
+                .contains(RoomOption.TEAMS);
+        assertThat(new SkullKingGameDefinition(null, null).supportedRoomOptions())
+                .doesNotContain(RoomOption.TEAMS);
+    }
+
+    @Test
     @DisplayName("BETTING 은 티츄만 — RoomChipService 가 티츄를 직접 참조하는 예외와 일치")
     void bettingIsTichuOnly() {
         assertThat(new TichuGameDefinition(null, null, null, null).supportedRoomOptions())

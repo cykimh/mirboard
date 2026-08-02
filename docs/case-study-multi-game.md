@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **748건 중 621건(83%)이 Docker 불필요**합니다.
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **749건 중 622건(83%)이 Docker 불필요**합니다.
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·

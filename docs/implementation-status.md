@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-105),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-106),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -57,8 +57,8 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   둘 다 AVAILABLE.
 - `GET /api/games/{id}` — 단일 게임 상세.
 - 응답에 `supportedRoomOptions`(D-106) — 게임이 실제로 쓰는 방 설정
-  (`TARGET_SCORE`·`TEAMS`·`BETTING`). 티츄만 셋 다, 스컬킹은 없음. 방 만들기·대기실 UI 가
-  이걸 보고 노출을 정하고 서버도 같은 집합으로 검증한다.
+  (`TARGET_SCORE`·`TEAMS`·`BETTING`). 티츄만 셋 다, 스컬킹은 없음. `TARGET_SCORE`·`BETTING`
+  은 노출/검증을 가르고, `TEAMS` 는 좌석 정책 **라벨**만 가른다(D-106 정정).
 - **확장성**: 새 게임은 `domain.game.{newgame}` + `GameDefinition @Component` 등록만으로
   카탈로그·방 생성·엔진 디스패치에 자동 연결(REST/로비 코드 무변경).
   D-98 이후 이 문장은 **인게임까지 참**이다 — §14 참조.
@@ -82,11 +82,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   빈 방은 `room_leave.lua`/`room_delete.lua` 가 관련 키까지 정리.
 - **재입장(멱등)** `POST /api/rooms/{id}/join-or-reconnect` — JOINED/RECONNECTED/SPECTATING
   모드 반환. 나갔다 재입장 시 ALREADY_IN_ROOM 버그 제거(Phase 18, D-74).
-- **팀 정책** `PUT /api/rooms/{id}/team-policy` (SEQUENTIAL/RANDOM/MANUAL, 호스트만).
-  팀 없는 게임은 거절(`UNSUPPORTED_ROOM_OPTION`, D-106).
-- **게임별 옵션 게이팅**(D-106): `targetScore`·`teamPolicy`·`stake` 는 게임이
-  `supportedRoomOptions` 로 선언한 것만 허용. 미지원인데 기본값 아닌 값이 오면 거절 —
-  예전엔 스컬킹 방에 stake 를 걸면 통과한 뒤 칩 없이 봇만 금지됐다.
+- **좌석 정책** `PUT /api/rooms/{id}/team-policy` (SEQUENTIAL/RANDOM/MANUAL, 호스트만).
+  이름과 달리 실체는 좌석 순서 정책이라 **게임을 가리지 않는다** — `RANDOM` 은 시작 직전
+  좌석을 섞고, 개인전에서도 좌석 순서 = 턴 순서다(D-106 정정).
+- **게임별 옵션 게이팅**(D-106): `targetScore`·`stake` 는 게임이 `supportedRoomOptions`
+  로 선언한 것만 허용. 미지원인데 기본값 아닌 값이 오면 거절 — 예전엔 스컬킹 방에 stake 를
+  걸면 통과한 뒤 `RoomChipService` 가 조용히 return 해서 칩 없이 봇만 금지됐다.
 - **중단** `POST /api/rooms/{id}/abort` (호스트, in-game → FINISHED).
 - **관전** `POST`/`DELETE /api/rooms/{id}/spectate` — 관전자는 손패·액션 불가(§상태 은닉).
 - **재동기화** `GET /api/rooms/{id}/resync` — tableView + privateHand + seq(§7).
@@ -244,7 +245,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **748건** (D-106 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **749건** (D-106 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에

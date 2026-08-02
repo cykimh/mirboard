@@ -193,18 +193,22 @@
   `capacity - 1 > 4` 인 방은 봇으로 채울 수 없다 — 봇 풀 확장은 스컬킹 통합 시 별건).
 - `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
   고정·불변. **stake>0 이면 `fillWithBots` 불가**(봇=무한 잔액 → 칩 파밍 방지).
-- **게임별 옵션 게이팅(D-106)**: `targetScore`·`teamPolicy`·`stake` 는 게임의
-  `supportedRoomOptions` 에 그 옵션이 있을 때만 쓸 수 있다. 없는데 **기본값이 아닌 값**
-  (`targetScore != 1000`, `teamPolicy != SEQUENTIAL`, `stake != 0`)을 보내면
-  `UNSUPPORTED_ROOM_OPTION`. 기본값은 통과한다 — 옛 클라가 늘 `targetScore:1000` 을
-  보냈고 그 방은 정상이기 때문. D-106 이후 클라는 미지원 옵션을 아예 생략한다.
+- **게임별 옵션 게이팅(D-106)**: `targetScore`·`stake` 는 게임의 `supportedRoomOptions`
+  에 그 옵션이 있을 때만 쓸 수 있다. 없는데 **기본값이 아닌 값**(`targetScore != 1000`,
+  `stake != 0`)을 보내면 `UNSUPPORTED_ROOM_OPTION`. 기본값은 통과한다 — 옛 클라가 늘
+  `targetScore:1000` 을 보냈고 그 방은 정상이기 때문. D-106 이후 클라는 미지원 옵션을
+  아예 생략한다.
+- **`teamPolicy` 는 게이팅 대상이 아니다**(D-106 정정). 이름과 달리 실체는 **좌석 순서
+  정책**이고 게임을 가리지 않는다 — `RANDOM` 은 게임 시작 직전 좌석을 섞을 뿐이라
+  개인전에서도 유효하다(좌석 순서 = 턴 순서). `TEAMS` 는 클라 라벨("팀 배정" vs
+  "좌석 순서")만 가른다.
 
 응답 `201` — Room (위 형식과 동일, 본인이 host로 자동 join 됨).
 에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태),
 `INVALID_CAPACITY` (게임 허용 인원 범위 밖 — `details` 에 `capacity`/`minPlayers`/
 `maxPlayers`), `INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇
-동시 요청), `UNSUPPORTED_ROOM_OPTION` (게임이 안 쓰는 방 설정 — `details` 에
-`gameType`/`option`, D-106).
+동시 요청), `UNSUPPORTED_ROOM_OPTION` (게임이 안 쓰는 방 설정 — `TARGET_SCORE`/`BETTING`
+둘뿐, `details` 에 `gameType`/`option`, D-106).
 
 ### POST `/api/rooms/{roomId}/join`
 응답 `200` — Room 갱신본.
@@ -287,10 +291,10 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 ```
 
 ### PUT `/api/rooms/{roomId}/team-policy` *(Phase 8C — 호스트 전용)*
-WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
-**팀이 없는 게임(`supportedRoomOptions` 에 `TEAMS` 없음)은 값과 무관하게 거절**
-(`UNSUPPORTED_ROOM_OPTION`, D-106) — 생성 경로와 달리 기본값 카브아웃이 없다.
-팀 없는 방에 정책을 "바꾸는" 요청은 전부 무의미하기 때문.
+WAITING 방의 **좌석 순서 정책**을 변경. IN_GAME / FINISHED 방은 거절.
+**게임을 가리지 않는다**(D-106 정정) — `RANDOM` 은 좌석을 섞을 뿐이고 개인전에서도
+좌석 순서 = 턴 순서라 의미가 있다. 팀 유무(`supportedRoomOptions` 의 `TEAMS`)는 클라가
+라벨을 "팀 배정"/"좌석 순서" 중 무엇으로 부를지만 정한다.
 
 요청
 ```json
@@ -298,7 +302,7 @@ WAITING 방의 팀 배정 정책을 변경. IN_GAME / FINISHED 방은 거절.
 ```
 
 응답 `200` — Room 갱신본. 에러: `NOT_HOST` (403), `GAME_ALREADY_STARTED` (409),
-`ROOM_NOT_FOUND` (404), `UNSUPPORTED_ROOM_OPTION` (400, 팀 없는 게임).
+`ROOM_NOT_FOUND` (404).
 
 본 청크 (Phase 8C) 에서는 `RANDOM` 만 서버 동작 분기 (4번째 join 직후 좌석 셔플).
 `MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트

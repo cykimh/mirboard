@@ -134,7 +134,7 @@ public class RoomService {
         if (stake > 0 && fillWithBots) {
             throw new StakedRoomNoBotsException();
         }
-        requireSupportedRoomOptions(def, teamPolicy, targetScore, stake);
+        requireSupportedRoomOptions(def, targetScore, stake);
         int capacity = requestedCapacity == null ? def.maxPlayers() : requestedCapacity;
         if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
             throw new InvalidCapacityException(capacity, def.minPlayers(), def.maxPlayers());
@@ -184,23 +184,30 @@ public class RoomService {
      * 기존 테스트를 깨지 않으면서, "의도적으로 설정한 값"만 잡기 위해서다. 예컨대 스컬킹
      * 방에 stake=100 이 오면 여기서 막힌다 — 예전엔 통과한 뒤 `RoomChipService` 가 조용히
      * return 해서 칩 없이 봇만 금지된 방이 만들어졌다.
+     *
+     * <p><b>`teamPolicy` 는 검사하지 않는다</b>(D-106 정정). 좌석 정책은 게임 중립이다 —
+     * `domain.game` 에 `TeamPolicy` 참조가 0건이고, `RANDOM` 은 {@link #onGameStart} 에서
+     * 좌석 순서를 섞을 뿐이다. 개인전에서도 좌석 순서 = 턴 순서라 의미가 있으므로,
+     * `TEAMS` 는 UI 라벨("팀 배정" vs "좌석 순서")만 가른다.
      */
-    private static void requireSupportedRoomOptions(GameDefinition def, TeamPolicy teamPolicy,
-                                                    int targetScore, int stake) {
+    private static void requireSupportedRoomOptions(GameDefinition def, int targetScore,
+                                                    int stake) {
         var supported = def.supportedRoomOptions();
         if (targetScore != DEFAULT_TARGET_SCORE && !supported.contains(RoomOption.TARGET_SCORE)) {
             throw new UnsupportedRoomOptionException(def.id(), RoomOption.TARGET_SCORE);
-        }
-        if (teamPolicy != null && teamPolicy != TeamPolicy.SEQUENTIAL
-                && !supported.contains(RoomOption.TEAMS)) {
-            throw new UnsupportedRoomOptionException(def.id(), RoomOption.TEAMS);
         }
         if (stake != DEFAULT_STAKE && !supported.contains(RoomOption.BETTING)) {
             throw new UnsupportedRoomOptionException(def.id(), RoomOption.BETTING);
         }
     }
 
-    /** Phase 8C — WAITING 중 호스트가 팀 정책을 변경. IN_GAME 이후엔 호출 불가. */
+    /**
+     * Phase 8C — WAITING 중 호스트가 좌석 정책을 변경. IN_GAME 이후엔 호출 불가.
+     *
+     * <p>이름은 `teamPolicy` 지만 실제로는 <b>좌석 순서 정책</b>이라 게임을 가리지 않는다
+     * (D-106 정정) — 개인전에서도 좌석 순서 = 턴 순서이므로 셔플이 의미 있다. 팀 유무는
+     * 클라의 라벨("팀 배정" vs "좌석 순서")만 바꾼다.
+     */
     public Room updateTeamPolicy(String roomId, long requesterId, TeamPolicy newPolicy) {
         Room room = getRoom(roomId);
         if (room.hostId() != requesterId) {
@@ -208,11 +215,6 @@ public class RoomService {
         }
         if (room.status() != RoomStatus.WAITING) {
             throw new GameAlreadyStartedException(roomId);
-        }
-        // D-106 — 팀이 없는 게임에서는 정책 변경 자체가 성립하지 않는다. 생성 경로와 달리
-        // 여기선 기본값 카브아웃이 없다: 팀 없는 방에 정책을 "바꾸는" 요청은 전부 무의미하다.
-        if (!games.require(room.gameType()).supportedRoomOptions().contains(RoomOption.TEAMS)) {
-            throw new UnsupportedRoomOptionException(room.gameType(), RoomOption.TEAMS);
         }
         repository.updateTeamPolicy(roomId, newPolicy);
         Room updated = getRoom(roomId);
