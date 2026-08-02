@@ -59,7 +59,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `Set<RoomOption>`(`TARGET_SCORE`·`TEAMS`·`BETTING`). **기본은 빈 집합(옵트인)**이라 새 게임은
   아무것도 안 써야 맞다 — 안 쓰는 설정이 방 만들기·대기실에 뜨지 않는다. 티츄만 셋 다 선언.
   서버도 같은 집합으로 검증한다(미지원 옵션에 기본값 아닌 값 → `UNSUPPORTED_ROOM_OPTION`).
-  모든 게임에 통하는 설정(인원·턴 제한·봇 채우기)은 여기 넣지 말 것.
+  모든 게임에 통하는 설정(인원·턴 제한·봇 채우기·**좌석 순서 정책**)은 여기 넣지 말 것 —
+  `TEAMS` 는 예외적으로 게이트가 아니라 **라벨 결정자**다(팀전 "팀 배정" / 개인전
+  "좌석 순서"). `teamPolicy` 는 게임을 가리지 않으며 서버도 거절하지 않는다.
 - 새 게임 추가 절차: `domain.game.{newgame}` 패키지 + `GameDefinition @Component` Bean 등록
   (+ `GameEngine` 구현, `GameStartingEvent` 리스너로 라운드 시작) → 카탈로그/방 생성/인게임
   디스패치/봇/타임아웃/resync 가 자동 연결됨. 로비·허브 컨트롤러와 스케줄러 수정 불필요.

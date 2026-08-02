@@ -91,32 +91,7 @@ class RoomOptionRejectionIntegrationTest {
                 .andExpect(jsonPath("$.error.details.option").value("TARGET_SCORE"));
     }
 
-    @Test
-    @DisplayName("스컬킹 방에 RANDOM 팀 정책을 지정하면 거절한다 (개인전)")
-    void rejectsTeamPolicyOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_team_user", "validpass1");
-
-        createRoom(token, Map.of(
-                "name", "팀 스컬킹", "gameType", "SKULL_KING", "teamPolicy", "RANDOM"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_ROOM_OPTION"))
-                .andExpect(jsonPath("$.error.details.option").value("TEAMS"));
-    }
-
-    @Test
-    @DisplayName("만들어진 스컬킹 방에 팀 정책 변경을 걸어도 거절한다")
-    void rejectsTeamPolicyUpdateOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_team_up_user", "validpass1");
-        String roomId = createdRoomId(token, Map.of(
-                "name", "스컬킹 방", "gameType", "SKULL_KING"));
-
-        mockMvc.perform(put("/api/rooms/" + roomId + "/team-policy")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("teamPolicy", "RANDOM"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_ROOM_OPTION"));
-    }
+    // 좌석 정책은 여기 없다 — 게임 중립이라 거절 대상이 아니다(D-106 정정). 아래 통과 절 참조.
 
     // ── 통과 ──────────────────────────────────────────────────────────────
 
@@ -149,6 +124,35 @@ class RoomOptionRejectionIntegrationTest {
                 "name", "티츄 내기방", "gameType", "TICHU",
                 "targetScore", 500, "stake", 100, "teamPolicy", "RANDOM"))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("개인전에도 RANDOM 좌석 정책을 받는다 — 좌석 순서 = 턴 순서 (D-106 정정)")
+    void acceptsRandomSeatPolicyOnSkullKing() throws Exception {
+        String token = registerAndLogin("opt_seat_user", "validpass1");
+
+        // 한때 이걸 UNSUPPORTED_ROOM_OPTION 으로 막았다. `domain.game` 에 TeamPolicy 참조가
+        // 0건이고 RANDOM 은 onGameStart 에서 좌석 순서를 섞을 뿐이라, 동작하는 기능을
+        // 없앤 것이었다.
+        createRoom(token, Map.of(
+                "name", "좌석 셔플 스컬킹", "gameType", "SKULL_KING", "teamPolicy", "RANDOM"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.teamPolicy").value("RANDOM"));
+    }
+
+    @Test
+    @DisplayName("만들어진 개인전 방의 좌석 정책도 바꿀 수 있다")
+    void acceptsSeatPolicyUpdateOnSkullKing() throws Exception {
+        String token = registerAndLogin("opt_seat_up_user", "validpass1");
+        String roomId = createdRoomId(token, Map.of(
+                "name", "스컬킹 방", "gameType", "SKULL_KING"));
+
+        mockMvc.perform(put("/api/rooms/" + roomId + "/team-policy")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("teamPolicy", "RANDOM"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teamPolicy").value("RANDOM"));
     }
 
     @Test

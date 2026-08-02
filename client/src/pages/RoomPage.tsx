@@ -41,9 +41,9 @@ export function RoomPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [usernames, setUsernames] = useState<Record<number, string>>({});
-  // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 팀 배정 노출 여부에만 쓴다.
-  // null = 아직 모름(요청 중) → 노출하지 않는다. 팀 없는 게임에서 잠깐 떴다 사라지는
-  // 것보다, 팀 있는 게임에서 한 박자 늦게 나타나는 편이 낫다.
+  // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 좌석 정책 **라벨**을 고르는 데만 쓴다.
+  // null = 아직 모름(요청 중) → 행을 그리지 않는다. 티츄에서 "좌석 순서"가 잠깐 떴다
+  // "팀 배정"으로 바뀌는 깜빡임을 막으려는 것이다.
   const [roomOptions, setRoomOptions] = useState<RoomOption[] | null>(null);
 
   // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
@@ -181,6 +181,9 @@ export function RoomPage() {
   }
 
   const iAmHost = !!(room && user && room.hostId === user.userId);
+  // D-106 정정 — 좌석 정책은 게임 중립(RANDOM 은 좌석 순서를 섞을 뿐)이라 숨기지 않는다.
+  // 팀이 있는 게임에서만 "팀 배정"으로 부른다.
+  const seatPolicyLabel = roomOptions?.includes('TEAMS') ? '팀 배정' : '좌석 순서';
   const canAbort = iAmHost && room?.status === 'IN_GAME';
 
   if (error) {
@@ -317,12 +320,12 @@ export function RoomPage() {
                 })}
               </ul>
 
-              {(roomOptions ?? []).includes('TEAMS') && (
+              {roomOptions !== null && (
               <>
               <Separator />
 
               <div className="flex items-center gap-3">
-                <span className="text-sm">팀 배정</span>
+                <span className="text-sm">{seatPolicyLabel}</span>
                 {iAmHost ? (
                   <Select
                     value={room.teamPolicy}
@@ -330,7 +333,7 @@ export function RoomPage() {
                       handleTeamPolicyChange(v as TeamPolicy)
                     }
                   >
-                    <SelectTrigger className="w-40" aria-label="팀 배정">
+                    <SelectTrigger className="w-40" aria-label={seatPolicyLabel}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="app-shell">
