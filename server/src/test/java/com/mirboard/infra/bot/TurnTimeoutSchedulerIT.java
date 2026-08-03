@@ -41,7 +41,13 @@ import org.testcontainers.utility.DockerImageName;
  * <p>비-봇 host(seat 0) + 봇 3명, turnSeconds=1. seat 0 은 아무도 행동하지
  * 않으므로 BotScheduler 가 처리 못 함 → 매 턴 ~1초 후 TurnTimeoutScheduler 가
  * 자동 안전행동(Ready/PassCards/PassTrick/약한카드)을 적용해 매치가 끝까지
- * 진행되어야 한다. targetScore=300 으로 빠르게 종료. 매치 종료 후 invariant 검증.
+ * 진행되어야 한다. 매치 종료 후 invariant 검증.
+ *
+ * <p>실행시간은 라운드 수에 선형 비례한다(매 턴 ≈ turnSeconds + 폴링 주기).
+ * targetScore 는 그래서 "타임아웃 자동진행이 매치를 완주시킨다"를 보이는 데
+ * 필요한 최소치로 낮춰 둔다 — 300 이면 부하 걸린 머신에서 Awaitility 2분
+ * 제한에 간헐적으로 걸렸다. 150 은 라운드 수를 절반으로 줄일 뿐 검증 대상
+ * (딜링/패스/트릭/라운드 전이 전 구간의 자동진행)은 그대로다.
  */
 @SpringBootTest
 @Testcontainers
@@ -92,7 +98,7 @@ class TurnTimeoutSchedulerIT {
         Room room = roomService.createRoom(
                 humanHostId, "turn-timeout", "TICHU",
                 TeamPolicy.SEQUENTIAL, /*fillWithBots*/ true,
-                /*targetScore*/ 300, /*turnSeconds*/ 1);
+                /*targetScore*/ 150, /*turnSeconds*/ 1);
         String roomId = room.roomId();
 
         // Phase 16(#2) — 봇 3 은 자동 ready. 사람 호스트가 준비하면 전원 ready
