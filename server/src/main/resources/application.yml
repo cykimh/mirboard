@@ -74,6 +74,16 @@ management:
         enabled: true
 
 mirboard:
+  sentry:
+    # D-107 (C3) — 오류 리포팅. **DSN 이 없으면 아무 일도 일어나지 않는다**(SentryConfig 가
+    # @ConditionalOnProperty 로 아예 생성되지 않음). 로컬·CI 무영향.
+    # 공식 Spring Boot 스타터는 Boot 4 비호환이라(스타터 자신이 경고) sentry-logback
+    # 어펜더를 코드로 붙인다 — 상세는 SentryConfig javadoc.
+    dsn: ${SENTRY_DSN:}
+    environment: ${SENTRY_ENVIRONMENT:local}
+    release: ${SENTRY_RELEASE:}
+    # 0 = 성능 트레이싱 끔. 요청 트레이싱이 없는 구성이라 켜도 얻는 것이 적다.
+    traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
   demo:
     # D-105 — 쇼케이스용 데모 계정. **기본 꺼짐**: 공개 비밀번호 계정이 로컬·CI 에
     # 생기면 안 된다. 배포 환경에서만 MIRBOARD_DEMO_ENABLED=true + 비밀번호를 준다.

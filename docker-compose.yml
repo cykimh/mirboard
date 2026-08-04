@@ -49,6 +49,50 @@ services:
       - ./server/src/main/resources/db/migration:/flyway/sql:ro
     profiles: ["migrate"]
 
+  # ── D-107 (C3) 로컬 관측 스택 ──────────────────────────────────────────
+  # `docker compose --profile observability up -d` 로만 뜬다 — 기본 개발에는
+  # 영향이 없다. Grafana Cloud 같은 SaaS 계정이 필요 없고, 대시보드가 리포에
+  # JSON 으로 있어 컨테이너를 지워도 화면을 잃지 않는다.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: mirboard-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    # Linux 에서 host.docker.internal 을 게이트웨이로 매핑(서버는 호스트에서 돈다).
+    # Docker Desktop/OrbStack 은 이미 제공하지만 명시해도 무해하다.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles: ["observability"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: mirboard-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      # 로컬 전용이라 익명 열람 허용 — 로그인 벽이 관측을 귀찮게 만들면 안 본다.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    profiles: ["observability"]
+
 volumes:
   postgres-data:
   redis-data:
+  prometheus-data:
+  grafana-data:
