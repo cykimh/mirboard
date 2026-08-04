@@ -111,6 +111,20 @@ JDK 25 가 로컬에 없으면 Gradle 의 foojay 리졸버가 자동으로 받�
 로컬 개발 자격증명(개발 한정): Postgres `mirboard / mirboardpw`, DB `mirboard`, :5432 /
 Redis 비밀번호 없음, :6379. 검증·테스트는 `scripts/check.sh` 가 담당한다.
 
+### 관측 스택 (선택, D-107)
+
+```bash
+docker compose --profile observability up -d
+```
+
+Prometheus(:9090) + Grafana(:3000)가 뜬다. Grafana 는 익명 열람이라 로그인 없이
+바로 보이고, 대시보드는 `ops/grafana/dashboards/*.json` 에서 프로비저닝된다 —
+화면을 손으로 고쳐도 컨테이너를 지우면 사라지므로, 남길 변경은 JSON 에 반영할 것.
+
+Prometheus 는 컨테이너에서 `host.docker.internal:8080` 을 긁으므로 **서버는 호스트에서**
+돌고 있어야 한다(`./scripts/dev.sh server`). 게임별 카운터가 갈리는지 보려면
+서로 다른 게임으로 방을 만들고 "누적 방 생성 (게임별)" 패널을 확인한다.
+
 ---
 
 ## 서버 빌드 / 실행

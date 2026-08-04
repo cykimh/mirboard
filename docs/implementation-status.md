@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-106),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-107),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -30,7 +30,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 | 10 | 채팅 (로비 / 방) | ✅ | `infra.ws.lobby`, `infra.ws.RoomChatController` |
 | 11 | UI 리디자인 (Tailwind+shadcn, 다크) | ✅ | `client` (Phase 20, D-76/77) |
 | 12 | 멀티 인스턴스 (opt-in) | ✅(opt-in) | `infra.messaging.RedisMessageGateway` |
-| 13 | 관측성 (Prometheus, MDC 로그) | ✅ | `infra.metrics`, `infra.web.MdcKeys` |
+| 13 | 관측성 (Prometheus 게임별 차원, Grafana, Sentry) | ✅ | `infra.metrics`, `infra.config.SentryConfig`, `ops/grafana` (D-107) |
 | 14 | **`GameEngine` 포트 (멀티게임 기반)** | ✅ | `domain.game.core.GameEngine`, `infra.ws.GameEngineProvider`, `TichuGameEngine` |
 
 설계 단계(Phase 1)부터 클라이언트 통합·UI 리디자인(Phase 20)까지 로드맵 항목이 완료
@@ -233,8 +233,17 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 - **멀티 인스턴스(opt-in)**: `mirboard.messaging.gateway=redis` 시 Redis Pub/Sub fan-out
   (`RedisMessageGateway`, `DomainEventBus` instanceId 중복 제거). 기본은 in-memory 단일 인스턴스.
-- **관측성**: Prometheus(`/actuator/prometheus`, `MirboardMetrics`), MDC 로그
-  (`userId`/`roomId`/`eventId`, `MdcKeys`).
+- **관측성**(D-107, C3): Prometheus(`/actuator/prometheus`, `MirboardMetrics`), MDC 로그
+  (`userId`/`roomId`/`eventId`, `MdcKeys`). 게임 활동 카운터 4종은 `gameType` 차원 —
+  `mirboard_room_opened_total`·`game_started`·`round_completed`·`match_completed`
+  (이름에 `.created` 를 쓰면 OpenMetrics 예약어와 충돌해 접미사가 잘린다).
+  로비/프로토콜 카운터(`room_joined`·`action_rejected`)는 평면.
+- **로컬 관측 스택**(D-107): `docker compose --profile observability up -d` →
+  Prometheus(:9090) + Grafana(:3000, 익명 열람). 데이터소스·대시보드는 `ops/grafana`
+  에 프로비저닝돼 컨테이너를 지워도 화면이 남는다. SaaS 계정 불필요.
+- **Sentry**(D-107): `sentry-logback` 어펜더로 ERROR 로그 캡처. `SENTRY_DSN` 미설정 시
+  **Bean 자체가 생성되지 않는다**. 공식 Spring Boot 스타터는 Boot 4 비호환(스타터 자신이
+  경고) — 상세는 `SentryConfig` javadoc. PII 전송 끔.
 - **배포**: `client` 빌드를 서버 정적 리소스로 번들해 단일 jar 서빙, `Dockerfile`/`fly.toml`
   멀티스테이지로 Fly.io. CD 는 `.github/workflows/deploy.yml`(main 푸시 + 수동 트리거) —
   `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. 라이브 인스턴스는 아직 없다(D-105).
@@ -283,7 +292,6 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 스컬킹 매치 결과 영속·ELO — D-02 의 게임별 rating 분리 결정이 선행(D-102 보류).
 - 스컬킹 손패 dnd 정렬·특수 카드 SVG 에셋·i18n 이관 — S6 범위 밖(D-103 이월).
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
-- Sentry/Grafana 관측성(M2 C3) — 로컬 스택 또는 외부 SaaS 필요.
 - 라이브 배포 — CD 워크플로는 준비됐고 `FLY_API_TOKEN` 설정만 남았다(D-105).
   (멀티 인스턴스 세션 레지스트리는 D-96 에서 해소 — §8 참조.)
 
