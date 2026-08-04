@@ -44,6 +44,7 @@ dependencies {
     // 운영 (Phase 6A-3) — Actuator + Prometheus 메트릭 노출
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    implementation("io.sentry:sentry-logback:8.16.0")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")

@@ -1,0 +1,121 @@
+{
+  "title": "Mirboard 개요",
+  "uid": "mirboard-overview",
+  "tags": ["mirboard"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "D-107 (C3). 게임별로 갈리는 패널은 gameType 태그를 legend 로 쓴다 — 이 태그가 상수 'TICHU' 로 박혀 있던 동안은 스컬킹 게임이 티츄로 집계됐다.",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "게임 시작 (게임별, 5분 rate)",
+      "description": "gameType 이 실제 차원인지 눈으로 확인하는 패널. 스컬킹 방을 시작했는데 TICHU 선만 올라가면 태그가 다시 상수로 박힌 것이다.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (gameType) (rate(mirboard_game_started_total[5m]))",
+          "legendFormat": "{{gameType}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "라운드 완료 (게임별, 5분 rate)",
+      "description": "티츄는 목표 점수까지 라운드가 무제한, 스컬킹은 10라운드 고정이라 매치당 라운드 수의 성격이 다르다.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (gameType) (rate(mirboard_round_completed_total[5m]))",
+          "legendFormat": "{{gameType}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "누적 매치 종료 (게임별)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (gameType) (mirboard_match_completed_total)",
+          "legendFormat": "{{gameType}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "누적 방 생성 (게임별)",
+      "description": "어느 게임을 고르는지. 시작(started)과 비교하면 만들어 놓고 안 시작한 방의 비율이 보인다.",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (gameType) (mirboard_room_opened_total)",
+          "legendFormat": "{{gameType}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "액션 거절 (5분 rate)",
+      "description": "게임 무관 평면 카운터. 튀면 클라 버그나 악의적 요청 — 서버가 룰을 지켜 낸 횟수다.",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(mirboard_action_rejected_total[5m])",
+          "legendFormat": "rejected"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "HTTP 5xx (5분 rate)",
+      "description": "Sentry 가 ERROR 로그를 잡는 것과 별개로, 응답 코드로 본 실패율. 5xx 가 없으면 시계열 자체가 없어 'No data' 가 되므로 `or vector(0)` 로 0 을 그린다 — 오류 없음이 고장처럼 보이면 패널을 안 믿게 된다.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or vector(0)",
+          "legendFormat": "5xx"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "JVM 힙 사용량",
+      "description": "가상 스레드를 쓰므로 스레드 수보다 힙이 먼저 신호를 준다.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "used"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})",
+          "legendFormat": "max"
+        }
+      ]
+    }
+  ]
+}

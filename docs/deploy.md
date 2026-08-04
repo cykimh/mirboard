@@ -120,3 +120,30 @@ gh secret set FLY_API_TOKEN --body "<위 명령의 출력>"
 
 단일 진실원은 [.env.example](../.env.example) 입니다. 배포 시 필요한 시크릿은 위
 "Secret 셋업" 절 참조.
+
+---
+
+## Sentry 오류 리포팅 (D-107, 선택)
+
+DSN 을 주지 않으면 `SentryConfig` Bean 자체가 만들어지지 않는다 — 로컬·CI 는 영향이 없다.
+배포 환경에서만 켠다:
+
+```bash
+flyctl secrets set SENTRY_DSN="https://<key>@<org>.ingest.sentry.io/<project>" \
+                   SENTRY_ENVIRONMENT=production \
+                   SENTRY_RELEASE="$(git rev-parse --short HEAD)"
+```
+
+- **공식 Spring Boot 스타터는 쓰지 않는다.** `sentry-spring-boot-starter-jakarta` 는
+  Boot 3 대상이고, Boot 4 에 붙이면 Sentry 자신이 `!Incompatible Spring Boot Version
+  detected!` 를 낸다. 대신 `sentry-logback` 어펜더를 코드로 붙인다 — ERROR 로그가
+  이벤트로, INFO 는 breadcrumb 으로 올라간다. Boot 4 지원 스타터가 나오면 재검토.
+- **PII 는 보내지 않는다**(`send-default-pii=false`). `users` 화이트리스트로 개인정보를
+  스키마에서 막아 놓고 예외 리포트로 흘리면 원칙이 무의미하다. MDC 의 userId 는 내부
+  식별자라 태그로 붙는다.
+- 성능 트레이싱은 기본 끔(`SENTRY_TRACES_SAMPLE_RATE=0.0`). 스타터를 포기해 요청
+  트레이싱이 없으므로 켜도 얻는 것이 적다 — 무료 쿼터를 오류 리포트에 쓰는 편이 낫다.
+
+Grafana 는 SaaS 를 붙이지 않았다. 로컬 스택(`--profile observability`)이 정본이고,
+프로덕션 메트릭을 보려면 `/actuator/prometheus` 를 외부 Prometheus 가 긁게 하면 된다
+(엔드포인트는 `/api/**` 밖이라 인증이 없으니, 공개 배포 시 네트워크 레벨로 막을 것).

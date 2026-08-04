@@ -45,11 +45,11 @@ public class MatchProgressService {
         if (!advance.roundCompleted()) {
             return;
         }
-        metrics.roundCompleted();
+        metrics.roundCompleted(room.gameType());
         if (!advance.matchCompleted()) {
             return;
         }
-        metrics.matchCompleted();
+        metrics.matchCompleted(room.gameType());
         // D-82 — 사람만의 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로
         // 같은 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이
         // 아니므로 기존대로 FINISHED.

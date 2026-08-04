@@ -145,7 +145,7 @@ public class RoomService {
                 fillWithBots, targetScore, turnSeconds, stake);
         Room room = getRoom(roomId);
         events.publish(RoomChangedEvent.updated(room));
-        metrics.roomCreated();
+        metrics.roomOpened(gameType);
         log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={} stake={}",
                 roomId, gameType, hostUserId, capacity, teamPolicy, fillWithBots,
                 targetScore, turnSeconds, stake);
@@ -293,7 +293,7 @@ public class RoomService {
         }
         events.publish(new com.mirboard.domain.game.core.GameStartingEvent(
                 room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
-        metrics.gameStarted();
+        metrics.gameStarted(room.gameType());
         log.info("Game starting: roomId={} gameType={} players={}",
                 roomId, room.gameType(), room.playerIds());
         return room;

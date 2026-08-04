@@ -840,7 +840,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | --- | --- | --- | --- |
 | M0 | C·G | 보안 기저: CORS 화이트리스트+보안헤더(D-83), 로그인 brute-force 잠금+인증 레이트리밋 Redis(D-84). CLAUDE.md 현행화, `.env.example` | ✅ |
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
-| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | 🔶 C1·C4·C5 완료 / C3 남음 |
+| M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | ✅ C1·C3·C4·C5 완료 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | 🔶 D-105: README·케이스 스터디·스크린샷·데모 계정 시더·CD 워크플로 완료 / **라이브 배포는 사용자 실행 대기**(`FLY_API_TOKEN`), GIF 는 정적 스크린샷으로 대체 |
 | M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | ✅ S0~S6 완료(D-97~D-104): 포트·인원 가변·룰 명세·순수 엔진(305건)·탈주(유령 좌석)·인게임 배선(봇 풀매치 IT)·클라 게임판(Row-Flow, 실측 완료). 실행 단위 `docs/plans/multi-game-sessions.md`. **잔여 별건**: 스컬킹 매치 영속·ELO(D-02 게임별 rating 분리 선행), 끊김 유예 구간 정지(D-104 한계), 요트/할리갈리 |
@@ -897,8 +897,20 @@ broadcast 시 Redis 링버퍼(`chatlog:*`, 최근 100개·TTL 2h) 보관으로 �
 신고된 것만 `chat_reports`(V9)로 승격돼 상시 로그 영속화가 아니다. `POST /api/chat/reports` +
 어드민 `GET /api/admin/chat-reports`. 처리 상태(resolve)는 범위 밖.
 
-**남은 M2**: C3(Sentry+Grafana — 로컬 스택/외부 SaaS 필요)만. C1 의 Micrometer 카운터는
-`MirboardMetrics` 공유 파일이라 C3 로 위임.
+**M2 완료(C3, D-107)**: 관측성 마감. 핵심은 기능 추가가 아니라 **메트릭이 거짓말을 하고
+있었다는 발견**이다 — `gameStarted` 에 `tag("gameType","TICHU")` 가 상수로 박혀 스컬킹
+게임이 티츄로 집계됐다(C1 이 "`MirboardMetrics` 공유 파일이라 C3 로 위임"한 그 지점).
+게임 활동 카운터 4종을 실제 차원으로 바꾸고 기동 시 전 게임 조합을 미리 등록한다.
+
+실측이 설계를 두 번 바꿨다: (1) Sentry 공식 스타터는 Boot 4 비호환 — 붙여서 띄우면
+Sentry 자신이 `!Incompatible Spring Boot Version detected!` 를 낸다. 컴파일·기동은
+통과하므로 추측했으면 넘어갔을 것이고, `sentry-logback` 어펜더로 우회했다.
+(2) `mirboard.room.created` 는 `mirboard_room_total` 로 노출된다 — OpenMetrics 가
+`_created` 를 예약어로 쓴다. 스택을 실제로 띄워 대시보드 패널이 비는 것을 보고 발견해
+`room.opened` 로 개명했다.
+
+Sentry 는 DSN 없으면 Bean 자체가 없고(옵트인), Grafana 는 SaaS 대신
+`docker compose --profile observability` 로컬 스택 + JSON 대시보드 7패널이다.
 
 **M3 완료(D-96)**: 단일 인스턴스 전제 3곳(`WsSessionRegistry`·`TurnTimeoutScheduler`·
 `DesertionGraceScheduler`)을 모두 Redis 로 이전. 프레즌스는 세션 카운터 HASH, 타이머는
