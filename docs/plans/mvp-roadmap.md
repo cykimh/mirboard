@@ -939,11 +939,17 @@ Gradle 버전 표기 드리프트(8.10.2 → 실제 wrapper 9.4.1). 쇼케이스
 **작업 분리 계획**: 트랙 경계·직렬화 지점·세션/서브에이전트 운영 수칙은
 `docs/plans/parallel-tracks.md`(T0·T1·T3·T4·T6 완료, T5 1차 완료).
 
-**트랙 외 기술부채(미착수)**: A6/A7 폴리시가 쌓이며 `GameTable.tsx` 단일 컴포넌트가
-915줄까지 커졌고 직접 테스트가 없다. 동작·시각 무변경 전제의 분해 계획은
-`docs/plans/gametable-refactor.md`. 마일스톤 번호를 붙이지 않으며 M2·M3(전부 서버
-작업)와 충돌하지 않으나, **다음 클라이언트 UX 작업 전에** 끝내는 편이 낫다.
-착수 시 D-87 선행.
+**트랙 외 기술부채(완료, D-87)**: A6/A7 폴리시가 쌓이며 915줄까지 커졌던
+`GameTable.tsx` 단일 컴포넌트를 **동작·시각 무변경**으로 분해했다(2026-07-29).
+프레젠테이션 4개(`GameTableHeader`·`TableArena`·`MyHandPanel`·`MatchEndedPanel`) +
+훅 3개(`useGameTableModel`·`useGameTableEffects`·`useGameActions`) + 순수 함수
+1개(`gameTableSelection`)로 나누고 `GameTable` 은 조립 루트(278줄)만 남겼다.
+추출 **전에** 특성화 테스트를 붙였고(`GameTable.test.tsx` 11건), 검증은 육안이 아니라
+전후 커밋의 렌더 DOM 17시나리오 덤프 비교(`class` 공백 정규화 후 **바이트 일치**).
+계획 대비 보정 2건(계획에 없던 `useGameTableModel` 추가 · "200줄 이하" 기준을 "조립
+루트만 남을 것"으로 재정의)은 D-87 에 기록. 계획서는 `docs/plans/gametable-refactor.md`.
+마일스톤 번호는 붙이지 않았다. **잔여**: 성능 최적화(memo/useCallback)는 별건으로 미착수.
+직후 라이브 401px 실측에서 나온 게임판 결함 4건은 D-88 에서 보정.
 
 ---
 
