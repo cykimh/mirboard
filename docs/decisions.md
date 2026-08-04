@@ -174,6 +174,34 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-107 (2026-08-04) — 관측성 마감(C3): Sentry 는 Logback 어펜더로, 메트릭에 게임 차원
+
+**Sentry 공식 Spring Boot 스타터를 쓰지 않는다.** `sentry-spring-boot-starter-jakarta:8.16.0`
+을 실제로 붙여 컨텍스트를 띄워 보니 Sentry 자신이 경고를 냈다 —
+`SentrySpringVersionChecker: !Incompatible Spring Boot Version detected!`. `-jakarta` 변종은
+Boot 3(Jakarta EE 10) 대상이고 이 프로젝트는 Boot 4(Spring Framework 7 / Jakarta EE 11)다.
+컴파일과 기동은 통과하므로 **추측하면 넘어갔을 결함**이다. 대신 `io.sentry:sentry-logback`
+어펜더를 쓴다 — Logback 확장이라 Spring 버전과 결합이 없고(같은 IT 재실행 시 경고 0건),
+ERROR 로그 캡처라는 핵심 가치는 그대로다. 스타터가 주는 요청 트레이싱은 포기한다(Boot 4
+지원이 나오면 재검토).
+
+**DSN 이 없으면 아무 일도 일어나지 않는다.** D-105 데모 계정과 같은 옵트인 패턴 —
+`SENTRY_DSN` 미설정 시 어펜더가 no-op 이라 로컬·CI 는 영향이 없다. `send-default-pii`
+는 끈다: `users` 화이트리스트로 개인정보를 막아 놓고 예외 리포트로 흘리면 원칙이 무의미하다.
+
+**메트릭에 `gameType` 을 실제 차원으로 넣는다.** `MirboardMetrics` 의 `gameStarted` 에는
+`tag("gameType", "TICHU")` 가 **상수로 박혀** 있었다. 티츄 하나일 때는 맞았지만 스컬킹이
+붙은 뒤로는 스컬킹 게임이 TICHU 로 집계된다 — 게임별 대시보드가 조용히 거짓말을 한다.
+D-105 케이스 스터디에서 "문서화되지 않은 잔재"로 지목해 둔 바로 그 줄이다. `gameStarted`·
+`roundCompleted`·`matchCompleted` 를 게임별 카운터로 바꾸고, 호출부가 방의 `gameType` 을
+넘긴다. 카운터를 미리 등록해 스크래퍼가 항상 같은 시계열을 보게 하던 성질은 유지해야 하므로,
+등록된 게임 목록(`GameRegistry`)으로 기동 시 전 조합을 미리 만든다.
+
+**Grafana 는 SaaS 가 아니라 로컬 스택으로 넣는다.** docker-compose 의 `observability`
+프로파일(Prometheus + Grafana)과 프로비저닝된 대시보드 JSON 을 리포에 둔다 — 계정 없이
+`docker compose --profile observability up` 한 줄로 뜨고, 대시보드가 코드로 관리돼
+"화면을 손으로 만들어 놓고 잃어버리는" 문제가 없다. 외부 Grafana Cloud 연동은 별건.
+
 ## D-106 (2026-08-01) — 방 옵션을 게임이 선언한다: `GameDefinition.supportedRoomOptions()`
 
 **문제.** 방 생성 모달의 **목표 점수**·**판돈**과 대기실의 **팀 배정**이 게임과 무관하게 항상
