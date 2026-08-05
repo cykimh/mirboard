@@ -174,6 +174,38 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-108 (2026-08-04) — 라운드별 점수 내역: `TableView.completedRounds` 로 노출
+
+게임판 점수 칩을 눌러 라운드별 획득 점수를 보는 기능. 데이터 자체는 이미 양쪽에 다
+있었다 — 서버 `TichuMatchState.roundScores`(영속), 클라 `roundHistory`(Phase 15#1).
+**문제는 둘이 이어져 있지 않다는 것**이다. 클라 `roundHistory` 는 라이브 `ROUND_ENDED`
+누적으로만 쌓이고 `applySnapshot`(resync)이 복원하지 않아, 새로고침·재접속·두 번째
+기기(폰)·중간 관전 진입에서 내역이 비거나 일부만 남는다. 기존 `MatchEndedPanel` 의
+라운드 표도 같은 약점을 이미 갖고 있었다.
+
+**노출 지점을 `TableView` 로 잡는다 — 인프라를 건드리지 않기 위해서다.**
+`RoomController.resync` 는 `engine.publicView(state)` 만 부르는 게임 중립 코드라(D-98),
+티츄 공개 뷰에 필드를 더하면 컨트롤러·`ResyncResponse`·`GameEngine` 포트 계약이 전부
+무변경으로 남는다. `ResyncResponse` 에 최상위 필드를 새로 다는 대안은 포트 계약을
+넓혀 다른 게임까지 끌고 들어가므로 택하지 않았다.
+
+**이름은 `completedRounds`.** `TableView` 에는 이미 `roundScores` 가 있는데 그건
+**현재 라운드의 팀별 점수**(`Map<Team,Integer>`)다. 재사용하면 의미가 조용히 뒤집힌다.
+
+**클라는 덮어쓰기로 합류한다.** `applySnapshot` 이 `tableView.completedRounds` 로
+`roundHistory` 를 통째로 교체하고(append 아님 → 중복 누적이 구조적으로 불가능),
+`ROUND_ENDED` 라이브 append 는 즉시 반응성 때문에 유지한다. 라이브는 빠르게, resync 는
+권위 있게 — 어긋나면 다음 resync 가 교정한다.
+
+UI 는 shadcn Dialog(기존 모달 패턴 재사용). 표기는 **내 팀 기준 "우리/상대"** 로
+스왑한다 — 점수 칩이 이미 그 관점이라 Team A/B 로 쓰면 칩과 어긋난다. `MatchEndedPanel`
+의 기존 표와 중복이므로 공용 `RoundHistoryTable` 로 추출하고, 관점 차이(패널=Team A/B,
+모달=우리/상대)는 행 데이터와 열 라벨을 prop 으로 받아 흡수한다.
+
+범위 밖: 티츄 선언 성패는 `RoundScore` 에 없어 서버 정산 구조 변경이 필요하므로 넣지
+않는다. 스컬킹은 매치 영속 자체가 별건(D-102 보류 ①)이라 이번 대상이 아니다.
+상세 계획은 `docs/plans/round-history-modal.md`.
+
 ## D-107 (2026-08-04) — 관측성 마감(C3): Sentry 는 Logback 어펜더로, 메트릭에 게임 차원
 
 **Sentry 공식 Spring Boot 스타터를 쓰지 않는다.** `sentry-spring-boot-starter-jakarta:8.16.0`
