@@ -40,6 +40,8 @@ interface TableArenaProps {
   selectedPlayable: boolean;
   onPass: () => void;
   onPlay: () => void;
+  /** D-108 — 점수 칩 클릭 → 라운드별 점수 내역. */
+  onOpenRoundHistory: () => void;
 }
 
 /**
@@ -74,6 +76,7 @@ export function TableArena({
   selectedPlayable,
   onPass,
   onPlay,
+  onOpenRoundHistory,
 }: TableArenaProps) {
   return (
     <div className={`table-arena ${arenaTint}`} ref={arenaRef}>
@@ -207,7 +210,15 @@ export function TableArena({
           </div>
         </div>
       )}
-      <div className="scoreboard" aria-label="현재 점수">
+      {/* D-108 — 누르면 라운드별 점수. 완료 라운드가 0개여도 비활성화하지 않는다:
+          안 눌리는 버튼은 기능이 없는 것처럼 읽힌다(모달이 빈 상태를 안내). */}
+      <button
+        type="button"
+        className="scoreboard"
+        aria-label="현재 점수 — 누르면 라운드별 점수"
+        aria-haspopup="dialog"
+        onClick={onOpenRoundHistory}
+      >
         <span className="scoreboard-round">R{tableView.roundNumber}</span>
         <span className="scoreboard-team us">
           우리 {tableView.matchScores[myTeam] ?? 0}
@@ -215,7 +226,7 @@ export function TableArena({
         <span className="scoreboard-team them">
           상대 {tableView.matchScores[myTeam === 'A' ? 'B' : 'A'] ?? 0}
         </span>
-      </div>
+      </button>
       {isInPlaying && turnSeconds > 0 && (
         <TurnCountdown turnSeconds={turnSeconds} />
       )}

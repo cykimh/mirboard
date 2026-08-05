@@ -1,3 +1,6 @@
+/* D-108 — div 에서 button 으로 바뀌었다(라운드별 점수 열기). 게임판은 .app-shell
+   밖이라 tailwind preflight 가 안 닿으므로 UA 기본 버튼 스타일을 여기서 눌러야 한다:
+   border/background/font 를 명시하지 않으면 알약 칩이 회색 사각 버튼으로 보인다. */
 .scoreboard {
   position: absolute;
   left: 12px;
@@ -10,6 +13,24 @@
   background: rgba(0, 0, 0, 0.5);
   font-size: 0.8rem;
   font-weight: 700;
+  /* UA 리셋 */
+  border: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.scoreboard:hover {
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.scoreboard:focus-visible {
+  outline: 2px solid var(--color-warning, #f0c000);
+  outline-offset: 2px;
 }
 
 .scoreboard-round {
@@ -59,6 +80,18 @@
 .score-history-total {
   font-weight: 800;
   background: rgba(255, 209, 128, 0.12);
+}
+
+/* D-108 — 첫 완주자 배지. 좁은 폭에서 4열이 깨지지 않도록 이름을 줄이고,
+   전체 이름은 title 로 남긴다(마크업은 RoundHistoryTable 이 이미 title 을 단다). */
+.score-history-finisher {
+  display: inline-block;
+  max-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  opacity: 0.85;
 }
 
 /* Phase 15(#5) — 경기장 채팅 말풍선 (발신자 좌석 근처, 잠깐 노출 후 fade). */

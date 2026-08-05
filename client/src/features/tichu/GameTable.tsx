@@ -21,6 +21,7 @@ import { MatchEndedPanel } from './MatchEndedPanel';
 import { MyHandPanel } from './MyHandPanel';
 import { GameTableHeader } from './GameTableHeader';
 import { TableArena } from './TableArena';
+import { RoundHistoryModal } from './RoundHistoryModal';
 
 interface GameTableProps {
   roomId: string;
@@ -72,6 +73,8 @@ export function GameTable({
   const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
     useStompRoom(roomId, token, tichuRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
+  // D-108 — 순수 UI 상태(서버 상태 아님)라 useGameTableModel 이 아니라 여기 둔다.
+  const [roundHistoryOpen, setRoundHistoryOpen] = useState(false);
   const unreadCount = useRoomChatStore((s) => s.unreadCount);
   const { muted, toggleMute, playChime } = useSfx();
   const cardAnimEnabled = useCardAnimStore((s) => s.enabled);
@@ -174,6 +177,16 @@ export function GameTable({
         selectedPlayable={m.selectedPlayable}
         onPass={a.handlePass}
         onPlay={a.handlePlay}
+        onOpenRoundHistory={() => setRoundHistoryOpen(true)}
+      />
+
+      <RoundHistoryModal
+        open={roundHistoryOpen}
+        onOpenChange={setRoundHistoryOpen}
+        roundHistory={m.roundHistory}
+        myTeam={m.myTeam}
+        playerIds={playerIds}
+        usernames={usernames}
       />
 
       {!spectator && (

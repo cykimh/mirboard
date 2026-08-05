@@ -118,6 +118,11 @@
 > (docs/api.md) 다. 본인 큐의 메시지는 절대 `/topic` 으로 누출되어선 안 되며,
 > 서버 측 직렬화 시 `PrivateHand` 와 `TableView` DTO 를 분리된 타입으로 다룬다.
 
+> **D-108 — 라운드 내역의 진실원**: `ROUND_ENDED` 는 클라 라운드 내역에 한 건을
+> **append** 하는 라이브 패치이고, 권위값은 resync 의 `TableView.completedRounds` 다
+> (클라가 통째로 **교체**). 라이브만 믿으면 새로고침·재접속·두 번째 기기에서 내역이
+> 비므로 둘 다 필요하다 — 어긋나면 다음 resync 가 교정한다.
+
 ---
 
 ## 클라 → 서버 — `/app/room/{roomId}/action`

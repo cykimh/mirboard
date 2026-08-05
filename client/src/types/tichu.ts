@@ -46,6 +46,20 @@ export interface TableView {
   roundNumber: number;
   finishingOrder: number[];
   activeWishRank: number | null;
+  /**
+   * D-108 — 끝난 라운드들의 점수. 바로 위 `roundScores` 와 헷갈리지 말 것:
+   * 그쪽은 **현재 라운드**의 팀별 점수다.
+   * 구 서버 응답에는 없을 수 있어 옵셔널.
+   */
+  completedRounds?: CompletedRound[];
+}
+
+/** D-108 — 끝난 라운드 한 건. 서버 `TableView.CompletedRound` 미러. */
+export interface CompletedRound {
+  teamAScore: number;
+  teamBScore: number;
+  firstFinisherSeat: number;
+  doubleVictory: boolean;
 }
 
 export interface PrivateHand {

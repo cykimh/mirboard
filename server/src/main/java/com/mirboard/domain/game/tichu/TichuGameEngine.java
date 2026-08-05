@@ -19,6 +19,7 @@ import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.scoring.MvpCalculator;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
 import com.mirboard.domain.game.tichu.scoring.SeatContribution;
+import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
@@ -141,7 +142,22 @@ public final class TichuGameEngine implements GameEngine {
     public Object publicView(GameState state) {
         TichuMatchState matchState = matchState();
         return TichuStateMapper.toTableView(
-                tichuState(state), matchState.scoresByTeam(), matchState.roundNumber());
+                tichuState(state),
+                matchState.scoresByTeam(),
+                matchState.roundNumber(),
+                completedRoundsView(matchState));
+    }
+
+    /**
+     * D-108 — 끝난 라운드 점수를 공개 뷰 타입으로 옮긴다. 도메인 {@code RoundScore} 를
+     * 그대로 싣지 않는 이유는 {@code state} 패키지가 {@code scoring} 을 되짚으면 순환이
+     * 되기 때문이다. 양쪽을 모두 아는 여기가 변환 자리다.
+     */
+    private static List<TableView.CompletedRound> completedRoundsView(TichuMatchState matchState) {
+        return matchState.roundScores().stream()
+                .map(r -> new TableView.CompletedRound(
+                        r.teamAScore(), r.teamBScore(), r.firstFinisherSeat(), r.doubleVictory()))
+                .toList();
     }
 
     /** 티츄는 손패가 비공개이므로 항상 존재한다 (요트 같은 게임은 empty 를 돌려준다). */

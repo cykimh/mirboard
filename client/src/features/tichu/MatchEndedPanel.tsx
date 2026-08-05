@@ -1,6 +1,7 @@
 import { t } from '@/i18n/messages';
 import { Button } from '@/components/ui/button';
 import { SeatAvatar } from './SeatAvatar';
+import { RoundHistoryTable } from './RoundHistoryTable';
 import type { TichuRoomState } from './tichuStore';
 
 interface MatchEndedPanelProps {
@@ -114,32 +115,21 @@ export function MatchEndedPanel({
         );
       })()}
       {roundHistory.length > 0 && (
-        <table className="score-history">
-          <thead>
-            <tr>
-              <th>R</th>
-              <th>Team A</th>
-              <th>Team B</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {roundHistory.map((r, i) => (
-              <tr key={i}>
-                <td>{i + 1}</td>
-                <td>{r.teamAScore}</td>
-                <td>{r.teamBScore}</td>
-                <td>{r.doubleVictory ? '더블 승' : ''}</td>
-              </tr>
-            ))}
-            <tr className="score-history-total">
-              <td>합계</td>
-              <td>{matchEnded.finalScores.A ?? 0}</td>
-              <td>{matchEnded.finalScores.B ?? 0}</td>
-              <td />
-            </tr>
-          </tbody>
-        </table>
+        // D-108 — 표는 공용 컴포넌트로. 이 패널은 Team A/B 관점을 유지한다
+        // (첫 완주자 배지는 게임판 모달 전용 — 여기 마크업은 이동 전과 동일).
+        <RoundHistoryTable
+          rows={roundHistory.map((r, i) => ({
+            round: i + 1,
+            left: r.teamAScore,
+            right: r.teamBScore,
+            doubleVictory: r.doubleVictory,
+          }))}
+          labels={{ left: 'Team A', right: 'Team B' }}
+          totals={{
+            left: matchEnded.finalScores.A ?? 0,
+            right: matchEnded.finalScores.B ?? 0,
+          }}
+        />
       )}
       <p>
         {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
