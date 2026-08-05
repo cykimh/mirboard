@@ -45,7 +45,7 @@
 | Dealing(8) | 라운드 시작 | DeclareGrandTichu / Ready | 4명 ready |
 | Dealing(14) | 8 단계 4명 ready | DeclareTichu / Ready | 4명 ready |
 | Passing | 14 단계 4명 ready | PassCards (좌/파트너/우 각 1장) | 4명 모두 submit |
-| Playing | 4명 swap 완료 | PlayCard / PassTrick / DeclareTichu (첫 플레이 전) / MakeWish / GiveDragonTrick | 3명 완주 또는 더블 빅토리 |
+| Playing | 4명 swap 완료 | PlayCard(마작 시 wishRank 동봉) / PassTrick / DeclareTichu (첫 플레이 전) / GiveDragonTrick | 3명 완주 또는 더블 빅토리 |
 | RoundEnd | shouldEndRound | (없음) | matchProgress 가 다음 라운드 또는 매치 종료 |
 
 - **코드:** `TichuState` sealed (`state/TichuState.java`), `TichuEngine.applyReady/applyPassCards/applyPlayCard`, `TichuRoundStarter.startRound` (`lifecycle/TichuRoundStarter.java`)
@@ -163,17 +163,17 @@
 
 ### 8.1 Mahjong (rank 1)
 - **첫 리드 강제**: 라운드 시작 (Playing 진입) 시 Mahjong 보유자가 첫 리드.
-- **Wish 활성**: Mahjong 을 단독 또는 콤보로 낸 **직후** 한 번에 한해 rank 2..14 중 하나를 wish 로 지정 가능 (생략 가능).
+- **Wish 활성**: Mahjong 을 내는 **그 액션에 함께** rank 2..14 중 하나를 wish 로 지정 (생략 가능). 단독 리드든 콤보(예: 1-2-3-4-5 STRAIGHT)의 일부든 무관 — 낸 카드에 Mahjong 이 포함되면 지정 가능. **별도 `MAKE_WISH` 액션은 없다** (D-108 폐기 — 사후 별도 창은 다음 플레이어가 카드를 내는 순간 닫혀 실사용이 불가능했다).
 - Mahjong 은 일반 SINGLE 처럼 동작 (rank 1, 가장 약함). 콤보 내 일반 카드와 섞일 수 없음 (STRAIGHT 의 시작 1만 허용).
 
 **코드:**
-- 리드 결정: `TichuEngine.mahjongHolder` (`TichuEngine.java:195-202`)
-- Wish 액션: `TichuAction.MakeWish(rank)`, `applyMakeWish` (`TichuEngine.java:328-338`)
-- Wish 검증: `ActionValidator.validateMakeWish` (`ActionValidator.java:178-196`) — Mahjong 직후 + currentTopSeat==me + 중복 금지
+- 리드 결정: `TichuEngine.mahjongHolder`
+- Wish 지정: `TichuAction.PlayCard(cards, wishRank)` 의 `wishRank` — `TichuEngine.applyPlayCard` 가 `Wish.active(...)` 세팅 + `WishMade` 이벤트 발행
+- Wish 검증: `ActionValidator.validatePlayCard` 의 소원 지정 절 — `wishRank != null` 인데 낸 카드에 Mahjong 이 없으면 `WISH_OUT_OF_CONTEXT`, rank 가 2..14 밖이면 `INVALID_WISH_RANK`
 
-**테스트:** `ActionValidatorTest` (Wish 활성/비활성 케이스).
+**테스트:** `ActionValidatorTest` (마작 단독 / 스트레이트 동봉 / 마작 미포함 / 랭크 범위), `TichuSpecialCardScenarioTest` (동봉 1회로 활성 + 다음 좌석이 그 위에 낸 뒤에도 유지).
 
-**갭:** Mahjong 자체를 콤보 (예: 1-2-3-4-5 STRAIGHT) 일부로 낸 후 wish 가능한지 명시 부재. 현재 ActionValidator 는 `currentTop.cards == [Mahjong]` 단독 요구.
+**갭:** 없음 — D-108 에서 콤보 동봉 갭이 닫혔다. "소원 1회" 제한은 Mahjong 이 덱에 1장뿐이라 구조적으로 보장되므로 별도 중복 검사가 없다.
 
 ### 8.2 Dog (rank 0)
 - **solo + lead 만 허용** — follow 또는 콤보 안 됨.
@@ -219,9 +219,9 @@
 
 Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한 한 wish rank 카드를 포함한 합법 플레이를 해야 한다.
 
-**현재 구현 (`ActionValidator.java:76-86`)**:
+**현재 구현 (`ActionValidator.validatePlayCard` 의 wish 강제 절)**:
 - **lead**: 보유한 wish rank + 미포함 플레이 → reject (`WISH_NOT_FULFILLED`)
-- **follow**: **deferred** — line 83 주석 "Strict only on lead; on follow, deferred (need beat check)". 현재 미구현. **10C 에서 마감 예정**.
+- **follow**: wish rank 를 포함한 **합법 follow 가 존재하면** 미포함 플레이 → reject. 존재 판정은 `WishFulfillmentChecker.canPlayWishRank`. **10C(D-58) 에서 마감 완료**.
 
 **fulfill** 시점: 플레이 카드에 wish rank 가 한 번이라도 포함되면 `Wish.fulfill()` → activeWish.fulfilled=true. 이후 trick 진행 동안 다음 트릭으로 전파 (`TichuEngine.closeTrickAndContinue` 의 `trick.activeWish()` 유지). 그러나 fulfilled wish 는 더 이상 강제되지 않음 (`Wish.isActive()` → false).
 
@@ -232,7 +232,7 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 
 **테스트:** `ActionValidatorTest` (lead + 보유 + 미포함 → reject).
 
-**갭:** follow 강제 미구현. wish + BOMB 인터럽트 시 fulfillment 처리 명시 부재. **10C 에서 마감**.
+**갭:** `WishFulfillmentChecker` 가 콤보(스트레이트/풀하우스/연속페어)를 보지 않아, 콤보로만 wish rank 를 낼 수 있는 상황에서는 강제되지 않는다. wish + BOMB 인터럽트 시 fulfillment 처리도 명시 부재.
 
 ---
 

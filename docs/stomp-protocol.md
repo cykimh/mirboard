@@ -136,9 +136,8 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 | `DECLARE_TICHU` | — | Dealing(14) 또는 Playing 첫 플레이 전까지 |
 | `READY` | — | Dealing 단계 "다음 단계로" 신호 (Phase 5b) |
 | `PASS_CARDS` | `toLeft, toPartner, toRight` (각 Card) | Passing 단계, 좌석당 1회 |
-| `PLAY_CARD` | `cards: Card[]` | 일반 플레이 (Phoenix 해석은 서버가 결정) |
+| `PLAY_CARD` | `cards: Card[]`, `wishRank?: 2..14` | 일반 플레이 (Phoenix 해석은 서버가 결정). `wishRank` 는 낸 카드에 Mahjong 이 포함될 때만 허용 — 소원은 마작을 내는 액션에 동봉한다(D-108) |
 | `PASS_TRICK` | — | 트릭 패스 (리드 차례에는 불가) |
-| `MAKE_WISH` | `rank: 2..14` | Mahjong 을 낸 직후만 |
 | `GIVE_DRAGON_TRICK` | `toSeat` | Dragon 트릭 획득 직후 — 상대팀 좌석 |
 
 `Card` 직렬화 (서버 `Card` record 와 동일):

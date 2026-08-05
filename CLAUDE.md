@@ -216,7 +216,7 @@ npm --prefix client run test -- authStore   # 특정 테스트만
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
 - 클라 → 서버 `/app/room/{roomId}/action`
-  - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`, `PASS_TRICK`, `MAKE_WISH`, `GIVE_DRAGON_TRICK`
+  - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-108), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
 
 전체 카탈로그: `docs/stomp-protocol.md`.

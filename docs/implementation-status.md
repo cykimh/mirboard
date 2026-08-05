@@ -126,8 +126,8 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - **RoundEnd**: 트릭 점수 + 보너스 + 티츄/그랜드 가감 집계. 목표 점수 도달 시 매치 종료.
 
 ### 5.2 액션 (sealed `TichuAction`)
-`DeclareGrandTichu`, `DeclareTichu`, `Ready`, `PassCards`, `PlayCard`(phoenixAs override),
-`PassTrick`, `MakeWish`, `GiveDragonTrick`. 페이즈별 검증은 `ActionValidator`,
+`DeclareGrandTichu`, `DeclareTichu`, `Ready`, `PassCards`, `PlayCard`(cards + 선택 `wishRank`),
+`PassTrick`, `GiveDragonTrick`. 페이즈별 검증은 `ActionValidator`,
 소원 충족 판정은 `WishFulfillmentChecker`.
 
 ### 5.3 카드 / 족보 / 특수 카드
@@ -135,8 +135,9 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 족보 판별 `HandDetector`, 비교 `HandComparator`(sealed `Hand`). 폭탄(BOMB)은 트릭 인터럽트.
 - 특수 카드: **마작**(소원 호출), **피닉스**(와일드, 트릭 획득 시 −25), **드래곤**(최강 단일,
   +25, 트릭을 상대팀에 넘김), **개**(다음 차례 강제).
-- 마작 플레이 → MAKE_WISH 흐름, 드래곤 트릭 → GIVE_DRAGON_TRICK 흐름이 클라 모달과 연동
-  (`MakeWishModal`, `GiveDragonTrickModal`).
+- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-108) — 클라는
+  마작이 포함된 선택을 낼 때 `MakeWishModal` 을 먼저 거친다. 드래곤 트릭 → GIVE_DRAGON_TRICK
+  흐름은 기존대로 `GiveDragonTrickModal` 과 연동.
 
 > 족보 종류/점수 규칙/특수 카드 상호작용의 정확한 정의는 `docs/rules-tichu.md` 가 정본.
 
