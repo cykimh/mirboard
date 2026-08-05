@@ -284,6 +284,14 @@ public final class TichuEngine {
             updatedWish = wishBefore.fulfill();
         }
 
+        // 소원 지정 (D-108). fulfillment **뒤**에 둔다 — "마작을 낸 그 플레이가 자기
+        // 소원을 즉시 채우지 않는다"를 코드 순서로 못박는다(마작 rank 1, 소원 2~14 라
+        // 실제로도 겹치지 않지만 순서에 의존하지 않게). 검증은 ActionValidator 가 마쳤다.
+        if (action.wishRank() != null) {
+            updatedWish = Wish.active(action.wishRank());
+            events.add(new TichuEvent.WishMade(action.wishRank()));
+        }
+
         List<Card> newAccumulated = new ArrayList<>(trick.accumulatedCards());
         newAccumulated.addAll(action.cards());
         List<Hand> newPlaySequence = new ArrayList<>(trick.playSequence());

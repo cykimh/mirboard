@@ -83,6 +83,40 @@ class TichuSpecialCardScenarioTest {
     }
 
     @Test
+    void mahjong_lead_with_bundled_wish_activates_in_one_action() {
+        // D-108 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
+        // 였다. 소원을 플레이에 동봉하면 창 자체가 없으므로, 다음 좌석이 낸 뒤에도
+        // 소원이 살아 있는지로 고정한다.
+        var players = List.of(
+                PlayerState.initial(0, List.of(Card.mahjong(), n(Suit.JADE, 5))),
+                PlayerState.initial(1, List.of(n(Suit.SWORD, 7))),
+                PlayerState.initial(2, List.of(n(Suit.STAR, 9))),
+                PlayerState.initial(3, List.of(n(Suit.PAGODA, 11))));
+        TichuState state = new TichuState.Playing(players, TrickState.lead(0, null), -1);
+        var engine = new TichuEngine(CTX);
+
+        var afterMahjong = engine.apply(state, 0,
+                new TichuAction.PlayCard(List.of(Card.mahjong()), 7));
+
+        // 한 액션이 PLAYED 와 WISH_MADE 를 함께 낸다.
+        assertThat(afterMahjong.events())
+                .anyMatch(e -> e instanceof com.mirboard.domain.game.tichu.event.TichuEvent.Played)
+                .anyMatch(e -> e instanceof com.mirboard.domain.game.tichu.event.TichuEvent.WishMade w
+                        && w.rank() == 7);
+
+        var trick = ((TichuState.Playing) afterMahjong.newState()).trick();
+        assertThat(trick.activeWish()).isNotNull();
+        assertThat(trick.activeWish().rank()).isEqualTo(7);
+        assertThat(trick.activeWish().fulfilled()).isFalse();
+
+        // 다음 좌석(1)이 마작 위에 카드를 낸다 — 예전엔 여기서 소원 창이 닫혔다.
+        TichuState afterFollow = play(engine, afterMahjong.newState(), 1, n(Suit.SWORD, 7));
+        var followTrick = ((TichuState.Playing) afterFollow).trick();
+        assertThat(followTrick.activeWish()).isNotNull();
+        assertThat(followTrick.activeWish().rank()).isEqualTo(7);
+    }
+
+    @Test
     void wish_active_lead_holding_wished_must_include_it() {
         // 0번 자리: 보유 wish 카드 (7) + 다른 카드 (5). wish=7 활성 상태에서 5만 리드 시도 → reject.
         var players = List.of(

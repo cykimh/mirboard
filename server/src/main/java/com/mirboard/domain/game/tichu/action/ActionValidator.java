@@ -92,6 +92,19 @@ public final class ActionValidator {
                 }
             }
         }
+
+        // 소원 "지정" (D-108) — 위의 소원 "강제" 와 다른 관심사다. 마작을 내는 그
+        // 액션에 동봉하며, 단독 리드든 콤보의 일부든 낸 카드에 마작이 포함되면 허용.
+        // 메서드 끝에 두는 이유: 턴·소유·족보 실패가 먼저 보고되어야 거절 사유가 읽힌다.
+        // "소원 1회" 는 마작이 덱에 1장뿐이라 구조적으로 보장되므로 중복 검사가 없다.
+        if (action.wishRank() != null) {
+            if (action.cards().stream().noneMatch(c -> c.is(Special.MAHJONG))) {
+                throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
+            }
+            if (action.wishRank() < 2 || action.wishRank() > 14) {
+                throw reject(RejectionReason.INVALID_WISH_RANK);
+            }
+        }
     }
 
     // ---------- PassTrick ----------
