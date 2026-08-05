@@ -251,6 +251,10 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       turnStartedAt: Date.now(),
       disconnectedSeats: new Set(disconnectedSeats ?? []),
       chips: chips ?? {},
+      // D-108 — 라운드 내역은 서버 권위값으로 **교체**한다. append 였다면 재접속마다
+      // 같은 라운드가 중복으로 쌓인다. 라이브 ROUND_ENDED append 는 즉시 반응성 때문에
+      // 그대로 두고, 어긋나면 다음 resync 가 교정하는 구조.
+      roundHistory: tableView.completedRounds ?? [],
       // D-82 — 리매치로 새 매치가 시작되면 resync 가 들어오므로 종료 배너를 정리.
       // (매치 중 재접속 시엔 어차피 null 이라 무해.)
       matchEnded: null,

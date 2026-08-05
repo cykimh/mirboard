@@ -32,12 +32,13 @@ public final class TichuStateMapper {
 
     public static TableView toTableView(TichuState state,
                                         Map<Team, Integer> matchScores,
-                                        int roundNumber) {
+                                        int roundNumber,
+                                        List<TableView.CompletedRound> completedRounds) {
         return switch (state) {
-            case TichuState.Dealing d -> dealingToTableView(d, matchScores, roundNumber);
-            case TichuState.Passing p -> passingToTableView(p, matchScores, roundNumber);
-            case TichuState.Playing p -> playingToTableView(p, matchScores, roundNumber);
-            case TichuState.RoundEnd r -> roundEndToTableView(r, matchScores, roundNumber);
+            case TichuState.Dealing d -> dealingToTableView(d, matchScores, roundNumber, completedRounds);
+            case TichuState.Passing p -> passingToTableView(p, matchScores, roundNumber, completedRounds);
+            case TichuState.Playing p -> playingToTableView(p, matchScores, roundNumber, completedRounds);
+            case TichuState.RoundEnd r -> roundEndToTableView(r, matchScores, roundNumber, completedRounds);
         };
     }
 
@@ -58,7 +59,8 @@ public final class TichuStateMapper {
 
     private static TableView dealingToTableView(TichuState.Dealing dealing,
                                                 Map<Team, Integer> matchScores,
-                                                int roundNumber) {
+                                                int roundNumber,
+                                                List<TableView.CompletedRound> completedRounds) {
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
         for (PlayerState p : dealing.players()) {
@@ -80,12 +82,14 @@ public final class TichuStateMapper {
                 matchScores,
                 roundNumber,
                 List.of(),
-                null);
+                null,
+                completedRounds);
     }
 
     private static TableView passingToTableView(TichuState.Passing passing,
                                                 Map<Team, Integer> matchScores,
-                                                int roundNumber) {
+                                                int roundNumber,
+                                                List<TableView.CompletedRound> completedRounds) {
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
         for (PlayerState p : passing.players()) {
@@ -107,12 +111,14 @@ public final class TichuStateMapper {
                 matchScores,
                 roundNumber,
                 List.of(),
-                null);
+                null,
+                completedRounds);
     }
 
     private static TableView playingToTableView(TichuState.Playing playing,
                                                 Map<Team, Integer> matchScores,
-                                                int roundNumber) {
+                                                int roundNumber,
+                                                List<TableView.CompletedRound> completedRounds) {
         TrickState trick = playing.trick();
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
@@ -134,12 +140,14 @@ public final class TichuStateMapper {
                 matchScores,
                 roundNumber,
                 finishingOrder(playing.players()),
-                trick.hasActiveWish() ? trick.activeWish().rank() : null);
+                trick.hasActiveWish() ? trick.activeWish().rank() : null,
+                completedRounds);
     }
 
     private static TableView roundEndToTableView(TichuState.RoundEnd r,
                                                  Map<Team, Integer> matchScores,
-                                                 int roundNumber) {
+                                                 int roundNumber,
+                                                List<TableView.CompletedRound> completedRounds) {
         Map<Integer, Integer> handCounts = new HashMap<>();
         Map<Integer, TichuDeclaration> declarations = new HashMap<>();
         for (PlayerState p : r.players()) {
@@ -163,7 +171,8 @@ public final class TichuStateMapper {
                 matchScores,
                 roundNumber,
                 finishingOrder(r.players()),
-                null);
+                null,
+                completedRounds);
     }
 
     private static Map<Team, Integer> liveTrickScores(List<PlayerState> players) {

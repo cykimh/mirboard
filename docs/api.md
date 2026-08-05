@@ -363,7 +363,11 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
     "matchScores": { "A": 240, "B": 100 },
     "roundNumber": 3,
     "finishingOrder": [],
-    "activeWishRank": 7
+    "activeWishRank": 7,
+    "completedRounds": [
+      { "teamAScore": 100, "teamBScore": 0, "firstFinisherSeat": 0, "doubleVictory": false },
+      { "teamAScore": 140, "teamBScore": 100, "firstFinisherSeat": 3, "doubleVictory": false }
+    ]
   },
   "privateHand": { "seat": 0, "cards": [
     { "suit": "JADE", "rank": 9, "special": null },
@@ -376,6 +380,10 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - 좌석 식별은 **seat(0~3, playerIds 인덱스)**, `handCounts`/`declarations` 키도 seat.
 - `disconnectedSeats`: 현재 끊긴 플레이어 좌석(재접속 배지 즉시 반영, D-75).
 - `chips`: D-82 방 단위 테이블 칩(userId→칩). 내기 없는 방은 빈 맵.
+- `completedRounds`: D-108 **끝난 라운드들의** 점수(순서 = 라운드 1..N). 바로 위
+  `roundScores` 와 혼동 주의 — 그쪽은 **현재 라운드**의 팀별 점수다. 클라는 이 값으로
+  라운드 내역을 통째로 교체하므로(append 아님), 재접속·새 기기에서도 내역이 온전하다.
+  끝난 라운드가 없으면 `[]`.
 
 에러: `NOT_IN_ROOM`, `RESYNC_NOT_AVAILABLE` (게임 진행 중이 아님).
 
