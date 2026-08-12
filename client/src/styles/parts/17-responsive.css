@@ -137,6 +137,19 @@
   }
 }
 
+/* D-108 — 점수 칩이 라운드별 점수를 여는 버튼이 되면서 터치 타겟 규칙(≥44px) 대상이
+   됐다. 실제 높이는 padding 4px + 0.8rem 글자라 ~23px 뿐이다.
+   알약을 키우지 않고 ::after 로 히트 영역만 넓힌다 — A6/A7 의 '좌석 비침범'과
+   헤더 여백을 그대로 두면서 타겟만 확보하기 위해서다(칩은 경기장 좌상단 모서리라
+   확장분이 좌석에 닿지 않는다). */
+@media (pointer: coarse) {
+  .scoreboard::after {
+    content: '';
+    position: absolute;
+    inset: -11px;
+  }
+}
+
 /* A3 후속 — 헤더 토글(사운드/애니/이모지/채팅)·액션 바(선언/준비)·이모지 팔레트도
    44px 하한. shadcn size="sm"(h-8=32px)을 컴포넌트 수정 없이 min-height 로 보정
    (min-height 가 height 를 이긴다). 터치 기기 또는 좁은 폭에서만 — 데스크톱
