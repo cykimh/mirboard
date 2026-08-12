@@ -64,25 +64,6 @@ class TichuSpecialCardScenarioTest {
     }
 
     @Test
-    void mahjong_lead_then_make_wish_activates() {
-        var players = List.of(
-                PlayerState.initial(0, List.of(Card.mahjong(), n(Suit.JADE, 5))),
-                PlayerState.initial(1, List.of(n(Suit.SWORD, 7))),
-                PlayerState.initial(2, List.of(n(Suit.STAR, 9))),
-                PlayerState.initial(3, List.of(n(Suit.PAGODA, 11))));
-        TichuState state = new TichuState.Playing(players, TrickState.lead(0, null), -1);
-        var engine = new TichuEngine(CTX);
-
-        state = play(engine, state, 0, Card.mahjong());
-        var afterMahjong = engine.apply(state, 0, new TichuAction.MakeWish(7));
-        var trick = ((TichuState.Playing) afterMahjong.newState()).trick();
-
-        assertThat(trick.activeWish()).isNotNull();
-        assertThat(trick.activeWish().rank()).isEqualTo(7);
-        assertThat(trick.activeWish().fulfilled()).isFalse();
-    }
-
-    @Test
     void mahjong_lead_with_bundled_wish_activates_in_one_action() {
         // D-108 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
         // 였다. 소원을 플레이에 동봉하면 창 자체가 없으므로, 다음 좌석이 낸 뒤에도

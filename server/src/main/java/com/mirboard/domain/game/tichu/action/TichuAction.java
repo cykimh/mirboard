@@ -18,7 +18,6 @@ import java.util.List;
         @JsonSubTypes.Type(value = TichuAction.PassCards.class, name = "PASS_CARDS"),
         @JsonSubTypes.Type(value = TichuAction.PlayCard.class, name = "PLAY_CARD"),
         @JsonSubTypes.Type(value = TichuAction.PassTrick.class, name = "PASS_TRICK"),
-        @JsonSubTypes.Type(value = TichuAction.MakeWish.class, name = "MAKE_WISH"),
         @JsonSubTypes.Type(value = TichuAction.GiveDragonTrick.class, name = "GIVE_DRAGON_TRICK")
 })
 public sealed interface TichuAction extends GameAction
@@ -28,7 +27,6 @@ public sealed interface TichuAction extends GameAction
                 TichuAction.PassCards,
                 TichuAction.PlayCard,
                 TichuAction.PassTrick,
-                TichuAction.MakeWish,
                 TichuAction.GiveDragonTrick {
 
     /** 첫 8장 단계에서 한 번만 선언 가능 (성공/실패 ±200). Dealing 의 ready 도 함께 표시. */
@@ -71,10 +69,6 @@ public sealed interface TichuAction extends GameAction
 
     /** 차례에서 패스. 리드 차례에는 패스 불가. */
     record PassTrick() implements TichuAction {
-    }
-
-    /** Mahjong 을 낸 직후, 한 번에 한해 2~14 중 한 rank 를 소원으로 지정. */
-    record MakeWish(int rank) implements TichuAction {
     }
 
     /** Dragon 으로 트릭을 가져간 직후, 상대 팀 좌석 중 하나에게 트릭 양도. */

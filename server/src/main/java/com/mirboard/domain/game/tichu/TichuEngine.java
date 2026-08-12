@@ -57,7 +57,6 @@ public final class TichuEngine {
             case TichuAction.DeclareGrandTichu __ -> applyDeclareGrandTichu(state, seat);
             case TichuAction.Ready __ -> applyReady(state, seat);
             case TichuAction.PassCards pc -> applyPassCards(state, seat, pc);
-            case TichuAction.MakeWish w -> applyMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> applyGiveDragonTrick(state, seat, g);
         };
     }
@@ -363,20 +362,6 @@ public final class TichuEngine {
         return new Result(
                 new TichuState.Playing(playing.players(), finalTrick, playing.firstFinisher()),
                 events);
-    }
-
-    // ---------- Wish ----------
-
-    private Result applyMakeWish(TichuState state, int seat, TichuAction.MakeWish action) {
-        TichuState.Playing playing = (TichuState.Playing) state;
-        TrickState trick = playing.trick();
-        TrickState updated = new TrickState(
-                trick.leadSeat(), trick.currentTurnSeat(), trick.currentTop(),
-                trick.currentTopSeat(), trick.passedSeats(), trick.playSequence(),
-                trick.accumulatedCards(), Wish.active(action.rank()));
-        return new Result(
-                new TichuState.Playing(playing.players(), updated, playing.firstFinisher()),
-                List.of(new TichuEvent.WishMade(action.rank())));
     }
 
     // ---------- Dragon Give ----------

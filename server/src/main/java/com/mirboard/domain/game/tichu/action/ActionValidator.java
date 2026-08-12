@@ -33,7 +33,6 @@ public final class ActionValidator {
             case TichuAction.DeclareGrandTichu __ -> validateDeclareGrandTichu(state, seat);
             case TichuAction.Ready __ -> validateReady(state, seat);
             case TichuAction.PassCards pc -> validatePassCards(state, seat, pc);
-            case TichuAction.MakeWish w -> validateMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> validateGiveDragonTrick(state, seat, g);
         }
     }
@@ -192,27 +191,6 @@ public final class ActionValidator {
         }
         if (!playerOwnsAll(player.hand(), chosen)) {
             throw reject(RejectionReason.CARDS_NOT_OWNED);
-        }
-    }
-
-    // ---------- MakeWish ----------
-    private static void validateMakeWish(TichuState state, int seat, TichuAction.MakeWish action) {
-        TichuState.Playing playing = requirePlaying(state);
-        if (action.rank() < 2 || action.rank() > 14) {
-            throw reject(RejectionReason.INVALID_WISH_RANK);
-        }
-        TrickState trick = playing.trick();
-        // 소원은 Mahjong 을 막 낸 직후에만 가능. 가장 마지막 플레이가 Mahjong 인지 확인.
-        if (trick.currentTop() == null) {
-            throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
-        }
-        List<Card> top = trick.currentTop().cards();
-        boolean topIsMahjong = top.size() == 1 && top.get(0).is(Special.MAHJONG);
-        if (!topIsMahjong || trick.currentTopSeat() != seat) {
-            throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
-        }
-        if (trick.activeWish() != null) {
-            throw reject(RejectionReason.DUPLICATE_DECLARATION, "wish already made this round");
         }
     }
 

@@ -391,52 +391,6 @@ class ActionValidatorTest {
                 .doesNotThrowAnyException();
     }
 
-    // ---------- MakeWish ----------
-
-    @Test
-    void wish_must_follow_mahjong_play() {
-        Hand mahjongHand = new Hand(HandType.SINGLE, List.of(Card.mahjong()), 1, 1);
-        var trick = new TrickState(
-                0, 1, mahjongHand, 0, Set.of(),
-                List.of(mahjongHand), mahjongHand.cards(), null);
-        var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
-
-        assertThatCode(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(7)))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void wish_after_non_mahjong_play_is_rejected() {
-        Hand nonMahjong = singleHand(n(Suit.JADE, 9));
-        var trick = new TrickState(
-                0, 1, nonMahjong, 0, Set.of(),
-                List.of(nonMahjong), nonMahjong.cards(), null);
-        var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
-
-        assertThatThrownBy(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(7)))
-                .extracting(t -> ((TichuActionRejectedException) t).reason())
-                .isEqualTo(RejectionReason.WISH_OUT_OF_CONTEXT);
-    }
-
-    @Test
-    void invalid_wish_rank_is_rejected() {
-        Hand mahjongHand = new Hand(HandType.SINGLE, List.of(Card.mahjong()), 1, 1);
-        var trick = new TrickState(
-                0, 1, mahjongHand, 0, Set.of(),
-                List.of(mahjongHand), mahjongHand.cards(), null);
-        var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
-
-        assertThatThrownBy(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(15)))
-                .extracting(t -> ((TichuActionRejectedException) t).reason())
-                .isEqualTo(RejectionReason.INVALID_WISH_RANK);
-    }
-
     // ---------- Wish enforcement on play ----------
 
     @Test
