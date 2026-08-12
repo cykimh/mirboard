@@ -94,7 +94,17 @@ public final class LegalActionEnumerator {
 
         // 1장 단일 플레이.
         for (Card c : me.hand()) {
+            // 소원 없는 변형을 항상 **먼저** 넣는다 — TimeoutActionPolicy 가 동률에서
+            // Stream.min 의 "먼저 온 것 유지" 성질로 고르므로, 이 순서라야 타임아웃
+            // 자동 플레이가 D-108 이전과 똑같이 "소원 없이 마작" 으로 남는다.
             result.add(new TichuAction.PlayCard(List.of(c)));
+            if (c.is(Special.MAHJONG)) {
+                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-108). 봇은 휴리스틱 없이
+                // 균등 후보 — RandomBotPolicy 가 이 중에서 고른다.
+                for (int r = 2; r <= 14; r++) {
+                    result.add(new TichuAction.PlayCard(List.of(c), r));
+                }
+            }
         }
 
         // 동일 rank 페어 / 트리플 — 손패가 14장 이내라 O(n^3) 무시 가능.
