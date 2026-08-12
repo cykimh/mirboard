@@ -214,7 +214,7 @@ esc 를 "소원 없이 내기"로 두면 모달을 무심코 닫았을 때 카�
 | `TichuSpecialCardScenarioTest:77` | 별도 `MakeWish` 호출을 동봉으로 교체. **원 버그의 회귀 테스트**로 "마작 플레이 한 번에 `WishMade` 발행 + `activeWish` 세팅 + 다음 좌석이 그 위에 낸 뒤에도 유지"를 검증 |
 | `LegalActionEnumeratorTest` | 마작 보유 시 마작 후보가 14종(소원 없음 1 + 랭크 2~14 의 13), 그리고 **소원 없는 변형이 목록에서 먼저** |
 | `RandomBotPolicyTest` · `BotMatchSimulationIT` | 봇 소원이 켜진 상태에서 매치가 교착 없이 정상 종료 |
-| `GameStompControllerIntegrationTest` | 와이어에서 `PLAY_CARD {cards, wishRank}` 한 프레임이 `PLAYED` + `WISH_MADE` 를 내는지. **선결 확인**: 마작 보유 좌석을 결정론적으로 만들 수 있는지 구현 착수 시 확인하고, 불가하면 엔진 레벨 검증으로 대체하되 그 사실을 이 문서에 남긴다 |
+| `GameStompControllerIntegrationTest` | 와이어에서 `PLAY_CARD {cards, wishRank}` 한 프레임이 `PLAYED` + `WISH_MADE` 를 내는지. 기존 `mahjong_leader_plays_...` 테스트가 `forcePlayingFromDealing` 으로 마작 리더를 결정론적으로 만들고 있어, 셋업 복제 없이 그 테스트를 확장했다 |
 
 **클라**
 
