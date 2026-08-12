@@ -13,18 +13,34 @@ import { rankGlyph } from './handType';
 
 interface MakeWishModalProps {
   open: boolean;
+  /** 소원을 지정하고 낸다. */
   onConfirm: (rank: number) => void;
-  onSkip: () => void;
+  /** 소원 없이 낸다. */
+  onSkipWish: () => void;
+  /** 취소 — 아무것도 보내지 않는다 (esc / 바깥 클릭). */
+  onCancel: () => void;
 }
 
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
-/** Phase 20e(D-76) — shadcn Dialog 재디자인. 소원 지정 로직 불변. */
-export function MakeWishModal({ open, onConfirm, onSkip }: MakeWishModalProps) {
+/**
+ * 소원 모달. D-108 이후 이 모달은 "이미 낸 마작에 소원을 건다"가 아니라 **아직 보내지
+ * 않은 플레이에 소원을 실을지 묻는** 창이다. 그래서 dismiss(esc/바깥 클릭)는 "소원
+ * 없이 내기"가 아니라 **취소**다 — 무심코 닫았을 때 카드가 나가면 안 된다.
+ */
+export function MakeWishModal({ open, onConfirm, onSkipWish, onCancel }: MakeWishModalProps) {
   const [selected, setSelected] = useState<number | null>(null);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onSkip()}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setSelected(null);
+          onCancel();
+        }
+      }}
+    >
       <DialogContent className="app-shell">
         <DialogHeader>
           <DialogTitle>{t('wish.title')}</DialogTitle>
@@ -44,13 +60,25 @@ export function MakeWishModal({ open, onConfirm, onSkip }: MakeWishModalProps) {
           ))}
         </div>
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={onSkip}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setSelected(null);
+              onSkipWish();
+            }}
+          >
             {t('wish.skip')}
           </Button>
           <Button
             type="button"
             disabled={selected === null}
-            onClick={() => selected !== null && onConfirm(selected)}
+            onClick={() => {
+              if (selected === null) return;
+              const rank = selected;
+              setSelected(null);
+              onConfirm(rank);
+            }}
           >
             {t('wish.confirm')}
           </Button>

@@ -19,7 +19,9 @@ interface UseGameActionsArgs {
   toggleCardSelection: (c: Card) => void;
   selectPassCard: (c: Card) => void;
   setError: (msg: string | null) => void;
-  setWishModalDismissed: (v: boolean) => void;
+  /** 아직 보내지 않은, 소원 모달 대기 중인 플레이. null 이면 모달은 닫혀 있다. */
+  pendingWishPlay: Card[] | null;
+  setPendingWishPlay: (cards: Card[] | null) => void;
 }
 
 /**
@@ -41,11 +43,18 @@ export function useGameActions({
   toggleCardSelection,
   selectPassCard,
   setError,
-  setWishModalDismissed,
+  pendingWishPlay,
+  setPendingWishPlay,
 }: UseGameActionsArgs) {
   function handlePlay() {
     if (selectedCards.length === 0) {
       setError(t('play.error.pickCard'));
+      return;
+    }
+    // D-108 — 마작이 포함되면 소원을 먼저 묻고 한 프레임으로 보낸다. 여기서는 아직
+    // 전송하지 않는다. 소원은 마작을 내는 행위의 일부라 서버도 한 액션으로 받는다.
+    if (selectedCards.some((c) => c.special === 'MAHJONG')) {
+      setPendingWishPlay(selectedCards);
       return;
     }
     sendAction({ '@action': 'PLAY_CARD', cards: selectedCards });
@@ -72,13 +81,25 @@ export function useGameActions({
     sendAction({ '@action': 'DECLARE_GRAND_TICHU' });
   }
 
-  function handleMakeWish(rank: number) {
-    sendAction({ '@action': 'MAKE_WISH', rank });
-    setWishModalDismissed(true);
+  /** 소원을 지정하고 낸다 — PLAY_CARD 한 프레임에 wishRank 를 동봉. */
+  function handleConfirmWishPlay(rank: number) {
+    if (!pendingWishPlay) return;
+    sendAction({ '@action': 'PLAY_CARD', cards: pendingWishPlay, wishRank: rank });
+    setPendingWishPlay(null);
+    clearSelection();
   }
 
-  function handleSkipWish() {
-    setWishModalDismissed(true);
+  /** 소원 없이 낸다 — 일반 PLAY_CARD 와 동일한 프레임. */
+  function handlePlayWithoutWish() {
+    if (!pendingWishPlay) return;
+    sendAction({ '@action': 'PLAY_CARD', cards: pendingWishPlay });
+    setPendingWishPlay(null);
+    clearSelection();
+  }
+
+  /** 취소 — 전송하지 않고 선택도 유지한다(다시 "내기" 를 누를 수 있게). */
+  function handleCancelWishPlay() {
+    setPendingWishPlay(null);
   }
 
   function handleGiveDragon(toSeat: number) {
@@ -115,8 +136,9 @@ export function useGameActions({
     handleBackgroundClick,
     handleDeclareTichu,
     handleDeclareGrandTichu,
-    handleMakeWish,
-    handleSkipWish,
+    handleConfirmWishPlay,
+    handlePlayWithoutWish,
+    handleCancelWishPlay,
     handleGiveDragon,
     handleReady,
     handleRematch,

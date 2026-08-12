@@ -20,9 +20,6 @@ interface UseGameTableEffectsArgs {
   mySeat: number;
   myTeam: 'A' | 'B';
   myTurn: boolean;
-  /** Mahjong 리드 컨텍스트 식별자. 바뀌면 소원 모달 dismiss 를 초기화한다. */
-  wishContextKey: string | null;
-  setWishModalDismissed: (v: boolean) => void;
   matchEnded: TichuRoomState['matchEnded'];
   triggerEffect: (kind: EffectKind, text?: string, tone?: EffectTone) => void;
   playChime: () => void;
@@ -37,7 +34,7 @@ interface UseGameTableEffectsArgs {
 }
 
 /**
- * GameTable 의 부수효과 묶음 — 소원 모달 초기화, 매치 종료/내 차례 연출 트리거,
+ * GameTable 의 부수효과 묶음 — 매치 종료/내 차례 연출 트리거,
  * 카드 비행 애니메이션, 패스 자동 제출.
  *
  * 애니메이션에 필요한 DOM ref(arena/centerTrick)와 비행 상태를 돌려주므로,
@@ -50,8 +47,6 @@ export function useGameTableEffects({
   mySeat,
   myTeam,
   myTurn,
-  wishContextKey,
-  setWishModalDismissed,
   matchEnded,
   triggerEffect,
   playChime,
@@ -64,12 +59,6 @@ export function useGameTableEffects({
   passCardsBySlot,
   sendAction,
 }: UseGameTableEffectsArgs) {
-  useEffect(() => {
-    setWishModalDismissed(false);
-    // setWishModalDismissed 는 setState 라 안정적 — wishContextKey 변화로만 트리거.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wishContextKey]);
-
   // 매치 종료 시 연출 1회 트리거. mySeat 으로 승/패/관전(중립) 분기 — 패배 시 트로피
   // 축하가 아니라 차분한 muted 연출(EffectsOverlay 가 tone 으로 렌더).
   useEffect(() => {

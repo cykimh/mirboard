@@ -60,7 +60,6 @@ export type TichuActionType =
   | 'DECLARE_GRAND_TICHU'
   | 'READY'
   | 'PASS_CARDS'
-  | 'MAKE_WISH'
   | 'GIVE_DRAGON_TRICK';
 
 export interface ResyncResponse {
