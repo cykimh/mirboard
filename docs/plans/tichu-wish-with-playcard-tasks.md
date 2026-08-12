@@ -1716,7 +1716,11 @@ git commit -m "test: 마작 소원 동봉 통합 검증 + 미덮인 범위 기�
 
 ## 완료 기준
 
-- [ ] `grep -rn "MAKE_WISH\|MakeWish" server/src client/src` → **0건**
+- [ ] `grep -rn "MAKE_WISH\|MakeWish" server/src` → **0건**
+- [ ] `grep -rn "MAKE_WISH" client/src` → **0건**
+      (`client/src/features/tichu/MakeWishModal.tsx` 의 컴포넌트 이름 `MakeWishModal` 은
+      **남는다** — §6 "유지" 목록대로 모달 자체는 존치하고 props 만 바뀌므로, 제거된
+      액션의 잔재가 아니다)
 - [ ] `./gradlew :server:test` 실패 0
 - [ ] `npm --prefix client run test` 실패 0, `npm --prefix client run build` 성공
 - [ ] `git diff --stat main -- server/src/main/java/com/mirboard/infra` → 변경 0
