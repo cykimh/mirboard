@@ -25,7 +25,8 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>{@code presence:room:{roomId}} — HASH userId→세션 수. "이 방에 누가 있나".</li>
  *   <li>{@code presence:session:{sessionId}} — STRING "{userId}:{roomId}".
- *       DISCONNECT 는 sessionId 만 주므로 역방향 조회가 필요하다.</li>
+ *       DISCONNECT 는 sessionId 만 주므로 역방향 조회가 필요하다. 동시에 "이 세션을
+ *       이미 셌는가"의 표식이라 {@link #join} 이 구독마다 불려도 카운터는 한 번만 는다.</li>
  * </ul>
  */
 @Component
@@ -35,19 +36,33 @@ public class RoomPresence {
     private static final Duration TTL = Duration.ofHours(6);
 
     private final StringRedisTemplate redis;
+    private final RedisScript<Long> joinScript;
     private final RedisScript<Long> leaveScript;
 
     public RoomPresence(StringRedisTemplate redis,
+                        @Qualifier("presenceJoinScript") RedisScript<Long> joinScript,
                         @Qualifier("presenceLeaveScript") RedisScript<Long> leaveScript) {
         this.redis = redis;
+        this.joinScript = joinScript;
         this.leaveScript = leaveScript;
     }
 
-    /** 게임 토픽 SUBSCRIBE 시 호출. 같은 유저의 두 번째 탭이면 카운터만 증가한다. */
+    /**
+     * 방 토픽 SUBSCRIBE 시 호출. 같은 유저의 두 번째 탭이면 카운터가 증가하지만,
+     * <b>같은 세션의 추가 구독은 세지 않는다</b> — 호출자는 구독마다 부르는데 DISCONNECT
+     * 는 세션당 한 번뿐이라, 멱등하지 않으면 잔여 카운터가 남아 끊긴 사용자가 영영
+     * 접속 중으로 보인다(= 탈주 미확정). 멱등 판정은 `presence_join.lua` 안에서 원자적.
+     */
     public void join(String sessionId, long userId, String roomId) {
-        redis.opsForHash().increment(roomKey(roomId), String.valueOf(userId), 1L);
-        redis.expire(roomKey(roomId), TTL);
-        redis.opsForValue().set(sessionKey(sessionId), userId + ":" + roomId, TTL);
+        String existing = redis.opsForValue().get(sessionKey(sessionId));
+        if (existing != null && !existing.equals(userId + ":" + roomId)) {
+            // 세션이 다른 방(또는 다른 유저)을 보고 있었다 — 옛 방 카운터부터 내려야
+            // 그 방에 고아 프레즌스가 남지 않는다. 클라는 방마다 새 소켓을 열지만
+            // 구독은 클라가 보내는 값이므로 신뢰하지 않는다(Server-Authoritative).
+            leave(sessionId);
+        }
+        redis.execute(joinScript, List.of(roomKey(roomId), sessionKey(sessionId)),
+                String.valueOf(userId), roomId, String.valueOf(TTL.toSeconds()));
     }
 
     /**
