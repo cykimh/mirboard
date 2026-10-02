@@ -12,7 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-108 — 소원이 PlayCard 에 동봉되면서 봇 후보에 랭크 변형이 생겼다. 타임아웃
+ * D-109 — 소원이 PlayCard 에 동봉되면서 봇 후보에 랭크 변형이 생겼다. 타임아웃
  * 자동 플레이는 **결정적**이어야 하므로 소원을 걸지 않는 쪽으로 고정한다.
  */
 class TimeoutActionPolicyTest {

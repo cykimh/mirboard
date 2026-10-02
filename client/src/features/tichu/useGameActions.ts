@@ -51,7 +51,7 @@ export function useGameActions({
       setError(t('play.error.pickCard'));
       return;
     }
-    // D-108 — 마작이 포함되면 소원을 먼저 묻고 한 프레임으로 보낸다. 여기서는 아직
+    // D-109 — 마작이 포함되면 소원을 먼저 묻고 한 프레임으로 보낸다. 여기서는 아직
     // 전송하지 않는다. 소원은 마작을 내는 행위의 일부라 서버도 한 액션으로 받는다.
     if (selectedCards.some((c) => c.special === 'MAHJONG')) {
       setPendingWishPlay(selectedCards);

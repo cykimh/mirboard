@@ -1,4 +1,4 @@
-# 마작 소원 `PLAY_CARD` 동봉 (D-108) 구현 계획
+# 마작 소원 `PLAY_CARD` 동봉 (D-109) 구현 계획
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -14,7 +14,7 @@
 **Tech Stack:** Java 25 / Spring Boot 4.0.1 (sealed interface + record), JUnit 5 + AssertJ /
 Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 
-**설계 정본:** `docs/plans/tichu-wish-with-playcard.md` · **결정 이력:** `docs/decisions.md` D-108
+**설계 정본:** `docs/plans/tichu-wish-with-playcard.md` · **결정 이력:** `docs/decisions.md` D-109
 
 ## Global Constraints
 
@@ -32,7 +32,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 - **`javax.*` 금지, `jakarta.*` 만 사용** (이 작업에는 해당 import 없음).
 - 커밋 시 pre-commit 훅 `check:fast`(클라 tsc + vitest + 서버 compile)가 자동 게이트다.
   훅이 실패하면 커밋이 막히므로 각 Task 의 테스트 단계를 건너뛰지 말 것.
-- 문서 수정은 코드보다 **먼저** (Task 1). `docs/decisions.md` D-108 은 이미 작성되어 있다.
+- 문서 수정은 코드보다 **먼저** (Task 1). `docs/decisions.md` D-109 은 이미 작성되어 있다.
 - 한국어 프로젝트 — 주석·문서·커밋 메시지는 한국어로 작성한다.
 
 ---
@@ -74,7 +74,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 - Modify: `docs/plans/mvp-roadmap.md` (트랙 외 기록 블록 뒤)
 
 **Interfaces:**
-- Consumes: `docs/decisions.md` D-108 (이미 작성됨), `docs/plans/tichu-wish-with-playcard.md`
+- Consumes: `docs/decisions.md` D-109 (이미 작성됨), `docs/plans/tichu-wish-with-playcard.md`
 - Produces: 없음 (문서 전용). 이후 Task 들이 이 문서와 일치하는지로 검증된다.
 
 - [ ] **Step 1: `docs/stomp-protocol.md` 액션 표 수정**
@@ -90,7 +90,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 바꿀 내용 (`MAKE_WISH` 행 삭제, `PLAY_CARD` 행에 옵션 필드 추가):
 
 ```markdown
-| `PLAY_CARD` | `cards: Card[]`, `wishRank?: 2..14` | 일반 플레이 (Phoenix 해석은 서버가 결정). `wishRank` 는 낸 카드에 Mahjong 이 포함될 때만 허용 — 소원은 마작을 내는 액션에 동봉한다(D-108) |
+| `PLAY_CARD` | `cards: Card[]`, `wishRank?: 2..14` | 일반 플레이 (Phoenix 해석은 서버가 결정). `wishRank` 는 낸 카드에 Mahjong 이 포함될 때만 허용 — 소원은 마작을 내는 액션에 동봉한다(D-109) |
 | `PASS_TRICK` | — | 트릭 패스 (리드 차례에는 불가) |
 ```
 
@@ -105,7 +105,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 바꿀 내용:
 
 ```markdown
-- **Wish 활성**: Mahjong 을 내는 **그 액션에 함께** rank 2..14 중 하나를 wish 로 지정 (생략 가능). 단독 리드든 콤보(예: 1-2-3-4-5 STRAIGHT)의 일부든 무관 — 낸 카드에 Mahjong 이 포함되면 지정 가능. **별도 `MAKE_WISH` 액션은 없다** (D-108 폐기 — 사후 별도 창은 다음 플레이어가 카드를 내는 순간 닫혀 실사용이 불가능했다).
+- **Wish 활성**: Mahjong 을 내는 **그 액션에 함께** rank 2..14 중 하나를 wish 로 지정 (생략 가능). 단독 리드든 콤보(예: 1-2-3-4-5 STRAIGHT)의 일부든 무관 — 낸 카드에 Mahjong 이 포함되면 지정 가능. **별도 `MAKE_WISH` 액션은 없다** (D-109 폐기 — 사후 별도 창은 다음 플레이어가 카드를 내는 순간 닫혀 실사용이 불가능했다).
 ```
 
 - [ ] **Step 3: `docs/rules-tichu.md` §8.1 코드/테스트/갭 블록 수정**
@@ -133,7 +133,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 
 **테스트:** `ActionValidatorTest` (마작 단독 / 스트레이트 동봉 / 마작 미포함 / 랭크 범위), `TichuSpecialCardScenarioTest` (동봉 1회로 활성 + 다음 좌석이 그 위에 낸 뒤에도 유지).
 
-**갭:** 없음 — D-108 에서 콤보 동봉 갭이 닫혔다. "소원 1회" 제한은 Mahjong 이 덱에 1장뿐이라 구조적으로 보장되므로 별도 중복 검사가 없다.
+**갭:** 없음 — D-109 에서 콤보 동봉 갭이 닫혔다. "소원 1회" 제한은 Mahjong 이 덱에 1장뿐이라 구조적으로 보장되므로 별도 중복 검사가 없다.
 ```
 
 - [ ] **Step 4: `docs/rules-tichu.md` §9 의 낡은 "deferred" 서술 정정**
@@ -180,7 +180,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 바꿀 내용:
 
 ```markdown
-  - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-108), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
+  - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
 ```
 
 - [ ] **Step 6: `docs/implementation-status.md` 두 곳 수정**
@@ -211,7 +211,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 바꿀 내용:
 
 ```markdown
-- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-108) — 클라는
+- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-109) — 클라는
   마작이 포함된 선택을 낼 때 `MakeWishModal` 을 먼저 거친다. 드래곤 트릭 → GIVE_DRAGON_TRICK
   흐름은 기존대로 `GiveDragonTrickModal` 과 연동.
 ```
@@ -237,7 +237,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 바꿀 내용:
 
 ```markdown
-### 시나리오 1 — Mahjong 소원 (D-108)
+### 시나리오 1 — Mahjong 소원 (D-109)
 
 1. 게임 시작 (정원 + 전원 준비 → IN_GAME). **봇 채우기 방으로도 검증 가능** — 소원 창이
    더 이상 다음 플레이어의 속도에 좌우되지 않는 것이 이 시나리오의 핵심이다.
@@ -269,7 +269,7 @@ Vite + React 18 + TypeScript, Zustand, Vitest + React Testing Library.
 ```markdown
 직후 라이브 401px 실측에서 나온 게임판 결함 4건은 D-88 에서 보정.
 
-**트랙 외 룰 결함(D-108)**: 로컬 실플레이(2026-08-04)에서 마작 소원(MAKE_WISH)이 실사용
+**트랙 외 룰 결함(D-109)**: 로컬 실플레이(2026-08-04)에서 마작 소원(MAKE_WISH)이 실사용
 불가로 드러났다. 소원 창이 "마작이 아직 트릭 top 인 동안"으로만 열려 있어 다음 플레이어가
 카드를 내는 순간 닫혔고(봇 방 기준 700ms), 봇은 소원 후보를 아예 만들지 않아 봇이 마작을
 리드하면 소원이 영구히 발생하지 않았다. 원 티츄 룰대로 **소원을 `PLAY_CARD` 에 동봉**하고
@@ -287,7 +287,7 @@ Run:
 grep -rn "MAKE_WISH\|MakeWish" docs/ CLAUDE.md README.md
 ```
 
-Expected: `docs/decisions.md` 안의 **이력 서술**(D-34, D-108 등 과거 결정 설명)만 남고,
+Expected: `docs/decisions.md` 안의 **이력 서술**(D-34, D-109 등 과거 결정 설명)만 남고,
 `docs/stomp-protocol.md` · `docs/rules-tichu.md` · `CLAUDE.md` · `docs/implementation-status.md` ·
 `docs/qa-scenarios.md` 에는 `MAKE_WISH` 액션을 **현재 계약으로 소개하는** 문장이 없어야 한다.
 (`docs/plans/mvp-roadmap.md` 의 Phase 1 액션 목록·6E-1 완료 기록과 `docs/decisions.md` 는
@@ -297,7 +297,7 @@ Expected: `docs/decisions.md` 안의 **이력 서술**(D-34, D-108 등 과거 �
 
 ```bash
 git add docs/stomp-protocol.md docs/rules-tichu.md CLAUDE.md docs/implementation-status.md docs/qa-scenarios.md docs/plans/mvp-roadmap.md docs/decisions.md docs/plans/tichu-wish-with-playcard.md docs/plans/tichu-wish-with-playcard-tasks.md
-git commit -m "docs: 마작 소원을 PLAY_CARD 에 동봉 — 계약 문서 선행 갱신 (D-108)"
+git commit -m "docs: 마작 소원을 PLAY_CARD 에 동봉 — 계약 문서 선행 갱신 (D-109)"
 ```
 
 ---
@@ -329,7 +329,7 @@ git commit -m "docs: 마작 소원을 PLAY_CARD 에 동봉 — 계약 문서 선
 다음 섹션을 추가한다. (기존 MakeWish 테스트 3개는 Task 3 에서 지운다 — 지금은 둘 다 산다.)
 
 ```java
-    // ---------- PlayCard 에 동봉한 소원 (D-108) ----------
+    // ---------- PlayCard 에 동봉한 소원 (D-109) ----------
 
     @Test
     void wish_bundled_with_solo_mahjong_lead_is_accepted() {
@@ -347,7 +347,7 @@ git commit -m "docs: 마작 소원을 PLAY_CARD 에 동봉 — 계약 문서 선
 
     @Test
     void wish_bundled_with_straight_containing_mahjong_is_accepted() {
-        // D-108 신규 룰: 마작을 콤보(1-2-3-4-5)의 일부로 내도 소원을 걸 수 있다.
+        // D-109 신규 룰: 마작을 콤보(1-2-3-4-5)의 일부로 내도 소원을 걸 수 있다.
         var straight = List.of(
                 Card.mahjong(), n(Suit.JADE, 2), n(Suit.SWORD, 3),
                 n(Suit.STAR, 4), n(Suit.PAGODA, 5));
@@ -439,7 +439,7 @@ Expected: FAIL — 컴파일 에러 `constructor PlayCard in record PlayCard can
      * 차례에서 손패 묶음을 트릭에 낸다. 폭탄은 다른 차례에도 인터럽트 가능.
      *
      * <p>{@code wishRank} 는 Mahjong 소원(2~14). null 이면 소원 없음. 소원은 마작을
-     * 내는 행위의 일부라 별도 액션이 아니라 여기에 동봉한다 (D-108) — 사후 별도
+     * 내는 행위의 일부라 별도 액션이 아니라 여기에 동봉한다 (D-109) — 사후 별도
      * 액션이던 시절엔 다음 플레이어가 카드를 내는 순간 창이 닫혀 실사용이 불가능했다.
      */
     record PlayCard(List<Card> cards, Integer wishRank) implements TichuAction {
@@ -478,7 +478,7 @@ Expected: FAIL — 컴파일 에러 `constructor PlayCard in record PlayCard can
             }
         }
 
-        // 소원 "지정" (D-108) — 위의 소원 "강제" 와 다른 관심사다. 마작을 내는 그
+        // 소원 "지정" (D-109) — 위의 소원 "강제" 와 다른 관심사다. 마작을 내는 그
         // 액션에 동봉하며, 단독 리드든 콤보의 일부든 낸 카드에 마작이 포함되면 허용.
         // 메서드 끝에 두는 이유: 턴·소유·족보 실패가 먼저 보고되어야 거절 사유가 읽힌다.
         // "소원 1회" 는 마작이 덱에 1장뿐이라 구조적으로 보장되므로 중복 검사가 없다.
@@ -514,7 +514,7 @@ Expected: PASS (기존 MakeWish 테스트 3개 포함 전부 그린).
 ```java
     @Test
     void mahjong_lead_with_bundled_wish_activates_in_one_action() {
-        // D-108 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
+        // D-109 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
         // 였다. 소원을 플레이에 동봉하면 창 자체가 없으므로, 다음 좌석이 낸 뒤에도
         // 소원이 살아 있는지로 고정한다.
         var players = List.of(
@@ -582,7 +582,7 @@ Expected: FAIL — `mahjong_lead_with_bundled_wish_activates_in_one_action` 에�
             updatedWish = wishBefore.fulfill();
         }
 
-        // 소원 지정 (D-108). fulfillment **뒤**에 둔다 — "마작을 낸 그 플레이가 자기
+        // 소원 지정 (D-109). fulfillment **뒤**에 둔다 — "마작을 낸 그 플레이가 자기
         // 소원을 즉시 채우지 않는다"를 코드 순서로 못박는다(마작 rank 1, 소원 2~14 라
         // 실제로도 겹치지 않지만 순서에 의존하지 않게). 검증은 ActionValidator 가 마쳤다.
         if (action.wishRank() != null) {
@@ -618,7 +618,7 @@ Expected: PASS. 특히 `TichuEngineRoundSimulationTest` · `DealingLifecycleTest
 
 ```bash
 git add server/src/main/java/com/mirboard/domain/game/tichu/action/TichuAction.java server/src/main/java/com/mirboard/domain/game/tichu/action/ActionValidator.java server/src/main/java/com/mirboard/domain/game/tichu/TichuEngine.java server/src/test/java/com/mirboard/domain/game/tichu/action/ActionValidatorTest.java server/src/test/java/com/mirboard/domain/game/tichu/TichuSpecialCardScenarioTest.java
-git commit -m "feat(tichu): PLAY_CARD 에 wishRank 동봉 — 마작 소원을 플레이와 원자화 (D-108)"
+git commit -m "feat(tichu): PLAY_CARD 에 wishRank 동봉 — 마작 소원을 플레이와 원자화 (D-109)"
 ```
 
 ---
@@ -773,7 +773,7 @@ Expected: PASS, 실패 0. (Testcontainers 통합 테스트가 있으므로 Docke
 
 ```bash
 git add server/src
-git commit -m "refactor(tichu): MAKE_WISH 액션 제거 — PlayCard 동봉으로 일원화 (D-108)"
+git commit -m "refactor(tichu): MAKE_WISH 액션 제거 — PlayCard 동봉으로 일원화 (D-109)"
 ```
 
 ---
@@ -864,10 +864,10 @@ Expected: FAIL — `Expected size: 14 but was: 1` (아직 변형을 만들지 �
         for (Card c : me.hand()) {
             // 소원 없는 변형을 항상 **먼저** 넣는다 — TimeoutActionPolicy 가 동률에서
             // Stream.min 의 "먼저 온 것 유지" 성질로 고르므로, 이 순서라야 타임아웃
-            // 자동 플레이가 D-108 이전과 똑같이 "소원 없이 마작" 으로 남는다.
+            // 자동 플레이가 D-109 이전과 똑같이 "소원 없이 마작" 으로 남는다.
             result.add(new TichuAction.PlayCard(List.of(c)));
             if (c.is(Special.MAHJONG)) {
-                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-108). 봇은 휴리스틱 없이
+                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-109). 봇은 휴리스틱 없이
                 // 균등 후보 — RandomBotPolicy 가 이 중에서 고른다.
                 for (int r = 2; r <= 14; r++) {
                     result.add(new TichuAction.PlayCard(List.of(c), r));
@@ -909,7 +909,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-108 — 소원이 PlayCard 에 동봉되면서 봇 후보에 랭크 변형이 생겼다. 타임아웃
+ * D-109 — 소원이 PlayCard 에 동봉되면서 봇 후보에 랭크 변형이 생겼다. 타임아웃
  * 자동 플레이는 **결정적**이어야 하므로 소원을 걸지 않는 쪽으로 고정한다.
  */
 class TimeoutActionPolicyTest {
@@ -968,7 +968,7 @@ Expected: PASS. 봇이 소원을 걸면 소원 강제가 실제로 작동하므�
 
 ```bash
 git add server/src/main/java/com/mirboard/domain/game/tichu/bot/LegalActionEnumerator.java server/src/test/java/com/mirboard/domain/game/tichu/bot/
-git commit -m "feat(tichu): 봇이 마작 소원을 후보로 낸다 — 타임아웃은 무소원 고정 (D-108)"
+git commit -m "feat(tichu): 봇이 마작 소원을 후보로 낸다 — 타임아웃은 무소원 고정 (D-109)"
 ```
 
 ---
@@ -1002,7 +1002,7 @@ git commit -m "feat(tichu): 봇이 마작 소원을 후보로 낸다 — 타임�
 ```tsx
 const MAHJONG: Card = { suit: null, rank: 1, special: 'MAHJONG' };
 
-describe('GameTable — 마작 소원 동봉 (D-108)', () => {
+describe('GameTable — 마작 소원 동봉 (D-109)', () => {
   it('마작이 포함된 선택을 내면 전송 전에 소원 모달을 띄운다', () => {
     seed({
       tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
@@ -1158,7 +1158,7 @@ interface MakeWishModalProps {
 const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 /**
- * 소원 모달. D-108 이후 이 모달은 "이미 낸 마작에 소원을 건다"가 아니라 **아직 보내지
+ * 소원 모달. D-109 이후 이 모달은 "이미 낸 마작에 소원을 건다"가 아니라 **아직 보내지
  * 않은 플레이에 소원을 실을지 묻는** 창이다. 그래서 dismiss(esc/바깥 클릭)는 "소원
  * 없이 내기"가 아니라 **취소**다 — 무심코 닫았을 때 카드가 나가면 안 된다.
  */
@@ -1248,7 +1248,7 @@ export function MakeWishModal({ open, onConfirm, onSkipWish, onCancel }: MakeWis
 바꿀 내용:
 
 ```ts
-  // D-108 — 마작이 포함된 플레이는 소원 모달을 먼저 거친다. 여기 담겨 있는 동안은
+  // D-109 — 마작이 포함된 플레이는 소원 모달을 먼저 거친다. 여기 담겨 있는 동안은
   // 아직 서버로 나가지 않은 상태이고, 모달을 취소하면 그대로 폐기된다.
   const [pendingWishPlay, setPendingWishPlay] = useState<Card[] | null>(null);
 ```
@@ -1340,7 +1340,7 @@ export function MakeWishModal({ open, onConfirm, onSkipWish, onCancel }: MakeWis
       setError(t('play.error.pickCard'));
       return;
     }
-    // D-108 — 마작이 포함되면 소원을 먼저 묻고 한 프레임으로 보낸다. 여기서는 아직
+    // D-109 — 마작이 포함되면 소원을 먼저 묻고 한 프레임으로 보낸다. 여기서는 아직
     // 전송하지 않는다. 소원은 마작을 내는 행위의 일부라 서버도 한 액션으로 받는다.
     if (selectedCards.some((c) => c.special === 'MAHJONG')) {
       setPendingWishPlay(selectedCards);
@@ -1541,7 +1541,7 @@ Expected: **0건**.
 
 ```bash
 git add client/src
-git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 dismiss 상태머신 제거 (D-108)"
+git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 dismiss 상태머신 제거 (D-109)"
 ```
 
 ---
@@ -1562,7 +1562,7 @@ git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 di
 `mahjong_leader_plays_and_event_broadcasts_to_subscribers` 가 있고,
 `forcePlayingFromDealing` 이 **마작 보유자를 리드 좌석으로 결정론적으로** 만든다.
 새 테스트를 만들어 40줄짜리 셋업을 복제하지 말고 **이 테스트를 확장**한다 —
-같은 프레임에 `wishRank` 를 실으면 기존 `PLAYED` 검증을 유지한 채 D-108 와이어 계약이
+같은 프레임에 `wishRank` 를 실으면 기존 `PLAYED` 검증을 유지한 채 D-109 와이어 계약이
 함께 덮인다.
 
 메서드 이름을 찾는다:
@@ -1588,7 +1588,7 @@ git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 di
 
 ```java
         action.put("cards", List.of(cardJson));
-        // D-108 — 소원은 별도 액션이 아니라 이 프레임에 동봉된다.
+        // D-109 — 소원은 별도 액션이 아니라 이 프레임에 동봉된다.
         action.put("wishRank", 7);
         leaderSession.send("/app/room/" + roomId + "/action", action);
 ```
@@ -1614,7 +1614,7 @@ git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 di
 바꿀 내용:
 
 ```java
-        // 한 프레임이 PLAYED 와 WISH_MADE 를 함께 브로드캐스트한다 (D-108).
+        // 한 프레임이 PLAYED 와 WISH_MADE 를 함께 브로드캐스트한다 (D-109).
         JsonNode played = null;
         JsonNode wishMade = null;
         for (int i = 0; i < 8 && (played == null || wishMade == null); i++) {
@@ -1627,7 +1627,7 @@ git commit -m "feat(client): 마작 소원을 PLAY_CARD 에 동봉 — 모달 di
         assertThat(played).as("Subscriber must receive a PLAYED event").isNotNull();
         assertThat(played.get("payload").get("seat").asInt()).isEqualTo(leadSeat);
         assertThat(played.get("seq").asLong()).isPositive();
-        assertThat(wishMade).as("같은 프레임이 WISH_MADE 도 낸다 (D-108)").isNotNull();
+        assertThat(wishMade).as("같은 프레임이 WISH_MADE 도 낸다 (D-109)").isNotNull();
         assertThat(wishMade.get("payload").get("rank").asInt()).isEqualTo(7);
     }
 ```
@@ -1707,7 +1707,7 @@ Expected: **출력 없음** (변경 0). 이 작업은 게임 내부에서만 끝
 
 ```bash
 git add -A
-git commit -m "test: 마작 소원 동봉 통합 검증 + 미덮인 범위 기록 (D-108)"
+git commit -m "test: 마작 소원 동봉 통합 검증 + 미덮인 범위 기록 (D-109)"
 ```
 
 (변경할 파일이 없으면 이 스텝은 건너뛴다.)

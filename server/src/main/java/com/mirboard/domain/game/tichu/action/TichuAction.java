@@ -53,7 +53,7 @@ public sealed interface TichuAction extends GameAction
      * 차례에서 손패 묶음을 트릭에 낸다. 폭탄은 다른 차례에도 인터럽트 가능.
      *
      * <p>{@code wishRank} 는 Mahjong 소원(2~14). null 이면 소원 없음. 소원은 마작을
-     * 내는 행위의 일부라 별도 액션이 아니라 여기에 동봉한다 (D-108) — 사후 별도
+     * 내는 행위의 일부라 별도 액션이 아니라 여기에 동봉한다 (D-109) — 사후 별도
      * 액션이던 시절엔 다음 플레이어가 카드를 내는 순간 창이 닫혀 실사용이 불가능했다.
      */
     record PlayCard(List<Card> cards, Integer wishRank) implements TichuAction {

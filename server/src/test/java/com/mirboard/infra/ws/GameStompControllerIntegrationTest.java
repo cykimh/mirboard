@@ -130,11 +130,11 @@ class GameStompControllerIntegrationTest {
         cardJson.put("rank", mahjong.rank());
         cardJson.put("special", Special.MAHJONG.name());
         action.put("cards", List.of(cardJson));
-        // D-108 — 소원은 별도 액션이 아니라 이 프레임에 동봉된다.
+        // D-109 — 소원은 별도 액션이 아니라 이 프레임에 동봉된다.
         action.put("wishRank", 7);
         leaderSession.send("/app/room/" + roomId + "/action", action);
 
-        // 한 프레임이 PLAYED 와 WISH_MADE 를 함께 브로드캐스트한다 (D-108).
+        // 한 프레임이 PLAYED 와 WISH_MADE 를 함께 브로드캐스트한다 (D-109).
         JsonNode played = null;
         JsonNode wishMade = null;
         for (int i = 0; i < 8 && (played == null || wishMade == null); i++) {
@@ -147,7 +147,7 @@ class GameStompControllerIntegrationTest {
         assertThat(played).as("Subscriber must receive a PLAYED event").isNotNull();
         assertThat(played.get("payload").get("seat").asInt()).isEqualTo(leadSeat);
         assertThat(played.get("seq").asLong()).isPositive();
-        assertThat(wishMade).as("같은 프레임이 WISH_MADE 도 낸다 (D-108)").isNotNull();
+        assertThat(wishMade).as("같은 프레임이 WISH_MADE 도 낸다 (D-109)").isNotNull();
         assertThat(wishMade.get("payload").get("rank").asInt()).isEqualTo(7);
     }
 

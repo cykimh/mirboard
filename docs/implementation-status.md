@@ -135,7 +135,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 족보 판별 `HandDetector`, 비교 `HandComparator`(sealed `Hand`). 폭탄(BOMB)은 트릭 인터럽트.
 - 특수 카드: **마작**(소원 호출), **피닉스**(와일드, 트릭 획득 시 −25), **드래곤**(최강 단일,
   +25, 트릭을 상대팀에 넘김), **개**(다음 차례 강제).
-- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-108) — 클라는
+- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-109) — 클라는
   마작이 포함된 선택을 낼 때 `MakeWishModal` 을 먼저 거친다. 드래곤 트릭 → GIVE_DRAGON_TRICK
   흐름은 기존대로 `GiveDragonTrickModal` 과 연동.
 

@@ -196,7 +196,7 @@ describe('GameTable — 카드 선택', () => {
 
 const MAHJONG: Card = { suit: null, rank: 1, special: 'MAHJONG' };
 
-describe('GameTable — 마작 소원 동봉 (D-108)', () => {
+describe('GameTable — 마작 소원 동봉 (D-109)', () => {
   it('마작이 포함된 선택을 내면 전송 전에 소원 모달을 띄운다', () => {
     seed({
       tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),

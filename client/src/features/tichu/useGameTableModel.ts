@@ -48,7 +48,7 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
 
   const mySeat = playerIds.indexOf(myUserId);
   const myTeam: 'A' | 'B' = mySeat >= 0 && mySeat % 2 === 1 ? 'B' : 'A';
-  // D-108 — 마작이 포함된 플레이는 소원 모달을 먼저 거친다. 여기 담겨 있는 동안은
+  // D-109 — 마작이 포함된 플레이는 소원 모달을 먼저 거친다. 여기 담겨 있는 동안은
   // 아직 서버로 나가지 않은 상태이고, 모달을 취소하면 그대로 폐기된다.
   const [pendingWishPlay, setPendingWishPlay] = useState<Card[] | null>(null);
 

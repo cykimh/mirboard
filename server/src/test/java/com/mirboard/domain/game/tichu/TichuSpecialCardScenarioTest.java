@@ -65,7 +65,7 @@ class TichuSpecialCardScenarioTest {
 
     @Test
     void mahjong_lead_with_bundled_wish_activates_in_one_action() {
-        // D-108 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
+        // D-109 회귀 테스트 — 원 버그는 "다음 사람이 마작 위에 내면 소원 창이 닫힌다"
         // 였다. 소원을 플레이에 동봉하면 창 자체가 없으므로, 다음 좌석이 낸 뒤에도
         // 소원이 살아 있는지로 고정한다.
         var players = List.of(

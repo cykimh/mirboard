@@ -313,7 +313,7 @@ class ActionValidatorTest {
                 .isEqualTo(RejectionReason.DRAGON_GIVE_NOT_PERMITTED);
     }
 
-    // ---------- PlayCard 에 동봉한 소원 (D-108) ----------
+    // ---------- PlayCard 에 동봉한 소원 (D-109) ----------
 
     @Test
     void wish_bundled_with_solo_mahjong_lead_is_accepted() {
@@ -331,7 +331,7 @@ class ActionValidatorTest {
 
     @Test
     void wish_bundled_with_straight_containing_mahjong_is_accepted() {
-        // D-108 신규 룰: 마작을 콤보(1-2-3-4-5)의 일부로 내도 소원을 걸 수 있다.
+        // D-109 신규 룰: 마작을 콤보(1-2-3-4-5)의 일부로 내도 소원을 걸 수 있다.
         var straight = List.of(
                 Card.mahjong(), n(Suit.JADE, 2), n(Suit.SWORD, 3),
                 n(Suit.STAR, 4), n(Suit.PAGODA, 5));

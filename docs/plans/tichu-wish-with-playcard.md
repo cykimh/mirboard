@@ -1,6 +1,6 @@
-# 마작 소원을 `PLAY_CARD` 에 동봉 (D-108) — 설계
+# 마작 소원을 `PLAY_CARD` 에 동봉 (D-109) — 설계
 
-> 상태: **설계 승인** · 2026-08-05 · 결정 이력 `docs/decisions.md` D-108
+> 상태: **설계 승인** · 2026-08-05 · 결정 이력 `docs/decisions.md` D-109
 > 계약 정본은 `docs/stomp-protocol.md`(액션 표)·`docs/rules-tichu.md`(§8.1, §9).
 > 이 문서는 그 둘을 어떻게 고칠지와 코드 변경 범위를 적는다.
 
@@ -229,7 +229,7 @@ esc 를 "소원 없이 내기"로 두면 모달을 무심코 닫았을 때 카�
 
 | 순서 | 파일 | 내용 |
 | --- | --- | --- |
-| 1 | `docs/decisions.md` | **D-108 추가 (완료)** |
+| 1 | `docs/decisions.md` | **D-109 추가 (완료)** |
 | 2 | `docs/plans/tichu-wish-with-playcard.md` | 본 문서 |
 | 3 | `docs/stomp-protocol.md` | `PLAY_CARD` 행에 `wishRank?: 2..14` 추가, `MAKE_WISH` 행 삭제 |
 | 4 | `docs/rules-tichu.md` | §8.1 소원 시점 = 마작 플레이와 **동시**, "콤보 갭" 해소 표기. §9 의 "follow 강제 deferred — 10C 에서 마감 예정" 은 이미 구현됐는데 문서가 낡음 → 함께 정정 |
