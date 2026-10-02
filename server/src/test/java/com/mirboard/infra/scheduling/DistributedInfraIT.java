@@ -2,7 +2,9 @@ package com.mirboard.infra.scheduling;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.infra.ws.RoomPresence;
+import com.mirboard.infra.ws.WsSessionLifecycleListener;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -25,6 +31,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 /**
  * D-96 — 수평 확장 인프라 2종(프레즌스 · 데드라인 큐) 검증.
@@ -59,6 +68,7 @@ class DistributedInfraIT {
     }
 
     @Autowired RoomPresence presence;
+    @Autowired WsSessionLifecycleListener lifecycle;
     @Autowired DeadlineQueue deadlines;
     @Autowired RedisConnectionFactory redisConnectionFactory;
 
@@ -110,6 +120,76 @@ class DistributedInfraIT {
         // 모르는 세션은 조용히 empty — DISCONNECT 가 중복으로 와도 안전해야 한다.
         assertThat(presence.leave("sess-X")).isEmpty();
         assertThat(presence.leave("never-registered")).isEmpty();
+    }
+
+    @Test
+    void one_session_counts_once_however_many_room_topics_it_subscribes() {
+        String room = UUID.randomUUID().toString();
+        // 실제 클라(useStompRoom)는 한 세션에서 방 토픽을 3개 구독한다 —
+        // `/topic/room/{id}`, `/chat`, `/reaction`. 리스너는 구독마다 join 을 부르는데
+        // DISCONNECT 는 세션당 한 번뿐이므로, join 이 멱등하지 않으면 잔여 카운터가 남아
+        // `hasLiveSession` 이 영영 true 가 된다(= 탈주가 확정되지 않는다).
+        presence.join("sess-1", 11L, room);
+        presence.join("sess-1", 11L, room);
+        presence.join("sess-1", 11L, room);
+
+        presence.leave("sess-1");
+
+        assertThat(presence.hasLiveSession(11L, room)).isFalse();
+        assertThat(presence.viewers(room)).isEmpty();
+    }
+
+    @Test
+    void reusing_a_session_for_another_room_does_not_leak_the_previous_room() {
+        String roomA = UUID.randomUUID().toString();
+        String roomB = UUID.randomUUID().toString();
+        presence.join("sess-2", 11L, roomA);
+        presence.join("sess-2", 11L, roomB);
+
+        // 세션이 실제로 보고 있는 방은 B 다. A 가 남으면 그 방에서 영원히 접속 중으로
+        // 보이며, 탈주 회피에 악용할 수 있다(클라가 보낸 구독은 검증 대상).
+        assertThat(presence.hasLiveSession(11L, roomA)).isFalse();
+        assertThat(presence.hasLiveSession(11L, roomB)).isTrue();
+
+        presence.leave("sess-2");
+        assertThat(presence.hasLiveSession(11L, roomB)).isFalse();
+    }
+
+    @Test
+    void subscribing_the_three_room_topics_then_disconnecting_clears_presence() {
+        String room = UUID.randomUUID().toString();
+        AuthPrincipal user = new AuthPrincipal(11L, "tester");
+
+        // 프로덕션 경로 그대로: 한 세션이 방 토픽 3개를 구독한 뒤 끊긴다.
+        lifecycle.onSubscribe(subscribeEvent("ws-1", "/topic/room/" + room, user));
+        lifecycle.onSubscribe(subscribeEvent("ws-1", "/topic/room/" + room + "/chat", user));
+        lifecycle.onSubscribe(subscribeEvent("ws-1", "/topic/room/" + room + "/reaction", user));
+        assertThat(presence.hasLiveSession(11L, room)).isTrue();
+
+        lifecycle.onDisconnect(disconnectEvent("ws-1"));
+
+        assertThat(presence.hasLiveSession(11L, room)).isFalse();
+    }
+
+    private static SessionSubscribeEvent subscribeEvent(String sessionId,
+                                                        String destination,
+                                                        AuthPrincipal user) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setSessionId(sessionId);
+        accessor.setDestination(destination);
+        accessor.setLeaveMutable(true);
+        Message<byte[]> message =
+                MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+        return new SessionSubscribeEvent(new Object(), message, user);
+    }
+
+    private static SessionDisconnectEvent disconnectEvent(String sessionId) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.DISCONNECT);
+        accessor.setSessionId(sessionId);
+        accessor.setLeaveMutable(true);
+        Message<byte[]> message =
+                MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+        return new SessionDisconnectEvent(new Object(), message, sessionId, CloseStatus.NORMAL);
     }
 
     // ---------- 데드라인 큐 ----------

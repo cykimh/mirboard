@@ -221,6 +221,10 @@ CREATE TABLE tichu_match_participants (
 
 방 입장은 **Redis Lua 스크립트**로 원자화: capacity 체크 → `players` push → `room:{id}` 갱신을 한 트랜잭션.
 
+> *(Phase 1 설계 시점 표. 정본은 `docs/redis-keys.md` — `session:{userId}`·`presence:lobby`
+> 는 끝내 구현되지 않았고, 세션→방은 D-96 의 `presence:room:*`/`presence:session:*` 이
+> 대신한다.)*
+
 ### 1.3 REST API 명세
 
 | Method | Path | Body / Query | 응답 | 인증 |

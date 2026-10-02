@@ -174,6 +174,28 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-111 (2026-08-12) — 프레즌스 등록 멱등화: 세션당 1회 (D-96 보정)
+
+`docs/redis-keys.md` 를 코드와 대조하다 발견한 **실동작 결함**. `WsSessionLifecycleListener`
+는 `^/topic/room/([^/]+)(?:/.*)?$` 에 맞는 **구독마다** `RoomPresence.join` 을 부르는데
+DISCONNECT 는 세션당 한 번뿐이고, 실제 클라(`useStompRoom`)는 한 세션에서 방 토픽을 3개
+(`/topic/room/{id}`·`/chat`·`/reaction`) 구독한다. 접속 `+3` / 끊김 `−1` → **잔여 2** 라
+`hasLiveSession` 이 끊긴 뒤에도 참이고, 그 결과 **탈주 유예가 만료돼도 "재접속함"으로
+판정돼 탈주가 확정되지 않았다**(TTL 6h 까지). D-96 이 의도한 "세션 카운터"가 실제로는
+"구독 카운터"였던 것.
+
+**리스너의 매칭 규칙을 좁히지 않고 `RoomPresence` 에서 접는다.** 구독 목적지는 클라가
+보내는 값이라 "구독 1개 = 세션 1개"를 신뢰 기준으로 삼을 수 없다(Server-Authoritative).
+신규 `presence_join.lua` 가 `presence:session:{sessionId}` 를 `SET NX` 로 잡아 **성공했을
+때만** `HINCRBY +1` 한다 — 판정과 증가가 한 원자 단위라 SUBSCRIBE 프레임 3개가 동시에
+처리돼도 증가는 한 번이다. 세션이 다른 방으로 재사용되는 경우(악용 시 옛 방에 영구
+프레즌스를 남길 수 있다)는 옛 방 `leave` 를 먼저 태워 정리한다.
+
+**테스트가 왜 못 잡았나**: `DistributedInfraIT` 가 `presence.join` 을 sessionId 당 1회만
+불러, 버그가 사는 **리스너↔프레즌스 이음매**를 지나갔다. 그래서 회귀 테스트는 실제
+`SessionSubscribeEvent` 3개 + `SessionDisconnectEvent` 를 리스너에 직접 흘리는 형태로
+추가했다(서버 768건 그린, 신규 3건).
+
 ## D-110 (2026-10-03) — 실사용 점검 UX 결함 2건: 스컬킹 나가기 확인 · 대기실 헤더 라벨
 
 7주 공백 후 로컬 실사용 점검(봇 4인 스컬킹·티츄)에서 나온 결함이다. **① 스컬킹 게임 중
@@ -1002,6 +1024,12 @@ V3 is_bot 선례). in-memory 세션 레지스트리는 단일 인스턴스 MVP(D
 전제 — 다중 인스턴스 전환 시 Redis presence 로 교체(범위 밖). 패스
 픽커는 별도 박스에서 `arena-actions`(액션 버튼 영역)로 통합 — 상태/
 제출 로직 불변, JSX/CSS 배치만.
+
+*in-memory `WsSessionRegistry` 및 단일 인스턴스 전제 부분 변경 → D-96
+(Redis `presence:*` 로 이전, 클래스 삭제). 유예 기본값 30s → 120s 변경 → D-79.*
+
+*번호·경위 (2026-10-03)*: 2026-08-12 세션에서 D-109 로 작성됐으나 커밋되지 않은 채 worktree 에
+남아 있었다. 그 사이 D-109(마작 소원)·D-110 이 main 에 들어가 D-111 로 정정해 병합한다.
 
 ## D-74 (2026-05-18) — Phase 18: 메인 입장 멱등화 + room_leave ready 정리 + 방 만들기 모달 + "미르보드카페" 개편
 

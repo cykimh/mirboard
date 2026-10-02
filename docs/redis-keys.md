@@ -22,23 +22,45 @@
 | `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
-| `session:{userId}` | HASH | 30m | `currentRoomId`, `wsSessionId`, `lastSeenAt` | WS CONNECT 시 갱신 |
-| `presence:lobby` | SET | — | 로비 접속자 userId | WS DISCONNECT 시 SREM |
+| `presence:room:{roomId}` | HASH | 6h | `userId` → 해당 방을 보고 있는 **세션 수** | D-96(D-111 보정). `RoomPresence`. 방 토픽 SUBSCRIBE 시 `presence_join.lua` 로 **세션당 1회만** `HINCRBY +1`, DISCONNECT 시 `presence_leave.lua` 로 −1(0 이면 `HDEL`, 빈 HASH 면 키 자체 `DEL`). **boolean 이 아니라 카운터** — 탭 두 개 중 하나만 닫아도 접속 중이어야 탈주 오판이 없다. 탈주 유예 만료 시 "재접속했는가"(`hasLiveSession`) 판정의 근거 |
+| `presence:session:{sessionId}` | STRING | 6h | `"{userId}:{roomId}"` | D-96(D-111 보정). `RoomPresence`. 역할 둘: ① DISCONNECT 이벤트는 sessionId 만 주므로 역방향 조회, ② **"이 세션을 이미 셌는가" 표식** — `SET NX` 성공 시에만 카운터를 올려 한 세션의 구독 여러 개가 중복 계수되지 않게 한다. leave 시 `DEL` |
+| `deadlines:{kind}` | ZSET | 12h | member=페이로드, score=만료 `epochMillis` | D-96. `DeadlineQueue`. `kind`=`turn`(member `{roomId}#{generation}`, `TurnTimeoutScheduler`) · `desertion`(member `{roomId}:{userId}`, `DesertionGraceScheduler`). 모든 인스턴스가 폴링(`mirboard.scheduling.poll-interval-millis`, 기본 250ms)하고 만료분 pop 은 `deadline_poll.lua` 로 원자화 — 한 항목은 정확히 한 인스턴스에만 간다. 같은 member 재등록 = score 갱신(= 기존 타이머 취소+재등록). `schedule()` 마다 EXPIRE 갱신 |
 | `login:fail:{username}` | STRING(INTEGER) | 윈도(기본 15m) | 로그인 연속 실패 횟수 | D-84. `INCR`+첫 실패 시 EXPIRE. 임계 초과 시 lock 설정, 성공 시 DEL |
 | `lock:login:{username}` | STRING | 잠금(기본 15m) | 잠금 마커 | D-84. 존재 시 423 ACCOUNT_LOCKED. users 스키마 비침범(휘발) |
 | `ratelimit:{bucket}:{subject}` | STRING(INTEGER) | 윈도(TTL) | 버킷별 요청 카운터 | D-90(D-84 확장). `bucket`=`auth`·`api-default`·`room-create`·`expensive-write`·`game-action`·`chat`·`reaction`·`stomp-default`. `subject`=인증 시 `u:{userId}`, 아니면 `ip:{ip}`(NAT 오탐 회피). Lua 원자 고정 윈도(`INCR`+`EXPIRE`). HTTP 초과=429, STOMP 초과=드롭(액션만 본인 큐 `ERROR(RATE_LIMITED)`). 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
 | `chatlog:lobby` / `chatlog:room:{roomId}` | LIST(JSON) | 2h | 최근 채팅 100개 `{eventId,userId,username,message,ts}` | D-93. **신고 시 서버가 원문·작성자를 확정하기 위한 근거** — 클라가 본문을 제출하면 무고가 가능하므로(Server-Authoritative). 상시 채팅 로그 영속화가 아니다: 여기서 휘발되고 **신고된 것만** `chat_reports`(V9)로 승격. `message` 는 D-86 마스킹 적용 후 본문 |
 | `suspend:user:{userId}` | STRING | 정지 기간(TTL) | 어드민 유저 정지 마커 | D-86. 존재 시 로그인/CONNECT 차단(403 ACCOUNT_SUSPENDED). users 스키마 비침범(휘발) |
 
-> Phase 19(#1, D-75): 세션→방 매핑은 Redis presence 키가 아니라 서버
-> in-memory `WsSessionRegistry`(SUBSCRIBE 등록 / DISCONNECT 제거)로 구현.
-> 단일 인스턴스 MVP(D-03) 전제 — 다중 인스턴스 전환 시 Redis presence 로
-> 교체(범위 밖). `session:{userId}`/`presence:*` 행은 향후 설계용 placeholder.
+> **D-96**: 세션→방 매핑은 Redis `presence:*` 다. D-75 가 도입했던 in-memory
+> `WsSessionRegistry` 는 **삭제됐고**(클래스 없음), 같은 역할을 `RoomPresence` 가
+> Redis 로 수행한다. 단일 인스턴스 전제(D-03)는 D-96 이 번복 — 인스턴스 A 에 붙은
+> 재접속을 B 가 못 봐서 **재접속을 탈주로 오판**하던 것이 전환 이유다.
+> 설계 단계의 placeholder 였던 `session:{userId}`·`presence:lobby` 행은 **구현되지
+> 않은 채 남아 있어 삭제**했다(코드 전수 검색 0건). 세션→방은 위 `presence:*` 가,
+> 방별 접속자 조회는 `RoomPresence.viewers(roomId)` 가 대신한다.
+
+> **왜 등록이 멱등해야 하나 (D-111)**: `WsSessionLifecycleListener.onSubscribe` 는
+> `^/topic/room/([^/]+)(?:/.*)?$` 에 매칭되는 **구독마다** 호출되는데(클라 `useStompRoom`
+> 은 한 세션에서 `/topic/room/{id}`·`/chat`·`/reaction` **3개**를 구독한다), `onDisconnect`
+> 는 세션당 **한 번만** 호출된다. 등록이 세션당 1회로 접히지 않으면 `+3 / −1` 로 잔여
+> 카운터가 남아 `hasLiveSession` 이 끊긴 뒤에도 참이 되고, 탈주 유예가 만료돼도
+> "재접속함"으로 판정돼 **탈주가 확정되지 않는다**. 리스너가 아니라 `RoomPresence` 쪽에서
+> 접는 이유는, 구독 목적지가 클라가 보내는 값이라 매칭 규칙을 신뢰 기준으로 삼을 수 없기
+> 때문이다(Server-Authoritative).
 
 > `rooms:open` 은 TTL이 없는 대신, 방이 `IN_GAME`/`FINISHED` 가 되거나 삭제되면
 > ZREM 으로 동기 제거된다.
 
 ## 원자성 보증 (Lua 스크립트)
+
+### `room_create.lua`
+입력: `KEYS = [room:{id}, room:{id}:players, rooms:open]`,
+`ARGV = [roomId, hostId, name, gameType, capacity, createdAt, teamPolicy,
+fillWithBots, targetScore, turnSeconds, stake]`.
+
+방 메타 HASH + 호스트 `RPUSH` + `rooms:open` ZADD 를 한 덩어리로 생성(양쪽 EXPIRE 6h).
+UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` 시 `-10`(ROOM_ID_COLLISION).
+성공 `1`.
 
 ### `room_join.lua`
 입력: `KEYS[1]=room:{id}`, `KEYS[2]=room:{id}:players`, `ARGV[1]=userId`,
@@ -88,6 +110,48 @@ spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 �
 마지막 관전자가 나간 경우)을 `RoomService.destroyIfEmpty` 가 정리할 때
 호출. 방 존재 시 `1`, 없으면 `0` 반환.
 
+### `room_finish.lua`
+입력: `KEYS = [room:{id}, rooms:open]`, `ARGV = [roomId, now]`.
+`status=FINISHED` + `ZREM rooms:open` + 방 메타 TTL 을 **600s 로 단축**(결과 화면이
+머무를 시간만 남기고 자연 만료). 방 없으면 `-1`, 성공 `1`. state/hand 정리는 호출자
+(게임별 cleanup) 몫.
+
+### `presence_join.lua` *(D-111)*
+입력: `KEYS = [presence:room:{roomId}, presence:session:{sessionId}]`,
+`ARGV = [userId, roomId, ttlSeconds]`.
+
+세션 키를 `SET NX` 로 잡아 **성공했을 때만** `HINCRBY +1`, 실패(= 이미 등록된 세션)면
+TTL 만 갱신. 반환은 이 호출로 카운터가 올라갔으면 `1`, 건너뛰었으면 `0`.
+**"이 세션을 이미 셌는가" 판정과 증가가 한 원자 단위**여야 하는 이유: 한 세션의 SUBSCRIBE
+프레임 3개가 동시에 처리되면 검사-후-증가가 갈라져 카운터가 2~3까지 올라가고, 그만큼
+DISCONNECT 후에도 잔여가 남아 **탈주가 확정되지 않는다**.
+(세션이 다른 방으로 재사용된 경우는 `RoomPresence.join` 이 옛 방 `leave` 를 먼저 태운다 —
+옛 방 HASH 는 `KEYS` 밖이라 스크립트가 건드릴 수 없다.)
+
+### `presence_leave.lua` *(D-96)*
+입력: `KEYS[1] = presence:room:{roomId}`, `ARGV = [userId, ttlSeconds]`.
+
+`HINCRBY -1` 후 0 이하면 `HDEL` 로 필드를 지워 "접속 없음"으로 만들고, HASH 가 비면
+키 자체를 `DEL`(아니면 EXPIRE 갱신). 반환값은 남은 세션 수.
+**감소·삭제·TTL 갱신이 한 원자 단위**여야 하는 이유: 탭 여러 개가 동시에 닫힐 때
+읽고-쓰기가 갈라지면 카운터가 음수로 새거나 살아 있는 세션이 지워져 **재접속을 탈주로
+오판**한다.
+
+### `deadline_poll.lua` *(D-96)*
+입력: `KEYS[1] = deadlines:{kind}`, `ARGV = [nowMillis, maxCount]`.
+
+`ZRANGEBYSCORE (-inf, now] LIMIT 0 maxCount` + 가져온 것만 `ZREM` 을 한 덩어리로 묶는다.
+**모든 인스턴스가 같은 ZSET 을 폴링**하므로 pop 이 원자적이지 않으면 두 인스턴스가 같은
+타이머를 동시에 발화한다. 원자 pop 이라 한 항목은 정확히 한 인스턴스에만 가고, 인스턴스가
+죽어도 ZSET 이 남아 다른 인스턴스가 자동 인계한다(리더 선출 불필요 — 리더 부재라는 장애
+모드를 만들지 않으려는 선택). `LIMIT` 은 한 인스턴스가 폭주분을 독점하지 않게 하는 상한.
+반환: 만료된 member 배열.
+
+### `rate_limit_fixed_window.lua` *(D-84)*
+입력: `KEYS[1] = ratelimit:{bucket}:{subject}`, `ARGV = [limit, windowSeconds]`.
+`INCR` 후 카운트가 1(=윈도 첫 요청)일 때만 `EXPIRE` — 두 단계가 갈라지면 TTL 없는
+카운터가 영구 잔존해 해당 subject 가 영구 차단된다. 한도 초과 `0`, 허용 `1`.
+
 ### `room_action_seq.lua` (선택)
 액션 처리 직후 `INCR seq` + 이벤트 페이로드를 Pub/Sub 으로 동시 발행. 단일 인스턴스
 배포에서는 굳이 필요 없고 Spring 측 `convertAndSend` 로 충분.
@@ -103,11 +167,21 @@ spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 �
 - 게임 종료(`GAME_ENDED` 처리) 시 `room:{id}:state`, `room:{id}:hand:*` 즉시 DEL.
 - 방 메타(`room:{id}`, `players`) 는 잔류 인원이 잠시 결과 화면에 머무를 수 있도록
   TTL 10분으로 단축한 뒤 자연 만료.
-- `session:{userId}` 는 WS DISCONNECT 후 grace 30s 동안 유지 → 재접속 시 갱신.
+- `presence:session:{sessionId}` 는 DISCONNECT 시 즉시 `DEL`,
+  `presence:room:{roomId}` 는 `presence_leave.lua` 가 카운터를 내리고 0 이면 필드를 지운다
+  (마지막 세션이 나가면 키까지 `DEL`). 탈주 유예는 이 프레즌스와 별개로
+  `deadlines:desertion` 에 걸리며 기본 120s(D-79, `mirboard.desertion.grace-seconds`).
+- `RoomPresence.clearRoom` 은 현재 **호출부가 없다** — 정상 경로에서는 마지막 DISCONNECT 가
+  카운터를 0 으로 만들며 키까지 지우므로(D-111 이후) 고아는 남지 않는다. 다만 세션이 끊김
+  없이 방만 사라지는 경로에서는 TTL(6h)까지 잔류할 수 있다.
 
-## 멀티 인스턴스 확장 시 고려 (현재 범위 밖)
+## 멀티 인스턴스 (D-96 이후 — 더 이상 범위 밖 아님)
 
-- 본 MVP는 **단일 인스턴스 배포** 가정. STOMP 메시지 브로커는 Spring 내장
-  `SimpleBroker` 사용.
-- 추후 스케일 아웃 시 Redis Pub/Sub 또는 외부 메시지 브로커(RabbitMQ STOMP relay)로
-  교체할 수 있도록, 컨트롤러는 `EventPublisher` 추상화 뒤에 둔다.
+- 단일 인스턴스 전제(D-03)는 **D-96 에서 번복**됐다. 인스턴스에 묶여 있던 세 가지
+  (`WsSessionRegistry` · `TurnTimeoutScheduler` · `DesertionGraceScheduler`)가 위
+  `presence:*` / `deadlines:{kind}` 로 옮겨졌고, 2-인스턴스 통합 테스트
+  (`TwoInstanceHandoffIT`)가 데드라인 인계·중복 실행 0·교차 프레즌스 조회를 검증한다.
+- STOMP 브로커는 여전히 Spring 내장 `SimpleBroker` 지만, fan-out 은 `MessageGateway`
+  추상화 뒤에 있다(Phase 6D). `MIRBOARD_MESSAGING_GATEWAY=redis` 로 켜면 STOMP
+  broadcast(`stomp:routes` 채널, `StompMessageRelay`)와 도메인 이벤트(`DomainEventBus`)가
+  Redis Pub/Sub 위로 흐르므로 **sticky session 없이** 작동한다. 기본값은 `in-memory`.
