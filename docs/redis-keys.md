@@ -20,7 +20,7 @@
 | `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(리매치 시 유지), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
-| `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
+| `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `session:{userId}` | HASH | 30m | `currentRoomId`, `wsSessionId`, `lastSeenAt` | WS CONNECT 시 갱신 |
 | `presence:lobby` | SET | — | 로비 접속자 userId | WS DISCONNECT 시 SREM |
@@ -87,6 +87,21 @@ rooms:open]`, `ARGV = [roomId]`.
 spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 남았다가
 마지막 관전자가 나간 경우)을 `RoomService.destroyIfEmpty` 가 정리할 때
 호출. 방 존재 시 `1`, 없으면 `0` 반환.
+
+### `room_seq_next.lua`
+입력: `KEYS[1]=room:{id}:seq`, `ARGV[1]=ttl 초(6h)`. `INCR` 후 `EXPIRE` 하고 새 seq 를
+반환한다.
+
+두 명령을 굳이 원자로 묶는 이유는 두 가지다. (1) 발행 경로는 이벤트마다 도는
+핫패스라 왕복을 늘리고 싶지 않다. (2) 나눠 보내면 그 사이에 죽었을 때 TTL 없는 고아
+카운터가 남는다 — 실제로 순수 `INCR` 이던 시절 방 하나당 카운터 하나가 영구히
+적립됐다(문서는 처음부터 6h 였고 코드만 어긋나 있었다). 묶어두면 "카운터가 있으면
+TTL 도 있다" 가 항상 참이다.
+
+**매번** EXPIRE 하는 것도 의도다. 첫 발행에만 걸면 6h 를 넘기는 방에서 카운터가 매치
+도중 만료돼 `INCR` 이 1부터 다시 시작하고, 클라의 seq gap 판정이 깨진다. 정리 Lua 로
+지우지 않는 이유도 같다(위 `room_leave.lua` 3번 참고) — 방이 살아있는 동안 사라지면
+안 되는 키라, 삭제가 아니라 TTL 로만 사그라들게 둔다.
 
 ### `room_action_seq.lua` (선택)
 액션 처리 직후 `INCR seq` + 이벤트 페이로드를 Pub/Sub 으로 동시 발행. 단일 인스턴스

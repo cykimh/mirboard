@@ -41,6 +41,12 @@ public class RedisConfig {
         return scriptOf("lua/room_delete.lua");
     }
 
+    /** 방 이벤트 seq 발급 (INCR+EXPIRE 원자) — 고아 카운터 방지. */
+    @Bean
+    public RedisScript<Long> roomSeqNextScript() {
+        return scriptOf("lua/room_seq_next.lua");
+    }
+
     /** D-84 — 인증 IP 고정 윈도 레이트리밋 (INCR+EXPIRE 원자). */
     @Bean
     public RedisScript<Long> rateLimitFixedWindowScript() {
