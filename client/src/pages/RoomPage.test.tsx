@@ -126,3 +126,26 @@ describe('RoomPage — 좌석 정책 라벨 (D-106 정정)', () => {
     expect(await screen.findByText('좌석 순서')).toBeTruthy();
   });
 });
+
+describe('RoomPage — 대기실 헤더 라벨 (D-110)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('게임 표시명과 한국어 상태를 쓰고 enum 원문을 노출하지 않는다', async () => {
+    loadGame.mockResolvedValue({ ...game('SKULL_KING', []), displayName: '스컬킹' });
+    renderRoom({ gameType: 'SKULL_KING' });
+
+    expect(await screen.findByText(/스컬킹 · 대기 중 · 1\/4/)).toBeTruthy();
+    expect(screen.queryByText(/SKULL_KING|WAITING/)).toBeNull();
+  });
+
+  it('게임 메타 조회에 실패하면 게임 id 로 폴백한다', async () => {
+    loadGame.mockRejectedValue(new Error('network'));
+    renderRoom({ gameType: 'SKULL_KING' });
+
+    expect(await screen.findByText(/SKULL_KING · 대기 중 · 1\/4/)).toBeTruthy();
+  });
+});

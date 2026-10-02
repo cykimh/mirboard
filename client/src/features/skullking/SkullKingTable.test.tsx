@@ -299,3 +299,62 @@ describe('칩/판돈은 스컬킹에 없다', () => {
     expect(container.textContent).not.toMatch(/칩|판돈/);
   });
 });
+
+describe('나가기 확인 (D-110)', () => {
+  // 탈주는 되돌릴 수 없다(유령 좌석 자동조종, D-104) — 진행 중인 플레이어만 확인을 거친다.
+  const exitButton = () => screen.getByRole('button', { name: '나가기' });
+
+  it('진행 중인 플레이어가 확인을 취소하면 나가지 않는다', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const onExit = vi.fn();
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable({ onExit });
+
+    fireEvent.click(exitButton());
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(onExit).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('확인하면 나간다', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const onExit = vi.fn();
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable({ onExit });
+
+    fireEvent.click(exitButton());
+
+    expect(onExit).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+
+  it('관전자는 묻지 않고 바로 나간다', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const onExit = vi.fn();
+    seed({ seatCount: 4, mySeat: -1, phase: 'PLAYING' });
+    renderTable({ onExit, spectator: true });
+
+    fireEvent.click(exitButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onExit).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+
+  it('매치가 끝난 뒤에는 묻지 않는다', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const onExit = vi.fn();
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    useSkullKingStore.setState({
+      matchEnded: { winners: [0], finalScores: { 0: 40 }, roundsPlayed: 10 },
+    });
+    renderTable({ onExit });
+
+    fireEvent.click(exitButton());
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onExit).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+});

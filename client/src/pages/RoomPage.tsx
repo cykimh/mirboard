@@ -8,7 +8,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
 import { useRoomMeta } from '@/ws/useRoomMeta';
-import type { Room, RoomOption, TeamPolicy } from '@/types/api';
+import type { Room, RoomOption, RoomStatus, TeamPolicy } from '@/types/api';
 import {
   Card,
   CardContent,
@@ -32,6 +32,13 @@ import {
  * shadcn 으로 재디자인. IN_GAME 의 GameTable 은 20e 범위라 레거시 레이아웃
  * 유지(.app-shell 밖에 둬 스코프 base 영향 없음). 상태/WS/핸들러 불변.
  */
+// D-110 — 대기실 헤더에 enum 원문(WAITING 등) 대신 쓰는 라벨.
+const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
+  WAITING: '대기 중',
+  IN_GAME: '게임 중',
+  FINISHED: '종료',
+};
+
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();
   const token = useAuthStore((s) => s.token);
@@ -45,6 +52,8 @@ export function RoomPage() {
   // null = 아직 모름(요청 중) → 행을 그리지 않는다. 티츄에서 "좌석 순서"가 잠깐 떴다
   // "팀 배정"으로 바뀌는 깜빡임을 막으려는 것이다.
   const [roomOptions, setRoomOptions] = useState<RoomOption[] | null>(null);
+  // D-110 — 헤더용 게임 표시명. 메타를 못 받으면 null 로 두고 gameType 으로 폴백한다.
+  const [gameName, setGameName] = useState<string | null>(null);
 
   // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
   // 같은 게임의 방을 여러 번 드나들어도 요청은 한 번이다.
@@ -54,7 +63,9 @@ export function RoomPage() {
     let cancelled = false;
     loadGame(token, gameType)
       .then((g) => {
-        if (!cancelled) setRoomOptions(g.supportedRoomOptions ?? []);
+        if (cancelled) return;
+        setRoomOptions(g.supportedRoomOptions ?? []);
+        setGameName(g.displayName);
       })
       .catch(() => {
         // 게임 메타를 못 받아도 대기실은 동작해야 한다 — 옵션만 숨긴 채 둔다.
@@ -259,7 +270,8 @@ export function RoomPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {room.gameType} · {room.status} · {room.playerCount}/
+              {gameName ?? room.gameType} ·{' '}
+              {ROOM_STATUS_LABEL[room.status] ?? room.status} · {room.playerCount}/
               {room.capacity}
               {(room.spectatorIds ?? []).length > 0 &&
                 ` · 👁 관전 ${(room.spectatorIds ?? []).length}`}

@@ -87,6 +87,22 @@ export function SkullKingTable({
     });
   };
 
+  // D-110 — 진행 중 나가기는 되돌릴 수 없는 탈주다(유령 좌석 자동조종, D-104).
+  // 관전자·매치 종료 후는 잃을 것이 없어 묻지 않는다.
+  const exit = () => {
+    if (!onExit) return;
+    if (
+      !spectator &&
+      !s.matchEnded &&
+      !window.confirm(
+        '게임 중에 나가면 탈주로 처리되고, 내 자리는 남은 라운드 동안 자동으로 플레이됩니다. 나가시겠습니까?',
+      )
+    ) {
+      return;
+    }
+    onExit();
+  };
+
   return (
     <div
       className="sk-table"
@@ -115,7 +131,7 @@ export function SkullKingTable({
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
           {onExit && (
-            <button type="button" className="sk-badge" onClick={onExit}>
+            <button type="button" className="sk-badge" onClick={exit}>
               나가기
             </button>
           )}
