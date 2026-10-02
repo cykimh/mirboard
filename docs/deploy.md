@@ -75,6 +75,24 @@ java -jar server/build/libs/server-0.1.0-SNAPSHOT.jar
 # → http://localhost:8080 에 React + REST + STOMP 모두 같은 origin
 ```
 
+**배포 이미지 그대로 검증** — `flyctl deploy` 가 빌드하는 것과 같은 `Dockerfile` 을 로컬
+compose 의 Postgres/Redis 에 붙여 띄운다. 첫 배포 전에 한 번 돌려 두면 실패 원인이 Fly
+설정인지 이미지인지 갈라진다(2026-10-03 실측: 헬스 UP ~9s, Flyway 10개 검증).
+
+```bash
+docker build -t mirboard:deploy-check .
+docker run --rm -d --name mirboard-deploycheck -p 18080:8080 \
+  -e MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)" \
+  -e MIRBOARD_DB_URL=jdbc:postgresql://host.docker.internal:5432/mirboard \
+  -e MIRBOARD_DB_USER=mirboard -e MIRBOARD_DB_PASSWORD=mirboardpw \
+  -e MIRBOARD_REDIS_HOST=host.docker.internal -e MIRBOARD_REDIS_PORT=6379 \
+  -e MIRBOARD_REDIS_SSL=false -e MIRBOARD_ALLOWED_ORIGINS=http://localhost:18080 \
+  mirboard:deploy-check
+curl -s localhost:18080/actuator/health          # → {"status":"UP",...}
+curl -s -o /dev/null -w '%{http_code}\n' localhost:18080/api/games   # → 401 (인증 필요)
+docker stop mirboard-deploycheck
+```
+
 
 ---
 
