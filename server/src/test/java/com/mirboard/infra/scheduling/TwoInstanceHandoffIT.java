@@ -82,17 +82,20 @@ class TwoInstanceHandoffIT {
     private static ConfigurableApplicationContext boot(String name) {
         return new SpringApplicationBuilder(com.mirboard.MirboardApplication.class, ProbeConfig.class)
                 .web(WebApplicationType.NONE)
-                .properties(
-                        "spring.application.name=" + name,
-                        "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
-                        "spring.datasource.username=" + POSTGRES.getUsername(),
-                        "spring.datasource.password=" + POSTGRES.getPassword(),
-                        "spring.data.redis.host=" + REDIS.getHost(),
-                        "spring.data.redis.port=" + REDIS.getFirstMappedPort(),
-                        "mirboard.jwt.secret=two-instance-test-secret-must-be-32-bytes",
+                // D-113 — 커맨드라인 인자로 넘긴다. `.properties(...)` 는 우선순위 최하위의
+                // "기본 프로퍼티"라 application.yml 의 127.0.0.1 기본값에 덮여, 두 인스턴스가
+                // 컨테이너가 아니라 개발자 머신의 compose Postgres/Redis 에 붙었다(그리고
+                // reset() 의 flushDb 가 개발 Redis 를 비웠다).
+                .run(
+                        "--spring.application.name=" + name,
+                        "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                        "--spring.datasource.username=" + POSTGRES.getUsername(),
+                        "--spring.datasource.password=" + POSTGRES.getPassword(),
+                        "--spring.data.redis.host=" + REDIS.getHost(),
+                        "--spring.data.redis.port=" + REDIS.getFirstMappedPort(),
+                        "--mirboard.jwt.secret=two-instance-test-secret-must-be-32-bytes",
                         // 폴링을 짧게 — 테스트 대기 시간을 줄인다.
-                        "mirboard.scheduling.poll-interval-millis=200")
-                .run();
+                        "--mirboard.scheduling.poll-interval-millis=200");
     }
 
     private static ConfigurableApplicationContext instanceA() {

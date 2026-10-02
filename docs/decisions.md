@@ -174,6 +174,25 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-113 (2026-10-03) — 통합 테스트 밀폐화: 개발용 compose 인프라에 몰래 붙던 IT 4개
+
+GitHub CI 의 서버 잡은 **첫 실행(2026-05-15)부터 21회 전부 실패**했고 아무도 몰랐다 — 로컬
+`check.sh server` 는 늘 그린이었기 때문이다. CI 와 같은 조건(깨끗한 clone, compose 없는
+리눅스 컨테이너)으로 재현하니 9건이 실패했다. 원인은 자체 컨테이너 없이 `application.yml`
+기본값 `127.0.0.1:5432`/`:6379` 로 **개발자 머신의 compose Postgres·Redis 에 붙던 IT** 들이다.
+`AuthFlowIntegrationTest`·`GameCatalogIntegrationTest`·`SecurityHeadersAndCorsIntegrationTest`
+는 Redis 컨테이너가 없었고, `TwoInstanceHandoffIT` 는 컨테이너 주소를 넘기긴 했지만
+`SpringApplicationBuilder.properties()` 가 **우선순위 최하위의 기본 프로퍼티**라
+`application.yml` 에 덮였다. 후자는 매 테스트 `flushDb()` 를 하므로 **로컬에서 서버 테스트를
+돌릴 때마다 개발 Redis 를 비우고 있었다.**
+
+고치는 것은 두 겹이다. ① 네 테스트를 밀폐화한다 — Redis 컨테이너 + `@DynamicPropertySource`
+(다른 IT 와 같은 패턴), `TwoInstanceHandoffIT` 는 프로퍼티를 커맨드라인 인자(`run(args)`)로
+넘겨 yml 보다 우선하게 한다. ② 테스트 전역 `application.properties` 에서 datasource·Redis
+기본 주소를 **존재할 수 없는 호스트(`*.invalid`)** 로 덮는다. 그러면 컨테이너를 빠뜨린 IT 는
+로컬에서도 CI 와 똑같이 즉시 실패한다 — "로컬은 통과, CI 는 실패"가 다시 생기지 않게 하는 게
+①보다 중요하다. ①만 하면 다음 IT 가 같은 실수를 해도 로컬에선 또 안 보인다.
+
 ## D-112 (2026-10-03) — 방 seq 카운터에 슬라이딩 TTL: `room_seq_next.lua`
 
 `room:{id}:seq` 는 `docs/redis-keys.md` 에 처음부터 TTL 6h 로 적혀 있었지만 코드는 순수
