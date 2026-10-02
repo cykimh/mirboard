@@ -79,10 +79,10 @@ const KO = {
   'play.error.passSlots': '3장(왼쪽/파트너/오른쪽) 모두 선택해야 합니다',
 
   // --- Mahjong 소원 모달 ---
-  'wish.title': '소원 — 다음에 강제할 랭크',
-  'wish.body': '다른 플레이어가 가능한 한 이 랭크 카드를 포함하도록 강제합니다. 건너뛰면 소원 없음.',
-  'wish.skip': '건너뛰기 (소원 없음)',
-  'wish.confirm': '소원 지정',
+  'wish.title': '마작을 냅니다 — 소원을 지정할까요?',
+  'wish.body': '지정한 랭크를 다른 플레이어가 가능한 한 포함하도록 강제합니다. 소원은 마작을 내는 순간 함께 정해집니다.',
+  'wish.skip': '소원 없이 내기',
+  'wish.confirm': '소원 지정하고 내기',
 
   // --- Dragon 트릭 양도 모달 ---
   'dragon.title': 'Dragon 트릭 양도',

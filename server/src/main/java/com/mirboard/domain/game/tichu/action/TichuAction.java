@@ -18,7 +18,6 @@ import java.util.List;
         @JsonSubTypes.Type(value = TichuAction.PassCards.class, name = "PASS_CARDS"),
         @JsonSubTypes.Type(value = TichuAction.PlayCard.class, name = "PLAY_CARD"),
         @JsonSubTypes.Type(value = TichuAction.PassTrick.class, name = "PASS_TRICK"),
-        @JsonSubTypes.Type(value = TichuAction.MakeWish.class, name = "MAKE_WISH"),
         @JsonSubTypes.Type(value = TichuAction.GiveDragonTrick.class, name = "GIVE_DRAGON_TRICK")
 })
 public sealed interface TichuAction extends GameAction
@@ -28,7 +27,6 @@ public sealed interface TichuAction extends GameAction
                 TichuAction.PassCards,
                 TichuAction.PlayCard,
                 TichuAction.PassTrick,
-                TichuAction.MakeWish,
                 TichuAction.GiveDragonTrick {
 
     /** 첫 8장 단계에서 한 번만 선언 가능 (성공/실패 ±200). Dealing 의 ready 도 함께 표시. */
@@ -51,19 +49,26 @@ public sealed interface TichuAction extends GameAction
     record PassCards(Card toLeft, Card toPartner, Card toRight) implements TichuAction {
     }
 
-    /** 차례에서 손패 묶음을 트릭에 낸다. 폭탄은 다른 차례에도 인터럽트 가능. */
-    record PlayCard(List<Card> cards) implements TichuAction {
+    /**
+     * 차례에서 손패 묶음을 트릭에 낸다. 폭탄은 다른 차례에도 인터럽트 가능.
+     *
+     * <p>{@code wishRank} 는 Mahjong 소원(2~14). null 이면 소원 없음. 소원은 마작을
+     * 내는 행위의 일부라 별도 액션이 아니라 여기에 동봉한다 (D-109) — 사후 별도
+     * 액션이던 시절엔 다음 플레이어가 카드를 내는 순간 창이 닫혀 실사용이 불가능했다.
+     */
+    record PlayCard(List<Card> cards, Integer wishRank) implements TichuAction {
         public PlayCard {
             cards = List.copyOf(cards);
+        }
+
+        /** 소원 없이 내는 경우. */
+        public PlayCard(List<Card> cards) {
+            this(cards, null);
         }
     }
 
     /** 차례에서 패스. 리드 차례에는 패스 불가. */
     record PassTrick() implements TichuAction {
-    }
-
-    /** Mahjong 을 낸 직후, 한 번에 한해 2~14 중 한 rank 를 소원으로 지정. */
-    record MakeWish(int rank) implements TichuAction {
     }
 
     /** Dragon 으로 트릭을 가져간 직후, 상대 팀 좌석 중 하나에게 트릭 양도. */

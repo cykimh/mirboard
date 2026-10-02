@@ -194,6 +194,101 @@ describe('GameTable — 카드 선택', () => {
   });
 });
 
+const MAHJONG: Card = { suit: null, rank: 1, special: 'MAHJONG' };
+
+describe('GameTable — 마작 소원 동봉 (D-109)', () => {
+  it('마작이 포함된 선택을 내면 전송 전에 소원 모달을 띄운다', () => {
+    seed({
+      tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
+      privateHand: privateHand([MAHJONG, card('JADE', 5)]),
+    });
+
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: 'MAHJONG 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '내기 (1장)' }));
+
+    // 아직 아무것도 나가지 않았다.
+    expect(sendAction).not.toHaveBeenCalled();
+    expect(screen.getByText('마작을 냅니다 — 소원을 지정할까요?')).toBeInTheDocument();
+  });
+
+  it('소원 지정하고 내기 → wishRank 를 동봉한 PLAY_CARD 한 번', () => {
+    seed({
+      tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
+      privateHand: privateHand([MAHJONG, card('JADE', 5)]),
+    });
+
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: 'MAHJONG 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '내기 (1장)' }));
+    fireEvent.click(screen.getByRole('button', { name: '7' }));
+    fireEvent.click(screen.getByRole('button', { name: '소원 지정하고 내기' }));
+
+    expect(sendAction).toHaveBeenCalledTimes(1);
+    expect(sendAction).toHaveBeenCalledWith({
+      '@action': 'PLAY_CARD',
+      cards: [MAHJONG],
+      wishRank: 7,
+    });
+  });
+
+  it('소원 없이 내기 → wishRank 없는 PLAY_CARD 한 번', () => {
+    seed({
+      tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
+      privateHand: privateHand([MAHJONG, card('JADE', 5)]),
+    });
+
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: 'MAHJONG 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '내기 (1장)' }));
+    fireEvent.click(screen.getByRole('button', { name: '소원 없이 내기' }));
+
+    expect(sendAction).toHaveBeenCalledTimes(1);
+    expect(sendAction).toHaveBeenCalledWith({
+      '@action': 'PLAY_CARD',
+      cards: [MAHJONG],
+    });
+  });
+
+  it('esc 로 모달을 닫으면 아무것도 보내지 않고 선택을 유지한다', () => {
+    seed({
+      tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
+      privateHand: privateHand([MAHJONG, card('JADE', 5)]),
+    });
+
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: 'MAHJONG 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '내기 (1장)' }));
+    // Radix Dialog 는 ownerDocument 에서 Escape 를 듣는다.
+    fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' });
+
+    expect(sendAction).not.toHaveBeenCalled();
+    expect(useTichuStore.getState().selectedCardKeys.size).toBe(1);
+  });
+
+  it('마작이 없는 선택은 모달 없이 즉시 PLAY_CARD 를 보낸다', () => {
+    seed({
+      tableView: tableView({ phase: 'PLAYING', currentTurnSeat: 0 }),
+      privateHand: privateHand([card('JADE', 5), card('SWORD', 9)]),
+    });
+
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: 'JADE 5' }));
+    fireEvent.click(screen.getByRole('button', { name: '내기 (1장)' }));
+
+    expect(sendAction).toHaveBeenCalledTimes(1);
+    expect(sendAction).toHaveBeenCalledWith({
+      '@action': 'PLAY_CARD',
+      cards: [card('JADE', 5)],
+    });
+  });
+});
+
 describe('GameTable — 매치 종료', () => {
   it('매치 종료 시 .match-ended 패널에 승패·최종점수·라운드표를 렌더한다', () => {
     seed({

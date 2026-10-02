@@ -15,8 +15,8 @@ interface UseGameTableModelArgs {
  *
  * GameTable 이 조립 루트로만 남게 하려고 D-87 에서 추가했다. 여기서 나가는 값은
  * 전부 store + props 의 함수이고 부수효과는 없다(부수효과는 useGameTableEffects).
- * 유일한 예외가 소원 모달 dismiss 플래그인데, 모달 표시 여부(showWishModal)를
- * 계산하려면 같은 자리에 있어야 해서 함께 둔다.
+ * 유일한 예외가 소원 모달의 대기 플레이(pendingWishPlay)인데, 모달 표시 여부를
+ * 여기서 계산하므로 같은 자리에 둔다.
  *
  * phaseLabel/arenaTint 는 tableView 가 null 이면 의미가 없다 — 호출부가 로딩
  * 분기에서 걸러내므로 그때 값은 쓰이지 않는다.
@@ -48,7 +48,9 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
 
   const mySeat = playerIds.indexOf(myUserId);
   const myTeam: 'A' | 'B' = mySeat >= 0 && mySeat % 2 === 1 ? 'B' : 'A';
-  const [wishModalDismissed, setWishModalDismissed] = useState(false);
+  // D-109 — 마작이 포함된 플레이는 소원 모달을 먼저 거친다. 여기 담겨 있는 동안은
+  // 아직 서버로 나가지 않은 상태이고, 모달을 취소하면 그대로 폐기된다.
+  const [pendingWishPlay, setPendingWishPlay] = useState<Card[] | null>(null);
 
   const phase = tableView?.phase ?? null;
   const dealingCardCount = tableView?.dealingCardCount ?? 0;
@@ -60,21 +62,6 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
     isInPassing && (tableView?.passingSubmittedSeats ?? []).includes(mySeat);
   const myDeclaration = tableView?.declarations?.[mySeat] ?? 'NONE';
   const myTurn = isInPlaying && tableView !== null && tableView.currentTurnSeat === mySeat;
-
-  const myMahjongLeadActive =
-    isInPlaying &&
-    tableView !== null &&
-    tableView.currentTopSeat === mySeat &&
-    tableView.currentTop !== null &&
-    tableView.currentTop.cards.length === 1 &&
-    tableView.currentTop.cards[0].special === 'MAHJONG' &&
-    tableView.activeWishRank === null;
-
-  const wishContextKey = myMahjongLeadActive
-    ? `${tableView.currentTopSeat}-mahjong`
-    : null;
-
-  const showWishModal = myMahjongLeadActive && !wishModalDismissed;
 
   // Dragon 양도 강제 상태: Dragon 단독으로 내가 받았고, 서버가 TrickTaken 대신
   // TurnChanged(taker=mySeat) 만 발행해서 currentTurnSeat 가 다시 본인.
@@ -183,9 +170,8 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
     iAmPassSubmitted,
     myDeclaration,
     myTurn,
-    wishContextKey,
-    showWishModal,
-    setWishModalDismissed,
+    pendingWishPlay,
+    setPendingWishPlay,
     mustGiveDragon,
     selectedCards,
     selectedCombo,

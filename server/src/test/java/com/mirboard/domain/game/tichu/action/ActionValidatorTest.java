@@ -313,50 +313,82 @@ class ActionValidatorTest {
                 .isEqualTo(RejectionReason.DRAGON_GIVE_NOT_PERMITTED);
     }
 
-    // ---------- MakeWish ----------
+    // ---------- PlayCard 에 동봉한 소원 (D-109) ----------
 
     @Test
-    void wish_must_follow_mahjong_play() {
-        Hand mahjongHand = new Hand(HandType.SINGLE, List.of(Card.mahjong()), 1, 1);
-        var trick = new TrickState(
-                0, 1, mahjongHand, 0, Set.of(),
-                List.of(mahjongHand), mahjongHand.cards(), null);
+    void wish_bundled_with_solo_mahjong_lead_is_accepted() {
         var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
+                List.of(List.of(Card.mahjong()),
+                        List.of(n(Suit.SWORD, 6)),
+                        List.of(n(Suit.STAR, 7)),
+                        List.of(n(Suit.PAGODA, 8))),
+                leadTrick(0));
 
-        assertThatCode(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(7)))
+        assertThatCode(() -> ActionValidator.validate(state, 0,
+                new TichuAction.PlayCard(List.of(Card.mahjong()), 7)))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void wish_after_non_mahjong_play_is_rejected() {
-        Hand nonMahjong = singleHand(n(Suit.JADE, 9));
-        var trick = new TrickState(
-                0, 1, nonMahjong, 0, Set.of(),
-                List.of(nonMahjong), nonMahjong.cards(), null);
+    void wish_bundled_with_straight_containing_mahjong_is_accepted() {
+        // D-109 신규 룰: 마작을 콤보(1-2-3-4-5)의 일부로 내도 소원을 걸 수 있다.
+        var straight = List.of(
+                Card.mahjong(), n(Suit.JADE, 2), n(Suit.SWORD, 3),
+                n(Suit.STAR, 4), n(Suit.PAGODA, 5));
         var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
+                List.of(straight,
+                        List.of(n(Suit.SWORD, 6)),
+                        List.of(n(Suit.STAR, 7)),
+                        List.of(n(Suit.PAGODA, 8))),
+                leadTrick(0));
 
-        assertThatThrownBy(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(7)))
+        assertThatCode(() -> ActionValidator.validate(state, 0,
+                new TichuAction.PlayCard(straight, 9)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void wish_bundled_without_mahjong_is_rejected() {
+        var state = playingState(
+                List.of(List.of(n(Suit.JADE, 9)),
+                        List.of(n(Suit.SWORD, 6)),
+                        List.of(n(Suit.STAR, 7)),
+                        List.of(n(Suit.PAGODA, 8))),
+                leadTrick(0));
+
+        assertThatThrownBy(() -> ActionValidator.validate(state, 0,
+                new TichuAction.PlayCard(List.of(n(Suit.JADE, 9)), 7)))
                 .extracting(t -> ((TichuActionRejectedException) t).reason())
                 .isEqualTo(RejectionReason.WISH_OUT_OF_CONTEXT);
     }
 
     @Test
-    void invalid_wish_rank_is_rejected() {
-        Hand mahjongHand = new Hand(HandType.SINGLE, List.of(Card.mahjong()), 1, 1);
-        var trick = new TrickState(
-                0, 1, mahjongHand, 0, Set.of(),
-                List.of(mahjongHand), mahjongHand.cards(), null);
+    void bundled_wish_rank_out_of_range_is_rejected() {
         var state = playingState(
-                List.of(List.of(), List.of(), List.of(), List.of()), trick);
+                List.of(List.of(Card.mahjong()),
+                        List.of(n(Suit.SWORD, 6)),
+                        List.of(n(Suit.STAR, 7)),
+                        List.of(n(Suit.PAGODA, 8))),
+                leadTrick(0));
 
-        assertThatThrownBy(() ->
-                ActionValidator.validate(state, 0, new TichuAction.MakeWish(15)))
+        assertThatThrownBy(() -> ActionValidator.validate(state, 0,
+                new TichuAction.PlayCard(List.of(Card.mahjong()), 15)))
                 .extracting(t -> ((TichuActionRejectedException) t).reason())
                 .isEqualTo(RejectionReason.INVALID_WISH_RANK);
+    }
+
+    @Test
+    void play_without_wish_rank_is_unaffected() {
+        var state = playingState(
+                List.of(List.of(Card.mahjong()),
+                        List.of(n(Suit.SWORD, 6)),
+                        List.of(n(Suit.STAR, 7)),
+                        List.of(n(Suit.PAGODA, 8))),
+                leadTrick(0));
+
+        assertThatCode(() -> ActionValidator.validate(state, 0,
+                new TichuAction.PlayCard(List.of(Card.mahjong()))))
+                .doesNotThrowAnyException();
     }
 
     // ---------- Wish enforcement on play ----------

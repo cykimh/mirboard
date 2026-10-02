@@ -79,7 +79,7 @@ class GameStompControllerIntegrationTest {
     private final RestTemplate http = new RestTemplate();
 
     @Test
-    void mahjong_leader_plays_and_event_broadcasts_to_subscribers() throws Exception {
+    void mahjong_leader_plays_with_bundled_wish_and_events_broadcast() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
                 List.of("ws_alice", "ws_bob", "ws_charlie", "ws_dave"));
         Map<String, Long> userIds = userIdsFromMe(tokens);
@@ -130,20 +130,25 @@ class GameStompControllerIntegrationTest {
         cardJson.put("rank", mahjong.rank());
         cardJson.put("special", Special.MAHJONG.name());
         action.put("cards", List.of(cardJson));
+        // D-109 — 소원은 별도 액션이 아니라 이 프레임에 동봉된다.
+        action.put("wishRank", 7);
         leaderSession.send("/app/room/" + roomId + "/action", action);
 
-        // Expect a Played event broadcast.
-        JsonNode env = null;
-        for (int i = 0; i < 5; i++) {
+        // 한 프레임이 PLAYED 와 WISH_MADE 를 함께 브로드캐스트한다 (D-109).
+        JsonNode played = null;
+        JsonNode wishMade = null;
+        for (int i = 0; i < 8 && (played == null || wishMade == null); i++) {
             JsonNode candidate = inbox.poll(2, TimeUnit.SECONDS);
-            if (candidate != null && "PLAYED".equals(candidate.get("type").asText())) {
-                env = candidate;
-                break;
-            }
+            if (candidate == null) continue;
+            String type = candidate.get("type").asText();
+            if ("PLAYED".equals(type)) played = candidate;
+            if ("WISH_MADE".equals(type)) wishMade = candidate;
         }
-        assertThat(env).as("Subscriber must receive a PLAYED event").isNotNull();
-        assertThat(env.get("payload").get("seat").asInt()).isEqualTo(leadSeat);
-        assertThat(env.get("seq").asLong()).isPositive();
+        assertThat(played).as("Subscriber must receive a PLAYED event").isNotNull();
+        assertThat(played.get("payload").get("seat").asInt()).isEqualTo(leadSeat);
+        assertThat(played.get("seq").asLong()).isPositive();
+        assertThat(wishMade).as("같은 프레임이 WISH_MADE 도 낸다 (D-109)").isNotNull();
+        assertThat(wishMade.get("payload").get("rank").asInt()).isEqualTo(7);
     }
 
     // ---------- helpers ----------

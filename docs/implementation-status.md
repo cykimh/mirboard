@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-107),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-109),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -126,8 +126,8 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - **RoundEnd**: 트릭 점수 + 보너스 + 티츄/그랜드 가감 집계. 목표 점수 도달 시 매치 종료.
 
 ### 5.2 액션 (sealed `TichuAction`)
-`DeclareGrandTichu`, `DeclareTichu`, `Ready`, `PassCards`, `PlayCard`(phoenixAs override),
-`PassTrick`, `MakeWish`, `GiveDragonTrick`. 페이즈별 검증은 `ActionValidator`,
+`DeclareGrandTichu`, `DeclareTichu`, `Ready`, `PassCards`, `PlayCard`(cards + 선택 `wishRank`),
+`PassTrick`, `GiveDragonTrick`. 페이즈별 검증은 `ActionValidator`,
 소원 충족 판정은 `WishFulfillmentChecker`.
 
 ### 5.3 카드 / 족보 / 특수 카드
@@ -135,8 +135,9 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 족보 판별 `HandDetector`, 비교 `HandComparator`(sealed `Hand`). 폭탄(BOMB)은 트릭 인터럽트.
 - 특수 카드: **마작**(소원 호출), **피닉스**(와일드, 트릭 획득 시 −25), **드래곤**(최강 단일,
   +25, 트릭을 상대팀에 넘김), **개**(다음 차례 강제).
-- 마작 플레이 → MAKE_WISH 흐름, 드래곤 트릭 → GIVE_DRAGON_TRICK 흐름이 클라 모달과 연동
-  (`MakeWishModal`, `GiveDragonTrickModal`).
+- 마작 소원은 `PLAY_CARD` 에 `wishRank` 를 동봉해 한 프레임으로 처리(D-109) — 클라는
+  마작이 포함된 선택을 낼 때 `MakeWishModal` 을 먼저 거친다. 드래곤 트릭 → GIVE_DRAGON_TRICK
+  흐름은 기존대로 `GiveDragonTrickModal` 과 연동.
 
 > 족보 종류/점수 규칙/특수 카드 상호작용의 정확한 정의는 `docs/rules-tichu.md` 가 정본.
 
@@ -254,12 +255,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **765건** (D-108 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **769건** (D-109 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
   묶여 있다(티츄 룰 단위와 함께 ~5s).
-- **클라이언트**: **266건 / 33파일** (D-108 시점 실측, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **271건 / 33파일** (D-109 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 

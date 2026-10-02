@@ -33,7 +33,6 @@ public final class ActionValidator {
             case TichuAction.DeclareGrandTichu __ -> validateDeclareGrandTichu(state, seat);
             case TichuAction.Ready __ -> validateReady(state, seat);
             case TichuAction.PassCards pc -> validatePassCards(state, seat, pc);
-            case TichuAction.MakeWish w -> validateMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> validateGiveDragonTrick(state, seat, g);
         }
     }
@@ -90,6 +89,19 @@ public final class ActionValidator {
                         player.hand(), trick.currentTop(), wishedRank)) {
                     throw reject(RejectionReason.WISH_NOT_FULFILLED);
                 }
+            }
+        }
+
+        // 소원 "지정" (D-109) — 위의 소원 "강제" 와 다른 관심사다. 마작을 내는 그
+        // 액션에 동봉하며, 단독 리드든 콤보의 일부든 낸 카드에 마작이 포함되면 허용.
+        // 메서드 끝에 두는 이유: 턴·소유·족보 실패가 먼저 보고되어야 거절 사유가 읽힌다.
+        // "소원 1회" 는 마작이 덱에 1장뿐이라 구조적으로 보장되므로 중복 검사가 없다.
+        if (action.wishRank() != null) {
+            if (action.cards().stream().noneMatch(c -> c.is(Special.MAHJONG))) {
+                throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
+            }
+            if (action.wishRank() < 2 || action.wishRank() > 14) {
+                throw reject(RejectionReason.INVALID_WISH_RANK);
             }
         }
     }
@@ -179,27 +191,6 @@ public final class ActionValidator {
         }
         if (!playerOwnsAll(player.hand(), chosen)) {
             throw reject(RejectionReason.CARDS_NOT_OWNED);
-        }
-    }
-
-    // ---------- MakeWish ----------
-    private static void validateMakeWish(TichuState state, int seat, TichuAction.MakeWish action) {
-        TichuState.Playing playing = requirePlaying(state);
-        if (action.rank() < 2 || action.rank() > 14) {
-            throw reject(RejectionReason.INVALID_WISH_RANK);
-        }
-        TrickState trick = playing.trick();
-        // 소원은 Mahjong 을 막 낸 직후에만 가능. 가장 마지막 플레이가 Mahjong 인지 확인.
-        if (trick.currentTop() == null) {
-            throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
-        }
-        List<Card> top = trick.currentTop().cards();
-        boolean topIsMahjong = top.size() == 1 && top.get(0).is(Special.MAHJONG);
-        if (!topIsMahjong || trick.currentTopSeat() != seat) {
-            throw reject(RejectionReason.WISH_OUT_OF_CONTEXT);
-        }
-        if (trick.activeWish() != null) {
-            throw reject(RejectionReason.DUPLICATE_DECLARATION, "wish already made this round");
         }
     }
 

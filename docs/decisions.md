@@ -174,6 +174,47 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-109 (2026-08-05) — 마작 소원을 `PLAY_CARD` 에 동봉: 별도 `MAKE_WISH` 액션 폐기
+
+**증상.** 로컬 실플레이(2026-08-04)에서 마작을 리드로 내면 `MakeWishModal` 이 뜨자마자
+사라졌다. 소원 창이 "마작이 아직 트릭의 top 일 동안"으로만 열려 있었기 때문이다 — 클라
+`myMahjongLeadActive`(`useGameTableModel.ts`)와 서버 `validateMakeWish`(`ActionValidator.java`)
+가 똑같이 `currentTop==[MAHJONG] && currentTopSeat==seat` 을 요구했고, 다음 사람이 마작
+위에 카드를 얹는 순간 조건이 깨진다. 봇 방에서 그 시간은 `mirboard.bot.delay-millis` 기본
+**700ms** 라 사람이 랭크를 고를 수 없고, 사람끼리도 상대가 즉시 내면 같다.
+
+**원인은 타이밍이 아니라 모델.** 원 티츄 룰에서 소원은 **마작을 내는 행위의 일부**(동시
+선언)지 낸 뒤에 따로 잡는 창이 아니다. 이를 사후 별도 액션으로 모델링해서 다음 플레이어
+와의 경합이 생겼다. 봇 쪽은 아예 미구현이기도 했다 — `LegalActionEnumerator` 가 `MakeWish`
+를 후보로 만들지 않아 봇이 마작을 리드하면 그 라운드 소원은 영구히 발생하지 않았다.
+
+**결정.** `TichuAction.PlayCard` 에 nullable `wishRank` 를 얹고 `MakeWish` 액션을 제거한다.
+검증이 "낸 카드에 마작이 포함되면 소원 허용"으로 바뀌면서 `docs/rules-tichu.md` §8.1 이
+갭으로 적어 둔 **콤보(1-2-3-4-5) 속 마작도 소원 가능**이 함께 해소된다. 경합이 없어지는
+게 아니라 발생할 수 없는 모델이 되고, 소원 결정이 제출 **전에** 끝나므로 기존 턴 타임아웃이
+그대로 덮는다 — 새 상태도 새 타임아웃도 필요 없다. 반대안이던 "서버가 소원 결정까지 턴을
+붙잡는 pending 상태"는 잘못된 모델(별도 창)을 유지한 채 상태머신·타임아웃·봇 처리·대기
+UI 를 새로 얹어야 해서 버렸다. "봇 딜레이 상향"은 사람 상대에서 그대로 깨지므로 기각.
+
+**파급.** `PlayCard` 에 편의 생성자(`PlayCard(cards)` → `wishRank=null`)를 남겨 기존 호출부
+27곳은 무변경. `WISH_MADE` 이벤트·`Wish`·`TrickState.activeWish`·소원 **강제** 로직·
+`TableView.activeWishRank` 는 전부 그대로라 클라 리듀서와 헤더 표시가 안 바뀐다. 삭제되는
+것은 클라의 모달 dismiss 상태머신(`wishModalDismissed`/`wishContextKey` + 리셋 effect)이라
+코드가 줄어든다. 봇은 후보에 랭크 변형 13종을 얹되 **소원 없는 변형을 먼저** 넣어
+`TimeoutActionPolicy` 의 동률 선택(`Stream.min` 은 먼저 온 것을 유지)이 현행과 같게 남는다.
+프로토콜은 `PLAY_CARD` 에 옵션 필드 1개 추가 + `MAKE_WISH` 행 삭제이며, `GameEngine` 포트와
+infra 는 무변경(`TichuAction` 은 게임 내부).
+
+**UX.** 마작이 포함된 선택을 낼 때 모달이 먼저 뜨고 [소원 지정하고 내기] / [소원 없이 내기]
+중 하나로 한 프레임이 나간다. esc·바깥 클릭은 **취소**(전송 없음)로 바꾼다 — 기존처럼
+"건너뛰기 = 전송"으로 두면 모달을 무심코 닫았을 때 카드가 나가 버린다.
+
+실행 단위는 `docs/plans/tichu-wish-with-playcard.md`.
+
+*번호 정정 (2026-10-03)*: 병렬 브랜치에서 D-108 로 작성됐으나 main 의 D-108(라운드별 점수
+내역)과 ID 가 겹쳐 병합 시 D-109 로 바꿨다. 이 브랜치의 커밋 메시지에 남은 "D-108" 은 이
+결정을 가리킨다.
+
 ## D-108 (2026-08-04) — 라운드별 점수 내역: `TableView.completedRounds` 로 노출
 
 게임판 점수 칩을 눌러 라운드별 획득 점수를 보는 기능. 데이터 자체는 이미 양쪽에 다

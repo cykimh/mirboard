@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mirboard.domain.game.tichu.action.TichuAction;
 import com.mirboard.domain.game.tichu.card.Card;
+import com.mirboard.domain.game.tichu.card.Special;
 import com.mirboard.domain.game.tichu.card.Suit;
 import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TichuState;
@@ -65,6 +66,39 @@ class LegalActionEnumeratorTest {
         // 5, 7 단일 플레이만 합법 (페어 없음). PassTrick 은 lead 이므로 reject.
         assertThat(legal).hasSize(2)
                 .allMatch(a -> a instanceof TichuAction.PlayCard);
+    }
+
+    @Test
+    void playing_phase_mahjong_offers_wish_variants_with_no_wish_first() {
+        var players = List.of(
+                p(0, Card.mahjong(), n(Suit.SWORD, 7)),
+                p(1, n(Suit.JADE, 10)),
+                p(2, n(Suit.STAR, 9)),
+                p(3, n(Suit.PAGODA, 4)));
+        var state = new TichuState.Playing(players, TrickState.lead(0, null), -1);
+
+        var legal = LegalActionEnumerator.enumerate(state, 0);
+
+        var mahjongPlays = legal.stream()
+                .filter(a -> a instanceof TichuAction.PlayCard pc
+                        && pc.cards().size() == 1
+                        && pc.cards().get(0).is(Special.MAHJONG))
+                .map(a -> (TichuAction.PlayCard) a)
+                .toList();
+
+        // 소원 없음 1 + 랭크 2~14 의 13 = 14종.
+        assertThat(mahjongPlays).hasSize(14);
+        assertThat(mahjongPlays.get(0).wishRank()).isNull();
+        assertThat(mahjongPlays.stream().map(TichuAction.PlayCard::wishRank).filter(r -> r != null))
+                .containsExactlyInAnyOrder(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
+
+        // 마작이 아닌 카드(SWORD 7)는 변형을 만들지 않는다.
+        var nonMahjongPlays = legal.stream()
+                .filter(a -> a instanceof TichuAction.PlayCard pc
+                        && pc.cards().size() == 1
+                        && !pc.cards().get(0).is(Special.MAHJONG))
+                .toList();
+        assertThat(nonMahjongPlays).hasSize(1);
     }
 
     @Test

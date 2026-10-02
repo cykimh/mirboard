@@ -57,7 +57,6 @@ public final class TichuEngine {
             case TichuAction.DeclareGrandTichu __ -> applyDeclareGrandTichu(state, seat);
             case TichuAction.Ready __ -> applyReady(state, seat);
             case TichuAction.PassCards pc -> applyPassCards(state, seat, pc);
-            case TichuAction.MakeWish w -> applyMakeWish(state, seat, w);
             case TichuAction.GiveDragonTrick g -> applyGiveDragonTrick(state, seat, g);
         };
     }
@@ -284,6 +283,14 @@ public final class TichuEngine {
             updatedWish = wishBefore.fulfill();
         }
 
+        // 소원 지정 (D-109). fulfillment **뒤**에 둔다 — "마작을 낸 그 플레이가 자기
+        // 소원을 즉시 채우지 않는다"를 코드 순서로 못박는다(마작 rank 1, 소원 2~14 라
+        // 실제로도 겹치지 않지만 순서에 의존하지 않게). 검증은 ActionValidator 가 마쳤다.
+        if (action.wishRank() != null) {
+            updatedWish = Wish.active(action.wishRank());
+            events.add(new TichuEvent.WishMade(action.wishRank()));
+        }
+
         List<Card> newAccumulated = new ArrayList<>(trick.accumulatedCards());
         newAccumulated.addAll(action.cards());
         List<Hand> newPlaySequence = new ArrayList<>(trick.playSequence());
@@ -355,20 +362,6 @@ public final class TichuEngine {
         return new Result(
                 new TichuState.Playing(playing.players(), finalTrick, playing.firstFinisher()),
                 events);
-    }
-
-    // ---------- Wish ----------
-
-    private Result applyMakeWish(TichuState state, int seat, TichuAction.MakeWish action) {
-        TichuState.Playing playing = (TichuState.Playing) state;
-        TrickState trick = playing.trick();
-        TrickState updated = new TrickState(
-                trick.leadSeat(), trick.currentTurnSeat(), trick.currentTop(),
-                trick.currentTopSeat(), trick.passedSeats(), trick.playSequence(),
-                trick.accumulatedCards(), Wish.active(action.rank()));
-        return new Result(
-                new TichuState.Playing(playing.players(), updated, playing.firstFinisher()),
-                List.of(new TichuEvent.WishMade(action.rank())));
     }
 
     // ---------- Dragon Give ----------

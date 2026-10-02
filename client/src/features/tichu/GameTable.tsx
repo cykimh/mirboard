@@ -87,8 +87,6 @@ export function GameTable({
     mySeat: m.mySeat,
     myTeam: m.myTeam,
     myTurn: m.myTurn,
-    wishContextKey: m.wishContextKey,
-    setWishModalDismissed: m.setWishModalDismissed,
     matchEnded: m.matchEnded,
     triggerEffect,
     playChime,
@@ -115,7 +113,8 @@ export function GameTable({
     toggleCardSelection: m.toggleCardSelection,
     selectPassCard: m.selectPassCard,
     setError: m.setError,
-    setWishModalDismissed: m.setWishModalDismissed,
+    pendingWishPlay: m.pendingWishPlay,
+    setPendingWishPlay: m.setPendingWishPlay,
   });
 
   const tableView = m.tableView;
@@ -233,9 +232,10 @@ export function GameTable({
       )}
 
       <MakeWishModal
-        open={m.showWishModal}
-        onConfirm={a.handleMakeWish}
-        onSkip={a.handleSkipWish}
+        open={m.pendingWishPlay !== null}
+        onConfirm={a.handleConfirmWishPlay}
+        onSkipWish={a.handlePlayWithoutWish}
+        onCancel={a.handleCancelWishPlay}
       />
 
       <GiveDragonTrickModal
