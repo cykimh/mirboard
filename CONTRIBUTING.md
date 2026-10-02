@@ -166,7 +166,9 @@ npm --prefix client run dev
   --tests "com.mirboard.domain.game.skullking.*" \
   --tests "com.mirboard.domain.lobby.auth.*"
 
-# 통합 테스트 (Testcontainers). scripts/check.sh 가 Colima/OrbStack socket 을
+# 통합 테스트 (Testcontainers). IT 는 각자 Postgres/Redis 컨테이너를 띄우므로 compose 는
+# 필요 없다 — 테스트 기본 주소가 *.invalid 로 막혀 있어 컨테이너를 빠뜨린 IT 는 즉시
+# 실패한다(D-113). scripts/check.sh 가 Colima/OrbStack socket 을
 # 자동 감지하므로 wrapper 사용 시 아래 export 불필요. raw gradlew 직접 호출 시만:
 export DOCKER_HOST="unix://$HOME/.orbstack/run/docker.sock"   # Colima: ~/.colima/default/docker.sock
 export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"

@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-110),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-113),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -190,6 +190,8 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 탈주자 패널티(`desert_count`+1·lose+1·ELO−, 봇 매치 ELO 제외)는 영속이 있는
   티츄에만 적용된다 — 스컬킹 매치 영속은 D-02 게임별 rating 분리 선행으로 별건.
 - 유예 내 복귀 시 세션 복원.
+- 프레즌스는 **세션당 1회** 집계한다(D-111). 클라가 한 세션에서 방 토픽을 3개 구독하는데
+  구독마다 세던 시절엔 끊긴 뒤에도 잔여 카운터가 남아 탈주가 확정되지 않았다.
 
 관련 클래스/테스트: `DesertionService`, `RoomPresence`, `SkullKingDesertionTest`,
 끊김/탈주 유닛 + `MatchResultRecorder` 탈주 IT.
@@ -255,14 +257,17 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **769건** (D-110 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **776건** (D-113 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
   묶여 있다(티츄 룰 단위와 함께 ~5s).
-- **클라이언트**: **277건 / 33파일** (D-110 시점 실측, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **277건 / 33파일** (D-113 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
+- **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
+  않는다. 테스트 기본 주소를 `*.invalid` 로 막아, 컨테이너를 빠뜨린 IT 는 로컬에서도 CI 와
+  똑같이 실패한다(이 가드 이전엔 CI 가 21회 연속 실패하는 동안 로컬은 그린이었다).
 
 ---
 
