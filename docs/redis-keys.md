@@ -20,7 +20,7 @@
 | `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(리매치 시 유지), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
-| `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `INCR` 로만 변경 |
+| `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `presence:room:{roomId}` | HASH | 6h | `userId` → 해당 방을 보고 있는 **세션 수** | D-96(D-111 보정). `RoomPresence`. 방 토픽 SUBSCRIBE 시 `presence_join.lua` 로 **세션당 1회만** `HINCRBY +1`, DISCONNECT 시 `presence_leave.lua` 로 −1(0 이면 `HDEL`, 빈 HASH 면 키 자체 `DEL`). **boolean 이 아니라 카운터** — 탭 두 개 중 하나만 닫아도 접속 중이어야 탈주 오판이 없다. 탈주 유예 만료 시 "재접속했는가"(`hasLiveSession`) 판정의 근거 |
 | `presence:session:{sessionId}` | STRING | 6h | `"{userId}:{roomId}"` | D-96(D-111 보정). `RoomPresence`. 역할 둘: ① DISCONNECT 이벤트는 sessionId 만 주므로 역방향 조회, ② **"이 세션을 이미 셌는가" 표식** — `SET NX` 성공 시에만 카운터를 올려 한 세션의 구독 여러 개가 중복 계수되지 않게 한다. leave 시 `DEL` |
@@ -151,6 +151,21 @@ DISCONNECT 후에도 잔여가 남아 **탈주가 확정되지 않는다**.
 입력: `KEYS[1] = ratelimit:{bucket}:{subject}`, `ARGV = [limit, windowSeconds]`.
 `INCR` 후 카운트가 1(=윈도 첫 요청)일 때만 `EXPIRE` — 두 단계가 갈라지면 TTL 없는
 카운터가 영구 잔존해 해당 subject 가 영구 차단된다. 한도 초과 `0`, 허용 `1`.
+
+### `room_seq_next.lua`
+입력: `KEYS[1]=room:{id}:seq`, `ARGV[1]=ttl 초(6h)`. `INCR` 후 `EXPIRE` 하고 새 seq 를
+반환한다.
+
+두 명령을 굳이 원자로 묶는 이유는 두 가지다. (1) 발행 경로는 이벤트마다 도는
+핫패스라 왕복을 늘리고 싶지 않다. (2) 나눠 보내면 그 사이에 죽었을 때 TTL 없는 고아
+카운터가 남는다 — 실제로 순수 `INCR` 이던 시절 방 하나당 카운터 하나가 영구히
+적립됐다(문서는 처음부터 6h 였고 코드만 어긋나 있었다). 묶어두면 "카운터가 있으면
+TTL 도 있다" 가 항상 참이다.
+
+**매번** EXPIRE 하는 것도 의도다. 첫 발행에만 걸면 6h 를 넘기는 방에서 카운터가 매치
+도중 만료돼 `INCR` 이 1부터 다시 시작하고, 클라의 seq gap 판정이 깨진다. 정리 Lua 로
+지우지 않는 이유도 같다(위 `room_leave.lua` 3번 참고) — 방이 살아있는 동안 사라지면
+안 되는 키라, 삭제가 아니라 TTL 로만 사그라들게 둔다.
 
 ### `room_action_seq.lua` (선택)
 액션 처리 직후 `INCR seq` + 이벤트 페이로드를 Pub/Sub 으로 동시 발행. 단일 인스턴스
