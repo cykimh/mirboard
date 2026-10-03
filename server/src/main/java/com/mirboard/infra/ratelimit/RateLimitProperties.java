@@ -14,6 +14,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 멈추므로 넉넉하다 — 한도를 조이는 것은 실제 트래픽 분포를 본 뒤에 한다.
  *
  * <p>{@code enabled=false} 면 전 버킷을 무제한으로 만든다(사고 시 즉시 끄기용).
+ *
+ * <p>{@code clientIpHeader} — D-117. IP 키에 쓸 클라 IP 를 읽을 <b>신뢰 헤더</b> 이름
+ * (운영 {@code Fly-Client-IP}). 비우면 {@code remoteAddr}. 해석은 {@link ClientIpResolver}.
  */
 @ConfigurationProperties("mirboard.ratelimit")
 public class RateLimitProperties {
@@ -45,6 +48,7 @@ public class RateLimitProperties {
 
     private boolean enabled = true;
     private Map<String, Bucket> buckets = new LinkedHashMap<>();
+    private String clientIpHeader;
 
     /**
      * 버킷 정책 조회 — 설정 override 가 있으면 그것, 없으면 기본값.
@@ -69,6 +73,14 @@ public class RateLimitProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getClientIpHeader() {
+        return clientIpHeader;
+    }
+
+    public void setClientIpHeader(String clientIpHeader) {
+        this.clientIpHeader = clientIpHeader;
     }
 
     public Map<String, Bucket> getBuckets() {

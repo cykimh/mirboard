@@ -20,10 +20,26 @@ class RateLimitRoutingTest {
         return HttpRateLimitFilter.bucketFor(req);
     }
 
+    private static boolean ipOnly(String method, String uri) {
+        return HttpRateLimitFilter.ipOnlyFor(new MockHttpServletRequest(method, uri));
+    }
+
     @Test
     void auth_endpoints_use_the_auth_bucket() {
         assertThat(httpBucket("POST", "/api/auth/login")).isEqualTo(RateLimitProperties.AUTH);
         assertThat(httpBucket("POST", "/api/auth/register")).isEqualTo(RateLimitProperties.AUTH);
+    }
+
+    @Test
+    void auth_routes_are_ip_only_and_user_routes_are_not() {
+        // D-117 — 인증 경로는 Bearer 를 실어도 IP 키다. userId 키로 바뀌면 토큰을 이어 붙여
+        // (가입 → 그 토큰으로 또 가입) IP 버킷을 우회할 수 있었다.
+        assertThat(ipOnly("POST", "/api/auth/login")).isTrue();
+        assertThat(ipOnly("POST", "/api/auth/register")).isTrue();
+        // 인증된 사용자 경로는 그대로 userId 키(D-90 NAT 오탐 회피).
+        assertThat(ipOnly("POST", "/api/rooms")).isFalse();
+        assertThat(ipOnly("POST", "/api/me/avatar")).isFalse();
+        assertThat(ipOnly("GET", "/api/games")).isFalse();
     }
 
     @Test

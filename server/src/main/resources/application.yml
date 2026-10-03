@@ -107,6 +107,9 @@ mirboard:
   ratelimit:
     # D-90 — 전역 HTTP + STOMP 고정 윈도 레이트리밋(Lua 원자). 키는 인증되면 userId,
     # 아니면 IP. 사고 시 enabled:false 로 전 버킷 즉시 무제한.
+    # D-117 — /api/auth/** 는 Bearer 를 실어도 **항상 IP 키**. IP 는 client-ip-header
+    # (신뢰 헤더, 운영 Fly-Client-IP — application-prod.yml)에서 읽고, 비우면 remoteAddr.
+    # IPv6 는 /64 로 묶는다. 429 의 Retry-After 는 버킷 윈도(초).
     enabled: ${MIRBOARD_RATELIMIT_ENABLED:true}
     buckets:
       # 인증(가입/로그인) — IP 키. D-84 값 보존.
