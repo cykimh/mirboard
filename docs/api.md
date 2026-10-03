@@ -390,6 +390,13 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   leave 는 **탈주**로 처리 — 상대팀 승리로 매치 즉시 종료, 탈주자
   `desert_count`+1 · `lose_count`+1 · ELO 차감(봇 포함 매치는 ELO 제외,
   D-71). WAITING/FINISHED 이거나 관전자면 일반 leave/stopSpectating.
+- **D-122 — 진행 중 매치의 좌석도 고정한다.** IN_GAME 플레이어의 leave 가 탈주로 처리되지
+  않으면(이미 탈주한 좌석의 재요청 — 더블클릭이나 유예 탈주 뒤 재접속해 '나가기', 또는 방 락
+  획득 실패) 매치가 진행 중인 한 **아무것도 하지 않고** `204` 다(`playerIds` 불변). 끊김은 유예
+  탈주가 처리한다. 일반 leave 로 넘기는 것은 매치가 이미 끝난 방(티츄 사람만의 리매치 대기,
+  D-82 — 이 경로의 좌석 당김은 별건)과, 그 사이 방이 FINISHED 가 된 경우뿐이다. 진행 중에
+  목록을 당기면 STOMP 액션의 좌석 판정과 비공개 이벤트(`HAND_DEALT` 등) 라우팅이 남의 좌석을
+  가리켰다.
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
   은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
   기본 **120s**, D-79) 후 미복귀 시 탈주.

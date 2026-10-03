@@ -165,8 +165,12 @@ public class RoomController {
             Room room = rooms.getRoom(roomId);
             if (room.status() == RoomStatus.IN_GAME
                     && room.playerIds().contains(me.userId())) {
-                // D-82 — 매치 종료 후(리매치 대기) 등 탈주 미해당이면 false → 일반 leave 로 폴백.
                 if (desertion.processDesertion(roomId, me.userId())) {
+                    return;
+                }
+                // D-122 — 탈주가 처리되지 않았다고 일반 leave 로 넘기면 IN_GAME 의 LREM 이
+                // 라이브 매치의 좌석을 당긴다(좌석 판정·비공개 이벤트 라우팅이 남의 좌석으로).
+                if (!seatMayBeReleased(roomId)) {
                     return;
                 }
             }
@@ -174,6 +178,24 @@ public class RoomController {
             // 이미 소멸 — 아래 leaveRoom 이 RoomNotFound 를 동일 처리.
         }
         rooms.leaveRoom(roomId, me.userId());
+    }
+
+    /**
+     * D-122 — IN_GAME 참가자의 탈주가 처리되지 않은 뒤 일반 leave 로 넘겨도 되는가.
+     *
+     * <p>처리되지 않는 경우는 셋이다: 이미 탈주한 좌석의 재요청(더블클릭, 유예 탈주 뒤 재접속해
+     * '나가기' — 스컬킹처럼 남은 사람끼리 계속하는 게임), 락 획득 실패, 매치가 이미 끝남. 앞의
+     * 둘은 <b>매치가 진행 중</b>이라 좌석을 그대로 둔다(아무것도 안 함 — 끊김은 유예 탈주가
+     * 처리한다). 넘기는 것은 매치가 끝나 리매치를 기다리는 방(티츄 사람만, D-82 — 좌석이 당겨지는
+     * 그 경로는 별건)과, 그 사이 방이 IN_GAME 을 벗어난 경우(FINISHED 는 lua 가 좌석을 고정)뿐이다.
+     * 판정은 게임 중립 — 매치 종료 여부는 엔진 포트가 답한다.
+     */
+    private boolean seatMayBeReleased(String roomId) {
+        Room now = rooms.getRoom(roomId);
+        if (now.status() != RoomStatus.IN_GAME) {
+            return true;
+        }
+        return engines.forRoom(now).isMatchOver();
     }
 
     /** 관전 시작. 플레이어로 입장한 방은 거절. */

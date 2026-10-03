@@ -112,9 +112,12 @@ room:{id}:spectators]`, `ARGV = [userId, roomId]`.
    (state/hand/seq 키는 게임별 cleanup·TTL 로 소멸 — leave 스크립트 비관여.)
 4. 남은 인원 수(또는 `0`) 반환.
 
-> IN_GAME 의 `LREM` 은 남아 있다 — 탈주로 처리되지 않은 leave(티츄 리매치 대기 방 등)가
-> 좌석을 당기는 기존 동작은 리매치 흐름(D-82)과 얽혀 별건이다(D-122). 그 경우에 대비해
-> resync 는 좌석 목록이 정원보다 줄었으면 비공개 뷰를 주지 않는다(`api.md` resync).
+> IN_GAME 의 `LREM` 은 스크립트에 남아 있지만, 호출 측이 **매치가 끝난 방에서만** 여기로
+> 보낸다(D-122). `RoomController.leave` 는 IN_GAME 플레이어의 탈주가 처리되지 않았을 때(이미
+> 탈주한 좌석의 재요청·락 획득 실패) 엔진 포트의 `isMatchOver()` 가 false 면 스크립트를 부르지
+> 않는다 — 진행 중 매치의 좌석 인덱스는 STOMP 좌석 판정·비공개 이벤트 라우팅이 쓴다. 남는
+> 경로는 티츄 사람만의 리매치 대기 방(D-82)의 leave 하나이고, 리매치 흐름과 얽혀 별건이다. 그
+> 경우에 대비해 resync 는 좌석 목록이 정원보다 줄었으면 비공개 뷰를 주지 않는다(`api.md` resync).
 
 ### `room_delete.lua` *(Phase 19 #1, D-75)*
 입력: `KEYS = [room, players, room:{id}:ready, room:{id}:spectators,

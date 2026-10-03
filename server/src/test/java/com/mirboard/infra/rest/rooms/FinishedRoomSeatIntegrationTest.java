@@ -40,6 +40,9 @@ import org.testcontainers.utility.DockerImageName;
  * <ol>
  *   <li>FINISHED 방 나가기는 좌석 목록·호스트를 건드리지 않고, 빈 방이 돼도 지우지 않는다
  *       (방은 {@code room_finish.lua} 의 600s TTL 로 사라진다).</li>
+ *   <li>진행 중(IN_GAME) 매치에서 탈주가 처리되지 않은 '나가기'(이미 탈주한 좌석의 재요청,
+ *       락 획득 실패)도 좌석을 당기지 않는다 — 라이브 STOMP 의 좌석 판정·비공개 이벤트
+ *       라우팅이 같은 인덱스를 쓴다.</li>
  *   <li>나간 사람은 그 방에 묶이지 않는다 — 허브로 돌아가 다른 방에 들어갈 수 있다.</li>
  *   <li>심층 방어: 어떤 경로로든 시작 뒤 좌석 목록이 줄었으면 resync 는 비공개 뷰를 주지
  *       않는다(관전자 뷰). 목록에 없는 사람도 관전자 뷰다.</li>
@@ -156,6 +159,69 @@ class FinishedRoomSeatIntegrationTest {
         JsonNode room = getRoom(roomId, guest.token());
         assertThat(longs(room.get("playerIds"))).containsExactly(guest.userId());
         assertThat(room.get("hostId").asLong()).isEqualTo(guest.userId());
+    }
+
+    // ---------- IN_GAME: 탈주가 처리되지 않은 '나가기' ----------
+
+    /**
+     * 사람 3인 스컬킹에서 좌석 0 이 '나가기' → 탈주(남은 2명이 계속, MATCH_CONTINUES). 같은
+     * 사람이 다시 '나가기'(더블클릭, 또는 유예 탈주 뒤 재접속해 누름)하면 엔진은 이미 탈주한
+     * 좌석이라 NOT_APPLICABLE 이다. 예전엔 일반 leave 로 흘러 IN_GAME 의 {@code LREM} 이 좌석을
+     * 당겼다 — 라이브 매치 도중이라 carol 이 bob 의 손패로 카드를 내고, 다음 라운드의 bob 손패
+     * (HAND_DEALT)가 carol 에게 갔다.
+     */
+    @Test
+    void leaving_again_from_a_deserted_seat_keeps_the_seats_of_the_live_match()
+            throws Exception {
+        Table t = startSkullKing("fs7");
+        JsonNode bobBefore = resync(t.roomId, t.token(1)).get("privateHand");
+        JsonNode carolBefore = resync(t.roomId, t.token(2)).get("privateHand");
+
+        leave(t.roomId, t.token(0)); // 탈주 — 남은 2명이 계속.
+        leave(t.roomId, t.token(0)); // 이미 탈주한 좌석의 재요청.
+
+        JsonNode room = getRoom(t.roomId, t.token(1));
+        assertThat(room.get("status").asText()).isEqualTo("IN_GAME");
+        assertThat(longs(room.get("playerIds")))
+                .as("라이브 매치의 좌석 목록 불변 — LREM 하지 않는다")
+                .containsExactlyElementsOf(t.userIds);
+        assertThat(room.get("hostId").asLong()).isEqualTo(t.userIds.get(0));
+
+        JsonNode bob = resync(t.roomId, t.token(1)).get("privateHand");
+        JsonNode carol = resync(t.roomId, t.token(2)).get("privateHand");
+        assertThat(bob.get("seat").asInt()).isEqualTo(1);
+        assertThat(bob.get("hand")).isEqualTo(bobBefore.get("hand"));
+        assertThat(carol.get("seat").asInt()).isEqualTo(2);
+        assertThat(carol.get("hand")).isEqualTo(carolBefore.get("hand"));
+
+        // 탈주한 사람은 이 방에 묶이지 않는다 — 다른 방 입장 정상.
+        Player other = registerAndLogin("fs7_other");
+        String otherRoom = createRoom(other.token(), "TICHU", null);
+        mockMvc.perform(post("/api/rooms/" + otherRoom + "/join")
+                        .header("Authorization", bearer(t.token(0))))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * 방 액션 락을 못 잡아(다른 처리가 오래 쥠) 탈주 처리가 건너뛰어진 '나가기'도 좌석을 당기지
+     * 않는다. 좌석은 그대로 두고, 그 사람의 끊김은 유예 탈주(120s)가 처리한다.
+     */
+    @Test
+    void a_leave_that_cannot_take_the_room_lock_keeps_the_seat() throws Exception {
+        Table t = startSkullKing("fs8");
+        String lockKey = "room:" + t.roomId + ":lock";
+        redis.opsForValue().set(lockKey, "held-by-test", java.time.Duration.ofSeconds(30));
+        try {
+            leave(t.roomId, t.token(0)); // 탈주 처리 락 재시도(~3s) 실패.
+        } finally {
+            redis.delete(lockKey);
+        }
+
+        JsonNode room = getRoom(t.roomId, t.token(1));
+        assertThat(room.get("status").asText()).isEqualTo("IN_GAME");
+        assertThat(longs(room.get("playerIds"))).containsExactlyElementsOf(t.userIds);
+        assertThat(resync(t.roomId, t.token(2)).get("privateHand").get("seat").asInt())
+                .isEqualTo(2);
     }
 
     // ---------- resync 심층 방어 ----------

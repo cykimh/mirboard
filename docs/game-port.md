@@ -80,6 +80,12 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 바꿨다: `MATCH_CONTINUES` 면 인프라는 이벤트만 브로드캐스트하고 방을 IN_GAME 으로 유지한
 채 봇/타임아웃을 재무장한다. 티츄는 `MATCH_ENDED`/`NOT_APPLICABLE` 만 쓴다.
 
+*(D-122)* `NOT_APPLICABLE` 을 받은 '나가기'를 인프라가 일반 leave(좌석 목록 `LREM`)로 넘기는
+것은 **`isMatchOver()` 가 true 일 때뿐**이다(티츄 리매치 대기). 매치가 진행 중이면 — 예컨대
+`MATCH_CONTINUES` 게임에서 이미 탈주한 좌석이 다시 '나가기' — 좌석을 그대로 둔다. 진행 중
+매치의 좌석 인덱스는 액션 좌석 판정·비공개 이벤트 라우팅이 쓰므로 당기면 손패가 남에게 간다.
+새 게임은 이미 탈주한 좌석에 `NOT_APPLICABLE` 을 돌려주면 된다(별도 처리 불필요).
+
 `GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
 `(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
