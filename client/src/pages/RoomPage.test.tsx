@@ -207,6 +207,65 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
     expect(screen.queryByText('게임이 종료되었습니다.')).toBeNull();
   });
 
+  /**
+   * D-122 — FINISHED 방에서 누가 나가면 서버가 `LREM` 으로 좌석 목록을 당겼고(서버는 D-122 로
+   * 막았다), 유지된 게임판은 매번 최신 메타의 playerIds·botSeats 로 그렸다. 엔진 좌석 번호는
+   * 그대로라 남은 사람 화면의 이름·(나)·봇 표시가 한 칸씩 밀렸다. 전이 직전 IN_GAME 의
+   * 좌석 목록을 얼려 넘긴다.
+   */
+  it('유지된 게임판은 전이 직전 IN_GAME 좌석 목록을 고정해 넘긴다 — 뒤이은 퇴장 메타에 밀리지 않는다', async () => {
+    // 나(1)는 좌석 1. 좌석 0 은 다른 사람(2), 2·3 은 봇.
+    const inGame = {
+      ...ROOM,
+      gameType: 'SKULL_KING',
+      status: 'IN_GAME',
+      playerIds: [2, 1, 900, 901],
+      botSeats: [2, 3],
+    } as Room;
+    loadGame.mockResolvedValue(game('SKULL_KING', []));
+    renderRoom(inGame);
+    await screen.findByTestId('skullking-table');
+    expect(skullProps.at(-1)!.playerIds).toEqual([2, 1, 900, 901]);
+
+    act(() => {
+      metaCallback()({ ...inGame, status: 'FINISHED' } as Room);
+    });
+    // 좌석 0 의 사람이 '메인으로'를 눌러 나간 메타 — 목록이 당겨지고 봇 좌석도 재계산된다.
+    // (참가자 집합이 바뀌어 이름 재조회가 돈다 — async act 로 그 갱신까지 흘려보낸다.)
+    await act(async () => {
+      metaCallback()({
+        ...inGame,
+        status: 'FINISHED',
+        playerIds: [1, 900, 901],
+        botSeats: [1, 2],
+      } as Room);
+    });
+
+    const last = skullProps.at(-1)!;
+    expect(last.roomFinished).toBe(true);
+    expect(last.playerIds).toEqual([2, 1, 900, 901]);
+    expect(last.botSeats).toEqual([2, 3]);
+  });
+
+  it('게임 중에는 고정하지 않고 최신 메타를 그대로 넘긴다', async () => {
+    const inGame = {
+      ...ROOM,
+      gameType: 'SKULL_KING',
+      status: 'IN_GAME',
+      playerIds: [1, 2],
+      botSeats: [],
+    } as unknown as Room;
+    loadGame.mockResolvedValue(game('SKULL_KING', []));
+    renderRoom(inGame);
+    await screen.findByTestId('skullking-table');
+
+    act(() => {
+      metaCallback()({ ...inGame, botSeats: [1] } as Room);
+    });
+
+    expect(skullProps.at(-1)!.botSeats).toEqual([1]);
+  });
+
   it('처음부터 FINISHED 로 들어오면(새로고침) 기존 종료 카드', async () => {
     loadGame.mockResolvedValue(game('SKULL_KING', []));
     renderRoom({ gameType: 'SKULL_KING', status: 'FINISHED' });

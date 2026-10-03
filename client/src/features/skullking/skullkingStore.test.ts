@@ -561,6 +561,106 @@ describe('matchResult → matchEnded 복원 (D-120)', () => {
   });
 });
 
+/**
+ * D-122 — 매치가 끝난 뒤에는 게임 이벤트를 반영하지 않는다. 탈주 조기 종료·강제 종료 뒤에도
+ * 서버 턴 타이머·봇이 버려진 라운드를 계속 진행하던 결함이 있었고, D-120 이 유지한 게임판에
+ * 그 이벤트가 그대로 보였다(종료 패널 위로 '내 차례'가 다시 뜨고 트릭 레일이 움직인다).
+ * 원인은 서버에서 고치지만 클라도 심층 방어로 막는다. 권위값인 resync 만 예외다.
+ */
+describe('매치 종료 뒤 잔여 이벤트 무시 (D-122)', () => {
+  const RESULT = { winners: [2], finalScores: { 0: 10, 1: -20, 2: 90, 3: 40 }, roundsPlayed: 3 };
+
+  beforeEach(() => {
+    store().applySnapshot(
+      snapshot({
+        tableView: {
+          ...TABLE,
+          phase: 'PLAYING',
+          currentTurnSeat: 0,
+          seats: [seat(0), seat(1), seat(2), seat(3)],
+          trick: [],
+        },
+      }),
+    );
+    expect(store().applyEvent(ev('MATCH_ENDED', RESULT, 11))).toBe('applied');
+  });
+
+  it('TURN_CHANGED 가 내 차례를 다시 세우지 않는다', () => {
+    expect(store().applyEvent(ev('TURN_CHANGED', { currentTurnSeat: 2 }, 12))).toBe('ignored');
+    expect(store().currentTurnSeat).toBe(-1);
+  });
+
+  it('CARD_PLAYED·TRICK_TAKEN 이 트릭 레일과 승수를 움직이지 않는다', () => {
+    store().applyEvent(
+      ev('CARD_PLAYED', { seat: 2, card: suit('GREEN', 5), declaredAs: null }, 12),
+    );
+    expect(store().trick).toEqual([]);
+    expect(store().seats.find((s) => s.seat === 2)!.handCount).toBe(3);
+
+    store().applyEvent(
+      ev('TRICK_TAKEN', { winnerSeat: 2, winningCard: suit('GREEN', 5), trickNumber: 1 }, 13),
+    );
+    expect(store().settledTrick).toBeNull();
+    expect(store().seats.find((s) => s.seat === 2)!.tricksWon).toBe(0);
+  });
+
+  it('PLAYING_STARTED·ROUND_ENDED 도 단계·점수를 바꾸지 않는다', () => {
+    store().applyEvent(ev('PLAYING_STARTED', { leadSeat: 2 }, 12));
+    expect(store().currentTurnSeat).toBe(-1);
+
+    store().applyEvent(
+      ev(
+        'ROUND_ENDED',
+        {
+          roundNumber: 4,
+          scores: { 2: { bid: 0, won: 0, base: 40, bonus: 0 } },
+          cumulativeScores: { 0: 0, 1: 0, 2: 999, 3: 0 },
+        },
+        13,
+      ),
+    );
+    expect(store().cumulativeScores).toEqual(RESULT.finalScores);
+    expect(store().completedRounds).toEqual([]);
+  });
+
+  it('BIDDING_STARTED 가 판정과 무관한 스크럽(D-103)도 하지 않는다', () => {
+    expect(
+      store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 20)),
+    ).toBe('ignored');
+    expect(store().roundNumber).toBe(3);
+    expect(store().hand).toHaveLength(3);
+  });
+
+  it('잔여 이벤트는 resync 를 부르지 않는다 — gap 이어도 ignored', () => {
+    expect(store().applyEvent(ev('CARD_PLAYED', {}, 99))).toBe('ignored');
+    expect(store().applyEvent(ev('WHO_KNOWS', {}, 12))).toBe('ignored');
+    expect(store().lastSeq).toBe(11);
+  });
+
+  it('HAND_DEALT 로 손패를 갈지 않는다', () => {
+    store().applyPrivateHand({ seat: 2, cards: [suit('BLACK', 1)], roundNumber: 4 });
+    expect(store().hand).toHaveLength(3);
+  });
+
+  it('연결 상태 배지는 계속 반영한다 (게임 진행이 아니다)', () => {
+    expect(store().applyEvent(ev('PLAYER_DISCONNECTED', { seat: 1 }))).toBe('applied');
+    expect([...store().disconnectedSeats]).toEqual([1]);
+  });
+
+  it('권위값인 resync 는 그대로 반영한다', () => {
+    store().applySnapshot(
+      snapshot({ eventSeq: 30, tableView: { ...TABLE, roundNumber: 3, matchResult: RESULT } }),
+    );
+    expect(store().lastSeq).toBe(30);
+    expect(store().matchEnded).toEqual(RESULT);
+
+    // 서버가 매치가 끝나지 않았다고 말하면(진행 중 상태) 그 말이 이긴다 — 다시 이벤트를 받는다.
+    store().applySnapshot(snapshot({ eventSeq: 31, tableView: { ...TABLE, matchResult: null } }));
+    expect(store().matchEnded).toBeNull();
+    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 32))).toBe('applied');
+  });
+});
+
 describe('lastRoundResult — 다음 라운드 Bidding 동안의 직전 결과 (D-120)', () => {
   const base = {
     phase: 'BIDDING' as const,

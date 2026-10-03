@@ -42,6 +42,12 @@ const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
   FINISHED: '종료',
 };
 
+/** D-122 — 유지된 게임판이 쓰는 좌석 목록 스냅샷 (FINISHED 전이 직전 IN_GAME 메타). */
+interface HeldSeats {
+  playerIds: number[];
+  botSeats: number[];
+}
+
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();
   const token = useAuthStore((s) => s.token);
@@ -110,7 +116,13 @@ export function RoomPage() {
   // 게임판을 내리면 마지막 라운드 결과와 최종 점수를 못 본다. 그래서 전이를 **관측한**
   // 게임판은 유지한다 — 메타와 게임 이벤트의 도착 순서에 기대지 않는 판단이다. 새로고침으로
   // 처음부터 FINISHED 를 받으면 전이를 본 적이 없으므로 기존 종료 카드다.
-  const [boardHeld, setBoardHeld] = useState(false);
+  //
+  // D-122 — 전이를 볼 때 **직전 IN_GAME 메타의 좌석 목록**도 함께 얼린다. 유지된 게임판의
+  // 좌석 번호(엔진)는 불변인데, FINISHED 뒤 누가 나가 메타의 playerIds 가 당겨지면 이름·
+  // (나)·봇 표시가 한 칸씩 밀렸다. 서버도 FINISHED 방의 좌석을 더는 당기지 않지만(D-122),
+  // 게임판이 라이브 메타의 좌석 목록에 기대지 않게 하는 심층 방어다. null = 유지 안 함.
+  const [heldSeats, setHeldSeats] = useState<HeldSeats | null>(null);
+  const boardHeld = heldSeats !== null;
   const roomRef = useRef<Room | null>(null);
   roomRef.current = room;
 
@@ -121,8 +133,9 @@ export function RoomPage() {
     token,
     (r) => {
       // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
-      if (roomRef.current?.status === 'IN_GAME' && r.status === 'FINISHED') {
-        setBoardHeld(true);
+      const prev = roomRef.current;
+      if (prev?.status === 'IN_GAME' && r.status === 'FINISHED') {
+        setHeldSeats({ playerIds: prev.playerIds, botSeats: prev.botSeats ?? [] });
       }
       roomRef.current = r;
       setRoom(r);
@@ -261,14 +274,19 @@ export function RoomPage() {
     room.gameType === 'SKULL_KING' &&
     (room.status === 'IN_GAME' || (boardHeld && roomFinished))
   ) {
+    // D-122 — 유지된 게임판은 얼린 좌석 목록으로 그린다. 게임 중에는 라이브 메타 그대로.
+    const seats: HeldSeats =
+      roomFinished && heldSeats
+        ? heldSeats
+        : { playerIds: room.playerIds, botSeats: room.botSeats ?? [] };
     return (
       <main className="room-page">
         <SkullKingTable
           roomId={room.roomId}
-          playerIds={room.playerIds}
+          playerIds={seats.playerIds}
           myUserId={user.userId}
           spectator={iAmSpectator}
-          botSeats={room.botSeats ?? []}
+          botSeats={seats.botSeats}
           usernames={usernames}
           turnSeconds={room.turnSeconds ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
