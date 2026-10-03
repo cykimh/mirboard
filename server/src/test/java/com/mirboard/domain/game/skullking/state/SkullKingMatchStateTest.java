@@ -228,6 +228,44 @@ class SkullKingMatchStateTest {
                 .isEqualTo(history);
     }
 
+    // ---------- D-122 — 완주 라운드 수는 매치가 끝날 때 확정해 저장한다 ----------
+
+    @Test
+    void rounds_played_is_unset_while_the_match_is_running() {
+        SkullKingMatchState state = scored(SkullKingMatchState.initial(3, 0),
+                Map.of(0, 10, 1, 0, 2, 20), 3);
+
+        assertThat(state.roundsPlayed()).isNull();
+        assertThat(state.withSeatDeserted(1).roundsPlayed()).isNull();
+    }
+
+    @Test
+    void finishing_the_tenth_round_records_ten_rounds_played() {
+        SkullKingMatchState state = SkullKingMatchState.initial(2, 0);
+        for (int i = 0; i < SkullKingMatchState.TOTAL_ROUNDS; i++) {
+            state = scored(state, Map.of(0, 10, 1, -10), 2);
+        }
+
+        assertThat(state.isMatchOver()).isTrue();
+        assertThat(state.roundsPlayed()).isEqualTo(SkullKingMatchState.TOTAL_ROUNDS);
+    }
+
+    /** 조기 종료 — 진행 중이던 라운드는 폐기되므로 그 앞까지가 완주다 (§13-⑲). */
+    @Test
+    void abandoning_records_the_rounds_completed_before_the_jump() {
+        SkullKingMatchState inRoundThree = scored(
+                scored(SkullKingMatchState.initial(3, 0), Map.of(0, 10, 1, 0, 2, 20), 3),
+                Map.of(0, -10, 1, 30, 2, 0), 3);
+
+        assertThat(SkullKingMatchState.initial(3, 0).abandoned().roundsPlayed())
+                .as("1라운드 도중 종료 = 완주 0")
+                .isZero();
+        assertThat(inRoundThree.abandoned().roundsPlayed()).isEqualTo(2);
+        assertThat(inRoundThree.abandoned().abandoned().roundsPlayed())
+                .as("이미 끝난 매치를 다시 버려도 값이 흔들리지 않는다")
+                .isEqualTo(2);
+    }
+
     @Test
     void null_history_normalises_to_empty_for_old_json() {
         SkullKingMatchState state = new SkullKingMatchState(1, 0, Map.of(0, 0), null, null);

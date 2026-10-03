@@ -482,8 +482,9 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   앞선 라운드가 빠질 수 있다(합계는 권위값 `cumulativeScores` 를 쓴다).
 - `matchResult`: D-120 매치가 끝난 뒤에만 `{ winners: [seat], finalScores: {seat: 점수},
   roundsPlayed }`, 그 전에는 `null`. `MATCH_ENDED` payload 와 같은 모양이라 재접속·탭 전환
-  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 마지막 기록의 라운드 번호 — 탈주 조기
-  종료면 10 미만이다.
+  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 **매치가 끝날 때 매치 상태에 저장한 값**
+  (D-122)이라 `MATCH_ENDED`·DB 기록과 같다 — 탈주 조기 종료면 10 미만이다. 라운드 상태에서
+  역산하지 않는다(종료 뒤 상태가 바뀌어도 흔들리지 않게). 값이 없는 구 매치만 예전 역산.
 - 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
   마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
   resync 한다.
