@@ -9,7 +9,6 @@ import com.mirboard.domain.game.tichu.action.TichuAction;
 import com.mirboard.domain.game.tichu.bot.LegalActionEnumerator;
 import com.mirboard.domain.game.tichu.bot.RandomBotPolicy;
 import com.mirboard.domain.game.tichu.bot.TimeoutActionPolicy;
-import com.mirboard.domain.game.tichu.card.Special;
 import com.mirboard.domain.game.tichu.event.TichuEvent;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
@@ -23,12 +22,10 @@ import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
-import com.mirboard.domain.game.tichu.state.TrickState;
 import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,13 +112,7 @@ public final class TichuGameEngine implements GameEngine {
      */
     @Override
     public List<Integer> pendingSeats(GameState state) {
-        return switch (tichuState(state)) {
-            case TichuState.Dealing d -> seatsWhere(d.players().size(), s -> !d.ready().contains(s));
-            case TichuState.Passing p ->
-                    seatsWhere(p.players().size(), s -> !p.submitted().containsKey(s));
-            case TichuState.Playing pl -> playingPendingSeats(pl);
-            case TichuState.RoundEnd __ -> List.of();
-        };
+        return TichuPendingSeats.of(tichuState(state));
     }
 
     @Override
@@ -296,29 +287,6 @@ public final class TichuGameEngine implements GameEngine {
                 .findFirst()
                 .orElseGet(() -> new RoundScore(
                         ended.teamAScore(), ended.teamBScore(), -1, false));
-    }
-
-    private static List<Integer> playingPendingSeats(TichuState.Playing playing) {
-        TrickState trick = playing.trick();
-        // 용으로 트릭을 가져간 좌석은 양도(GiveDragonTrick)를 마칠 때까지 차례를 붙잡는다.
-        if (dragonGivePending(trick)) {
-            return List.of(trick.currentTopSeat());
-        }
-        int current = trick.currentTurnSeat();
-        if (current < 0 || playing.players().get(current).isFinished()) {
-            return List.of();
-        }
-        return List.of(current);
-    }
-
-    private static boolean dragonGivePending(TrickState trick) {
-        return trick.currentTop() != null
-                && trick.currentTop().cards().size() == 1
-                && trick.currentTop().cards().get(0).is(Special.DRAGON);
-    }
-
-    private static List<Integer> seatsWhere(int seatCount, java.util.function.IntPredicate pending) {
-        return IntStream.range(0, seatCount).filter(pending).boxed().toList();
     }
 
     private static TichuState tichuState(GameState state) {
