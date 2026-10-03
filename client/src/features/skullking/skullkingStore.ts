@@ -231,6 +231,8 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
     },
 
     applyPrivateHand(payload) {
+      // D-122 — 끝난 매치의 손패는 갈지 않는다 (applyEvent 의 잔여 이벤트 가드와 같은 이유).
+      if (get().matchEnded) return;
       set({
         mySeat: payload.seat,
         hand: payload.cards,
@@ -243,6 +245,20 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
     applyEvent(envelope) {
       const { type, seq, payload } = envelope;
       const state = get();
+
+      // D-122 — 매치가 끝났으면 이후 게임 이벤트는 반영하지 않는다. 탈주 조기 종료·강제
+      // 종료 뒤에도 서버 턴 타이머·봇이 버려진 라운드를 이어 가던 결함이 있었는데, D-120 이
+      // 종료 뒤에도 게임판을 유지하므로 그 이벤트가 종료 패널 위에서 '내 차례'를 다시 세우고
+      // 트릭 레일을 움직였다. 서버가 원인을 막고, 여기는 심층 방어다. resync 도 부르지 않는다
+      // ('ignored') — 권위값은 applySnapshot 으로만 들어오고, 그쪽은 이 가드 밖이다.
+      // 연결 상태 배지는 게임 진행이 아니라 그대로 반영한다.
+      if (
+        state.matchEnded &&
+        type !== 'PLAYER_DISCONNECTED' &&
+        type !== 'PLAYER_RECONNECTED'
+      ) {
+        return 'ignored';
+      }
 
       let verdict: ApplyEventResult = 'applied';
       if (seq !== undefined) {
