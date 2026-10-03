@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -128,6 +132,48 @@ class FinishedRoomStopsProgressIT {
 
         assertThat(roomStatus(t)).isEqualTo("FINISHED");
         assertStopped(t);
+    }
+
+    /**
+     * 강제 종료는 방 액션 락 안에서 한다. 락 밖에서 FINISHED 로 만들면, 락을 쥐고 IN_GAME 을
+     * 확인한 직후의 액션(사람·봇·타임아웃)이 그대로 적용·브로드캐스트됐다 — 스컬킹이면 그 액션이
+     * 끝낸 라운드의 정산과 다음 라운드 시작까지. 진행 중 액션을 락 보유로 흉내 내고, 그동안 abort 가
+     * 기다리는지(방이 아직 IN_GAME) 본 뒤 락을 놓으면 끝나는지 본다.
+     */
+    @Test
+    void an_abort_waits_for_the_in_flight_action_to_release_the_room_lock() throws Exception {
+        Table t = startTwoPlayerSkullKing("fp4");
+        String lockKey = "room:" + t.roomId + ":lock";
+        redis.opsForValue().set(lockKey, "in-flight-action", Duration.ofSeconds(30));
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<Integer> abort = pool.submit(() -> mockMvc.perform(
+                            post("/api/rooms/" + t.roomId + "/abort")
+                                    .header("Authorization", bearer(t.tokens.get(0))))
+                    .andReturn().getResponse().getStatus());
+
+            Awaitility.await()
+                    .during(Duration.ofMillis(500))
+                    .atMost(Duration.ofSeconds(2))
+                    .pollInterval(Duration.ofMillis(50))
+                    .until(() -> "IN_GAME".equals(rawStatus(t.roomId)));
+            assertThat(abort.isDone()).as("액션이 락을 쥔 동안 abort 는 기다린다").isFalse();
+
+            redis.delete(lockKey); // 진행 중이던 액션이 끝났다.
+
+            assertThat(abort.get(5, TimeUnit.SECONDS)).isEqualTo(204);
+            assertThat(rawStatus(t.roomId)).isEqualTo("FINISHED");
+            assertThat(pendingTurnDeadlines(t.roomId)).isEmpty();
+        } finally {
+            redis.delete(lockKey);
+            pool.shutdownNow();
+        }
+    }
+
+    /** 방 해시의 status 를 직접 읽는다(MockMvc 를 다른 스레드와 동시에 쓰지 않으려고). */
+    private String rawStatus(String roomId) {
+        Object status = redis.opsForHash().get("room:" + roomId, "status");
+        return status == null ? null : status.toString();
     }
 
     /**
