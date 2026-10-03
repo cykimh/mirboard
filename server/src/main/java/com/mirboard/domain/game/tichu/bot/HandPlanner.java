@@ -173,6 +173,11 @@ final class HandPlanner {
         return best.groups + best.losers;
     }
 
+    /** {@link #plan} 의 묶음 수만. */
+    static int groupCount(long hand) {
+        return solve(hand, false).groups;
+    }
+
     /**
      * 컨트롤: 용, 봉황 단독, A 단독, 폭탄, K 이상 페어·연속페어, Q 이상 트리플·풀하우스,
      * A 로 끝나는 스트레이트.
@@ -280,6 +285,8 @@ final class HandPlanner {
                     }
                     int len = hi - lo + 1;
                     if (len < 5) continue;
+                    // 이미 5장 이상인 스트레이트 끝에 봉황만 붙이는 건 묶음 하나만 합치므로 제외.
+                    if (missing >= 0 && (missing == lo || missing == hi) && len - 1 >= 5) continue;
                     int bestLen = bestLo < 0 ? 0 : bestHi - bestLo + 1;
                     if (len > bestLen || (len == bestLen && bestMissing >= 0 && missing < 0)) {
                         bestLo = lo;

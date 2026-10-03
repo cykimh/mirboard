@@ -68,6 +68,16 @@ class HandPlannerTest {
     }
 
     @Test
+    void phoenix_is_not_merely_appended_to_a_complete_straight() {
+        var plan = plan(n(Suit.JADE, 2), n(Suit.SWORD, 3), n(Suit.STAR, 4), n(Suit.PAGODA, 5),
+                n(Suit.JADE, 6), Card.phoenix(), n(Suit.SWORD, 13));
+
+        assertThat(plan.groups()).hasSize(3);
+        assertThat(plan.groups()).anySatisfy(g ->
+                assertThat(g.mask()).isEqualTo(HandPlanner.PHOENIX));
+    }
+
+    @Test
     void bombs_are_reserved_before_other_groups() {
         var plan = plan(n(Suit.JADE, 7), n(Suit.SWORD, 7), n(Suit.STAR, 7), n(Suit.PAGODA, 7),
                 n(Suit.JADE, 5), n(Suit.SWORD, 6), n(Suit.STAR, 8), n(Suit.PAGODA, 9));
