@@ -99,22 +99,65 @@ docker stop mirboard-deploycheck
 
 ---
 
-## 데모 계정 (D-105)
+## 게스트 체험 (D-117)
 
-쇼케이스용 고정 계정. **기본 꺼짐** — 공개 비밀번호를 가진 계정이 로컬·CI 에 생기면 안 되므로
-배포 환경에서만 켭니다. Flyway 마이그레이션이 아니라 환경변수 게이트인 이유이기도 합니다:
-켜고 끄는 것이 설정 한 줄이고, 되돌리는 데 새 마이그레이션이 필요 없습니다.
+로그인 화면의 「게스트로 바로 체험하기」(`POST /api/auth/guest`)는 **기본 켜짐**이라 새
+시크릿이 필요 없습니다. 방문자마다 일회용 게스트 계정을 만듭니다 — D-105 의 공유 데모
+계정(`DemoAccountSeeder`)은 같은 userId 를 여러 사람이 써서 좌석 탈취·손패 유출이 생겨
+**삭제**했습니다.
+
+| 환경 변수 | 기본 | 뜻 |
+| --- | --- | --- |
+| `MIRBOARD_GUEST_ENABLED` | `true` | 킬스위치. `false` 면 생성이 403 `GUEST_DISABLED` |
+| `MIRBOARD_GUEST_DAILY_CAP` | `200` | UTC 하루 전역 생성 상한(비용 상한). 넘으면 503 `GUEST_UNAVAILABLE` |
+| `MIRBOARD_RATELIMIT_GUEST_LIMIT` | `10` | IP(IPv6 /64) 당 하루 생성 한도. 넘으면 429 |
+| `MIRBOARD_CLIENT_IP_HEADER` | `Fly-Client-IP` | 레이트리밋 IP 를 읽을 신뢰 헤더(prod 프로필만). 클라가 위조할 수 있는 `X-Forwarded-For` 대신 Fly 프록시가 채우는 값을 쓴다 |
+
+남용 시 긴급 차단(머신 재시작됨):
 
 ```bash
-flyctl secrets set \
-  MIRBOARD_DEMO_ENABLED=true \
-  MIRBOARD_DEMO_USERNAME=demo \
-  MIRBOARD_DEMO_PASSWORD="<8자 이상>"
+flyctl secrets set MIRBOARD_GUEST_ENABLED=false -a mirboard
 ```
 
-비밀번호가 비어 있으면 시더가 **경고만 남기고 건너뜁니다**(약한 계정 자동 생성 방지).
-계정은 일반 사용자와 동일하게 취급되어 레이트리밋·정지·모더레이션이 그대로 적용됩니다.
-구현: `server/.../infra/config/DemoAccountSeeder.java`.
+한도만 조이려면:
+
+```bash
+flyctl secrets set MIRBOARD_GUEST_DAILY_CAP=100 MIRBOARD_RATELIMIT_GUEST_LIMIT=5 -a mirboard
+```
+
+전역 상한의 첫 거절은 ERROR 로그(= Sentry 이벤트, D-107)로, 70% 도달은 WARN 으로 남습니다.
+
+### 배포 후 실측
+
+**IP 위조 내성** — 게스트 할당량을 쓰지 않으려고 로그인 버킷(분당 20)으로 잽니다. 1~20번은
+`401`, **21번째는 `429`** 여야 합니다. 21번째도 `401` 이면 `Fly-Client-IP` 를 클라가 위조할 수
+있다는 뜻입니다(그때는 XFF 오른쪽 끝 홉을 쓰는 해석기로 바꿔야 함).
+
+```bash
+for i in $(seq 1 21); do curl -s -o /dev/null -w "$i %{http_code}\n" -X POST https://mirboard.fly.dev/api/auth/login -H 'Content-Type: application/json' -H "X-Forwarded-For: 10.0.0.$i" -H "Forwarded: for=10.0.1.$i" -H "Fly-Client-IP: 10.0.2.$i" -d "{\"username\":\"ipcheck_$i\",\"password\":\"x\"}"; done
+```
+
+**게스트 생성** — 이 IP 의 하루 10회 중 1회를 씁니다. `201` 이어야 합니다.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://mirboard.fly.dev/api/auth/guest -H 'Content-Type: application/json' -d '{}'
+```
+
+### 데모 계정 잔재 정리 (D-105 를 운영에서 켠 적이 있을 때만)
+
+`flyctl secrets list -a mirboard` 에 `MIRBOARD_DEMO_*` 가 보이면 지웁니다(이제 아무도 읽지 않음).
+
+```bash
+flyctl secrets unset MIRBOARD_DEMO_ENABLED MIRBOARD_DEMO_USERNAME MIRBOARD_DEMO_PASSWORD -a mirboard
+```
+
+비밀번호가 공개됐던 `demo` 행이 운영 DB 에 남아 있으면 로그인 불가 해시로 봉인합니다. 데모를
+켠 적이 없다면 실제 사용자의 `demo` 계정일 수 있으니 건드리지 않습니다.
+
+```sql
+SELECT id, created_at FROM users WHERE username = 'demo';
+UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
+```
 
 ---
 

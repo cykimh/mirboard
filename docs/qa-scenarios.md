@@ -34,6 +34,46 @@ curl -s http://localhost:8080/api/me -H "Authorization: Bearer $TOKEN"
 - 토큰 없는 `/api/me` → `401 UNAUTHORIZED`
 - username 규칙 위반 (`^[A-Za-z0-9_]{3,20}$`) → `400 INVALID_INPUT`
 
+## 게스트 체험 (D-117)
+
+가입 없이 들어온 방문자가 한 판을 끝까지 하고, 게스트 제한이 지켜지는지:
+
+```bash
+# 1) 게스트 생성 — 201, user.guest=true, username 은 guest-xxxxxxxx
+G=$(curl -s -X POST http://localhost:8080/api/auth/guest \
+  -H "Content-Type: application/json" -d '{}')
+echo "$G" | jq .user
+GT=$(echo "$G" | jq -r .accessToken)
+
+# 2) 게스트 금지 행위 — 둘 다 403 GUEST_FORBIDDEN
+curl -s -X PUT http://localhost:8080/api/me/password -H "Authorization: Bearer $GT" \
+  -H "Content-Type: application/json" -d '{"currentPassword":"x","newPassword":"newpass123"}'
+curl -s -X DELETE http://localhost:8080/api/me/avatar -H "Authorization: Bearer $GT"
+
+# 3) 게스트 username 으로는 로그인할 수 없다 — 401 BAD_CREDENTIALS
+curl -s -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" \
+  -d "{\"username\":\"$(echo "$G" | jq -r .user.username)\",\"password\":\"__guest_no_login__\"}"
+
+# 4) JSON 이 아니면 415 (크로스사이트 폼 전송 차단)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/auth/guest \
+  -H "Content-Type: text/plain" -d '{}'
+```
+
+브라우저(시크릿 창 권장 — 로컬 스토리지가 비어 있어야 처음 온 사람과 같다):
+
+1. 로그인 화면 폼 아래 '또는' + 「게스트로 바로 체험하기」 + 캡션 "가입 없이 12시간 · 전적은
+   랭킹에 오르지 않아요" → 누르면 메인으로 간다.
+2. 메인 헤더: username 옆 '게스트' 배지, 아바타 버튼은 눌리지 않고 마우스를 올리면 이유가 뜬다.
+3. 「새 방 만들기」 → '빈 좌석 봇으로 채우기'가 **켜진 채** 열린다 → 봇 방에서 한 판을 끝낸다.
+4. 로비 채팅을 다른 창(정회원)과 주고받는다 — 게스트도 정회원과 같다.
+5. 랭킹 카드에 게스트가 없다. 프로필의 비밀번호 칸은 안내 문구로 바뀌어 있다.
+6. 「로그아웃」 → "다시 들어올 수 없어요" 확인창. 취소하면 그대로, 확인하면 로그인 화면.
+7. 한도: 같은 IP 에서 하루 11번째 생성은 429 → 로그인 화면이 "이 네트워크에서 오늘 만들 수
+   있는 게스트 수를 다 썼어요" + 「회원가입하고 시작하기」 버튼을 보여 준다.
+
+운영에서는 배포 직후 [deploy.md](deploy.md) "게스트 체험 → 배포 후 실측"의 IP 위조 내성 루프
+(로그인 21회 — 21번째가 429)를 한 번 돌린다.
+
 ## Phase 2c — 게임 카탈로그
 
 ```bash
