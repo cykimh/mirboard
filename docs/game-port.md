@@ -205,10 +205,11 @@ default Set<RoomOption> supportedRoomOptions() { return EnumSet.noneOf(RoomOptio
    `engine.actionType()` 이 대상 타입을 주고 컨트롤러가 변환한다. 목적지는 하나로 유지되어
    클라 계약은 바뀌지 않았다. 알 수 없는 판별자는 `ERROR(INVALID_ACTION)`.
 3. **봇 정책은 포트 메서드 + 게임별 override 로 분리.** `botAction(state, seat, random)` 의
-   기본 구현이 "합법 액션 균등 분포"이고 티츄는 `RandomBotPolicy` 로 override 한다. 시드
-   `Random` 은 스케줄러가 계속 보유하므로 `mirboard.bot.seed` 재현성이 유지된다.
-   스컬킹은 결정적 휴리스틱 `SkullKingBotPolicy` 로 override 한다(D-119) — `random` 을 쓰지
-   않으므로 같은 상태면 같은 수이고, 시드 재현성은 그대로다(`rules-skullking.md` §16).
+   기본 구현이 "합법 액션 균등 분포"다. 두 게임 모두 이를 결정적 휴리스틱으로 override 한다 —
+   티츄는 `HeuristicBotPolicy`(D-118), 스컬킹은 `SkullKingBotPolicy`(D-119). 둘 다 공개 정보만
+   보고 `random` 인자를 쓰지 않으므로 같은 상태면 같은 수다(`rules-tichu.md` §16 ·
+   `rules-skullking.md` §16). 시드 `Random` 은 스케줄러가 계속 보유하므로 포트 기본 봇을 쓰는
+   새 게임에는 `mirboard.bot.seed` 재현성이 그대로 남는다.
    **새 게임 권장 패턴**: 봇 정책은 공개 정보만 담은 뷰를 받아 `legalActions` 의 원소를
    고르고, 어댑터는 정책이 예외·null·비합법 액션을 내면 ERROR 로그 후 `timeoutAction` 으로
    폴백한다 — 턴 제한 0 방에선 스케줄러가 재시도하지 않아 정책 버그가 방 정지로 이어진다.

@@ -100,6 +100,7 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.tichu.TichuSpecialCardScenarioTest" \
             --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
             --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
+            --tests "com.mirboard.domain.game.tichu.bot.*" \
             --tests "com.mirboard.domain.game.skullking.*"
         log "모두 통과"
         ;;

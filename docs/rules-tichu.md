@@ -213,6 +213,15 @@
 
 **갭:** **Dragon 양도 후 점수 이전 (recipient.tricksWon += accumulated) 의 명시적 단위 테스트 부재.** 10B 에서 추가 예정.
 
+**갭 (D-118 에서 확인, 문서화만 — 수정은 별도 D-NN):**
+- **(a) 즉시 양도 대기**: 용이 top 이 되는 순간 대기 좌석이 용 주인 하나로 바뀌고
+  (`TichuPendingSeats`), `ActionValidator.validateGiveDragonTrick` 은 다른 좌석이 모두
+  패스했는지 보지 않는다. 봇·타임아웃은 곧바로 양도해 트릭이 닫히므로 사실상 아무도 용에
+  응수(폭탄 포함)할 수 없다. 표준 룰은 모두 패스해 트릭을 이긴 **뒤에** 양도하고, 그 전에는
+  폭탄으로 끊을 수 있다.
+- **(d) 용으로 라운드 종료 시 무양도**: 용을 낸 그 플레이로 라운드가 끝나면(3명 완주·더블
+  빅토리) `TichuEngine.endRoundClosingTrick` 이 양도 없이 용 주인에게 트릭을 넘긴다.
+
 ---
 
 ## 9. Wish 강제
@@ -233,6 +242,14 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 **테스트:** `ActionValidatorTest` (lead + 보유 + 미포함 → reject).
 
 **갭:** `WishFulfillmentChecker` 가 콤보(스트레이트/풀하우스/연속페어)를 보지 않아, 콤보로만 wish rank 를 낼 수 있는 상황에서는 강제되지 않는다. wish + BOMB 인터럽트 시 fulfillment 처리도 명시 부재.
+
+**갭 (D-118 에서 확인, 문서화만):**
+- **(b) 용 양도 시 소원 소멸**: `TichuEngine.applyGiveDragonTrick` 이 다음 트릭을
+  `TrickState.lead(nextLead, null)` 로 시작해 **활성 소원이 사라진다**. 일반 트릭 종료와 개는
+  소원을 이어 간다.
+- **PassTrick 은 소원 강제를 받지 않는다**: `validatePassTrick` 에 소원 검사가 없어, 소원
+  랭크를 쥐고 낼 수 있어도 패스가 통과한다. 봇(§16, F2)은 자발적으로 지키지만 사람·랜덤 봇은
+  빠져나갈 수 있다.
 
 ---
 
@@ -265,6 +282,10 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 **코드:** `TichuEngine.closeTrickAndContinue` (`TichuEngine.java:373-419`), `applyPlayCard` Dog 분기 (`TichuEngine.java:232-245`)
 
 **테스트:** `TichuEngineRoundSimulationTest.pass_closes_trick_when_all_others_pass`, Dog 케이스 부재 — **10B 에서 추가**.
+
+**갭 (D-118 에서 확인, 문서화만):** **(c) 패스 영구** — 한 번 패스한 좌석은 그 트릭이 끝날
+때까지 `passedSeats` 에 남아 `TurnManager.advanceTurn` 이 건너뛴다. 차례가 다시 돌아와도 낼 수
+없다. 표준 룰은 패스한 뒤에도 다음 차례에 다시 낼 수 있다.
 
 ---
 
@@ -349,9 +370,89 @@ per-room generation gen-guard + RoomActionLock 공유, BotScheduler 와 동일
 자동 진행해 매치 완주 + invariant. `RoomControllerIntegrationTest` — turnSeconds
 지정/기본 2 케이스.
 
+봇 좌석의 수는 이 정책이 아니라 §16 `HeuristicBotPolicy` 가 정한다 — 타임아웃 정책은 사람
+무응답용 안전 액션으로 봇 정책과 별개다.
+
 **갭/제약:** 단일 머신 배포 전제 (타이머 in-memory). 다중 인스턴스 전환 시 Redis
 동기화 필요 (Phase 6D 패턴, 범위 외). 클라 실시간 카운트다운 UI 는 후속 (현재는
 "턴 제한 N초" 정적 배지만).
+
+---
+
+## 16. 봇 정책 (D-118)
+
+솔로 방 봇 좌석의 수는 `TichuGameEngine.botAction` → `HeuristicBotPolicy.choose` 가 정한다.
+룰이 아니라 **정책**이지만, 봇이 엔진의 현재 동작(아래 (a)~(d))을 전제로 튜닝되므로 룰 문서에
+같이 둔다.
+
+**원칙**
+- **공개 정보만** 본다. 상태는 `BotView.of(state, seat)` 로만 읽는다 — 본인 손패, 좌석별
+  장수·선언·완주, 공개 트릭(top·차례·패스 좌석·활성 소원·트릭 점수), 나온 카드, 내 용 양도
+  보류. 남의 손패, `reservedSecondHalf`(내 몫 포함), 남의 패스 선택은 보지 않는다.
+- **결정적**: Random·시간·해시 순회 없음. 포트의 `random` 인자는 무시한다. 같은 상태면 같은 수.
+- 후보는 `LegalActionEnumerator.enumerateFull`(기존 후보 + `ComboFinder` 조합 + 선언을
+  `ActionValidator` 로 거른 목록) 안에서만 고른다. 각 규칙은 "legal ∩ 규칙 술어"에서 고르고
+  비면 다음 규칙으로 넘어간다. 제안은 다시 검증하고, 실패하면 `TimeoutActionPolicy` 로 폴백.
+- **평가 함수** `HandPlanner`: 손패를 묶음으로 분해(폭탄 예약 → 4변형 그리디 → (묶음 수,
+  루저 수) 최소). **컨트롤** = 용, 봉황 단독, A 단독, 폭탄, K 이상 페어·연속페어, Q 이상
+  트리플·풀하우스, A 로 끝나는 스트레이트. **루저** = 비컨트롤 단일·페어 중 rank ≤10, 트리플
+  중 ≤8. cost = 묶음 수 + 루저 수. 봉황은 둘 이상의 묶음을 합칠 때만 조합에 쓴다.
+
+**공통 술어** (엔진을 고치면 여기만 다시 보정)
+- **가드(partnerHoldBack)**: 파트너 선언 ∧ 파트너 미완주 ∧ 완주자 없음 ∧ 내 선언 없음 ∧ 상대
+  위협 없음(활성 상대 중 장수 ≤2 이면서 파트너 장수 이하인 좌석 없음). 참이면 손패를 비우는
+  후보를 뺀다(리드 후보가 전부 완주일 때만 예외).
+- **danger**: 활성 상대 ≤2장 ∨ 활성 상대가 선언자 ∨ 가드.
+- **isBoss**: 미공개 카드(56 − 내 손 − 공개 카드)로 같은 타입·길이에서 이길 수 없는 묶음.
+  남의 폭탄은 보지 않는다. 용 단독은 (a) 때문에 불패로 친다.
+
+**결정 지점**
+
+| 지점 | 규칙 (위에서부터 먼저 맞는 것) |
+| --- | --- |
+| 그랜드티츄 (Dealing 8) | 파트너 미선언 ∧ power8(용 + 봉황 + A 수 + 2×포카드) ≥ 4 ∧ 용 또는 봉황 → 선언, 아니면 Ready |
+| 티츄 — 패스 전 (Dealing 14) | 파트너 미선언 ∧ controls ≥ losers+2 ∧ losers ≤ 2 ∧ controls ≥ 3 |
+| 티츄 — 패스 후 (Playing, 14장, 내 차례) | 파트너 미선언 ∧ 완주자 없음 ∧ 모든 상대 ≥10장 ∧ controls ≥ losers+1 ∧ losers ≤ 3 ∧ controls ≥ 3 ∧ 비컨트롤 묶음(groups − controls) < controls 이면서 ≤ 3. 상대가 선언했으면 앞의 두 문턱을 1씩 보수적으로. 선언은 차례를 넘기지 않는다(스케줄러가 같은 좌석을 다시 부른다) |
+| 패스 — 파트너 | 파트너 선언 → 폭탄 밖 최강 카드 / 내가 선언(또는 패스 후 선언 기준 충족) → 최저 루저 단일 / 내 controls ≤1 → 최강 카드 / 그 외 → 비컨트롤 최고 단일 |
+| 패스 — 상대 둘 | 남은 손에서 (cost(손−c), 점수카드 여부, 랭크) 최소를 차례로 2장. 약한 쪽이 toLeft(s+1). 용·봉황·폭탄 구성원·마작은 맨 뒤, 개는 파트너 미선언 ∧ 내 controls ≥2 일 때만 |
+| 리드 L1 | 손패 전체가 한 합법 조합이면 낸다 (가드면 건너뜀) |
+| 리드 L2 | 파트너 활성 ∧ (파트너 선언 ∨ 파트너 ≤2장 ∨ (내 controls=0 ∧ 파트너 장수 ≤ 내 장수) ∨ 가드) → 개 |
+| 리드 L3 | 가드 아님 ∧ 묶음 2개 ∧ 그중 하나가 불패 → 불패 묶음부터 |
+| 리드 L4 | 활성 상대가 1장 → 단일이 아닌 리드 중 cost 최소, 없으면 최고 단일 |
+| 리드 L5 | 파트너 1장 → 최저 단일 |
+| 리드 L6 | 가드 → 완주가 아닌 비컨트롤 최저 단일(파트너에게 리드를 넘김) |
+| 리드 L7 | 폭탄·컨트롤을 뺀 후보 중 (cost(손−c), 랭크, −장수) 최소 → 컨트롤만 남으면 가장 약한 컨트롤 → 폭탄만 남으면 가장 약한 폭탄. 폭탄을 깨는 후보와 파트너가 나간 뒤의 개는 뺀다 |
+| 팔로우 F0 | 용 양도 보류 → 양도(완주한 좌석이어도 이 분기가 먼저) |
+| 팔로우 F1 | 손패를 비우는 합법 조합 (가드면 건너뜀) |
+| 팔로우 F2 | 활성 소원 랭크를 쥐고 그 랭크를 포함한 legal 이 있으면 그중 F4 순서로 최선(§9 자발 준수) |
+| 팔로우 F3 | top 이 파트너 → 패스. 단 s+1(마지막 응수자) 상대가 활성·미패스·≤2장이고 파트너 top 이 불패가 아니면, 이기는 불패 비폭탄 중 가장 싼 것으로 막는다. 파트너에게 폭탄은 쓰지 않는다 |
+| 팔로우 F4 | 비폭탄 중 (Δcost, 컨트롤 사용, 랭크) 최소. 컨트롤은 트릭 점수 ≥15 ∨ danger ∨ 내가 선언자 ∨ 사용 후 묶음 ≤2 일 때만, 조합을 깨는 수는 트릭 점수 ≥10 ∨ danger 일 때만 |
+| 팔로우 F5 | top 이 상대 ∧ (top 좌석 ≤3장 ∨ 활성 상대 선언자 ∨ 가드 ∨ 트릭 점수 ≥25 ∨ 폭탄 후 묶음 ≤1) ∧ F4 실패 → 이기는 가장 약한 폭탄 |
+| 팔로우 F6 | 패스 |
+| 소원 | 낸 카드에 마작이 있으면 14→2 순으로 내 손에 없고 4장이 다 나오지 않은 최고 랭크, 없으면 소원 없음 |
+| 용 양도 | 활성 상대 중 장수가 많은 쪽(4등 가능성 → 그 트릭 점수가 1등 팀으로 넘어갈 수 있음), 동률이면 비선언자, 그다음 좌석 오름차순 |
+| 봉황 | 조합 채우기는 플래너가 정한다. 단독 리드는 L7 의 "컨트롤만 남음"에서만, 단독 팔로우는 F4 컨트롤 조건 |
+
+**봇이 전제하는 엔진 현황** — 위 §8.4·§9·§11 의 갭. 고치면(별도 D-NN) `isBoss` 와 F3·F4
+문턱을 다시 보정한다.
+- (a) 용이 top 이 되는 즉시 양도 대기가 걸려 아무도 응수할 수 없다 → 용 단독은 불패.
+- (b) 용을 양도하면 활성 소원이 사라진다.
+- (c) 한 번 패스하면 그 트릭에 다시 들어올 수 없다 → 팔로우는 "이번이 이 트릭의 마지막 기회".
+- (d) 용으로 라운드가 끝나면 양도 없이 용 주인이 트릭을 가져간다.
+
+**범위 밖**: 차례 밖 폭탄 인터럽트(BotScheduler 가 대기 좌석만 깨운다 — infra 무변경 원칙),
+봇 난이도 방 옵션.
+
+**코드:** `domain/game/tichu/bot/HeuristicBotPolicy.java`(결정 지점·공통 술어·튜닝 상수),
+`BotView.java`, `HandPlanner.java`, `ComboFinder.java`, `LegalActionEnumerator.enumerateFull`,
+`TichuPendingSeats.java`, 배선 `TichuGameEngine.botAction`.
+
+**테스트:** `HeuristicBotPolicyTest`(결정 지점 시나리오), `ComboFinderTest`, `HandPlannerTest`,
+`LegalActionEnumeratorTest`(enumerateFull), `BotDeterminismGuardTest`(소스 정적 가드),
+`HeuristicBotSimulationTest`(순수 시뮬레이션 — 랜덤·그리디 기준선, 자가대전 선언, 숨김 정보
+스크램블 동치, 결정 비용), `HeuristicBotEvaluationTest`(`MIRBOARD_BOT_EVAL=1` 대형 평가),
+`TichuGameEngineBotActionTest`, `BotMatchSimulationIT`(실경로). 수치·보정 로그·재현 명령은
+`docs/plans/tichu-bot-heuristic.md`.
 
 ---
 

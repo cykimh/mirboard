@@ -10,6 +10,9 @@ import java.util.Random;
  *
  * <p>단순화 휴리스틱: PlayCard 후보가 여러 개면 50% 확률로 PassTrick 선호 → 손패 보존
  * 효과 (실제로는 random 이 결국 PlayCard 도 충분히 고름).
+ *
+ * <p>D-118 이후 운영에서는 쓰지 않는다({@link HeuristicBotPolicy} 로 교체) — 봇 평가
+ * 시뮬레이션의 기준선(이전 운영 봇)으로 유지한다.
  */
 public final class RandomBotPolicy {
 
