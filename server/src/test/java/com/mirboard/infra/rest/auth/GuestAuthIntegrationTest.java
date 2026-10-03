@@ -17,6 +17,7 @@ import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -27,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
@@ -78,6 +80,7 @@ class GuestAuthIntegrationTest {
     @Autowired UserRepository users;
     @Autowired JdbcTemplate jdbc;
     @Autowired Clock clock;
+    @Autowired StringRedisTemplate redis;
 
     private final SplittableRandom rng = new SplittableRandom();
 
@@ -183,6 +186,18 @@ class GuestAuthIntegrationTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.error.code").value("GUEST_UNAVAILABLE"));
+    }
+
+    @Test
+    void daily_counter_key_always_carries_its_ttl() throws Exception {
+        // redis-keys.md 계약: `guest:issued:{UTC 날짜}` 는 TTL 48h. INCR 과 첫 EXPIRE 가 한
+        // 스크립트라 "카운터가 있으면 TTL 도 있다"가 항상 참이어야 한다.
+        createGuest();
+        createGuest();
+
+        String key = "guest:issued:" + LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
+        assertThat(redis.opsForValue().get(key)).isEqualTo("2");
+        assertThat(redis.getExpire(key)).isBetween(1L, Duration.ofHours(48).toSeconds());
     }
 
     @Test

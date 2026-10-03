@@ -6,13 +6,16 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.random.RandomGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 /**
@@ -46,21 +49,25 @@ public class GuestAccountService {
 
     private final UserRepository users;
     private final StringRedisTemplate redis;
+    private final RedisScript<Long> issueScript;
     private final GuestProperties props;
     private final GuestAccountSweeper sweeper;
     private final Clock clock;
     private final RandomGenerator rng;
 
     @Autowired
-    public GuestAccountService(UserRepository users, StringRedisTemplate redis, GuestProperties props,
-                               GuestAccountSweeper sweeper, Clock clock) {
-        this(users, redis, props, sweeper, clock, new SecureRandom());
+    public GuestAccountService(UserRepository users, StringRedisTemplate redis,
+                               @Qualifier("guestDailyIssueScript") RedisScript<Long> issueScript,
+                               GuestProperties props, GuestAccountSweeper sweeper, Clock clock) {
+        this(users, redis, issueScript, props, sweeper, clock, new SecureRandom());
     }
 
-    GuestAccountService(UserRepository users, StringRedisTemplate redis, GuestProperties props,
-                        GuestAccountSweeper sweeper, Clock clock, RandomGenerator rng) {
+    GuestAccountService(UserRepository users, StringRedisTemplate redis, RedisScript<Long> issueScript,
+                        GuestProperties props, GuestAccountSweeper sweeper, Clock clock,
+                        RandomGenerator rng) {
         this.users = users;
         this.redis = redis;
+        this.issueScript = issueScript;
         this.props = props;
         this.sweeper = sweeper;
         this.clock = clock;
@@ -88,6 +95,7 @@ public class GuestAccountService {
 
     /**
      * UTC 하루 전역 상한. INCR 이 원자라 다중 인스턴스에서도 상한을 넘겨 발급하지 않는다.
+     * 첫 EXPIRE 도 같은 스크립트(`guest_daily_issue.lua`)라 TTL 없는 날짜 키가 남지 않는다.
      * Redis 가 응답하지 않으면 만들지 않는다 — 어차피 Redis 없이는 방이 동작하지 않는다.
      */
     private void reserveDailySlot() {
@@ -95,14 +103,12 @@ public class GuestAccountService {
         String key = ISSUED_KEY_PREFIX + LocalDate.ofInstant(now, ZoneOffset.UTC);
         long issued;
         try {
-            Long n = redis.opsForValue().increment(key);
+            Long n = redis.execute(issueScript, List.of(key),
+                    Long.toString(ISSUED_KEY_TTL.toSeconds()));
             if (n == null) {
                 throw new GuestUnavailableException(secondsUntilNextUtcMidnight(now));
             }
             issued = n;
-            if (issued == 1L) {
-                redis.expire(key, ISSUED_KEY_TTL);
-            }
         } catch (DataAccessException e) {
             log.warn("Guest daily cap check failed (failing closed): {}", e.toString());
             throw new GuestUnavailableException(secondsUntilNextUtcMidnight(now));
