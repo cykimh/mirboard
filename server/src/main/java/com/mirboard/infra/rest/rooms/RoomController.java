@@ -12,6 +12,7 @@ import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.infra.bot.TurnTimeoutScheduler;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.RoomPresence;
@@ -42,19 +43,22 @@ public class RoomController {
     private final DesertionService desertion;
     private final RoomPresence sessions;
     private final RoomChipStore chipStore;
+    private final TurnTimeoutScheduler turnTimeout;
 
     public RoomController(RoomService rooms,
                           GameEngineProvider engines,
                           RoomSeq seqs,
                           DesertionService desertion,
                           RoomPresence sessions,
-                          RoomChipStore chipStore) {
+                          RoomChipStore chipStore,
+                          TurnTimeoutScheduler turnTimeout) {
         this.rooms = rooms;
         this.engines = engines;
         this.seqs = seqs;
         this.desertion = desertion;
         this.sessions = sessions;
         this.chipStore = chipStore;
+        this.turnTimeout = turnTimeout;
     }
 
     @GetMapping
@@ -147,6 +151,8 @@ public class RoomController {
     public void abort(@PathVariable String roomId,
                       @AuthenticationPrincipal AuthPrincipal me) {
         rooms.abortGame(roomId, me.userId());
+        // D-122 — 끝난 방의 턴 데드라인 취소(발화 쪽 방 상태 가드와 이중 방어).
+        turnTimeout.cancel(roomId);
     }
 
     @PostMapping("/{roomId}/leave")

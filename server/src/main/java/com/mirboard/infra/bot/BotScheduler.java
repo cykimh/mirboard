@@ -9,6 +9,7 @@ import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
@@ -62,6 +63,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>안전망: 1 라운드 내 봇 액션 최대 {@value #MAX_BOT_ACTIONS_PER_ROOM} 회. 초과 시
  * 경고 로그 + 스케줄 중단 (무한 루프 방어).
+ *
+ * <p>D-122 — <b>IN_GAME 인 방만</b> 진행한다(락 전·락 안 두 번 확인). 탈주 조기 종료·강제
+ * 종료로 끝난 방에서 이미 돌던 루프가 버려진 라운드를 계속 두던 경로를 막는다. 게임 중립
+ * 판정(방 상태)이다.
  */
 @Component
 public class BotScheduler {
@@ -119,6 +124,8 @@ public class BotScheduler {
             // 방이 사라짐 (매치 종료 후 finished + TTL) — 정상 종료.
             return;
         }
+        // D-122 — 끝난(또는 아직 시작 안 한) 방은 진행하지 않는다.
+        if (room.status() != RoomStatus.IN_GAME) return;
         // 솔로 방이 아니면 아무것도 안 함.
         if (room.botSeats().isEmpty()) return;
 
@@ -147,6 +154,11 @@ public class BotScheduler {
             return;
         }
         try {
+            // D-122 — 락 안에서 재확인. 딜레이·락 대기 사이에 탈주 MATCH_ENDED(이 락 안에서
+            // FINISHED 로 만든다)나 강제 종료가 끼었을 수 있다.
+            if (!stillInGame(roomId)) {
+                return;
+            }
             GameEngine engine = engines.forRoom(room);
             GameState state = engine.loadState().orElse(null);
             if (state == null) {
@@ -184,6 +196,15 @@ public class BotScheduler {
         }
         // 락 해제 후 재귀 — 다음 봇 있으면 이어서.
         runRoom(roomId, iterations + 1);
+    }
+
+    /** 방이 아직 있고 IN_GAME 인가. */
+    private boolean stillInGame(String roomId) {
+        try {
+            return roomService.getRoom(roomId).status() == RoomStatus.IN_GAME;
+        } catch (RoomNotFoundException e) {
+            return false;
+        }
     }
 
     /**

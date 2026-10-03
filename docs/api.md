@@ -372,7 +372,9 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 유일한 탈출구.
 
 응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
-방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
+방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트. D-122: 턴
+데드라인을 취소하고, 이후 액션·봇·턴 타임아웃은 방 상태 가드로 적용되지 않는다(버려진
+라운드가 더 진행되지 않음).
 
 ### POST `/api/rooms/{roomId}/leave`
 응답 `204`.
@@ -565,6 +567,7 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 ### POST `/api/admin/rooms/{roomId}/abort`
 어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
 와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+호스트 abort 와 같이 턴 데드라인을 취소한다(D-122).
 
 ### POST `/api/admin/users/{userId}/suspend`
 유저 정지. 본문 `{ "minutes": 60 }`(선택, 기본 60분, 1~525600 클램프). 정지 상태는 Redis

@@ -70,6 +70,27 @@ class DesertionServiceTest {
         verify(lock).release("r1");
     }
 
+    /**
+     * D-122 — 탈주로 매치가 끝나면 걸려 있던 턴 데드라인을 취소한다. 남겨 두면 발화해 버려진
+     * 라운드를 자동 진행했다. 재무장(onTurnAdvanced)이 아니라 취소다.
+     */
+    @Test
+    void match_ending_desertion_cancels_the_turn_deadline() {
+        List<Long> players = List.of(10L, 20L);
+        when(bots.isBot(10L)).thenReturn(false);
+        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(inGame(players));
+        when(engines.forRoom(any())).thenReturn(engine);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_ENDED);
+
+        service.processDesertion("r1", 10L);
+
+        verify(turnTimeout).cancel("r1");
+        verify(turnTimeout, never()).onTurnAdvanced(any());
+        verify(botScheduler, never()).scheduleBots(any());
+    }
+
     /** D-102/D-104 — 개인전 '남은 사람끼리 계속': 방 유지 + 봇/타이머 재무장. */
     @Test
     void continued_desertion_keeps_the_room_and_rearms_schedulers() {

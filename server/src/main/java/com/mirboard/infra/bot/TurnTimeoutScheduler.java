@@ -8,6 +8,7 @@ import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
@@ -18,6 +19,7 @@ import com.mirboard.infra.ws.RoomActionLock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -45,6 +47,12 @@ import org.springframework.stereotype.Component;
  * <p>D-98 — 게임을 모른다. 겨눌 좌석은 {@link GameEngine#pendingSeat}, 적용할 안전
  * 액션은 {@link GameEngine#timeoutAction} 이 결정한다 (과거 이 클래스가 티츄 단계별
  * switch 와 {@code TimeoutActionPolicy} 를 직접 들고 있었다).
+ *
+ * <p>D-122 — <b>IN_GAME 인 방만</b> 진행한다. 탈주 조기 종료·강제 종료는 방을 FINISHED 로
+ * 만들 뿐 직전 액션이 걸어 둔 데드라인은 살아 있었고, 이 클래스는 방 상태를 보지 않아 버려진
+ * 라운드를 끝까지 자동 진행했다. 판정은 게임 중립(방 상태)이다 — 강제 종료는 엔진 상태로는
+ * 매치가 안 끝났으므로 {@code isMatchOver()} 로는 못 막는다. 끝내는 쪽은 {@link #cancel} 로
+ * 데드라인을 지운다.
  */
 @Component
 public class TurnTimeoutScheduler implements DeadlineHandler {
@@ -103,14 +111,33 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
             cleanup(roomId);
             return;
         }
-        long prevGen = generations.current(roomId);
-        long gen = generations.bump(roomId);
-        deadlines.cancel(KIND, member(roomId, prevGen));
+        long gen = invalidate(roomId);
+
+        // D-122 — 끝난 방에는 다음 턴이 없다(매치를 끝낸 액션 직후의 호출 등). 취소만 한다.
+        if (room.status() != RoomStatus.IN_GAME) return;
 
         int turnSeconds = room.turnSeconds();
         if (turnSeconds <= 0) return;  // 타이머 끔 — 기존 동작 호환.
 
         deadlines.schedule(KIND, member(roomId, gen), Duration.ofSeconds(turnSeconds));
+    }
+
+    /**
+     * D-122 — 걸려 있는 턴 데드라인을 취소한다(재무장 없음). 매치를 액션 경로 밖에서 끝내는
+     * 쪽 — 탈주 MATCH_ENDED, 호스트/어드민 강제 종료 — 이 부른다. generation 을 올리므로 이미
+     * 폴러가 집어 간 항목도 발화 시점에 버려진다. 발화 쪽에도 방 상태 가드가 있으니 이것은
+     * 정리(ZSET 회수)와 이중 방어다.
+     */
+    public void cancel(String roomId) {
+        invalidate(roomId);
+    }
+
+    /** generation++ 후 이전 generation 의 데드라인을 지운다. 새 generation 을 반환. */
+    private long invalidate(String roomId) {
+        long prevGen = generations.current(roomId);
+        long gen = generations.bump(roomId);
+        deadlines.cancel(KIND, member(roomId, prevGen));
+        return gen;
     }
 
     /** 폴러가 만료된 항목을 넘겨준다. 이 인스턴스가 단독 소유한 상태로 들어온다. */
@@ -143,6 +170,8 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
             cleanup(roomId);
             return;
         }
+        // D-122 — 끝난 방의 남은 데드라인. 버려진 라운드를 진행하지 않는다.
+        if (room.status() != RoomStatus.IN_GAME) return;
 
         if (!lock.tryAcquire(roomId)) {
             // 다른 액션 처리 중 — 짧게 뒤로 미뤄 재시도 (gen 재확인은 그때).
@@ -153,6 +182,11 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         try {
             // 락 안에서 gen 재확인 (락 대기 중 누가 행동했을 수 있음).
             if (generations.current(roomId) != capturedGen) return;
+            // D-122 — 락 안에서 방 상태도 재확인. 탈주 MATCH_ENDED 는 이 락 안에서 방을
+            // FINISHED 로 만든다 — 락 전에 IN_GAME 을 봤어도 지금은 끝났을 수 있다.
+            Optional<Room> current = inGameRoom(roomId);
+            if (current.isEmpty()) return;
+            room = current.get();
 
             GameEngine engine = engines.forRoom(room);
             GameState state = engine.loadState().orElse(null);
@@ -197,6 +231,16 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         List<GameEvent> outbound = new ArrayList<>(result.events());
         matchProgress.advance(engine, room, result.newState(), outbound);
         broadcaster.broadcast(roomId, outbound, room.playerIds());
+    }
+
+    /** 지금 IN_GAME 인 방. 없거나 끝났으면 empty. */
+    private Optional<Room> inGameRoom(String roomId) {
+        try {
+            Room room = roomService.getRoom(roomId);
+            return room.status() == RoomStatus.IN_GAME ? Optional.of(room) : Optional.empty();
+        } catch (RoomNotFoundException e) {
+            return Optional.empty();
+        }
     }
 
     /**
