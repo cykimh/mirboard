@@ -94,7 +94,7 @@ export const SKULL_KING_TUTORIAL_STEPS: TutorialStep[] = [
             <SkullCardChip key={i} card={c} compact />
           ))}
         </SkullRow>
-        <p>확장 카드(약탈품·크라켄·흰고래)는 쓰지 않습니다.</p>
+        <p>상급자 카드(약탈품·크라켄·흰고래)는 쓰지 않습니다.</p>
       </>
     ),
   },
@@ -340,7 +340,10 @@ export const SKULL_KING_TUTORIAL_STEPS: TutorialStep[] = [
             게임 중에는 상단 <strong>'규칙'</strong> 버튼으로 이 안내를 다시 볼 수 있습니다. 턴
             제한이 있는 방이면 보는 동안에도 타이머가 흐릅니다.
           </li>
-          <li>게임 도중 나가면 탈주로 처리되고, 내 자리는 자동 조종이 남은 게임을 플레이합니다.</li>
+          <li>
+            게임 도중 나가면 탈주로 처리되고, 내 자리는 자동 조종으로 남은 라운드를 계속합니다. 남은
+            좌석이 2개 미만이거나 사람이 아무도 없으면 매치는 그 자리에서 끝납니다.
+          </li>
         </ul>
         <p>
           자세한 규칙은 게임 카드의 "자세히" 링크에서 볼 수 있습니다. 즐겁게 플레이하세요!

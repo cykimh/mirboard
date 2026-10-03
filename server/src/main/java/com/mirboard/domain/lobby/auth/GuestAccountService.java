@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
  * 트랜잭션은 rollback-only 라 같은 트랜잭션에서 재시도할 수 없다 — INSERT 는
  * {@code saveAndFlush} 의 자체 트랜잭션으로 한 번씩 커밋/롤백돼야 한다. ② 정리 쪽 오류가
  * 바깥 트랜잭션을 rollback-only 로 만들면 방금 만든 게스트까지 사라진다.
- * (GuestAccountServiceTest·GuestAuthIntegrationTest 의 독 행 케이스가 이 계약을 지킨다.)
+ * (이 계약을 강제하는 테스트는 없다 — 붙이면 재시도가 rollback-only 트랜잭션에 갇히니 고칠 때 주의.)
  *
  * <p>로그에 IP 를 남기지 않는다(로그인/가입 경로와 같은 원칙).
  */

@@ -90,6 +90,8 @@ case "$SUBCMD" in
 
     rules)
         log "서버 룰 도메인 단위 테스트 (Docker 불필요)"
+        # 스컬킹도 티츄처럼 하위 패키지를 명시한다 — skullking.* 로 쓸면 persistence 의
+        # SkullKingMatchRecorderIT(D-115, Testcontainers)까지 잡혀 "Docker 불필요"가 거짓이 된다.
         ./gradlew :server:test \
             --tests "com.mirboard.domain.game.tichu.card.*" \
             --tests "com.mirboard.domain.game.tichu.hand.*" \
@@ -101,7 +103,17 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
             --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
             --tests "com.mirboard.domain.game.tichu.bot.*" \
-            --tests "com.mirboard.domain.game.skullking.*"
+            --tests "com.mirboard.domain.game.skullking.DealerTest" \
+            --tests "com.mirboard.domain.game.skullking.SkullKing*" \
+            --tests "com.mirboard.domain.game.skullking.action.*" \
+            --tests "com.mirboard.domain.game.skullking.bid.*" \
+            --tests "com.mirboard.domain.game.skullking.bot.*" \
+            --tests "com.mirboard.domain.game.skullking.card.*" \
+            --tests "com.mirboard.domain.game.skullking.invariant.*" \
+            --tests "com.mirboard.domain.game.skullking.scoring.*" \
+            --tests "com.mirboard.domain.game.skullking.state.*" \
+            --tests "com.mirboard.domain.game.skullking.trick.*" \
+            --tests "com.mirboard.domain.game.skullking.persistence.SkullKingJsonRoundTripTest"
         log "모두 통과"
         ;;
 

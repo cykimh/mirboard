@@ -147,7 +147,7 @@ class SkullKingBotStrengthTest {
     }
 
     @Test
-    void harness_is_paired_and_reproducible() {
+    void harness_is_reproducible() {
         Policy[] seats = {Policy.HEURISTIC, Policy.RANDOM, Policy.WEAKEST, Policy.RANDOM};
         BotMatchHarness.MatchOutcome first = BotMatchHarness.play(4, BASE, seats);
         BotMatchHarness.MatchOutcome again = BotMatchHarness.play(4, BASE, seats);

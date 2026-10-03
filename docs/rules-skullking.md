@@ -13,7 +13,8 @@
 > 경로는 전부 `server/src/{main,test}/java/com/mirboard/domain/game/skullking/` 기준의
 > 상대 경로다. 순수 룰 엔진(S4, D-101) 위에 포트 어댑터 `SkullKingGameEngine`·
 > `GameDefinition` 등록·상태 저장·뷰 매퍼·봇/디스패치 배선(S5, D-102)까지 완료됐다.
-> 남은 것은 클라 게임판(S6, D-103)뿐이다.
+> 이후 클라 게임판(S6, D-103), 매치 영속·ELO(D-115), 봇 휴리스틱(D-119, §16), 라운드 기록·점수표
+> (D-120), 튜토리얼(D-121)까지 붙었다.
 
 > **출처 신뢰도 경고.** 근거는 나무위키 스컬킹 문서(볼트
 > `inbox/clippings/스컬킹.md`, 최종 수정 2026-04-02)다. 집단 편집 문서라 검증되지 않은
@@ -655,8 +656,12 @@ S4 가 조용히 틀리기 쉬운 지점만 모았다.
 - §13 의 확정 해석을 바꾸려면 새 D 항목이 필요하다. 코드만 고치지 말 것.
 - 각 §13 항목은 대응 테스트가 있다. 해석을 바꾸면 그 테스트가 먼저 빨개진다 — 테스트를
   지우지 말고 새 해석으로 고쳐 쓸 것.
+- 튜토리얼(`client/src/features/skullking/tutorial/skullkingTutorialSteps.tsx`·`TrickQuiz.tsx`,
+  D-121)은 단계마다 본 문서의 절을 근거로 인용한다. 룰 서술을 바꾸면 같은 commit 에서 튜토리얼
+  문구와 퀴즈 정답도 고친다.
 
-마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영 + 라운드 기록 (D-120).
+마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영 + 봇 정책 (D-119) + 라운드 기록 (D-120)
++ 튜토리얼 역참조 (D-121).
 **순수 룰 엔진 구현 완료** — `domain.game.skullking` 테스트 342건 = Docker 불필요
 339건(`./scripts/check.sh rules`) + `persistence/SkullKingMatchRecorderIT` 3건.
 통합(포트 어댑터·`GameDefinition` 등록·상태 저장·뷰 매퍼·봇 정책·STOMP)은 S5(D-102).

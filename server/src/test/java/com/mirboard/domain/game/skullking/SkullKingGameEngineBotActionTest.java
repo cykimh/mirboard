@@ -34,7 +34,7 @@ class SkullKingGameEngineBotActionTest {
                 new Random(seed)).newState();
     }
 
-    /** 전원 0 예측 후 플레이 국면 — 좌석 0 이 첫 리드. */
+    /** 좌석 0 은 1, 나머지는 0 을 예측한 뒤의 플레이 국면 — 좌석 0 이 첫 리드. */
     private SkullKingState playingFrom(SkullKingState bidding) {
         SkullKingState state = bidding;
         for (int seat = 0; seat < CONTEXT.seatCount(); seat++) {

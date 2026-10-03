@@ -451,7 +451,7 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   "phase": "BIDDING",
   "roundNumber": 4,
   "handSize": 4,
-  "startSeat": 3,
+  "startSeat": 1,
   "currentTurnSeat": -1,
   "seats": [
     { "seat": 0, "handCount": 4, "hasBid": true,  "bid": null, "tricksWon": 0 },
