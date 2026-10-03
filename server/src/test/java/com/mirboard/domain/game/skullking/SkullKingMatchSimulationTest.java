@@ -1,11 +1,13 @@
 package com.mirboard.domain.game.skullking;
 
+import static com.mirboard.domain.game.skullking.state.MatchStateFixtures.scored;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.skullking.action.SkullKingAction;
 import com.mirboard.domain.game.skullking.event.SkullKingEvent;
 import com.mirboard.domain.game.skullking.invariant.SkullKingInvariantChecker;
+import com.mirboard.domain.game.skullking.scoring.RoundScore;
 import com.mirboard.domain.game.skullking.state.PlayerState;
 import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
 import com.mirboard.domain.game.skullking.state.SkullKingState;
@@ -96,6 +98,38 @@ class SkullKingMatchSimulationTest {
         assertThat(played.events()).anyMatch(SkullKingEvent.MatchEnded.class::isInstance);
     }
 
+    /**
+     * D-120 — 라운드 기록이 점수판의 권위 원천이 되려면 빠짐·중복·순서 어긋남이 없어야
+     * 하고, 기록의 합이 누적 점수와 좌석마다 같아야 한다(어긋나면 둘 중 하나가 틀렸다).
+     */
+    @ParameterizedTest(name = "{0}인 매치")
+    @ValueSource(ints = {2, 3, 4, 5, 6, 7, 8})
+    void history_matches_cumulative_for_every_seat_count(int seatCount) {
+        Played played = playMatch(seatCount, 20261003L + seatCount);
+        SkullKingMatchState match = played.finalMatch();
+
+        assertThat(match.completedRounds())
+                .extracting(SkullKingMatchState.CompletedRound::roundNumber)
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        for (int seat = 0; seat < seatCount; seat++) {
+            int s = seat;
+            int sum = match.completedRounds().stream()
+                    .mapToInt(r -> r.scores().get(s).total())
+                    .sum();
+            assertThat(sum)
+                    .as("좌석 %d 의 라운드 합 = 누적", seat)
+                    .isEqualTo(match.cumulativeScores().get(seat));
+        }
+        // 기록은 RoundEnded 이벤트의 점수와 같은 값이다 (라이브 패치 ↔ 권위값 일치).
+        List<Map<Integer, RoundScore>> fromEvents = played.events().stream()
+                .filter(SkullKingEvent.RoundEnded.class::isInstance)
+                .map(e -> ((SkullKingEvent.RoundEnded) e).scores())
+                .toList();
+        assertThat(match.completedRounds())
+                .extracting(SkullKingMatchState.CompletedRound::scores)
+                .isEqualTo(fromEvents);
+    }
+
     @ParameterizedTest(name = "seed {0}")
     @ValueSource(longs = {1L, 2L, 3L, 17L, 42L, 9001L})
     void four_player_matches_survive_many_seeds(long seed) {
@@ -136,7 +170,7 @@ class SkullKingMatchSimulationTest {
         List<Integer> seen = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             seen.add(match.startSeat());
-            match = match.withRoundScored(Map.of(0, 0, 1, 0, 2, 0, 3, 0), 4);
+            match = scored(match, Map.of(0, 0, 1, 0, 2, 0, 3, 0), 4);
         }
 
         assertThat(seen).containsExactly(0, 1, 2, 3, 0, 1, 2, 3);

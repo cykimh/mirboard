@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.skullking;
 
+import static com.mirboard.domain.game.skullking.state.MatchStateFixtures.scored;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -170,8 +171,8 @@ class SkullKingDesertionTest {
         @Test
         void a_two_player_desertion_ends_the_match_with_the_survivor_as_sole_winner() {
             SkullKingEngine engine = engineFor(2);
-            SkullKingMatchState match = SkullKingMatchState.initial(2, 0)
-                    .withRoundScored(Map.of(0, 50, 1, 10), 2);
+            SkullKingMatchState match =
+                    scored(SkullKingMatchState.initial(2, 0), Map.of(0, 50, 1, 10), 2);
             SkullKingState state = engine.startRound(match, new Random(1)).newState();
 
             Desertion desertion = engine.desert(state, match, 0, allHuman(2));
@@ -187,6 +188,39 @@ class SkullKingDesertionTest {
                     .containsExactly(1);
             assertThat(ended.finalScores()).containsEntry(0, 50).containsEntry(1, 10);
             assertThat(ended.roundsPlayed()).as("완주한 라운드는 1개뿐").isEqualTo(1);
+        }
+
+        /**
+         * D-120 — 조기 종료는 진행 중 라운드를 기록하지 않는다(§13-⑲ 폐기). 그래서 기록 건수가
+         * 곧 MatchEnded.roundsPlayed 다 — 공개 뷰의 matchResult 가 이 등식에 기댄다.
+         */
+        @Test
+        void early_termination_history_equals_rounds_played() {
+            SkullKingEngine engine = engineFor(3);
+            SkullKingMatchState match = SkullKingMatchState.initial(3, 0);
+            match = scored(match, Map.of(0, 10, 1, 20, 2, 30), 3);
+            match = scored(match, Map.of(0, -10, 1, 0, 2, 40), 3);
+            SkullKingState state = engine.startRound(match, new Random(3)).newState();
+
+            Desertion first = engine.desert(state, match, 0, allHuman(3));
+            assertThat(first.outcome()).isEqualTo(Desertion.Outcome.CONTINUED);
+            assertThat(first.matchState().completedRounds())
+                    .as("탈주 후 계속 — 앞선 기록 보존")
+                    .isEqualTo(match.completedRounds());
+
+            Desertion second =
+                    engine.desert(first.newState(), first.matchState(), 1, allHuman(3));
+            assertThat(second.outcome()).isEqualTo(Desertion.Outcome.MATCH_ENDED);
+            SkullKingEvent.MatchEnded ended = second.events().stream()
+                    .filter(SkullKingEvent.MatchEnded.class::isInstance)
+                    .map(SkullKingEvent.MatchEnded.class::cast)
+                    .findFirst().orElseThrow();
+
+            assertThat(second.matchState().completedRounds())
+                    .extracting(SkullKingMatchState.CompletedRound::roundNumber)
+                    .as("라운드 3 은 진행 중이었으므로 기록되지 않는다")
+                    .containsExactly(1, 2);
+            assertThat(second.matchState().completedRounds()).hasSize(ended.roundsPlayed());
         }
 
         @Test

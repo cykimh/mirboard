@@ -124,11 +124,13 @@ public final class SkullKingGameEngine implements GameEngine {
 
     // ---------- 뷰 ----------
 
+    /**
+     * 공개 뷰. 매치 상태째 넘겨 누적 점수·탈주 좌석과 함께 끝난 라운드 기록·매치 결과까지
+     * 싣는다(D-120) — resync 가 이 값을 그대로 내보내므로 포트·인프라는 무변경이다.
+     */
     @Override
     public Object publicView(GameState state) {
-        SkullKingMatchState match = matchState();
-        return SkullKingStateMapper.toTableView(
-                skState(state), match.cumulativeScores(), match.desertedSeats());
+        return SkullKingStateMapper.toTableView(skState(state), matchState());
     }
 
     @Override
@@ -157,13 +159,21 @@ public final class SkullKingGameEngine implements GameEngine {
      * 다음 라운드는 {@code startRoundAndDrain} 으로 시작해 상태를 직접 영속화하고, 발행할
      * 이벤트(RoundEnded·MatchEnded 또는 새 라운드의 BiddingStarted/HandDealt)를
      * {@code outbound} 에 append 한다.
+     *
+     * <p>라운드 사이에 서버는 멈추지 않는다 — RoundEnded 와 다음 라운드 BiddingStarted 가
+     * 한 배치로 나가고, 직전 라운드 결과는 클라가 다음 라운드 Bidding 동안 보여 준다(D-120).
+     * 이미 정산된 라운드면 {@link #resumeAfterSettlement} 로 빠진다.
      */
     @Override
     public Advance advance(GameState newState, List<GameEvent> outbound) {
         if (!(skState(newState) instanceof SkullKingState.RoundEnd ended)) {
             return Advance.NONE;
         }
-        SkullKingEngine.Settlement settled = rules.settleRound(ended, matchState());
+        SkullKingMatchState match = matchState();
+        if (match.hasSettled(ended.roundNumber())) {
+            return resumeAfterSettlement(ended, match, outbound);
+        }
+        SkullKingEngine.Settlement settled = rules.settleRound(ended, match);
         SkullKingMatchState afterRound = settled.matchState();
         matchStateStore.save(context.roomId(), afterRound);
         outbound.addAll(settled.events());
@@ -182,6 +192,30 @@ public final class SkullKingGameEngine implements GameEngine {
         stateStore.save(context.roomId(), nextRound.newState());
         outbound.addAll(nextRound.events());
         return new Advance(true, false);
+    }
+
+    /**
+     * 복구 분기 (D-120) — 정산(매치 상태 저장)은 끝났는데 다음 라운드 상태를 저장하기 전에
+     * 멈춘 방. 저장된 상태는 RoundEnd(N), 매치는 이미 N+1 이다. 탈주 CONTINUED 가 이 상태로
+     * {@link #advance} 를 다시 부르는 경로가 실제로 있다.
+     *
+     * <p>이중 정산하지 않고(기록·누적이 두 번 들어간다), 이미 나간 RoundEnded/MatchEnded 도
+     * 다시 내지 않는다. 매치가 안 끝났으면 다음 라운드만 시작한다. 반환은 {@code NONE} —
+     * 라운드 완료 메트릭과 방 FINISHED 처리는 처음 정산 때 이미 했다.
+     */
+    private Advance resumeAfterSettlement(SkullKingState.RoundEnd ended,
+                                          SkullKingMatchState match,
+                                          List<GameEvent> outbound) {
+        log.warn("SkullKing round {} already settled (match at round {}) — resuming without "
+                        + "re-settling: room={}",
+                ended.roundNumber(), match.roundNumber(), context.roomId());
+        if (match.isMatchOver()) {
+            return Advance.NONE;
+        }
+        SkullKingEngine.Result nextRound = rules.startRoundAndDrain(match, random);
+        stateStore.save(context.roomId(), nextRound.newState());
+        outbound.addAll(nextRound.events());
+        return Advance.NONE;
     }
 
     /**

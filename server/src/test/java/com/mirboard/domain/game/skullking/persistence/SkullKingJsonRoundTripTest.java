@@ -106,4 +106,56 @@ class SkullKingJsonRoundTripTest {
         assertThat(match.desertedSeats()).isEmpty();
         assertThat(match.roundNumber()).isEqualTo(2);
     }
+
+    // ---------- D-120 — 라운드 기록 ----------
+
+    @Test
+    void match_state_with_completed_rounds_round_trips() throws Exception {
+        SkullKingMatchState match = new SkullKingMatchState(3, 1,
+                Map.of(0, 30, 1, -10), Set.of(),
+                List.of(new SkullKingMatchState.CompletedRound(1, Map.of(
+                                0, new RoundScore(1, 1, 20, 10), 1, new RoundScore(0, 1, -10, 0))),
+                        new SkullKingMatchState.CompletedRound(2, Map.of(
+                                0, new RoundScore(0, 0, 20, 0), 1, new RoundScore(2, 2, 40, 0)))));
+
+        String json = mapper.writeValueAsString(match);
+
+        assertThat(mapper.readValue(json, SkullKingMatchState.class)).isEqualTo(match);
+        // 좌석 점수는 4필드만 영속된다 — total 은 파생값이라 JSON 에 싣지 않는다.
+        assertThat(json).contains("\"completedRounds\"").doesNotContain("\"total\"");
+    }
+
+    /** 구 JSON(배포 시점에 진행 중이던 매치) — completedRounds 부재 → 빈 목록. */
+    @Test
+    void old_json_without_completed_rounds_reads() throws Exception {
+        String withDeserted = "{\"roundNumber\":4,\"startSeat\":0,"
+                + "\"cumulativeScores\":{\"0\":10,\"1\":0},\"desertedSeats\":[1]}";
+        String withoutDeserted = "{\"roundNumber\":2,\"startSeat\":1,"
+                + "\"cumulativeScores\":{\"0\":10,\"1\":0}}";
+
+        SkullKingMatchState a = mapper.readValue(withDeserted, SkullKingMatchState.class);
+        SkullKingMatchState b = mapper.readValue(withoutDeserted, SkullKingMatchState.class);
+
+        assertThat(a.completedRounds()).isEmpty();
+        assertThat(a.desertedSeats()).containsExactly(1);
+        assertThat(b.completedRounds()).isEmpty();
+        assertThat(b.roundNumber()).isEqualTo(2);
+    }
+
+    /**
+     * 롤백 안전 — 다음에 필드가 늘어도 이 버전이 그 JSON 을 읽을 수 있어야 한다. 기본
+     * {@code ObjectMapper} 는 모르는 필드에서 실패하므로 어노테이션이 실제로 일한다.
+     */
+    @Test
+    void unknown_field_is_ignored() throws Exception {
+        String future = "{\"roundNumber\":2,\"startSeat\":0,\"cumulativeScores\":{\"0\":5},"
+                + "\"futureField\":true,"
+                + "\"completedRounds\":[{\"roundNumber\":1,\"futureNested\":1,"
+                + "\"scores\":{\"0\":{\"bid\":0,\"won\":0,\"base\":5,\"bonus\":0}}}]}";
+
+        SkullKingMatchState match = mapper.readValue(future, SkullKingMatchState.class);
+
+        assertThat(match.completedRounds()).containsExactly(
+                new SkullKingMatchState.CompletedRound(1, Map.of(0, new RoundScore(0, 0, 5, 0))));
+    }
 }
