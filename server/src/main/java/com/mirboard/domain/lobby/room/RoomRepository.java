@@ -152,15 +152,23 @@ public class RoomRepository {
     }
 
     public void markFinished(String roomId, long now) {
+        // D-122 — 좌석·준비·관전 키도 메타와 같은 600s 로 줄인다. FINISHED 방은 마지막 leave 로
+        // 지워지지 않으므로(좌석 고정) 그대로 두면 6h 동안 남는다.
         Long result = redis.execute(
                 finishScript,
-                List.of("room:" + roomId, ROOMS_OPEN_KEY),
+                List.of("room:" + roomId, ROOMS_OPEN_KEY,
+                        "room:" + roomId + ":players", readyKey(roomId), spectatorsKey(roomId)),
                 roomId,
                 Long.toString(now));
         long v = unwrap(result);
         if (v == -1L) throw new RoomNotFoundException(roomId);
     }
 
+    /**
+     * 플레이어 퇴장 (room_leave.lua). WAITING/IN_GAME 은 좌석 목록에서 빼고(빈 방이면 소멸,
+     * 호스트면 승격), <b>FINISHED 는 좌석을 그대로 둔다</b>(D-122) — 시작된 게임의 좌석
+     * 인덱스는 불변이라 남은 사람의 좌석·비공개 뷰가 밀리지 않는다. 방은 TTL 로 사라진다.
+     */
     public void leave(String roomId, long userId) {
         // D-74: ready SET, D-75: spectators SET 도 빈 방 destroy 시 정리하므로
         // KEYS[4]/KEYS[5] 로 추가 전달 (join/create 와 공유하는 keysFor 는 불변).

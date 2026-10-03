@@ -197,15 +197,34 @@ public class RoomController {
         GameEngine engine = engines.forRoom(room);
         GameState state = engine.loadState()
                 .orElseThrow(() -> new ResyncNotAvailableException(roomId));
+        int privateSeat = occupiedSeat(room, seat);
         return new ResyncResponse(
                 roomId,
                 engine.phaseName(state),
                 seqs.current(roomId),
                 engine.publicView(state),
                 // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
-                seat >= 0 ? engine.privateView(state, seat).orElse(null) : null,
+                privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null,
                 disconnectedSeats(room, me.userId()),
                 chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
+    }
+
+    /**
+     * D-122 심층 방어(State Hiding) — 비공개 뷰는 요청자가 <b>실제로 앉은 좌석</b>에만 준다.
+     *
+     * <p>좌석 번호는 게임이 시작될 때 정원({@code capacity})만큼 찬 좌석 목록의 인덱스다.
+     * 시작 뒤 목록이 줄었다면(leave 폴백의 {@code LREM}) 뒤쪽 사람들의 {@code indexOf} 가 한
+     * 칸씩 당겨져 <b>남의 좌석</b>을 가리킨다 — 그대로 쓰면 다른 좌석의 손패·미공개 예측이
+     * 나간다. 그래서 목록이 정원과 다르면 좌석을 확신할 수 없다고 보고 관전자 뷰(공개만)로
+     * 떨어뜨린다. FINISHED 방은 좌석을 고정하므로(room_leave.lua) 정상 경로에서는 걸리지 않는다.
+     *
+     * @return 비공개 뷰를 줄 좌석, 줄 수 없으면 -1
+     */
+    private static int occupiedSeat(Room room, int indexInList) {
+        if (indexInList < 0 || room.playerIds().size() != room.capacity()) {
+            return -1;
+        }
+        return indexInList;
     }
 
     /**
