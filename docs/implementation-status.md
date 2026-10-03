@@ -249,7 +249,9 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   경고) — 상세는 `SentryConfig` javadoc. PII 전송 끔.
 - **배포**: `client` 빌드를 서버 정적 리소스로 번들해 단일 jar 서빙, `Dockerfile`/`fly.toml`
   멀티스테이지로 Fly.io. CD 는 `.github/workflows/deploy.yml`(main 푸시 + 수동 트리거) —
-  `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. 라이브 인스턴스는 아직 없다(D-105).
+  `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. **라이브: https://mirboard.fly.dev**
+  (2026-10-03, 도쿄 리전. 유휴 시 머신이 멈춰 첫 접속에 약 30초 콜드 스타트). Redis 는 Fly 자체
+  앱 `mirboard-redis`(D-114), DB 는 Fly Postgres `mirboard-db`.
 - **데모 계정**: `DemoAccountSeeder`, `mirboard.demo.enabled` **기본 false**. 공개 비밀번호
   계정이 로컬·CI 에 생기지 않도록 마이그레이션이 아닌 환경변수 게이트 시더로 둔다(D-105).
 
@@ -299,7 +301,6 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 스컬킹 매치 결과 영속·ELO — D-02 의 게임별 rating 분리 결정이 선행(D-102 보류).
 - 스컬킹 손패 dnd 정렬·특수 카드 SVG 에셋·i18n 이관 — S6 범위 밖(D-103 이월).
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
-- 라이브 배포 — CD 워크플로는 준비됐고 `FLY_API_TOKEN` 설정만 남았다(D-105).
   (멀티 인스턴스 세션 레지스트리는 D-96 에서 해소 — §8 참조.)
 
 ---

@@ -10,6 +10,8 @@
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 서버 테스트 776건 / 클라 277건
 
+**라이브**: https://mirboard.fly.dev — 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
+
 ---
 
 ![미르보드카페](docs/assets/screenshots/01-hub.png)

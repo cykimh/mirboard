@@ -846,7 +846,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M1 | A | 티츄 제품 완성도: 카드 이미지(특수4종 SVG 선행)·온보딩 튜토리얼·모바일 반응형·프로필/비번변경(설계변경)·접근성 + 게임판 UX 폴리시(A6 헤더/오버레이/팀칩, A7 카드 가독성·좌석스택·버튼) | ✅ |
 | M2 | C | 운영 하드닝 심화: 레이트리밋 완성(전역/STOMP)·Sentry+Grafana·어드민/모더레이션(역할 별도테이블)·백업런북·k6 | ✅ C1·C3·C4·C5 완료 |
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
-| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | 🔶 D-105: README·케이스 스터디·스크린샷·데모 계정 시더·CD 워크플로 완료 / **라이브 배포는 사용자 실행 대기**(`FLY_API_TOKEN`), GIF 는 정적 스크린샷으로 대체. 배포 이미지는 로컬에서 prod 프로필 기동 검증 완료(2026-10-03, `docs/deploy.md` §3) |
+| M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | ✅ D-105: README·케이스 스터디·스크린샷·데모 계정 시더·CD 워크플로. **라이브 배포 2026-10-03**(https://mirboard.fly.dev) — 첫 재배포에서 5월의 Upstash Redis 소멸을 발견해 Fly 자체 Redis 로 교체(D-114), `FLY_API_TOKEN` 등록으로 main 푸시 = 자동 배포. GIF 는 정적 스크린샷으로 대체 |
 | M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | ✅ S0~S6 완료(D-97~D-104): 포트·인원 가변·룰 명세·순수 엔진(305건)·탈주(유령 좌석)·인게임 배선(봇 풀매치 IT)·클라 게임판(Row-Flow, 실측 완료). 실행 단위 `docs/plans/multi-game-sessions.md`. **잔여 별건**: 스컬킹 매치 영속·ELO(D-02 게임별 rating 분리 선행), 끊김 유예 구간 정지(D-104 한계), 요트/할리갈리 |
 
 **M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
