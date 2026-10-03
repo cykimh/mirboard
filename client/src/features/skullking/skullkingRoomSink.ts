@@ -30,6 +30,8 @@ const ERROR_LABEL: Record<string, string> = {
   // 인프라 공통 코드도 여기서 받는다.
   BUSY: '다른 처리가 진행 중입니다. 잠시 후 다시 시도하세요.',
   GAME_NOT_STARTED: '아직 게임이 시작되지 않았습니다.',
+  // D-122 — 강제 종료·탈주 조기 종료 뒤(FINISHED) 늦게 낸 액션의 거절.
+  GAME_NOT_IN_PROGRESS: '이미 끝난 게임입니다.',
 };
 
 /**
