@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useRoomMeta } from '@/ws/useRoomMeta';
 import type { GameSummary, Room, RoomOption } from '@/types/api';
 
 /**
@@ -37,6 +38,24 @@ vi.mock('@/api/rooms', () => ({
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
 vi.mock('@/api/users', () => ({ usersApi: { names } }));
+
+// 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120).
+const { skullProps, tichuProps } = vi.hoisted(() => ({
+  skullProps: [] as Record<string, unknown>[],
+  tichuProps: [] as Record<string, unknown>[],
+}));
+vi.mock('@/features/skullking/SkullKingTable', () => ({
+  SkullKingTable: (props: Record<string, unknown>) => {
+    skullProps.push(props);
+    return <div data-testid="skullking-table" />;
+  },
+}));
+vi.mock('@/features/tichu/GameTable', () => ({
+  GameTable: (props: Record<string, unknown>) => {
+    tichuProps.push(props);
+    return <div data-testid="tichu-table" />;
+  },
+}));
 
 const ROOM: Room = {
   roomId: 'r1',
@@ -147,5 +166,59 @@ describe('RoomPage — 대기실 헤더 라벨 (D-110)', () => {
     renderRoom({ gameType: 'SKULL_KING' });
 
     expect(await screen.findByText(/SKULL_KING · 대기 중 · 1\/4/)).toBeTruthy();
+  });
+});
+
+/**
+ * D-120 — 봇 방은 매치가 끝나면 서버가 방을 FINISHED 로 바꾸고, 그 메타가 게임 이벤트보다
+ * 먼저 올 수 있다. 그때 게임판을 내리면 라운드 10 결과와 최종 점수를 볼 수 없다. 그래서
+ * **이 세션에서 IN_GAME→FINISHED 전이를 본** 스컬킹 게임판은 내리지 않는다 — 메타와 게임
+ * 이벤트의 도착 순서와 무관한 판단이다.
+ */
+describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
+  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    skullProps.length = 0;
+    tichuProps.length = 0;
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('스컬킹 게임 중 FINISHED 를 받으면 게임판을 유지하고 roomFinished 를 넘긴다', async () => {
+    loadGame.mockResolvedValue(game('SKULL_KING', []));
+    renderRoom({ gameType: 'SKULL_KING', status: 'IN_GAME' });
+    await screen.findByTestId('skullking-table');
+    expect(skullProps.at(-1)!.roomFinished).toBe(false);
+
+    act(() => {
+      metaCallback()({ ...ROOM, gameType: 'SKULL_KING', status: 'FINISHED' } as Room);
+    });
+
+    expect(screen.getByTestId('skullking-table')).toBeInTheDocument();
+    expect(skullProps.at(-1)!.roomFinished).toBe(true);
+    expect(screen.queryByText('게임이 종료되었습니다.')).toBeNull();
+  });
+
+  it('처음부터 FINISHED 로 들어오면(새로고침) 기존 종료 카드', async () => {
+    loadGame.mockResolvedValue(game('SKULL_KING', []));
+    renderRoom({ gameType: 'SKULL_KING', status: 'FINISHED' });
+
+    expect(await screen.findByText('게임이 종료되었습니다.')).toBeInTheDocument();
+    expect(screen.queryByTestId('skullking-table')).toBeNull();
+  });
+
+  it('티츄 방은 기존대로 FINISHED 전이 시 종료 카드로 바뀐다', async () => {
+    loadGame.mockResolvedValue(game('TICHU', ['TARGET_SCORE', 'TEAMS', 'BETTING']));
+    renderRoom({ gameType: 'TICHU', status: 'IN_GAME' });
+    await screen.findByTestId('tichu-table');
+
+    act(() => {
+      metaCallback()({ ...ROOM, gameType: 'TICHU', status: 'FINISHED' } as Room);
+    });
+
+    expect(screen.queryByTestId('tichu-table')).toBeNull();
+    expect(screen.getByText('게임이 종료되었습니다.')).toBeInTheDocument();
   });
 });

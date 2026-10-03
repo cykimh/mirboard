@@ -75,6 +75,41 @@ class SkullKingBotMatchSimulationIT {
         runAllBotMatch(6);
     }
 
+    /**
+     * D-120 — 라운드 기록이 실제 배선(봇 → advance → 매치 상태 저장)을 타고 10건 다 남는다.
+     * 봇 방은 매치 종료 직후 FINISHED 로 전이되므로, 클라가 종료 화면에서 점수표를 그리려면
+     * 이 기록이 Redis 에 온전해야 한다. 기존 완주 테스트와 분리한 것은 병렬 작업과의 병합
+     * 충돌을 피하려는 것이다(같은 방 생성 절차를 쓴다).
+     */
+    @Test
+    void all_bot_match_records_every_round_in_the_match_history() {
+        int capacity = 4;
+        long hostBotId = bots.getBotIds().get(0);
+        Room room = roomService.createRoom(hostBotId, "sk-bot-history", "SKULL_KING",
+                TeamPolicy.SEQUENTIAL, true, RoomService.DEFAULT_TARGET_SCORE,
+                0, RoomService.DEFAULT_STAKE, capacity);
+        String roomId = room.roomId();
+
+        Awaitility.await()
+                .atMost(90, TimeUnit.SECONDS)
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> matchStateStore.load(roomId)
+                        .map(SkullKingMatchState::isMatchOver)
+                        .orElse(false));
+
+        SkullKingMatchState match = matchStateStore.load(roomId).orElseThrow();
+        assertThat(match.completedRounds())
+                .extracting(SkullKingMatchState.CompletedRound::roundNumber)
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        for (int seat = 0; seat < capacity; seat++) {
+            int s = seat;
+            assertThat(match.completedRounds().stream()
+                    .mapToInt(r -> r.scores().get(s).total()).sum())
+                    .as("좌석 %d — 기록의 합 = 누적 점수", seat)
+                    .isEqualTo(match.cumulativeScores().get(seat));
+        }
+    }
+
     private void runAllBotMatch(int capacity) {
         long hostBotId = bots.getBotIds().get(0);
         // D-106 — 스컬킹은 목표 점수·팀·내기를 안 쓴다. 예전엔 targetScore 에 0(뜻 없는 값)을

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { bidsRevealed, useSkullKingStore } from './skullkingStore';
+import {
+  bidsRevealed,
+  lastRoundResult,
+  useSkullKingStore,
+} from './skullkingStore';
 import type {
+  CompletedRoundView,
   SeatView,
   SkullCard,
   SkullKingPrivateView,
@@ -442,5 +447,164 @@ describe('applySnapshot / applyPrivateHand', () => {
     expect(store().seats).toEqual([]);
     expect(store().hand).toEqual([]);
     expect(store().phase).toBeNull();
+  });
+});
+
+// ---------- D-120 — 라운드 기록·매치 결과 ----------
+
+const r = (
+  roundNumber: number,
+  totals: Record<number, number>,
+): CompletedRoundView => ({
+  roundNumber,
+  scores: Object.fromEntries(
+    Object.entries(totals).map(([seat, t]) => [
+      seat,
+      { bid: 0, won: 0, base: t, bonus: 0, total: t },
+    ]),
+  ),
+});
+
+const roundEnded = (roundNumber: number, seq: number) =>
+  ev(
+    'ROUND_ENDED',
+    {
+      roundNumber,
+      scores: {
+        0: { bid: 1, won: 1, base: 20, bonus: 10 },
+        1: { bid: 0, won: 1, base: -10, bonus: 0 },
+      },
+      cumulativeScores: { 0: 30, 1: -10 },
+    },
+    seq,
+  );
+
+describe('completedRounds — 권위값 교체 + 라이브 upsert (D-120)', () => {
+  it('applySnapshot 은 기록을 통째로 교체한다 — 재호출해도 중복이 없다', () => {
+    const tableView = { ...TABLE, completedRounds: [r(1, { 0: 10 }), r(2, { 0: 20 })] };
+    store().applySnapshot(snapshot({ tableView }));
+    store().applySnapshot(snapshot({ tableView }));
+
+    expect(store().completedRounds.map((x) => x.roundNumber)).toEqual([1, 2]);
+  });
+
+  it('필드가 없는 구 응답이면 빈 목록', () => {
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, completedRounds: [r(1, { 0: 1 })] } }));
+    store().applySnapshot(snapshot()); // TABLE 에는 completedRounds 가 없다
+
+    expect(store().completedRounds).toEqual([]);
+  });
+
+  it('ROUND_ENDED 는 total 을 파생해 한 건 append 하고, 같은 라운드 재수신은 덮어쓴다', () => {
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, completedRounds: [r(1, { 0: 5 })] } }));
+
+    store().applyEvent(roundEnded(2, 11));
+    expect(store().completedRounds.map((x) => x.roundNumber)).toEqual([1, 2]);
+    expect(store().completedRounds[1].scores[0].total).toBe(30);
+    expect(store().completedRounds[1].scores[1].total).toBe(-10);
+
+    // resync 로 lastSeq 가 되감긴 뒤 같은 라운드가 다시 와도 한 건만 남는다.
+    store().applySnapshot(
+      snapshot({ eventSeq: 10, tableView: { ...TABLE, completedRounds: store().completedRounds } }),
+    );
+    store().applyEvent(roundEnded(2, 11));
+    expect(store().completedRounds.map((x) => x.roundNumber)).toEqual([1, 2]);
+  });
+
+  it('번호 순서가 어긋나 와도 라운드 번호 순으로 정렬된다', () => {
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, completedRounds: [r(3, { 0: 1 })] } }));
+    store().applyEvent(roundEnded(2, 11));
+
+    expect(store().completedRounds.map((x) => x.roundNumber)).toEqual([2, 3]);
+  });
+
+  it('BIDDING_STARTED 스크럽 뒤에도 기록은 남는다', () => {
+    store().applySnapshot(snapshot());
+    store().applyEvent(roundEnded(3, 11));
+    store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 99));
+
+    expect(store().roundScores).toEqual({});
+    expect(store().completedRounds.map((x) => x.roundNumber)).toEqual([3]);
+  });
+
+  it('reset 은 기록을 비운다', () => {
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, completedRounds: [r(1, { 0: 1 })] } }));
+    store().reset('r-2');
+
+    expect(store().completedRounds).toEqual([]);
+  });
+});
+
+describe('matchResult → matchEnded 복원 (D-120)', () => {
+  it('resync 에 매치 결과가 있으면 종료 패널 상태를 복원한다', () => {
+    const matchResult = { winners: [1], finalScores: { 0: 10, 1: 90 }, roundsPlayed: 10 };
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, matchResult } }));
+
+    expect(store().matchEnded).toEqual(matchResult);
+  });
+
+  it('매치 진행 중(null)·구 응답(필드 없음)이면 null', () => {
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, matchResult: null } }));
+    expect(store().matchEnded).toBeNull();
+
+    store().applySnapshot(snapshot());
+    expect(store().matchEnded).toBeNull();
+  });
+
+  it('라이브로 받은 종료 패널을 진행 중 resync 가 지우지 않는다 — 종료 후 resync 는 값을 싣는다', () => {
+    const matchResult = { winners: [0], finalScores: { 0: 40 }, roundsPlayed: 10 };
+    store().applySnapshot(snapshot());
+    store().applyEvent(ev('MATCH_ENDED', matchResult, 11));
+    store().applySnapshot(snapshot({ eventSeq: 11, tableView: { ...TABLE, matchResult } }));
+
+    expect(store().matchEnded).toEqual(matchResult);
+  });
+});
+
+describe('lastRoundResult — 다음 라운드 Bidding 동안의 직전 결과 (D-120)', () => {
+  const base = {
+    phase: 'BIDDING' as const,
+    roundNumber: 4,
+    completedRounds: [r(2, { 0: 1 }), r(3, { 0: 2 })],
+    roundScores: {},
+    matchEnded: null,
+  };
+
+  it('BIDDING N+1 이면 라운드 N 기록을 돌려준다', () => {
+    expect(lastRoundResult(base)?.roundNumber).toBe(3);
+  });
+
+  it('BIDDING 인데 마지막 기록이 직전 라운드가 아니면 null (기록 누락 구간)', () => {
+    expect(lastRoundResult({ ...base, roundNumber: 5 })).toBeNull();
+    expect(lastRoundResult({ ...base, completedRounds: [] })).toBeNull();
+  });
+
+  it('ROUND_END 이고 마지막 기록 번호가 같으면 그 기록', () => {
+    const got = lastRoundResult({ ...base, phase: 'ROUND_END', roundNumber: 3 });
+    expect(got?.roundNumber).toBe(3);
+    expect(got?.scores[0].total).toBe(2);
+  });
+
+  /** 잠금 없는 resync 가 RoundEnd 저장과 매치 저장 사이에 끼면 기록이 한 라운드 늦다. */
+  it('ROUND_END 인데 기록이 아직 없으면 roundScores 로 합성한다', () => {
+    const roundScores = { 0: { bid: 1, won: 1, base: 20, bonus: 0, total: 20 } };
+    const got = lastRoundResult({
+      ...base,
+      phase: 'ROUND_END',
+      roundNumber: 4,
+      roundScores,
+    });
+
+    expect(got).toEqual({ roundNumber: 4, scores: roundScores });
+  });
+
+  it('PLAYING·매치 종료면 null', () => {
+    expect(lastRoundResult({ ...base, phase: 'PLAYING' })).toBeNull();
+    expect(
+      lastRoundResult({
+        ...base,
+        matchEnded: { winners: [0], finalScores: { 0: 1 }, roundsPlayed: 10 },
+      }),
+    ).toBeNull();
   });
 });

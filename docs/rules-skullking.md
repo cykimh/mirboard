@@ -88,6 +88,12 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
 | Playing | 전원 입찰 | `PLAY_CARD` | 손패 소진 |
 | RoundScoring | 손패 소진 | (없음) | 다음 라운드 또는 매치 종료 |
 
+- **RoundScoring 은 정지 구간이 아니다** (D-120). 서버는 정산(`ROUND_ENDED`)과 다음 라운드
+  시작(`BIDDING_STARTED`)을 한 배치로 보낸다. 직전 라운드 결과는 클라가 **다음 라운드
+  Bidding 동안** 닫을 수 있는 비차단 패널로 보여 주고, 끝난 라운드 기록은 매치 상태
+  `completedRounds` 에 남아 resync 로 복원된다. 라운드 사이에 멈추면 대기 좌석이 비어
+  봇·타임아웃이 진행을 못 일으키고, 멈춘 사이 탈주가 같은 라운드를 두 번 정산할 수 있다.
+
 - 라운드마다 **덱 전체를 다시 섞어** 분배한다 (라운드 간 카드가 이월되지 않는다).
 - **라운드 시작 플레이어**: 1라운드 첫 리드는 원문이 "적당한 방법으로 정한다"라고만 해서
   **서버 균일 무작위 + 시드 로깅**으로 정한다(§13-⑯). 이후 라운드마다 **턴 순서 +1**
@@ -97,10 +103,11 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
 
 - **코드:** `state/SkullKingState.java:28` sealed(Bidding/Playing/RoundEnd),
   `SkullKingEngine.java:120`(apply), `SkullKingEngine.java:96`(startRound),
-  `SkullKingEngine.java:297`(settleRound), 시작 좌석 회전은
-  `state/SkullKingMatchState.withRoundScored`
+  `SkullKingEngine.java:300`(settleRound), 점수 누적·라운드 기록·시작 좌석 회전은
+  `state/SkullKingMatchState.withRoundCompleted`(한 메서드 — 기록을 빠뜨리는 경로를 두지
+  않는다, D-120)
 - **테스트:** `SkullKingMatchSimulationTest`(2~8인 전 좌석 수 10라운드 완주 + 시작 좌석
-  회전), `SkullKingEngineTest`(라이프사이클 26건)
+  회전 + 기록 10건 = 누적), `SkullKingEngineTest`(라이프사이클 28건)
 - **갭:** **Dealing 이 상태가 아니다**(D-101) — 액션 0개인 통과 지점이라 `Dealer` 가
   분배하고 곧장 Bidding 을 만든다. 티츄의 Dealing 은 선언 윈도우라 상태였던 것과 다르다
 
@@ -208,7 +215,7 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 
 - **코드:** `trick/LeadSuitResolver.java:43`(지연 확정 파생),
   `action/ActionValidator.java:102`(`followsLeadSuit`),
-  `SkullKingEngine.java:361`(`legalPlayActions` — 손패 필터),
+  `SkullKingEngine.java:365`(`legalPlayActions` — 손패 필터),
   `state/TrickState.leadSuit()`(저장하지 않고 매번 파생)
 - **테스트:** `trick/LeadSuitResolverTest`(15건 — 색상/캐릭터/탈출 리드 3갈래 + §13-⑤
   연쇄), `action/ActionValidatorTest$FollowObligation`(양성 4 / 음성 3),
@@ -422,14 +429,21 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
   (진행 중 라운드 폐기). 탈주 좌석은 승자 후보에서 제외된다.
 
 - **코드:** `state/SkullKingMatchState.java`(`TOTAL_ROUNDS=10`, `isMatchOver()`,
-  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외),
-  `SkullKingEngine.java:297`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
-  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`)
-- **테스트:** `state/SkullKingMatchStateTest`(15건 — 10라운드 종료·공동 승리·전원 음수·
-  탈주 제외/누적), `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`
-  (완주 22건), `SkullKingDesertionTest`(17건 — 탈주 포함 풀매치 완주)
-- **갭:** 매치 결과 영속화와 ELO 는 D-02 스키마 결정(게임별 rating 분리) 선행으로
-  **별건 보류**(D-102). 탈주는 D-104 로
+  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외. `completedRounds` 는
+  정산이 끝난 라운드 기록 1..N, `hasSettled(round)` 는 이미 정산한 라운드인가 — D-120),
+  `SkullKingEngine.java:300`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
+  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`).
+  조기 종료(`abandoned`)는 진행 중 라운드를 기록하지 않으므로 기록 건수 = 완주 라운드 수다.
+  어댑터 `SkullKingGameEngine.advance` 는 이미 정산된 라운드(정산 후 다음 라운드 저장 전에
+  멈춘 방)를 `hasSettled` 로 걸러 이중 정산 없이 다음 라운드만 시작한다(D-120)
+- **테스트:** `state/SkullKingMatchStateTest`(20건 — 10라운드 종료·공동 승리·전원 음수·
+  탈주 제외/누적·라운드 기록과 번호 가드), `SkullKingEngineTest$Settlement`(5건),
+  `SkullKingMatchSimulationTest`(완주 29건 — 2~8인 기록 합 = 누적),
+  `SkullKingDesertionTest`(18건 — 탈주 포함 풀매치 완주·조기 종료 기록 = 완주 수),
+  `SkullKingGameEngineCompletedRoundsTest`(10건 — 공개 뷰 기록·매치 결과·복구 분기),
+  `persistence/SkullKingJsonRoundTripTest`(10건 — 구 JSON·모르는 필드)
+- **갭:** 매치 결과 영속화와 개인전 ELO 는 **D-115 로 완료**됐다(게임별 전적
+  `user_game_stats`·`skullking_match_results`, D-02 의 게임별 rating 분리). 탈주는 D-104 로
   확정·구현됐다(순수 엔진 `desert`) — S5 는 포트 `GameEngine.desert` 를 이 메서드에
   연결만 한다. 끊김 유예(120s) 구간의 정지는 미해결 한계로 S5 별건
 
@@ -642,6 +656,7 @@ S4 가 조용히 틀리기 쉬운 지점만 모았다.
 - 각 §13 항목은 대응 테스트가 있다. 해석을 바꾸면 그 테스트가 먼저 빨개진다 — 테스트를
   지우지 말고 새 해석으로 고쳐 쓸 것.
 
-마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영. **순수 룰 엔진 구현 완료**
-— 테스트 305건.
+마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영 + 라운드 기록 (D-120).
+**순수 룰 엔진 구현 완료** — `domain.game.skullking` 테스트 342건 = Docker 불필요
+339건(`./scripts/check.sh rules`) + `persistence/SkullKingMatchRecorderIT` 3건.
 통합(포트 어댑터·`GameDefinition` 등록·상태 저장·뷰 매퍼·봇 정책·STOMP)은 S5(D-102).
