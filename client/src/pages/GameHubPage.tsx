@@ -36,8 +36,9 @@ import {
 } from '@/components/ui/avatar';
 import { avatarSrc } from '@/api/avatar';
 import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
-import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
-import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { tutorialFor } from '@/features/tutorial/gameTutorials';
+import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { useColorblindStore } from '@/features/theme/colorblindStore';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -59,7 +60,10 @@ export function GameHubPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
-  const tutorial = useTutorialGate();
+  // D-121 — 카드별 '게임 방법'으로 연 게임. 허브는 게임을 고를 수 없어 자동 노출하지 않는다
+  // (자동 노출은 그 게임 대기실 첫 입장 — RoomPage).
+  const [tutorialGameId, setTutorialGameId] = useState<string | null>(null);
+  const hubTutorial = tutorialFor(tutorialGameId);
   const colorblind = useColorblindStore((s) => s.enabled);
   const toggleColorblind = useColorblindStore((s) => s.toggle);
   const [avatarVersion, setAvatarVersion] = useState(0);
@@ -198,17 +202,6 @@ export function GameHubPage() {
             )}
             <Button
               type="button"
-              variant="outline"
-              size="sm"
-              onClick={tutorial.show}
-              aria-label="게임 방법"
-              title="게임 방법"
-            >
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">게임 방법</span>
-            </Button>
-            <Button
-              type="button"
               variant={colorblind ? 'default' : 'outline'}
               size="sm"
               onClick={toggleColorblind}
@@ -260,6 +253,7 @@ export function GameHubPage() {
             : games?.map((game) => {
                 const available = game.status === 'AVAILABLE';
                 const wiki = gameWikiUrl(game.id);
+                const hasTutorial = !!tutorialFor(game.id);
                 return (
                   <Card
                     key={game.id}
@@ -292,6 +286,18 @@ export function GameHubPage() {
                         >
                           자세히 <ExternalLink className="h-3.5 w-3.5" />
                         </a>
+                      )}
+                      {hasTutorial && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTutorialGameId(game.id)}
+                          aria-label={`${game.displayName} 게임 방법`}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                          게임 방법
+                        </Button>
                       )}
                     </CardFooter>
                   </Card>
@@ -453,7 +459,17 @@ export function GameHubPage() {
         />
       )}
 
-      <TutorialModal open={tutorial.open} onClose={tutorial.close} />
+      {/* 마운트마다 0단계부터. 닫으면 그 게임을 본 것으로 기록해 대기실에서 다시 띄우지 않는다. */}
+      {hubTutorial && (
+        <TutorialDialog
+          tutorial={hubTutorial}
+          open
+          onClose={() => {
+            markTutorialSeen(hubTutorial.seenKey);
+            setTutorialGameId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,8 +1,10 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 import { useAuthStore } from '@/features/auth/authStore';
+import { GAME_TUTORIALS } from '@/features/tutorial/gameTutorials';
+import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
 import type { GameSummary, Room, RoomOption } from '@/types/api';
 
@@ -39,7 +41,8 @@ vi.mock('@/api/rooms', () => ({
 vi.mock('@/api/games', () => ({ loadGame }));
 vi.mock('@/api/users', () => ({ usersApi: { names } }));
 
-// 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120).
+// 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120). 텍스트는
+// 대기실 튜토리얼 테스트(D-121)가 IN_GAME 분기 진입을 확인하는 데 쓴다.
 const { skullProps, tichuProps } = vi.hoisted(() => ({
   skullProps: [] as Record<string, unknown>[],
   tichuProps: [] as Record<string, unknown>[],
@@ -47,13 +50,13 @@ const { skullProps, tichuProps } = vi.hoisted(() => ({
 vi.mock('@/features/skullking/SkullKingTable', () => ({
   SkullKingTable: (props: Record<string, unknown>) => {
     skullProps.push(props);
-    return <div data-testid="skullking-table" />;
+    return <div data-testid="skullking-table">스컬킹 게임판</div>;
   },
 }));
 vi.mock('@/features/tichu/GameTable', () => ({
   GameTable: (props: Record<string, unknown>) => {
     tichuProps.push(props);
-    return <div data-testid="tichu-table" />;
+    return <div data-testid="tichu-table">티츄 게임판</div>;
   },
 }));
 
@@ -88,7 +91,7 @@ function game(id: string, options: RoomOption[]): GameSummary {
 
 function renderRoom(room: Partial<Room> = {}) {
   joinOrReconnect.mockResolvedValue({ mode: 'JOINED', room: { ...ROOM, ...room } });
-  render(
+  return render(
     <MemoryRouter initialEntries={['/rooms/r1']}>
       <Routes>
         <Route path="/rooms/:roomId" element={<RoomPage />} />
@@ -100,6 +103,8 @@ function renderRoom(room: Partial<Room> = {}) {
 describe('RoomPage — 좌석 정책 라벨 (D-106 정정)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // D-121 — 대기실 첫 입장 튜토리얼 자동 노출(모달)이 끼어들지 않게 전부 본 것으로 둔다.
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
     // 실제 계약: { names: [{userId, username}] } — 배열이다.
     names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
@@ -149,6 +154,7 @@ describe('RoomPage — 좌석 정책 라벨 (D-106 정정)', () => {
 describe('RoomPage — 대기실 헤더 라벨 (D-110)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
     names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
   });
@@ -220,5 +226,90 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
 
     expect(screen.queryByTestId('tichu-table')).toBeNull();
     expect(screen.getByText('게임이 종료되었습니다.')).toBeInTheDocument();
+  });
+});
+
+describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
+  const SK_KEY = 'mirboard.tutorial.skull_king.seen.v1';
+  const SK_TITLE = '미르보드 스컬킹에 오신 걸 환영합니다';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useRoomMeta).mockReset();
+    // setup.ts 의 MemoryStorage 는 파일 안에서 테스트 간에 유지된다 — 직접 비운다.
+    localStorage.clear();
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('SKULL_KING', []), displayName: '스컬킹' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('그 게임 대기실에 처음 들어오면 1회 자동으로 뜨고, 닫으면 다시 안 뜬다', async () => {
+    const first = renderRoom({ gameType: 'SKULL_KING' });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: SK_TITLE })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+
+    expect(localStorage.getItem(SK_KEY)).toBe('1');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    first.unmount();
+
+    renderRoom({ gameType: 'SKULL_KING' });
+    await screen.findByText('테스트 방');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('티츄는 레거시 키를 본 사람에게 다시 띄우지 않는다', async () => {
+    localStorage.setItem('mirboard.tutorial.seen.v1', '1');
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom({ gameType: 'TICHU' });
+
+    await screen.findByText('팀 배정');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('헤더 "게임 방법" 버튼으로 다시 연다', async () => {
+    localStorage.setItem(SK_KEY, '1');
+    renderRoom({ gameType: 'SKULL_KING' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '게임 방법' }));
+    expect(await screen.findByRole('heading', { name: SK_TITLE })).toBeInTheDocument();
+  });
+
+  it('튜토리얼이 없는 게임이면 버튼도 다이얼로그도 없다', async () => {
+    loadGame.mockResolvedValue(game('NEW_GAME', []));
+    renderRoom({ gameType: 'NEW_GAME' });
+
+    await screen.findByText('테스트 방');
+    expect(screen.queryByRole('button', { name: '게임 방법' })).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('IN_GAME 방으로 바로 들어오면 대기실 튜토리얼을 띄우지 않는다', async () => {
+    renderRoom({ gameType: 'SKULL_KING', status: 'IN_GAME' });
+
+    await screen.findByText('스컬킹 게임판');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(localStorage.getItem(SK_KEY)).toBeNull();
+  });
+
+  it('연 채로 게임이 시작되면 닫고, 리매치로 대기실에 돌아와도 다시 열리지 않는다', async () => {
+    let pushRoom!: (r: Room) => void;
+    vi.mocked(useRoomMeta).mockImplementation((_id, _token, onRoom) => {
+      pushRoom = onRoom;
+    });
+    localStorage.setItem(SK_KEY, '1');
+    renderRoom({ gameType: 'SKULL_KING' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '게임 방법' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+    act(() => pushRoom({ ...ROOM, gameType: 'SKULL_KING', status: 'IN_GAME' }));
+    expect(await screen.findByText('스컬킹 게임판')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    act(() => pushRoom({ ...ROOM, gameType: 'SKULL_KING', status: 'WAITING' }));
+    expect(await screen.findByText('테스트 방')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

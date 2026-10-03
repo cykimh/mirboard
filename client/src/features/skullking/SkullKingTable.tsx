@@ -14,6 +14,9 @@ import { SkullHandPanel } from './SkullHandPanel';
 import { BidPanel } from './BidPanel';
 import { SkullMatchEndPanel, SkullRoundResultPanel } from './SkullScorePanels';
 import { SkullRoundHistoryModal } from './SkullRoundHistoryModal';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
+import { SKULL_KING_TUTORIAL } from './tutorial/skullkingTutorial';
 
 interface Props {
   roomId: string;
@@ -65,6 +68,8 @@ export function SkullKingTable({
   // D-120 — 점수표 모달·결과 패널 닫기는 서버 상태가 아니라 이 화면의 로컬 상태다.
   const [historyOpen, setHistoryOpen] = useState(false);
   const [dismissedRound, setDismissedRound] = useState<number | null>(null);
+  // D-121 — 게임판에서는 수동으로만 연다(자동 노출 없음). 입찰·턴 타이머가 계속 흐른다.
+  const rules = useTutorialGate(SKULL_KING_TUTORIAL.seenKey, false);
 
   const s = useSkullKingStore();
   const revealed = bidsRevealed(s);
@@ -157,6 +162,14 @@ export function SkullKingTable({
             onClick={() => setChatOpen((v) => !v)}
           >
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
+          </button>
+          <button
+            type="button"
+            className="sk-badge"
+            onClick={rules.show}
+            title="게임 방법 다시 보기 — 턴 타이머는 계속 흐릅니다"
+          >
+            규칙
           </button>
           {onExit && (
             <button type="button" className="sk-badge" onClick={exit}>
@@ -331,6 +344,8 @@ export function SkullKingTable({
           roomId={roomId}
         />
       )}
+
+      <TutorialDialog tutorial={SKULL_KING_TUTORIAL} open={rules.open} onClose={rules.close} />
     </div>
   );
 }

@@ -65,6 +65,52 @@ describe('18-skullking-table.css — 네임스페이스 격리', () => {
   });
 });
 
+/** 주석 제거본에서 선택자가 정확히 `selector` 인 첫 블록의 `--토큰: 값` 을 뽑는다. */
+function tokensOf(selector: string): Map<string, string> {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`(^|})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(cssCode);
+  const tokens = new Map<string, string>();
+  if (!m) return tokens;
+  for (const [, name, value] of m[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
+    tokens.set(name, value.trim());
+  }
+  return tokens;
+}
+
+/**
+ * D-121 — 튜토리얼 다이얼로그는 body 포털이라 `.sk-table` 밖이다. 토큰이 안 풀리면 칩 배경이
+ * `var(--sk-suit-*)` → transparent 가 되는데 jsdom(css:false)은 이를 못 잡는다. 그래서
+ * `.sk-tokens` 가 칩 토큰을 **같은 값으로** 선언하는지 원문으로 고정한다.
+ */
+describe('18-skullking-table.css — .sk-tokens (D-121 포털 토큰)', () => {
+  const CHIP_TOKENS = [
+    '--sk-suit-green',
+    '--sk-suit-purple',
+    '--sk-suit-yellow',
+    '--sk-suit-black',
+    '--sk-special-bg',
+    '--sk-special-fg',
+  ];
+  const table = tokensOf('.sk-table');
+  const portal = tokensOf('.sk-tokens');
+
+  it('칩이 쓰는 토큰을 모두 선언한다', () => {
+    for (const t of CHIP_TOKENS) expect(portal.get(t), t).toBeTruthy();
+  });
+
+  it('값이 게임판(.sk-table) 토큰과 같다 — 복제본이 어긋나면 다이얼로그 칩 색만 달라진다', () => {
+    expect(portal.size).toBeGreaterThan(0);
+    for (const [name, value] of portal) {
+      expect(value, name).toBe(table.get(name));
+    }
+  });
+
+  it('레이아웃 속성은 갖지 않는다 — 토큰만 푸는 클래스다', () => {
+    const block = /(^|})\s*\.sk-tokens\s*\{([^}]*)\}/.exec(cssCode)?.[2] ?? '';
+    expect(block).not.toMatch(/(^|[;\s])(display|padding|min-height|gap)\s*:/);
+  });
+});
+
 describe('index.css — 캐스케이드 순서', () => {
   const order = [...indexCss.matchAll(/@import '\.\/parts\/(\d+)-[^']+'/g)].map(
     (m) => Number(m[1]),
