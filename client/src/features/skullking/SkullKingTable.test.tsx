@@ -358,3 +358,39 @@ describe('나가기 확인 (D-110)', () => {
     confirm.mockRestore();
   });
 });
+
+describe('규칙 버튼 (D-121)', () => {
+  const SK_KEY = 'mirboard.tutorial.skull_king.seen.v1';
+
+  beforeEach(() => localStorage.clear());
+
+  it('누르면 스컬킹 튜토리얼이 열리고, 게임 액션은 보내지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+
+    expect(
+      screen.getByRole('heading', { name: '미르보드 스컬킹에 오신 걸 환영합니다' }),
+    ).toBeInTheDocument();
+    // 다이얼로그는 body 포털(.sk-table 밖)이라 본문이 칩 토큰 클래스를 직접 가져야 한다.
+    expect(document.querySelector('.tutorial-body')).toHaveClass('sk-tokens');
+    expect(sendAction).not.toHaveBeenCalled();
+  });
+
+  it('미열람이어도 게임판에서는 자동으로 뜨지 않는다 — 타이머가 흐르는 중이다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(localStorage.getItem(SK_KEY)).toBeNull();
+  });
+
+  it('관전자도 연다', () => {
+    seed({ seatCount: 4, mySeat: -1, phase: 'PLAYING' });
+    renderTable({ spectator: true });
+
+    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
