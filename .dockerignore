@@ -22,3 +22,7 @@ server/out
 docs
 README.md
 CLAUDE.md
+
+# 로컬 DB 덤프 — 원격 빌더(CD 의 --remote-only)로 업로드되지 않게
+backups
+.claude

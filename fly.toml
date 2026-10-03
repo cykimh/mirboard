@@ -12,10 +12,10 @@
 #   MIRBOARD_DB_URL           Postgres jdbc URL. 예: jdbc:postgresql://<host>:5432/mirboard
 #   MIRBOARD_DB_USER          Postgres 사용자
 #   MIRBOARD_DB_PASSWORD      Postgres 비밀번호
-#   MIRBOARD_REDIS_HOST       Upstash Redis 호스트 (예: foo-bar-12345.upstash.io)
-#   MIRBOARD_REDIS_PORT       Upstash Redis 포트 (기본 6379, TLS 는 보통 6380)
-#   MIRBOARD_REDIS_PASSWORD   Upstash Redis 비밀번호 (Upstash 콘솔의 default user password)
-#   MIRBOARD_REDIS_SSL        "true" (Upstash 는 TLS 강제, Phase 7-3 에서 처리)
+#   MIRBOARD_REDIS_HOST       mirboard-redis.internal (D-114 — Fly 자체 Redis 앱, ops/redis/)
+#   MIRBOARD_REDIS_PORT       6379
+#   MIRBOARD_REDIS_PASSWORD   mirboard-redis 앱의 REDIS_PASSWORD 와 같은 값
+#   MIRBOARD_REDIS_SSL        "false" (사설망 6PN 이라 TLS 없음. 매니지드 Redis 면 "true")
 
 app = "mirboard"
 primary_region = "nrt"

@@ -8,9 +8,9 @@
 #   MIRBOARD_DB_URL           jdbc:postgresql://... (Fly Postgres / Supabase / Neon)
 #   MIRBOARD_DB_USER          Postgres 사용자
 #   MIRBOARD_DB_PASSWORD      Postgres 비밀번호
-#   MIRBOARD_REDIS_HOST       Upstash Redis 호스트
-#   MIRBOARD_REDIS_PORT       6380 (TLS) 권장
-#   MIRBOARD_REDIS_PASSWORD   Upstash 비밀번호
+#   MIRBOARD_REDIS_HOST       mirboard-redis.internal (D-114 — Fly 자체 Redis 앱)
+#   MIRBOARD_REDIS_PORT       6379
+#   MIRBOARD_REDIS_PASSWORD   mirboard-redis 의 REDIS_PASSWORD 와 같은 값
 #
 # 선택:
 #   MIRBOARD_MESSAGING_GATEWAY  redis (멀티 머신 가능 — fly.toml 에서 이미 설정)
@@ -28,7 +28,8 @@ spring:
   data:
     redis:
       ssl:
-        # Upstash 는 TLS 필수. local dev 와의 유일한 차이.
+        # 기본값 true 는 매니지드 Redis(D-39 Upstash) 시절의 안전한 기본. D-114 의 Fly 자체
+        # Redis 는 사설망이라 시크릿 MIRBOARD_REDIS_SSL=false 로 끈다.
         enabled: ${MIRBOARD_REDIS_SSL:true}
 
 # Phase 6D — 멀티 인스턴스 fan-out 기본값을 redis 로. fly.toml [env] 에서도 셋팅했지만

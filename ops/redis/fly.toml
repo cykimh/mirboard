@@ -1,0 +1,20 @@
+# D-114 — 운영 Redis. 배포: 이 디렉터리에서 `flyctl deploy --local-only`.
+#
+# 최초 1회 (계정 소유자):
+#   flyctl apps create mirboard-redis -o personal
+#   flyctl secrets set REDIS_PASSWORD="$(openssl rand -hex 32)" -a mirboard-redis --stage
+#   (같은 값을 본 앱에 MIRBOARD_REDIS_PASSWORD 로 — docs/deploy.md 참고)
+#
+# [http_service]/[[services]] 가 없으므로 공개 포트가 없고, 본 앱은
+# mirboard-redis.internal:6379 (Fly 사설망)로만 접근한다. 서비스가 없어 auto-stop 대상도
+# 아니므로 머신은 상시 가동이다(월 약 $2).
+
+app = "mirboard-redis"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

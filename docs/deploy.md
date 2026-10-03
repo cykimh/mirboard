@@ -1,4 +1,4 @@
-# 배포 (Fly.io + Postgres + Upstash Redis)
+# 배포 (Fly.io + Postgres + Redis)
 
 시연용 단일 머신 배포. Tokyo(`nrt`) 리전, 비용 약 $5~10/mo.
 `fly.toml` 은 `min_machines_running=0` + `auto_stop_machines="stop"` 이라 유휴 시 머신이
@@ -20,9 +20,12 @@ flyctl postgres attach --app mirboard mirboard-db
 #    → 자동으로 DATABASE_URL secret 이 셋됨. 본 앱은 별도 명명을 쓰므로 아래
 #       MIRBOARD_DB_URL 로 다시 설정한다 (Postgres URI → jdbc URL 변환).
 
-# 3) Upstash Redis (Tokyo 리전, TLS)
-#    https://console.upstash.com 에서 "Create Database" → Region: ap-northeast-1
-#    → host/port/password 메모.
+# 3) Redis — Fly 자체 앱 (D-114, 월 약 $2 고정). 설정은 ops/redis/ 에 있다.
+#    (Upstash 무료 DB 는 방치 중 삭제됐고, 종량제는 D-96 폴링 때문에 요금이 튈 수 있어 택하지 않음)
+flyctl apps create mirboard-redis -o personal
+openssl rand -hex 32 > /tmp/redis-pw && chmod 600 /tmp/redis-pw
+flyctl secrets set REDIS_PASSWORD="$(cat /tmp/redis-pw)" -a mirboard-redis --stage
+(cd ops/redis && flyctl deploy --local-only --ha=false)
 ```
 
 ### 1. Secret 셋업
@@ -37,12 +40,12 @@ flyctl secrets set \
   MIRBOARD_DB_USER="<user>" \
   MIRBOARD_DB_PASSWORD="<password>"
 
-# Upstash Redis (TLS 포트 보통 6380)
+# Redis (D-114 — 사설망 mirboard-redis.internal, TLS 없음). 비밀번호는 위 3) 과 같은 값
 flyctl secrets set \
-  MIRBOARD_REDIS_HOST="<your-db>.upstash.io" \
-  MIRBOARD_REDIS_PORT="6380" \
-  MIRBOARD_REDIS_PASSWORD="<password>" \
-  MIRBOARD_REDIS_SSL="true"
+  MIRBOARD_REDIS_HOST="mirboard-redis.internal" \
+  MIRBOARD_REDIS_PORT="6379" \
+  MIRBOARD_REDIS_PASSWORD="$(cat /tmp/redis-pw)" \
+  MIRBOARD_REDIS_SSL="false" && rm /tmp/redis-pw
 ```
 
 ### 2. 첫 배포
