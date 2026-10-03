@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
@@ -102,12 +102,28 @@ export function RoomPage() {
     }
   }, [token, navigate]);
 
+  // D-120 — 이 세션에서 IN_GAME→FINISHED 전이를 봤는가. 봇 방은 매치가 끝나면 서버가
+  // 방을 FINISHED 로 바꾸는데, 그 메타가 마지막 게임 이벤트보다 먼저 올 수 있다. 그때
+  // 게임판을 내리면 마지막 라운드 결과와 최종 점수를 못 본다. 그래서 전이를 **관측한**
+  // 게임판은 유지한다 — 메타와 게임 이벤트의 도착 순서에 기대지 않는 판단이다. 새로고침으로
+  // 처음부터 FINISHED 를 받으면 전이를 본 적이 없으므로 기존 종료 카드다.
+  const [boardHeld, setBoardHeld] = useState(false);
+  const roomRef = useRef<Room | null>(null);
+  roomRef.current = room;
+
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
   useRoomMeta(
     roomId,
     token,
-    (r) => setRoom(r),
+    (r) => {
+      // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
+      if (roomRef.current?.status === 'IN_GAME' && r.status === 'FINISHED') {
+        setBoardHeld(true);
+      }
+      roomRef.current = r;
+      setRoom(r);
+    },
     () => setError('방이 종료되었습니다.'),
   );
 
@@ -224,7 +240,13 @@ export function RoomPage() {
   // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
   // 다른 게임의 코드 경로는 실행조차 되지 않는다.
-  if (room.status === 'IN_GAME' && room.gameType === 'SKULL_KING') {
+  // D-120: 스컬킹은 이 세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지한다(위
+  // boardHeld). 티츄는 아직 기존 동작 그대로다 — 매치 결과·'한 판 더' 게이팅이 먼저다.
+  const roomFinished = room.status === 'FINISHED';
+  if (
+    room.gameType === 'SKULL_KING' &&
+    (room.status === 'IN_GAME' || (boardHeld && roomFinished))
+  ) {
     return (
       <main className="room-page">
         <SkullKingTable
@@ -237,6 +259,7 @@ export function RoomPage() {
           turnSeconds={room.turnSeconds ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
           onExit={handleLeave}
+          roomFinished={roomFinished}
         />
       </main>
     );

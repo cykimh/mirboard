@@ -100,6 +100,15 @@ export interface RoundScorePayload {
   total?: number;
 }
 
+/**
+ * 끝난 라운드 하나 (D-120) — 서버 `SkullKingStateMapper.CompletedRoundView`. `roundScores`
+ * (현재 라운드, ROUND_END 에만)와 이름이 닮았지만 다르다 — 이쪽은 정산이 끝난 라운드 1..N.
+ */
+export interface CompletedRoundView {
+  roundNumber: number;
+  scores: Record<number, RoundScoreView>;
+}
+
 /** 서버 `SkullKingStateMapper.TableView` 와 1:1. */
 export interface SkullKingTableView {
   phase: SkullKingPhase;
@@ -116,6 +125,13 @@ export interface SkullKingTableView {
   desertedSeats: number[];
   /** ROUND_END 에만 채워진다. */
   roundScores: Record<number, RoundScoreView>;
+  /**
+   * 끝난 라운드 기록, 라운드 번호 순 (D-120). 점수표의 권위값 — 스토어가 통째로 교체한다.
+   * 옵셔널인 것은 D-120 이전 서버 응답·기존 테스트 시드 호환 때문이다.
+   */
+  completedRounds?: CompletedRoundView[];
+  /** 매치가 끝난 뒤에만 값 (`MATCH_ENDED` payload 와 같은 모양, D-120). */
+  matchResult?: MatchEndedPayload | null;
 }
 
 /** 서버 `SkullKingStateMapper.PrivateView` 와 1:1. `myBid` 는 공개 전 구간에만. */
