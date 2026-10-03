@@ -60,6 +60,12 @@ public final class HeuristicBotPolicy {
     static final int TICHU_MAX_LOSERS = 3;
     /** 패스 후 티츄는 모든 상대가 이 장수 이상일 때만. */
     static final int TICHU_MIN_OPPONENT_CARDS = 10;
+    /**
+     * 자가대전 보정(D-118)으로 더한 보수 조건: 티츄는 컨트롤 3개 이상, 패스 후 선언은 비컨트롤
+     * 묶음(groups − controls) 3개 이하. 초기 문턱만으로는 성공률 0.62 로 목표 0.70 미달.
+     */
+    static final int TICHU_MIN_CONTROLS = 3;
+    static final int TICHU_MAX_OPEN_GROUPS = 3;
     /** 위협: 활성 상대가 이 장수 이하. */
     static final int THREAT_CARDS = 2;
     /** 팔로우에서 컨트롤을 쓸 만한 트릭 점수. */
@@ -161,7 +167,8 @@ public final class HeuristicBotPolicy {
             if (v.dealingCardCount() == 14 && has(legal, TichuAction.DeclareTichu.class)) {
                 HandPlanner.Plan plan = HandPlanner.plan(v.hand());
                 if (plan.controls() >= plan.losers() + EARLY_TICHU_MARGIN
-                        && plan.losers() <= EARLY_TICHU_MAX_LOSERS) {
+                        && plan.losers() <= EARLY_TICHU_MAX_LOSERS
+                        && plan.controls() >= TICHU_MIN_CONTROLS) {
                     return new TichuAction.DeclareTichu();
                 }
             }
@@ -186,7 +193,9 @@ public final class HeuristicBotPolicy {
             if (v.declared(o)) bump = 1;
         }
         return plan.controls() >= plan.losers() + TICHU_MARGIN + bump
-                && plan.losers() <= TICHU_MAX_LOSERS - bump;
+                && plan.losers() <= TICHU_MAX_LOSERS - bump
+                && plan.controls() >= TICHU_MIN_CONTROLS
+                && plan.size() - plan.controls() <= TICHU_MAX_OPEN_GROUPS;
     }
 
     // ---------- 패스 ----------
@@ -331,7 +340,10 @@ public final class HeuristicBotPolicy {
             List<Candidate> keep = filter(pool, x -> !x.empties);
             if (!keep.isEmpty()) pool = keep;   // 리드 후보가 전부 완주면 예외.
         }
-        List<Candidate> safe = filter(pool, x -> x.empties || !c.breaksBomb(x));
+        // 폭탄을 깨는 비폭탄 후보, 파트너가 나간 뒤의 개(리드가 상대에게 간다)는 뺀다.
+        boolean partnerOut = v.finished(v.partner());
+        List<Candidate> safe = filter(pool, x -> x.empties
+                || (!c.breaksBomb(x) && !(partnerOut && x.mask == DOG)));
         if (safe.isEmpty()) safe = pool;
 
         // L1 손패 전체가 한 조합.
