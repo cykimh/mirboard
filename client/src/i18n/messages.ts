@@ -101,6 +101,22 @@ const KO = {
   'match.ended.titleSuffix': '승리',
   'match.ended.finalScore': '최종 누적',
   'match.ended.roundsPlayed': '라운드 진행',
+
+  // --- 게스트 체험 (D-117) ---
+  'auth.guest.or': '또는',
+  'auth.guest.cta': '게스트로 바로 체험하기',
+  'auth.guest.creating': '입장 중...',
+  'auth.guest.caption': '가입 없이 12시간 · 전적은 랭킹에 오르지 않아요',
+  'auth.guest.error.rateLimited':
+    '이 네트워크에서 오늘 만들 수 있는 게스트 수를 다 썼어요. 회원가입하면 바로 이어서 즐길 수 있어요.',
+  'auth.guest.error.unavailable':
+    '지금은 게스트 입장이 어려워요. 회원가입하면 바로 이용할 수 있어요.',
+  'auth.guest.signupCta': '회원가입하고 시작하기',
+  'hub.guest.badge': '게스트',
+  'hub.guest.avatarDisabled': '게스트는 아바타를 바꿀 수 없어요 — 회원가입하면 쓸 수 있어요',
+  'hub.guest.logoutConfirm':
+    '게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 로그아웃할까요?',
+  'profile.guest.noPassword': '게스트 계정은 비밀번호가 없어요 — 회원가입하면 전적이 남아요',
 } as const;
 
 export type MessageKey = keyof typeof KO;

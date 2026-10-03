@@ -11,6 +11,7 @@ import { TierBadge } from '@/components/TierBadge';
 import { ChangePasswordForm } from '@/features/profile/ChangePasswordForm';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { t } from '@/i18n/messages';
 
 /** M1/A4 — 프로필/설정 페이지. 전적·아바타·비밀번호 변경 통합(D-85). */
 export function ProfilePage() {
@@ -67,7 +68,12 @@ export function ProfilePage() {
 
         <section className="rounded-lg border p-4">
           <h2 className="mb-3 text-lg font-semibold">비밀번호 변경</h2>
-          {token && <ChangePasswordForm token={token} />}
+          {/* D-117 — 게스트는 비밀번호가 없다(서버도 403 GUEST_FORBIDDEN). */}
+          {user.guest ? (
+            <p className="text-sm text-muted-foreground">{t('profile.guest.noPassword')}</p>
+          ) : (
+            token && <ChangePasswordForm token={token} />
+          )}
         </section>
       </div>
     </div>

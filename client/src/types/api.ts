@@ -63,6 +63,8 @@ export interface LoginResponse {
   user: {
     userId: number;
     username: string;
+    /** D-117 — 일회용 게스트 계정. D-117 이전 스냅샷에는 없으므로 optional(없으면 정회원). */
+    guest?: boolean;
   };
 }
 
