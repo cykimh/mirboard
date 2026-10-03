@@ -66,6 +66,55 @@ public final class EloCalculator {
         return java.util.Map.copyOf(result);
     }
 
+    /**
+     * D-115 — 개인전 한 명의 최종 성적.
+     *
+     * @param deserted 탈주 좌석. 점수와 무관하게 최하위로 취급한다(탈주끼리는 동률).
+     */
+    public record Placement(PlayerInput player, int score, boolean deserted) {
+    }
+
+    /**
+     * D-115 — 개인전(2~8인) 쌍대 ELO. 모든 쌍 (i, j) 를 한 판으로 보고
+     * {@code S_ij}(점수가 높으면 1, 같으면 0.5, 낮으면 0)와 개인 rating 기대 승률의 차를
+     * {@code K_i / (n−1)} 로 합산한다. 2인이면 일반 ELO 와 같고, 같은 K 면 증감 합이 보존된다.
+     *
+     * @return userId → newRating 맵 (전원 포함)
+     */
+    public static Map<Long, Integer> applyFreeForAll(List<Placement> placements) {
+        int n = placements.size();
+        if (n < 2) {
+            throw new IllegalArgumentException("Free-for-all needs at least two players");
+        }
+        java.util.HashMap<Long, Integer> result = new java.util.HashMap<>();
+        for (Placement me : placements) {
+            double sum = 0.0;
+            for (Placement other : placements) {
+                if (other == me) {
+                    continue;
+                }
+                double expected = 1.0 / (1.0 + Math.pow(10.0,
+                        (other.player().currentRating() - me.player().currentRating()) / 400.0));
+                sum += outcome(me, other) - expected;
+            }
+            int k = kFactor(me.player().gamesPlayed());
+            int delta = (int) Math.round(k * sum / (n - 1));
+            result.put(me.player().userId(), me.player().currentRating() + delta);
+        }
+        return java.util.Map.copyOf(result);
+    }
+
+    /** me 기준 한 쌍의 결과: 1 승, 0.5 무, 0 패. 탈주는 비탈주보다 항상 아래. */
+    private static double outcome(Placement me, Placement other) {
+        if (me.deserted() != other.deserted()) {
+            return me.deserted() ? 0.0 : 1.0;
+        }
+        if (me.deserted()) {
+            return 0.5;
+        }
+        return me.score() > other.score() ? 1.0 : me.score() == other.score() ? 0.5 : 0.0;
+    }
+
     public static int kFactor(int gamesPlayed) {
         return gamesPlayed < NEW_PLAYER_THRESHOLD ? NEW_PLAYER_K : DEFAULT_K;
     }

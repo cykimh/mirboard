@@ -3,6 +3,7 @@ package com.mirboard.domain.game.scoring;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.mirboard.domain.game.scoring.EloCalculator.Placement;
 import com.mirboard.domain.game.scoring.EloCalculator.PlayerInput;
 import java.util.List;
 import java.util.Map;
@@ -76,5 +77,52 @@ class EloCalculatorTest {
         assertThat(Tier.fromRating(1550)).isEqualTo(Tier.DIAMOND);
         assertThat(Tier.fromRating(1700)).isEqualTo(Tier.MASTER);
         assertThat(Tier.fromRating(9999)).isEqualTo(Tier.MASTER);
+    }
+
+    // ---------- D-115 — 개인전(free-for-all) 쌍대 ELO ----------
+
+    private static Placement placed(long userId, int rating, int games, int score) {
+        return new Placement(new PlayerInput(userId, rating, games), score, false);
+    }
+
+    @Test
+    void ffa_two_players_matches_plain_elo() {
+        // 2인이면 쌍이 하나뿐이라 K/(n-1)=K — 일반 ELO 와 같아야 한다.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 50, 80), placed(2, 1000, 50, 20)));
+        assertThat(out).containsEntry(1L, 1016).containsEntry(2L, 984);
+    }
+
+    @Test
+    void ffa_four_players_equal_ratings_spread_by_placement() {
+        // 각자 3쌍. 1등은 3승 → 32/3 × (3 − 1.5) = 16, 2등은 2승 1패 → 32/3 × 0.5 ≈ 5.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 50, 120), placed(2, 1000, 50, 60),
+                placed(3, 1000, 50, 10), placed(4, 1000, 50, -40)));
+        assertThat(out).containsEntry(1L, 1016).containsEntry(2L, 1005)
+                .containsEntry(3L, 995).containsEntry(4L, 984);
+    }
+
+    @Test
+    void ffa_tied_scores_count_as_draw() {
+        // 공동 승리(§13-⑰) — 같은 점수는 0.5. 레이팅이 같으면 둘 다 변동 없음.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 50, 70), placed(2, 1000, 50, 70)));
+        assertThat(out).containsEntry(1L, 1000).containsEntry(2L, 1000);
+    }
+
+    @Test
+    void ffa_deserter_ranks_last_regardless_of_score() {
+        // 탈주 직전 점수가 가장 높아도 레이팅을 얻으면 안 된다.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                new Placement(new PlayerInput(1, 1000, 50), 300, true),
+                placed(2, 1000, 50, 10)));
+        assertThat(out).containsEntry(1L, 984).containsEntry(2L, 1016);
+    }
+
+    @Test
+    void ffa_needs_at_least_two_players() {
+        assertThatThrownBy(() -> EloCalculator.applyFreeForAll(List.of(placed(1, 1000, 50, 0))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

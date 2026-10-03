@@ -848,6 +848,7 @@ D(수평 확장성)·E(멀티게임)·G(문서·데모). 제외: B(리텐션·�
 | M3 | D | 수평 확장성: WsSessionRegistry/TurnTimeout/DesertionGrace → Redis presence/deadline, 2-인스턴스 IT·failover(**D-03 전제 번복**). M0 이연분 포함 | ✅ |
 | M4 | G | 쇼케이스 마감: README 리뉴얼·데모 GIF·케이스 스터디·데모 계정·라이브 배포·CD | 🔶 D-105: README·케이스 스터디·스크린샷·데모 계정 시더·CD 워크플로 완료 / **라이브 배포는 사용자 실행 대기**(`FLY_API_TOKEN`), GIF 는 정적 스크린샷으로 대체. 배포 이미지는 로컬에서 prod 프로필 기동 검증 완료(2026-10-03, `docs/deploy.md` §3) |
 | M5 | E | 멀티게임: 포트 졸업 → 디스패치 seam 포트화 → 스컬킹(2~8인) | ✅ S0~S6 완료(D-97~D-104): 포트·인원 가변·룰 명세·순수 엔진(305건)·탈주(유령 좌석)·인게임 배선(봇 풀매치 IT)·클라 게임판(Row-Flow, 실측 완료). 실행 단위 `docs/plans/multi-game-sessions.md`. **잔여 별건**: 스컬킹 매치 영속·ELO(D-02 게임별 rating 분리 선행), 끊김 유예 구간 정지(D-104 한계), 요트/할리갈리 |
+| M6 | E·A | 스컬킹 완성도: ① 게임별 전적·레이팅(매치 영속·개인전 ELO·게임별 랭킹) ② 라운드 점수표 ③ 봇 휴리스틱 ④ 튜토리얼 | 🔶 ① 구현 완료·검토 대기(D-115, 브랜치 `feat/game-stats`, 계획 `docs/plans/game-stats.md`) / ②~④ 미착수 |
 
 **M0 상세(완료)**: D-83(`SecurityConfig`/`WebSocketConfig` origin 화이트리스트+헤더),
 D-84(`LoginAttemptService`·`AuthRateLimiter`·`rate_limit_fixed_window.lua`, 전부 Redis 휘발 —

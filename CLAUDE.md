@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-113까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(티츄만) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 `users.rating` 게임별 분리(D-02) 선행이라 의도적 별건.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-115까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -39,7 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
-- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `created_at`. `rating`/`is_bot`/`desert_count` 는 게임 성적·행동 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산). **내기 칩은 계정에 두지 않는다(D-82)** — 방 단위 테이블 칩(`room:{id}:chips`, Redis)으로만 존재. (`chip_balance` 컬럼은 D-81 에서 추가했다가 V7 에서 DROP.)
+- 현재 허용 컬럼: `id`, `username`, `password_hash`, `win_count`, `lose_count`, `rating`(V2, D-02), `is_bot`(V3), `desert_count`(V4), `created_at`. `rating`/`is_bot`/`desert_count` 는 게임 성적·행동 집계용 derived 값이라 화이트리스트 추가 허용(`tier` 는 컬럼 아님 — rating 구간에서 계산). **내기 칩은 계정에 두지 않는다(D-82)** — 방 단위 테이블 칩(`room:{id}:chips`, Redis)으로만 존재. (`chip_balance` 컬럼은 D-81 에서 추가했다가 V7 에서 DROP.) **D-115**: 승패·레이팅·탈주는 게임별 별도 테이블 `user_game_stats`(V11, PK `user_id+game_type`)로 옮겼다 — `users` 의 `win_count`/`lose_count`/`rating`/`desert_count` 는 이관 후 **읽지도 쓰지도 않으며** 운영 확인 뒤 별도 마이그레이션으로 DROP 예정(다시 쓰는 코드를 만들지 말 것).
 - 로그인/회원가입 엔드포인트도 헤더/쿠키 식별자를 기록하지 않는다 (IP는 인프라 레벨만).
 - 선택적 코스메틱 아바타는 `users` 가 아니라 **별도 테이블 `user_avatars`**(V5, BYTEA 128px PNG)에 저장(D-80). `users` 화이트리스트는 불변. 조회는 공개 `GET /avatars/{userId}`, 업로드/삭제는 `POST`/`DELETE /api/me/avatar`(본인).
 

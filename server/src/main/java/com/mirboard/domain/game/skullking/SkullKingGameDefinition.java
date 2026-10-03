@@ -7,6 +7,7 @@ import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.skullking.persistence.SkullKingMatchStateStore;
 import com.mirboard.domain.game.skullking.persistence.SkullKingStateStore;
 import java.security.SecureRandom;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,12 +29,15 @@ public final class SkullKingGameDefinition implements GameDefinition {
 
     private final SkullKingStateStore stateStore;
     private final SkullKingMatchStateStore matchStateStore;
+    private final ApplicationEventPublisher publisher;
     private final SecureRandom random = new SecureRandom();
 
     public SkullKingGameDefinition(SkullKingStateStore stateStore,
-                                   SkullKingMatchStateStore matchStateStore) {
+                                   SkullKingMatchStateStore matchStateStore,
+                                   ApplicationEventPublisher publisher) {
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
+        this.publisher = publisher;
     }
 
     @Override
@@ -68,6 +72,6 @@ public final class SkullKingGameDefinition implements GameDefinition {
 
     @Override
     public GameEngine newEngine(GameContext ctx) {
-        return new SkullKingGameEngine(ctx, stateStore, matchStateStore, random);
+        return new SkullKingGameEngine(ctx, stateStore, matchStateStore, random, publisher);
     }
 }
