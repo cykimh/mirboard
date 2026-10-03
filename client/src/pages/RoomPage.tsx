@@ -7,6 +7,9 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { tutorialFor } from '@/features/tutorial/gameTutorials';
+import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
 import type { Room, RoomOption, RoomStatus, TeamPolicy } from '@/types/api';
 import {
@@ -197,6 +200,17 @@ export function RoomPage() {
   const seatPolicyLabel = roomOptions?.includes('TEAMS') ? '팀 배정' : '좌석 순서';
   const canAbort = iAmHost && room?.status === 'IN_GAME';
 
+  // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
+  // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
+  const tutorial = tutorialFor(room?.gameType);
+  const waiting = room?.status === 'WAITING';
+  const tutorialGate = useTutorialGate(tutorial?.seenKey ?? null, !!tutorial && waiting);
+  const hideTutorial = tutorialGate.hide;
+  // 연 채로 게임이 시작되면 기록 없이 닫는다 — 리매치로 대기실에 돌아와도 다시 열려 있지 않게.
+  useEffect(() => {
+    if (!waiting) hideTutorial();
+  }, [waiting, hideTutorial]);
+
   if (error) {
     return (
       <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
@@ -285,6 +299,11 @@ export function RoomPage() {
                 onClick={handleAbort}
               >
                 게임 종료
+              </Button>
+            )}
+            {tutorial && (
+              <Button type="button" variant="outline" onClick={tutorialGate.show}>
+                게임 방법
               </Button>
             )}
             <Button type="button" variant="outline" onClick={handleLeave}>
@@ -403,6 +422,14 @@ export function RoomPage() {
           </Card>
         )}
       </div>
+
+      {tutorial && (
+        <TutorialDialog
+          tutorial={tutorial}
+          open={tutorialGate.open}
+          onClose={tutorialGate.close}
+        />
+      )}
     </div>
   );
 }
