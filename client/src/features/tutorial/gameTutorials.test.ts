@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GAME_TUTORIALS, tutorialFor } from './gameTutorials';
 import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
+import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
 
 /**
  * D-121 — 튜토리얼 레지스트리. 클라에서 "튜토리얼용 게임 id" 를 아는 곳은 여기 하나뿐이다.
@@ -21,8 +22,13 @@ describe('tutorialFor', () => {
     expect(tutorialFor('TICHU')).toBe(TICHU_TUTORIAL);
   });
 
+  it('스컬킹 id 로 스컬킹 튜토리얼을 돌려준다', () => {
+    expect(tutorialFor('SKULL_KING')).toBe(SKULL_KING_TUTORIAL);
+  });
+
   it('대소문자를 정규화한다 (loadGame 과 같은 규약)', () => {
     expect(tutorialFor('tichu')).toBe(TICHU_TUTORIAL);
+    expect(tutorialFor('skull_king')).toBe(SKULL_KING_TUTORIAL);
   });
 
   it('미등록 id·null·undefined 는 undefined — 버튼이 안 뜰 뿐 깨지지 않는다', () => {

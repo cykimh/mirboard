@@ -537,3 +537,18 @@ button.sk-card {
   border: 1px solid rgba(232, 93, 117, 0.5);
   font-size: 13px;
 }
+
+/* D-121 */
+/* ── 포털 토큰 — 튜토리얼 다이얼로그 ─────────────────────────────── */
+/* 다이얼로그는 body 포털이라 .sk-table **밖**이다. .sk-card* 규칙은 원래 전역이라 그대로
+ * 적용되지만, 칩 배경의 var(--sk-suit-*) 가 안 풀리면 transparent 가 된다. 그래서 칩이 쓰는
+ * 토큰만 .sk-tokens 로 다시 푼다(GameTutorial.bodyClassName). 값은 위 .sk-table 토큰과 같아야
+ * 한다 — skullkingCssNamespace.test 가 대조한다. */
+.sk-tokens {
+  --sk-suit-green: #3fa45b;
+  --sk-suit-purple: #7b5cd6;
+  --sk-suit-yellow: #e0b32a;
+  --sk-suit-black: #23242b;
+  --sk-special-bg: #f4f1e8;
+  --sk-special-fg: #2a2620;
+}

@@ -64,6 +64,7 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
     renderHub();
 
     expect(await screen.findByRole('button', { name: '티츄 게임 방법' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '스컬킹 게임 방법' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '준비 중 게임 게임 방법' })).toBeNull();
     // 헤더의 공용 '게임 방법' 버튼은 카드로 옮겨졌다.
     expect(screen.queryByRole('button', { name: '게임 방법' })).toBeNull();
@@ -72,7 +73,13 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
   it('카드 버튼이 그 게임의 튜토리얼을 연다', async () => {
     renderHub();
 
-    fireEvent.click(await screen.findByRole('button', { name: '티츄 게임 방법' }));
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 게임 방법' }));
+    expect(
+      await screen.findByRole('heading', { name: '미르보드 스컬킹에 오신 걸 환영합니다' }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '티츄 게임 방법' }));
     expect(
       await screen.findByRole('heading', { name: '미르보드 티츄에 오신 걸 환영합니다' }),
     ).toBeInTheDocument();
@@ -88,11 +95,13 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
   it('닫으면 그 게임의 열람 키를 기록한다 — 대기실에서 다시 뜨지 않는다', async () => {
     renderHub();
 
-    fireEvent.click(await screen.findByRole('button', { name: '티츄 게임 방법' }));
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 게임 방법' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
 
-    expect(localStorage.getItem('mirboard.tutorial.seen.v1')).toBe('1');
+    expect(localStorage.getItem('mirboard.tutorial.skull_king.seen.v1')).toBe('1');
+    // 다른 게임의 열람 기록은 건드리지 않는다.
+    expect(localStorage.getItem('mirboard.tutorial.seen.v1')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
