@@ -77,6 +77,9 @@
 ```
 > D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
 > 응답에 칩 잔액 없음.
+>
+> D-115: `winCount`/`loseCount` 는 **전 게임 합**이다. 게임별 값은
+> `GET /api/users/{userId}/stats` 의 `games[]`.
 
 ### PUT `/api/me/password` *(D-85 — 본인 비밀번호 변경)*
 요청 (인증 필요)
@@ -257,9 +260,19 @@ schema constraint 유지.
   "loseCount": 3,
   "rating": 1120,
   "tier": "SILVER",
-  "desertCount": 1
+  "desertCount": 1,
+  "games": [
+    { "gameType": "TICHU", "rating": 1120, "tier": "SILVER",
+      "winCount": 5, "loseCount": 3, "desertCount": 1 },
+    { "gameType": "SKULL_KING", "rating": 985, "tier": "BRONZE",
+      "winCount": 0, "loseCount": 2, "desertCount": 0 }
+  ]
 }
 ```
+
+**D-115 — 전적은 게임별이다.** `games[]` 는 한 판이라도 한 게임만 싣는다(저장소
+`user_game_stats`). 최상위 `winCount`~`desertCount`·`rating`·`tier` 는 D-115 이전 클라
+호환용으로 **TICHU 값**을 그대로 둔다(안 해 봤으면 기본값 1000/0/0/0).
 
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
@@ -267,13 +280,16 @@ schema constraint 유지.
 tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
 1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
 
-### GET `/api/users/ranking` *(Phase 16 #5)*
-쿼리 `limit` (기본 20, 1~100 clamp). 봇 제외, rating 내림차순(동점 시 id 오름차순).
-username 외 식별 정보 노출 0건 — D-02 constraint.
+### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
+쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇 제외, 그 게임의
+rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라도 한 사람만** 싣는다.
+등록되지 않은 `gameType` 은 `404 GAME_NOT_AVAILABLE`. username 외 식별 정보 노출
+0건 — D-02 constraint.
 
 응답 `200`
 ```json
 {
+  "gameType": "TICHU",
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
       "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }

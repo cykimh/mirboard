@@ -8,7 +8,7 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 776건 / 클라 277건
+서버 테스트 793건 / 클라 286건
 
 **라이브**: https://mirboard.fly.dev — 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
 

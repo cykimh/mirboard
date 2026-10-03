@@ -2,11 +2,8 @@ package com.mirboard.domain.lobby.auth;
 
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -18,25 +15,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.isBot = true ORDER BY u.id ASC")
     List<User> findBots();
 
-    /** Phase 16(#5) — 랭킹: 봇 제외, rating 내림차순(동점 id 오름차순). */
-    @Query("SELECT u FROM User u WHERE u.isBot = false ORDER BY u.rating DESC, u.id ASC")
-    List<User> findRanking(Pageable pageable);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.winCount = u.winCount + 1 WHERE u.id = :id")
-    int incrementWinCount(@Param("id") long id);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.loseCount = u.loseCount + 1 WHERE u.id = :id")
-    int incrementLoseCount(@Param("id") long id);
-
-    /** Phase 19(#3) — 게임중 탈주 확정 시 +1. */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.desertCount = u.desertCount + 1 WHERE u.id = :id")
-    int incrementDesertCount(@Param("id") long id);
-
-    /** Phase 8D — ELO 갱신. EloCalculator 가 계산한 newRating 으로 덮어쓰기. */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.rating = :rating WHERE u.id = :id")
-    int updateRating(@Param("id") long id, @Param("rating") int rating);
+    // D-115 — 랭킹·승패·탈주·ELO 쓰기는 게임별 user_game_stats 로 옮겨졌다
+    // (UserGameStatsService). users 의 옛 컬럼은 이관 후 읽지도 쓰지도 않으며, 별도
+    // 마이그레이션으로 DROP 한다 — 그 전까지 다시 쓰는 경로가 생기지 않게 메서드를 없앤다.
 }

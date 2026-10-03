@@ -63,6 +63,7 @@ class SkullKingBotMatchSimulationIT {
     @Autowired BotUserRegistry bots;
     @Autowired SkullKingStateStore stateStore;
     @Autowired SkullKingMatchStateStore matchStateStore;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Test
     void four_player_all_bot_match_completes_ten_rounds() {
@@ -108,6 +109,18 @@ class SkullKingBotMatchSimulationIT {
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(Duration.ofMillis(100))
                 .until(() -> roomService.getRoom(roomId).status() == RoomStatus.FINISHED);
+
+        // D-115 — 매치 종료가 기록으로 남는다(봇 매치라 ELO 는 없고 행·참가자만).
+        Awaitility.await()
+                .atMost(10, TimeUnit.SECONDS)
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM skullking_match_results WHERE room_id = ?",
+                        Integer.class, roomId) == 1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM skullking_match_participants p"
+                        + " JOIN skullking_match_results r ON r.id = p.match_id WHERE r.room_id = ?",
+                Integer.class, roomId)).isEqualTo(capacity);
 
         // 마지막 라운드 상태 invariant (2-인자 — 탈주 정합 포함).
         stateStore.load(roomId).ifPresent(state ->

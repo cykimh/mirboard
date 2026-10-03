@@ -72,7 +72,7 @@ class RoomOptionGatingTest {
     @Test
     @DisplayName("스컬킹은 아무 옵션도 선언하지 않는다 — 10R 고정·개인전·칩 미지원")
     void skullKingDeclaresNone() {
-        var skullKing = new SkullKingGameDefinition(null, null);
+        var skullKing = new SkullKingGameDefinition(null, null, null);
 
         assertThat(skullKing.supportedRoomOptions()).isEmpty();
     }
@@ -86,7 +86,7 @@ class RoomOptionGatingTest {
         // 의 acceptsRandomSeatPolicyOnSkullKing 이 REST 로 확인한다.
         assertThat(new TichuGameDefinition(null, null, null, null).supportedRoomOptions())
                 .contains(RoomOption.TEAMS);
-        assertThat(new SkullKingGameDefinition(null, null).supportedRoomOptions())
+        assertThat(new SkullKingGameDefinition(null, null, null).supportedRoomOptions())
                 .doesNotContain(RoomOption.TEAMS);
     }
 
@@ -95,7 +95,7 @@ class RoomOptionGatingTest {
     void bettingIsTichuOnly() {
         assertThat(new TichuGameDefinition(null, null, null, null).supportedRoomOptions())
                 .contains(RoomOption.BETTING);
-        assertThat(new SkullKingGameDefinition(null, null).supportedRoomOptions())
+        assertThat(new SkullKingGameDefinition(null, null, null).supportedRoomOptions())
                 .doesNotContain(RoomOption.BETTING);
     }
 

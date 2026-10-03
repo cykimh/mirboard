@@ -69,6 +69,14 @@ class MatchResultRecorderIT {
     @Autowired
     com.mirboard.domain.lobby.auth.BotUserRegistry bots;
 
+    // D-115 — 티츄 전적은 users 가 아니라 게임별 테이블에 쌓인다.
+    @Autowired
+    com.mirboard.domain.game.scoring.UserGameStatsService stats;
+
+    private com.mirboard.domain.game.scoring.UserGameStatsService.GameStats tichu(long userId) {
+        return stats.get(userId, com.mirboard.domain.game.tichu.TichuGameDefinition.ID);
+    }
+
     @Test
     @Transactional
     void recorder_persists_match_and_increments_winners() {
@@ -102,18 +110,22 @@ class MatchResultRecorderIT {
         assertThat(participantsByUser.values()).allMatch(p -> p.getMatchId().equals(matchId));
 
         // Win/lose counts.
-        var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
-        assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
-        assertThat(refreshed.get(2).getWinCount()).isEqualTo(1);
-        assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
-        assertThat(refreshed.get(3).getLoseCount()).isEqualTo(1);
+        var refreshed = ids.stream().map(this::tichu).toList();
+        assertThat(refreshed.get(0).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(2).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
+        assertThat(refreshed.get(3).loseCount()).isEqualTo(1);
 
         // Phase 8D — ELO 갱신 검증. 모든 신규 유저 (gamesPlayed=0 → K=40), rating=1000.
         // expected=0.5, delta = 40 * 0.5 = 20. 승팀 +20, 패팀 -20.
-        assertThat(refreshed.get(0).getRating()).isEqualTo(1020);
-        assertThat(refreshed.get(2).getRating()).isEqualTo(1020);
-        assertThat(refreshed.get(1).getRating()).isEqualTo(980);
-        assertThat(refreshed.get(3).getRating()).isEqualTo(980);
+        assertThat(refreshed.get(0).rating()).isEqualTo(1020);
+        assertThat(refreshed.get(2).rating()).isEqualTo(1020);
+        assertThat(refreshed.get(1).rating()).isEqualTo(980);
+        assertThat(refreshed.get(3).rating()).isEqualTo(980);
+
+        // D-115 — users 의 옛 레이팅 컬럼은 이관 후 쓰기가 멈췄다(DROP 은 별도 마이그레이션).
+        assertThat(userRepo.findById(ids.get(0)).orElseThrow().getRating()).isEqualTo(1000);
+        assertThat(userRepo.findById(ids.get(0)).orElseThrow().getWinCount()).isZero();
     }
 
     @Test
@@ -134,14 +146,13 @@ class MatchResultRecorderIT {
         // match_result + participant 는 기록됨.
         assertThat(matchRepo.findAll()).anyMatch(m -> m.getRoomId().equals("room-bot"));
 
-        var refreshed = humans.stream()
-                .map(u -> userRepo.findById(u.getId()).orElseThrow()).toList();
+        var refreshed = humans.stream().map(u -> tichu(u.getId())).toList();
         // 승패는 반영 (seat0,2 = A 승 / seat1 = B 패).
-        assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
-        assertThat(refreshed.get(2).getWinCount()).isEqualTo(1);
-        assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
+        assertThat(refreshed.get(0).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(2).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
         // ELO 는 제외 — rating 기본값 1000 유지.
-        assertThat(refreshed).allMatch(u -> u.getRating() == 1000);
+        assertThat(refreshed).allMatch(u -> u.rating() == 1000);
     }
 
     @Test
@@ -157,18 +168,18 @@ class MatchResultRecorderIT {
                 "room-desert", ids, 120, 80, Team.A,
                 List.of(new RoundScore(120, 80, 0, false)), deserter, 0));
 
-        var refreshed = ids.stream().map(id -> userRepo.findById(id).orElseThrow()).toList();
+        var refreshed = ids.stream().map(this::tichu).toList();
         // 탈주자(seat1, B) — 패배 + 탈주 카운트.
-        assertThat(refreshed.get(1).getLoseCount()).isEqualTo(1);
-        assertThat(refreshed.get(1).getDesertCount()).isEqualTo(1);
-        assertThat(refreshed.get(1).getRating()).isLessThan(1000);
+        assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).desertCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).rating()).isLessThan(1000);
         // 상대팀(seat0,2 = A) — 승리, 탈주 카운트 없음.
-        assertThat(refreshed.get(0).getWinCount()).isEqualTo(1);
-        assertThat(refreshed.get(0).getDesertCount()).isZero();
-        assertThat(refreshed.get(0).getRating()).isGreaterThan(1000);
+        assertThat(refreshed.get(0).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(0).desertCount()).isZero();
+        assertThat(refreshed.get(0).rating()).isGreaterThan(1000);
         // 탈주자 파트너(seat3, B) — 같이 패배하지만 탈주 카운트 없음.
-        assertThat(refreshed.get(3).getLoseCount()).isEqualTo(1);
-        assertThat(refreshed.get(3).getDesertCount()).isZero();
+        assertThat(refreshed.get(3).loseCount()).isEqualTo(1);
+        assertThat(refreshed.get(3).desertCount()).isZero();
     }
 
     private List<User> registerFour(String... usernames) {

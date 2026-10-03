@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-113),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-115),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -200,11 +200,18 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 9. 랭킹 / ELO (Phase 8D)
 
-- `users.rating`(기본 1000) 를 ELO(K=32, `EloCalculator`)로 매치 결과마다 갱신. 봇 제외.
+- **게임별**(D-115): 전적·레이팅은 `user_game_stats`(V11, `user_id+game_type`)에 쌓인다.
+  티츄 기존 값은 V11 이 TICHU 행으로 이관했고 `users` 의 옛 컬럼은 쓰기를 멈췄다(DROP 예정).
+- ELO: 티츄는 팀 평균(`applyMatch`), 스컬킹은 개인전 쌍대(`applyFreeForAll` — 탈주 좌석
+  최하위). K=40(30판 미만)/32. 봇이 낀 매치는 승패만 기록, ELO 제외(D-71).
+- 스컬킹 매치는 `skullking_match_results/participants` 에 남는다(`SkullKingMatchRecorder`).
 - **tier** 는 컬럼이 아니라 rating 구간에서 계산(BRONZE→…→MASTER, derived).
-- 엔드포인트: `GET /api/users/{id}/stats`, `GET /api/users/ranking`(봇 제외 상위), `GET /api/me`.
+- 엔드포인트: `GET /api/users/{id}/stats`(`games[]`), `GET /api/users/ranking?gameType=`
+  (게임별, 기본 TICHU), `GET /api/me`(승패 = 전 게임 합). 클라는 랭킹 게임 탭·프로필
+  게임별 전적·헤더 대표 티어(가장 많이 한 게임).
 
-관련 테스트: `EloCalculatorTest`, 사용자 통계 통합 테스트.
+관련 테스트: `EloCalculatorTest`, `UserGameStatsServiceIT`, `V11UserGameStatsMigrationIT`,
+`SkullKingMatchRecorderIT`, `UserStatsIntegrationTest`, 클라 `RankingCard`·`GameRecords`.
 
 ---
 
@@ -259,12 +266,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **776건** (D-113 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **793건** (D-115 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
   묶여 있다(티츄 룰 단위와 함께 ~5s).
-- **클라이언트**: **277건 / 33파일** (D-113 시점 실측, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **286건 / 36파일** (D-115 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
@@ -298,7 +305,6 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 ## 15. 미구현 / 범위 밖 (참고)
 
 - 게임별 격리 채팅(로비/방 채팅만 존재).
-- 스컬킹 매치 결과 영속·ELO — D-02 의 게임별 rating 분리 결정이 선행(D-102 보류).
 - 스컬킹 손패 dnd 정렬·특수 카드 SVG 에셋·i18n 이관 — S6 범위 밖(D-103 이월).
 - JWT 리프레시 토큰(12h 단일 토큰, MVP 범위).
   (멀티 인스턴스 세션 레지스트리는 D-96 에서 해소 — §8 참조.)
@@ -332,8 +338,8 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   **Row-Flow**(auto-fit 좌석 그리드 + 재생순 트릭 레일)로 폭 미디어 쿼리 0개. CSS 는
   `styles/parts/18-skullking-table.css` 에 `.sk-` 접두로 격리하고 네임스페이스 규칙을
   테스트로 기계화했다. 375×667 8인 실측 완료.
-- **남은 것**: 매치 결과 영속·ELO·desert_count 는 D-02 스키마 결정(게임별 rating 분리) 선행으로
-  별건(D-102 보류). 끊김 유예 구간 정지(D-104 한계)도 미해결.
+- **매치 영속·ELO(D-115)**: 게임별 전적 테이블로 해소 — §9.
+- **남은 것**: 끊김 유예 구간 정지(D-104 한계), 라운드 점수표·봇 휴리스틱·튜토리얼(M6 후속).
 
 ---
 

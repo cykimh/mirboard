@@ -8,6 +8,8 @@ import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.skullking.action.RejectionReason;
 import com.mirboard.domain.game.skullking.action.SkullKingAction;
 import com.mirboard.domain.game.skullking.action.SkullKingActionRejectedException;
+import com.mirboard.domain.game.skullking.event.SkullKingEvent;
+import com.mirboard.domain.game.skullking.event.SkullKingMatchCompleted;
 import com.mirboard.domain.game.skullking.persistence.SkullKingMatchStateStore;
 import com.mirboard.domain.game.skullking.persistence.SkullKingStateStore;
 import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
@@ -20,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-102 — 스컬킹의 {@link GameEngine} 포트 어댑터. 방 하나에 대응하는 per-room 인스턴스로
@@ -44,16 +47,19 @@ public final class SkullKingGameEngine implements GameEngine {
     private final SkullKingStateStore stateStore;
     private final SkullKingMatchStateStore matchStateStore;
     private final SecureRandom random;
+    private final ApplicationEventPublisher publisher;
 
     public SkullKingGameEngine(GameContext context,
                                SkullKingStateStore stateStore,
                                SkullKingMatchStateStore matchStateStore,
-                               SecureRandom random) {
+                               SecureRandom random,
+                               ApplicationEventPublisher publisher) {
         this.context = context;
         this.rules = new SkullKingEngine(context);
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.random = random;
+        this.publisher = publisher;
     }
 
     @Override
@@ -161,6 +167,7 @@ public final class SkullKingGameEngine implements GameEngine {
         SkullKingMatchState afterRound = settled.matchState();
         matchStateStore.save(context.roomId(), afterRound);
         outbound.addAll(settled.events());
+        recordIfEnded(settled.events(), afterRound);
 
         log.info("SkullKing round completed: room={} round={} cumulative={}",
                 context.roomId(), ended.roundNumber(), afterRound.cumulativeScores());
@@ -197,6 +204,7 @@ public final class SkullKingGameEngine implements GameEngine {
             case MATCH_ENDED -> {
                 matchStateStore.save(context.roomId(), desertion.matchState());
                 outbound.addAll(desertion.events());
+                recordIfEnded(desertion.events(), desertion.matchState());
                 log.warn("SkullKing desertion ended match: room={} seat={} userId={} winners={}",
                         context.roomId(), seat, deserterUserId, desertion.matchState().winners());
                 return DesertOutcome.MATCH_ENDED;
@@ -219,6 +227,22 @@ public final class SkullKingGameEngine implements GameEngine {
     }
 
     // ---------- internals ----------
+
+    /**
+     * D-115 — 순수 엔진이 매치 종료({@code MatchEnded})를 냈으면 기록 이벤트를 발행한다.
+     * 완주 라운드 수·승자는 엔진이 정한 값을 그대로 쓴다(조기 종료 계산을 여기서 반복하지
+     * 않는다). 인스턴스 간 전파(DomainEventBus)가 아니라 로컬 발행 — 각 인스턴스가 다시
+     * 기록하면 같은 매치가 중복으로 남는다.
+     */
+    private void recordIfEnded(List<SkullKingEvent> events, SkullKingMatchState match) {
+        for (SkullKingEvent event : events) {
+            if (event instanceof SkullKingEvent.MatchEnded ended) {
+                publisher.publishEvent(new SkullKingMatchCompleted(
+                        context.roomId(), context.playerIds(), ended.finalScores(),
+                        ended.winners(), match.desertedSeats(), ended.roundsPlayed()));
+            }
+        }
+    }
 
     /** 영속된 매치 상태. 없으면(방금 시작) 좌석 0 시작의 초기 상태 — 리스너가 곧 채운다. */
     private SkullKingMatchState matchState() {

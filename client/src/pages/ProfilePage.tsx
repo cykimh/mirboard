@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { usersApi, type UserStats } from '@/api/users';
+import { gamesApi } from '@/api/games';
+import { GameRecords } from '@/features/stats/GameRecords';
+import { primaryGame } from '@/features/stats/primaryGame';
 import { avatarSrc } from '@/api/avatar';
 import { TierBadge } from '@/components/TierBadge';
 import { ChangePasswordForm } from '@/features/profile/ChangePasswordForm';
@@ -15,6 +18,8 @@ export function ProfilePage() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const [stats, setStats] = useState<UserStats | null>(null);
+  // D-115 — 게임 표시명은 카탈로그에서 (클라에 게임 이름을 박지 않는다).
+  const [gameNames, setGameNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (token && user) {
@@ -22,8 +27,14 @@ export function ProfilePage() {
         .stats(token, user.userId)
         .then(setStats)
         .catch(() => setStats(null));
+      gamesApi
+        .catalog(token)
+        .then((res) => setGameNames(Object.fromEntries(res.games.map((g) => [g.id, g.displayName]))))
+        .catch(() => {});
     }
   }, [token, user]);
+
+  const primary = primaryGame(stats?.games ?? []);
 
   if (!user) return null;
 
@@ -45,14 +56,13 @@ export function ProfilePage() {
           </Avatar>
           <div className="flex flex-col gap-1">
             <span className="text-lg font-semibold">{user.username}</span>
-            {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
-            {stats && (
-              <span className="text-sm text-muted-foreground">
-                {stats.winCount}승 {stats.loseCount}패 · 레이팅 {stats.rating}
-                {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
-              </span>
-            )}
+            {primary && <TierBadge tier={primary.tier} rating={primary.rating} />}
           </div>
+        </section>
+
+        <section className="rounded-lg border p-4">
+          <h2 className="mb-3 text-lg font-semibold">게임별 전적</h2>
+          {stats && <GameRecords records={stats.games ?? []} names={gameNames} />}
         </section>
 
         <section className="rounded-lg border p-4">

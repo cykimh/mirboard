@@ -4,7 +4,9 @@ import { Eye, ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
-import { usersApi, type UserStats, type RankEntry } from '@/api/users';
+import { usersApi, type UserStats } from '@/api/users';
+import { RankingCard } from '@/features/stats/RankingCard';
+import { primaryGame } from '@/features/stats/primaryGame';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useLobbyStomp } from '@/ws/useLobbyStomp';
 import { TierBadge } from '@/components/TierBadge';
@@ -37,14 +39,6 @@ import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
 import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
 import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
 import { useColorblindStore } from '@/features/theme/colorblindStore';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
 
@@ -59,7 +53,6 @@ export function GameHubPage() {
   const navigate = useNavigate();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [ranking, setRanking] = useState<RankEntry[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +89,6 @@ export function GameHubPage() {
       })
       .catch((err: Error) => setError(err.message));
     usersApi.stats(token, user.userId).then(setStats).catch(() => {});
-    usersApi.ranking(token, 20).then((r) => setRanking(r.entries)).catch(() => {});
   }, [token, user, navigate]);
 
   useEffect(() => {
@@ -138,6 +130,17 @@ export function GameHubPage() {
   }
 
   const availableGames = (games ?? []).filter((g) => g.status === 'AVAILABLE');
+  const played = stats?.games ?? [];
+  const primary = primaryGame(played);
+  const totals = played.reduce(
+    (acc, g) => ({
+      win: acc.win + g.winCount,
+      lose: acc.lose + g.loseCount,
+      desert: acc.desert + g.desertCount,
+    }),
+    { win: 0, lose: 0, desert: 0 },
+  );
+  const gameName = (id: string) => games?.find((g) => g.id === id)?.displayName ?? id;
 
   return (
     <div className="app-shell min-h-screen bg-background text-foreground">
@@ -176,11 +179,16 @@ export function GameHubPage() {
                 </button>
               </div>
             )}
-            {stats && <TierBadge tier={stats.tier} rating={stats.rating} />}
+            {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로, 전적은 전 게임 합. */}
+            {primary && (
+              <span title={`${gameName(primary.gameType)} 기준`}>
+                <TierBadge tier={primary.tier} rating={primary.rating} />
+              </span>
+            )}
             {stats && (
               <span className="text-xs text-muted-foreground">
-                {stats.winCount}승 {stats.loseCount}패
-                {stats.desertCount > 0 && ` · 탈주 ${stats.desertCount}`}
+                {totals.win}승 {totals.lose}패
+                {totals.desert > 0 && ` · 탈주 ${totals.desert}`}
               </span>
             )}
             <Button
@@ -407,55 +415,10 @@ export function GameHubPage() {
           </Card>
         </div>
 
-        {/* 랭킹 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>랭킹</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {ranking.length === 0 ? (
-              <p className="text-sm italic text-muted-foreground">
-                아직 랭킹 데이터가 없습니다.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">#</TableHead>
-                    <TableHead>유저</TableHead>
-                    <TableHead>티어</TableHead>
-                    <TableHead>레이팅</TableHead>
-                    <TableHead>전적</TableHead>
-                    <TableHead>탈주</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ranking.map((e) => (
-                    <TableRow
-                      key={e.userId}
-                      className={cn(
-                        user &&
-                          e.userId === user.userId &&
-                          'bg-accent font-semibold',
-                      )}
-                    >
-                      <TableCell>{e.rank}</TableCell>
-                      <TableCell>{e.username}</TableCell>
-                      <TableCell>
-                        <TierBadge tier={e.tier} />
-                      </TableCell>
-                      <TableCell>{e.rating}</TableCell>
-                      <TableCell>
-                        {e.winCount}승 {e.loseCount}패
-                      </TableCell>
-                      <TableCell>{e.desertCount}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* 랭킹 — D-115 게임별 */}
+        {token && availableGames.length > 0 && (
+          <RankingCard token={token} games={availableGames} myUserId={user?.userId} />
+        )}
       </div>
 
       {token && (
