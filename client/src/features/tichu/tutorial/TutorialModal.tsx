@@ -1,70 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { TUTORIAL_STEPS } from './tutorialSteps';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { TICHU_TUTORIAL } from './tichuTutorial';
 
 interface TutorialModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-/** A2 — 다단계 온보딩 룰 튜토리얼. 첫 로그인 1회 자동 + 헤더 도움말 버튼으로 재호출. */
+/**
+ * A2 — 티츄 다단계 룰 튜토리얼. D-121 에서 마크업을 게임 중립 `TutorialDialog` 로 옮기고
+ * 티츄 선언만 꽂는 래퍼가 됐다. 허브·대기실은 레지스트리(`tutorialFor`)를 쓰므로 이 래퍼는
+ * 티츄 회귀 가드이자 티츄 게임판 진입점 후보로 남긴다.
+ */
 export function TutorialModal({ open, onClose }: TutorialModalProps) {
-  const [step, setStep] = useState(0);
-  const total = TUTORIAL_STEPS.length;
-  const current = TUTORIAL_STEPS[step];
-  const isLast = step === total - 1;
-
-  // 다시 열 때 항상 처음부터.
-  useEffect(() => {
-    if (open) setStep(0);
-  }, [open]);
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="app-shell" style={{ maxWidth: 560 }}>
-        <DialogHeader>
-          <DialogTitle>{current.title}</DialogTitle>
-          <DialogDescription className="sr-only">티츄 기본 규칙 안내 튜토리얼</DialogDescription>
-        </DialogHeader>
-
-        <div className="tutorial-body" style={{ minHeight: 180 }}>
-          {current.body}
-        </div>
-
-        <DialogFooter className="gap-2" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.85rem', opacity: 0.7 }} aria-hidden="true">
-            {step + 1} / {total}
-          </span>
-          <span style={{ display: 'flex', gap: 8 }}>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={step === 0}
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-            >
-              이전
-            </Button>
-            {isLast ? (
-              <Button type="button" size="sm" onClick={onClose}>
-                시작하기
-              </Button>
-            ) : (
-              <Button type="button" size="sm" onClick={() => setStep((s) => Math.min(total - 1, s + 1))}>
-                다음
-              </Button>
-            )}
-          </span>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <TutorialDialog tutorial={TICHU_TUTORIAL} open={open} onClose={onClose} />;
 }
