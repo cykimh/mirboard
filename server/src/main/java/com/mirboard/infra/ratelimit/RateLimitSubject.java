@@ -9,7 +9,12 @@ import java.security.Principal;
  * <p>인증된 요청은 {@code u:{userId}}, 아니면 {@code ip:{addr}} 를 쓴다. 같은 NAT
  * (집·카페 Wi-Fi, 모바일 캐리어) 뒤의 여러 사용자가 서로의 할당량을 깎지 않게 하려는
  * 것 — 지인 대상 서비스라 오탐 비용이 회피 비용보다 크다. 계정 다중생성으로 우회하는
- * 경로는 가입/로그인의 IP 버킷(`auth`)이 이미 막는다.
+ * 경로는 가입/로그인의 IP 버킷(`auth`)이 막는다.
+ *
+ * <p>D-117 — 위 문장은 D-117 부터 사실이 됐다. 그 전에는 `/api/auth/**` 도 Bearer 를 실으면
+ * userId 키로 바뀌어 버킷을 갈아탈 수 있었다. 이제 인증 경로는 주체와 무관하게
+ * {@link #ofIp} 이고({@code HttpRateLimitFilter} 의 {@code ipOnly} 라우트), IP 는
+ * {@link ClientIpResolver} 가 신뢰 헤더에서 읽어 IPv6 를 /64 로 정규화한 값이다.
  */
 public final class RateLimitSubject {
 

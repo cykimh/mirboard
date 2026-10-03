@@ -153,11 +153,13 @@ export function GameHubPage() {
           <div className="flex items-center gap-3">
             {user && (
               <div className="flex items-center gap-2">
+                {/* D-117 — 게스트는 아바타 업로드 불가(서버도 403). 버튼만 잠그고 이유는 title 로. */}
                 <button
                   type="button"
                   onClick={() => setAvatarModalOpen(true)}
-                  title="아바타 설정"
-                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={!!user.guest}
+                  title={user.guest ? t('hub.guest.avatarDisabled') : '아바타 설정'}
+                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:hover:opacity-100"
                 >
                   <Avatar>
                     <AvatarImage
@@ -177,6 +179,9 @@ export function GameHubPage() {
                 >
                   {user.username}
                 </button>
+                {user.guest && (
+                  <Badge variant="secondary">{t('hub.guest.badge')}</Badge>
+                )}
               </div>
             )}
             {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로, 전적은 전 게임 합. */}
@@ -220,6 +225,8 @@ export function GameHubPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                // D-117 — 게스트는 비밀번호가 없어 로그아웃하면 같은 신원으로 못 돌아온다.
+                if (user?.guest && !window.confirm(t('hub.guest.logoutConfirm'))) return;
                 logout();
                 navigate('/login');
               }}
@@ -426,6 +433,7 @@ export function GameHubPage() {
           open={showCreateModal}
           token={token}
           availableGames={availableGames}
+          defaultFillWithBots={!!user?.guest}
           onClose={() => setShowCreateModal(false)}
           onError={(msg) => {
             setError(msg);
@@ -434,7 +442,7 @@ export function GameHubPage() {
         />
       )}
 
-      {token && user && (
+      {token && user && !user.guest && (
         <AvatarSettingsModal
           open={avatarModalOpen}
           onClose={() => setAvatarModalOpen(false)}

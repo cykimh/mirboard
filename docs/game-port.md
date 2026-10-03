@@ -120,7 +120,7 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 | --- | --- |
 | 팀(`Team` enum) | 개인전 게임이 다수 |
 | 칩/판돈(D-82) | 티츄 매치 종료에 묶인 별건. 신규 게임은 `stake=0` 으로 시작 |
-| ELO | `users.rating` 단일 컬럼이라 게임별 분리는 스키마 결정(D-02 검토 필요) |
+| ELO·전적 | 게임별 `user_game_stats`(D-115)에 각 게임의 매치 기록기가 직접 쓴다. 공통 규칙은 `domain.game.scoring`(`RatedMatchPolicy`·`EloCalculator`·`UserGameStatsService`) — 아래 "매치 기록기 계약" *(D-115 정정: 예전 이 행은 "`users.rating` 단일 컬럼이라 스키마 결정 필요"였다)* |
 | 좌석 수 4 고정 | 가변으로 감 — §3 |
 | 트릭·리드수트 | 트릭테이킹 계열만의 개념 — 포트에 없음. *(D-101 정정: 티츄 트릭 모델은 조합 기반(`Hand`·passedSeats·wish)이고 리드수트 개념이 없어 교집합 0 — 공유 모듈 없이 스컬킹 전용 `domain/game/skullking/trick/` 으로 구현됐다)* |
 
@@ -129,6 +129,23 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 "어느 팀이 이겼는가"에 붙어 있어서 포트로 올리려면 팀 개념을 다시 끌어올려야 하고, 신규
 게임은 `stake=0` 으로 시작하므로 지금 일반화하면 **쓰이지 않는 추상**이 된다. 스컬킹에
 내기를 붙이는 시점에 "승자 집합"만 다루는 게임 중립 정산 이벤트를 별건으로 검토한다.
+
+### 매치 기록기 계약 (D-115·D-117)
+
+ELO·전적은 포트 밖이지만, 새 게임의 매치 기록기(`MatchResultRecorder`·`SkullKingMatchRecorder`
+같은, 게임별 매치 종료 이벤트 리스너)는 다음 두 가지를 지켜야 한다.
+
+1. **ELO 적용 여부는 `RatedMatchPolicy.eloApplies(playerIds)` 하나로 판정한다.** 봇(D-71)이나
+   게스트(D-117)가 한 명이라도 낀 매치는 전원 미적용이다(승패·탈주는 기록). 조건을 기록기마다
+   따로 쓰면 한쪽만 고쳐진다 — 실제로 D-117 전에는 두 기록기에 `hasBots` 가 각각 있었다.
+2. **비봇 참가자마다 `user_game_stats` 행을 남긴다**(`UserGameStatsService.record`, ELO 미적용이면
+   `newRating=null`). 게스트 정리(`GuestAccountSweeper`)가 이 행을 "매치를 끝낸 증거"로 쓴다.
+   참가자 테이블에만 쓰고 stats 를 빠뜨리면, 그 게스트는 48h 뒤 정리 대상이 됐다가 참가자 FK
+   때문에 삭제가 매번 실패한다(그 행만 건너뛰고 warn — 정리 자체는 커서로 계속 진행).
+
+`users` 를 FK 로 참조하는 테이블을 **매치와 무관한 용도**(신고·역할처럼)로 새로 만들면
+`UserRepository.findExpiredGuestIds` 에 `NOT EXISTS` 를 더할 것. 매치 참가자 테이블은 2번이
+지켜지는 한 수정이 필요 없다. `GuestAccountSweeperIT` 가 이 경계를 고정한다.
 
 ### 그런데 "포트에 안 넣는다"가 UI 를 자동으로 고쳐주지는 않았다 (D-106)
 

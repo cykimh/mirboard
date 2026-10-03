@@ -7,6 +7,9 @@ import com.mirboard.domain.admin.SelfReportException;
 import com.mirboard.domain.game.core.GameNotFoundException;
 import com.mirboard.domain.lobby.auth.AccountLockedException;
 import com.mirboard.domain.lobby.auth.AccountSuspendedException;
+import com.mirboard.domain.lobby.auth.GuestDisabledException;
+import com.mirboard.domain.lobby.auth.GuestForbiddenException;
+import com.mirboard.domain.lobby.auth.GuestUnavailableException;
 import com.mirboard.domain.lobby.auth.InvalidCredentialsException;
 import com.mirboard.domain.lobby.auth.InvalidPasswordException;
 import com.mirboard.domain.lobby.auth.InvalidUsernameException;
@@ -25,6 +28,7 @@ import com.mirboard.domain.lobby.room.RoomFullException;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.infra.rest.me.InvalidAvatarException;
 import java.util.Map;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -83,6 +87,30 @@ public class GlobalExceptionHandler {
         // D-86 — 정지된 계정. 403 Forbidden.
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorEnvelope.of("ACCOUNT_SUSPENDED", "정지된 계정입니다. 관리자에게 문의하세요."));
+    }
+
+    @ExceptionHandler(GuestForbiddenException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleGuestForbidden(GuestForbiddenException e) {
+        // D-117 — 게스트 금지 행위(비밀번호 변경·아바타).
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorEnvelope.of("GUEST_FORBIDDEN",
+                        "게스트 계정은 쓸 수 없는 기능입니다. 회원가입하면 쓸 수 있어요."));
+    }
+
+    @ExceptionHandler(GuestDisabledException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleGuestDisabled(GuestDisabledException e) {
+        // D-117 — 킬스위치(mirboard.guest.enabled=false).
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorEnvelope.of("GUEST_DISABLED", "지금은 게스트 입장을 받지 않습니다."));
+    }
+
+    @ExceptionHandler(GuestUnavailableException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleGuestUnavailable(GuestUnavailableException e) {
+        // D-117 — 오늘(UTC) 전역 상한 소진, 또는 상한 판정 불가(Redis 장애 — fail-closed).
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()))
+                .body(ApiErrorEnvelope.of("GUEST_UNAVAILABLE",
+                        "지금은 게스트 입장이 어렵습니다. 회원가입으로 이용해 주세요."));
     }
 
     @ExceptionHandler(ChatMessageNotFoundException.class)

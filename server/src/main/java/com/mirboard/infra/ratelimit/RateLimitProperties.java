@@ -14,12 +14,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 멈추므로 넉넉하다 — 한도를 조이는 것은 실제 트래픽 분포를 본 뒤에 한다.
  *
  * <p>{@code enabled=false} 면 전 버킷을 무제한으로 만든다(사고 시 즉시 끄기용).
+ *
+ * <p>{@code clientIpHeader} — D-117. IP 키에 쓸 클라 IP 를 읽을 <b>신뢰 헤더</b> 이름
+ * (운영 {@code Fly-Client-IP}). 비우면 {@code remoteAddr}. 해석은 {@link ClientIpResolver}.
  */
 @ConfigurationProperties("mirboard.ratelimit")
 public class RateLimitProperties {
 
     // ── 버킷 이름 상수 (어댑터의 라우팅 표가 참조) ──
     public static final String AUTH = "auth";
+    /** D-117 — 게스트 생성. IP(IPv6 /64) 당 하루 한도. */
+    public static final String GUEST = "guest";
     public static final String EXPENSIVE_WRITE = "expensive-write";
     public static final String ROOM_CREATE = "room-create";
     public static final String API_DEFAULT = "api-default";
@@ -31,6 +36,8 @@ public class RateLimitProperties {
     private static final Map<String, RateLimitPolicy> DEFAULTS = Map.of(
             // D-84 값 보존 — 인증은 IP 당 분당 20.
             AUTH, new RateLimitPolicy(AUTH, 20, Duration.ofMinutes(1)),
+            // D-117 — 게스트는 방문자마다 users 행을 만든다. 정상 리뷰어는 하루 한두 번이면 충분.
+            GUEST, new RateLimitPolicy(GUEST, 10, Duration.ofHours(24)),
             // 아바타 업로드(128px PNG → BYTEA)·비밀번호 변경(BCrypt).
             EXPENSIVE_WRITE, new RateLimitPolicy(EXPENSIVE_WRITE, 10, Duration.ofMinutes(1)),
             // 방 생성은 Lua 트랜잭션 + 봇 시드.
@@ -45,6 +52,7 @@ public class RateLimitProperties {
 
     private boolean enabled = true;
     private Map<String, Bucket> buckets = new LinkedHashMap<>();
+    private String clientIpHeader;
 
     /**
      * 버킷 정책 조회 — 설정 override 가 있으면 그것, 없으면 기본값.
@@ -69,6 +77,14 @@ public class RateLimitProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getClientIpHeader() {
+        return clientIpHeader;
+    }
+
+    public void setClientIpHeader(String clientIpHeader) {
+        this.clientIpHeader = clientIpHeader;
     }
 
     public Map<String, Bucket> getBuckets() {

@@ -27,7 +27,10 @@
 | `deadlines:{kind}` | ZSET | 12h | member=페이로드, score=만료 `epochMillis` | D-96. `DeadlineQueue`. `kind`=`turn`(member `{roomId}#{generation}`, `TurnTimeoutScheduler`) · `desertion`(member `{roomId}:{userId}`, `DesertionGraceScheduler`). 모든 인스턴스가 폴링(`mirboard.scheduling.poll-interval-millis`, 기본 250ms)하고 만료분 pop 은 `deadline_poll.lua` 로 원자화 — 한 항목은 정확히 한 인스턴스에만 간다. 같은 member 재등록 = score 갱신(= 기존 타이머 취소+재등록). `schedule()` 마다 EXPIRE 갱신 |
 | `login:fail:{username}` | STRING(INTEGER) | 윈도(기본 15m) | 로그인 연속 실패 횟수 | D-84. `INCR`+첫 실패 시 EXPIRE. 임계 초과 시 lock 설정, 성공 시 DEL |
 | `lock:login:{username}` | STRING | 잠금(기본 15m) | 잠금 마커 | D-84. 존재 시 423 ACCOUNT_LOCKED. users 스키마 비침범(휘발) |
-| `ratelimit:{bucket}:{subject}` | STRING(INTEGER) | 윈도(TTL) | 버킷별 요청 카운터 | D-90(D-84 확장). `bucket`=`auth`·`api-default`·`room-create`·`expensive-write`·`game-action`·`chat`·`reaction`·`stomp-default`. `subject`=인증 시 `u:{userId}`, 아니면 `ip:{ip}`(NAT 오탐 회피). Lua 원자 고정 윈도(`INCR`+`EXPIRE`). HTTP 초과=429, STOMP 초과=드롭(액션만 본인 큐 `ERROR(RATE_LIMITED)`). 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
+| `ratelimit:{bucket}:{subject}` | STRING(INTEGER) | 윈도(TTL) | 버킷별 요청 카운터 | D-90(D-84 확장). `bucket`=`auth`·`guest`(D-117, 24h)·`api-default`·`room-create`·`expensive-write`·`game-action`·`chat`·`reaction`·`stomp-default`. `subject`=인증 시 `u:{userId}`, 아니면 `ip:{ip}`(NAT 오탐 회피). **D-117: `/api/auth/**`(`auth`·`guest`)는 Bearer 를 실어도 항상 `ip:` 키**. IP 는 신뢰 헤더 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`, 없으면 remoteAddr)에서 읽고 IPv6 는 `x:x:x:x::/64` 로 묶는다(예: `ratelimit:guest:ip:2001:db8:1:2::/64`). `bucket` 은 원본 URI 가 아니라 MVC·Security 가 매칭하는 정규화 경로(디코딩·contextPath/`X-Forwarded-Prefix` 제외)로 고른다 — 인코딩 변형으로 버킷을 갈아타지 못하게(D-117 보정). Lua 원자 고정 윈도(`INCR`+`EXPIRE`). HTTP 초과=429(`Retry-After`=윈도 초), STOMP 초과=드롭(액션만 본인 큐 `ERROR(RATE_LIMITED)`). 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
+| `guest:issued:{yyyy-MM-dd}` | STRING(INTEGER) | 48h | 그날(UTC) 발급한 게스트 수 | D-117. `GuestAccountService` 가 생성마다 `guest_daily_issue.lua` 로 `INCR`+첫 발급 `EXPIRE 48h` 를 한 번에(원자 — 다중 인스턴스에서도 상한 초과 발급 없고, TTL 없는 날짜 키가 남지 않음). `mirboard.guest.daily-cap`(기본 200) 초과면 503 `GUEST_UNAVAILABLE`. Redis 장애면 판정 불가로 **fail-closed**(레이트리밋의 fail-open 과 반대 — 전역 상한은 비용 상한이라). 70% 도달 WARN, 첫 거절 ERROR(Sentry) |
+| `guest:sweep:lock` | STRING | 10m | 게스트 정리 스로틀 락 | D-117. `SET NX EX 600` 을 잡은 인스턴스만 `GuestAccountSweeper.sweepOnce()` 실행 — 생성 경로에서 10분에 1회 |
+| `guest:sweep:cursor` | STRING(INTEGER) | 7d | 정리 커서(마지막으로 본 users.id) | D-117. 배치가 가득 차면 마지막 id 로 전진, 덜 차면 0 으로 되돌림 — FK 위반으로 못 지우는 행(독 행)이 배치 크기 이상 쌓여도 정리가 같은 자리에서 멈추지 않는다 |
 | `chatlog:lobby` / `chatlog:room:{roomId}` | LIST(JSON) | 2h | 최근 채팅 100개 `{eventId,userId,username,message,ts}` | D-93. **신고 시 서버가 원문·작성자를 확정하기 위한 근거** — 클라가 본문을 제출하면 무고가 가능하므로(Server-Authoritative). 상시 채팅 로그 영속화가 아니다: 여기서 휘발되고 **신고된 것만** `chat_reports`(V9)로 승격. `message` 는 D-86 마스킹 적용 후 본문 |
 | `suspend:user:{userId}` | STRING | 정지 기간(TTL) | 어드민 유저 정지 마커 | D-86. 존재 시 로그인/CONNECT 차단(403 ACCOUNT_SUSPENDED). users 스키마 비침범(휘발) |
 
@@ -151,6 +154,13 @@ DISCONNECT 후에도 잔여가 남아 **탈주가 확정되지 않는다**.
 입력: `KEYS[1] = ratelimit:{bucket}:{subject}`, `ARGV = [limit, windowSeconds]`.
 `INCR` 후 카운트가 1(=윈도 첫 요청)일 때만 `EXPIRE` — 두 단계가 갈라지면 TTL 없는
 카운터가 영구 잔존해 해당 subject 가 영구 차단된다. 한도 초과 `0`, 허용 `1`.
+
+### `guest_daily_issue.lua` *(D-117)*
+입력: `KEYS[1] = guest:issued:{UTC yyyy-MM-dd}`, `ARGV[1] = ttl 초(48h)`.
+`INCR` 후 순번이 1(=그날 첫 발급)일 때만 `EXPIRE`, 새 순번을 반환한다(상한 비교·경보는
+`GuestAccountService`). `rate_limit_fixed_window.lua` 와 같은 이유로 묶는다 — `INCR` 뒤
+`EXPIRE` 가 실패하거나 프로세스가 죽으면 TTL 없는 날짜 키가 영구히 남고, 이후 요청은 순번이
+2 이상이라 다시 걸지 않는다.
 
 ### `room_seq_next.lua`
 입력: `KEYS[1]=room:{id}:seq`, `ARGV[1]=ttl 초(6h)`. `INCR` 후 `EXPIRE` 하고 새 seq 를

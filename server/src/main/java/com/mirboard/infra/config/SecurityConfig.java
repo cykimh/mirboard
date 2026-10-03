@@ -53,7 +53,9 @@ public class SecurityConfig {
                         // 401 이 반복 발생 (배포 시연에서 적발) → 비-API default-permit.
                         // ⚠️ 규약: 민감한 HTTP 엔드포인트는 반드시 /api/** 하위에 둘 것.
                         .requestMatchers(HttpMethod.POST,
-                                "/api/auth/register", "/api/auth/login").permitAll()
+                                "/api/auth/register", "/api/auth/login",
+                                // D-117 — 가입 없는 체험(게스트 생성).
+                                "/api/auth/guest").permitAll()
                         .requestMatchers("/ws/**", "/error", "/actuator/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())

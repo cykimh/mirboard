@@ -29,7 +29,12 @@
 `USERNAME_TAKEN`, `BAD_CREDENTIALS`, `ROOM_FULL`, `ROOM_NOT_FOUND`,
 `ALREADY_IN_ROOM`, `NOT_IN_ROOM`, `GAME_ALREADY_STARTED`,
 `GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`,
-`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*.
+`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*,
+`GUEST_FORBIDDEN` (403, 게스트 금지 행위), `GUEST_DISABLED` (403, 게스트 생성 꺼짐),
+`GUEST_UNAVAILABLE` (503, 게스트 일일 상한) *(D-117)*.
+
+429 응답의 `Retry-After` 는 그 버킷의 **윈도 길이(초)** 다 *(D-117 — 예전엔 고정 60)*. 예:
+`auth` 60, `guest` 86400.
 
 ---
 
@@ -63,12 +68,47 @@
   "accessToken": "eyJhbGciOi...",
   "tokenType": "Bearer",
   "expiresAt": 1715600000000,
-  "user": { "userId": 17, "username": "alice_01" }
+  "user": { "userId": 17, "username": "alice_01", "guest": false }
 }
 ```
+`user.guest` *(D-117, 가산)* — 게스트 계정이면 `true`(아래 `/api/auth/guest`). 로그인은 언제나 `false`.
+
 에러: `BAD_CREDENTIALS`, `ACCOUNT_LOCKED` (423 — 실패 누적 잠금, D-84),
 `TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84),
 `ACCOUNT_SUSPENDED` (403 — 어드민 정지, D-86).
+
+### POST `/api/auth/guest` *(D-117 — 가입 없는 체험)*
+인증 불필요. 방문자마다 **일회용 게스트 계정**(`users` 행 1개)을 만들고 로그인 응답을 바로
+준다. 공유 데모 계정(D-105)을 대체한다 — 같은 userId 를 여러 사람이 쓰면 좌석 탈취·손패
+유출이 생기기 때문이다.
+
+요청: `Content-Type: application/json` **필수**, 본문은 `{}` 이거나 비어 있다(읽지 않음).
+그 밖의 Content-Type 은 `415`. JSON 을 요구하는 이유는 크로스사이트 simple request(text/plain
+폼 전송)를 막고 브라우저가 프리플라이트를 하게 해 CORS 화이트리스트(D-83)에 걸리게 하려는 것.
+
+응답 `201` — 로그인과 같은 형태
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "tokenType": "Bearer",
+  "expiresAt": 1715600000000,
+  "user": { "userId": 812, "username": "guest-k7m2xq9p", "guest": true }
+}
+```
+- 게스트는 컬럼이 아니라 **규약**으로 식별한다(`users` 화이트리스트 불변, D-02):
+  username `guest-[a-hjkmnp-z2-9]{8}` (하이픈은 가입 정책 밖이라 위조 불가) + 로그인 불가
+  해시 + `is_bot=false`. 같은 username 으로 로그인은 항상 `401 BAD_CREDENTIALS`.
+- 토큰은 12h. 게스트는 비밀번호가 없으므로 로그아웃·만료 뒤 같은 신원으로 돌아올 수 없다.
+- 게스트 제한: 비밀번호 변경·아바타 업로드/삭제 `403 GUEST_FORBIDDEN`, 랭킹 제외, 게스트가
+  한 명이라도 낀 매치는 **전원 ELO 미적용**(승패·탈주는 기록). 채팅은 정회원과 같다.
+- 한 판도 끝내지 않은 게스트 행은 48h 뒤 서버가 지운다(끝낸 게스트는 전적 보존 때문에 남음).
+
+에러:
+- `TOO_MANY_REQUESTS` (429) — IP(IPv6 는 /64) 당 하루 10회(`guest` 버킷). `Retry-After: 86400`.
+  토큰을 실어도 IP 키다.
+- `GUEST_UNAVAILABLE` (503) — UTC 하루 전역 상한(기본 200) 소진, 또는 상한을 판정할 수 없음
+  (Redis 장애 — fail-closed). `Retry-After` = 다음 UTC 자정까지 남은 초.
+- `GUEST_DISABLED` (403) — 운영 킬스위치(`MIRBOARD_GUEST_ENABLED=false`).
 
 ### GET `/api/me`
 응답 `200`
@@ -88,7 +128,8 @@
 ```
 현재 비밀번호 재검증 → `PasswordPolicy`(8~64자) 검증 → BCrypt 재해시 후 `users.password_hash`
 갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
-에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반).
+에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반),
+`GUEST_FORBIDDEN` (403 — 게스트 계정, D-117).
 
 ---
 
@@ -281,7 +322,7 @@ tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249
 1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
-쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇 제외, 그 게임의
+쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
 rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라도 한 사람만** 싣는다.
 등록되지 않은 `gameType` 은 `404 GAME_NOT_AVAILABLE`. username 외 식별 정보 노출
 0건 — D-02 constraint.
@@ -417,10 +458,10 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 
 ### POST `/api/me/avatar`
 multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 응답 `204`.
-에러: `INVALID_AVATAR` (빈 파일/미지원 형식), 업로드 크기 초과.
+에러: `INVALID_AVATAR` (빈 파일/미지원 형식), 업로드 크기 초과, `GUEST_FORBIDDEN` (403 — 게스트, D-117).
 
 ### DELETE `/api/me/avatar`
-응답 `204` (없어도 204).
+응답 `204` (없어도 204). 에러: `GUEST_FORBIDDEN` (403 — 게스트, D-117).
 
 ### GET `/avatars/{userId}` *(공개, 비-`/api`)*
 `image/png` 바이너리 (`Cache-Control: max-age=60`), 없으면 `404`. `<img>` 직접
@@ -520,3 +561,11 @@ TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유�
 - *(D-84)* 로그인 brute-force 잠금 + 인증 엔드포인트 IP 레이트리밋. 잠금/카운터는
   전부 Redis(휘발, TTL)에 두어 `users` 스키마 불변(D-02 준수). 레이트리밋 버킷 키에
   쓰는 클라이언트 IP 는 TTL 휘발값이며 영속 로그가 아니다(위 IP 비기록 원칙과 일관).
+- *(D-117)* `/api/auth/**` 는 Bearer 유무와 무관하게 **항상 IP 키**로 레이트리밋한다(토큰을
+  이어 붙여 버킷을 갈아타는 우회 차단). IP 는 `X-Forwarded-For`·`Forwarded`(클라 위조 가능)가
+  아니라 신뢰 헤더 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`)에서 읽고,
+  IPv6 는 /64 로 묶는다. 게스트 생성 로그에도 IP 를 남기지 않는다. 버킷·대상 판정은 원본
+  URI 가 아니라 MVC·Security 가 매칭하는 경로(디코딩·`;` 파라미터 제거·contextPath 제외)로
+  한다 — `/api/auth/%67uest`·`/%61pi/auth/guest`·`X-Forwarded-Prefix` 처럼 같은 엔드포인트에
+  닿는 변형도 같은 버킷·같은 IP 키를 쓴다. 해석할 수 없거나 `%` 가 섞인 경로는 제외하지 않고
+  기본 버킷을 적용한다.

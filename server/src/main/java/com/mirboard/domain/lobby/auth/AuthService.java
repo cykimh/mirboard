@@ -55,11 +55,17 @@ public class AuthService {
     /**
      * D-85 — 본인 비밀번호 변경. 현재 비밀번호 재검증 → 새 비밀번호 정책 검증 → BCrypt 재해시.
      * 현재 비번 불일치는 {@link InvalidCredentialsException}(401), 정책 위반은
-     * {@link InvalidPasswordException}(400). users 스키마 변경 없음(password_hash 갱신만).
+     * {@link InvalidPasswordException}(400), 게스트는 {@link GuestForbiddenException}(403, D-117).
+     * users 스키마 변경 없음(password_hash 갱신만).
      */
     @Transactional
     public void changePassword(long userId, String currentPassword, String newPassword) {
         var user = userRepository.findById(userId).orElseThrow(InvalidCredentialsException::new);
+        // D-117 — 게스트는 비밀번호가 없다. sentinel 불일치(401)로 우연히 막히던 것을 정책으로
+        // 명시한다 — 403 GUEST_FORBIDDEN.
+        if (GuestPolicy.isGuest(user.getUsername())) {
+            throw new GuestForbiddenException();
+        }
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }

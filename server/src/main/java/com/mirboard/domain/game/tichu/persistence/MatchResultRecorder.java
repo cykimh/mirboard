@@ -3,6 +3,7 @@ package com.mirboard.domain.game.tichu.persistence;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.game.scoring.EloCalculator;
+import com.mirboard.domain.game.scoring.RatedMatchPolicy;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.game.tichu.TichuGameDefinition;
@@ -38,6 +39,7 @@ public class MatchResultRecorder {
     private final TichuMatchParticipantRepository participantRepo;
     private final UserGameStatsService stats;
     private final BotUserRegistry bots;
+    private final RatedMatchPolicy ratedMatchPolicy;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -45,12 +47,14 @@ public class MatchResultRecorder {
                                TichuMatchParticipantRepository participantRepo,
                                UserGameStatsService stats,
                                BotUserRegistry bots,
+                               RatedMatchPolicy ratedMatchPolicy,
                                ObjectMapper objectMapper,
                                Clock clock) {
         this.matchRepo = matchRepo;
         this.participantRepo = participantRepo;
         this.stats = stats;
         this.bots = bots;
+        this.ratedMatchPolicy = ratedMatchPolicy;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -59,8 +63,9 @@ public class MatchResultRecorder {
     @Transactional
     public void onMatchCompleted(TichuMatchCompleted event) {
         // Phase 16(#4) — 봇 포함 매치도 win/lose·match_result 는 기록하되 ELO(rating)
-        // 만 제외 (rating 인플레이션 방지). 사람 4인 매치만 ELO 반영.
-        boolean hasBots = event.playerIds().stream().anyMatch(bots::isBot);
+        // 만 제외 (rating 인플레이션 방지). D-117 — 게스트가 낀 매치도 같은 규칙.
+        // 정회원 4인 매치만 ELO 반영.
+        boolean rated = ratedMatchPolicy.eloApplies(event.playerIds());
         String payloadJson;
         try {
             payloadJson = objectMapper.writeValueAsString(Map.of(
@@ -93,10 +98,10 @@ public class MatchResultRecorder {
             if (Team.ofSeat(seat) == Team.A) teamAInput.add(input);
             else teamBInput.add(input);
         }
-        // 봇 포함 매치는 ELO 미적용 — 빈 맵이면 아래 updateRating 이 skip.
-        Map<Long, Integer> newRatings = hasBots
-                ? Map.of()
-                : EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A);
+        // 봇·게스트 포함 매치는 ELO 미적용 — 빈 맵이면 아래 record 가 rating 을 유지.
+        Map<Long, Integer> newRatings = rated
+                ? EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A)
+                : Map.of();
 
         for (int seat = 0; seat < playerIds.size(); seat++) {
             long userId = playerIds.get(seat);
@@ -120,6 +125,6 @@ public class MatchResultRecorder {
         log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, eloApplied={}, ratings={}",
                 event.roomId(), winner,
                 event.cumulativeTeamAScore(), event.cumulativeTeamBScore(),
-                event.roundScores().size(), !hasBots, newRatings);
+                event.roundScores().size(), rated, newRatings);
     }
 }

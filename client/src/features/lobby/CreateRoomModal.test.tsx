@@ -32,7 +32,7 @@ const VARIABLE: GameSummary = {
 };
 
 /** availableGames 를 한 개만 넘기면 모달이 그 게임을 자동 선택한다(Radix Select 조작 회피). */
-function openModal(games: GameSummary[]) {
+function openModal(games: GameSummary[], extra: { defaultFillWithBots?: boolean } = {}) {
   render(
     <MemoryRouter>
       <CreateRoomModal
@@ -41,6 +41,7 @@ function openModal(games: GameSummary[]) {
         availableGames={games}
         onClose={() => {}}
         onError={() => {}}
+        {...extra}
       />
     </MemoryRouter>,
   );
@@ -138,5 +139,41 @@ describe('CreateRoomModal — 방 옵션 게이팅 (D-106)', () => {
     const opts = lastCreateOpts();
     expect(opts.targetScore).toBe(1000);
     expect(opts.stake).toBe(0);
+  });
+});
+
+describe('CreateRoomModal — 봇 채우기 기본값 (D-117)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMock.mockResolvedValue({ roomId: 'room-1' });
+  });
+
+  function botCheckbox() {
+    return screen.getByRole('checkbox');
+  }
+
+  it('기본은 꺼진 채 열리고 fillWithBots=false 로 보낸다', async () => {
+    openModal([FIXED]);
+    expect(botCheckbox().getAttribute('aria-checked')).toBe('false');
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().fillWithBots).toBe(false);
+  });
+
+  it('defaultFillWithBots 면 켜진 채 열리고 fillWithBots=true 로 보낸다', async () => {
+    // 게스트는 혼자 온 리뷰어라 사람을 기다리지 않고 바로 한 판 하게.
+    openModal([FIXED], { defaultFillWithBots: true });
+    expect(botCheckbox().getAttribute('aria-checked')).toBe('true');
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().fillWithBots).toBe(true);
+  });
+
+  it('기본값이 켜져 있어도 내기를 켜면 봇은 꺼진다 (D-81 판돈 방 봇 금지)', async () => {
+    openModal([FIXED], { defaultFillWithBots: true });
+    fireEvent.click(screen.getByLabelText('판돈(내기) 켜기/끄기'));
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().fillWithBots).toBe(false);
   });
 });

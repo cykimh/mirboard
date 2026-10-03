@@ -20,10 +20,82 @@ class RateLimitRoutingTest {
         return HttpRateLimitFilter.bucketFor(req);
     }
 
+    private static boolean ipOnly(String method, String uri) {
+        return HttpRateLimitFilter.ipOnlyFor(new MockHttpServletRequest(method, uri));
+    }
+
     @Test
     void auth_endpoints_use_the_auth_bucket() {
         assertThat(httpBucket("POST", "/api/auth/login")).isEqualTo(RateLimitProperties.AUTH);
         assertThat(httpBucket("POST", "/api/auth/register")).isEqualTo(RateLimitProperties.AUTH);
+    }
+
+    @Test
+    void guest_creation_has_its_own_ip_only_bucket() {
+        // D-117 — `/api/auth/` prefix 보다 먼저 매칭돼야 auth(분당 20)가 아니라 하루 한도를 쓴다.
+        assertThat(httpBucket("POST", "/api/auth/guest")).isEqualTo(RateLimitProperties.GUEST);
+        assertThat(ipOnly("POST", "/api/auth/guest")).isTrue();
+        // 정확 일치 — 하위 경로는 일반 auth 버킷.
+        assertThat(httpBucket("POST", "/api/auth/guest/x")).isEqualTo(RateLimitProperties.AUTH);
+    }
+
+    @Test
+    void guest_bucket_defaults_to_ten_per_day() {
+        RateLimitPolicy policy = new RateLimitProperties().policy(RateLimitProperties.GUEST);
+        assertThat(policy.limit()).isEqualTo(10);
+        assertThat(policy.window()).isEqualTo(Duration.ofHours(24));
+    }
+
+    @Test
+    void auth_routes_are_ip_only_and_user_routes_are_not() {
+        // D-117 — 인증 경로는 Bearer 를 실어도 IP 키다. userId 키로 바뀌면 토큰을 이어 붙여
+        // (가입 → 그 토큰으로 또 가입) IP 버킷을 우회할 수 있었다.
+        assertThat(ipOnly("POST", "/api/auth/login")).isTrue();
+        assertThat(ipOnly("POST", "/api/auth/register")).isTrue();
+        // 인증된 사용자 경로는 그대로 userId 키(D-90 NAT 오탐 회피).
+        assertThat(ipOnly("POST", "/api/rooms")).isFalse();
+        assertThat(ipOnly("POST", "/api/me/avatar")).isFalse();
+        assertThat(ipOnly("GET", "/api/games")).isFalse();
+    }
+
+    @Test
+    void routing_judges_the_decoded_path_that_mvc_and_security_match() {
+        // D-117 보정 — 원본 URI 로 판정하면 `%67uest` 같은 인코딩 변형이 같은 컨트롤러에 닿으면서
+        // 버킷만 바뀌었다(게스트 하루 10 → auth 분당 20, auth → api-default + userId 키).
+        assertThat(httpBucket("POST", "/api/auth/%67uest")).isEqualTo(RateLimitProperties.GUEST);
+        assertThat(ipOnly("POST", "/api/auth/%67uest")).isTrue();
+        assertThat(httpBucket("POST", "/%61pi/auth/guest")).isEqualTo(RateLimitProperties.GUEST);
+        assertThat(httpBucket("POST", "/api/%61uth/register")).isEqualTo(RateLimitProperties.AUTH);
+        assertThat(ipOnly("POST", "/api/%61uth/register")).isTrue();
+    }
+
+    @Test
+    void forwarded_prefix_is_stripped_like_the_context_path() {
+        // framework 전략의 ForwardedHeaderFilter 는 `X-Forwarded-Prefix: /zz` 를 contextPath 로
+        // 바꿔 requestURI 를 `/zz/api/...` 로 만든다. MVC·Security 는 그 뒤의 경로로 매칭한다.
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/zz/api/auth/guest");
+        req.setContextPath("/zz");
+        assertThat(HttpRateLimitFilter.appliesTo(req)).isTrue();
+        assertThat(HttpRateLimitFilter.bucketFor(req)).isEqualTo(RateLimitProperties.GUEST);
+        assertThat(HttpRateLimitFilter.ipOnlyFor(req)).isTrue();
+    }
+
+    private static boolean applies(String uri) {
+        return HttpRateLimitFilter.appliesTo(new MockHttpServletRequest("GET", uri));
+    }
+
+    @Test
+    void filter_scope_leans_to_limiting_when_the_path_is_in_doubt() {
+        assertThat(applies("/api/games")).isTrue();
+        assertThat(applies("/%61pi/auth/guest")).isTrue();
+        // 정적 자산·SPA 딥링크·<img> 아바타는 그대로 제외.
+        assertThat(applies("/assets/index-abc.js")).isFalse();
+        assertThat(applies("/avatars/7")).isFalse();
+        assertThat(applies("/games/r1")).isFalse();
+        // 해석할 수 없거나 인코딩이 섞인 경로는 제외하지 않는다 — 판단이 틀릴 때 무보호보다
+        // 기본 버킷 한 칸을 쓰는 쪽이 싸다.
+        assertThat(applies("/x/%zz")).isTrue();
+        assertThat(applies("/games/%ED%8B%B0")).isTrue();
     }
 
     @Test

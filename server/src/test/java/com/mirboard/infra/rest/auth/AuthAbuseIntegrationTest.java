@@ -1,6 +1,7 @@
 package com.mirboard.infra.rest.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,6 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * D-84 — 로그인 brute-force 잠금(423) + 인증 IP 레이트리밋(429) end-to-end.
+ * D-117 — 게스트 생성의 IP 일일 한도(`guest` 버킷)와 토큰 연쇄 우회 차단.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,7 +43,9 @@ import org.testcontainers.utility.DockerImageName;
         "mirboard.ratelimit.buckets.auth.limit=5",
         "mirboard.ratelimit.buckets.auth.window=1m",
         "mirboard.ratelimit.buckets.api-default.limit=1000",
-        "mirboard.ratelimit.buckets.api-default.window=1m"
+        "mirboard.ratelimit.buckets.api-default.window=1m",
+        "mirboard.ratelimit.buckets.guest.limit=2",
+        "mirboard.ratelimit.buckets.guest.window=24h"
 })
 class AuthAbuseIntegrationTest {
 
@@ -111,5 +115,28 @@ class AuthAbuseIntegrationTest {
                 .content(body("ghost9", "whatever1")))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error.code").value("TOO_MANY_REQUESTS"));
+    }
+
+    @Test
+    void guest_creation_is_ip_rate_limited_even_with_tokens() throws Exception {
+        String token = null;
+        for (int i = 0; i < 2; i++) {
+            String json = mockMvc.perform(post("/api/auth/guest")
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            token = objectMapper.readTree(json).get("accessToken").asText();
+        }
+        // 같은 IP 3번째 → 하루 한도(2) 초과. 하루 윈도이므로 Retry-After 도 하루.
+        mockMvc.perform(post("/api/auth/guest")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "86400"))
+                .andExpect(jsonPath("$.error.code").value("TOO_MANY_REQUESTS"));
+        // 방금 받은 게스트 토큰을 실어도 userId 버킷으로 갈아타지 못한다(토큰 연쇄 차단).
+        mockMvc.perform(post("/api/auth/guest")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isTooManyRequests());
     }
 }
