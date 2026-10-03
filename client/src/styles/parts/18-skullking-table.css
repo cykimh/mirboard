@@ -583,6 +583,26 @@ html:not(.dark) .sk-table {
   font-size: 15px;
 }
 
+/* 7열이 375px 에 들어가야 한다 — 머리글이 '예/측'으로 쪼개지지 않게 nowrap 으로 두고
+ * 여백·글자를 줄인다. 그래도 넘치면(긴 이름) 래퍼가 가로 스크롤한다. */
+.sk-round-result .sk-score-table {
+  font-size: 12px;
+}
+
+.sk-round-result .sk-score-table th,
+.sk-round-result .sk-score-table td {
+  padding: 4px 3px;
+  white-space: nowrap;
+}
+
+.sk-round-result-name {
+  display: inline-block;
+  max-width: 6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
 .sk-round-result-me td {
   font-weight: 700;
   background: color-mix(in srgb, #e0b32a 16%, transparent);
@@ -616,7 +636,7 @@ html:not(.dark) .sk-table {
 
 .sk-history-table th,
 .sk-history-table td {
-  padding: 4px 8px;
+  padding: 4px 5px;
   text-align: center;
   white-space: nowrap;
   border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent);
@@ -657,7 +677,7 @@ html:not(.dark) .sk-table {
 
 .sk-history-name {
   display: inline-block;
-  max-width: 8ch;
+  max-width: 7ch;
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: bottom;

@@ -36,49 +36,53 @@ export function SkullRoundResultPanel({
   return (
     <section className="sk-round-result" aria-label={title}>
       <h3>{title}</h3>
-      <table className="sk-score-table">
-        <thead>
-          <tr>
-            <th>플레이어</th>
-            <th>예측</th>
-            <th>획득</th>
-            <th>기본</th>
-            <th>보너스</th>
-            <th>합계</th>
-            <th>누적</th>
-          </tr>
-        </thead>
-        <tbody>
-          {seats.map((seat) => {
-            const s = round.scores[seat];
-            const hit = s.bid === s.won;
-            const mine = seat === mySeat;
-            return (
-              <tr
-                key={seat}
-                className={`${hit ? 'sk-history-hit' : 'sk-history-miss'}${
-                  mine ? ' sk-round-result-me' : ''
-                }`}
-              >
-                <td>
-                  {nameOf(seat)}
-                  {mine && ' (나)'}
-                </td>
-                <td>{s.bid}</td>
-                <td>{s.won}</td>
-                <td>{signed(s.base)}</td>
-                <td>{s.bonus > 0 ? `+${s.bonus}` : hit ? '0' : '—'}</td>
-                <td>
-                  <strong>
-                    {signed(s.total)} {hit ? '✓' : '✗'}
-                  </strong>
-                </td>
-                <td>{cumulativeScores[seat] ?? 0}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="sk-history-scroll">
+        <table className="sk-score-table">
+          <thead>
+            <tr>
+              <th>플레이어</th>
+              <th>예측</th>
+              <th>획득</th>
+              <th>기본</th>
+              <th>보너스</th>
+              <th>합계</th>
+              <th>누적</th>
+            </tr>
+          </thead>
+          <tbody>
+            {seats.map((seat) => {
+              const s = round.scores[seat];
+              const hit = s.bid === s.won;
+              const mine = seat === mySeat;
+              return (
+                <tr
+                  key={seat}
+                  className={`${hit ? 'sk-history-hit' : 'sk-history-miss'}${
+                    mine ? ' sk-round-result-me' : ''
+                  }`}
+                >
+                  <td>
+                    <span className="sk-round-result-name" title={nameOf(seat)}>
+                      {nameOf(seat)}
+                    </span>
+                    {mine && <span className="sk-history-tag">(나)</span>}
+                  </td>
+                  <td>{s.bid}</td>
+                  <td>{s.won}</td>
+                  <td>{signed(s.base)}</td>
+                  <td>{s.bonus > 0 ? `+${s.bonus}` : hit ? '0' : '—'}</td>
+                  <td>
+                    <strong>
+                      {signed(s.total)} {hit ? '✓' : '✗'}
+                    </strong>
+                  </td>
+                  <td>{cumulativeScores[seat] ?? 0}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       <p className="sk-round-note">예측을 맞히지 못하면 보너스는 전부 소멸합니다.</p>
       <div className="sk-round-result-actions">
         <button
