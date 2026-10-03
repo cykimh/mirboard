@@ -22,8 +22,8 @@ import org.junit.jupiter.api.Test;
  * ({@code docs/plans/tichu-bot-heuristic.md}). 시드가 고정이라 테스트 자체는 결정적이며,
  * 아래 통계는 "이 고정 표본이 증거로 충분한가"의 근거다.
  *
- * <p>무거운 표본(랜덤 1000매치·그리디 1000딜·자가대전 200매치·기능 끄기 비교)은
- * {@link HeuristicBotEvaluationTest} 로 분리했다({@code MIRBOARD_BOT_EVAL=1}).
+ * <p>무거운 표본(랜덤 1000매치·그리디 1000딜·자가대전 보정 800매치·검증 600매치·기능 끄기
+ * 비교)은 {@link HeuristicBotEvaluationTest} 로 분리했다({@code MIRBOARD_BOT_EVAL=1}).
  */
 class HeuristicBotSimulationTest {
 

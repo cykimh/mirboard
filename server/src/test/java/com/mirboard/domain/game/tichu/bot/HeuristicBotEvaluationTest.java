@@ -73,24 +73,54 @@ class HeuristicBotEvaluationTest {
         assertThat((double) sum.positive()).isGreaterThanOrEqualTo(sum.threshold());
     }
 
-    /** 자가대전 200매치 — 선언 보정. 문턱 구간별 성공률을 함께 출력한다. */
+    /**
+     * 선언 보정 표본(in-sample) — 문턱을 고를 때 본 시드 구간. 1·2차 보정은 30000~30199,
+     * 3차 보정은 리뷰가 보정 밖으로 돌린 50000~70199 를 더했다(그래서 이 구간도 이제 보정 표본).
+     * 목표 단언은 하지 않고 구간별 성공률·문턱 구간 표만 낸다 — 목표는
+     * {@link #self_play_holdout_meets_declaration_targets} 가 보정에 쓰지 않은 시드로 단언한다.
+     */
+    private static final long[][] CALIBRATION_SEEDS = {
+            {30_000, 200}, {50_000, 200}, {60_000, 200}, {70_000, 200}};
+
+    /**
+     * 검증 표본(held-out) — 문턱을 확정한 <b>뒤에</b> 한 번만 돌리려고 정해 둔 구간. 보정에
+     * 다시 쓰면 안 된다(쓰게 되면 그 구간은 {@link #CALIBRATION_SEEDS} 로 옮기고 새 구간을 정한다).
+     */
+    private static final long HOLDOUT_FIRST_SEED = 100_000;
+    private static final int HOLDOUT_MATCHES = 600;
+
+    /** 자가대전 보정 표본 800매치 — 구간별 성공률과 문턱 구간(controls·비컨트롤 묶음)별 표. */
     @Test
-    void self_play_200_matches_calibrates_declarations() {
+    void self_play_calibration_log() {
         var calibration = new Calibration();
-        var arena = new TichuBotArena().observe(calibration);
-        var stats = new TichuBotArena.Stats();
-        var seats = new TichuBotArena.Seat[] {TichuBotArena.heuristic(), TichuBotArena.heuristic(),
-                TichuBotArena.heuristic(), TichuBotArena.heuristic()};
-        int rounds = 0;
-        for (long deck = 30_000; deck < 30_200; deck++) {
-            rounds += arena.playMatch(seats, deck, stats).rounds();
+        var total = new TichuBotArena.Stats();
+        for (long[] range : CALIBRATION_SEEDS) {
+            var stats = selfPlay(calibration, range[0], (int) range[1]);
+            System.out.printf("[D-118 eval] calibration seeds %d~%d: %s%n",
+                    range[0], range[0] + range[1] - 1, summary(stats));
+            assertThat(stats.fellBack).isZero();
+            total.tichuCalls += stats.tichuCalls;
+            total.tichuMade += stats.tichuMade;
+            total.grandCalls += stats.grandCalls;
+            total.grandMade += stats.grandMade;
         }
-        System.out.printf("[D-118 eval] self-play: 200 matches, %d rounds, tichu %d/%d (%.3f),"
-                        + " grand %d/%d (%.3f), partner-out-first %d, fellBack %d%n",
-                rounds, stats.tichuMade, stats.tichuCalls, stats.tichuRate(),
-                stats.grandMade, stats.grandCalls, stats.grandRate(),
-                stats.partnerOutFirstWhileDeclared, stats.fellBack);
+        System.out.printf("[D-118 eval] calibration total: tichu %d/%d (%.3f), grand %d/%d (%.3f)%n",
+                total.tichuMade, total.tichuCalls, total.tichuRate(),
+                total.grandMade, total.grandCalls, total.grandRate());
         calibration.print();
+    }
+
+    /**
+     * 자가대전 검증 표본 600매치 — 사전 등록 목표(티츄 ≥ 0.70, 그랜드 ≥ 0.55)를 여기서 단언한다.
+     * 문턱 구간 표는 일부러 내지 않는다(검증 표본으로 문턱을 다시 고르지 않도록).
+     */
+    @Test
+    void self_play_holdout_meets_declaration_targets() {
+        var stats = selfPlay(null, HOLDOUT_FIRST_SEED, HOLDOUT_MATCHES);
+        System.out.printf("[D-118 eval] holdout seeds %d~%d: %s%n", HOLDOUT_FIRST_SEED,
+                HOLDOUT_FIRST_SEED + HOLDOUT_MATCHES - 1, summary(stats));
+        double[] ci = wilson(stats.tichuMade, stats.tichuCalls);
+        System.out.printf("[D-118 eval] holdout tichu 95%% CI %.3f–%.3f%n", ci[0], ci[1]);
 
         assertThat(stats.fellBack).isZero();
         assertThat(stats.tichuRate()).isGreaterThanOrEqualTo(TICHU_TARGET);
@@ -100,6 +130,26 @@ class HeuristicBotEvaluationTest {
         } else {
             assertThat(stats.grandRate()).isGreaterThanOrEqualTo(GRAND_TARGET);
         }
+    }
+
+    /** @param calibration null 이면 문턱 구간을 기록하지 않는다. */
+    private static TichuBotArena.Stats selfPlay(Calibration calibration, long firstSeed, int matches) {
+        var arena = new TichuBotArena().observe(calibration);
+        var stats = new TichuBotArena.Stats();
+        var seats = new TichuBotArena.Seat[] {TichuBotArena.heuristic(), TichuBotArena.heuristic(),
+                TichuBotArena.heuristic(), TichuBotArena.heuristic()};
+        for (long deck = firstSeed; deck < firstSeed + matches; deck++) {
+            arena.playMatch(seats, deck, stats);
+        }
+        return stats;
+    }
+
+    private static String summary(TichuBotArena.Stats stats) {
+        return String.format("%d rounds, tichu %d/%d (%.3f), grand %d/%d (%.3f),"
+                        + " partner-out-first %d, fellBack %d",
+                stats.rounds, stats.tichuMade, stats.tichuCalls, stats.tichuRate(),
+                stats.grandMade, stats.grandCalls, stats.grandRate(),
+                stats.partnerOutFirstWhileDeclared, stats.fellBack);
     }
 
     /** 기능 끄기 비교: 전부 켠 휴리스틱 vs 하나 끈 휴리스틱, 듀플리케이트 500딜. */
@@ -124,7 +174,7 @@ class HeuristicBotEvaluationTest {
     // ---------- 선언 보정 로그 ----------
 
     /**
-     * 휴리스틱이 선언하는 순간의 손패 지표(그랜드=power8, 티츄=controls·losers·groups)를 남기고
+     * 휴리스틱이 선언하는 순간의 손패 지표(그랜드=power8, 티츄=controls·비컨트롤 묶음)를 남기고
      * 라운드 끝에 성패를 붙인다.
      */
     private static final class Calibration implements TichuBotArena.Observer {
@@ -142,11 +192,11 @@ class HeuristicBotEvaluationTest {
                 for (int r = 2; r <= 14; r++) {
                     if (HandPlanner.count(hand, r) == 4) power += 2;
                 }
-                pending.add(new int[] {seat, 0, power, 0, 0});
+                pending.add(new int[] {seat, 0, power, 0});
             } else if (action instanceof TichuAction.DeclareTichu) {
                 var plan = HandPlanner.plan(hand);
                 int kind = state instanceof TichuState.Dealing ? 1 : 2;
-                pending.add(new int[] {seat, kind, plan.controls(), plan.losers(), plan.size()});
+                pending.add(new int[] {seat, kind, plan.controls(), plan.size() - plan.controls()});
             }
         }
 
@@ -156,10 +206,8 @@ class HeuristicBotEvaluationTest {
                 boolean made = end.players().get(p[0]).finishedOrder() == 1;
                 String key = switch (p[1]) {
                     case 0 -> String.format("grand power8=%d", p[2]);
-                    case 1 -> String.format("tichu(패스 전) controls=%d losers=%d groups=%d",
-                            p[2], p[3], p[4]);
-                    default -> String.format("tichu(패스 후) controls=%d losers=%d groups=%d",
-                            p[2], p[3], p[4]);
+                    case 1 -> String.format("tichu(패스 전) controls=%d 비컨트롤=%d", p[2], p[3]);
+                    default -> String.format("tichu(패스 후) controls=%d 비컨트롤=%d", p[2], p[3]);
                 };
                 int[] b = buckets.computeIfAbsent(key, k -> new int[2]);
                 b[0]++;

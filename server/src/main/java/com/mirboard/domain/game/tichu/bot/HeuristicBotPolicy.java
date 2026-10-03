@@ -64,7 +64,9 @@ public final class HeuristicBotPolicy {
     static final int TICHU_MIN_OPPONENT_CARDS = 10;
     /**
      * 자가대전 보정(D-118)으로 더한 보수 조건: 티츄는 컨트롤 3개 이상, 패스 후 선언은 비컨트롤
-     * 묶음(groups − controls) 3개 이하. 초기 문턱만으로는 성공률 0.62 로 목표 0.70 미달.
+     * 묶음(groups − controls)이 3개 이하이면서 <b>컨트롤 수보다 적을 것</b>. 초기 문턱만으로는
+     * 성공률 0.62, 비컨트롤 ≤3 만으로는 보정 밖 시드에서 0.675 로 목표 0.70 미달이었다
+     * (가장 약한 구간 = controls 3·비컨트롤 3).
      */
     static final int TICHU_MIN_CONTROLS = 3;
     static final int TICHU_MAX_OPEN_GROUPS = 3;
@@ -198,7 +200,12 @@ public final class HeuristicBotPolicy {
         return plan.controls() >= plan.losers() + TICHU_MARGIN + bump
                 && plan.losers() <= TICHU_MAX_LOSERS - bump
                 && plan.controls() >= TICHU_MIN_CONTROLS
-                && plan.size() - plan.controls() <= TICHU_MAX_OPEN_GROUPS;
+                && openGroups(plan) <= Math.min(TICHU_MAX_OPEN_GROUPS, plan.controls() - 1);
+    }
+
+    /** 비컨트롤 묶음 수 — 컨트롤로 리드를 되찾을 때마다 하나씩 털어야 하는 묶음. */
+    private static int openGroups(HandPlanner.Plan plan) {
+        return plan.size() - plan.controls();
     }
 
     // ---------- 패스 ----------

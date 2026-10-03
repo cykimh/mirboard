@@ -195,6 +195,31 @@ class HeuristicBotPolicyTest {
 
             assertThat(choose(state)).isInstanceOf(TichuAction.PlayCard.class);
         }
+
+        /*
+         * 패스 후 선언의 비컨트롤 묶음 문턱(보정 3차): 비컨트롤 묶음이 컨트롤 수보다 적어야 한다.
+         * 아래 두 손은 controls 3 이고 나머지 문턱(losers·상대 장수)은 모두 통과한다.
+         */
+
+        @Test
+        void no_tichu_with_three_controls_and_three_open_groups() {
+            // 용 · A · KK | 2-7 스트레이트 · 99 · JJ — controls 3, 비컨트롤 3, losers 1
+            var state = new Table().me(Card.dragon(), n(J, 14), n(J, 13), n(S, 13), n(J, 2),
+                    n(S, 3), n(T, 4), n(P, 5), n(J, 6), n(S, 7), n(J, 9), n(S, 9), n(T, 11),
+                    n(P, 11)).size(1, 14).size(2, 14).size(3, 14).lead();
+
+            assertThat(choose(state)).isInstanceOf(TichuAction.PlayCard.class);
+        }
+
+        @Test
+        void tichu_with_three_controls_and_two_open_groups() {
+            // 용 · A · KKK | 2-9 스트레이트 · J — controls 3, 비컨트롤 2, losers 0
+            var state = new Table().me(Card.dragon(), n(J, 14), n(J, 13), n(S, 13), n(T, 13),
+                    n(J, 2), n(S, 3), n(T, 4), n(P, 5), n(J, 6), n(S, 7), n(T, 8), n(P, 9),
+                    n(T, 11)).size(1, 14).size(2, 14).size(3, 14).lead();
+
+            assertThat(choose(state)).isInstanceOf(TichuAction.DeclareTichu.class);
+        }
     }
 
     // ---------- 패스 ----------

@@ -412,7 +412,7 @@ per-room generation gen-guard + RoomActionLock 공유, BotScheduler 와 동일
 | --- | --- |
 | 그랜드티츄 (Dealing 8) | 파트너 미선언 ∧ power8(용 + 봉황 + A 수 + 2×포카드) ≥ 4 ∧ 용 또는 봉황 → 선언, 아니면 Ready |
 | 티츄 — 패스 전 (Dealing 14) | 파트너 미선언 ∧ controls ≥ losers+2 ∧ losers ≤ 2 ∧ controls ≥ 3 |
-| 티츄 — 패스 후 (Playing, 14장, 내 차례) | 파트너 미선언 ∧ 완주자 없음 ∧ 모든 상대 ≥10장 ∧ controls ≥ losers+1 ∧ losers ≤ 3 ∧ controls ≥ 3 ∧ 비컨트롤 묶음 ≤ 3. 상대가 선언했으면 앞의 두 문턱을 1씩 보수적으로. 선언은 차례를 넘기지 않는다(스케줄러가 같은 좌석을 다시 부른다) |
+| 티츄 — 패스 후 (Playing, 14장, 내 차례) | 파트너 미선언 ∧ 완주자 없음 ∧ 모든 상대 ≥10장 ∧ controls ≥ losers+1 ∧ losers ≤ 3 ∧ controls ≥ 3 ∧ 비컨트롤 묶음(groups − controls) < controls 이면서 ≤ 3. 상대가 선언했으면 앞의 두 문턱을 1씩 보수적으로. 선언은 차례를 넘기지 않는다(스케줄러가 같은 좌석을 다시 부른다) |
 | 패스 — 파트너 | 파트너 선언 → 폭탄 밖 최강 카드 / 내가 선언(또는 패스 후 선언 기준 충족) → 최저 루저 단일 / 내 controls ≤1 → 최강 카드 / 그 외 → 비컨트롤 최고 단일 |
 | 패스 — 상대 둘 | 남은 손에서 (cost(손−c), 점수카드 여부, 랭크) 최소를 차례로 2장. 약한 쪽이 toLeft(s+1). 용·봉황·폭탄 구성원·마작은 맨 뒤, 개는 파트너 미선언 ∧ 내 controls ≥2 일 때만 |
 | 리드 L1 | 손패 전체가 한 합법 조합이면 낸다 (가드면 건너뜀) |
