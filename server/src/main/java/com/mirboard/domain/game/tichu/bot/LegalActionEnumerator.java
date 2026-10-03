@@ -146,8 +146,8 @@ public final class LegalActionEnumerator {
             // 자동 플레이가 D-109 이전과 똑같이 "소원 없이 마작" 으로 남는다.
             result.add(new TichuAction.PlayCard(List.of(c)));
             if (c.is(Special.MAHJONG)) {
-                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-109). 봇은 휴리스틱 없이
-                // 균등 후보 — RandomBotPolicy 가 이 중에서 고른다.
+                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-109). 이 균등 후보는 타임아웃·
+                // 랜덤 기준선(RandomBotPolicy)용 — 휴리스틱 봇은 소원을 직접 정한다(D-118).
                 for (int r = 2; r <= 14; r++) {
                     result.add(new TichuAction.PlayCard(List.of(c), r));
                 }
