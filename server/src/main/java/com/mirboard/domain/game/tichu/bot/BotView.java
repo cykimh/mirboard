@@ -123,10 +123,6 @@ final class BotView {
         return sizes[s];
     }
 
-    TichuDeclaration declaration(int s) {
-        return declarations[s];
-    }
-
     boolean declared(int s) {
         return declarations[s] != TichuDeclaration.NONE;
     }

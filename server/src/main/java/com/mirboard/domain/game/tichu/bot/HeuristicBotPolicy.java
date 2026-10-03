@@ -9,6 +9,7 @@ import static com.mirboard.domain.game.tichu.bot.HandPlanner.count;
 import com.mirboard.domain.game.tichu.action.ActionValidator;
 import com.mirboard.domain.game.tichu.action.TichuAction;
 import com.mirboard.domain.game.tichu.action.TichuActionRejectedException;
+import com.mirboard.domain.game.tichu.card.Card;
 import com.mirboard.domain.game.tichu.hand.Hand;
 import com.mirboard.domain.game.tichu.hand.HandDetector;
 import com.mirboard.domain.game.tichu.hand.HandType;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,6 +136,7 @@ public final class HeuristicBotPolicy {
      * 수 있다(ScoreCalculator). 동률이면 비선언자, 그다음 좌석 오름차순.
      */
     private static TichuAction giveDragon(BotView v, List<TichuAction> legal) {
+        if (!v.dragonGiveMine()) return null;
         List<TichuAction> gives = filter(legal, a -> a instanceof TichuAction.GiveDragonTrick);
         if (gives.isEmpty()) return null;
         int a = Math.min(v.leftOpponent(), v.rightOpponent());
@@ -361,9 +364,8 @@ public final class HeuristicBotPolicy {
         }
         // L3 두 묶음 중 하나가 불패면 그것부터.
         if (!c.guard && c.plan.size() == 2) {
-            Candidate boss = min(filter(safe,
-                    x -> c.isBoss(x) && HandPlanner.groupCount(v.hand() & ~x.mask) <= 1),
-                    Comparator.comparingInt(x -> 0));
+            Candidate boss = first(safe,
+                    x -> c.isBoss(x) && HandPlanner.groupCount(v.hand() & ~x.mask) <= 1);
             if (boss != null) return c.play(boss);
         }
         // L4 활성 상대가 1장이면 단일을 피한다.
@@ -743,7 +745,7 @@ public final class HeuristicBotPolicy {
             .thenComparingInt(x -> x.hand.length())
             .thenComparingInt(x -> x.hand.rank());
 
-    private static com.mirboard.domain.game.tichu.card.Card card(long single) {
+    private static Card card(long single) {
         return HandPlanner.card(Long.numberOfTrailingZeros(single));
     }
 
@@ -751,7 +753,7 @@ public final class HeuristicBotPolicy {
         return new int[] {v.leftOpponent(), v.rightOpponent()};
     }
 
-    private static boolean anyOpponent(BotView v, java.util.function.IntPredicate p) {
+    private static boolean anyOpponent(BotView v, IntPredicate p) {
         for (int o : opponents(v)) {
             if (v.active(o) && p.test(o)) return true;
         }
