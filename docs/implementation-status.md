@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-115),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-121),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -155,8 +155,19 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 - 시드 봇 4명(`bot_north/east/south/west`, `is_bot=TRUE`, 로그인 불가) — V3 마이그레이션.
 - 사람 < 4명으로 시작 시 빈 좌석을 봇으로 채움(join 시 서버가 자동 ready).
-- `infra.bot.BotScheduler` 가 봇 차례에 `LegalActionEnumerator` 의 합법 수 중 선택해 적용.
-  딜레이 `mirboard.bot.delay-millis`(기본 700ms, D-76 후속 상향).
+- `infra.bot.BotScheduler` 가 봇 차례에 포트 `botAction` 을 부르고, 각 게임 어댑터가 자기 정책에
+  위임한다. 딜레이 `mirboard.bot.delay-millis`(기본 700ms, D-76 후속 상향).
+- **티츄 봇 = `HeuristicBotPolicy`(D-118)** — 공개 정보(`BotView`)만 보는 결정적 휴리스틱. 선언·패스·
+  리드·팔로우·폭탄·소원·개·용 양도·봉황을 다루고 파트너 선언 가드를 둔다. 후보는
+  `LegalActionEnumerator.enumerateFull`(기존 후보 + `ComboFinder` 조합 + 선언, `ActionValidator`
+  필터), 제안이 검증에 실패하면 `TimeoutActionPolicy` 로 폴백. 순수 시뮬레이션: 랜덤 상대 100/100,
+  그리디 기준선 듀플리케이트 200딜 Δ>0 143/186, 선언 성공률(보정 밖 시드) 티츄 0.729·그랜드 0.778.
+  `RandomBotPolicy` 는 평가 기준선으로만 남았다.
+- **스컬킹 봇 = `SkullKingBotPolicy`(D-119)** — 공개 정보 뷰(`SkullKingBotView`) → `TrickResolver`
+  기반 비복원 승률. 입찰은 기대 승수 반올림, 플레이는 가장 싼 승리 카드 또는 가장 위험한 카드 털기.
+  1:무작위 2~8인 승률 0.92~1.00, 자가대전 적중률 0.650(`rules-skullking.md` §16).
+- 두 정책 모두 예외·비합법 수를 내면 ERROR 로그 후 `timeoutAction`(최약수)으로 폴백한다.
+  `timeoutAction`·탈주 유령 자동조종은 최약수 그대로(D-104).
 - 봇 라벨은 UI에서 제거(D-76 후속), 봇 매치는 ELO 집계 제외(D-71).
 - `TurnTimeoutScheduler` 가 무응답 차례를 자동 처리.
 
@@ -231,6 +242,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 게임판: `GameTable`, `SortableHand`(@dnd-kit 손패 정렬), `CardChip`, `SeatAvatar`,
   `EffectsOverlay`, 소원/드래곤 모달.
 - 상태: Zustand 스토어(`authStore`, `tichuStore`, `roomChatStore`, `themeStore`, `effectStore`).
+- **게스트 체험(D-117)**: 로그인 화면 「게스트로 바로 체험하기」 → `POST /api/auth/guest`. 헤더 '게스트'
+  배지, 아바타·비번 변경 비활성, 로그아웃 시 "다시 들어올 수 없어요" 확인.
+- **튜토리얼(D-121)**: 게임별 레지스트리(`features/tutorial/gameTutorials.ts`) + 게임 중립
+  `TutorialDialog`/`useTutorialGate`. 진입점은 허브 게임 카드 '게임 방법', 대기실 헤더 버튼 + 그 게임
+  대기실 첫 입장 1회 자동 노출, 스컬킹 게임판 '규칙'(수동). 스컬킹은 13단계(단계마다
+  `rules-skullking.md` § 인용) + '누가 이길까?' 4문제. A2 의 허브 첫 방문 자동 노출은 여기로 옮겼다.
 - **Phase 20(D-76/77)**: Tailwind v3(`preflight:false`) + shadcn/ui(slate, CSS vars),
   라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). 게임판 기하는 `styles.css` 유지,
   좌석 컴팩트화·경기장 확대 등 후속 개선.
@@ -259,19 +276,25 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   `FLY_API_TOKEN` 미설정이면 잡이 스스로 건너뛴다. **라이브: https://mirboard.fly.dev**
   (2026-10-03, 도쿄 리전. 유휴 시 머신이 멈춰 첫 접속에 약 30초 콜드 스타트). Redis 는 Fly 자체
   앱 `mirboard-redis`(D-114), DB 는 Fly Postgres `mirboard-db`.
-- **데모 계정**: `DemoAccountSeeder`, `mirboard.demo.enabled` **기본 false**. 공개 비밀번호
-  계정이 로컬·CI 에 생기지 않도록 마이그레이션이 아닌 환경변수 게이트 시더로 둔다(D-105).
+- **게스트 체험(D-117, D-105 데모 계정 대체)**: `POST /api/auth/guest` 가 방문자마다 일회용 `users`
+  행(규약 `guest-`+sentinel 해시, D-02 불변)을 만들고 JWT 를 준다. 비번/아바타 403, 랭킹 제외,
+  게스트 포함 매치 ELO 미적용(`RatedMatchPolicy`). IP(IPv6 /64)당 하루 10회 + UTC 하루 전역 200명
+  (Lua 원자 카운터, fail-closed). 48h 미참여 게스트 자동 정리(10분 1회). 킬스위치
+  `MIRBOARD_GUEST_ENABLED`. 공유 데모 계정은 같은 계정 동시 접속이 좌석 탈취·손패 유출을 일으켜 폐기.
+- **레이트리밋 보정(D-117 ← D-90)**: `/api/auth/**` 는 Bearer 와 무관하게 항상 IP 키, 클라 IP 는
+  신뢰 헤더(운영 `Fly-Client-IP`)·IPv6 /64, 버킷·대상 판정은 원본 URI 가 아니라 디코딩·contextPath
+  제외 경로(인코딩·`X-Forwarded-Prefix` 우회 차단). 429 `Retry-After` = 버킷 윈도.
 
 ---
 
 ## 13. 테스트 현황
 
-- **서버**: **793건** (D-115 시점 실측, 실패 0). 스컬킹은 순수 305건 + 통합(JSON 왕복·봇 풀매치 IT) 포함.
+- **서버**: **966건** (D-121 시점 실측, 실패 0, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 369건(그중 Docker 불필요 365건).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
-- 스컬킹 305건은 **전부 Docker 불필요** — 순수 룰 엔진이라 `./scripts/check.sh rules` 에
-  묶여 있다(티츄 룰 단위와 함께 ~5s).
-- **클라이언트**: **286건 / 36파일** (D-115 시점 실측, 실패 0). Vitest + RTL — 스토어
+- 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹 룰 + 두 봇
+  평가, ~15s). 스컬킹 매치 기록 IT(D-115)는 Docker 가 필요해 `rules` 에서 뺐다.
+- **클라이언트**: **394건 / 43파일** (D-121 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
@@ -339,7 +362,14 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   `styles/parts/18-skullking-table.css` 에 `.sk-` 접두로 격리하고 네임스페이스 규칙을
   테스트로 기계화했다. 375×667 8인 실측 완료.
 - **매치 영속·ELO(D-115)**: 게임별 전적 테이블로 해소 — §9.
-- **남은 것**: 끊김 유예 구간 정지(D-104 한계), 라운드 점수표·봇 휴리스틱·튜토리얼(M6 후속).
+- **라운드 결과·점수표(D-120)**: 서버가 라운드 사이에 멈추지 않으므로 직전 결과는 다음 라운드 예측
+  중 비차단 패널(입력·손패 아래, 라운드별 닫기)로 보인다. `SkullKingMatchState.completedRounds`
+  (`withRoundCompleted` 단일 경로) → `TableView.completedRounds`·`matchResult` 로 resync 복원. 헤더
+  '점수표' Dialog(라운드×좌석). 이 세션에서 본 IN_GAME→FINISHED 면 게임판을 유지해 봇 방 라운드 10
+  결과를 볼 수 있다.
+- **봇(D-119)·튜토리얼(D-121)**: §6 · §11.
+- **남은 것**: 끊김 유예 구간 정지(D-104 한계), 봇 상대 모델링(8인 대 최약수 대등), 티츄 봇 방 종료
+  화면 유지.
 
 ---
 
