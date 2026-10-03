@@ -1,6 +1,7 @@
 package com.mirboard.domain.game.tichu.bot;
 
 import com.mirboard.domain.game.tichu.action.TichuAction;
+import com.mirboard.domain.game.tichu.card.Card;
 import com.mirboard.domain.game.tichu.hand.Hand;
 import com.mirboard.domain.game.tichu.hand.HandDetector;
 import com.mirboard.domain.game.tichu.state.TichuState;
@@ -15,7 +16,8 @@ import java.util.List;
  * <ul>
  *   <li>리드: {@link LegalActionEnumerator#enumerateFull} 후보 중 최다 장수 → 최저 랭크</li>
  *   <li>팔로우: 이기는 최저 비폭탄, 없으면 패스 — 파트너가 top 이어도 이긴다</li>
- *   <li>폭탄·선언·소원 없음, 최저 3장 패스, 용 트릭은 첫 상대(좌석 오름차순)에게</li>
+ *   <li>폭탄·선언·소원 없음, 실제 랭크 최저 3장 패스(봉황 14.5·용 16), 용 트릭은 첫 상대(좌석
+ *       오름차순)에게</li>
  * </ul>
  * 결정적이다.
  */
@@ -44,11 +46,27 @@ final class GreedyBaselinePolicy {
         };
     }
 
-    private static TichuAction lowestThree(List<com.mirboard.domain.game.tichu.card.Card> hand) {
+    /**
+     * 실제 랭크 최저 3장. 정규 비트 순서(개=0, 봉황=1, 마작=2, …)는 랭크 순서가 아니라서 그대로
+     * 앞 3장을 고르면 봉황을 매번 넘긴다 — 랭크 키로 다시 정렬한다(같은 랭크는 정규 순서 유지).
+     */
+    private static TichuAction lowestThree(List<Card> hand) {
         if (hand.size() < 3) return null;
-        long m = HandPlanner.mask(hand);
-        var cards = HandPlanner.cards(m);   // 정규 순서 = rank 오름차순
+        List<Card> cards = HandPlanner.cards(HandPlanner.mask(hand)).stream()
+                .sorted(Comparator.comparingInt(GreedyBaselinePolicy::rankKey))
+                .toList();
         return new TichuAction.PassCards(cards.get(0), cards.get(1), cards.get(2));
+    }
+
+    /** 랭크 ×2: 개 0, 마작 2, 일반 rank·2, 봉황 29(14.5), 용 32(16). */
+    private static int rankKey(Card c) {
+        if (c.special() == null) return c.rank() * 2;
+        return switch (c.special()) {
+            case DOG -> 0;
+            case MAHJONG -> 2;
+            case PHOENIX -> 29;
+            case DRAGON -> 32;
+        };
     }
 
     private record Play(long mask, Hand hand) {
