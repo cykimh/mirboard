@@ -30,7 +30,7 @@ export function RegisterPage() {
     try {
       await register(username, password);
       await login(username, password);
-      navigate('/games');
+      navigate('/games', { replace: true });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : '회원가입 실패';
       setError(message);

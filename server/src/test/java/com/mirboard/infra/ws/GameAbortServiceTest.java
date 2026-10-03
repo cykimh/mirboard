@@ -55,6 +55,22 @@ class GameAbortServiceTest {
         order.verify(lock).release("r1");
     }
 
+    /**
+     * 호스트가 아닌 요청은 방 액션 락을 잡기 **전에** 거절한다. 락부터 잡으면 방 밖의 인증
+     * 사용자도 POST /abort 를 반복해 라이브 방의 액션을 BUSY 로 막을 수 있다.
+     */
+    @Test
+    void a_non_host_abort_is_rejected_before_taking_the_room_lock() {
+        doThrow(new NotHostException("r1")).when(rooms).checkHostAbort("r1", 99L);
+
+        assertThatThrownBy(() -> service.abortByHost("r1", 99L))
+                .isInstanceOf(NotHostException.class);
+
+        verify(lock, never()).acquireWaiting(anyString());
+        verify(rooms, never()).abortGame(anyString(), org.mockito.ArgumentMatchers.anyLong());
+        verify(turnTimeout, never()).cancel(anyString());
+    }
+
     /** 검증 실패(호스트 아님·진행 중 아님)는 그대로 던지되 락은 놓고, 데드라인은 건드리지 않는다. */
     @Test
     void a_rejected_abort_releases_the_lock_and_keeps_the_deadline() {

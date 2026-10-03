@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
  * <p>획득은 탈주 처리와 같은 재시도({@link RoomActionLock#acquireWaiting})다. 끝내 못 잡으면
  * (비정상 경합) 거절하지 않고 <b>락 없이</b> 끝낸다 — 강제 종료는 끊긴 사람이 돌아오지 않을 때의
  * 탈출구라서다. 그 경우에만 액션 1건이 FINISHED 뒤에 적용될 수 있다(이후는 방 상태 가드로 정지).
- * 검증(호스트 여부·진행 중 여부)은 도메인 {@link RoomService} 가 락 안에서 한다.
+ * 검증(호스트 여부·진행 중 여부)은 도메인 {@link RoomService} 가 락 안에서 한다. 호스트 요청은 락을
+ * 잡기 <b>전에도</b> 한 번 검사한다 — 그러지 않으면 방 밖의 인증 사용자도 POST /abort 를 반복해
+ * 라이브 방의 락을 쥐고 실제 플레이어 액션을 BUSY 로 막을 수 있다.
  */
 @Service
 public class GameAbortService {
@@ -39,6 +41,7 @@ public class GameAbortService {
 
     /** 호스트 강제 종료 (Phase 8A). 호스트 아님·진행 중 아님은 도메인 예외 그대로. */
     public void abortByHost(String roomId, long hostUserId) {
+        rooms.checkHostAbort(roomId, hostUserId);
         abort(roomId, () -> rooms.abortGame(roomId, hostUserId));
     }
 
