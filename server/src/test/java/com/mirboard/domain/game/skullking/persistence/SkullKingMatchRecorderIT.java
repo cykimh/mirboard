@@ -7,12 +7,14 @@ import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.game.skullking.SkullKingGameDefinition;
 import com.mirboard.domain.game.skullking.event.SkullKingMatchCompleted;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
+import com.mirboard.domain.lobby.auth.GuestPolicy;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SplittableRandom;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -129,5 +131,25 @@ class SkullKingMatchRecorderIT {
         assertThat(sk(stayer).winCount()).isEqualTo(1);
         assertThat(sk(stayer).desertCount()).isZero();
         assertThat(sk(stayer).rating()).isGreaterThan(1000);
+    }
+
+    @Test
+    void match_with_guest_records_results_without_elo() {
+        // D-117 — 게스트가 낀 개인전도 승패·탈주는 누적, rating 은 전원 불변.
+        long a = human();
+        long b = human();
+        long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
+                GuestPolicy.NO_LOGIN_HASH, Clock.systemUTC())).getId();
+
+        publisher.publishEvent(new SkullKingMatchCompleted(room(), List.of(a, guest, b),
+                Map.of(0, 300, 1, 100, 2, 50), List.of(0), Set.of(2), 10));
+
+        assertThat(sk(a).winCount()).isEqualTo(1);
+        assertThat(sk(guest).loseCount()).isEqualTo(1);
+        assertThat(sk(b).loseCount()).isEqualTo(1);
+        assertThat(sk(b).desertCount()).isEqualTo(1);
+        assertThat(sk(a).rating()).isEqualTo(1000);
+        assertThat(sk(guest).rating()).isEqualTo(1000);
+        assertThat(sk(b).rating()).isEqualTo(1000);
     }
 }

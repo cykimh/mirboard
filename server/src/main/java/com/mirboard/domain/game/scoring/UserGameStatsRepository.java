@@ -11,11 +11,17 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
 
     List<UserGameStats> findByUserIdOrderByGameTypeAsc(long userId);
 
-    /** 게임별 랭킹 — 봇 제외, rating 내림차순(동점은 먼저 가입한 순). */
+    /**
+     * 게임별 랭킹 — 봇·게스트(D-117, {@code guestPattern}={@code GuestPolicy.LIKE_PATTERN}) 제외,
+     * rating 내림차순(동점은 먼저 가입한 순).
+     */
     @Query("SELECT s FROM UserGameStats s, User u"
             + " WHERE u.id = s.userId AND u.isBot = false AND s.gameType = :gameType"
+            + " AND u.username NOT LIKE :guestPattern"
             + " ORDER BY s.rating DESC, s.userId ASC")
-    List<UserGameStats> findRanking(@Param("gameType") String gameType, Pageable pageable);
+    List<UserGameStats> findRanking(@Param("gameType") String gameType,
+                                    @Param("guestPattern") String guestPattern,
+                                    Pageable pageable);
 
     /**
      * 한 매치 결과를 누적한다. 행이 없으면 기본값(1000)에서 시작하고, {@code rating} 이
