@@ -122,4 +122,18 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.authenticate("bob", "wrong-pass"))
                 .isInstanceOf(InvalidCredentialsException.class);
     }
+
+    @Test
+    void change_password_is_forbidden_for_guests_before_any_hash_check() {
+        // D-117 — 게스트는 비밀번호가 없다. sentinel 불일치로 401 이 나던 것을 정책으로 명시:
+        // 도메인에서 403 GUEST_FORBIDDEN 으로 막고 BCrypt 비교까지 가지 않는다.
+        var guest = User.create("guest-abcd2345", GuestPolicy.NO_LOGIN_HASH, CLOCK);
+        setId(guest, 9L);
+        given(userRepository.findById(9L)).willReturn(Optional.of(guest));
+
+        assertThatThrownBy(() -> service.changePassword(9L, "anything1", "newpass123"))
+                .isInstanceOf(GuestForbiddenException.class);
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(userRepository, never()).save(any());
+    }
 }

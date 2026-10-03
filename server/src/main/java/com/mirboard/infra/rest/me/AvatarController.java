@@ -3,6 +3,7 @@ package com.mirboard.infra.rest.me;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
+import com.mirboard.domain.lobby.auth.GuestPolicy;
 import com.mirboard.domain.lobby.auth.UserAvatar;
 import com.mirboard.domain.lobby.auth.UserAvatarRepository;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
  * 선택적 코스메틱 아바타(D-80). 업로드/삭제는 본인 인증(`/api/me/avatar`), 조회는
  * 게임 내 상대에게 노출되는 공개 코스메틱이라 비-`/api` 공개 경로(`/avatars/{userId}`)
  * — `<img>` 태그가 Bearer 토큰을 못 싣는 제약도 해소(카드/캐릭터 정적 에셋과 동일 모델).
+ * 게스트는 업로드/삭제 불가(D-117, 403 GUEST_FORBIDDEN).
  */
 @RestController
 public class AvatarController {
@@ -49,6 +51,8 @@ public class AvatarController {
         if (me == null) {
             throw new ResponseStatusException(UNAUTHORIZED);
         }
+        // D-117 — 익명 일회용 신원에 이미지 업로드 표면을 열지 않는다.
+        GuestPolicy.requireNotGuest(me);
         if (file == null || file.isEmpty()) {
             throw new InvalidAvatarException("파일이 비어 있습니다");
         }
@@ -68,6 +72,7 @@ public class AvatarController {
         if (me == null) {
             throw new ResponseStatusException(UNAUTHORIZED);
         }
+        GuestPolicy.requireNotGuest(me);
         if (avatars.existsById(me.userId())) {
             avatars.deleteById(me.userId());
         }

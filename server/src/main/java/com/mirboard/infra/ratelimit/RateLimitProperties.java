@@ -23,6 +23,8 @@ public class RateLimitProperties {
 
     // ── 버킷 이름 상수 (어댑터의 라우팅 표가 참조) ──
     public static final String AUTH = "auth";
+    /** D-117 — 게스트 생성. IP(IPv6 /64) 당 하루 한도. */
+    public static final String GUEST = "guest";
     public static final String EXPENSIVE_WRITE = "expensive-write";
     public static final String ROOM_CREATE = "room-create";
     public static final String API_DEFAULT = "api-default";
@@ -34,6 +36,8 @@ public class RateLimitProperties {
     private static final Map<String, RateLimitPolicy> DEFAULTS = Map.of(
             // D-84 값 보존 — 인증은 IP 당 분당 20.
             AUTH, new RateLimitPolicy(AUTH, 20, Duration.ofMinutes(1)),
+            // D-117 — 게스트는 방문자마다 users 행을 만든다. 정상 리뷰어는 하루 한두 번이면 충분.
+            GUEST, new RateLimitPolicy(GUEST, 10, Duration.ofHours(24)),
             // 아바타 업로드(128px PNG → BYTEA)·비밀번호 변경(BCrypt).
             EXPENSIVE_WRITE, new RateLimitPolicy(EXPENSIVE_WRITE, 10, Duration.ofMinutes(1)),
             // 방 생성은 Lua 트랜잭션 + 봇 시드.

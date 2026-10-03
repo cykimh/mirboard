@@ -42,6 +42,8 @@ public class HttpRateLimitFilter extends OncePerRequestFilter {
      * {@code ipOnly} 면 인증 주체를 무시하고 IP 키(D-117).
      */
     private static final List<Route> ROUTES = List.of(
+            // D-117 — 정확 일치. 아래 `/api/auth/` prefix 보다 먼저여야 하루 한도 버킷을 탄다.
+            new Route("POST", "/api/auth/guest", RateLimitProperties.GUEST, true),
             new Route("POST", "/api/auth/", RateLimitProperties.AUTH, true),
             new Route(null, "/api/me/avatar", RateLimitProperties.EXPENSIVE_WRITE, false),
             new Route("PUT", "/api/me/password", RateLimitProperties.EXPENSIVE_WRITE, false),

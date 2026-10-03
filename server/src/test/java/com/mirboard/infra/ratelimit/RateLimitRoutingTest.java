@@ -31,6 +31,22 @@ class RateLimitRoutingTest {
     }
 
     @Test
+    void guest_creation_has_its_own_ip_only_bucket() {
+        // D-117 — `/api/auth/` prefix 보다 먼저 매칭돼야 auth(분당 20)가 아니라 하루 한도를 쓴다.
+        assertThat(httpBucket("POST", "/api/auth/guest")).isEqualTo(RateLimitProperties.GUEST);
+        assertThat(ipOnly("POST", "/api/auth/guest")).isTrue();
+        // 정확 일치 — 하위 경로는 일반 auth 버킷.
+        assertThat(httpBucket("POST", "/api/auth/guest/x")).isEqualTo(RateLimitProperties.AUTH);
+    }
+
+    @Test
+    void guest_bucket_defaults_to_ten_per_day() {
+        RateLimitPolicy policy = new RateLimitProperties().policy(RateLimitProperties.GUEST);
+        assertThat(policy.limit()).isEqualTo(10);
+        assertThat(policy.window()).isEqualTo(Duration.ofHours(24));
+    }
+
+    @Test
     void auth_routes_are_ip_only_and_user_routes_are_not() {
         // D-117 — 인증 경로는 Bearer 를 실어도 IP 키다. userId 키로 바뀌면 토큰을 이어 붙여
         // (가입 → 그 토큰으로 또 가입) IP 버킷을 우회할 수 있었다.
