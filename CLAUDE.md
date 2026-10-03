@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-121까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-122까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -81,6 +81,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   (게임 튜토리얼 폴더 직접 import 금지 — `gameTutorials.test` 가 원문 검사). 자동 노출은 그 게임
   대기실 첫 입장 1회, 게임판은 수동만(타이머가 흐른다). 다이얼로그는 body 포털이라 게임판 스코프
   밖이므로 게임 토큰은 `bodyClassName` 으로 푼다(스컬킹 `.sk-tokens`).
+- **시작된 게임의 좌석은 불변 (D-122)**: 좌석 인덱스가 STOMP 좌석 판정·비공개 이벤트 라우팅·resync 의
+  기준이라, 진행 중 매치에서 탈주로 처리되지 않은 leave 는 no-op, FINISHED 방 leave 는 좌석 목록을
+  건드리지 않는다. 매치를 액션 경로 밖에서 끝내는 쪽(탈주 MATCH_ENDED·강제 종료)은 방 액션 락 안에서
+  FINISHED 전이 + 턴 데드라인 취소(`infra.ws.GameAbortService`). 리매치 여부는 `GameDefinition.supportsRematch()`
+  (기본 false, 티츄만 true).
 - **봇 정책은 게임이 소유한다 (D-118·D-119)**: 어댑터가 포트 `botAction` 을 override 해 공개 정보만
   담은 뷰를 받는 결정적 정책에 위임한다(티츄 `HeuristicBotPolicy`, 스컬킹 `SkullKingBotPolicy`).
   정책이 예외·비합법 수를 내면 ERROR 로그 후 `timeoutAction` 으로 폴백 — `timeoutAction`·탈주 유령

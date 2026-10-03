@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-121),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-122),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -201,6 +201,13 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 탈주자 패널티(`desert_count`+1·lose+1·ELO−, 봇 매치 ELO 제외)는 영속이 있는
   티츄에만 적용된다 — 스컬킹 매치 영속은 D-02 게임별 rating 분리 선행으로 별건.
 - 유예 내 복귀 시 세션 복원.
+- **좌석 고정·종료 방 정지(D-122)**: 시작된 게임의 좌석 목록은 매치가 끝나기 전엔 바뀌지 않는다 —
+  진행 중 매치의 탈주 미처리 '나가기'는 no-op, FINISHED 방 나가기는 좌석 불변(600s TTL 로 소멸).
+  resync 는 요청자가 실제 앉은 좌석의 비공개 뷰만 준다. 액션·봇·턴 타임아웃은 IN_GAME 이 아니면
+  멈추고, 탈주 MATCH_ENDED·강제 종료는 방 액션 락 안에서 FINISHED 전이 + 턴 데드라인 취소
+  (`GameAbortService`, 호스트 요청은 락 전에 사전 검증). 리매치는 게임이 선언(`supportsRematch()` —
+  티츄만)하므로 스컬킹 사람끼리 매치도 정상 종료 시 FINISHED. 남은 것: 티츄 리매치 대기 방의
+  leave 좌석 당김, 대기실 나가기와 게임 시작의 ms 단위 경합(`room_leave.lua` 원자화 후속).
 - 프레즌스는 **세션당 1회** 집계한다(D-111). 클라가 한 세션에서 방 토픽을 3개 구독하는데
   구독마다 세던 시절엔 끊긴 뒤에도 잔여 카운터가 남아 탈주가 확정되지 않았다.
 
@@ -289,12 +296,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **966건** (D-121 시점 실측, 실패 0, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 369건(그중 Docker 불필요 365건).
+- **서버**: **1014건** (D-122 시점 실측, 실패 0, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 375건(그중 Docker 불필요 371건). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹 룰 + 두 봇
   평가, ~15s). 스컬킹 매치 기록 IT(D-115)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **394건 / 43파일** (D-121 시점 실측, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **413건 / 44파일** (D-122 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
