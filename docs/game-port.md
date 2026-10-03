@@ -205,5 +205,7 @@ default Set<RoomOption> supportedRoomOptions() { return EnumSet.noneOf(RoomOptio
    `engine.actionType()` 이 대상 타입을 주고 컨트롤러가 변환한다. 목적지는 하나로 유지되어
    클라 계약은 바뀌지 않았다. 알 수 없는 판별자는 `ERROR(INVALID_ACTION)`.
 3. **봇 정책은 포트 메서드 + 게임별 override 로 분리.** `botAction(state, seat, random)` 의
-   기본 구현이 "합법 액션 균등 분포"이고 티츄는 `RandomBotPolicy` 로 override 한다. 시드
-   `Random` 은 스케줄러가 계속 보유하므로 `mirboard.bot.seed` 재현성이 유지된다.
+   기본 구현이 "합법 액션 균등 분포"이고, 티츄는 D-118 부터 `HeuristicBotPolicy` 로 override
+   한다(공개 정보만 보는 **결정적** 정책 — `random` 인자를 쓰지 않는다). 시드 `Random` 은
+   스케줄러가 계속 보유하므로 포트 기본 봇을 쓰는 게임(스컬킹)에는 `mirboard.bot.seed`
+   재현성이 그대로 남는다. 티츄는 시드와 무관하게 같은 상태면 같은 수다.

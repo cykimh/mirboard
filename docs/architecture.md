@@ -88,7 +88,8 @@ domain/
     ├── scoring/             EloCalculator (K=32, 봇 제외)
     └── tichu/               TichuGameDefinition, TichuEngine 외 다수
         ├── action/          TichuAction(sealed) + 8개 액션, ActionValidator, WishFulfillmentChecker
-        ├── bot/             BotPlayer, RandomBotPlayer, LegalActionEnumerator
+        ├── bot/             HeuristicBotPolicy(D-118), BotView, HandPlanner, ComboFinder,
+        │                    LegalActionEnumerator, TimeoutActionPolicy, RandomBotPolicy(평가 기준선)
         ├── card/            Card, Suit, Special, Wish, Deck
         ├── event/           티츄 도메인 이벤트
         ├── hand/            Hand(sealed), HandDetector, HandComparator, HandType
@@ -185,8 +186,9 @@ envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.m
 
 ### 4.4 봇 / 타임아웃 스케줄러
 
-- `infra.bot.BotScheduler` — 봇 차례에 백그라운드로 합법 액션을 선택해 적용
-  (`LegalActionEnumerator` 가 합법 수 열거). 딜레이는 `mirboard.bot.delay-millis`(기본 700ms),
+- `infra.bot.BotScheduler` — 봇 차례에 백그라운드로 액션을 선택해 적용. 선택은 포트
+  `GameEngine.botAction` 이 한다(티츄 = 공개 정보만 보는 결정적 `HeuristicBotPolicy`, D-118 /
+  포트 기본 = 합법 액션 균등 분포). 딜레이는 `mirboard.bot.delay-millis`(기본 700ms),
   봇 구동 통합 테스트는 0으로 override.
 - `infra.bot.TurnTimeoutScheduler` — 무응답 차례 자동 처리(자동 패스/스킵).
 

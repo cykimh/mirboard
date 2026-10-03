@@ -102,10 +102,10 @@ class HeuristicBotSimulationTest {
             rounds += arena.playMatch(seats, deck, stats).rounds();
         }
         System.out.printf("[D-118] self-play: 20 matches, %d rounds, tichu %d/%d (%.2f),"
-                        + " grand %d/%d, partner-out-first %d, fellBack %d%n",
+                        + " grand %d/%d, partner-out-first %d, fellBack %d, action-log hash %016x%n",
                 rounds, stats.tichuMade, stats.tichuCalls, stats.tichuRate(),
                 stats.grandMade, stats.grandCalls, stats.partnerOutFirstWhileDeclared,
-                stats.fellBack);
+                stats.fellBack, stats.actionLogHash);
 
         assertThat(stats.fellBack).isZero();
         assertThat(stats.tichuCalls).isGreaterThanOrEqualTo(20);

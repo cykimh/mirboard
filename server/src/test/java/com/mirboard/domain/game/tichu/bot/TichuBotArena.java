@@ -111,6 +111,8 @@ final class TichuBotArena {
         int partnerOutFirstWhileDeclared;
         int rounds;
         int doubleVictories;
+        /** 액션 로그 해시 — 두 JVM 실행의 결정성 비교(보조 확인)용. */
+        long actionLogHash = 17;
 
         double tichuRate() {
             return tichuCalls == 0 ? Double.NaN : (double) tichuMade / tichuCalls;
@@ -191,6 +193,7 @@ final class TichuBotArena {
             }
             state = result.newState();
             stats.actions++;
+            stats.actionLogHash = stats.actionLogHash * 31 + (seat + ":" + move.action()).hashCode();
             if (++actions > MAX_ACTIONS_PER_ROUND) {
                 throw new AssertionError("round stalled: > " + MAX_ACTIONS_PER_ROUND + " actions");
             }
