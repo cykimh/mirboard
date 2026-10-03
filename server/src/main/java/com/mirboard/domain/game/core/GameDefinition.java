@@ -35,6 +35,21 @@ public interface GameDefinition {
         return java.util.EnumSet.noneOf(RoomOption.class);
     }
 
+    /**
+     * 정상 종료한 매치 뒤에 같은 테이블에서 '한 판 더'(리매치, D-82)를 지원하는가 (D-122).
+     *
+     * <p>지원하면 사람만의 매치는 끝나도 방을 IN_GAME 으로 붙잡아 둔다 — 호스트가 같은 좌석으로
+     * 새 매치를 시작할 수 있게. 지원하지 않으면 정상 종료 때 방이 FINISHED 로 넘어간다(봇이
+     * 낀 매치는 원래부터 FINISHED). 리매치 UI 가 없는 게임이 IN_GAME 으로 남으면, 끝난 뒤의
+     * '나가기'가 탈주 판정을 거쳐 좌석 목록을 당기는 경로로 흘렀다.
+     *
+     * <p><b>기본은 false — 옵트인이다</b>({@link #supportedRoomOptions()} 와 같은 원칙). 새
+     * 게임은 한 줄도 쓰지 않아도 끝난 방이 정리된다.
+     */
+    default boolean supportsRematch() {
+        return false;
+    }
+
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
     GameEngine newEngine(GameContext ctx);
 }

@@ -261,7 +261,9 @@
 ### POST `/api/rooms/{roomId}/rematch` *(D-82)*
 호스트가 매치 종료 후 같은 4명·같은 테이블에서 '한 판 더'(리매치). 방은 IN_GAME 을 유지한
 채 새 매치를 시작하고, 방 단위 테이블 칩(`room:{id}:chips`)은 누적되며 판돈 미만 보유자는
-무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). 응답 `200` — Room.
+무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). **리매치를 지원하는 게임만**
+(`GameDefinition.supportsRematch()`, 현재 티츄만 — D-122): 지원하지 않는 게임은 사람만의
+매치도 정상 종료 때 FINISHED 가 되므로 이 호출은 `GAME_NOT_IN_PROGRESS`. 응답 `200` — Room.
 에러: `NOT_HOST`, `GAME_NOT_IN_PROGRESS`(매치가 아직 안 끝났거나 진행 중 아님), `ROOM_NOT_FOUND`.
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
@@ -370,17 +372,33 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 유일한 탈출구.
 
 응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
-방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
+방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트. D-122: 턴
+데드라인을 취소하고, 이후 액션·봇·턴 타임아웃은 방 상태 가드로 적용되지 않는다(버려진
+라운드가 더 진행되지 않음). 전이와 취소는 **방 액션 락 안에서** 한다 — 진행 중인 액션이
+있으면 그것이 끝날 때까지(최대 약 3초) 기다린 뒤 종료한다. 재시도 끝에도 락을 못 잡으면
+거절하지 않고 락 없이 종료한다(탈출구 보장, `stomp-protocol.md` 액션 처리 단계 참고).
 
 ### POST `/api/rooms/{roomId}/leave`
 응답 `204`.
 - 호스트가 떠나면 잔존 인원 중 가장 먼저 입장한 사용자가 호스트 승격.
 - 마지막 인원이 떠나면 방 삭제(`room_leave.lua` 가 players/ready/spectators
   정리). 관전자만 남았다가 0이 되면 `room_delete.lua` 로 즉시 소멸.
+- **D-122 — FINISHED 방은 좌석을 고정한다.** 나가도 `playerIds`·`hostId` 가 그대로이고
+  마지막 사람이 나가도 방이 지워지지 않는다(FINISHED 후 600s TTL 로 사라짐). 좌석 번호 =
+  `playerIds` 인덱스라, 목록을 당기면 남은 사람의 좌석·종료 화면 이름·resync 비공개 뷰가
+  다른 좌석으로 밀렸다. 나간 사람은 그 방에 묶이지 않는다 — 허브·다른 방 입장 정상
+  (`ALREADY_IN_ROOM` 은 방 단위 검사).
 - Phase 19(#3, D-75): 방이 **IN_GAME** 이고 호출자가 플레이어면 명시적
   leave 는 **탈주**로 처리 — 상대팀 승리로 매치 즉시 종료, 탈주자
   `desert_count`+1 · `lose_count`+1 · ELO 차감(봇 포함 매치는 ELO 제외,
   D-71). WAITING/FINISHED 이거나 관전자면 일반 leave/stopSpectating.
+- **D-122 — 진행 중 매치의 좌석도 고정한다.** IN_GAME 플레이어의 leave 가 탈주로 처리되지
+  않으면(이미 탈주한 좌석의 재요청 — 더블클릭이나 유예 탈주 뒤 재접속해 '나가기', 또는 방 락
+  획득 실패) 매치가 진행 중인 한 **아무것도 하지 않고** `204` 다(`playerIds` 불변). 끊김은 유예
+  탈주가 처리한다. 일반 leave 로 넘기는 것은 매치가 이미 끝난 방(티츄 사람만의 리매치 대기,
+  D-82 — 이 경로의 좌석 당김은 별건)과, 그 사이 방이 FINISHED 가 된 경우뿐이다. 진행 중에
+  목록을 당기면 STOMP 액션의 좌석 판정과 비공개 이벤트(`HAND_DEALT` 등) 라우팅이 남의 좌석을
+  가리켰다.
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
   은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
   기본 **120s**, D-79) 후 미복귀 시 탈주.
@@ -482,11 +500,16 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   앞선 라운드가 빠질 수 있다(합계는 권위값 `cumulativeScores` 를 쓴다).
 - `matchResult`: D-120 매치가 끝난 뒤에만 `{ winners: [seat], finalScores: {seat: 점수},
   roundsPlayed }`, 그 전에는 `null`. `MATCH_ENDED` payload 와 같은 모양이라 재접속·탭 전환
-  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 마지막 기록의 라운드 번호 — 탈주 조기
-  종료면 10 미만이다.
+  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 **매치가 끝날 때 매치 상태에 저장한 값**
+  (D-122)이라 `MATCH_ENDED`·DB 기록과 같다 — 탈주 조기 종료면 10 미만이다. 라운드 상태에서
+  역산하지 않는다(종료 뒤 상태가 바뀌어도 흔들리지 않게). 값이 없는 구 매치만 예전 역산.
 - 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
   마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
   resync 한다.
+- **`privateHand` 는 요청자가 실제로 앉은 좌석에만**(D-122 심층 방어, 모든 게임 공통). 좌석은
+  `playerIds` 의 인덱스인데, 게임이 시작된 뒤 목록이 정원(`capacity`)보다 줄었다면 인덱스가
+  당겨져 남의 좌석을 가리킬 수 있으므로 `privateHand: null`(관전자 뷰)을 준다. 목록에 없는
+  사람(관전자 포함)도 관전자 뷰다. FINISHED 방은 좌석을 고정하므로 정상 경로에서는 해당 없음.
 
 에러: `NOT_IN_ROOM`, `RESYNC_NOT_AVAILABLE` (게임 진행 중이 아님).
 
@@ -553,6 +576,7 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 ### POST `/api/admin/rooms/{roomId}/abort`
 어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
 와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+호스트 abort 와 같이 방 액션 락 안에서 종료하고 턴 데드라인을 취소한다(D-122).
 
 ### POST `/api/admin/users/{userId}/suspend`
 유저 정지. 본문 `{ "minutes": 60 }`(선택, 기본 60분, 1~525600 클램프). 정지 상태는 Redis

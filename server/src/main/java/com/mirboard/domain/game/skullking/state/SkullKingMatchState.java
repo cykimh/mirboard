@@ -27,6 +27,11 @@ import java.util.TreeSet;
  * @param completedRounds   정산이 끝난 라운드 기록, 1..N 순서 (D-120). 점수표·재접속 복원의
  *                          권위 원천이다. 진행 중 라운드는 정산 전이라 절대 들어오지 않는다 —
  *                          그래서 공개 전 예측값(§5)이 여기로 새지 않는다
+ * @param roundsPlayed      완주 라운드 수 — <b>매치가 끝날 때 확정해 저장</b>한다 (D-122). 진행
+ *                          중이면 null. 10라운드 완주면 10, 탈주 조기 종료면 진행 중이던 라운드의
+ *                          앞까지. 결과 뷰가 라운드 상태에서 역산하면 종료 뒤 상태가 바뀌었을 때
+ *                          (종료 뒤 남은 턴 타이머가 버려진 라운드를 끝까지 민 경로) DB 기록과
+ *                          어긋났다. 필드가 없는 구 JSON 도 null — 뷰가 예전 역산으로 떨어진다
  */
 // 모르는 필드 무시 — 다음에 필드가 늘어난 JSON 을 이 버전으로 롤백해도 읽을 수 있게 (D-120).
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -34,7 +39,8 @@ public record SkullKingMatchState(int roundNumber,
                                   int startSeat,
                                   Map<Integer, Integer> cumulativeScores,
                                   Set<Integer> desertedSeats,
-                                  List<CompletedRound> completedRounds) {
+                                  List<CompletedRound> completedRounds,
+                                  Integer roundsPlayed) {
 
     /** 매치는 10라운드 고정 (§3). 목표 점수 방식이 아니다 (§12). */
     public static final int TOTAL_ROUNDS = 10;
@@ -51,6 +57,9 @@ public record SkullKingMatchState(int roundNumber,
                 : Collections.unmodifiableSet(new TreeSet<>(desertedSeats));
         // 기록이 없던 시절(D-120 이전)에 시작된 매치의 JSON 도 읽혀야 한다 — 빈 목록.
         completedRounds = completedRounds == null ? List.of() : List.copyOf(completedRounds);
+        // roundsPlayed 는 null 이 뜻을 가진다(미확정) — 구 JSON(필드 부재)도 그대로 null 로 둔다.
+        // 끝난 매치의 구 JSON 을 여기서 역산하지 않는 것은, 기록이 없던 시절(D-120 이전) 매치는
+        // 라운드 상태 없이는 답할 수 없기 때문이다(그 역산은 뷰가 상태를 들고 한다).
     }
 
     /** 탈주가 없던 시절(D-101) 시그니처 호환 — 기존 호출부·테스트 무변경. */
@@ -64,6 +73,14 @@ public record SkullKingMatchState(int roundNumber,
                                Map<Integer, Integer> cumulativeScores,
                                Set<Integer> desertedSeats) {
         this(roundNumber, startSeat, cumulativeScores, desertedSeats, List.of());
+    }
+
+    /** 완주 라운드 수가 없던 시절(D-120) 시그니처 호환 — 미확정(null). */
+    public SkullKingMatchState(int roundNumber, int startSeat,
+                               Map<Integer, Integer> cumulativeScores,
+                               Set<Integer> desertedSeats,
+                               List<CompletedRound> completedRounds) {
+        this(roundNumber, startSeat, cumulativeScores, desertedSeats, completedRounds, null);
     }
 
     /**
@@ -126,11 +143,14 @@ public record SkullKingMatchState(int roundNumber,
         scores.forEach((seat, score) -> next.merge(seat, score.total(), Integer::sum));
         List<CompletedRound> history = new ArrayList<>(completedRounds);
         history.add(new CompletedRound(round, scores));
-        return new SkullKingMatchState(roundNumber + 1,
+        int nextRound = roundNumber + 1;
+        return new SkullKingMatchState(nextRound,
                 Math.floorMod(startSeat + 1, seatCount),
                 next,
                 desertedSeats,
-                history);
+                history,
+                // 마지막 라운드를 정산하면 매치가 끝난다 — 그 순간 완주 수를 확정한다 (D-122).
+                nextRound > TOTAL_ROUNDS ? round : null);
     }
 
     /**
@@ -146,17 +166,21 @@ public record SkullKingMatchState(int roundNumber,
         Set<Integer> next = new TreeSet<>(desertedSeats);
         next.add(seat);
         return new SkullKingMatchState(roundNumber, startSeat, cumulativeScores, next,
-                completedRounds);
+                completedRounds, roundsPlayed);
     }
 
     /**
      * 탈주 조기 종료 (§13-⑲) — 남은 라운드를 소진시켜 포트의 무인자 {@code isMatchOver()}
-     * 계약을 새 필드 없이 재사용한다. 완주 라운드 수는 호출자가 점프 전에 읽는다. 진행 중
-     * 라운드는 폐기되므로 기록에 더하지 않는다 — 기록 건수 = 완주 라운드 수.
+     * 계약을 재사용한다. 진행 중 라운드는 폐기되므로 기록에 더하지 않는다.
+     *
+     * <p>완주 라운드 수는 <b>점프 전에 여기서</b> 확정해 저장한다 (D-122) — 진행 중이던
+     * 라운드({@link #roundNumber})의 앞까지다. 정산은 끝났는데 다음 라운드 저장 전에 멈춘 방
+     * (D-120 복구 분기)도 매치가 이미 N+1 이라 N 이 나온다. 이미 끝난 매치면 확정값을 지킨다.
      */
     public SkullKingMatchState abandoned() {
+        int played = roundsPlayed != null ? roundsPlayed : roundNumber - 1;
         return new SkullKingMatchState(TOTAL_ROUNDS + 1, startSeat, cumulativeScores,
-                desertedSeats, completedRounds);
+                desertedSeats, completedRounds, played);
     }
 
     /** 아직 매치에 남아 있는 좌석 — 오름차순. */

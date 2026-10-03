@@ -56,7 +56,7 @@ class DesertionServiceTest {
     void accepted_desertion_broadcasts_and_finishes_room() {
         List<Long> players = List.of(10L, 20L, 30L, 40L);
         when(bots.isBot(10L)).thenReturn(false);
-        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(players));
         when(engines.forRoom(any())).thenReturn(engine);
         when(engine.desert(eq(0), eq(10L), any()))
@@ -70,12 +70,33 @@ class DesertionServiceTest {
         verify(lock).release("r1");
     }
 
+    /**
+     * D-122 — 탈주로 매치가 끝나면 걸려 있던 턴 데드라인을 취소한다. 남겨 두면 발화해 버려진
+     * 라운드를 자동 진행했다. 재무장(onTurnAdvanced)이 아니라 취소다.
+     */
+    @Test
+    void match_ending_desertion_cancels_the_turn_deadline() {
+        List<Long> players = List.of(10L, 20L);
+        when(bots.isBot(10L)).thenReturn(false);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(inGame(players));
+        when(engines.forRoom(any())).thenReturn(engine);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_ENDED);
+
+        service.processDesertion("r1", 10L);
+
+        verify(turnTimeout).cancel("r1");
+        verify(turnTimeout, never()).onTurnAdvanced(any());
+        verify(botScheduler, never()).scheduleBots(any());
+    }
+
     /** D-102/D-104 — 개인전 '남은 사람끼리 계속': 방 유지 + 봇/타이머 재무장. */
     @Test
     void continued_desertion_keeps_the_room_and_rearms_schedulers() {
         List<Long> players = List.of(10L, 20L, 30L, 40L);
         when(bots.isBot(10L)).thenReturn(false);
-        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(players));
         when(engines.forRoom(any())).thenReturn(engine);
         when(engine.desert(eq(0), eq(10L), any()))
@@ -95,7 +116,7 @@ class DesertionServiceTest {
     @Test
     void desertion_declined_by_game_is_noop() {
         when(bots.isBot(10L)).thenReturn(false);
-        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(List.of(10L, 20L, 30L, 40L)));
         when(engines.forRoom(any())).thenReturn(engine);
         when(engine.desert(anyInt(), anyLong(), any()))
@@ -116,14 +137,14 @@ class DesertionServiceTest {
         boolean processed = service.processDesertion("r1", 99L);
 
         assertThat(processed).isFalse();
-        verify(lock, never()).tryAcquire(any());
+        verify(lock, never()).acquireWaiting(any());
         verify(engines, never()).forRoom(any());
     }
 
     @Test
     void already_finished_room_is_idempotent_noop() {
         when(bots.isBot(10L)).thenReturn(false);
-        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
         Room finished = new Room("r1", "방", "TICHU", 10L, RoomStatus.FINISHED,
                 4, 4, List.of(10L, 20L, 30L, 40L), Set.of(), TeamPolicy.SEQUENTIAL,
                 0L, false, List.of(), 1000, 0, 0, Set.of());
@@ -140,7 +161,7 @@ class DesertionServiceTest {
     @Test
     void non_participant_is_noop() {
         when(bots.isBot(77L)).thenReturn(false);
-        when(lock.tryAcquire("r1")).thenReturn(true);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
         when(roomService.getRoom("r1")).thenReturn(inGame(List.of(10L, 20L, 30L, 40L)));
 
         boolean processed = service.processDesertion("r1", 77L);

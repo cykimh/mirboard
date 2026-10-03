@@ -4,7 +4,7 @@ import com.mirboard.domain.admin.AdminAuthorization;
 import com.mirboard.domain.admin.ChatReportService;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.auth.SuspensionService;
-import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.infra.ws.GameAbortService;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -34,16 +34,17 @@ public class AdminController {
     private static final long MAX_SUSPEND_MINUTES = 60L * 24 * 365; // 1년 상한
 
     private final AdminAuthorization adminAuth;
-    private final RoomService roomService;
     private final SuspensionService suspensions;
     private final ChatReportService chatReports;
+    private final GameAbortService aborts;
 
-    public AdminController(AdminAuthorization adminAuth, RoomService roomService,
-                          SuspensionService suspensions, ChatReportService chatReports) {
+    public AdminController(AdminAuthorization adminAuth,
+                          SuspensionService suspensions, ChatReportService chatReports,
+                          GameAbortService aborts) {
         this.adminAuth = adminAuth;
-        this.roomService = roomService;
         this.suspensions = suspensions;
         this.chatReports = chatReports;
+        this.aborts = aborts;
     }
 
     /**
@@ -76,7 +77,8 @@ public class AdminController {
     public void abortRoom(@AuthenticationPrincipal AuthPrincipal principal,
                           @PathVariable String roomId) {
         adminAuth.requireAdmin(requireUserId(principal));
-        roomService.adminAbortGame(roomId);
+        // D-122 — 방 액션 락 안에서 FINISHED 전이 + 턴 데드라인 취소(진행 중 액션과 직렬화).
+        aborts.abortByAdmin(roomId);
     }
 
     /** 유저 정지(Redis TTL, users 비침범). 정지 후 로그인/CONNECT 차단. */

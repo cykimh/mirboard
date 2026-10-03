@@ -217,11 +217,11 @@ public final class SkullKingEngine {
 
         boolean humanLeft = humanSeats.stream().anyMatch(s -> !next.desertedSeats().contains(s));
         if (next.activeSeats().size() < SkullKingMatchState.MIN_SEATS_TO_CONTINUE || !humanLeft) {
-            // 조기 종료 — 진행 중 라운드는 점수 미반영 폐기 (§13-⑲). 완주 수는 점프 전에 읽는다.
-            int roundsPlayed = next.roundNumber() - 1;
+            // 조기 종료 — 진행 중 라운드는 점수 미반영 폐기 (§13-⑲). 완주 수는 abandoned() 가
+            // 점프 전에 확정해 매치 상태에 저장한다(D-122) — 이벤트·기록·뷰가 같은 값을 읽는다.
             SkullKingMatchState ended = next.abandoned();
             events.add(new SkullKingEvent.MatchEnded(
-                    ended.winners(), ended.cumulativeScores(), roundsPlayed));
+                    ended.winners(), ended.cumulativeScores(), ended.roundsPlayed()));
             return new Desertion(state, ended, Desertion.Outcome.MATCH_ENDED, events);
         }
         SkullKingState drained = drainGhosts(state, next.desertedSeats(), events);
@@ -306,7 +306,7 @@ public final class SkullKingEngine {
                 state.roundNumber(), state.scores(), next.cumulativeScores()));
         if (next.isMatchOver()) {
             events.add(new SkullKingEvent.MatchEnded(
-                    next.winners(), next.cumulativeScores(), SkullKingMatchState.TOTAL_ROUNDS));
+                    next.winners(), next.cumulativeScores(), next.roundsPlayed()));
         }
         return new Settlement(next, events);
     }

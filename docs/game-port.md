@@ -80,6 +80,12 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 바꿨다: `MATCH_CONTINUES` 면 인프라는 이벤트만 브로드캐스트하고 방을 IN_GAME 으로 유지한
 채 봇/타임아웃을 재무장한다. 티츄는 `MATCH_ENDED`/`NOT_APPLICABLE` 만 쓴다.
 
+*(D-122)* `NOT_APPLICABLE` 을 받은 '나가기'를 인프라가 일반 leave(좌석 목록 `LREM`)로 넘기는
+것은 **`isMatchOver()` 가 true 일 때뿐**이다(티츄 리매치 대기). 매치가 진행 중이면 — 예컨대
+`MATCH_CONTINUES` 게임에서 이미 탈주한 좌석이 다시 '나가기' — 좌석을 그대로 둔다. 진행 중
+매치의 좌석 인덱스는 액션 좌석 판정·비공개 이벤트 라우팅이 쓰므로 당기면 손패가 남에게 간다.
+새 게임은 이미 탈주한 좌석에 `NOT_APPLICABLE` 을 돌려주면 된다(별도 처리 불필요).
+
 `GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
 `(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
@@ -175,6 +181,25 @@ default Set<RoomOption> supportedRoomOptions() { return EnumSet.noneOf(RoomOptio
 
 교훈은 §0 과 같은 종류다 — 포트를 뽑았다고 게임 결합이 사라지지는 않는다. **어디에 남았는지
 측정해야 보인다.** 이번엔 실제로 앱을 띄워 스컬킹 방을 만들어 보고서야 드러났다.
+
+### 리매치도 게임이 선언한다 (D-122)
+
+같은 종류의 결합이 매치 종료 처리에도 남아 있었다. `MatchProgressService` 는 "사람만의 매치면
+방을 IN_GAME 으로 둔다"(D-82 리매치 대기)를 **모든 게임**에 적용했는데, 리매치('한 판 더')는
+티츄의 내기 테이블 장치다. 스컬킹 사람끼리 방은 끝난 뒤에도 IN_GAME 으로 남았고, 그 상태의
+'나가기'는 탈주 판정(해당 없음) → 일반 leave 로 흘러 좌석 목록을 당겼다 — 남은 사람의 종료
+패널 이름이 밀리고, resync 가 다른 좌석의 비공개 뷰를 줄 수 있었다.
+
+```java
+default boolean supportsRematch() { return false; }
+```
+
+- **기본 false(옵트인)** — `supportedRoomOptions()` 와 같은 원칙. 새 게임은 한 줄도 안 쓰면
+  정상 종료한 방이 FINISHED 로 넘어간다. 티츄만 `true`.
+- 인프라 규칙: 매치가 끝나면 방을 FINISHED 로 만든다. **예외는 하나** — 봇이 없고 게임이
+  리매치를 지원할 때(리매치 대기, IN_GAME 유지).
+- `RoomOption` 이 아니라 메서드인 이유: 방 생성 때 사용자가 고르는 설정이 아니라 게임 구조의
+  성질이다. UI 게이팅도 없다(리매치 버튼은 지원 게임의 게임판에만 있다).
 
 ## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 

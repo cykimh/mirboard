@@ -121,22 +121,30 @@ public final class SkullKingStateMapper {
     }
 
     /**
-     * 매치 결과. 승자·최종 점수는 매치 상태의 권위값이고, 완주 라운드 수는 마지막 기록의
-     * 번호다 — 조기 종료는 진행 중 라운드를 기록하지 않으므로 이 값이 엔진의
-     * {@code MatchEnded.roundsPlayed} 와 같아진다. 기록이 없는 구 매치(D-120 이전 JSON)는
-     * 상태로 역산한다: RoundEnd 면 그 라운드까지 완주, 아니면 진행 중이던 라운드의 앞까지.
+     * 매치 결과. 승자·최종 점수·완주 라운드 수 모두 매치 상태의 권위값이다 — 완주 수는 매치가
+     * 끝날 때 저장한 값이라(D-122) 엔진의 {@code MatchEnded.roundsPlayed}·DB 기록과 같다.
+     * 라운드 상태에서 역산하지 않는 이유: 종료 뒤에도 상태가 바뀔 수 있었다(남은 턴 타이머가
+     * 버려진 라운드를 RoundEnd 까지 밀면 0 이 1 이 됐다).
+     *
+     * <p>값이 없는 구 JSON(D-122 이전에 끝난 매치)만 예전 방식으로 떨어진다: 마지막 기록의
+     * 번호, 기록도 없으면(D-120 이전) RoundEnd 는 그 라운드까지, 아니면 진행 중이던 라운드의 앞까지.
      */
     private static MatchResultView matchResult(SkullKingState state, SkullKingMatchState match) {
-        List<SkullKingMatchState.CompletedRound> history = match.completedRounds();
-        int roundsPlayed;
-        if (!history.isEmpty()) {
-            roundsPlayed = history.get(history.size() - 1).roundNumber();
-        } else if (state instanceof SkullKingState.RoundEnd) {
-            roundsPlayed = state.roundNumber();
-        } else {
-            roundsPlayed = state.roundNumber() - 1;
-        }
+        int roundsPlayed = match.roundsPlayed() != null
+                ? match.roundsPlayed()
+                : legacyRoundsPlayed(state, match);
         return new MatchResultView(match.winners(), match.cumulativeScores(), roundsPlayed);
+    }
+
+    /** D-122 이전에 끝난 매치의 완주 수 역산 — 구 JSON 호환 전용. */
+    private static int legacyRoundsPlayed(SkullKingState state, SkullKingMatchState match) {
+        List<SkullKingMatchState.CompletedRound> history = match.completedRounds();
+        if (!history.isEmpty()) {
+            return history.get(history.size() - 1).roundNumber();
+        }
+        return state instanceof SkullKingState.RoundEnd
+                ? state.roundNumber()
+                : state.roundNumber() - 1;
     }
 
     /** 좌석별 점수 내역 → 뷰. total 은 컴포넌트가 아니라 메서드라 여기서 명시로 싣는다. */

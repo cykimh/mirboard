@@ -172,6 +172,34 @@ class SkullKingGameEngineCompletedRoundsTest {
             assertThat(result.finalScores()).isEqualTo(ended.finalScores());
         }
 
+        /**
+         * D-122 — 1라운드 도중 탈주로 조기 종료(완주 0)된 뒤 라운드 상태가 RoundEnd(1) 까지
+         * 굴러가도(종료 뒤 남은 턴 타이머가 버려진 라운드를 진행시키던 경로) 결과는 0라운드다.
+         * 상태로 역산하면 1 이 나와, 재동기화한 종료 패널이 DB(0)와 어긋났다.
+         */
+        @Test
+        void rounds_played_is_fixed_at_the_end_even_if_the_round_later_reaches_round_end() {
+            SkullKingEngine rules = new SkullKingEngine(new GameContext("r1", PLAYERS));
+            SkullKingMatchState match = SkullKingMatchState.initial(3, 0);
+            SkullKingState state = rules.startRound(match, new Random(7)).newState();
+            SkullKingEngine.Desertion first = rules.desert(state, match, 0, Set.of(0, 1, 2));
+            SkullKingEngine.Desertion second = rules.desert(
+                    first.newState(), first.matchState(), 1, Set.of(0, 1, 2));
+            assertThat(second.outcome()).isEqualTo(SkullKingEngine.Desertion.Outcome.MATCH_ENDED);
+            SkullKingEvent.MatchEnded ended = second.events().stream()
+                    .filter(SkullKingEvent.MatchEnded.class::isInstance)
+                    .map(SkullKingEvent.MatchEnded.class::cast)
+                    .findFirst().orElseThrow();
+            when(matchStates.load("r1")).thenReturn(Optional.of(second.matchState()));
+
+            SkullKingStateMapper.MatchResultView result = publicView(roundEnd(1)).matchResult();
+
+            assertThat(ended.roundsPlayed()).isZero();
+            assertThat(result.roundsPlayed())
+                    .as("종료 시점에 저장한 값 — 이후 라운드 상태와 무관")
+                    .isEqualTo(ended.roundsPlayed());
+        }
+
         /** 기록 없는 구 JSON 매치 — 라운드 수를 상태로 역산한다(MatchEnded 와 같은 값). */
         @Test
         void rounds_played_falls_back_to_the_state_without_history() {

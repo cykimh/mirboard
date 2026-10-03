@@ -142,6 +142,31 @@ class SkullKingJsonRoundTripTest {
         assertThat(b.roundNumber()).isEqualTo(2);
     }
 
+    // ---------- D-122 — 완주 라운드 수 ----------
+
+    @Test
+    void ended_match_round_trips_its_rounds_played() throws Exception {
+        SkullKingMatchState ended = SkullKingMatchState.initial(2, 0).abandoned();
+
+        String json = mapper.writeValueAsString(ended);
+
+        assertThat(json).contains("\"roundsPlayed\":0");
+        assertThat(mapper.readValue(json, SkullKingMatchState.class)).isEqualTo(ended);
+    }
+
+    /** 구 JSON(D-122 이전) — 필드 부재는 null(미확정)로 읽혀 뷰가 예전 역산으로 떨어진다. */
+    @Test
+    void old_json_without_rounds_played_reads_as_unset() throws Exception {
+        String old = "{\"roundNumber\":11,\"startSeat\":0,"
+                + "\"cumulativeScores\":{\"0\":10,\"1\":0},\"desertedSeats\":[1],"
+                + "\"completedRounds\":[]}";
+
+        SkullKingMatchState match = mapper.readValue(old, SkullKingMatchState.class);
+
+        assertThat(match.isMatchOver()).isTrue();
+        assertThat(match.roundsPlayed()).isNull();
+    }
+
     /**
      * 롤백 안전 — 다음에 필드가 늘어도 이 버전이 그 JSON 을 읽을 수 있어야 한다. 기본
      * {@code ObjectMapper} 는 모르는 필드에서 실패하므로 어노테이션이 실제로 일한다.

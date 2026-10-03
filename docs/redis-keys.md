@@ -12,11 +12,11 @@
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
 | `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정·불변 |
-| `room:{roomId}:players` | LIST | 6h | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index |
+| `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함) |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함) | 직렬화 책임은 GameEngine |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
-| `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
+| `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120)·`roundsPlayed`(완주 라운드 수, 매치가 끝날 때 확정 — 진행 중·구 JSON 은 `null`, D-122) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
 | `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(리매치 시 유지), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
@@ -97,6 +97,13 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 
 처리:
+0. **D-122 — `status=FINISHED` 면 좌석을 고정한다.** players 에 userId 가 없으면 `-2`,
+   있으면 `SREM ready userId`·`SREM spectators userId` 만 하고 **현재 좌석 수**(불변)를
+   반환한다. `LREM`·호스트 승격·빈 방 파괴를 하지 않는다 — 방은 `room_finish.lua` 가 건
+   600s TTL 로 사라진다. 이유: 좌석 번호 = 목록 인덱스라 `LREM` 이 남은 사람의 `indexOf` 를
+   다른 좌석으로 당겼다(종료 패널 이름 밀림, resync 가 남의 비공개 뷰를 반환). 나간 사람은
+   목록에 남지만 `ALREADY_IN_ROOM` 은 방 단위 검사라 다른 방 입장에는 영향이 없다.
+   아래 1~4 는 WAITING·IN_GAME 만 탄다(동작 불변).
 1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM).
 2. `players` 빈 리스트면 `DEL room players ready spectators` 및
    `ZREM rooms:open` → `0`(방 파괴). D-74: ready, D-75: spectators 도
@@ -104,6 +111,13 @@ room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 3. 호스트가 떠났다면 `LINDEX players 0` 으로 새 호스트 지정 후 `HSET room hostId`.
    (state/hand/seq 키는 게임별 cleanup·TTL 로 소멸 — leave 스크립트 비관여.)
 4. 남은 인원 수(또는 `0`) 반환.
+
+> IN_GAME 의 `LREM` 은 스크립트에 남아 있지만, 호출 측이 **매치가 끝난 방에서만** 여기로
+> 보낸다(D-122). `RoomController.leave` 는 IN_GAME 플레이어의 탈주가 처리되지 않았을 때(이미
+> 탈주한 좌석의 재요청·락 획득 실패) 엔진 포트의 `isMatchOver()` 가 false 면 스크립트를 부르지
+> 않는다 — 진행 중 매치의 좌석 인덱스는 STOMP 좌석 판정·비공개 이벤트 라우팅이 쓴다. 남는
+> 경로는 티츄 사람만의 리매치 대기 방(D-82)의 leave 하나이고, 리매치 흐름과 얽혀 별건이다. 그
+> 경우에 대비해 resync 는 좌석 목록이 정원보다 줄었으면 비공개 뷰를 주지 않는다(`api.md` resync).
 
 ### `room_delete.lua` *(Phase 19 #1, D-75)*
 입력: `KEYS = [room, players, room:{id}:ready, room:{id}:spectators,
@@ -114,10 +128,12 @@ spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 �
 호출. 방 존재 시 `1`, 없으면 `0` 반환.
 
 ### `room_finish.lua`
-입력: `KEYS = [room:{id}, rooms:open]`, `ARGV = [roomId, now]`.
+입력: `KEYS = [room:{id}, rooms:open, room:{id}:players, room:{id}:ready,
+room:{id}:spectators]`, `ARGV = [roomId, now]`.
 `status=FINISHED` + `ZREM rooms:open` + 방 메타 TTL 을 **600s 로 단축**(결과 화면이
-머무를 시간만 남기고 자연 만료). 방 없으면 `-1`, 성공 `1`. state/hand 정리는 호출자
-(게임별 cleanup) 몫.
+머무를 시간만 남기고 자연 만료). D-122: players·ready·spectators 도 같은 600s 로 줄인다 —
+FINISHED 방은 마지막 leave 로 파괴되지 않으므로(좌석 고정) 그대로 두면 6h 남는다. 방 없으면
+`-1`, 성공 `1`. state/hand 정리는 호출자(게임별 cleanup) 몫.
 
 ### `presence_join.lua` *(D-111)*
 입력: `KEYS = [presence:room:{roomId}, presence:session:{sessionId}]`,
