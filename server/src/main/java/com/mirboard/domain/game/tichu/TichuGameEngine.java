@@ -6,8 +6,8 @@ import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.tichu.action.TichuAction;
+import com.mirboard.domain.game.tichu.bot.HeuristicBotPolicy;
 import com.mirboard.domain.game.tichu.bot.LegalActionEnumerator;
-import com.mirboard.domain.game.tichu.bot.RandomBotPolicy;
 import com.mirboard.domain.game.tichu.bot.TimeoutActionPolicy;
 import com.mirboard.domain.game.tichu.event.TichuEvent;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
@@ -165,13 +165,13 @@ public final class TichuGameEngine implements GameEngine {
     }
 
     /**
-     * {@link RandomBotPolicy} 에 위임 — 포트 기본값(합법 액션 균등 분포)과 결과는 같지만
-     * 정책이 게임 쪽에 남아 있어야 휴리스틱을 넣을 자리가 생긴다. 시드 재현성은 호출자가
-     * 넘긴 {@code random} 인스턴스가 유지한다.
+     * D-118 — {@link HeuristicBotPolicy} 에 위임한다. 공개 정보만 보는 결정적 정책이라
+     * {@code random} 인자는 쓰지 않는다(같은 상태면 같은 수 — {@code mirboard.bot.seed} 는
+     * 포트 기본 봇을 쓰는 게임에만 의미가 남는다).
      */
     @Override
     public GameAction botAction(GameState state, int seat, Random random) {
-        return new RandomBotPolicy(random).choose(tichuState(state), seat);
+        return HeuristicBotPolicy.choose(tichuState(state), seat);
     }
 
     @Override
