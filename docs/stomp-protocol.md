@@ -191,6 +191,15 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 > 이벤트 type 문자열은 게임 간 재사용된다(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
 > 게임을 하나만 가지므로 충돌이 없다. 클라(S6)는 방의 `gameType` 으로 스토어를 고른다.
 
+> **D-120 — 라운드 사이에 서버는 멈추지 않는다.** `ROUND_ENDED` 직후 **같은 배치**로 다음
+> 라운드의 `BIDDING_STARTED`(+ 비공개 `HAND_DEALT`)가 나간다. 그래서 클라는 직전 라운드
+> 결과를 `ROUND_END` 단계가 아니라 **다음 라운드 Bidding 동안** 비차단 패널로 보여 준다.
+> `ROUND_ENDED` 는 클라 점수표에 라운드 번호 기준으로 **upsert** 하는 라이브 패치이고,
+> 권위값은 resync 의 `tableView.completedRounds` 다(통째 교체). `MATCH_ENDED` 의 권위값은
+> `tableView.matchResult` — 둘 다 payload 는 그대로이고 진실원만 명시한 것이다. 봇 방은
+> 매치 종료 직후 방 메타가 `FINISHED` 로 바뀌는데(메타 토픽과 게임 토픽은 순서가 보장되지
+> 않는다), 클라는 이 세션에서 본 IN_GAME→FINISHED 전이면 게임판을 내리지 않는다.
+
 ### 액션 처리 단계 (서버)
 1. 방 조회 → 좌석 도출(비참가자는 `ERROR(NOT_IN_ROOM)`), `gameType` 으로 엔진 획득
    (`GameEngineProvider.forRoom`).

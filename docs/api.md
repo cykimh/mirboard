@@ -401,6 +401,52 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   라운드 내역을 통째로 교체하므로(append 아님), 재접속·새 기기에서도 내역이 온전하다.
   끝난 라운드가 없으면 `[]`.
 
+**스컬킹(`gameType=SKULL_KING`)의 `tableView`** — 봉투(`roomId`·`phase`·`eventSeq`·
+`disconnectedSeats`·`chips`)는 같고 `tableView`/`privateHand` 모양만 게임별로 다르다(D-98).
+서버 `SkullKingStateMapper.TableView`, 클라 `types/skullking.ts` 미러와 1:1. 아래는
+라운드 3 이 끝나고 라운드 4 를 예측하는 중이다.
+```json
+{
+  "phase": "BIDDING",
+  "roundNumber": 4,
+  "handSize": 4,
+  "startSeat": 3,
+  "currentTurnSeat": -1,
+  "seats": [
+    { "seat": 0, "handCount": 4, "hasBid": true,  "bid": null, "tricksWon": 0 },
+    { "seat": 1, "handCount": 4, "hasBid": false, "bid": null, "tricksWon": 0 }
+  ],
+  "trick": [],
+  "cumulativeScores": { "0": 50, "1": -10 },
+  "desertedSeats": [],
+  "roundScores": {},
+  "completedRounds": [
+    { "roundNumber": 1, "scores": {
+        "0": { "bid": 0, "won": 0, "base": 10, "bonus": 0, "total": 10 },
+        "1": { "bid": 1, "won": 0, "base": -10, "bonus": 0, "total": -10 } } },
+    { "roundNumber": 2, "scores": { "0": { "bid": 1, "won": 1, "base": 20, "bonus": 0, "total": 20 },
+                                    "1": { "bid": 0, "won": 0, "base": 20, "bonus": 0, "total": 20 } } },
+    { "roundNumber": 3, "scores": { "0": { "bid": 1, "won": 1, "base": 20, "bonus": 0, "total": 20 },
+                                    "1": { "bid": 2, "won": 0, "base": -20, "bonus": 0, "total": -20 } } }
+  ],
+  "matchResult": null
+}
+```
+- `seats[].bid`: 전원 제출 전(BIDDING)에는 항상 `null` — 제출 여부만 `hasBid` 로 공개(§5).
+  본인 값은 `privateHand.myBid`(`{ seat, hand: SkullCard[], myBid }`)로만 온다.
+- `completedRounds`: D-120 **정산이 끝난 라운드** 기록(순서 = 라운드 1..N). 진행 중 라운드는
+  절대 담기지 않으므로 공개 전 예측값이 이 경로로 새지 않는다. 바로 위 `roundScores` 와
+  혼동 주의 — 그쪽은 **현재 라운드**의 정산 내역이고 `ROUND_END` 에만 채워진다. 클라는 이
+  값으로 점수표를 통째로 교체한다. 끝난 라운드가 없으면 `[]`. D-120 이전에 시작된 매치는
+  앞선 라운드가 빠질 수 있다(합계는 권위값 `cumulativeScores` 를 쓴다).
+- `matchResult`: D-120 매치가 끝난 뒤에만 `{ winners: [seat], finalScores: {seat: 점수},
+  roundsPlayed }`, 그 전에는 `null`. `MATCH_ENDED` payload 와 같은 모양이라 재접속·탭 전환
+  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 마지막 기록의 라운드 번호 — 탈주 조기
+  종료면 10 미만이다.
+- 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
+  마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
+  resync 한다.
+
 에러: `NOT_IN_ROOM`, `RESYNC_NOT_AVAILABLE` (게임 진행 중이 아님).
 
 ---
