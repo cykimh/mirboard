@@ -50,7 +50,7 @@ Usage: ./scripts/check.sh <subcommand> [args]
 
   fast              빠른 회귀 (클라 tsc+vitest + 서버 compile, ~30s)
                     pre-commit hook 과 동일 로직.
-  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량, ~5s)
+  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량 + 봇 강도 평가, ~15s)
                     Docker 불필요.
   server            서버 풀 (단위 + IT, Docker 필요, ~1m20s)
   client            클라 풀 (build:check + test + build, ~10s)
