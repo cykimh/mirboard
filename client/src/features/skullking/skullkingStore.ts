@@ -4,11 +4,13 @@ import type {
   BidsRevealedPayload,
   BiddingStartedPayload,
   CardPlayedPayload,
+  CompletedRoundView,
   HandDealtPayload,
   MatchEndedPayload,
   PlayedCardView,
   PlayingStartedPayload,
   RoundEndedPayload,
+  RoundScorePayload,
   RoundScoreView,
   SeatDesertedPayload,
   SeatView,
@@ -45,6 +47,12 @@ export interface SkullKingRoomState {
   cumulativeScores: Record<number, number>;
   desertedSeats: number[];
   roundScores: Record<number, RoundScoreView>;
+  /**
+   * 끝난 라운드 기록, 라운드 번호 순 (D-120). resync 의 `completedRounds` 가 권위값이라
+   * 통째로 교체하고, 라이브 `ROUND_ENDED` 는 같은 번호 기준 upsert 로만 덧댄다 — 그래서
+   * 재접속을 몇 번 하든 중복 누적이 구조적으로 불가능하다.
+   */
+  completedRounds: CompletedRoundView[];
 
   // ── 본인 전용 ──
   mySeat: number;
@@ -60,7 +68,6 @@ export interface SkullKingRoomState {
   // ── 메타 ──
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
-  roundEnded: RoundEndedPayload | null;
   matchEnded: MatchEndedPayload | null;
   turnStartedAt: number;
 }
@@ -95,6 +102,7 @@ const INITIAL: SkullKingRoomState = {
   cumulativeScores: {},
   desertedSeats: [],
   roundScores: {},
+  completedRounds: [],
   mySeat: -1,
   hand: [],
   myBid: null,
@@ -102,7 +110,6 @@ const INITIAL: SkullKingRoomState = {
   tigressDeclaration: null,
   disconnectedSeats: new Set(),
   errorMessage: null,
-  roundEnded: null,
   matchEnded: null,
   turnStartedAt: 0,
 };
@@ -110,6 +117,69 @@ const INITIAL: SkullKingRoomState = {
 /** 예측값이 공개된 구간인가 (§5) — BIDDING 이면 아직 비공개. */
 export function bidsRevealed(state: SkullKingRoomState): boolean {
   return state.phase !== null && state.phase !== 'BIDDING';
+}
+
+/**
+ * 직전 라운드 결과 — 결과 패널·내 정보줄 '직전' 값이 읽는 순수 셀렉터 (D-120).
+ *
+ * 서버는 라운드 사이에 멈추지 않는다(`ROUND_ENDED` 와 다음 라운드 `BIDDING_STARTED` 가 한
+ * 배치). 그래서 결과는 **다음 라운드 예측 중**에 보여 준다. 번호를 대칭으로 확인하는 것이
+ * 요점이다 — 기록이 한 라운드 늦거나 빠진 과도 상태에서 엉뚱한 라운드를 "직전"이라 부르지
+ * 않는다.
+ *
+ * - 매치 종료면 null (종료 패널이 대신한다)
+ * - ROUND_END: 마지막 기록이 이 라운드면 그것, 아니면 `roundScores` 로 합성한다. 잠금 없는
+ *   resync 가 RoundEnd 저장과 매치 저장 사이에 끼면 기록이 아직 없기 때문이다
+ * - BIDDING: 마지막 기록이 바로 앞 라운드일 때만
+ * - 그 외(PLAYING) null
+ */
+export function lastRoundResult(
+  s: Pick<
+    SkullKingRoomState,
+    'matchEnded' | 'phase' | 'roundNumber' | 'completedRounds' | 'roundScores'
+  >,
+): CompletedRoundView | null {
+  if (s.matchEnded) return null;
+  const last = s.completedRounds[s.completedRounds.length - 1] ?? null;
+  if (s.phase === 'ROUND_END') {
+    if (last && last.roundNumber === s.roundNumber) return last;
+    if (Object.keys(s.roundScores).length === 0) return null;
+    return { roundNumber: s.roundNumber, scores: s.roundScores };
+  }
+  if (s.phase === 'BIDDING') {
+    return last && last.roundNumber === s.roundNumber - 1 ? last : null;
+  }
+  return null;
+}
+
+/**
+ * 이벤트 payload 의 좌석 점수 → 뷰. 서버 `RoundScore` 는 컴포넌트가 4개라 `total` 이 오지
+ * 않는다 — 파생한다(resync 경로에는 명시로 온다).
+ */
+function toScoreViews(
+  scores: Record<number, RoundScorePayload>,
+): Record<number, RoundScoreView> {
+  const views: Record<number, RoundScoreView> = {};
+  Object.entries(scores).forEach(([seat, s]) => {
+    views[Number(seat)] = {
+      bid: s.bid,
+      won: s.won,
+      base: s.base,
+      bonus: s.bonus,
+      total: s.total ?? s.base + s.bonus,
+    };
+  });
+  return views;
+}
+
+/** 같은 라운드 번호는 덮어쓰고 번호 순으로 정렬한 새 배열. */
+function upsertRound(
+  rounds: CompletedRoundView[],
+  round: CompletedRoundView,
+): CompletedRoundView[] {
+  return [...rounds.filter((r) => r.roundNumber !== round.roundNumber), round].sort(
+    (a, b) => a.roundNumber - b.roundNumber,
+  );
 }
 
 /** 좌석 하나만 갱신한 새 배열. */
@@ -142,6 +212,8 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
         cumulativeScores: t.cumulativeScores ?? {},
         desertedSeats: t.desertedSeats ?? [],
         roundScores: t.roundScores ?? {},
+        // D-120 — 권위값으로 통째 교체(append 아님). 필드가 없는 구 응답이면 빈 목록.
+        completedRounds: t.completedRounds ?? [],
         lastSeq: snap.eventSeq,
         // 관전자는 privateHand 가 null 이다 (서버 계약).
         mySeat: snap.privateHand?.seat ?? -1,
@@ -152,12 +224,15 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
         turnStartedAt: Date.now(),
         // settledTrick 은 보존한다 — resync 가 승자 왕관을 지우면 방금 트릭을 누가
         // 가져갔는지 화면에서 사라진다.
-        matchEnded: null,
-        roundEnded: null,
+        // D-120 — 매치 결과도 서버 권위값이다. 예전엔 null 로 덮어 재접속·탭 전환 뒤
+        // 종료 패널이 사라졌다.
+        matchEnded: t.matchResult ?? null,
       });
     },
 
     applyPrivateHand(payload) {
+      // D-122 — 끝난 매치의 손패는 갈지 않는다 (applyEvent 의 잔여 이벤트 가드와 같은 이유).
+      if (get().matchEnded) return;
       set({
         mySeat: payload.seat,
         hand: payload.cards,
@@ -170,6 +245,22 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
     applyEvent(envelope) {
       const { type, seq, payload } = envelope;
       const state = get();
+
+      // D-122 — 매치가 끝났으면 이후 게임 이벤트는 반영하지 않는다. 탈주 조기 종료·강제
+      // 종료 뒤에도 서버 턴 타이머·봇이 버려진 라운드를 이어 가던 결함이 있었는데, D-120 이
+      // 종료 뒤에도 게임판을 유지하므로 그 이벤트가 종료 패널 위에서 '내 차례'를 다시 세우고
+      // 트릭 레일을 움직였다. 서버가 원인을 막고, 여기는 심층 방어다 — 단 MATCH_ENDED 를 받은
+      // 경우(탈주 조기 종료·정상 종료)만 덮는다. 강제 종료는 MATCH_ENDED 를 내지 않으므로 서버
+      // 쪽 정지(D-122 c)가 유일한 방어다. resync 도 부르지 않는다
+      // ('ignored') — 권위값은 applySnapshot 으로만 들어오고, 그쪽은 이 가드 밖이다.
+      // 연결 상태 배지는 게임 진행이 아니라 그대로 반영한다.
+      if (
+        state.matchEnded &&
+        type !== 'PLAYER_DISCONNECTED' &&
+        type !== 'PLAYER_RECONNECTED'
+      ) {
+        return 'ignored';
+      }
 
       let verdict: ApplyEventResult = 'applied';
       if (seq !== undefined) {
@@ -193,7 +284,8 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
           trick: [],
           settledTrick: null,
           roundScores: {},
-          roundEnded: null,
+          // completedRounds 는 건드리지 않는다 — 직전 라운드 결과를 이 예측 단계 동안
+          // 보여 주는 것이 D-120 의 요점이다.
           myBid: null,
           selectedIndex: null,
           tigressDeclaration: null,
@@ -306,22 +398,17 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
 
         case 'ROUND_ENDED': {
           const p = payload as RoundEndedPayload;
-          // 이벤트 payload 에는 total 이 없다(서버 RoundScore 컴포넌트 4개) — 파생한다.
-          const scores: Record<number, RoundScoreView> = {};
-          Object.entries(p.scores).forEach(([seat, s]) => {
-            scores[Number(seat)] = {
-              bid: s.bid,
-              won: s.won,
-              base: s.base,
-              bonus: s.bonus,
-              total: s.total ?? s.base + s.bonus,
-            };
-          });
+          const scores = toScoreViews(p.scores);
           set({
             phase: 'ROUND_END',
             roundScores: scores,
             cumulativeScores: p.cumulativeScores,
-            roundEnded: p,
+            // 라이브 패치 — 권위값은 resync 의 completedRounds 다. 같은 라운드를 다시
+            // 받아도(resync 로 lastSeq 가 되감긴 경우) 한 건만 남도록 upsert 한다.
+            completedRounds: upsertRound(state.completedRounds, {
+              roundNumber: p.roundNumber,
+              scores,
+            }),
             currentTurnSeat: -1,
             ...advance,
           });

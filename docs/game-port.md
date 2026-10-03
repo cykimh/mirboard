@@ -80,6 +80,12 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 바꿨다: `MATCH_CONTINUES` 면 인프라는 이벤트만 브로드캐스트하고 방을 IN_GAME 으로 유지한
 채 봇/타임아웃을 재무장한다. 티츄는 `MATCH_ENDED`/`NOT_APPLICABLE` 만 쓴다.
 
+*(D-122)* `NOT_APPLICABLE` 을 받은 '나가기'를 인프라가 일반 leave(좌석 목록 `LREM`)로 넘기는
+것은 **`isMatchOver()` 가 true 일 때뿐**이다(티츄 리매치 대기). 매치가 진행 중이면 — 예컨대
+`MATCH_CONTINUES` 게임에서 이미 탈주한 좌석이 다시 '나가기' — 좌석을 그대로 둔다. 진행 중
+매치의 좌석 인덱스는 액션 좌석 판정·비공개 이벤트 라우팅이 쓰므로 당기면 손패가 남에게 간다.
+새 게임은 이미 탈주한 좌석에 `NOT_APPLICABLE` 을 돌려주면 된다(별도 처리 불필요).
+
 `GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
 `(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
@@ -120,7 +126,7 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 | --- | --- |
 | 팀(`Team` enum) | 개인전 게임이 다수 |
 | 칩/판돈(D-82) | 티츄 매치 종료에 묶인 별건. 신규 게임은 `stake=0` 으로 시작 |
-| ELO | `users.rating` 단일 컬럼이라 게임별 분리는 스키마 결정(D-02 검토 필요) |
+| ELO·전적 | 게임별 `user_game_stats`(D-115)에 각 게임의 매치 기록기가 직접 쓴다. 공통 규칙은 `domain.game.scoring`(`RatedMatchPolicy`·`EloCalculator`·`UserGameStatsService`) — 아래 "매치 기록기 계약" *(D-115 정정: 예전 이 행은 "`users.rating` 단일 컬럼이라 스키마 결정 필요"였다)* |
 | 좌석 수 4 고정 | 가변으로 감 — §3 |
 | 트릭·리드수트 | 트릭테이킹 계열만의 개념 — 포트에 없음. *(D-101 정정: 티츄 트릭 모델은 조합 기반(`Hand`·passedSeats·wish)이고 리드수트 개념이 없어 교집합 0 — 공유 모듈 없이 스컬킹 전용 `domain/game/skullking/trick/` 으로 구현됐다)* |
 
@@ -129,6 +135,23 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 "어느 팀이 이겼는가"에 붙어 있어서 포트로 올리려면 팀 개념을 다시 끌어올려야 하고, 신규
 게임은 `stake=0` 으로 시작하므로 지금 일반화하면 **쓰이지 않는 추상**이 된다. 스컬킹에
 내기를 붙이는 시점에 "승자 집합"만 다루는 게임 중립 정산 이벤트를 별건으로 검토한다.
+
+### 매치 기록기 계약 (D-115·D-117)
+
+ELO·전적은 포트 밖이지만, 새 게임의 매치 기록기(`MatchResultRecorder`·`SkullKingMatchRecorder`
+같은, 게임별 매치 종료 이벤트 리스너)는 다음 두 가지를 지켜야 한다.
+
+1. **ELO 적용 여부는 `RatedMatchPolicy.eloApplies(playerIds)` 하나로 판정한다.** 봇(D-71)이나
+   게스트(D-117)가 한 명이라도 낀 매치는 전원 미적용이다(승패·탈주는 기록). 조건을 기록기마다
+   따로 쓰면 한쪽만 고쳐진다 — 실제로 D-117 전에는 두 기록기에 `hasBots` 가 각각 있었다.
+2. **비봇 참가자마다 `user_game_stats` 행을 남긴다**(`UserGameStatsService.record`, ELO 미적용이면
+   `newRating=null`). 게스트 정리(`GuestAccountSweeper`)가 이 행을 "매치를 끝낸 증거"로 쓴다.
+   참가자 테이블에만 쓰고 stats 를 빠뜨리면, 그 게스트는 48h 뒤 정리 대상이 됐다가 참가자 FK
+   때문에 삭제가 매번 실패한다(그 행만 건너뛰고 warn — 정리 자체는 커서로 계속 진행).
+
+`users` 를 FK 로 참조하는 테이블을 **매치와 무관한 용도**(신고·역할처럼)로 새로 만들면
+`UserRepository.findExpiredGuestIds` 에 `NOT EXISTS` 를 더할 것. 매치 참가자 테이블은 2번이
+지켜지는 한 수정이 필요 없다. `GuestAccountSweeperIT` 가 이 경계를 고정한다.
 
 ### 그런데 "포트에 안 넣는다"가 UI 를 자동으로 고쳐주지는 않았다 (D-106)
 
@@ -158,6 +181,25 @@ default Set<RoomOption> supportedRoomOptions() { return EnumSet.noneOf(RoomOptio
 
 교훈은 §0 과 같은 종류다 — 포트를 뽑았다고 게임 결합이 사라지지는 않는다. **어디에 남았는지
 측정해야 보인다.** 이번엔 실제로 앱을 띄워 스컬킹 방을 만들어 보고서야 드러났다.
+
+### 리매치도 게임이 선언한다 (D-122)
+
+같은 종류의 결합이 매치 종료 처리에도 남아 있었다. `MatchProgressService` 는 "사람만의 매치면
+방을 IN_GAME 으로 둔다"(D-82 리매치 대기)를 **모든 게임**에 적용했는데, 리매치('한 판 더')는
+티츄의 내기 테이블 장치다. 스컬킹 사람끼리 방은 끝난 뒤에도 IN_GAME 으로 남았고, 그 상태의
+'나가기'는 탈주 판정(해당 없음) → 일반 leave 로 흘러 좌석 목록을 당겼다 — 남은 사람의 종료
+패널 이름이 밀리고, resync 가 다른 좌석의 비공개 뷰를 줄 수 있었다.
+
+```java
+default boolean supportsRematch() { return false; }
+```
+
+- **기본 false(옵트인)** — `supportedRoomOptions()` 와 같은 원칙. 새 게임은 한 줄도 안 쓰면
+  정상 종료한 방이 FINISHED 로 넘어간다. 티츄만 `true`.
+- 인프라 규칙: 매치가 끝나면 방을 FINISHED 로 만든다. **예외는 하나** — 봇이 없고 게임이
+  리매치를 지원할 때(리매치 대기, IN_GAME 유지).
+- `RoomOption` 이 아니라 메서드인 이유: 방 생성 때 사용자가 고르는 설정이 아니라 게임 구조의
+  성질이다. UI 게이팅도 없다(리매치 버튼은 지원 게임의 게임판에만 있다).
 
 ## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 
@@ -205,5 +247,12 @@ default Set<RoomOption> supportedRoomOptions() { return EnumSet.noneOf(RoomOptio
    `engine.actionType()` 이 대상 타입을 주고 컨트롤러가 변환한다. 목적지는 하나로 유지되어
    클라 계약은 바뀌지 않았다. 알 수 없는 판별자는 `ERROR(INVALID_ACTION)`.
 3. **봇 정책은 포트 메서드 + 게임별 override 로 분리.** `botAction(state, seat, random)` 의
-   기본 구현이 "합법 액션 균등 분포"이고 티츄는 `RandomBotPolicy` 로 override 한다. 시드
-   `Random` 은 스케줄러가 계속 보유하므로 `mirboard.bot.seed` 재현성이 유지된다.
+   기본 구현이 "합법 액션 균등 분포"다. 두 게임 모두 이를 결정적 휴리스틱으로 override 한다 —
+   티츄는 `HeuristicBotPolicy`(D-118), 스컬킹은 `SkullKingBotPolicy`(D-119). 둘 다 공개 정보만
+   보고 `random` 인자를 쓰지 않으므로 같은 상태면 같은 수다(`rules-tichu.md` §16 ·
+   `rules-skullking.md` §16). 시드 `Random` 은 스케줄러가 계속 보유하므로 포트 기본 봇을 쓰는
+   새 게임에는 `mirboard.bot.seed` 재현성이 그대로 남는다.
+   **새 게임 권장 패턴**: 봇 정책은 공개 정보만 담은 뷰를 받아 `legalActions` 의 원소를
+   고르고, 어댑터는 정책이 예외·null·비합법 액션을 내면 ERROR 로그 후 `timeoutAction` 으로
+   폴백한다 — 턴 제한 0 방에선 스케줄러가 재시도하지 않아 정책 버그가 방 정지로 이어진다.
+   `timeoutAction`(사람·탈주 좌석 대리)은 봇 정책과 섞지 않는다.

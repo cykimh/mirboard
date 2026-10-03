@@ -12,14 +12,14 @@
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
 | `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정·불변 |
-| `room:{roomId}:players` | LIST | 6h | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index |
+| `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함) |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함) | 직렬화 책임은 GameEngine |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
-| `match:{roomId}:state` | STRING(JSON) | 6h | `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore | Phase 5c 추가, 라운드 전환 시 유지 |
-| `room:{roomId}:ready` | SET | 6h | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
+| `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120)·`roundsPlayed`(완주 라운드 수, 매치가 끝날 때 확정 — 진행 중·구 JSON 은 `null`, D-122) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
+| `room:{roomId}:ready` | SET | 6h (FINISHED 후 600s) | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(리매치 시 유지), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
-| `room:{roomId}:spectators` | SET | 6h | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
+| `room:{roomId}:spectators` | SET | 6h (FINISHED 후 600s) | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 | `SET key NX EX 2` |
 | `presence:room:{roomId}` | HASH | 6h | `userId` → 해당 방을 보고 있는 **세션 수** | D-96(D-111 보정). `RoomPresence`. 방 토픽 SUBSCRIBE 시 `presence_join.lua` 로 **세션당 1회만** `HINCRBY +1`, DISCONNECT 시 `presence_leave.lua` 로 −1(0 이면 `HDEL`, 빈 HASH 면 키 자체 `DEL`). **boolean 이 아니라 카운터** — 탭 두 개 중 하나만 닫아도 접속 중이어야 탈주 오판이 없다. 탈주 유예 만료 시 "재접속했는가"(`hasLiveSession`) 판정의 근거 |
@@ -27,7 +27,10 @@
 | `deadlines:{kind}` | ZSET | 12h | member=페이로드, score=만료 `epochMillis` | D-96. `DeadlineQueue`. `kind`=`turn`(member `{roomId}#{generation}`, `TurnTimeoutScheduler`) · `desertion`(member `{roomId}:{userId}`, `DesertionGraceScheduler`). 모든 인스턴스가 폴링(`mirboard.scheduling.poll-interval-millis`, 기본 250ms)하고 만료분 pop 은 `deadline_poll.lua` 로 원자화 — 한 항목은 정확히 한 인스턴스에만 간다. 같은 member 재등록 = score 갱신(= 기존 타이머 취소+재등록). `schedule()` 마다 EXPIRE 갱신 |
 | `login:fail:{username}` | STRING(INTEGER) | 윈도(기본 15m) | 로그인 연속 실패 횟수 | D-84. `INCR`+첫 실패 시 EXPIRE. 임계 초과 시 lock 설정, 성공 시 DEL |
 | `lock:login:{username}` | STRING | 잠금(기본 15m) | 잠금 마커 | D-84. 존재 시 423 ACCOUNT_LOCKED. users 스키마 비침범(휘발) |
-| `ratelimit:{bucket}:{subject}` | STRING(INTEGER) | 윈도(TTL) | 버킷별 요청 카운터 | D-90(D-84 확장). `bucket`=`auth`·`api-default`·`room-create`·`expensive-write`·`game-action`·`chat`·`reaction`·`stomp-default`. `subject`=인증 시 `u:{userId}`, 아니면 `ip:{ip}`(NAT 오탐 회피). Lua 원자 고정 윈도(`INCR`+`EXPIRE`). HTTP 초과=429, STOMP 초과=드롭(액션만 본인 큐 `ERROR(RATE_LIMITED)`). 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
+| `ratelimit:{bucket}:{subject}` | STRING(INTEGER) | 윈도(TTL) | 버킷별 요청 카운터 | D-90(D-84 확장). `bucket`=`auth`·`guest`(D-117, 24h)·`api-default`·`room-create`·`expensive-write`·`game-action`·`chat`·`reaction`·`stomp-default`. `subject`=인증 시 `u:{userId}`, 아니면 `ip:{ip}`(NAT 오탐 회피). **D-117: `/api/auth/**`(`auth`·`guest`)는 Bearer 를 실어도 항상 `ip:` 키**. IP 는 신뢰 헤더 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`, 없으면 remoteAddr)에서 읽고 IPv6 는 `x:x:x:x::/64` 로 묶는다(예: `ratelimit:guest:ip:2001:db8:1:2::/64`). `bucket` 은 원본 URI 가 아니라 MVC·Security 가 매칭하는 정규화 경로(디코딩·contextPath/`X-Forwarded-Prefix` 제외)로 고른다 — 인코딩 변형으로 버킷을 갈아타지 못하게(D-117 보정). Lua 원자 고정 윈도(`INCR`+`EXPIRE`). HTTP 초과=429(`Retry-After`=윈도 초), STOMP 초과=드롭(액션만 본인 큐 `ERROR(RATE_LIMITED)`). 클라 IP 는 휘발 카운터 키(영속 로그 아님) |
+| `guest:issued:{yyyy-MM-dd}` | STRING(INTEGER) | 48h | 그날(UTC) 발급한 게스트 수 | D-117. `GuestAccountService` 가 생성마다 `guest_daily_issue.lua` 로 `INCR`+첫 발급 `EXPIRE 48h` 를 한 번에(원자 — 다중 인스턴스에서도 상한 초과 발급 없고, TTL 없는 날짜 키가 남지 않음). `mirboard.guest.daily-cap`(기본 200) 초과면 503 `GUEST_UNAVAILABLE`. Redis 장애면 판정 불가로 **fail-closed**(레이트리밋의 fail-open 과 반대 — 전역 상한은 비용 상한이라). 70% 도달 WARN, 첫 거절 ERROR(Sentry) |
+| `guest:sweep:lock` | STRING | 10m | 게스트 정리 스로틀 락 | D-117. `SET NX EX 600` 을 잡은 인스턴스만 `GuestAccountSweeper.sweepOnce()` 실행 — 생성 경로에서 10분에 1회 |
+| `guest:sweep:cursor` | STRING(INTEGER) | 7d | 정리 커서(마지막으로 본 users.id) | D-117. 배치가 가득 차면 마지막 id 로 전진, 덜 차면 0 으로 되돌림 — FK 위반으로 못 지우는 행(독 행)이 배치 크기 이상 쌓여도 정리가 같은 자리에서 멈추지 않는다 |
 | `chatlog:lobby` / `chatlog:room:{roomId}` | LIST(JSON) | 2h | 최근 채팅 100개 `{eventId,userId,username,message,ts}` | D-93. **신고 시 서버가 원문·작성자를 확정하기 위한 근거** — 클라가 본문을 제출하면 무고가 가능하므로(Server-Authoritative). 상시 채팅 로그 영속화가 아니다: 여기서 휘발되고 **신고된 것만** `chat_reports`(V9)로 승격. `message` 는 D-86 마스킹 적용 후 본문 |
 | `suspend:user:{userId}` | STRING | 정지 기간(TTL) | 어드민 유저 정지 마커 | D-86. 존재 시 로그인/CONNECT 차단(403 ACCOUNT_SUSPENDED). users 스키마 비침범(휘발) |
 
@@ -94,6 +97,13 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 
 처리:
+0. **D-122 — `status=FINISHED` 면 좌석을 고정한다.** players 에 userId 가 없으면 `-2`,
+   있으면 `SREM ready userId`·`SREM spectators userId` 만 하고 **현재 좌석 수**(불변)를
+   반환한다. `LREM`·호스트 승격·빈 방 파괴를 하지 않는다 — 방은 `room_finish.lua` 가 건
+   600s TTL 로 사라진다. 이유: 좌석 번호 = 목록 인덱스라 `LREM` 이 남은 사람의 `indexOf` 를
+   다른 좌석으로 당겼다(종료 패널 이름 밀림, resync 가 남의 비공개 뷰를 반환). 나간 사람은
+   목록에 남지만 `ALREADY_IN_ROOM` 은 방 단위 검사라 다른 방 입장에는 영향이 없다.
+   아래 1~4 는 WAITING·IN_GAME 만 탄다(동작 불변).
 1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM).
 2. `players` 빈 리스트면 `DEL room players ready spectators` 및
    `ZREM rooms:open` → `0`(방 파괴). D-74: ready, D-75: spectators 도
@@ -101,6 +111,16 @@ room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 3. 호스트가 떠났다면 `LINDEX players 0` 으로 새 호스트 지정 후 `HSET room hostId`.
    (state/hand/seq 키는 게임별 cleanup·TTL 로 소멸 — leave 스크립트 비관여.)
 4. 남은 인원 수(또는 `0`) 반환.
+
+> IN_GAME 의 `LREM` 은 스크립트에 남아 있지만, 호출 측이 **매치가 끝난 방에서만** 여기로
+> 보낸다(D-122). `RoomController.leave` 는 IN_GAME 플레이어의 탈주가 처리되지 않았을 때(이미
+> 탈주한 좌석의 재요청·락 획득 실패) 엔진 포트의 `isMatchOver()` 가 false 면 스크립트를 부르지
+> 않는다 — 진행 중 매치의 좌석 인덱스는 STOMP 좌석 판정·비공개 이벤트 라우팅이 쓴다. 남는
+> 경로는 둘이다. ① 티츄 사람만의 리매치 대기 방(D-82)의 leave — 리매치 흐름과 얽혀 별건.
+> ② 대기실(WAITING) 나가기·끊김과 마지막 준비(`room_ready.lua` 의 IN_GAME 전이)가 몇 ms 안에 겹치는
+> 경합 — 컨트롤러 검사가 원자적이지 않아 이 스크립트의 IN_GAME `LREM` 이 실행될 수 있다(기존 경합,
+> 후속: 스크립트가 IN_GAME 에서 거절하고 리매치 대기 폴백만 플래그로 허용). 두 경우에 대비해 resync 는
+> 좌석 목록이 정원보다 줄었으면 비공개 뷰를 주지 않는다(`api.md` resync).
 
 ### `room_delete.lua` *(Phase 19 #1, D-75)*
 입력: `KEYS = [room, players, room:{id}:ready, room:{id}:spectators,
@@ -111,10 +131,12 @@ spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 �
 호출. 방 존재 시 `1`, 없으면 `0` 반환.
 
 ### `room_finish.lua`
-입력: `KEYS = [room:{id}, rooms:open]`, `ARGV = [roomId, now]`.
+입력: `KEYS = [room:{id}, rooms:open, room:{id}:players, room:{id}:ready,
+room:{id}:spectators]`, `ARGV = [roomId, now]`.
 `status=FINISHED` + `ZREM rooms:open` + 방 메타 TTL 을 **600s 로 단축**(결과 화면이
-머무를 시간만 남기고 자연 만료). 방 없으면 `-1`, 성공 `1`. state/hand 정리는 호출자
-(게임별 cleanup) 몫.
+머무를 시간만 남기고 자연 만료). D-122: players·ready·spectators 도 같은 600s 로 줄인다 —
+FINISHED 방은 마지막 leave 로 파괴되지 않으므로(좌석 고정) 그대로 두면 6h 남는다. 방 없으면
+`-1`, 성공 `1`. state/hand 정리는 호출자(게임별 cleanup) 몫.
 
 ### `presence_join.lua` *(D-111)*
 입력: `KEYS = [presence:room:{roomId}, presence:session:{sessionId}]`,
@@ -151,6 +173,13 @@ DISCONNECT 후에도 잔여가 남아 **탈주가 확정되지 않는다**.
 입력: `KEYS[1] = ratelimit:{bucket}:{subject}`, `ARGV = [limit, windowSeconds]`.
 `INCR` 후 카운트가 1(=윈도 첫 요청)일 때만 `EXPIRE` — 두 단계가 갈라지면 TTL 없는
 카운터가 영구 잔존해 해당 subject 가 영구 차단된다. 한도 초과 `0`, 허용 `1`.
+
+### `guest_daily_issue.lua` *(D-117)*
+입력: `KEYS[1] = guest:issued:{UTC yyyy-MM-dd}`, `ARGV[1] = ttl 초(48h)`.
+`INCR` 후 순번이 1(=그날 첫 발급)일 때만 `EXPIRE`, 새 순번을 반환한다(상한 비교·경보는
+`GuestAccountService`). `rate_limit_fixed_window.lua` 와 같은 이유로 묶는다 — `INCR` 뒤
+`EXPIRE` 가 실패하거나 프로세스가 죽으면 TTL 없는 날짜 키가 영구히 남고, 이후 요청은 순번이
+2 이상이라 다시 걸지 않는다.
 
 ### `room_seq_next.lua`
 입력: `KEYS[1]=room:{id}:seq`, `ARGV[1]=ttl 초(6h)`. `INCR` 후 `EXPIRE` 하고 새 seq 를

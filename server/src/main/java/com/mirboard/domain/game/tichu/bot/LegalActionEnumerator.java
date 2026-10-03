@@ -18,10 +18,17 @@ import java.util.List;
  * <p>접근: phase 별로 후보 목록 생성 → {@link ActionValidator} 통과한 것만 합법으로 분류.
  * 합법성 검사 로직을 봇이 직접 복제하지 않고 엔진의 단일 소스에 위임한다.
  *
- * <p>단순화 가정: PlayCard 후보는 손패 단일 카드(1장) + 동일 rank 페어(2장) + 동일 rank
- * 트리플(3장). 폭탄/스트레이트/풀하우스 등은 1차 enumerate 안 함 — random 봇이 패스를
- * 선호하면 게임은 결국 진행되며, 향후 휴리스틱에서 확장 예정. ActionValidator 가
- * canBeat 검사로 부적합 카드를 자동 제외.
+ * <p>두 진입점의 역할 분담 (D-118):
+ * <ul>
+ *   <li>{@link #enumerate} — 포트 {@code legalActions}·{@link TimeoutActionPolicy}·
+ *       {@link RandomBotPolicy} 가 쓰는 <b>좁은</b> 후보. PlayCard 는 손패 단일 카드(1장) +
+ *       동일 rank 페어(2장) + 트리플(3장)뿐이고, Dealing 은 Ready 하나다. 이 계약(후보 분포·
+ *       타임아웃 자동 플레이)은 그대로 둔다.</li>
+ *   <li>{@link #enumerateFull} — {@link HeuristicBotPolicy} 전용 <b>넓은</b> 후보. 위 후보에
+ *       {@link ComboFinder} 조합(봉황 페어·트리플, 풀하우스, 스트레이트, 연속페어, 폭탄)과
+ *       선언(그랜드티츄·티츄)을 더해 같은 {@link ActionValidator} 로 거른다.</li>
+ * </ul>
+ * ActionValidator 가 canBeat 검사로 부적합 카드를 자동 제외.
  */
 public final class LegalActionEnumerator {
 
@@ -29,9 +36,49 @@ public final class LegalActionEnumerator {
     }
 
     public static List<TichuAction> enumerate(TichuState state, int seat) {
-        List<TichuAction> candidates = candidates(state, seat);
-        List<TichuAction> legal = new ArrayList<>();
-        for (TichuAction action : candidates) {
+        return validOnly(state, seat, candidates(state, seat));
+    }
+
+    /**
+     * D-118 — 휴리스틱 봇용 넓은 후보. 용 양도가 보류 중이면 (완주한 좌석이어도) 양도
+     * 후보만 돌려준다. 같은 카드 집합이 중복되지 않도록 {@link ComboFinder} 에서는
+     * {@link #candidates} 가 만들지 않는 묶음(4장 이상, 봉황이 낀 페어·트리플)만 더한다.
+     * 마작 소원 변형은 기존 후보의 단독 마작에만 붙는다 — 조합 속 마작의 소원은 봇이 직접
+     * 붙이고 검증한다.
+     */
+    static List<TichuAction> enumerateFull(TichuState state, int seat) {
+        List<TichuAction> raw = new ArrayList<>(candidates(state, seat));
+        switch (state) {
+            case TichuState.Dealing d -> {
+                if (d.phaseCardCount() == 8) raw.add(new TichuAction.DeclareGrandTichu());
+                if (d.phaseCardCount() == 14) raw.add(new TichuAction.DeclareTichu());
+            }
+            case TichuState.Playing pl -> {
+                if (isDragonGivePending(pl.trick(), seat)) break;   // 양도만.
+                PlayerState me = pl.players().get(seat);
+                if (pl.trick().currentTurnSeat() == seat && !me.isFinished()) {
+                    long hand = HandPlanner.mask(me.hand());
+                    long[] combos = pl.trick().isLead()
+                            ? ComboFinder.leadMasks(hand)
+                            : ComboFinder.followMasks(hand, pl.trick().currentTop());
+                    for (long m : combos) {
+                        int size = Long.bitCount(m);
+                        if (size >= 4 || (size >= 2 && (m & HandPlanner.PHOENIX) != 0)) {
+                            raw.add(new TichuAction.PlayCard(HandPlanner.cards(m)));
+                        }
+                    }
+                }
+                raw.add(new TichuAction.DeclareTichu());
+            }
+            case TichuState.Passing __ -> { }
+            case TichuState.RoundEnd __ -> { }
+        }
+        return validOnly(state, seat, raw);
+    }
+
+    private static List<TichuAction> validOnly(TichuState state, int seat, List<TichuAction> raw) {
+        List<TichuAction> legal = new ArrayList<>(raw.size());
+        for (TichuAction action : raw) {
             try {
                 ActionValidator.validate(state, seat, action);
                 legal.add(action);
@@ -99,8 +146,8 @@ public final class LegalActionEnumerator {
             // 자동 플레이가 D-109 이전과 똑같이 "소원 없이 마작" 으로 남는다.
             result.add(new TichuAction.PlayCard(List.of(c)));
             if (c.is(Special.MAHJONG)) {
-                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-109). 봇은 휴리스틱 없이
-                // 균등 후보 — RandomBotPolicy 가 이 중에서 고른다.
+                // 마작을 내는 액션에 소원을 동봉할 수 있다 (D-109). 이 균등 후보는 타임아웃·
+                // 랜덤 기준선(RandomBotPolicy)용 — 휴리스틱 봇은 소원을 직접 정한다(D-118).
                 for (int r = 2; r <= 14; r++) {
                     result.add(new TichuAction.PlayCard(List.of(c), r));
                 }

@@ -217,11 +217,11 @@ public final class SkullKingEngine {
 
         boolean humanLeft = humanSeats.stream().anyMatch(s -> !next.desertedSeats().contains(s));
         if (next.activeSeats().size() < SkullKingMatchState.MIN_SEATS_TO_CONTINUE || !humanLeft) {
-            // 조기 종료 — 진행 중 라운드는 점수 미반영 폐기 (§13-⑲). 완주 수는 점프 전에 읽는다.
-            int roundsPlayed = next.roundNumber() - 1;
+            // 조기 종료 — 진행 중 라운드는 점수 미반영 폐기 (§13-⑲). 완주 수는 abandoned() 가
+            // 점프 전에 확정해 매치 상태에 저장한다(D-122) — 이벤트·기록·뷰가 같은 값을 읽는다.
             SkullKingMatchState ended = next.abandoned();
             events.add(new SkullKingEvent.MatchEnded(
-                    ended.winners(), ended.cumulativeScores(), roundsPlayed));
+                    ended.winners(), ended.cumulativeScores(), ended.roundsPlayed()));
             return new Desertion(state, ended, Desertion.Outcome.MATCH_ENDED, events);
         }
         SkullKingState drained = drainGhosts(state, next.desertedSeats(), events);
@@ -289,20 +289,24 @@ public final class SkullKingEngine {
     // ---------- 라운드 정산 (§10, §12) ----------
 
     /**
-     * 라운드 점수를 매치에 누적하고, 10라운드를 다 돌았으면 매치 종료 이벤트까지 낸다.
+     * 라운드 점수를 매치에 누적·기록하고, 10라운드를 다 돌았으면 매치 종료 이벤트까지 낸다.
      *
      * <p>{@code RoundEnded} 를 여기서 내는 것은 매치 누적 점수를 함께 실어야 하기 때문이다 —
-     * {@code apply} 는 매치 상태를 모른다 (라운드 상태만 다룬다).
+     * {@code apply} 는 매치 상태를 모른다 (라운드 상태만 다룬다). 기록(D-120)은 이벤트와 같은
+     * {@code scores} 를 남긴다 — 라이브 패치와 권위값이 같은 값이어야 클라가 맞출 게 없다.
+     *
+     * @throws IllegalStateException 이미 정산한 라운드를 다시 넘기면 (라운드 번호 불일치)
      */
     public Settlement settleRound(SkullKingState.RoundEnd state, SkullKingMatchState match) {
-        SkullKingMatchState next = match.withRoundScored(state.totalsBySeat(), state.seatCount());
+        SkullKingMatchState next = match.withRoundCompleted(
+                state.roundNumber(), state.scores(), state.seatCount());
 
         List<SkullKingEvent> events = new ArrayList<>();
         events.add(new SkullKingEvent.RoundEnded(
                 state.roundNumber(), state.scores(), next.cumulativeScores()));
         if (next.isMatchOver()) {
             events.add(new SkullKingEvent.MatchEnded(
-                    next.winners(), next.cumulativeScores(), SkullKingMatchState.TOTAL_ROUNDS));
+                    next.winners(), next.cumulativeScores(), next.roundsPlayed()));
         }
         return new Settlement(next, events);
     }

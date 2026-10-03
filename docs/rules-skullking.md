@@ -13,7 +13,8 @@
 > 경로는 전부 `server/src/{main,test}/java/com/mirboard/domain/game/skullking/` 기준의
 > 상대 경로다. 순수 룰 엔진(S4, D-101) 위에 포트 어댑터 `SkullKingGameEngine`·
 > `GameDefinition` 등록·상태 저장·뷰 매퍼·봇/디스패치 배선(S5, D-102)까지 완료됐다.
-> 남은 것은 클라 게임판(S6, D-103)뿐이다.
+> 이후 클라 게임판(S6, D-103), 매치 영속·ELO(D-115), 봇 휴리스틱(D-119, §16), 라운드 기록·점수표
+> (D-120), 튜토리얼(D-121)까지 붙었다.
 
 > **출처 신뢰도 경고.** 근거는 나무위키 스컬킹 문서(볼트
 > `inbox/clippings/스컬킹.md`, 최종 수정 2026-04-02)다. 집단 편집 문서라 검증되지 않은
@@ -88,6 +89,12 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
 | Playing | 전원 입찰 | `PLAY_CARD` | 손패 소진 |
 | RoundScoring | 손패 소진 | (없음) | 다음 라운드 또는 매치 종료 |
 
+- **RoundScoring 은 정지 구간이 아니다** (D-120). 서버는 정산(`ROUND_ENDED`)과 다음 라운드
+  시작(`BIDDING_STARTED`)을 한 배치로 보낸다. 직전 라운드 결과는 클라가 **다음 라운드
+  Bidding 동안** 닫을 수 있는 비차단 패널로 보여 주고, 끝난 라운드 기록은 매치 상태
+  `completedRounds` 에 남아 resync 로 복원된다. 라운드 사이에 멈추면 대기 좌석이 비어
+  봇·타임아웃이 진행을 못 일으키고, 멈춘 사이 탈주가 같은 라운드를 두 번 정산할 수 있다.
+
 - 라운드마다 **덱 전체를 다시 섞어** 분배한다 (라운드 간 카드가 이월되지 않는다).
 - **라운드 시작 플레이어**: 1라운드 첫 리드는 원문이 "적당한 방법으로 정한다"라고만 해서
   **서버 균일 무작위 + 시드 로깅**으로 정한다(§13-⑯). 이후 라운드마다 **턴 순서 +1**
@@ -97,10 +104,11 @@ Dealing → Bidding → Playing(트릭 반복) → RoundScoring
 
 - **코드:** `state/SkullKingState.java:28` sealed(Bidding/Playing/RoundEnd),
   `SkullKingEngine.java:120`(apply), `SkullKingEngine.java:96`(startRound),
-  `SkullKingEngine.java:297`(settleRound), 시작 좌석 회전은
-  `state/SkullKingMatchState.withRoundScored`
+  `SkullKingEngine.java:300`(settleRound), 점수 누적·라운드 기록·시작 좌석 회전은
+  `state/SkullKingMatchState.withRoundCompleted`(한 메서드 — 기록을 빠뜨리는 경로를 두지
+  않는다, D-120)
 - **테스트:** `SkullKingMatchSimulationTest`(2~8인 전 좌석 수 10라운드 완주 + 시작 좌석
-  회전), `SkullKingEngineTest`(라이프사이클 26건)
+  회전 + 기록 10건 = 누적), `SkullKingEngineTest`(라이프사이클 28건)
 - **갭:** **Dealing 이 상태가 아니다**(D-101) — 액션 0개인 통과 지점이라 `Dealer` 가
   분배하고 곧장 Bidding 을 만든다. 티츄의 Dealing 은 선언 윈도우라 상태였던 것과 다르다
 
@@ -208,7 +216,7 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
 
 - **코드:** `trick/LeadSuitResolver.java:43`(지연 확정 파생),
   `action/ActionValidator.java:102`(`followsLeadSuit`),
-  `SkullKingEngine.java:361`(`legalPlayActions` — 손패 필터),
+  `SkullKingEngine.java:365`(`legalPlayActions` — 손패 필터),
   `state/TrickState.leadSuit()`(저장하지 않고 매번 파생)
 - **테스트:** `trick/LeadSuitResolverTest`(15건 — 색상/캐릭터/탈출 리드 3갈래 + §13-⑤
   연쇄), `action/ActionValidatorTest$FollowObligation`(양성 4 / 음성 3),
@@ -422,14 +430,21 @@ handSize(round, N) = min(round, ⌊70 / N⌋)
   (진행 중 라운드 폐기). 탈주 좌석은 승자 후보에서 제외된다.
 
 - **코드:** `state/SkullKingMatchState.java`(`TOTAL_ROUNDS=10`, `isMatchOver()`,
-  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외),
-  `SkullKingEngine.java:297`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
-  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`)
-- **테스트:** `state/SkullKingMatchStateTest`(15건 — 10라운드 종료·공동 승리·전원 음수·
-  탈주 제외/누적), `SkullKingEngineTest$Settlement`(4건), `SkullKingMatchSimulationTest`
-  (완주 22건), `SkullKingDesertionTest`(17건 — 탈주 포함 풀매치 완주)
-- **갭:** 매치 결과 영속화와 ELO 는 D-02 스키마 결정(게임별 rating 분리) 선행으로
-  **별건 보류**(D-102). 탈주는 D-104 로
+  `winners()` 가 공동 승리라 리스트를 돌려준다 — 탈주 좌석 제외. `completedRounds` 는
+  정산이 끝난 라운드 기록 1..N, `hasSettled(round)` 는 이미 정산한 라운드인가 — D-120),
+  `SkullKingEngine.java:300`(`settleRound`), 탈주는 `SkullKingEngine.java:207`(`desert`) +
+  `SkullKingEngine.java:239`(`applyAndDrain`) + `SkullKingEngine.java:252`(`startRoundAndDrain`).
+  조기 종료(`abandoned`)는 진행 중 라운드를 기록하지 않으므로 기록 건수 = 완주 라운드 수다.
+  어댑터 `SkullKingGameEngine.advance` 는 이미 정산된 라운드(정산 후 다음 라운드 저장 전에
+  멈춘 방)를 `hasSettled` 로 걸러 이중 정산 없이 다음 라운드만 시작한다(D-120)
+- **테스트:** `state/SkullKingMatchStateTest`(20건 — 10라운드 종료·공동 승리·전원 음수·
+  탈주 제외/누적·라운드 기록과 번호 가드), `SkullKingEngineTest$Settlement`(5건),
+  `SkullKingMatchSimulationTest`(완주 29건 — 2~8인 기록 합 = 누적),
+  `SkullKingDesertionTest`(18건 — 탈주 포함 풀매치 완주·조기 종료 기록 = 완주 수),
+  `SkullKingGameEngineCompletedRoundsTest`(10건 — 공개 뷰 기록·매치 결과·복구 분기),
+  `persistence/SkullKingJsonRoundTripTest`(10건 — 구 JSON·모르는 필드)
+- **갭:** 매치 결과 영속화와 개인전 ELO 는 **D-115 로 완료**됐다(게임별 전적
+  `user_game_stats`·`skullking_match_results`, D-02 의 게임별 rating 분리). 탈주는 D-104 로
   확정·구현됐다(순수 엔진 `desert`) — S5 는 포트 `GameEngine.desert` 를 이 메서드에
   연결만 한다. 끊김 유예(120s) 구간의 정지는 미해결 한계로 S5 별건
 
@@ -521,13 +536,132 @@ S4 가 조용히 틀리기 쉬운 지점만 모았다.
 
 ---
 
+## 16. 봇 정책 (D-119) — 룰이 아니라 전략
+
+이 절은 **룰이 아니다.** 판정은 §7 사다리 그대로이고, 여기엔 봇이 합법수 중 무엇을 고르는지만
+적는다. 상수나 선택 순서는 코드만 고쳐도 되지만(강도 평가 테스트가 지킨다), 아래 16.1 의
+**공정성 기준**을 넓히려면 새 D 항목이 필요하다.
+
+### 16.1 공정성 기준 — 공개 이벤트 기준 · 완전 기억
+
+기준은 "UI 에 보이는가"가 아니라 **"공개 이벤트로 이미 공개됐는가"**다. 봇이 쓰는 정보는
+`SkullKingBotView.of(state, seat)` 한 곳에서만 전체 상태로부터 골라내고, 정책은 그 뷰만 받는다.
+
+| 쓴다 | 쓰지 않는다 |
+| --- | --- |
+| 본인 손패 · 본인 예측 · 본인 승수 | 남의 손패 (어느 단계에서도) |
+| 진행 중 트릭에 나온 카드 | 입찰 중 남의 제출 예측 (§5 — 전원 제출 전 비공개) |
+| 이번 라운드에 `CARD_PLAYED` 로 공개된 카드 **전부** | 공개된 남의 예측·승수 (공개 정보지만 지금 정책이 안 씀 — 상대 모델링은 후속) |
+
+공개 카드는 **완전히 기억한다.** UI 는 직전 트릭만 보여 주지만, 사람도 기억할 수 있는 정보라
+불공정이 아니다. 미공개 풀은 덱 70장에서 손패와 공개 카드를 multiset 으로 뺀 것이라, 남의
+손패와 이번 라운드에 분배되지 않은 카드(8인 라운드 9·10 의 6장, §4)가 구별 없이 섞여 있다.
+
+### 16.2 입찰
+
+손패 카드마다 "그 카드로 리드했을 때의 승률"(16.4)에 리드 보정을 곱해 더한 기대 승수를
+반올림한다(`clamp(⌊E + 0.5⌋, 0, handSize)`). 합법 예측 중 그 값에 가장 가까운 것을 낸다.
+
+| 카드 | 리드 보정 | 이유 |
+| --- | --- | --- |
+| 비검정 색상 | `1/n + (n−1)/n · 0.3` | 남이 리드하면 오프수트가 되어 지기 쉽다 |
+| 검정 | `1/n + (n−1)/n · 0.75` | 으뜸패라 오프수트여도 이긴다 (§7.1) |
+| 특수 카드 | `1` | 리드 여부와 무관. 티그리스는 해적 선언으로 계산 |
+
+### 16.3 플레이
+
+`need = 본인 예측 − 본인 승수`. 합법수마다 승률 p(16.4)를 구해 고른다.
+
+| 국면 | 선택 (먼저 걸리는 단계) |
+| --- | --- |
+| `need > 0` (이겨야 한다) | ① p ≥ 0.6 인 것 중 **가장 싼 것** → ② p > 0.15 인 것 중 p 최대 → ③ 버림 순서상 가장 앞선 것 |
+| `need ≤ 0` (져야 한다) | ① p ≤ 0.2 인 것 중 **들고 있기 가장 위험한 것** → ② p 최소 |
+
+- **싼 정도(spendCost)**: 탈출류 0 < 비검정 100+r < 검정 200+r < 인어 300 < 해적 400 <
+  티그리스(해적 선언) 450 < 스컬킹 500. 이길 수 있으면 가장 싼 카드로 이기고 센 카드는 아낀다.
+- **위험도(liability)**: spendCost 와 같되 티그리스만 −1 — 어느 선언이든 고를 수 있어 들고
+  있어도 위험하지 않다. 그래서 티그리스는 털 대상에서 가장 뒤다.
+- **버림 순서(③)**: 일반·캐릭터 카드(spendCost 순) < 탈출 < 티그리스(탈출 선언 < 해적 선언).
+  탈출·티그리스는 나중에 쓸모가 있어 가장 늦게 버린다.
+- 동률은 합법수 순서상 앞선 것. `Random` 을 쓰지 않는다 — 같은 상태면 같은 수.
+
+**전함수다.** 합법수가 1개면 즉시 그것, 모든 분기는 비지 않은 합법수 위의 최소/최대로
+끝나므로 반환값은 항상 합법수의 원소다([탈출, 탈출]·[티그리스]만 남아도 반드시 하나를 낸다).
+그래도 정책이 예외·null·비합법 액션을 내면 어댑터가 ERROR 로그(D-107 Sentry) 후
+`timeoutAction`(최약수)으로 떨어진다 — 턴 제한 0(기본) 방은 봇 스케줄러가 재시도하지 않아,
+이 폴백이 없으면 방이 영구 정지할 수 있다.
+
+### 16.4 승률 추정 — TrickResolver 위의 비복원 곱
+
+정적 승률표를 두지 않는다 — §7 사다리를 숫자로 한 번 더 쓰는 셈이라 룰이 바뀌면 조용히
+어긋난다. 판정은 전부 `TrickResolver` 에 맡긴다.
+
+1. `winsNow` = (현재 트릭 + 내 카드)를 판정했을 때 내가 이기는가.
+2. F = 미공개 카드 u 를 한 장 더했을 때 승패가 **뒤집히는** u 의 수. 미공개 티그리스는
+   해적 선언으로 본다(위협 최대).
+3. 내 뒤의 k 명이 미공개 U 장에서 비복원으로 한 장씩 낸다고 보고
+   `noFlip = Π_{i<k} (U−F−i)/(U−i)` (U−F−i ≤ 0 이면 0), `p = winsNow ? noFlip : 1 − noFlip`.
+
+사칙연산만 쓴다(`pow` 없음) — JEP 306 으로 플랫폼과 무관하게 비트 단위로 재현된다.
+
+- **정확한 범위**: 현재 트릭 + 미공개 1장 조합까지. 마지막 순번(k=0)이면 정확히 0 또는 1.
+- **근사**: 미공개 2장 이상이 맞물리는 경우. 예: 인어 리드 뒤 해적과 스컬킹이 함께 나오면
+  3자 예외(§7 사다리 1단)로 인어가 이기지만, 모델은 "해적이 뒤집는다"만 보고 0 으로 본다.
+  상대가 follow 의무·전략 없이 미공개 풀에서 균등하게 낸다는 가정도 근사다.
+
+### 16.5 자동조종(최약수)과의 경계
+
+봇 휴리스틱은 **봇 좌석에만** 쓴다. 턴 제한 초과와 탈주 유령(§13-⑱)은 지금처럼 0 예측 +
+최약수(`timeoutAction`)다. 사람·탈주 좌석의 대리는 판을 흔들지 않는 것이 목적이고, 봇은
+1급 참가자라 목적이 다르다 — 두 경로를 섞지 않는다(D-104 근거 유지).
+
+### 16.6 강도와 알려진 한계
+
+고정 시드 쌍대 하네스(분배 난수를 (시드, 라운드)로 고정해 같은 패 위에서 정책만 비교)로
+측정했다. 평가 시드 20261003 계열, 괄호는 홀드아웃 777 계열.
+
+| 시나리오 | 결과 |
+| --- | --- |
+| 휴리스틱 1명 대 무작위 (2~8인, 각 50판) | 점수 차 +269~+499 (+297~+528), 승률 0.92~1.00 (0.96~1.00) |
+| 같은 패에서 휴리스틱 좌석 평균 − 최약수 좌석 평균 | n별 +375 이상 |
+| 자가대전 (2~8인, 각 30판) | 평균 96~312, 합산 예측 적중률 0.650 (0.667) — 무작위 자가대전 약 0.20 |
+| 휴리스틱 1명 대 최약수 봇 | n 합산 점수 차 +306 (+285) |
+
+- **8인 대 0-예측·최약수 봇은 대등**하다(+1.6, SE 23 / 홀드아웃 −8.4, SE 20). 모델이 균등
+  무작위 상대를 가정해서, 아무것도 이기려 하지 않는 상대 사이에선 라운드의 37% 에서 과잉
+  승리한다. 개선책은 공개 예측(`BIDS_REVEALED`) 기반 상대 모델링 — 16.1 경계를 넓히는 일이라
+  별건이다.
+- 2인 자가대전 적중률이 가장 낮다(0.39). 상수 5개(0.6 / 0.15 / 0.2 / 0.3 / 0.75)는 무작위
+  상대 기준으로 평가와 다른 시드 계열에서 정했고, **사람 상대 강도는 측정하지 않았다.**
+- 결정당 약 25µs. 봇 매치는 ELO 에서 빠지고(D-71/D-115) 승패만 기록된다.
+
+- **코드:** `bot/SkullKingBotView.java:58`(정보 경계 — 전체 상태를 읽는 유일한 지점),
+  `bot/SkullKingBotView.java:79`(미공개 풀, multiset 차),
+  `bot/TrickOdds.java:48`(승률 추정), `bot/SkullKingBotPolicy.java:31`(상수 5개),
+  `bot/SkullKingBotPolicy.java:68`(입찰), `bot/SkullKingBotPolicy.java:103`(플레이),
+  `SkullKingGameEngine#botAction`·`#chooseBotAction`(어댑터 배선 + timeoutAction 폴백)
+- **테스트:** `bot/SkullKingBotViewTest`(3건 — 남의 손패·공개 전 예측이 달라도 뷰·출력 동일),
+  `bot/TrickOddsTest`(6건 — 정확 범위·근사 한계 고정·비트 재현),
+  `bot/SkullKingBotPolicyTest`(7건 — 시나리오·전함수성),
+  `bot/SkullKingBotStrengthTest`(6건 — 강도 하한·대조군, 하한 = 실측 − 3SE 이하),
+  `SkullKingGameEngineBotActionTest`(4건 — 배선·폴백·타임아웃 최약수 유지)
+- **재현:** `./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"`
+  (Docker 불필요, 측정값은 `[D-119]` INFO 로그로 남는다)
+
+---
+
 ## 본 문서 ↔ 코드 동기화 규칙
 
 - 룰 변경 시 본 문서 + `docs/decisions.md` D-NN + 코드 + 테스트를 같은 commit 으로 묶는다.
 - §13 의 확정 해석을 바꾸려면 새 D 항목이 필요하다. 코드만 고치지 말 것.
 - 각 §13 항목은 대응 테스트가 있다. 해석을 바꾸면 그 테스트가 먼저 빨개진다 — 테스트를
   지우지 말고 새 해석으로 고쳐 쓸 것.
+- 튜토리얼(`client/src/features/skullking/tutorial/skullkingTutorialSteps.tsx`·`TrickQuiz.tsx`,
+  D-121)은 단계마다 본 문서의 절을 근거로 인용한다. 룰 서술을 바꾸면 같은 commit 에서 튜토리얼
+  문구와 퀴즈 정답도 고친다.
 
-마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영. **순수 룰 엔진 구현 완료**
-— 테스트 305건.
+마지막 갱신: S4 (D-101) + 탈주 (D-104) + Fable max 리뷰 반영 + 봇 정책 (D-119) + 라운드 기록 (D-120)
++ 튜토리얼 역참조 (D-121).
+**순수 룰 엔진 구현 완료** — `domain.game.skullking` 테스트 342건 = Docker 불필요
+339건(`./scripts/check.sh rules`) + `persistence/SkullKingMatchRecorderIT` 3건.
 통합(포트 어댑터·`GameDefinition` 등록·상태 저장·뷰 매퍼·봇 정책·STOMP)은 S5(D-102).

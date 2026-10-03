@@ -50,7 +50,7 @@ Usage: ./scripts/check.sh <subcommand> [args]
 
   fast              빠른 회귀 (클라 tsc+vitest + 서버 compile, ~30s)
                     pre-commit hook 과 동일 로직.
-  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량, ~5s)
+  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량 + 봇 강도 평가, ~15s)
                     Docker 불필요.
   server            서버 풀 (단위 + IT, Docker 필요, ~1m20s)
   client            클라 풀 (build:check + test + build, ~10s)
@@ -90,6 +90,8 @@ case "$SUBCMD" in
 
     rules)
         log "서버 룰 도메인 단위 테스트 (Docker 불필요)"
+        # 스컬킹도 티츄처럼 하위 패키지를 명시한다 — skullking.* 로 쓸면 persistence 의
+        # SkullKingMatchRecorderIT(D-115, Testcontainers)까지 잡혀 "Docker 불필요"가 거짓이 된다.
         ./gradlew :server:test \
             --tests "com.mirboard.domain.game.tichu.card.*" \
             --tests "com.mirboard.domain.game.tichu.hand.*" \
@@ -100,7 +102,18 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.tichu.TichuSpecialCardScenarioTest" \
             --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
             --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
-            --tests "com.mirboard.domain.game.skullking.*"
+            --tests "com.mirboard.domain.game.tichu.bot.*" \
+            --tests "com.mirboard.domain.game.skullking.DealerTest" \
+            --tests "com.mirboard.domain.game.skullking.SkullKing*" \
+            --tests "com.mirboard.domain.game.skullking.action.*" \
+            --tests "com.mirboard.domain.game.skullking.bid.*" \
+            --tests "com.mirboard.domain.game.skullking.bot.*" \
+            --tests "com.mirboard.domain.game.skullking.card.*" \
+            --tests "com.mirboard.domain.game.skullking.invariant.*" \
+            --tests "com.mirboard.domain.game.skullking.scoring.*" \
+            --tests "com.mirboard.domain.game.skullking.state.*" \
+            --tests "com.mirboard.domain.game.skullking.trick.*" \
+            --tests "com.mirboard.domain.game.skullking.persistence.SkullKingJsonRoundTripTest"
         log "모두 통과"
         ;;
 

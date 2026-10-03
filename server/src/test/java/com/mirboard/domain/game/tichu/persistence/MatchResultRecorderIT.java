@@ -182,6 +182,38 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(3).desertCount()).isZero();
     }
 
+    @Test
+    @Transactional
+    void match_with_guest_records_results_without_elo() {
+        // D-117 — 게스트가 한 명이라도 낀 매치는 전원 ELO 미적용(D-71 봇 규칙 확장). 승패·참가
+        // 기록은 그대로 — 게스트 정리가 "끝낸 매치"를 user_game_stats 로 판정하기 때문에도 필요.
+        var humans = registerFour("mrg_a", "mrg_b", "mrg_c");
+        User guest = userRepo.save(User.create("guest-mrg2a3b4",
+                com.mirboard.domain.lobby.auth.GuestPolicy.NO_LOGIN_HASH, clock));
+        List<Long> ids = List.of(
+                humans.get(0).getId(), humans.get(1).getId(),
+                humans.get(2).getId(), guest.getId());
+
+        publisher.publishEvent(new TichuMatchCompleted(
+                "room-guest", ids, 900, 200, Team.A,
+                List.of(new RoundScore(900, 200, 0, false)), null, 0));
+
+        var match = matchRepo.findAll().stream()
+                .filter(m -> m.getRoomId().equals("room-guest")).findFirst().orElseThrow();
+        assertThat(participantRepo.findAll())
+                .filteredOn(p -> p.getMatchId().equals(match.getId()))
+                .hasSize(4);
+
+        var refreshed = ids.stream().map(this::tichu).toList();
+        // 승패 증분 (seat0,2 = A 승 / seat1,3 = B 패) — 게스트(seat3)도 전적은 쌓인다.
+        assertThat(refreshed.get(0).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(2).winCount()).isEqualTo(1);
+        assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
+        assertThat(refreshed.get(3).loseCount()).isEqualTo(1);
+        // ELO 는 아무도 움직이지 않는다.
+        assertThat(refreshed).allMatch(u -> u.rating() == 1000);
+    }
+
     private List<User> registerFour(String... usernames) {
         List<User> created = new ArrayList<>();
         for (String u : usernames) {

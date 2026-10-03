@@ -2,6 +2,7 @@ package com.mirboard.infra.ws;
 
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
+import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -29,10 +30,13 @@ public class MatchProgressService {
 
     private final RoomService roomService;
     private final MirboardMetrics metrics;
+    private final GameRegistry games;
 
-    public MatchProgressService(RoomService roomService, MirboardMetrics metrics) {
+    public MatchProgressService(RoomService roomService, MirboardMetrics metrics,
+                                GameRegistry games) {
         this.roomService = roomService;
         this.metrics = metrics;
+        this.games = games;
     }
 
     /**
@@ -50,15 +54,26 @@ public class MatchProgressService {
             return;
         }
         metrics.matchCompleted(room.gameType());
-        // D-82 — 사람만의 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로
-        // 같은 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이
-        // 아니므로 기존대로 FINISHED.
-        if (!room.botSeats().isEmpty()) {
-            try {
-                roomService.markFinished(room.roomId());
-            } catch (RuntimeException e) {
-                log.warn("Failed to mark room {} finished: {}", room.roomId(), e.getMessage());
-            }
+        if (awaitsRematch(room)) {
+            return;
         }
+        try {
+            roomService.markFinished(room.roomId());
+        } catch (RuntimeException e) {
+            log.warn("Failed to mark room {} finished: {}", room.roomId(), e.getMessage());
+        }
+    }
+
+    /**
+     * D-82 — 사람만의 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로 같은
+     * 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이 아니다.
+     *
+     * <p>D-122 — 리매치는 <b>게임이 선언</b>한다({@code GameDefinition.supportsRematch()},
+     * 기본 false). 리매치가 없는 게임의 사람끼리 방이 IN_GAME 으로 남으면, 끝난 뒤 '나가기'가
+     * 탈주 판정(해당 없음) → 일반 leave 로 흘러 좌석 목록을 당겼다.
+     */
+    private boolean awaitsRematch(Room room) {
+        return room.botSeats().isEmpty()
+                && games.require(room.gameType()).supportsRematch();
     }
 }

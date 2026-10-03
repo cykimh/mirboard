@@ -191,17 +191,44 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 > 이벤트 type 문자열은 게임 간 재사용된다(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
 > 게임을 하나만 가지므로 충돌이 없다. 클라(S6)는 방의 `gameType` 으로 스토어를 고른다.
 
+> **D-120 — 라운드 사이에 서버는 멈추지 않는다.** `ROUND_ENDED` 직후 **같은 배치**로 다음
+> 라운드의 `BIDDING_STARTED`(+ 비공개 `HAND_DEALT`)가 나간다. 그래서 클라는 직전 라운드
+> 결과를 `ROUND_END` 단계가 아니라 **다음 라운드 Bidding 동안** 비차단 패널로 보여 준다.
+> `ROUND_ENDED` 는 클라 점수표에 라운드 번호 기준으로 **upsert** 하는 라이브 패치이고,
+> 권위값은 resync 의 `tableView.completedRounds` 다(통째 교체). `MATCH_ENDED` 의 권위값은
+> `tableView.matchResult` — 둘 다 payload 는 그대로이고 진실원만 명시한 것이다. 봇 방은
+> 매치 종료 직후 방 메타가 `FINISHED` 로 바뀌는데(메타 토픽과 게임 토픽은 순서가 보장되지
+> 않는다), 클라는 이 세션에서 본 IN_GAME→FINISHED 전이면 게임판을 내리지 않는다.
+
 ### 액션 처리 단계 (서버)
 1. 방 조회 → 좌석 도출(비참가자는 `ERROR(NOT_IN_ROOM)`), `gameType` 으로 엔진 획득
-   (`GameEngineProvider.forRoom`).
+   (`GameEngineProvider.forRoom`). **D-122: 방이 IN_GAME 이 아니면 적용하지 않는다** —
+   WAITING 은 `ERROR(GAME_NOT_STARTED)`, FINISHED(탈주 조기 종료·강제 종료 뒤)는
+   `ERROR(GAME_NOT_IN_PROGRESS)`. 끝난 방의 상태는 resync 용으로 남아 있어 막지 않으면 늦게
+   온 액션이 버려진 라운드를 진행시켰다.
 2. `engine.actionType()` 으로 payload 역직렬화 — 실패 시 `ERROR(INVALID_ACTION)`.
 3. 방 락 획득 (`SET NX room:{id}:lock TTL=2s`) — 실패 시 본인 큐 `ERROR(BUSY)`.
+   락을 잡은 뒤 방 상태를 **다시** 확인한다(D-122 — 탈주 MATCH_ENDED 는 이 락 안에서 방을
+   FINISHED 로 만든다).
 4. `engine.loadState()` (`room:{id}:state` JSON 역직렬화). 없으면 `ERROR(GAME_NOT_STARTED)`.
 5. `engine.apply(state, seat, action)` — 룰 위반 시 `GameActionRejectedException.code()`
    를 그대로 본인 큐 `ERROR` 코드로, 락 해제.
 6. 새 상태 저장, `engine.advance(...)` 로 라운드/매치 진행 이벤트 합류,
    이벤트마다 `room:{id}:seq` INCR, envelope 을 공개/비공개로 분기 전송.
 7. 락 해제 후 봇 스케줄(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`) 트리거.
+
+> **D-122 — 끝난 방은 진행하지 않는다.** 봇 루프와 턴 타임아웃 발화도 위 1·3 과 같은 방
+> 상태 가드(락 전·락 안)를 거친다 — 게임 중립 판정이라 엔진 상태로는 매치가 안 끝난 강제
+> 종료도 막힌다. 매치를 액션 경로 밖에서 끝내는 쪽(탈주 `MATCH_ENDED`, 호스트·어드민 abort)은
+> 턴 데드라인을 취소한다(generation 증가 + `deadlines:turn` 항목 제거). 그래서 매치가 끝난 뒤
+> `CARD_PLAYED`·`TURN_CHANGED` 등이 더 나오지 않는다.
+>
+> 둘 다 **같은 방 락 안에서** FINISHED 전이와 취소를 한다(락을 최대 약 3초 재시도해 잡는다).
+> 락 안 재확인은 락을 쥔 쪽끼리만 직렬화하므로, 락 밖에서 전이하면 "IN_GAME 확인 → apply"
+> 사이에 끼어 액션 1건(스컬킹이면 그 액션이 끝낸 라운드의 정산·다음 라운드 시작까지)이 FINISHED
+> 뒤에 적용됐다. 예외 하나: abort 는 끊긴 사람이 안 돌아올 때의 탈출구라, 재시도 끝에도 락을 못
+> 잡으면(비정상 경합) 거절하지 않고 락 없이 끝낸다 — 그때만 진행 중이던 액션 1건이 FINISHED 뒤에
+> 적용될 수 있고, 그 뒤는 위 가드로 멈춘다.
 
 ---
 

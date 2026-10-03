@@ -15,15 +15,17 @@ export interface LobbyChatPayload {
 }
 
 /**
- * 부분 패치 결과 (D-103). `tichuStore` 의 동명 타입과 **같은 문자열 유니온**이라 구조적으로
+ * 부분 패치 결과 (D-103). `tichuStore` 의 동명 타입은 이 유니온의 **부분집합**이라 구조적으로
  * 호환된다 — 티츄 스토어를 0줄도 고치지 않고 sink 계약을 만족시키기 위해 여기 새로 선언한다.
  *
  * - `applied`   — 패치 성공, lastSeq 갱신
  * - `duplicate` — 이미 처리한 이벤트
  * - `gap`       — seq 구멍, /resync 권유
  * - `unhandled` — 리듀서 없는 타입, /resync 권유
+ * - `ignored`   — 반영하지 않기로 한 이벤트(예: 스컬킹 매치 종료 뒤의 잔여 이벤트, D-122).
+ *                 resync 도 부르지 않는다 — 다시 받아 봐야 또 버릴 것이라서다.
  */
-export type ApplyEventResult = 'applied' | 'duplicate' | 'gap' | 'unhandled';
+export type ApplyEventResult = 'applied' | 'duplicate' | 'gap' | 'unhandled' | 'ignored';
 
 /**
  * `GET /api/rooms/{id}/resync` 응답의 **게임 중립 껍데기** (D-103). 서버

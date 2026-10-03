@@ -66,6 +66,9 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     jvmArgs("-XX:+EnableDynamicAgentLoading")
+    // 기본 512m 로는 IT 의 Spring 컨텍스트(각자 Testcontainers)가 늘자 힙이 모자랐다 —
+    // 테스트 JVM 이 OutOfMemoryError 로 죽어 뒤쪽 클래스가 결과 없이 빠졌다(D-122 검증 중 발견).
+    maxHeapSize = "1g"
 }
 
 // Phase 7-4 (D-39) — Vite 클라이언트 번들을 Spring Boot jar 의 정적 리소스로 동봉.

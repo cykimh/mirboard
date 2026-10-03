@@ -393,6 +393,23 @@ class SkullKingEngineTest {
             assertThat(settled.events()).anyMatch(SkullKingEvent.RoundEnded.class::isInstance);
         }
 
+        /** D-120 — 정산이 라운드 기록을 남긴다. 이벤트는 기존과 같다(계약 무변경). */
+        @Test
+        void settle_records_the_round_in_history() {
+            SkullKingEngine engine = engineFor(2);
+            SkullKingState.RoundEnd roundEnd = roundEndWith(3, 20);
+            SkullKingMatchState match = new SkullKingMatchState(3, 0, java.util.Map.of(0, 0, 1, 0));
+
+            SkullKingEngine.Settlement settled = engine.settleRound(roundEnd, match);
+
+            assertThat(settled.matchState().completedRounds()).hasSize(1);
+            SkullKingMatchState.CompletedRound last = settled.matchState().completedRounds().get(0);
+            assertThat(last.roundNumber()).isEqualTo(3);
+            assertThat(last.scores()).isEqualTo(roundEnd.scores());
+            assertThat(settled.events()).containsExactly(new SkullKingEvent.RoundEnded(
+                    3, roundEnd.scores(), java.util.Map.of(0, 20, 1, -10)));
+        }
+
         @Test
         void does_not_end_the_match_before_round_ten() {
             SkullKingEngine engine = engineFor(2);

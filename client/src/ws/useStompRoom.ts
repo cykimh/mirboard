@@ -86,7 +86,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
             // 라이프사이클 이벤트 또는 갭 — 권위 있는 스냅샷 재취득.
             resync();
           }
-          // 'applied' / 'duplicate' 인 경우엔 추가 동작 없음.
+          // 'applied' / 'duplicate' / 'ignored' 인 경우엔 추가 동작 없음.
         });
         // 본인 큐는 프레임을 가리지 않고 전량 게임 sink 로 넘긴다 — `ERROR` 까지 포함(D-103).
         // 게임마다 에러 코드가 달라 라벨링 위치가 게임 쪽이어야 하고, 같은 큐인데

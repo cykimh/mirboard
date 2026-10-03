@@ -13,6 +13,7 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
+import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.RoomPresence;
 import com.mirboard.infra.ws.RoomSeq;
@@ -42,19 +43,22 @@ public class RoomController {
     private final DesertionService desertion;
     private final RoomPresence sessions;
     private final RoomChipStore chipStore;
+    private final GameAbortService aborts;
 
     public RoomController(RoomService rooms,
                           GameEngineProvider engines,
                           RoomSeq seqs,
                           DesertionService desertion,
                           RoomPresence sessions,
-                          RoomChipStore chipStore) {
+                          RoomChipStore chipStore,
+                          GameAbortService aborts) {
         this.rooms = rooms;
         this.engines = engines;
         this.seqs = seqs;
         this.desertion = desertion;
         this.sessions = sessions;
         this.chipStore = chipStore;
+        this.aborts = aborts;
     }
 
     @GetMapping
@@ -146,7 +150,8 @@ public class RoomController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void abort(@PathVariable String roomId,
                       @AuthenticationPrincipal AuthPrincipal me) {
-        rooms.abortGame(roomId, me.userId());
+        // D-122 — 방 액션 락 안에서 FINISHED 전이 + 턴 데드라인 취소(진행 중 액션과 직렬화).
+        aborts.abortByHost(roomId, me.userId());
     }
 
     @PostMapping("/{roomId}/leave")
@@ -159,8 +164,12 @@ public class RoomController {
             Room room = rooms.getRoom(roomId);
             if (room.status() == RoomStatus.IN_GAME
                     && room.playerIds().contains(me.userId())) {
-                // D-82 — 매치 종료 후(리매치 대기) 등 탈주 미해당이면 false → 일반 leave 로 폴백.
                 if (desertion.processDesertion(roomId, me.userId())) {
+                    return;
+                }
+                // D-122 — 탈주가 처리되지 않았다고 일반 leave 로 넘기면 IN_GAME 의 LREM 이
+                // 라이브 매치의 좌석을 당긴다(좌석 판정·비공개 이벤트 라우팅이 남의 좌석으로).
+                if (!seatMayBeReleased(roomId)) {
                     return;
                 }
             }
@@ -168,6 +177,24 @@ public class RoomController {
             // 이미 소멸 — 아래 leaveRoom 이 RoomNotFound 를 동일 처리.
         }
         rooms.leaveRoom(roomId, me.userId());
+    }
+
+    /**
+     * D-122 — IN_GAME 참가자의 탈주가 처리되지 않은 뒤 일반 leave 로 넘겨도 되는가.
+     *
+     * <p>처리되지 않는 경우는 셋이다: 이미 탈주한 좌석의 재요청(더블클릭, 유예 탈주 뒤 재접속해
+     * '나가기' — 스컬킹처럼 남은 사람끼리 계속하는 게임), 락 획득 실패, 매치가 이미 끝남. 앞의
+     * 둘은 <b>매치가 진행 중</b>이라 좌석을 그대로 둔다(아무것도 안 함 — 끊김은 유예 탈주가
+     * 처리한다). 넘기는 것은 매치가 끝나 리매치를 기다리는 방(티츄 사람만, D-82 — 좌석이 당겨지는
+     * 그 경로는 별건)과, 그 사이 방이 IN_GAME 을 벗어난 경우(FINISHED 는 lua 가 좌석을 고정)뿐이다.
+     * 판정은 게임 중립 — 매치 종료 여부는 엔진 포트가 답한다.
+     */
+    private boolean seatMayBeReleased(String roomId) {
+        Room now = rooms.getRoom(roomId);
+        if (now.status() != RoomStatus.IN_GAME) {
+            return true;
+        }
+        return engines.forRoom(now).isMatchOver();
     }
 
     /** 관전 시작. 플레이어로 입장한 방은 거절. */
@@ -197,15 +224,34 @@ public class RoomController {
         GameEngine engine = engines.forRoom(room);
         GameState state = engine.loadState()
                 .orElseThrow(() -> new ResyncNotAvailableException(roomId));
+        int privateSeat = occupiedSeat(room, seat);
         return new ResyncResponse(
                 roomId,
                 engine.phaseName(state),
                 seqs.current(roomId),
                 engine.publicView(state),
                 // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
-                seat >= 0 ? engine.privateView(state, seat).orElse(null) : null,
+                privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null,
                 disconnectedSeats(room, me.userId()),
                 chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
+    }
+
+    /**
+     * D-122 심층 방어(State Hiding) — 비공개 뷰는 요청자가 <b>실제로 앉은 좌석</b>에만 준다.
+     *
+     * <p>좌석 번호는 게임이 시작될 때 정원({@code capacity})만큼 찬 좌석 목록의 인덱스다.
+     * 시작 뒤 목록이 줄었다면(leave 폴백의 {@code LREM}) 뒤쪽 사람들의 {@code indexOf} 가 한
+     * 칸씩 당겨져 <b>남의 좌석</b>을 가리킨다 — 그대로 쓰면 다른 좌석의 손패·미공개 예측이
+     * 나간다. 그래서 목록이 정원과 다르면 좌석을 확신할 수 없다고 보고 관전자 뷰(공개만)로
+     * 떨어뜨린다. FINISHED 방은 좌석을 고정하므로(room_leave.lua) 정상 경로에서는 걸리지 않는다.
+     *
+     * @return 비공개 뷰를 줄 좌석, 줄 수 없으면 -1
+     */
+    private static int occupiedSeat(Room room, int indexInList) {
+        if (indexInList < 0 || room.playerIds().size() != room.capacity()) {
+            return -1;
+        }
+        return indexInList;
     }
 
     /**

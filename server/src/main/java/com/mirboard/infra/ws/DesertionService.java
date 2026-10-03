@@ -32,10 +32,6 @@ public class DesertionService {
 
     private static final Logger log = LoggerFactory.getLogger(DesertionService.class);
 
-    /** 락 획득 재시도 (TTL 2s 보다 넉넉히 — 가상스레드라 블로킹 저렴). */
-    private static final int LOCK_RETRIES = 30;
-    private static final long LOCK_RETRY_MILLIS = 100L;
-
     private final RoomService roomService;
     private final GameEngineProvider engines;
     private final GameEventBroadcaster broadcaster;
@@ -71,7 +67,7 @@ public class DesertionService {
         if (bots.isBot(deserterUserId)) {
             return false; // 봇은 끊기지 않음 — 방어.
         }
-        if (!acquireLock(roomId)) {
+        if (!lock.acquireWaiting(roomId)) {
             log.warn("Desertion: lock 획득 실패 — skip. roomId={} userId={}",
                     roomId, deserterUserId);
             return false;
@@ -105,6 +101,10 @@ public class DesertionService {
             broadcaster.broadcast(roomId, outbound, room.playerIds());
             if (outcome == GameEngine.DesertOutcome.MATCH_ENDED) {
                 roomService.markFinished(roomId);
+                // D-122 — 직전 액션이 걸어 둔 턴 데드라인을 지운다. 남겨 두면 발화해 버려진
+                // 라운드를 자동 진행했다(발화 쪽 방 상태 가드와 이중 방어). 락 안에서 해야
+                // 락을 기다리던 발화가 넘겨받은 뒤 옛 generation 으로 통과하지 못한다.
+                turnTimeout.cancel(roomId);
             } else {
                 // D-102/D-104 — 남은 사람끼리 계속. 방은 IN_GAME 유지, 다음 차례가
                 // 사람이면 타이머, 봇이면 봇 루프가 이어받도록 재무장한다.
@@ -125,20 +125,5 @@ public class DesertionService {
             turnTimeout.onTurnAdvanced(roomId);
         }
         return processed;
-    }
-
-    private boolean acquireLock(String roomId) {
-        for (int i = 0; i < LOCK_RETRIES; i++) {
-            if (lock.tryAcquire(roomId)) {
-                return true;
-            }
-            try {
-                Thread.sleep(LOCK_RETRY_MILLIS);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        return false;
     }
 }

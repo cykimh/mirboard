@@ -8,9 +8,10 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 793건 / 클라 286건
+서버 테스트 1014건 / 클라 413건
 
-**라이브**: https://mirboard.fly.dev — 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
+**라이브**: https://mirboard.fly.dev — 로그인 화면 「게스트로 바로 체험하기」로 가입 없이 들어갈 수 있습니다.
+유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
 
 ---
 
@@ -35,7 +36,9 @@ Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 | 특징 | 족보 조합, 폭탄 인터럽트, 카드 패스 | 승수 예측 후 동시 공개, 비추이적 트릭 판정 |
 
 - **로비/방** — 방 생성(인원 선택)·입장·관전·랭킹·채팅. 게임 시작은 정원 충족 + **전원 준비**
-- **봇** — 빈 좌석을 합법 수 균등 분포 봇으로 자동 충족 (휴리스틱은 의도적 후속 과제)
+- **봇** — 빈 좌석을 자동 충족. 두 게임 모두 공개 정보만 보는 결정적 휴리스틱이다(티츄 D-118 —
+  랜덤 봇 상대 100전 100승, 스컬킹 D-119 — 1:무작위 2~8인 승률 0.92~1.00). 재현:
+  `./gradlew :server:test --tests "com.mirboard.domain.game.*.bot.*"` (Docker 불필요)
 - **재접속·탈주** — 끊김 유예 후 미복귀 시 게임별 규칙으로 처리
 - **UI** — 라이트/다크 토글, 모바일 반응형, 색약 모드
 

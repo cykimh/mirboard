@@ -29,7 +29,12 @@
 `USERNAME_TAKEN`, `BAD_CREDENTIALS`, `ROOM_FULL`, `ROOM_NOT_FOUND`,
 `ALREADY_IN_ROOM`, `NOT_IN_ROOM`, `GAME_ALREADY_STARTED`,
 `GAME_NOT_AVAILABLE`, `RESYNC_NOT_AVAILABLE`,
-`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*.
+`TOO_MANY_REQUESTS` (429, 레이트리밋 초과), `ACCOUNT_LOCKED` (423, 로그인 실패 누적 잠금) *(D-84)*,
+`GUEST_FORBIDDEN` (403, 게스트 금지 행위), `GUEST_DISABLED` (403, 게스트 생성 꺼짐),
+`GUEST_UNAVAILABLE` (503, 게스트 일일 상한) *(D-117)*.
+
+429 응답의 `Retry-After` 는 그 버킷의 **윈도 길이(초)** 다 *(D-117 — 예전엔 고정 60)*. 예:
+`auth` 60, `guest` 86400.
 
 ---
 
@@ -63,12 +68,47 @@
   "accessToken": "eyJhbGciOi...",
   "tokenType": "Bearer",
   "expiresAt": 1715600000000,
-  "user": { "userId": 17, "username": "alice_01" }
+  "user": { "userId": 17, "username": "alice_01", "guest": false }
 }
 ```
+`user.guest` *(D-117, 가산)* — 게스트 계정이면 `true`(아래 `/api/auth/guest`). 로그인은 언제나 `false`.
+
 에러: `BAD_CREDENTIALS`, `ACCOUNT_LOCKED` (423 — 실패 누적 잠금, D-84),
 `TOO_MANY_REQUESTS` (429 — IP 레이트리밋 초과, D-84),
 `ACCOUNT_SUSPENDED` (403 — 어드민 정지, D-86).
+
+### POST `/api/auth/guest` *(D-117 — 가입 없는 체험)*
+인증 불필요. 방문자마다 **일회용 게스트 계정**(`users` 행 1개)을 만들고 로그인 응답을 바로
+준다. 공유 데모 계정(D-105)을 대체한다 — 같은 userId 를 여러 사람이 쓰면 좌석 탈취·손패
+유출이 생기기 때문이다.
+
+요청: `Content-Type: application/json` **필수**, 본문은 `{}` 이거나 비어 있다(읽지 않음).
+그 밖의 Content-Type 은 `415`. JSON 을 요구하는 이유는 크로스사이트 simple request(text/plain
+폼 전송)를 막고 브라우저가 프리플라이트를 하게 해 CORS 화이트리스트(D-83)에 걸리게 하려는 것.
+
+응답 `201` — 로그인과 같은 형태
+```json
+{
+  "accessToken": "eyJhbGciOi...",
+  "tokenType": "Bearer",
+  "expiresAt": 1715600000000,
+  "user": { "userId": 812, "username": "guest-k7m2xq9p", "guest": true }
+}
+```
+- 게스트는 컬럼이 아니라 **규약**으로 식별한다(`users` 화이트리스트 불변, D-02):
+  username `guest-[a-hjkmnp-z2-9]{8}` (하이픈은 가입 정책 밖이라 위조 불가) + 로그인 불가
+  해시 + `is_bot=false`. 같은 username 으로 로그인은 항상 `401 BAD_CREDENTIALS`.
+- 토큰은 12h. 게스트는 비밀번호가 없으므로 로그아웃·만료 뒤 같은 신원으로 돌아올 수 없다.
+- 게스트 제한: 비밀번호 변경·아바타 업로드/삭제 `403 GUEST_FORBIDDEN`, 랭킹 제외, 게스트가
+  한 명이라도 낀 매치는 **전원 ELO 미적용**(승패·탈주는 기록). 채팅은 정회원과 같다.
+- 한 판도 끝내지 않은 게스트 행은 48h 뒤 서버가 지운다(끝낸 게스트는 전적 보존 때문에 남음).
+
+에러:
+- `TOO_MANY_REQUESTS` (429) — IP(IPv6 는 /64) 당 하루 10회(`guest` 버킷). `Retry-After: 86400`.
+  토큰을 실어도 IP 키다.
+- `GUEST_UNAVAILABLE` (503) — UTC 하루 전역 상한(기본 200) 소진, 또는 상한을 판정할 수 없음
+  (Redis 장애 — fail-closed). `Retry-After` = 다음 UTC 자정까지 남은 초.
+- `GUEST_DISABLED` (403) — 운영 킬스위치(`MIRBOARD_GUEST_ENABLED=false`).
 
 ### GET `/api/me`
 응답 `200`
@@ -88,7 +128,8 @@
 ```
 현재 비밀번호 재검증 → `PasswordPolicy`(8~64자) 검증 → BCrypt 재해시 후 `users.password_hash`
 갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
-에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반).
+에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반),
+`GUEST_FORBIDDEN` (403 — 게스트 계정, D-117).
 
 ---
 
@@ -220,7 +261,9 @@
 ### POST `/api/rooms/{roomId}/rematch` *(D-82)*
 호스트가 매치 종료 후 같은 4명·같은 테이블에서 '한 판 더'(리매치). 방은 IN_GAME 을 유지한
 채 새 매치를 시작하고, 방 단위 테이블 칩(`room:{id}:chips`)은 누적되며 판돈 미만 보유자는
-무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). 응답 `200` — Room.
+무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). **리매치를 지원하는 게임만**
+(`GameDefinition.supportsRematch()`, 현재 티츄만 — D-122): 지원하지 않는 게임은 사람만의
+매치도 정상 종료 때 FINISHED 가 되므로 이 호출은 `GAME_NOT_IN_PROGRESS`. 응답 `200` — Room.
 에러: `NOT_HOST`, `GAME_NOT_IN_PROGRESS`(매치가 아직 안 끝났거나 진행 중 아님), `ROOM_NOT_FOUND`.
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
@@ -281,7 +324,7 @@ tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249
 1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
-쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇 제외, 그 게임의
+쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
 rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라도 한 사람만** 싣는다.
 등록되지 않은 `gameType` 은 `404 GAME_NOT_AVAILABLE`. username 외 식별 정보 노출
 0건 — D-02 constraint.
@@ -329,17 +372,33 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 유일한 탈출구.
 
 응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
-방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
+방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트. D-122: 턴
+데드라인을 취소하고, 이후 액션·봇·턴 타임아웃은 방 상태 가드로 적용되지 않는다(버려진
+라운드가 더 진행되지 않음). 전이와 취소는 **방 액션 락 안에서** 한다 — 진행 중인 액션이
+있으면 그것이 끝날 때까지(최대 약 3초) 기다린 뒤 종료한다. 재시도 끝에도 락을 못 잡으면
+거절하지 않고 락 없이 종료한다(탈출구 보장, `stomp-protocol.md` 액션 처리 단계 참고).
 
 ### POST `/api/rooms/{roomId}/leave`
 응답 `204`.
 - 호스트가 떠나면 잔존 인원 중 가장 먼저 입장한 사용자가 호스트 승격.
 - 마지막 인원이 떠나면 방 삭제(`room_leave.lua` 가 players/ready/spectators
   정리). 관전자만 남았다가 0이 되면 `room_delete.lua` 로 즉시 소멸.
+- **D-122 — FINISHED 방은 좌석을 고정한다.** 나가도 `playerIds`·`hostId` 가 그대로이고
+  마지막 사람이 나가도 방이 지워지지 않는다(FINISHED 후 600s TTL 로 사라짐). 좌석 번호 =
+  `playerIds` 인덱스라, 목록을 당기면 남은 사람의 좌석·종료 화면 이름·resync 비공개 뷰가
+  다른 좌석으로 밀렸다. 나간 사람은 그 방에 묶이지 않는다 — 허브·다른 방 입장 정상
+  (`ALREADY_IN_ROOM` 은 방 단위 검사).
 - Phase 19(#3, D-75): 방이 **IN_GAME** 이고 호출자가 플레이어면 명시적
   leave 는 **탈주**로 처리 — 상대팀 승리로 매치 즉시 종료, 탈주자
   `desert_count`+1 · `lose_count`+1 · ELO 차감(봇 포함 매치는 ELO 제외,
   D-71). WAITING/FINISHED 이거나 관전자면 일반 leave/stopSpectating.
+- **D-122 — 진행 중 매치의 좌석도 고정한다.** IN_GAME 플레이어의 leave 가 탈주로 처리되지
+  않으면(이미 탈주한 좌석의 재요청 — 더블클릭이나 유예 탈주 뒤 재접속해 '나가기', 또는 방 락
+  획득 실패) 매치가 진행 중인 한 **아무것도 하지 않고** `204` 다(`playerIds` 불변). 끊김은 유예
+  탈주가 처리한다. 일반 leave 로 넘기는 것은 매치가 이미 끝난 방(티츄 사람만의 리매치 대기,
+  D-82 — 이 경로의 좌석 당김은 별건)과, 그 사이 방이 FINISHED 가 된 경우뿐이다. 진행 중에
+  목록을 당기면 STOMP 액션의 좌석 판정과 비공개 이벤트(`HAND_DEALT` 등) 라우팅이 남의 좌석을
+  가리켰다.
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
   은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
   기본 **120s**, D-79) 후 미복귀 시 탈주.
@@ -401,6 +460,57 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   라운드 내역을 통째로 교체하므로(append 아님), 재접속·새 기기에서도 내역이 온전하다.
   끝난 라운드가 없으면 `[]`.
 
+**스컬킹(`gameType=SKULL_KING`)의 `tableView`** — 봉투(`roomId`·`phase`·`eventSeq`·
+`disconnectedSeats`·`chips`)는 같고 `tableView`/`privateHand` 모양만 게임별로 다르다(D-98).
+서버 `SkullKingStateMapper.TableView`, 클라 `types/skullking.ts` 미러와 1:1. 아래는
+라운드 3 이 끝나고 라운드 4 를 예측하는 중이다.
+```json
+{
+  "phase": "BIDDING",
+  "roundNumber": 4,
+  "handSize": 4,
+  "startSeat": 1,
+  "currentTurnSeat": -1,
+  "seats": [
+    { "seat": 0, "handCount": 4, "hasBid": true,  "bid": null, "tricksWon": 0 },
+    { "seat": 1, "handCount": 4, "hasBid": false, "bid": null, "tricksWon": 0 }
+  ],
+  "trick": [],
+  "cumulativeScores": { "0": 50, "1": -10 },
+  "desertedSeats": [],
+  "roundScores": {},
+  "completedRounds": [
+    { "roundNumber": 1, "scores": {
+        "0": { "bid": 0, "won": 0, "base": 10, "bonus": 0, "total": 10 },
+        "1": { "bid": 1, "won": 0, "base": -10, "bonus": 0, "total": -10 } } },
+    { "roundNumber": 2, "scores": { "0": { "bid": 1, "won": 1, "base": 20, "bonus": 0, "total": 20 },
+                                    "1": { "bid": 0, "won": 0, "base": 20, "bonus": 0, "total": 20 } } },
+    { "roundNumber": 3, "scores": { "0": { "bid": 1, "won": 1, "base": 20, "bonus": 0, "total": 20 },
+                                    "1": { "bid": 2, "won": 0, "base": -20, "bonus": 0, "total": -20 } } }
+  ],
+  "matchResult": null
+}
+```
+- `seats[].bid`: 전원 제출 전(BIDDING)에는 항상 `null` — 제출 여부만 `hasBid` 로 공개(§5).
+  본인 값은 `privateHand.myBid`(`{ seat, hand: SkullCard[], myBid }`)로만 온다.
+- `completedRounds`: D-120 **정산이 끝난 라운드** 기록(순서 = 라운드 1..N). 진행 중 라운드는
+  절대 담기지 않으므로 공개 전 예측값이 이 경로로 새지 않는다. 바로 위 `roundScores` 와
+  혼동 주의 — 그쪽은 **현재 라운드**의 정산 내역이고 `ROUND_END` 에만 채워진다. 클라는 이
+  값으로 점수표를 통째로 교체한다. 끝난 라운드가 없으면 `[]`. D-120 이전에 시작된 매치는
+  앞선 라운드가 빠질 수 있다(합계는 권위값 `cumulativeScores` 를 쓴다).
+- `matchResult`: D-120 매치가 끝난 뒤에만 `{ winners: [seat], finalScores: {seat: 점수},
+  roundsPlayed }`, 그 전에는 `null`. `MATCH_ENDED` payload 와 같은 모양이라 재접속·탭 전환
+  뒤에도 종료 패널이 복원된다. `roundsPlayed` 는 **매치가 끝날 때 매치 상태에 저장한 값**
+  (D-122)이라 `MATCH_ENDED`·DB 기록과 같다 — 탈주 조기 종료면 10 미만이다. 라운드 상태에서
+  역산하지 않는다(종료 뒤 상태가 바뀌어도 흔들리지 않게). 값이 없는 구 매치만 예전 역산.
+- 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
+  마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
+  resync 한다.
+- **`privateHand` 는 요청자가 실제로 앉은 좌석에만**(D-122 심층 방어, 모든 게임 공통). 좌석은
+  `playerIds` 의 인덱스인데, 게임이 시작된 뒤 목록이 정원(`capacity`)보다 줄었다면 인덱스가
+  당겨져 남의 좌석을 가리킬 수 있으므로 `privateHand: null`(관전자 뷰)을 준다. 목록에 없는
+  사람(관전자 포함)도 관전자 뷰다. FINISHED 방은 좌석을 고정하므로 정상 경로에서는 해당 없음.
+
 에러: `NOT_IN_ROOM`, `RESYNC_NOT_AVAILABLE` (게임 진행 중이 아님).
 
 ---
@@ -417,10 +527,10 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 
 ### POST `/api/me/avatar`
 multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 응답 `204`.
-에러: `INVALID_AVATAR` (빈 파일/미지원 형식), 업로드 크기 초과.
+에러: `INVALID_AVATAR` (빈 파일/미지원 형식), 업로드 크기 초과, `GUEST_FORBIDDEN` (403 — 게스트, D-117).
 
 ### DELETE `/api/me/avatar`
-응답 `204` (없어도 204).
+응답 `204` (없어도 204). 에러: `GUEST_FORBIDDEN` (403 — 게스트, D-117).
 
 ### GET `/avatars/{userId}` *(공개, 비-`/api`)*
 `image/png` 바이너리 (`Cache-Control: max-age=60`), 없으면 `404`. `<img>` 직접
@@ -466,6 +576,7 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 ### POST `/api/admin/rooms/{roomId}/abort`
 어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
 와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+호스트 abort 와 같이 방 액션 락 안에서 종료하고 턴 데드라인을 취소한다(D-122).
 
 ### POST `/api/admin/users/{userId}/suspend`
 유저 정지. 본문 `{ "minutes": 60 }`(선택, 기본 60분, 1~525600 클램프). 정지 상태는 Redis
@@ -520,3 +631,11 @@ TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유�
 - *(D-84)* 로그인 brute-force 잠금 + 인증 엔드포인트 IP 레이트리밋. 잠금/카운터는
   전부 Redis(휘발, TTL)에 두어 `users` 스키마 불변(D-02 준수). 레이트리밋 버킷 키에
   쓰는 클라이언트 IP 는 TTL 휘발값이며 영속 로그가 아니다(위 IP 비기록 원칙과 일관).
+- *(D-117)* `/api/auth/**` 는 Bearer 유무와 무관하게 **항상 IP 키**로 레이트리밋한다(토큰을
+  이어 붙여 버킷을 갈아타는 우회 차단). IP 는 `X-Forwarded-For`·`Forwarded`(클라 위조 가능)가
+  아니라 신뢰 헤더 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`)에서 읽고,
+  IPv6 는 /64 로 묶는다. 게스트 생성 로그에도 IP 를 남기지 않는다. 버킷·대상 판정은 원본
+  URI 가 아니라 MVC·Security 가 매칭하는 경로(디코딩·`;` 파라미터 제거·contextPath 제외)로
+  한다 — `/api/auth/%67uest`·`/%61pi/auth/guest`·`X-Forwarded-Prefix` 처럼 같은 엔드포인트에
+  닿는 변형도 같은 버킷·같은 IP 키를 쓴다. 해석할 수 없거나 `%` 가 섞인 경로는 제외하지 않고
+  기본 버킷을 적용한다.

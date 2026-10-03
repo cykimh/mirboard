@@ -29,7 +29,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * D-102 (S5) 완료 기준 — <b>봇만으로 스컬킹 10라운드 완주</b>. 4인·6인 방을 봇으로 채워
- * 정의 등록 → GameStartingEvent → BotScheduler(포트 기본 botAction) → advance 의 라운드
+ * 정의 등록 → GameStartingEvent → BotScheduler(D-119 휴리스틱 botAction) → advance 의 라운드
  * 연쇄 → 매치 종료 → 방 FINISHED 까지 전 배선을 검증한다.
  *
  * <p>6인 방은 봇 풀 확장(V10, 4→8)의 회귀 가드이기도 하다 — 봇 5명이 필요해 V3 4명으로는
@@ -73,6 +73,41 @@ class SkullKingBotMatchSimulationIT {
     @Test
     void six_player_all_bot_match_completes_ten_rounds() {
         runAllBotMatch(6);
+    }
+
+    /**
+     * D-120 — 라운드 기록이 실제 배선(봇 → advance → 매치 상태 저장)을 타고 10건 다 남는다.
+     * 봇 방은 매치 종료 직후 FINISHED 로 전이되므로, 클라가 종료 화면에서 점수표를 그리려면
+     * 이 기록이 Redis 에 온전해야 한다. 기존 완주 테스트와 분리한 것은 병렬 작업과의 병합
+     * 충돌을 피하려는 것이다(같은 방 생성 절차를 쓴다).
+     */
+    @Test
+    void all_bot_match_records_every_round_in_the_match_history() {
+        int capacity = 4;
+        long hostBotId = bots.getBotIds().get(0);
+        Room room = roomService.createRoom(hostBotId, "sk-bot-history", "SKULL_KING",
+                TeamPolicy.SEQUENTIAL, true, RoomService.DEFAULT_TARGET_SCORE,
+                0, RoomService.DEFAULT_STAKE, capacity);
+        String roomId = room.roomId();
+
+        Awaitility.await()
+                .atMost(90, TimeUnit.SECONDS)
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> matchStateStore.load(roomId)
+                        .map(SkullKingMatchState::isMatchOver)
+                        .orElse(false));
+
+        SkullKingMatchState match = matchStateStore.load(roomId).orElseThrow();
+        assertThat(match.completedRounds())
+                .extracting(SkullKingMatchState.CompletedRound::roundNumber)
+                .containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        for (int seat = 0; seat < capacity; seat++) {
+            int s = seat;
+            assertThat(match.completedRounds().stream()
+                    .mapToInt(r -> r.scores().get(s).total()).sum())
+                    .as("좌석 %d — 기록의 합 = 누적 점수", seat)
+                    .isEqualTo(match.cumulativeScores().get(seat));
+        }
     }
 
     private void runAllBotMatch(int capacity) {

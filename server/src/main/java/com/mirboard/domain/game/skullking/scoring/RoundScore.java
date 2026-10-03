@@ -1,6 +1,7 @@
 package com.mirboard.domain.game.skullking.scoring;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * 한 좌석의 한 라운드 점수 내역 (`docs/rules-skullking.md` §10, §11).
@@ -13,7 +14,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * @param won    실제 승수
  * @param base   §10 표의 기본 점수 (실패 시 음수)
  * @param bonus  §11 보너스. 예측 실패 시 반드시 0
+ *
+ * <p>매치 상태 JSON 의 {@code completedRounds[].scores} 값으로도 영속된다(D-120) — 바깥 레코드와
+ * 같이 모르는 필드를 무시해야 다음 필드 추가 뒤에도 롤백이 안전하다.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record RoundScore(int bid, int won, int base, int bonus) {
 
     public RoundScore {

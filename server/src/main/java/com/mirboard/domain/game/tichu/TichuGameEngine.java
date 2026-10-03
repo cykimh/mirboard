@@ -6,10 +6,9 @@ import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.tichu.action.TichuAction;
+import com.mirboard.domain.game.tichu.bot.HeuristicBotPolicy;
 import com.mirboard.domain.game.tichu.bot.LegalActionEnumerator;
-import com.mirboard.domain.game.tichu.bot.RandomBotPolicy;
 import com.mirboard.domain.game.tichu.bot.TimeoutActionPolicy;
-import com.mirboard.domain.game.tichu.card.Special;
 import com.mirboard.domain.game.tichu.event.TichuEvent;
 import com.mirboard.domain.game.tichu.event.TichuMatchCompleted;
 import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
@@ -23,12 +22,10 @@ import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
-import com.mirboard.domain.game.tichu.state.TrickState;
 import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,13 +112,7 @@ public final class TichuGameEngine implements GameEngine {
      */
     @Override
     public List<Integer> pendingSeats(GameState state) {
-        return switch (tichuState(state)) {
-            case TichuState.Dealing d -> seatsWhere(d.players().size(), s -> !d.ready().contains(s));
-            case TichuState.Passing p ->
-                    seatsWhere(p.players().size(), s -> !p.submitted().containsKey(s));
-            case TichuState.Playing pl -> playingPendingSeats(pl);
-            case TichuState.RoundEnd __ -> List.of();
-        };
+        return TichuPendingSeats.of(tichuState(state));
     }
 
     @Override
@@ -174,13 +165,13 @@ public final class TichuGameEngine implements GameEngine {
     }
 
     /**
-     * {@link RandomBotPolicy} 에 위임 — 포트 기본값(합법 액션 균등 분포)과 결과는 같지만
-     * 정책이 게임 쪽에 남아 있어야 휴리스틱을 넣을 자리가 생긴다. 시드 재현성은 호출자가
-     * 넘긴 {@code random} 인스턴스가 유지한다.
+     * D-118 — {@link HeuristicBotPolicy} 에 위임한다. 공개 정보만 보는 결정적 정책이라
+     * {@code random} 인자는 쓰지 않는다(같은 상태면 같은 수 — {@code mirboard.bot.seed} 는
+     * 포트 기본 봇을 쓰는 게임에만 의미가 남는다).
      */
     @Override
     public GameAction botAction(GameState state, int seat, Random random) {
-        return new RandomBotPolicy(random).choose(tichuState(state), seat);
+        return HeuristicBotPolicy.choose(tichuState(state), seat);
     }
 
     @Override
@@ -296,29 +287,6 @@ public final class TichuGameEngine implements GameEngine {
                 .findFirst()
                 .orElseGet(() -> new RoundScore(
                         ended.teamAScore(), ended.teamBScore(), -1, false));
-    }
-
-    private static List<Integer> playingPendingSeats(TichuState.Playing playing) {
-        TrickState trick = playing.trick();
-        // 용으로 트릭을 가져간 좌석은 양도(GiveDragonTrick)를 마칠 때까지 차례를 붙잡는다.
-        if (dragonGivePending(trick)) {
-            return List.of(trick.currentTopSeat());
-        }
-        int current = trick.currentTurnSeat();
-        if (current < 0 || playing.players().get(current).isFinished()) {
-            return List.of();
-        }
-        return List.of(current);
-    }
-
-    private static boolean dragonGivePending(TrickState trick) {
-        return trick.currentTop() != null
-                && trick.currentTop().cards().size() == 1
-                && trick.currentTop().cards().get(0).is(Special.DRAGON);
-    }
-
-    private static List<Integer> seatsWhere(int seatCount, java.util.function.IntPredicate pending) {
-        return IntStream.range(0, seatCount).filter(pending).boxed().toList();
     }
 
     private static TichuState tichuState(GameState state) {

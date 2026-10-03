@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.scoring;
 
+import com.mirboard.domain.lobby.auth.GuestPolicy;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.util.List;
@@ -68,7 +69,8 @@ public class UserGameStatsService {
     /**
      * 한 매치 결과 1건을 누적한다.
      *
-     * @param newRating ELO 를 적용하지 않는 매치(봇 포함)면 null — rating 유지
+     * @param newRating ELO 를 적용하지 않는 매치(봇·게스트 포함, {@link RatedMatchPolicy})면
+     *                  null — rating 유지
      */
     @Transactional
     public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted) {
@@ -77,7 +79,9 @@ public class UserGameStatsService {
 
     @Transactional(readOnly = true)
     public List<RankRow> ranking(String gameType, int limit) {
-        List<UserGameStats> rows = repo.findRanking(gameType, PageRequest.of(0, limit));
+        // D-117 — 일회용 게스트는 랭킹에 싣지 않는다.
+        List<UserGameStats> rows = repo.findRanking(gameType, GuestPolicy.LIKE_PATTERN,
+                PageRequest.of(0, limit));
         Map<Long, String> names = users.findAllById(rows.stream().map(UserGameStats::getUserId).toList())
                 .stream().collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
         return IntStream.range(0, rows.size())

@@ -4,6 +4,8 @@ import { SkullKingTable } from './SkullKingTable';
 import { useSkullKingStore } from './skullkingStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import type {
+  CompletedRoundView,
+  MatchEndedPayload,
   SeatView,
   SkullCard,
   SkullKingPhase,
@@ -50,6 +52,10 @@ function seed(opts: {
   currentTurnSeat?: number;
   seats?: SeatView[];
   bids?: Record<number, number>;
+  roundNumber?: number;
+  completedRounds?: CompletedRoundView[];
+  cumulativeScores?: Record<number, number>;
+  matchResult?: MatchEndedPayload | null;
 }) {
   const seats =
     opts.seats ??
@@ -63,15 +69,17 @@ function seed(opts: {
     eventSeq: 1,
     tableView: {
       phase: opts.phase,
-      roundNumber: 3,
+      roundNumber: opts.roundNumber ?? 3,
       handSize: 3,
       startSeat: 0,
       currentTurnSeat: opts.currentTurnSeat ?? -1,
       seats,
       trick: [],
-      cumulativeScores: {},
+      cumulativeScores: opts.cumulativeScores ?? {},
       desertedSeats: [],
       roundScores: {},
+      completedRounds: opts.completedRounds,
+      matchResult: opts.matchResult,
     },
     privateHand:
       opts.mySeat >= 0
@@ -356,5 +364,239 @@ describe('나가기 확인 (D-110)', () => {
     expect(confirm).not.toHaveBeenCalled();
     expect(onExit).toHaveBeenCalledOnce();
     confirm.mockRestore();
+  });
+});
+
+// ---------- D-120 — 라운드 결과 · 점수표 · 종료 후 게임판 유지 ----------
+
+const R3: CompletedRoundView = {
+  roundNumber: 3,
+  scores: {
+    0: { bid: 1, won: 1, base: 20, bonus: 10, total: 30 },
+    1: { bid: 2, won: 0, base: -20, bonus: 0, total: -20 },
+    2: { bid: 0, won: 0, base: 30, bonus: 0, total: 30 },
+    3: { bid: 0, won: 2, base: -30, bonus: 0, total: -30 },
+  },
+};
+
+/** 라운드 3 이 끝나고 라운드 4 예측 중 — 서버는 라운드 사이에 멈추지 않는다. */
+function seedRound4Bidding(mySeat = 0) {
+  seed({
+    seatCount: 4,
+    mySeat,
+    phase: 'BIDDING',
+    roundNumber: 4,
+    hand: [suit('GREEN', 5)],
+    completedRounds: [R3],
+    cumulativeScores: { 0: 50, 1: -10, 2: 40, 3: -30 },
+  });
+}
+
+const resultPanel = () => screen.queryByRole('region', { name: '라운드 3 결과' });
+
+describe('직전 라운드 결과 — 다음 라운드 예측 중 비차단 표시 (D-120)', () => {
+  it('BIDDING R4 에서 라운드 3 결과를 좌석별로 보인다', () => {
+    seedRound4Bidding();
+    renderTable();
+
+    const panel = resultPanel()!;
+    expect(panel).not.toBeNull();
+    const rows = within(panel).getAllByRole('row').slice(1); // 머리글 제외
+    expect(rows).toHaveLength(4);
+    const mine = rows.find((row) => row.textContent?.includes('(나)'))!;
+    expect(mine.textContent).toContain('+30');
+    expect(mine.textContent).toContain('✓');
+    expect(mine.textContent).toContain('50'); // 누적
+    const missed = rows.find((row) => row.textContent?.includes('#101'))!;
+    expect(missed.textContent).toContain('✗');
+    expect(missed.textContent).toContain('-20');
+  });
+
+  it('입력 동선이 먼저다 — 예측 패널이 결과 패널보다 DOM 상 앞에 있다', () => {
+    seedRound4Bidding();
+    const { container } = renderTable();
+
+    const bid = container.querySelector('.sk-bid')!;
+    expect(bid).not.toBeNull();
+    expect(
+      bid.compareDocumentPosition(resultPanel()!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('닫으면 그 라운드 결과는 다시 뜨지 않는다', () => {
+    seedRound4Bidding();
+    renderTable();
+
+    fireEvent.click(within(resultPanel()!).getByRole('button', { name: '닫기' }));
+
+    expect(resultPanel()).toBeNull();
+  });
+
+  it('PLAYING 에 들어가면 보이지 않는다', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      phase: 'PLAYING',
+      roundNumber: 4,
+      completedRounds: [R3],
+    });
+    renderTable();
+
+    expect(resultPanel()).toBeNull();
+  });
+
+  it('관전자도 본다', () => {
+    seed({
+      seatCount: 4,
+      mySeat: -1,
+      phase: 'BIDDING',
+      roundNumber: 4,
+      completedRounds: [R3],
+    });
+    renderTable({ spectator: true });
+
+    expect(resultPanel()).not.toBeNull();
+  });
+
+  it('내 정보줄에 직전 라운드 값이 함께 뜬다', () => {
+    seedRound4Bidding();
+    const { container } = renderTable();
+
+    const me = container.querySelector('.sk-me')!;
+    expect(me.textContent).toContain('직전');
+    expect(me.textContent).toContain('R3');
+    expect(me.textContent).toContain('+30');
+  });
+});
+
+describe('점수표 모달 (D-120)', () => {
+  it('헤더의 점수표 버튼이 dialog 를 연다', () => {
+    seedRound4Bidding();
+    renderTable();
+
+    const button = screen.getByRole('button', { name: '점수표' });
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+    fireEvent.click(button);
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('table').textContent).toContain('R3');
+  });
+
+  it('결과 패널의 점수표 전체 버튼도 같은 dialog 를 연다', () => {
+    seedRound4Bidding();
+    renderTable();
+
+    fireEvent.click(within(resultPanel()!).getByRole('button', { name: '점수표 전체' }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('매치 종료 패널의 라운드 표 (D-120)', () => {
+  it('접힌 상세에 라운드 표가 있고 합계는 최종 점수다', () => {
+    const finalScores = { 0: 77, 1: -10, 2: 40, 3: -30 };
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      phase: 'ROUND_END',
+      roundNumber: 3,
+      completedRounds: [R3],
+      matchResult: { winners: [0], finalScores, roundsPlayed: 10 },
+    });
+    const { container } = renderTable();
+
+    const details = container.querySelector('.sk-match-end details')!;
+    expect(details).not.toBeNull();
+    const total = [...details.querySelectorAll('tbody tr')].at(-1)!;
+    expect(total.textContent).toContain('77');
+  });
+});
+
+describe('roomFinished — 종료 전이 후에도 유지된 게임판 (D-120)', () => {
+  it('매치 결과가 아직 없으면 종료 안내를 보이고 입력 패널을 숨긴다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
+    const onExit = vi.fn();
+    const { container } = renderTable({ roomFinished: true, onExit });
+
+    const note = container.querySelector('.sk-finished-note')!;
+    expect(note.textContent).toContain('게임이 종료되었습니다');
+    expect(container.querySelector('.sk-bid')).toBeNull();
+    fireEvent.click(within(note as HTMLElement).getByRole('button', { name: '메인으로' }));
+    expect(onExit).toHaveBeenCalledOnce();
+  });
+
+  it('PLAYING 이어도 카드 제출 패널을 숨긴다', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      phase: 'PLAYING',
+      currentTurnSeat: 0,
+      hand: [suit('GREEN', 5)],
+    });
+    renderTable({ roomFinished: true });
+
+    expect(screen.queryByRole('button', { name: '카드 제출' })).toBeNull();
+  });
+
+  it('매치 결과가 있으면 종료 안내 대신 매치 종료 패널', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      phase: 'ROUND_END',
+      matchResult: { winners: [1], finalScores: { 0: 1, 1: 2 }, roundsPlayed: 10 },
+    });
+    const { container } = renderTable({ roomFinished: true });
+
+    expect(container.querySelector('.sk-finished-note')).toBeNull();
+    expect(container.querySelector('.sk-match-end')).not.toBeNull();
+  });
+
+  it('나가기에 탈주 확인을 묻지 않는다', () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const onExit = vi.fn();
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable({ roomFinished: true, onExit });
+
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onExit).toHaveBeenCalledOnce();
+    confirm.mockRestore();
+  });
+});
+
+describe('규칙 버튼 (D-121)', () => {
+  const SK_KEY = 'mirboard.tutorial.skull_king.seen.v1';
+
+  beforeEach(() => localStorage.clear());
+
+  it('누르면 스컬킹 튜토리얼이 열리고, 게임 액션은 보내지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
+    renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+
+    expect(
+      screen.getByRole('heading', { name: '미르보드 스컬킹에 오신 걸 환영합니다' }),
+    ).toBeInTheDocument();
+    // 다이얼로그는 body 포털(.sk-table 밖)이라 본문이 칩 토큰 클래스를 직접 가져야 한다.
+    expect(document.querySelector('.tutorial-body')).toHaveClass('sk-tokens');
+    expect(sendAction).not.toHaveBeenCalled();
+  });
+
+  it('미열람이어도 게임판에서는 자동으로 뜨지 않는다 — 타이머가 흐르는 중이다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(localStorage.getItem(SK_KEY)).toBeNull();
+  });
+
+  it('관전자도 연다', () => {
+    seed({ seatCount: 4, mySeat: -1, phase: 'PLAYING' });
+    renderTable({ spectator: true });
+
+    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

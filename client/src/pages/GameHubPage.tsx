@@ -36,8 +36,9 @@ import {
 } from '@/components/ui/avatar';
 import { avatarSrc } from '@/api/avatar';
 import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
-import { TutorialModal } from '@/features/tichu/tutorial/TutorialModal';
-import { useTutorialGate } from '@/features/tichu/tutorial/useTutorialGate';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { tutorialFor } from '@/features/tutorial/gameTutorials';
+import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { useColorblindStore } from '@/features/theme/colorblindStore';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -59,7 +60,10 @@ export function GameHubPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
-  const tutorial = useTutorialGate();
+  // D-121 — 카드별 '게임 방법'으로 연 게임. 허브는 게임을 고를 수 없어 자동 노출하지 않는다
+  // (자동 노출은 그 게임 대기실 첫 입장 — RoomPage).
+  const [tutorialGameId, setTutorialGameId] = useState<string | null>(null);
+  const hubTutorial = tutorialFor(tutorialGameId);
   const colorblind = useColorblindStore((s) => s.enabled);
   const toggleColorblind = useColorblindStore((s) => s.toggle);
   const [avatarVersion, setAvatarVersion] = useState(0);
@@ -153,11 +157,13 @@ export function GameHubPage() {
           <div className="flex items-center gap-3">
             {user && (
               <div className="flex items-center gap-2">
+                {/* D-117 — 게스트는 아바타 업로드 불가(서버도 403). 버튼만 잠그고 이유는 title 로. */}
                 <button
                   type="button"
                   onClick={() => setAvatarModalOpen(true)}
-                  title="아바타 설정"
-                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  disabled={!!user.guest}
+                  title={user.guest ? t('hub.guest.avatarDisabled') : '아바타 설정'}
+                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:hover:opacity-100"
                 >
                   <Avatar>
                     <AvatarImage
@@ -177,6 +183,9 @@ export function GameHubPage() {
                 >
                   {user.username}
                 </button>
+                {user.guest && (
+                  <Badge variant="secondary">{t('hub.guest.badge')}</Badge>
+                )}
               </div>
             )}
             {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로, 전적은 전 게임 합. */}
@@ -191,17 +200,6 @@ export function GameHubPage() {
                 {totals.desert > 0 && ` · 탈주 ${totals.desert}`}
               </span>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={tutorial.show}
-              aria-label="게임 방법"
-              title="게임 방법"
-            >
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">게임 방법</span>
-            </Button>
             <Button
               type="button"
               variant={colorblind ? 'default' : 'outline'}
@@ -220,6 +218,8 @@ export function GameHubPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                // D-117 — 게스트는 비밀번호가 없어 로그아웃하면 같은 신원으로 못 돌아온다.
+                if (user?.guest && !window.confirm(t('hub.guest.logoutConfirm'))) return;
                 logout();
                 navigate('/login');
               }}
@@ -253,6 +253,7 @@ export function GameHubPage() {
             : games?.map((game) => {
                 const available = game.status === 'AVAILABLE';
                 const wiki = gameWikiUrl(game.id);
+                const hasTutorial = !!tutorialFor(game.id);
                 return (
                   <Card
                     key={game.id}
@@ -285,6 +286,18 @@ export function GameHubPage() {
                         >
                           자세히 <ExternalLink className="h-3.5 w-3.5" />
                         </a>
+                      )}
+                      {hasTutorial && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTutorialGameId(game.id)}
+                          aria-label={`${game.displayName} 게임 방법`}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                          게임 방법
+                        </Button>
                       )}
                     </CardFooter>
                   </Card>
@@ -426,6 +439,7 @@ export function GameHubPage() {
           open={showCreateModal}
           token={token}
           availableGames={availableGames}
+          defaultFillWithBots={!!user?.guest}
           onClose={() => setShowCreateModal(false)}
           onError={(msg) => {
             setError(msg);
@@ -434,7 +448,7 @@ export function GameHubPage() {
         />
       )}
 
-      {token && user && (
+      {token && user && !user.guest && (
         <AvatarSettingsModal
           open={avatarModalOpen}
           onClose={() => setAvatarModalOpen(false)}
@@ -445,7 +459,17 @@ export function GameHubPage() {
         />
       )}
 
-      <TutorialModal open={tutorial.open} onClose={tutorial.close} />
+      {/* 마운트마다 0단계부터. 닫으면 그 게임을 본 것으로 기록해 대기실에서 다시 띄우지 않는다. */}
+      {hubTutorial && (
+        <TutorialDialog
+          tutorial={hubTutorial}
+          open
+          onClose={() => {
+            markTutorialSeen(hubTutorial.seenKey);
+            setTutorialGameId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

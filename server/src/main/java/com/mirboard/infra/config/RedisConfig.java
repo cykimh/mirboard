@@ -53,6 +53,12 @@ public class RedisConfig {
         return scriptOf("lua/rate_limit_fixed_window.lua");
     }
 
+    /** D-117 — 게스트 일일 전역 상한 카운터 (INCR+첫 EXPIRE 원자) — TTL 없는 날짜 키 방지. */
+    @Bean
+    public RedisScript<Long> guestDailyIssueScript() {
+        return scriptOf("lua/guest_daily_issue.lua");
+    }
+
     /** D-96 — 방 프레즌스 세션 카운터 증가. 세션당 1회만(구독 수만큼 세지 않는다). */
     @Bean
     public RedisScript<Long> presenceJoinScript() {

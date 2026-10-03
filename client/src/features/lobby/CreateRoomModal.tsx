@@ -37,6 +37,11 @@ interface CreateRoomModalProps {
   availableGames: GameSummary[];
   onClose: () => void;
   onError: (message: string) => void;
+  /**
+   * D-117 — '빈 좌석 봇으로 채우기'의 초기값. 게스트는 혼자 온 리뷰어라 켠 채로 열어 사람을
+   * 기다리지 않고 바로 한 판 하게 한다. 판돈 방 봇 금지(D-81)는 그대로 우선한다.
+   */
+  defaultFillWithBots?: boolean;
 }
 
 /**
@@ -49,12 +54,13 @@ export function CreateRoomModal({
   availableGames,
   onClose,
   onError,
+  defaultFillWithBots,
 }: CreateRoomModalProps) {
   const navigate = useNavigate();
   const [selectedGame, setSelectedGame] = useState('');
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [fillWithBots, setFillWithBots] = useState(false);
+  const [fillWithBots, setFillWithBots] = useState(defaultFillWithBots ?? false);
   const [targetScore, setTargetScore] = useState(1000);
   const [turnSeconds, setTurnSeconds] = useState(0);
   const [stake, setStake] = useState(0);

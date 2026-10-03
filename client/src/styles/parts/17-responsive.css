@@ -167,3 +167,14 @@
     min-height: 44px;
   }
 }
+
+/* D-120 — 스컬킹 헤더 버튼(점수표·채팅·나가기)도 44px 하한. 점수표 버튼이 생기며 탭 대상이
+   셋이 됐는데 .sk-badge 알약은 ~22px 다. 버튼 사이 간격이 6px 뿐이라 ::after 히트 영역을
+   넓히면 이웃 버튼 위로 겹친다 — 그래서 알약 자체를 키운다(티츄 헤더 컨트롤과 같은 방식).
+   비대화형 배지(span)는 대상이 아니다. 터치 기기에서만 — 데스크톱 마우스 무영향. */
+@media (pointer: coarse) {
+  .sk-header button.sk-badge {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

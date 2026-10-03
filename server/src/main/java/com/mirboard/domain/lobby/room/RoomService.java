@@ -272,6 +272,12 @@ public class RoomService {
         if (room.status() != RoomStatus.IN_GAME) {
             throw new GameNotInProgressException(roomId);
         }
+        // D-122 — 리매치는 게임이 선언한다. 리매치가 없는 게임은 정상 종료 때 FINISHED 로 가지만,
+        // 매치가 끝난 채 IN_GAME 으로 남은 방(배포 전에 끝난 방·FINISHED 전이 실패)에서 조작된
+        // 요청이 새 매치를 시작하지 못하게 여기서도 막는다.
+        if (!games.require(room.gameType()).supportsRematch()) {
+            throw new GameNotInProgressException(roomId);
+        }
         log.info("Rematch: roomId={} host={} players={}", roomId, requesterId, room.playerIds());
         return onGameStart(room);
     }
@@ -341,10 +347,11 @@ public class RoomService {
     }
 
     /**
-     * Phase 8A — 호스트가 IN_GAME 방을 수동 종료. 무한 재접속 정책 하에서 끊긴
-     * 플레이어가 돌아오지 않을 때 빠져나오는 유일한 경로.
+     * D-122 — 호스트 강제 종료의 사전 검증(방 액션 락을 잡기 전). 호스트가 아니거나 진행 중이
+     * 아니면 던진다. 락 안의 {@link #abortGame} 이 같은 검사를 다시 한다(그 사이 상태가 바뀔 수
+     * 있다) — 이 메서드는 남의 방 락을 쥐는 요청을 막는 문지기일 뿐이다.
      */
-    public void abortGame(String roomId, long userId) {
+    public void checkHostAbort(String roomId, long userId) {
         Room room = getRoom(roomId);
         if (room.hostId() != userId) {
             throw new NotHostException(roomId);
@@ -352,6 +359,14 @@ public class RoomService {
         if (room.status() != RoomStatus.IN_GAME) {
             throw new GameNotInProgressException(roomId);
         }
+    }
+
+    /**
+     * Phase 8A — 호스트가 IN_GAME 방을 수동 종료. 무한 재접속 정책 하에서 끊긴
+     * 플레이어가 돌아오지 않을 때 빠져나오는 유일한 경로.
+     */
+    public void abortGame(String roomId, long userId) {
+        checkHostAbort(roomId, userId);
         repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
         repository.findById(roomId)
                 .ifPresent(updated -> events.publish(RoomChangedEvent.updated(updated)));

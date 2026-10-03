@@ -3,10 +3,12 @@ package com.mirboard.domain.game.scoring;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
+import com.mirboard.domain.lobby.auth.GuestPolicy;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.util.List;
+import java.util.SplittableRandom;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,5 +113,23 @@ class UserGameStatsServiceIT {
 
         assertThat(rows).extracting(UserGameStatsService.RankRow::userId).containsExactly(high, low);
         assertThat(rows.getFirst().username()).isNotBlank();
+    }
+
+    @Test
+    void ranking_excludes_guests() {
+        // D-117 — 일회용 게스트는 랭킹에 오르지 않는다(레이팅이 움직일 일도 없지만, 방어선 둘).
+        String game = freshGame();
+        long low = newUser();
+        long high = newUser();
+        long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
+                GuestPolicy.NO_LOGIN_HASH, Clock.systemUTC())).getId();
+        stats.record(low, game, false, 990, false);
+        stats.record(high, game, true, 1010, false);
+        stats.record(guest, game, true, 1500, false);
+
+        List<UserGameStatsService.RankRow> rows = stats.ranking(game, 10);
+
+        assertThat(rows).extracting(UserGameStatsService.RankRow::userId).containsExactly(high, low);
+        assertThat(rows).extracting(UserGameStatsService.RankRow::rank).containsExactly(1, 2);
     }
 }

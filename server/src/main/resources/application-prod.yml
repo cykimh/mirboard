@@ -40,10 +40,20 @@ mirboard:
   security:
     # D-83 — prod origin 화이트리스트. 실제 배포 도메인을 MIRBOARD_ALLOWED_ORIGINS 로 주입.
     allowed-origins: ${MIRBOARD_ALLOWED_ORIGINS:https://mirboard.fly.dev}
+  ratelimit:
+    # D-117 — 레이트리밋 IP 의 정본. Fly 프록시가 채우는 헤더만 믿는다. remoteAddr 는
+    # framework 전략에서 클라가 써 넣을 수 있는 X-Forwarded-For 맨 왼쪽 값이라 쓰지 않는다.
+    client-ip-header: ${MIRBOARD_CLIENT_IP_HEADER:Fly-Client-IP}
 
 server:
   forward-headers-strategy: framework
   # Fly proxy 뒤 — 실제 origin 은 X-Forwarded-* 헤더로 들어옴.
+  # D-117 — 아래 tomcat.remoteip.* 는 헤더 이름이 설정돼 있으면 전략과 무관하게 RemoteIpValve 를
+  # 등록한다(Boot 의 하위호환 동작 — 4.0.1 바이트코드로 확인). 하지만 그 뒤 framework 전략의
+  # ForwardedHeaderFilter 가 남은 X-Forwarded-For·Forwarded 의 맨 왼쪽 값으로 remoteAddr 를 다시
+  # 덮으므로, 클라가 그 헤더를 써 넣으면 remoteAddr 는 여전히 위조된다. 그래서 레이트리밋 IP 는
+  # remoteAddr 가 아니라 위 client-ip-header 가 정본이다. 이 블록은 scheme(HTTPS) 판정에도
+  # 관여해 HSTS 를 흔들 수 있으므로 이번에는 건드리지 않는다.
   tomcat:
     remoteip:
       protocol-header: x-forwarded-proto

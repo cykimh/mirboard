@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { roomsApi } from '@/api/rooms';
@@ -7,6 +7,9 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { tutorialFor } from '@/features/tutorial/gameTutorials';
+import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
 import type { Room, RoomOption, RoomStatus, TeamPolicy } from '@/types/api';
 import {
@@ -38,6 +41,12 @@ const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
   IN_GAME: '게임 중',
   FINISHED: '종료',
 };
+
+/** D-122 — 유지된 게임판이 쓰는 좌석 목록 스냅샷 (FINISHED 전이 직전 IN_GAME 메타). */
+interface HeldSeats {
+  playerIds: number[];
+  botSeats: number[];
+}
 
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();
@@ -102,12 +111,35 @@ export function RoomPage() {
     }
   }, [token, navigate]);
 
+  // D-120 — 이 세션에서 IN_GAME→FINISHED 전이를 봤는가. 봇 방은 매치가 끝나면 서버가
+  // 방을 FINISHED 로 바꾸는데, 그 메타가 마지막 게임 이벤트보다 먼저 올 수 있다. 그때
+  // 게임판을 내리면 마지막 라운드 결과와 최종 점수를 못 본다. 그래서 전이를 **관측한**
+  // 게임판은 유지한다 — 메타와 게임 이벤트의 도착 순서에 기대지 않는 판단이다. 새로고침으로
+  // 처음부터 FINISHED 를 받으면 전이를 본 적이 없으므로 기존 종료 카드다.
+  //
+  // D-122 — 전이를 볼 때 **직전 IN_GAME 메타의 좌석 목록**도 함께 얼린다. 유지된 게임판의
+  // 좌석 번호(엔진)는 불변인데, FINISHED 뒤 누가 나가 메타의 playerIds 가 당겨지면 이름·
+  // (나)·봇 표시가 한 칸씩 밀렸다. 서버도 FINISHED 방의 좌석을 더는 당기지 않지만(D-122),
+  // 게임판이 라이브 메타의 좌석 목록에 기대지 않게 하는 심층 방어다. null = 유지 안 함.
+  const [heldSeats, setHeldSeats] = useState<HeldSeats | null>(null);
+  const boardHeld = heldSeats !== null;
+  const roomRef = useRef<Room | null>(null);
+  roomRef.current = room;
+
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
   useRoomMeta(
     roomId,
     token,
-    (r) => setRoom(r),
+    (r) => {
+      // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
+      const prev = roomRef.current;
+      if (prev?.status === 'IN_GAME' && r.status === 'FINISHED') {
+        setHeldSeats({ playerIds: prev.playerIds, botSeats: prev.botSeats ?? [] });
+      }
+      roomRef.current = r;
+      setRoom(r);
+    },
     () => setError('방이 종료되었습니다.'),
   );
 
@@ -197,6 +229,17 @@ export function RoomPage() {
   const seatPolicyLabel = roomOptions?.includes('TEAMS') ? '팀 배정' : '좌석 순서';
   const canAbort = iAmHost && room?.status === 'IN_GAME';
 
+  // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
+  // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
+  const tutorial = tutorialFor(room?.gameType);
+  const waiting = room?.status === 'WAITING';
+  const tutorialGate = useTutorialGate(tutorial?.seenKey ?? null, !!tutorial && waiting);
+  const hideTutorial = tutorialGate.hide;
+  // 연 채로 게임이 시작되면 기록 없이 닫는다 — 리매치로 대기실에 돌아와도 다시 열려 있지 않게.
+  useEffect(() => {
+    if (!waiting) hideTutorial();
+  }, [waiting, hideTutorial]);
+
   if (error) {
     return (
       <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
@@ -224,19 +267,31 @@ export function RoomPage() {
   // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
   // 다른 게임의 코드 경로는 실행조차 되지 않는다.
-  if (room.status === 'IN_GAME' && room.gameType === 'SKULL_KING') {
+  // D-120: 스컬킹은 이 세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지한다(위
+  // boardHeld). 티츄는 아직 기존 동작 그대로다 — 매치 결과·'한 판 더' 게이팅이 먼저다.
+  const roomFinished = room.status === 'FINISHED';
+  if (
+    room.gameType === 'SKULL_KING' &&
+    (room.status === 'IN_GAME' || (boardHeld && roomFinished))
+  ) {
+    // D-122 — 유지된 게임판은 얼린 좌석 목록으로 그린다. 게임 중에는 라이브 메타 그대로.
+    const seats: HeldSeats =
+      roomFinished && heldSeats
+        ? heldSeats
+        : { playerIds: room.playerIds, botSeats: room.botSeats ?? [] };
     return (
       <main className="room-page">
         <SkullKingTable
           roomId={room.roomId}
-          playerIds={room.playerIds}
+          playerIds={seats.playerIds}
           myUserId={user.userId}
           spectator={iAmSpectator}
-          botSeats={room.botSeats ?? []}
+          botSeats={seats.botSeats}
           usernames={usernames}
           turnSeconds={room.turnSeconds ?? 0}
           spectatorCount={(room.spectatorIds ?? []).length}
           onExit={handleLeave}
+          roomFinished={roomFinished}
         />
       </main>
     );
@@ -285,6 +340,11 @@ export function RoomPage() {
                 onClick={handleAbort}
               >
                 게임 종료
+              </Button>
+            )}
+            {tutorial && (
+              <Button type="button" variant="outline" onClick={tutorialGate.show}>
+                게임 방법
               </Button>
             )}
             <Button type="button" variant="outline" onClick={handleLeave}>
@@ -403,6 +463,14 @@ export function RoomPage() {
           </Card>
         )}
       </div>
+
+      {tutorial && (
+        <TutorialDialog
+          tutorial={tutorial}
+          open={tutorialGate.open}
+          onClose={tutorialGate.close}
+        />
+      )}
     </div>
   );
 }

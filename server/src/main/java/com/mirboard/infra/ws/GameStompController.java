@@ -12,6 +12,7 @@ import com.mirboard.infra.web.MdcKeys;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.domain.lobby.room.RoomStatus;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,10 @@ import org.springframework.stereotype.Controller;
  * <p>D-98: 과거 {@code @Payload TichuAction} 으로 타입이 고정돼 있어 티츄 외의 게임은
  * 이 목적지를 쓸 수 없었다. 목적지는 하나로 두고(클라 계약 무변경) 방 → gameType 으로
  * 역직렬화 타깃을 고른다 — 본 클래스에 게임 이름은 등장하지 않는다.
+ *
+ * <p>D-122: 방이 IN_GAME 이 아니면 적용하지 않는다(락 전·락 안 두 번 확인). 끝난 방의
+ * 상태는 resync 를 위해 남아 있어서, 막지 않으면 늦게 도착한 액션이 버려진 라운드를
+ * 진행시켰다(강제 종료는 엔진 상태로는 매치가 안 끝났으므로 엔진 가드로는 못 막는다).
  */
 @Controller
 public class GameStompController {
@@ -110,6 +115,10 @@ public class GameStompController {
                     "User is not in the room");
             return;
         }
+        if (room.status() != RoomStatus.IN_GAME) {
+            rejectNotInProgress(me, roomId, room.status());
+            return;
+        }
 
         GameEngine engine;
         try {
@@ -131,6 +140,13 @@ public class GameStompController {
             return;
         }
         try {
+            // D-122 — 락 안에서 재확인. 탈주 MATCH_ENDED 는 이 락 안에서 방을 FINISHED 로
+            // 만든다 — 락 전에 IN_GAME 을 봤어도 지금은 끝났을 수 있다.
+            RoomStatus current = currentStatus(roomId);
+            if (current != RoomStatus.IN_GAME) {
+                rejectNotInProgress(me, roomId, current);
+                return;
+            }
             GameState state = engine.loadState().orElse(null);
             if (state == null) {
                 broadcaster.sendErrorTo(me.userId(), roomId, "GAME_NOT_STARTED",
@@ -173,6 +189,29 @@ public class GameStompController {
         botScheduler.scheduleBots(roomId);
         // Phase 13D — 다음 턴 타임아웃 타이머 (re)스케줄 (turnSeconds=0 이면 no-op).
         turnTimeout.onTurnAdvanced(roomId);
+    }
+
+    /** 지금 방 상태. 방이 사라졌으면 null. */
+    private RoomStatus currentStatus(String roomId) {
+        try {
+            return roomService.getRoom(roomId).status();
+        } catch (RoomNotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
+     * D-122 — 진행 중이 아닌 방의 액션 거절. 대기 중이면 기존 코드(`GAME_NOT_STARTED`),
+     * 끝났거나 사라졌으면 `GAME_NOT_IN_PROGRESS`(REST abort/rematch 와 같은 코드).
+     */
+    private void rejectNotInProgress(AuthPrincipal me, String roomId, RoomStatus status) {
+        if (status == RoomStatus.WAITING) {
+            broadcaster.sendErrorTo(me.userId(), roomId, "GAME_NOT_STARTED",
+                    "Game has not started yet");
+            return;
+        }
+        broadcaster.sendErrorTo(me.userId(), roomId, "GAME_NOT_IN_PROGRESS",
+                "Game is not in progress");
     }
 
     /**

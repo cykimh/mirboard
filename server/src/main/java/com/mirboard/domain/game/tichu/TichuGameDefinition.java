@@ -79,6 +79,15 @@ public final class TichuGameDefinition implements GameDefinition {
         return EnumSet.of(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
+    /**
+     * D-122 — '한 판 더'(D-82)는 티츄만 한다. 칩이 방 단위로 누적되는 내기 테이블이 같은
+     * 4명·같은 좌석으로 이어지는 것이 전제라, 사람만의 매치는 끝나도 방을 IN_GAME 으로 둔다.
+     */
+    @Override
+    public boolean supportsRematch() {
+        return true;
+    }
+
     @Override
     public GameEngine newEngine(GameContext ctx) {
         return new TichuGameEngine(ctx, stateStore, matchStateStore, roundStarter, events);
