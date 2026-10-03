@@ -29,7 +29,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * D-102 (S5) 완료 기준 — <b>봇만으로 스컬킹 10라운드 완주</b>. 4인·6인 방을 봇으로 채워
- * 정의 등록 → GameStartingEvent → BotScheduler(포트 기본 botAction) → advance 의 라운드
+ * 정의 등록 → GameStartingEvent → BotScheduler(D-119 휴리스틱 botAction) → advance 의 라운드
  * 연쇄 → 매치 종료 → 방 FINISHED 까지 전 배선을 검증한다.
  *
  * <p>6인 방은 봇 풀 확장(V10, 4→8)의 회귀 가드이기도 하다 — 봇 5명이 필요해 V3 4명으로는
