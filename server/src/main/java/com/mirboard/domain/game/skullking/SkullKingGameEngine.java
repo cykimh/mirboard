@@ -8,6 +8,8 @@ import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.skullking.action.RejectionReason;
 import com.mirboard.domain.game.skullking.action.SkullKingAction;
 import com.mirboard.domain.game.skullking.action.SkullKingActionRejectedException;
+import com.mirboard.domain.game.skullking.bot.SkullKingBotPolicy;
+import com.mirboard.domain.game.skullking.bot.SkullKingBotView;
 import com.mirboard.domain.game.skullking.event.SkullKingEvent;
 import com.mirboard.domain.game.skullking.event.SkullKingMatchCompleted;
 import com.mirboard.domain.game.skullking.persistence.SkullKingMatchStateStore;
@@ -19,7 +21,9 @@ import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
+import java.util.function.BiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -143,7 +147,46 @@ public final class SkullKingGameEngine implements GameEngine {
         return List.<GameAction>copyOf(rules.legalActions(skState(state), seat));
     }
 
-    // botAction 은 포트 기본값(합법 액션 균등 분포)을 그대로 쓴다 (D-102 보류 ②).
+    /**
+     * D-119 — 결정적 휴리스틱 {@link SkullKingBotPolicy} (D-102 보류 ② 해소). 정책은
+     * 공개 정보 뷰({@link SkullKingBotView})만 받는다. {@code random} 은 쓰지 않는다 —
+     * 결정적이라 {@code mirboard.bot.seed} 재현성은 그대로다(분배는 원래 SecureRandom).
+     *
+     * <p>타임아웃·유령 자동조종은 이 경로가 아니라 {@link #timeoutAction}(최약수)이다 —
+     * 사람·탈주 좌석의 대리는 판을 흔들지 않는 게 목적이고 봇은 1급 참가자라 목적이 다르다.
+     */
+    @Override
+    public GameAction botAction(GameState state, int seat, Random random) {
+        return chooseBotAction(skState(state), seat, SkullKingBotPolicy::choose);
+    }
+
+    /**
+     * 정책 호출 + 안전망. 합법수가 비면(범위 밖 좌석·남의 차례·RoundEnd) null. 정책이
+     * 예외를 던지거나 null·합법수 밖 액션을 내면 ERROR 로그(D-107 Sentry) 후 최약수
+     * {@code timeoutAction} 으로 떨어진다 — 턴 제한 0(기본) 방에선 BotScheduler 가 재스케줄
+     * 하지 않으므로, 이 폴백이 없으면 정책 버그 하나로 방이 영구 정지한다.
+     */
+    GameAction chooseBotAction(SkullKingState sk, int seat,
+                               BiFunction<SkullKingBotView, List<SkullKingAction>,
+                                       SkullKingAction> policy) {
+        List<SkullKingAction> legal = rules.legalActions(sk, seat);
+        if (legal.isEmpty()) {
+            return null;
+        }
+        try {
+            SkullKingAction chosen = policy.apply(SkullKingBotView.of(sk, seat), legal);
+            if (chosen != null && legal.contains(chosen)) {
+                return chosen;
+            }
+            log.error("SkullKing bot policy returned a non-legal action, falling back: "
+                            + "room={} seat={} phase={} action={}",
+                    context.roomId(), seat, sk.phaseName(), chosen);
+        } catch (RuntimeException e) {
+            log.error("SkullKing bot policy failed, falling back: room={} seat={} phase={}",
+                    context.roomId(), seat, sk.phaseName(), e);
+        }
+        return rules.timeoutAction(sk, seat);
+    }
 
     @Override
     public GameAction timeoutAction(GameState state, int seat) {
