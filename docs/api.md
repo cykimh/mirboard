@@ -564,4 +564,8 @@ TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유�
 - *(D-117)* `/api/auth/**` 는 Bearer 유무와 무관하게 **항상 IP 키**로 레이트리밋한다(토큰을
   이어 붙여 버킷을 갈아타는 우회 차단). IP 는 `X-Forwarded-For`·`Forwarded`(클라 위조 가능)가
   아니라 신뢰 헤더 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`)에서 읽고,
-  IPv6 는 /64 로 묶는다. 게스트 생성 로그에도 IP 를 남기지 않는다.
+  IPv6 는 /64 로 묶는다. 게스트 생성 로그에도 IP 를 남기지 않는다. 버킷·대상 판정은 원본
+  URI 가 아니라 MVC·Security 가 매칭하는 경로(디코딩·`;` 파라미터 제거·contextPath 제외)로
+  한다 — `/api/auth/%67uest`·`/%61pi/auth/guest`·`X-Forwarded-Prefix` 처럼 같은 엔드포인트에
+  닿는 변형도 같은 버킷·같은 IP 키를 쓴다. 해석할 수 없거나 `%` 가 섞인 경로는 제외하지 않고
+  기본 버킷을 적용한다.

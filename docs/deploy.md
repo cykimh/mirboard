@@ -137,6 +137,18 @@ flyctl secrets set MIRBOARD_GUEST_DAILY_CAP=100 MIRBOARD_RATELIMIT_GUEST_LIMIT=5
 for i in $(seq 1 21); do curl -s -o /dev/null -w "$i %{http_code}\n" -X POST https://mirboard.fly.dev/api/auth/login -H 'Content-Type: application/json' -H "X-Forwarded-For: 10.0.0.$i" -H "Forwarded: for=10.0.1.$i" -H "Fly-Client-IP: 10.0.2.$i" -d "{\"username\":\"ipcheck_$i\",\"password\":\"x\"}"; done
 ```
 
+**경로 변형 우회 내성** — 같은 로그인 버킷을 경로 문자열만 바꿔 잽니다. Fly 프록시가 경로를
+정규화하는지는 확인되지 않았으므로 서버가 직접 막는지 봅니다. 세 루프가 같은 버킷을 쓰므로 앞
+루프의 카운트가 넘어오지 않게 **루프마다 1분 간격**을 둡니다. 둘 다 1~20번 `401`, **21번째
+`429`** 여야 합니다(21번째도 `401` 이면 필터가 그 변형을 건너뛰거나 다른 버킷을 탄다는 뜻).
+
+```bash
+# 인코딩 경로 (/api/auth/login 과 같은 컨트롤러)
+for i in $(seq 1 21); do curl -s -o /dev/null -w "$i %{http_code}\n" -X POST 'https://mirboard.fly.dev/api/%61uth/login' -H 'Content-Type: application/json' -d "{\"username\":\"pathcheck_$i\",\"password\":\"x\"}"; done
+# X-Forwarded-Prefix (framework 전략이 contextPath 로 바꾼다)
+for i in $(seq 1 21); do curl -s -o /dev/null -w "$i %{http_code}\n" -X POST https://mirboard.fly.dev/api/auth/login -H 'Content-Type: application/json' -H 'X-Forwarded-Prefix: /zz' -d "{\"username\":\"prefixcheck_$i\",\"password\":\"x\"}"; done
+```
+
 **게스트 생성** — 이 IP 의 하루 10회 중 1회를 씁니다. `201` 이어야 합니다.
 
 ```bash
