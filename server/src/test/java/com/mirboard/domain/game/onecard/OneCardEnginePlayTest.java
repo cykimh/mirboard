@@ -106,7 +106,7 @@ class OneCardEnginePlayTest {
         assertThat(result.newState().topCard()).isEqualTo(heart(9));
         assertThat(result.newState().turnSeat()).isEqualTo(1);
         assertThat(result.events()).containsExactly(
-                new CardPlayed(0, heart(9), null, 2, 0),
+                new CardPlayed(0, heart(9), null, 2, 0, 1),
                 new HandUpdated(0, List.of(club(3), club(4)), List.of(), 2),
                 new TurnChanged(1, 1, 0));
         assertThat(result.events()).filteredOn(OneCardEvent::isPrivate).hasSize(1);
@@ -188,10 +188,11 @@ class OneCardEnginePlayTest {
                 hand(spade(4), spade(6), spade(8)), hand(diamond(4), diamond(6), diamond(8)))
                 .top(heart(5)).turn(0).build();
 
-        OneCardState next = play(engine(3), state, 0, heart(PlayingCard.QUEEN));
+        OneCardEngine.Result result = engine(3).apply(state, 0, PlayCard.of(heart(PlayingCard.QUEEN)), NOW);
 
-        assertThat(next.direction()).isEqualTo(-1);
-        assertThat(next.turnSeat()).isEqualTo(2);
+        assertThat(result.newState().direction()).isEqualTo(-1);
+        assertThat(result.newState().turnSeat()).isEqualTo(2);
+        assertThat(result.events()).contains(new CardPlayed(0, heart(PlayingCard.QUEEN), null, 2, 0, -1));
     }
 
     @Test
@@ -295,7 +296,7 @@ class OneCardEnginePlayTest {
         assertThat(next.hands().get(0)).isEmpty();
         assertThat(next.drawPile()).endsWith(diamond(10));
         assertThat(next.eliminations()).containsExactly(new Elimination(0, Elimination.Reason.BANKRUPT, 20));
-        assertThat(result.events()).contains(new PlayerEliminated(0, Elimination.Reason.BANKRUPT, 20));
+        assertThat(result.events()).contains(new PlayerEliminated(0, Elimination.Reason.BANKRUPT, 20, 21));
         assertThat(next.result().reason()).isEqualTo(EndReason.LAST_STANDING);
         assertThat(next.result().winners()).containsExactly(1);
         OneCardInvariantChecker.check(next);

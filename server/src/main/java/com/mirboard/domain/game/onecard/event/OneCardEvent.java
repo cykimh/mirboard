@@ -1,5 +1,7 @@
 package com.mirboard.domain.game.onecard.event;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.mirboard.domain.game.core.GameEvent;
@@ -18,7 +20,11 @@ import java.util.List;
  * <p><b>State Hiding (D-01).</b> 손패 카드는 비공개 {@link HandDealt}·{@link HandUpdated} 에만 담긴다.
  * 이 둘은 손패 전체와 {@code handVersion} 을 실어, 클라가 더 낮은 버전을 버리면 순서가 뒤바뀌어도 손패가
  * 되돌아가지 않는다. 봇의 반응 시각(경쟁 창의 {@code botPress})은 어떤 이벤트에도 싣지 않는다.
+ *
+ * <p>{@code isGetterVisibility=NONE}: core {@code GameEvent.isPrivate()} 가 is-getter 라 그대로 두면 모든
+ * 이벤트 JSON 에 {@code "private"} 키가 흘러나간다. 라우팅 판정은 서버 안의 일이라 클라 payload 에 필요 없다.
  */
+@JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@event")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = OneCardEvent.MatchStarted.class, name = "MATCH_STARTED"),
@@ -118,8 +124,9 @@ public sealed interface OneCardEvent extends GameEvent
      *
      * @param handCount   낸 뒤 그 좌석의 손패 장수
      * @param attackStack 낸 뒤의 공격 누적
+     * @param direction   낸 뒤 방향 — Q 로 창이 열리면 TURN_CHANGED 가 늦으므로 여기서 알린다
      */
-    record CardPlayed(int seat, PlayingCard card, Suit declaredSuit, int handCount, int attackStack)
+    record CardPlayed(int seat, PlayingCard card, Suit declaredSuit, int handCount, int attackStack, int direction)
             implements OneCardEvent {
     }
 
@@ -151,8 +158,15 @@ public sealed interface OneCardEvent extends GameEvent
     record RaceResolved(int raceId, RaceOutcome outcome, int bySeat) implements OneCardEvent {
     }
 
-    /** 공개 — 탈락. */
-    record PlayerEliminated(int seat, Elimination.Reason reason, int cardsHeld) implements OneCardEvent {
+    /**
+     * 공개 — 탈락.
+     *
+     * @param cardsHeld     탈락 순간 손에 있던 장수
+     * @param drawPileCount 탈락자 손패를 맨 아래에 넣은 뒤 뽑을 더미 장수(결과값). 파산이면 같은 전이
+     *                      CARDS_DRAWN 의 값보다 크고 이쪽이 최종이다
+     */
+    record PlayerEliminated(int seat, Elimination.Reason reason, int cardsHeld, int drawPileCount)
+            implements OneCardEvent {
     }
 
     /** 공개 — 매치 종료와 순위. */

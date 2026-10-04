@@ -77,7 +77,7 @@ class OneCardEngineDesertionTest {
         assertThat(state.hands().get(1)).isEmpty();
         assertThat(state.drawPile()).endsWith(spade(4), spade(6), spade(8));
         assertThat(result.events()).containsExactly(
-                new PlayerEliminated(1, Elimination.Reason.DESERTED, 3),
+                new PlayerEliminated(1, Elimination.Reason.DESERTED, 3, 47),
                 new HandUpdated(1, List.of(), List.of(), state.version()),
                 new TurnChanged(2, 1, 0));
         OneCardInvariantChecker.check(state);

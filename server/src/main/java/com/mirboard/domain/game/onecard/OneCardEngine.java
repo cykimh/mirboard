@@ -163,7 +163,7 @@ public final class OneCardEngine {
         t.version++;
 
         List<OneCardEvent> events = new ArrayList<>();
-        events.add(new OneCardEvent.CardPlayed(seat, card, t.declaredSuit, hand.size(), t.attackStack));
+        events.add(new OneCardEvent.CardPlayed(seat, card, t.declaredSuit, hand.size(), t.attackStack, t.direction));
         events.add(new OneCardEvent.HandUpdated(seat, hand, List.of(), t.version));
 
         if (hand.isEmpty()) {
@@ -432,7 +432,7 @@ public final class OneCardEngine {
             t.turnSeat = -1;
         }
         t.version++;
-        events.add(new OneCardEvent.PlayerEliminated(seat, reason, held));
+        events.add(new OneCardEvent.PlayerEliminated(seat, reason, held, t.drawPile.size()));
         events.add(new OneCardEvent.HandUpdated(seat, List.of(), List.of(), t.version));
     }
 

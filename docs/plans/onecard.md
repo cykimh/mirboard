@@ -137,13 +137,13 @@ S2(D-127)에서 처음 그림과 달라진 점: 단계 enum(`Phase`)·`ActionVal
 | 클라→서버 | `CALL_ONE_CARD` | `raceId`. 창 주인만 |
 | 클라→서버 | `CATCH` | `raceId`. 창 주인 외 |
 | 공개 | `MATCH_STARTED` | 첫 차례 좌석, 시작 카드, 손패 장수, 뽑을 더미 장수 |
-| 공개 | `CARD_PLAYED` | 좌석, 카드, 지정 무늬, 낸 뒤 손패 장수, 공격 누적 |
+| 공개 | `CARD_PLAYED` | 좌석, 카드, 지정 무늬, 낸 뒤 손패 장수, 공격 누적, 낸 뒤 방향(Q 로 창이 열리면 `TURN_CHANGED` 가 늦다) |
 | 공개 | `CARDS_DRAWN` | 좌석, **장수만**, 사유(`TURN`/`ATTACK`/`PENALTY`), 먹은 뒤 손패 장수, 뽑을 더미 장수 |
 | 공개 | `TURN_CHANGED` | 좌석, 방향, 공격 누적 |
 | 공개 | `RACE_OPENED` | `raceId`, 주인 좌석, 슬롯, 지터, 창 길이 |
 | 공개 | `RACE_RESOLVED` | `raceId`, 결과(`CALLED`/`CAUGHT`/`EXPIRED`, 창 중 탈주면 `CANCELLED`), 누른 좌석 |
 | 공개 | `PILE_RESHUFFLED` | 뽑을 더미 장수 |
-| 공개 | `PLAYER_ELIMINATED` | 좌석, 사유(`BANKRUPT`/`DESERTED`), 탈락 때 들고 있던 장수 |
+| 공개 | `PLAYER_ELIMINATED` | 좌석, 사유(`BANKRUPT`/`DESERTED`), 탈락 때 들고 있던 장수, 손패를 넣은 뒤 뽑을 더미 장수 |
 | 공개 | `MATCH_ENDED` | 순위, 사유(`FINISHED`/`LAST_STANDING`/`STALEMATE`/`NO_HUMANS`) |
 | 비공개 | `HAND_DEALT` | 내 손패 전체 + `handVersion` |
 | 비공개 | `HAND_UPDATED` | 내 손패 전체 + 새로 받은 카드 + `handVersion`(내기·먹기·벌칙·탈락마다, D-127) |
@@ -160,7 +160,7 @@ S2(D-127)에서 처음 그림과 달라진 점: 단계 enum(`Phase`)·`ActionVal
 - **비공개 payload 는 손패 전체 + `handVersion`**(상태 버전이라 좌석마다 단조 증가). 클라는 가진 것보다 낮은
   버전을 버린다 — 순번이 없어도 resync 스냅샷(비공개 뷰에도 `handVersion`)과 순서가 뒤바뀌어
   손패가 되돌아가지 않는다.
-- **공개 payload 는 증감이 아니라 결과값**(좌석 손패 장수, 맨 위 카드, 지정 무늬, 공격 누적,
+- **공개 payload 는 증감이 아니라 결과값**(좌석 손패 장수, 맨 위 카드, 지정 무늬, 공격 누적, 방향,
   뽑을 더미 장수). resync 는 잠금 없이 상태와 순번을 따로 읽어, 그 사이 액션이 끼면 이벤트가 두 번
   적용되거나 하나가 빠질 수 있다. 결과값이면 두 번 적용해도 같고, 빠져도 다음 이벤트에서 맞춰진다.
 
