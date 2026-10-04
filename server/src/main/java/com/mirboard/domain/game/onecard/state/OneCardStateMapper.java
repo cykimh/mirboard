@@ -13,7 +13,7 @@ import java.util.List;
  *   <li><b>봇 반응 시각</b> — 경쟁 창은 창 끝까지 남은 시간만 싣는다. 봇이 누를 시각
  *       ({@link RaceWindow#botPress()}, {@link RaceWindow#deadline()})은 어디에도 내보내지 않는다</li>
  * </ul>
- * 맨 위 카드·지정 무늘·공격 누적·방향·차례·탈락·결과는 공개 정보다.
+ * 맨 위 카드·지정 무늬·공격 누적·방향·차례·탈락·결과는 공개 정보다.
  */
 public final class OneCardStateMapper {
 
