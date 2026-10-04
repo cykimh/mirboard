@@ -185,7 +185,7 @@ Colima/OrbStack Docker socket 자동 감지 (`DOCKER_HOST=...` prefix 불필요)
 
 ```bash
 ./scripts/check.sh fast              # 빠른 회귀 (~30s, pre-commit 과 동일)
-./scripts/check.sh rules             # 룰 도메인 단위 (~3s, Docker 불필요)
+./scripts/check.sh rules             # 룰 도메인 단위 (~20s, Docker 불필요)
 ./scripts/check.sh server            # 서버 풀 (단위 + IT, ~1m20s)
 ./scripts/check.sh client            # 클라 풀 (build:check + test + build, ~10s)
 ./scripts/check.sh all               # server + client (~1m30s)

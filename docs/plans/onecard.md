@@ -89,34 +89,42 @@
 
 ### 4.1 서버 패키지 `domain.game.onecard`
 
-스컬킹의 2계층(순수 룰 엔진 + 포트 어댑터)을 그대로 따른다.
+스컬킹의 2계층(순수 룰 엔진 + 포트 어댑터)을 그대로 따른다. 괄호는 만드는 단계다.
 
 ```
 onecard/
-  OneCardGameDefinition   @Component · ID "ONE_CARD" · 2~6인 · status COMING_SOON → S4 에서 AVAILABLE
-  OneCardEngine           순수 룰 엔진 — 저장소·시계 없음, 난수는 주입
-  OneCardGameEngine       포트 어댑터 — 상태 저장(Redis)·시계·로컬 발행
-  card/        PlayingCard(무늬·숫자·조커), Deck
-  state/       OneCardState, RaceWindow, Phase
-  action/      OneCardAction(sealed: PlayCard·Draw·CallOneCard·Catch), ActionValidator, RejectionReason
-  rules/       PlayRules(낼 수 있나) · AttackRules(누적·반격) · TurnOrder(J·Q·K·탈락 건너뛰기)
-  race/        RaceRules(창 열기·해소·봇 반응 추첨)
-  event/       OneCardEvent(sealed), OneCardMatchCompleted
-  bot/         OneCardBotPolicy(공개 정보 뷰만 본다)
-  invariant/   OneCardInvariantChecker(54장 보존 등)
-  lifecycle/   OneCardRoundStarter(GameStartingEvent → 분배)
-  persistence/ OneCardStateStore, OneCardMatchRecorder
+  OneCardGameDefinition   @Component · ID "ONE_CARD" · 2~6인 · COMING_SOON → S4 에서 AVAILABLE (S3)
+  OneCardEngine           순수 룰 엔진 — 저장소·시계 없음, 난수는 주입 (S2)
+  OneCardGameEngine       포트 어댑터 — 상태 저장(Redis)·시계·로컬 발행 (S3)
+  Dealer · RaceSettings   분배·시작 카드 / 창 길이·봇 반응 구간·슬롯 수 (S2)
+  card/        Suit · Joker · PlayingCard(역할·공격 값과 세기) · Deck (S2)
+  state/       OneCardState · RaceWindow · Elimination · MatchResult (S2)
+  action/      OneCardAction(sealed: PlayCard·Draw·CallOneCard·Catch) · RejectionReason ·
+               OneCardActionRejectedException (S2)
+  rules/       PlayRules(낼 수 있나·반격) · TurnOrder(J·Q·K·탈락 건너뛰기) · Ranking(순위) (S2)
+  event/       OneCardEvent(sealed) (S2) · OneCardMatchCompleted (S3)
+  invariant/   OneCardInvariantChecker(54장 보존 등) (S2)
+  bot/         OneCardBotPolicy(공개 정보 뷰만 본다) (S3)
+  lifecycle/   OneCardRoundStarter(GameStartingEvent → 분배) (S3)
+  persistence/ OneCardStateStore, OneCardMatchRecorder (S3)
 ```
+
+S2(D-127)에서 처음 그림과 달라진 점: 단계 enum(`Phase`)·`ActionValidator`·`AttackRules`·`race/` 패키지는
+만들지 않았다. 단계는 상태에서 파생하고(§4.2), 검증과 경쟁 창 처리는 엔진 안에, 공격 값·세기는 카드에 뒀다 —
+각각 엔진 안 몇 곳에서만 쓰여 따로 뺄 이유가 없었다.
 
 ### 4.2 상태
 
-`record` + `with*` 불변 전이(CLAUDE.md 패턴).
+불변 레코드다. 한 전이가 여러 필드를 함께 바꾸므로 `with*` 대신 엔진 안에서만 가변 사본을 고쳐 새 레코드로
+얼린다(D-127).
 
-- `OneCardState`: 좌석별 손패 · 뽑을 더미 · 버린 더미 · 차례 좌석 · 방향(±1) · 지정 무늬(7) ·
-  공격 누적 장수와 세기 · K 보너스 차례 여부 · 경쟁 창 · 탈락 순서(파산·탈주) · 연속 패스 수 ·
-  총 차례 수 · 단계(`PLAYING`/`RACE`/`ENDED`)
-- `RaceWindow`: `raceId`(창 일련번호) · 주인 좌석 · 슬롯 · 지터 · 연 시각 · 창 길이 · **가장 빠른
-  봇의 좌석·행동·지연**(서버 전용)
+- `OneCardState`: 좌석별 손패 · 뽑을 더미(0번이 맨 위) · 버린 더미(마지막이 맨 위) · 차례 좌석(창이
+  열렸거나 끝났으면 −1) · 방향(±1) · 지정 무늬(7) · 공격 누적 장수 · 경쟁 창(없으면 null) · 탈락 목록(탈락 순) ·
+  연속 패스 수 · 총 차례 수 · 버전(전이마다 오른다 — 탈락이 낀 전이는 +2, 비공개 손패 이벤트의 `handVersion`) · 결과(끝나기 전엔 null).
+  공격 세기는 맨 위 카드에서, K 보너스 차례는 차례 좌석에서, 단계(`PLAYING`/`RACE`/`ENDED`)는 창·결과
+  유무에서 파생한다.
+- `RaceWindow`: `raceId`(창을 연 전이의 버전) · 주인 좌석 · 슬롯 · 지터 · 연 시각 · 창 길이 · 낸 순간 정해 둔
+  다음 차례(§9.2) · **가장 빠른 봇의 좌석·행동·지연**(서버 전용)
 
 첫 누름이 창을 닫으므로 봇은 가장 빠른 한 명만 기억하면 된다.
 
@@ -128,16 +136,17 @@ onecard/
 | 클라→서버 | `DRAW` | 공격 중이면 누적 장수, 아니면 1장 |
 | 클라→서버 | `CALL_ONE_CARD` | `raceId`. 창 주인만 |
 | 클라→서버 | `CATCH` | `raceId`. 창 주인 외 |
-| 공개 | `CARD_PLAYED` | 좌석, 카드, 지정 무늬, 공격 누적 |
-| 공개 | `CARDS_DRAWN` | 좌석, **장수만**, 사유(`TURN`/`ATTACK`/`PENALTY`) |
-| 공개 | `TURN_CHANGED` | 좌석, 방향 |
+| 공개 | `MATCH_STARTED` | 첫 차례 좌석, 시작 카드, 손패 장수, 뽑을 더미 장수 |
+| 공개 | `CARD_PLAYED` | 좌석, 카드, 지정 무늬, 낸 뒤 손패 장수, 공격 누적, 낸 뒤 방향(Q 로 창이 열리면 `TURN_CHANGED` 가 늦다) |
+| 공개 | `CARDS_DRAWN` | 좌석, **장수만**, 사유(`TURN`/`ATTACK`/`PENALTY`), 먹은 뒤 손패 장수, 뽑을 더미 장수 |
+| 공개 | `TURN_CHANGED` | 좌석, 방향, 공격 누적 |
 | 공개 | `RACE_OPENED` | `raceId`, 주인 좌석, 슬롯, 지터, 창 길이 |
-| 공개 | `RACE_RESOLVED` | `raceId`, 결과(`CALLED`/`CAUGHT`/`EXPIRED`), 누른 좌석 |
+| 공개 | `RACE_RESOLVED` | `raceId`, 결과(`CALLED`/`CAUGHT`/`EXPIRED`, 창 중 탈주면 `CANCELLED`), 누른 좌석 |
 | 공개 | `PILE_RESHUFFLED` | 뽑을 더미 장수 |
-| 공개 | `PLAYER_ELIMINATED` | 좌석, 사유(`BANKRUPT`/`DESERTED`) |
+| 공개 | `PLAYER_ELIMINATED` | 좌석, 사유(`BANKRUPT`/`DESERTED`), 탈락 때 들고 있던 장수, 손패를 넣은 뒤 뽑을 더미 장수 |
 | 공개 | `MATCH_ENDED` | 순위, 사유(`FINISHED`/`LAST_STANDING`/`STALEMATE`/`NO_HUMANS`) |
-| 비공개 | `HAND_DEALT` | 내 손패 |
-| 비공개 | `CARDS_RECEIVED` | 내가 먹은 카드 |
+| 비공개 | `HAND_DEALT` | 내 손패 전체 + `handVersion` |
+| 비공개 | `HAND_UPDATED` | 내 손패 전체 + 새로 받은 카드 + `handVersion`(내기·먹기·벌칙·탈락마다, D-127) |
 | 비공개 | `ERROR` | `NOT_YOUR_TURN`, `RACE_IN_PROGRESS`, `NO_RACE` 등 |
 
 이벤트 type 문자열은 게임 간에 재사용된다(`TURN_CHANGED` 등). 방 단위 토픽이라 충돌이 없다.
@@ -146,12 +155,12 @@ onecard/
 
 - **비공개 이벤트는 공개 순번을 쓰지 않는다**(§4.5b). 지금은 비공개 이벤트도 방 공통 순번을
   소비해, 그 이벤트를 못 받는 다른 클라에게는 다음 공개 이벤트가 구멍(gap)으로 보이고 resync 를
-  부른다. 원카드는 먹을 때마다 비공개 `CARDS_RECEIVED` 가 나가므로 이대로면 거의 매 차례 전원이
+  부른다. 원카드는 내거나 먹을 때마다 비공개 `HAND_UPDATED` 가 나가므로 이대로면 매 차례 전원이
   resync 한다.
-- **비공개 payload 는 손패 전체 + `handVersion`**(좌석별 단조 증가). 클라는 가진 것보다 낮은
+- **비공개 payload 는 손패 전체 + `handVersion`**(상태 버전이라 좌석마다 단조 증가). 클라는 가진 것보다 낮은
   버전을 버린다 — 순번이 없어도 resync 스냅샷(비공개 뷰에도 `handVersion`)과 순서가 뒤바뀌어
   손패가 되돌아가지 않는다.
-- **공개 payload 는 증감이 아니라 결과값**(좌석 손패 장수, 맨 위 카드, 지정 무늬, 공격 누적,
+- **공개 payload 는 증감이 아니라 결과값**(좌석 손패 장수, 맨 위 카드, 지정 무늬, 공격 누적, 방향,
   뽑을 더미 장수). resync 는 잠금 없이 상태와 순번을 따로 읽어, 그 사이 액션이 끼면 이벤트가 두 번
   적용되거나 하나가 빠질 수 있다. 결과값이면 두 번 적용해도 같고, 빠져도 다음 이벤트에서 맞춰진다.
 
@@ -173,7 +182,7 @@ A 가 카드를 내 손패 1장
 판정 규칙:
 
 - 주인의 `CALL_ONE_CARD` 가 먼저면 `CALLED`(안전). 다른 사람의 `CATCH` 가 먼저면 `CAUGHT` —
-  주인이 1장 먹는다(비공개 `CARDS_RECEIVED` + 공개 `CARDS_DRAWN(PENALTY)`).
+  주인이 1장 먹는다(비공개 `HAND_UPDATED` + 공개 `CARDS_DRAWN(PENALTY)`).
 - "먼저"는 **방 액션 락을 먼저 잡은 요청**이다. 락 경합으로 `BUSY` 를 받으면 클라는 창이 아직
   열려 있는 동안 짧게 재시도한다(최대 2회 — 락을 쥔 쪽이 창과 무관한 거절 처리일 수 있다).
   이미 해소돼 `NO_RACE` 를 받으면 오류 대신 "늦었어요"를 짧게 보여 준다.
@@ -183,7 +192,7 @@ A 가 카드를 내 손패 1장
   1000~2500ms이고 두 구간을 따로 설정할 수 있다(`mirboard.onecard.bot-reaction-*`). 가장 빠른
   봇이 3초 안이면 그 봇이 누른다.
 - 슬롯: 클라가 게임판 기준 상대 좌표로 정의한 N개(프로토콜 상수, 기본 8) 중 서버가 하나를
-  고르고, 지터(−1~1 로 정규화한 x·y 두 값, 클라가 슬롯 반경으로 환산)를 더한다. 전원이 같은
+  고르고, 지터(x·y 각각 −100~100 정수, 클라가 슬롯 반경의 백분율로 환산)를 더한다. 전원이 같은
   위치를 받으므로 위치 운은 공평하다.
 
 **공정성.** 판정이 서버 도착 순서라 핑이 낮을수록 유리하다(`multi-game.md` §7 이 할리갈리
@@ -228,7 +237,7 @@ default boolean sequenced() { return true; }
 
 - `GameEventBroadcaster` 는 `sequenced()` 가 false 인 이벤트에 `RoomSeq.next` 를 부르지 않고
   seq 를 비운다(`NON_NULL` 이라 JSON 에서 빠진다). 게임 이름을 보지 않는 판단이다.
-- 원카드는 비공개 이벤트(`HAND_DEALT`·`CARDS_RECEIVED`)만 false 로 둔다.
+- 원카드는 비공개 이벤트(`HAND_DEALT`·`HAND_UPDATED`)만 false 로 둔다.
 - **기본값이 true 인 이유**: 티츄는 이 resync 에 기대고 있다(§7). 기본을 바꾸면 티츄 동작이 바뀐다.
 
 ### 4.6 봇
@@ -327,6 +336,9 @@ default boolean sequenced() { return true; }
 - **봇 반응 구간**이 너무 쉽거나 어려울 수 있다 → 설정값으로 조정하고, 시뮬레이션으로 봇끼리
   잡히는 비율을 본다.
 - **3초 창이 템포를 늘어뜨릴 수 있다** → 대부분 첫 누름으로 일찍 닫힌다. 실측 후 창 길이를 조정한다.
+- **창 끝 뒤에 처리된 누름**(S2 최종 리뷰 N2): `press` 는 `now` 를 보지 않아 창 끝·봇 추첨 시각 뒤에 처리된 사람
+  누름도 이긴다(§9-4 문구는 허용, §9-2·§9-6 의 시간 의미와는 어긋남). 엄격하게 하려면 `press` 에서
+  `now >= race.deadline()` 이면 `NO_RACE` — S3 에서 결정한다.
 - **v1 제외**: 리매치(D-122 후속 "리매치 대기 중 나가면 좌석이 당겨짐"을 먼저 고친 뒤), 내기 칩,
   하우스 룰 옵션(방 옵션으로 변형 선택), 고정 위치 보조 모드.
 - **병합 순서**: D-116(다른 세션)이 먼저 main 에 들어가면 기록기 발행 방식은 그것을 따른다.
@@ -335,3 +347,7 @@ default boolean sequenced() { return true; }
   이벤트가 없는 변화가 이 resync 에 기대고 있어 고치려면 티츄 이벤트를 먼저 보강해야 한다 — 별도 과제.
 - **resync 가 잠금 없이 상태와 순번을 따로 읽는다**(모든 게임 공통). 원카드는 결과값 payload 로
   흡수하고(§4.3), 근본 수정(상태 저장과 순번 발급을 한 번에)은 별도 과제로 둔다.
+- **D-126 과 겹치는 부분**(2026-10-04 기준 다른 세션에서 진행 중): 티츄 resync 수정이 §4.5b 와 같은
+  `GameEvent.sequenced()` 기본 메서드와 "resync 를 방 락 안에서" 읽는 변경을 넣는다. 그쪽이 먼저 병합되면 S3 는
+  포트 확장을 새로 만들지 않고 원카드 비공개 이벤트에서 `sequenced()` 를 false 로 재정의만 하며, 위 두 위험
+  항목도 그쪽에서 닫힌다. S2 코드는 이 메서드를 쓰지 않으므로 병합 순서와 무관하다.

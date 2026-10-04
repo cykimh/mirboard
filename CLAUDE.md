@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-122까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-127까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -193,6 +193,7 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuGameEngine*Test"   # 포트 어댑터 (D-98)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.bot.*"       # 티츄 봇 정책·순수 시뮬레이션 (D-118, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·강도 평가 (D-119, Docker 불필요)
+./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*"         # 원카드 순수 엔진·시뮬레이션 (D-127, Docker 불필요)
 MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.tichu.bot.HeuristicBotEvaluationTest"   # 티츄 봇 대형 평가 (~1m30s)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest"

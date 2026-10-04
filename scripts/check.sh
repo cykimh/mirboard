@@ -50,7 +50,7 @@ Usage: ./scripts/check.sh <subcommand> [args]
 
   fast              빠른 회귀 (클라 tsc+vitest + 서버 compile, ~30s)
                     pre-commit hook 과 동일 로직.
-  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 전량 + 봇 강도 평가, ~15s)
+  rules             서버 룰 도메인 단위 (티츄 + 스컬킹 + 원카드 전량 + 봇 강도 평가, ~20s)
                     Docker 불필요.
   server            서버 풀 (단위 + IT, Docker 필요, ~1m20s)
   client            클라 풀 (build:check + test + build, ~10s)
@@ -92,6 +92,8 @@ case "$SUBCMD" in
         log "서버 룰 도메인 단위 테스트 (Docker 불필요)"
         # 스컬킹도 티츄처럼 하위 패키지를 명시한다 — skullking.* 로 쓸면 persistence 의
         # SkullKingMatchRecorderIT(D-115, Testcontainers)까지 잡혀 "Docker 불필요"가 거짓이 된다.
+        # 원카드는 아직(S2, D-127) 순수 테스트뿐이라 onecard.* 로 묶는다 — S3 에서 IT(기록기·라운드
+        # 시작)가 생기면 같은 이유로 하위 패키지를 명시할 것.
         ./gradlew :server:test \
             --tests "com.mirboard.domain.game.tichu.card.*" \
             --tests "com.mirboard.domain.game.tichu.hand.*" \
@@ -113,7 +115,8 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.skullking.scoring.*" \
             --tests "com.mirboard.domain.game.skullking.state.*" \
             --tests "com.mirboard.domain.game.skullking.trick.*" \
-            --tests "com.mirboard.domain.game.skullking.persistence.SkullKingJsonRoundTripTest"
+            --tests "com.mirboard.domain.game.skullking.persistence.SkullKingJsonRoundTripTest" \
+            --tests "com.mirboard.domain.game.onecard.*"
         log "모두 통과"
         ;;
 
