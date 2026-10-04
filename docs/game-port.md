@@ -64,6 +64,10 @@ public interface GameEngine {                       // per-room. newEngine(ctx) 
     default GameAction botAction(GameState state, int seat, Random random) { ... }  // 기본 균등분포
     GameAction timeoutAction(GameState state, int seat);
 
+    // ⑤ 라운드 · 매치 진행
+    Advance advance(GameState newState, List<GameEvent> outbound);
+    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
+
     // ⑦ 엔진 타이머 (D-128) — 기본 없음. 시간이 지나면 저절로 일어나는 전이(§2)
     default Optional<Duration> timer(GameState state) { return Optional.empty(); }  // 지금부터 남은 시간
     default Optional<Result> onTimer(GameState state) { return Optional.empty(); }  // 만료 시 전이
