@@ -53,6 +53,11 @@ import org.springframework.stereotype.Component;
  * 라운드를 끝까지 자동 진행했다. 판정은 게임 중립(방 상태)이다 — 강제 종료는 엔진 상태로는
  * 매치가 안 끝났으므로 {@code isMatchOver()} 로는 못 막는다. 끝내는 쪽은 {@link #cancel} 로
  * 데드라인을 지운다.
+ *
+ * <p>D-128 — 진행 직후 <b>엔진 타이머</b>({@link GameEngine#timer})도 같은 세대 번호로 건다
+ * ({@code deadlines:game}, 발화는 {@link EngineTimerScheduler}). 액션·봇·타임아웃·탈주·라운드
+ * 시작이 이미 이 메서드를 부르므로 호출 지점은 늘지 않고, 턴 제한을 끈 방에서도 걸린다. 무장마다
+ * 상태를 한 번 읽는다(Redis GET) — 타이머가 없는 게임도 같은 비용을 낸다.
  */
 @Component
 public class TurnTimeoutScheduler implements DeadlineHandler {
@@ -116,6 +121,8 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         // D-122 — 끝난 방에는 다음 턴이 없다(매치를 끝낸 액션 직후의 호출 등). 취소만 한다.
         if (room.status() != RoomStatus.IN_GAME) return;
 
+        armEngineTimer(roomId, room, gen);
+
         int turnSeconds = room.turnSeconds();
         if (turnSeconds <= 0) return;  // 타이머 끔 — 기존 동작 호환.
 
@@ -132,12 +139,29 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         invalidate(roomId);
     }
 
-    /** generation++ 후 이전 generation 의 데드라인을 지운다. 새 generation 을 반환. */
+    /** generation++ 후 이전 generation 의 데드라인(턴·엔진 타이머)을 지운다. 새 generation 을 반환. */
     private long invalidate(String roomId) {
         long prevGen = generations.current(roomId);
         long gen = generations.bump(roomId);
         deadlines.cancel(KIND, member(roomId, prevGen));
+        deadlines.cancel(EngineTimerScheduler.KIND, member(roomId, prevGen));
         return gen;
+    }
+
+    /**
+     * D-128 — 엔진이 시간 전이를 선언하면 남은 시간 뒤로 엔진 타이머를 건다. 실패해도 턴 타이머는
+     * 막지 않는다(로그만) — 엔진 타이머가 없는 게임의 진행이 이 경로 때문에 멈추면 안 된다.
+     */
+    private void armEngineTimer(String roomId, Room room, long gen) {
+        try {
+            GameEngine engine = engines.forRoom(room);
+            engine.loadState()
+                    .flatMap(engine::timer)
+                    .ifPresent(delay -> deadlines.schedule(
+                            EngineTimerScheduler.KIND, member(roomId, gen), delay));
+        } catch (RuntimeException e) {
+            log.warn("Engine timer arm failed: roomId={} err={}", roomId, e.toString());
+        }
     }
 
     /** 폴러가 만료된 항목을 넘겨준다. 이 인스턴스가 단독 소유한 상태로 들어온다. */
@@ -249,7 +273,9 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
      * 이 호출은 즉시 회수를 위한 것이다.
      */
     private void cleanup(String roomId) {
-        deadlines.cancel(KIND, member(roomId, generations.current(roomId)));
+        long gen = generations.current(roomId);
+        deadlines.cancel(KIND, member(roomId, gen));
+        deadlines.cancel(EngineTimerScheduler.KIND, member(roomId, gen));
         generations.clear(roomId);
     }
 

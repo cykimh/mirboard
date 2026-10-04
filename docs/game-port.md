@@ -1,6 +1,6 @@
 # GameEngine 포트 설계 (D-97 설계 · D-98 구현)
 
-> 상태: **구현 완료** (S1, D-98) · 설계 2026-07-30 · 반영 2026-07-30
+> 상태: **구현 완료** (S1, D-98) · 설계 2026-07-30 · 반영 2026-07-30 · 엔진 타이머 추가 D-128(2026-10-04)
 > 이 문서는 **계약 정본**이다. 포트를 바꾸면 여기를 먼저 고친다.
 > 구현 순서와 세션 분할은 `docs/plans/multi-game-sessions.md`.
 
@@ -64,9 +64,9 @@ public interface GameEngine {                       // per-room. newEngine(ctx) 
     default GameAction botAction(GameState state, int seat, Random random) { ... }  // 기본 균등분포
     GameAction timeoutAction(GameState state, int seat);
 
-    // ⑤ 라운드 · 매치 진행
-    Advance advance(GameState newState, List<GameEvent> outbound);
-    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
+    // ⑦ 엔진 타이머 (D-128) — 기본 없음. 시간이 지나면 저절로 일어나는 전이(§2)
+    default Optional<Duration> timer(GameState state) { return Optional.empty(); }  // 지금부터 남은 시간
+    default Optional<Result> onTimer(GameState state) { return Optional.empty(); }  // 만료 시 전이
 
     record Result(GameState newState, List<GameEvent> events) {}
     record Advance(boolean roundCompleted, boolean matchCompleted) {}
@@ -200,6 +200,35 @@ default boolean supportsRematch() { return false; }
   리매치를 지원할 때(리매치 대기, IN_GAME 유지).
 - `RoomOption` 이 아니라 메서드인 이유: 방 생성 때 사용자가 고르는 설정이 아니라 게임 구조의
   성질이다. UI 게이팅도 없다(리매치 버튼은 지원 게임의 게임판에만 있다).
+
+### 시간이 지나면 일어나는 전이도 게임이 선언한다 (D-128)
+
+원카드의 "원카드!/잡기!" 경쟁 창은 아무도 행동하지 않아도 상태가 바뀐다 — 추첨된 봇이 누를 시각이 오면
+봇이 누르고, 3초가 지나면 창이 닫힌다. 포트에는 이런 전이가 없었고 시간은 방의 턴 제한에만 묶여 있었다.
+봇 루프·턴 타임아웃을 재활용하면 턴 제한을 끈 방에서 창이 닫히지 않으므로 엔진이 타이머를 선언하는
+선택형 확장을 두었다.
+
+```java
+default Optional<Duration> timer(GameState state) { return Optional.empty(); }
+default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
+```
+
+- **기본 없음(옵트인)** — 티츄·스컬킹은 한 줄도 바꾸지 않았다.
+- **무장**: `TurnTimeoutScheduler.onTurnAdvanced` 가 턴 데드라인과 **같은 세대 번호**로
+  `deadlines:game`(member `{roomId}#{generation}`)에 건다. 액션·봇·타임아웃·탈주·라운드 시작이 이미 이
+  메서드를 부르므로 호출 지점은 늘지 않고, 턴 제한을 끈 방에서도 걸린다. 대가는 진행마다 상태 조회 1회
+  (Redis GET) — 타이머가 없는 게임도 같다.
+- **남은 시간**을 돌려준다. 재무장해도 처음부터 다시 세지 않게, 게임은 시작 시각을 상태에 두고 자기
+  시계로 계산한다(원카드: 창 연 시각 + 가장 빠른 봇 반응 또는 창 길이).
+- **발화**: `EngineTimerScheduler` 가 턴 타임아웃과 같은 가드를 거친다 — 세대 → IN_GAME → 락(실패 시 200ms
+  재시도) → 락 안 재확인. 적용만 `timeoutAction` 대신 `onTimer` 이고, 결과는 다른 진행과 같은 길(저장 →
+  `advance` → 브로드캐스트 → 봇·타이머 재무장)을 탄다. 세대 번호가 "타이머를 건 뒤 상태 무변경"을
+  보장하므로 `onTimer` 는 시각을 다시 보지 않는다.
+- **취소**: 세대가 오르면(누가 행동함) 두 종류가 함께 지워진다. `cancel()`(D-122)도 마찬가지다.
+- **왜 `GameAction` 이 아니라 `Result` 인가**: 액션은 클라 JSON 에서 역직렬화된다. "창 닫기" 같은 시스템
+  전이를 그 계층에 두면 클라가 위조해 보낼 수 있다.
+- 시간 전이가 진행 중인 동안 게임은 `pendingSeats` 를 비워 두면 된다(원카드 경쟁 창) — 봇 루프와 턴
+  타이머가 끼어들지 않고, 시간 진행은 엔진 타이머 하나가 맡는다.
 
 ## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 

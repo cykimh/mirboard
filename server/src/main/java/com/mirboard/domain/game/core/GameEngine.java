@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.core;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -98,6 +99,33 @@ public interface GameEngine {
 
     /** 턴 제한 초과 시 적용할 안전 액션 (결정적). null 이면 아무것도 안 한다. */
     GameAction timeoutAction(GameState state, int seat);
+
+    // ---------- ⑦ 엔진 타이머 (D-128) ----------
+
+    /**
+     * D-128 — 이 상태에 <b>시간이 지나면 저절로 일어나는 전이</b>가 있으면 지금부터 남은 시간.
+     * 기본은 없음(티츄·스컬킹).
+     *
+     * <p>턴 제한과는 별개다 — 방의 턴 제한이 꺼져 있어도 걸린다. 인프라는 진행 직후마다
+     * ({@code TurnTimeoutScheduler.onTurnAdvanced}) 이 값을 물어 턴 데드라인과 같은 세대 번호로
+     * 데드라인을 걸고, 만료되면 {@link #onTimer} 를 부른다. "남은 시간"을 돌려주는 것은 재무장해도
+     * 처음부터 다시 세지 않게 하려는 것이다 — 게임은 시작 시각을 상태에 두고 자기 시계로 계산한다.
+     */
+    default Optional<Duration> timer(GameState state) {
+        return Optional.empty();
+    }
+
+    /**
+     * D-128 — {@link #timer} 가 만료됐을 때의 전이. 비어 있으면 아무 일도 없다.
+     *
+     * <p>발화를 믿어도 된다 — 인프라는 세대 번호로 "타이머를 건 뒤 상태가 바뀌지 않았다"를
+     * 확인한 뒤에만, 방 액션 락을 쥐고 부른다. 시스템 전이를 {@link GameAction} 으로 두지 않은
+     * 것은 의도적이다: 액션은 클라 JSON 에서 역직렬화되므로 그 계층에 두면 클라가 위조해 보낼 수
+     * 있다.
+     */
+    default Optional<Result> onTimer(GameState state) {
+        return Optional.empty();
+    }
 
     // ---------- ⑤ 라운드 · 매치 진행 ----------
 
