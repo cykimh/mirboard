@@ -331,6 +331,10 @@ class OneCardMatchSimulationTest {
                         || !matchEnded.standings().equals(state.result().standings())) {
                     throw mismatch("MatchEnded", matchEnded, state.result());
                 }
+                // 끝난 판에 닫히지 않은 창이 남으면 안 된다 — 창을 연 전이는 반드시 RaceResolved 로 짝이 맞는다.
+                if (openRaceId != -1) {
+                    throw mismatch("끝난 판에 열려 있는 창 번호", openRaceId, -1);
+                }
                 return;
             }
             if (attackStack != state.attackStack()) {
