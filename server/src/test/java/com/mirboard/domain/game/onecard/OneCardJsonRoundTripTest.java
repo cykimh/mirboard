@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mirboard.domain.game.onecard.action.OneCardAction;
 import com.mirboard.domain.game.onecard.card.PlayingCard;
 import com.mirboard.domain.game.onecard.card.Suit;
@@ -63,6 +64,35 @@ class OneCardJsonRoundTripTest {
                         new MatchResult.Standing(1, 2, 2, MatchResult.SeatStatus.ALIVE))));
 
         assertThat(roundTrip(finished, OneCardState.class)).isEqualTo(finished);
+    }
+
+    /**
+     * D-128 — 새 버전이 필드를 더해 저장한 뒤 롤백돼도 진행 중 매치를 읽는다. 상태 안의 레코드(경쟁 창·봇 누름·
+     * 탈락·결과·순위)도 모두 같다.
+     */
+    @Test
+    void a_stored_state_with_unknown_fields_still_loads() throws Exception {
+        OneCardState racing = seats(hand(club(3)), hand(), hand(diamond(4), diamond(6), spade(8)))
+                .eliminated(1, Elimination.Reason.BANKRUPT, 20).top(heart(5))
+                .race(new RaceWindow(4, 0, 3, -20, 40, 1_000, 3_000, 2, new RaceWindow.BotPress(2, false, 1_500)))
+                .build();
+        ObjectNode racingJson = mapper.valueToTree(racing);
+        racingJson.put("addedLater", 1);
+        ((ObjectNode) racingJson.get("race")).put("addedLater", 1);
+        ((ObjectNode) racingJson.get("race").get("botPress")).put("addedLater", 1);
+        ((ObjectNode) racingJson.get("eliminations").get(0)).put("addedLater", 1);
+
+        OneCardState open = seats(hand(), hand(spade(4), spade(6))).top(heart(2)).turn(-1).build();
+        OneCardState finished = new OneCardState(open.hands(), open.drawPile(), open.discardPile(), -1, 1, null, 2,
+                null, List.of(), 0, 12, 9, new MatchResult(MatchResult.EndReason.FINISHED, List.of(
+                        new MatchResult.Standing(0, 1, 0, MatchResult.SeatStatus.FINISHED),
+                        new MatchResult.Standing(1, 2, 2, MatchResult.SeatStatus.ALIVE))));
+        ObjectNode finishedJson = mapper.valueToTree(finished);
+        ((ObjectNode) finishedJson.get("result")).put("addedLater", 1);
+        ((ObjectNode) finishedJson.get("result").get("standings").get(0)).put("addedLater", 1);
+
+        assertThat(mapper.treeToValue(racingJson, OneCardState.class)).isEqualTo(racing);
+        assertThat(mapper.treeToValue(finishedJson, OneCardState.class)).isEqualTo(finished);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.onecard.state;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
@@ -7,6 +8,7 @@ import java.util.List;
  *
  * @param standings 좌석마다 한 줄, 순위 오름차순(같은 순위는 좌석 오름차순)
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record MatchResult(EndReason reason, List<Standing> standings) {
 
     public MatchResult {
@@ -34,6 +36,7 @@ public record MatchResult(EndReason reason, List<Standing> standings) {
      * @param rank      1부터. 동순위 다음은 건너뛴다(1, 1, 3)
      * @param cardsLeft 살아 있으면 남은 장수, 탈락했으면 탈락 순간의 장수
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Standing(int seat, int rank, int cardsLeft, SeatStatus status) {
     }
 

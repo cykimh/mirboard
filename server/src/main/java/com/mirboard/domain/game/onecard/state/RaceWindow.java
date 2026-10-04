@@ -1,5 +1,7 @@
 package com.mirboard.domain.game.onecard.state;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * 열린 외치기 경쟁 창 (`docs/rules-onecard.md` §9).
  *
@@ -14,6 +16,7 @@ package com.mirboard.domain.game.onecard.state;
  * @param botPress     창을 열 때 추첨한 가장 빠른 봇의 누름. 봇이 없거나 창보다 늦으면 null.
  *                     <b>서버 전용</b> — 공개 뷰·이벤트에 싣지 않는다(설계서 §4.9)
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record RaceWindow(int raceId,
                          int ownerSeat,
                          int slot,
@@ -30,6 +33,7 @@ public record RaceWindow(int raceId,
      * @param call        true 면 주인의 "원카드!", false 면 다른 봇의 "잡기!"
      * @param delayMillis 창이 열린 뒤 누르기까지의 반응 시간
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record BotPress(int seat, boolean call, long delayMillis) {
     }
 
