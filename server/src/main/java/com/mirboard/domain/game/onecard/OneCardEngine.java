@@ -8,6 +8,7 @@ import com.mirboard.domain.game.onecard.card.PlayingCard;
 import com.mirboard.domain.game.onecard.card.Suit;
 import com.mirboard.domain.game.onecard.event.OneCardEvent;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.DrawReason;
+import com.mirboard.domain.game.onecard.event.OneCardEvent.RaceOutcome;
 import com.mirboard.domain.game.onecard.rules.PlayRules;
 import com.mirboard.domain.game.onecard.rules.Ranking;
 import com.mirboard.domain.game.onecard.rules.TurnOrder;
@@ -18,6 +19,8 @@ import com.mirboard.domain.game.onecard.state.OneCardState;
 import com.mirboard.domain.game.onecard.state.RaceWindow;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Random;
 
 /**
@@ -38,12 +41,21 @@ public final class OneCardEngine {
     /** 총 차례 상한 (§11.3). */
     public static final int TURN_LIMIT = 600;
 
+    /** 경쟁 버튼 지터 범위 — −100~100 (§9, 설계서 §4.4). */
+    public static final int JITTER_RANGE = 100;
+
     private final GameContext context;
     private final Random rng;
+    private final RaceSettings settings;
 
-    public OneCardEngine(GameContext context, Random rng) {
+    public OneCardEngine(GameContext context, Random rng, RaceSettings settings) {
         this.context = context;
         this.rng = rng;
+        this.settings = settings;
+    }
+
+    public OneCardEngine(GameContext context, Random rng) {
+        this(context, rng, RaceSettings.DEFAULT);
     }
 
     public GameContext context() {
@@ -99,9 +111,8 @@ public final class OneCardEngine {
         return switch (action) {
             case OneCardAction.PlayCard play -> play(state, seat, play, now);
             case OneCardAction.Draw __ -> draw(state, seat);
-            // 경쟁 창은 다음 태스크에서 연다 — 지금은 열린 창이 있을 수 없다.
-            case OneCardAction.CallOneCard __ -> throw rejected(RejectionReason.NO_RACE);
-            case OneCardAction.Catch __ -> throw rejected(RejectionReason.NO_RACE);
+            case OneCardAction.CallOneCard call -> press(state, seat, call.raceId(), true);
+            case OneCardAction.Catch katch -> press(state, seat, katch.raceId(), false);
         };
     }
 
@@ -143,7 +154,12 @@ public final class OneCardEngine {
         } else if (t.turnCount >= TURN_LIMIT) {
             finish(t, EndReason.STALEMATE, -1, events);
         } else {
-            passTurn(t, TurnOrder.afterPlay(t.seatCount(), t::alive, seat, t.direction, card), events);
+            int next = TurnOrder.afterPlay(t.seatCount(), t::alive, seat, t.direction, card);
+            if (hand.size() == 1) {
+                openRace(t, seat, next, now, events);
+            } else {
+                passTurn(t, next, events);
+            }
         }
         return new Result(t.freeze(), events);
     }
@@ -187,6 +203,98 @@ public final class OneCardEngine {
         }
     }
 
+    // ---------- 외치기 경쟁 (§9) ----------
+
+    private Result press(OneCardState state, int seat, int raceId, boolean call) {
+        RaceWindow race = state.race();
+        if (race == null || race.raceId() != raceId) {
+            throw rejected(RejectionReason.NO_RACE);
+        }
+        if (call && seat != race.ownerSeat()) {
+            throw rejected(RejectionReason.NOT_RACE_OWNER);
+        }
+        if (!call && seat == race.ownerSeat()) {
+            throw rejected(RejectionReason.OWNER_CANNOT_CATCH);
+        }
+        return resolveRace(state, call ? RaceOutcome.CALLED : RaceOutcome.CAUGHT, seat);
+    }
+
+    /**
+     * 경쟁 창이 저절로 닫히는 시각(epoch ms) — 가장 빠른 봇의 누름 또는 창 길이. 창이 없으면 비어 있다.
+     * 포트의 {@code timer} 는 이 값에서 지금 시각을 빼 남은 시간을 만든다(S3).
+     */
+    public OptionalLong timerDeadline(OneCardState state) {
+        if (state.ended() || state.race() == null) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(state.race().deadline());
+    }
+
+    /**
+     * 경쟁 창의 시간 전이 — 추첨해 둔 봇의 누름이 창보다 빠르면 그 누름, 아니면 아무도 안 누른 채 닫힘(§9-4).
+     * 발화를 믿는다: 시각을 다시 보지 않는다(설계서 §4.5).
+     */
+    public Optional<Result> onTimer(OneCardState state) {
+        if (state.ended() || state.race() == null) {
+            return Optional.empty();
+        }
+        RaceWindow.BotPress bot = state.race().botPress();
+        if (bot == null) {
+            return Optional.of(resolveRace(state, RaceOutcome.EXPIRED, -1));
+        }
+        return Optional.of(resolveRace(state, bot.call() ? RaceOutcome.CALLED : RaceOutcome.CAUGHT, bot.seat()));
+    }
+
+    private void openRace(Table t, int owner, int next, long now, List<OneCardEvent> events) {
+        int raceId = t.version;
+        int slot = rng.nextInt(settings.slotCount());
+        int jitterX = rng.nextInt(2 * JITTER_RANGE + 1) - JITTER_RANGE;
+        int jitterY = rng.nextInt(2 * JITTER_RANGE + 1) - JITTER_RANGE;
+        t.race = new RaceWindow(raceId, owner, slot, jitterX, jitterY, now, settings.windowMillis(), next,
+                fastestBot(t, owner));
+        t.turnSeat = -1;
+        events.add(new OneCardEvent.RaceOpened(raceId, owner, slot, jitterX, jitterY, settings.windowMillis()));
+    }
+
+    /** §9-6 — 살아 있는 봇마다 반응 시간을 뽑아 가장 빠른 한 명만 남긴다. 창보다 늦으면 없음. */
+    private RaceWindow.BotPress fastestBot(Table t, int owner) {
+        RaceWindow.BotPress fastest = null;
+        for (int seat = 0; seat < t.seatCount(); seat++) {
+            if (!t.alive(seat) || !context.botSeats().contains(seat)) {
+                continue;
+            }
+            boolean call = seat == owner;
+            long delay = call
+                    ? rng.nextLong(settings.ownerMinMillis(), settings.ownerMaxMillis() + 1)
+                    : rng.nextLong(settings.catcherMinMillis(), settings.catcherMaxMillis() + 1);
+            if (fastest == null || delay < fastest.delayMillis()) {
+                fastest = new RaceWindow.BotPress(seat, call, delay);
+            }
+        }
+        return fastest != null && fastest.delayMillis() < settings.windowMillis() ? fastest : null;
+    }
+
+    private Result resolveRace(OneCardState state, RaceOutcome outcome, int bySeat) {
+        Table t = new Table(state);
+        RaceWindow race = t.race;
+        t.race = null;
+        t.version++;
+        List<OneCardEvent> events = new ArrayList<>();
+        events.add(new OneCardEvent.RaceResolved(race.raceId(), outcome, bySeat));
+        if (outcome == RaceOutcome.CAUGHT) {
+            // §9.1 — 벌칙은 차례를 끝내지 않고 공격 누적·차례 수·연속 패스 수를 바꾸지 않는다.
+            int owner = race.ownerSeat();
+            List<PlayingCard> drawn = drawFromPile(t, 1, events);
+            List<PlayingCard> hand = t.hands.get(owner);
+            hand.addAll(drawn);
+            events.add(new OneCardEvent.CardsDrawn(owner, drawn.size(), DrawReason.PENALTY, hand.size(),
+                    t.drawPile.size()));
+            events.add(new OneCardEvent.HandUpdated(owner, hand, drawn, t.version));
+        }
+        passTurn(t, race.nextSeat(), events);
+        return new Result(t.freeze(), events);
+    }
+
     // ---------- 진행 질의 ----------
 
     /** 지금 행동을 기다리는 좌석. 경쟁 창이 열렸거나 끝났으면 비어 있다(설계서 §4.5). */
@@ -201,6 +309,12 @@ public final class OneCardEngine {
     public List<OneCardAction> legalActions(OneCardState state, int seat) {
         if (state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
             return List.of();
+        }
+        RaceWindow race = state.race();
+        if (race != null) {
+            return List.of(seat == race.ownerSeat()
+                    ? new OneCardAction.CallOneCard(race.raceId())
+                    : new OneCardAction.Catch(race.raceId()));
         }
         if (state.turnSeat() != seat) {
             return List.of();
