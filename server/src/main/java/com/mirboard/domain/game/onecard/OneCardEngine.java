@@ -69,6 +69,23 @@ public final class OneCardEngine {
         }
     }
 
+    /** {@link #desert} 결과. */
+    public record Desertion(OneCardState newState, Outcome outcome, List<OneCardEvent> events) {
+
+        public enum Outcome {
+            /** 이미 끝났거나 이미 탈락한 좌석 — 상태 무변경, 이벤트 0건 (§10). */
+            NOT_APPLICABLE,
+            /** 남은 사람끼리 계속. */
+            CONTINUED,
+            /** 탈락으로 1명만 남았거나 살아 있는 사람이 없어 끝났다 (§11.1). */
+            MATCH_ENDED
+        }
+
+        public Desertion {
+            events = List.copyOf(events);
+        }
+    }
+
     // ---------- 시작 (§2, §3) ----------
 
     public Result startMatch() {
@@ -293,6 +310,44 @@ public final class OneCardEngine {
         }
         passTurn(t, race.nextSeat(), events);
         return new Result(t.freeze(), events);
+    }
+
+    // ---------- 탈주 (§10, §9.2) ----------
+
+    /**
+     * 좌석 탈주 — 파산과 같은 탈락 경로. 이미 끝났거나 이미 탈락한 좌석이면 {@code NOT_APPLICABLE}(§10).
+     * 경쟁 창이 열려 있으면 벌칙 없이 닫고(§9-7), 정해 둔 다음 차례로 넘기되 그 사람이 탈주자면 그다음 사람이
+     * 공격 없이 받는다(§9.2). 창이 없고 탈주자의 차례였다면 걸린 공격은 사라진다(§10).
+     */
+    public Desertion desert(OneCardState state, int seat) {
+        if (state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
+            return new Desertion(state, Desertion.Outcome.NOT_APPLICABLE, List.of());
+        }
+        Table t = new Table(state);
+        t.version++;
+        List<OneCardEvent> events = new ArrayList<>();
+        RaceWindow race = t.race;
+        if (race != null) {
+            t.race = null;
+            events.add(new OneCardEvent.RaceResolved(race.raceId(), RaceOutcome.CANCELLED, -1));
+        }
+        boolean deserterHadTurn = race == null && t.turnSeat == seat;
+        eliminate(t, seat, Elimination.Reason.DESERTED, events);
+        if (endIfDecided(t, events)) {
+            return new Desertion(t.freeze(), Desertion.Outcome.MATCH_ENDED, events);
+        }
+        if (race != null) {
+            int next = race.nextSeat();
+            if (!t.alive(next)) {
+                next = TurnOrder.nextAlive(t.seatCount(), t::alive, next, t.direction);
+                t.attackStack = 0;
+            }
+            passTurn(t, next, events);
+        } else if (deserterHadTurn) {
+            t.attackStack = 0;
+            passTurn(t, TurnOrder.nextAlive(t.seatCount(), t::alive, seat, t.direction), events);
+        }
+        return new Desertion(t.freeze(), Desertion.Outcome.CONTINUED, events);
     }
 
     // ---------- 진행 질의 ----------
