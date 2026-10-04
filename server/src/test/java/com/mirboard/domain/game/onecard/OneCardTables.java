@@ -8,7 +8,9 @@ import com.mirboard.domain.game.onecard.state.Elimination;
 import com.mirboard.domain.game.onecard.state.OneCardState;
 import com.mirboard.domain.game.onecard.state.RaceWindow;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 테스트용 상태 빌더. 손패·맨 위·뽑을 더미만 정하면 나머지 카드는 버린 더미의 맨 위 아래에 넣어 54장 보존을
@@ -123,6 +125,13 @@ final class OneCardTables {
         used.add(top);
         if (drawPile != null) {
             used.addAll(drawPile);
+        }
+        Set<PlayingCard> seen = new HashSet<>();
+        for (PlayingCard card : used) {
+            if (!seen.add(card)) {
+                // 같은 카드가 두 군데 있는 상태는 54장 보존이 깨진 채 시작하므로 테스트 작성 실수다.
+                throw new IllegalArgumentException("card used twice in the hands, the top or the draw pile: " + card);
+            }
         }
         List<PlayingCard> rest = Deck.all().stream().filter(card -> !used.contains(card)).toList();
         List<PlayingCard> pile = drawPile != null ? drawPile : rest;

@@ -83,8 +83,10 @@ class PlayRulesTest {
     void under_a_black_joker_only_the_color_joker_counters_and_nothing_beats_the_color_joker() {
         assertThat(PlayRules.canPlay(BLACK, null, 5, COLOR)).isTrue();
         assertThat(PlayRules.canPlay(BLACK, null, 5, card(Suit.HEART, PlayingCard.ACE))).isFalse();
+        assertThat(PlayRules.canPlay(BLACK, null, 5, card(Suit.HEART, 2))).isFalse();
         assertThat(PlayRules.canPlay(COLOR, null, 7, BLACK)).isFalse();
         assertThat(PlayRules.canPlay(COLOR, null, 7, card(Suit.HEART, 2))).isFalse();
+        assertThat(PlayRules.canPlay(COLOR, null, 7, card(Suit.HEART, PlayingCard.ACE))).isFalse();
     }
 
     @Test

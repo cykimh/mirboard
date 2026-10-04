@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -48,6 +49,7 @@ class DealerTest {
     }
 
     @Test
+    @Timeout(value = 5, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void when_the_pile_has_no_normal_card_everything_is_redealt() {
         List<PlayingCard> normal = Deck.all().stream().filter(PlayingCard::isNormal).toList();
         List<PlayingCard> other = Deck.all().stream().filter(card -> !card.isNormal()).toList();
@@ -55,10 +57,16 @@ class DealerTest {
         bad.addAll(other);
         AtomicInteger calls = new AtomicInteger();
 
+        // 두 번째 순서는 Deck.all() 그대로다 — 손패 42장 다음 카드(인덱스 42)가 ♣4 라 바로 끝난다.
         Dealer.Deal deal = Dealer.deal(6, cards -> calls.incrementAndGet() == 1 ? bad : Deck.all());
 
         assertThat(calls).hasValue(2);
-        assertThat(deal.startCard().isNormal()).isTrue();
+        assertThat(deal.hands().get(0)).isEqualTo(Deck.all().subList(0, Dealer.HAND_SIZE));
+        assertThat(deal.startCard()).isEqualTo(Deck.all().get(42)).isEqualTo(PlayingCard.of(Suit.CLUB, 4));
+        List<PlayingCard> all = new ArrayList<>(deal.drawPile());
+        deal.hands().forEach(all::addAll);
+        all.add(deal.startCard());
+        assertThat(all).hasSize(Deck.SIZE).doesNotHaveDuplicates();
     }
 
     @Test

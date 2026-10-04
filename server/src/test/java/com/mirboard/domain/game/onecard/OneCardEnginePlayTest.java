@@ -33,6 +33,8 @@ import com.mirboard.domain.game.onecard.event.OneCardEvent.TurnChanged;
 import com.mirboard.domain.game.onecard.invariant.OneCardInvariantChecker;
 import com.mirboard.domain.game.onecard.state.Elimination;
 import com.mirboard.domain.game.onecard.state.MatchResult.EndReason;
+import com.mirboard.domain.game.onecard.state.MatchResult.SeatStatus;
+import com.mirboard.domain.game.onecard.state.MatchResult.Standing;
 import com.mirboard.domain.game.onecard.state.OneCardState;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -76,9 +78,15 @@ class OneCardEnginePlayTest {
 
         assertThat(state.hands()).allSatisfy(h -> assertThat(h).hasSize(Dealer.HAND_SIZE));
         assertThat(state.topCard().isNormal()).isTrue();
-        assertThat(result.events().getFirst()).isInstanceOf(MatchStarted.class);
+        assertThat(result.events().getFirst())
+                .isEqualTo(new MatchStarted(state.turnSeat(), state.topCard(), 7, state.drawPile().size()));
         assertThat(result.events()).filteredOn(HandDealt.class::isInstance).hasSize(4)
                 .allSatisfy(e -> assertThat(e.isPrivate()).isTrue());
+        for (int seat = 0; seat < 4; seat++) {
+            int owner = seat;
+            assertThat(result.events()).filteredOn(e -> e instanceof HandDealt && e.privateSeat() == owner)
+                    .containsExactly(new HandDealt(owner, state.hands().get(owner), 1));
+        }
         assertThat(result.events().getLast()).isEqualTo(new TurnChanged(state.turnSeat(), 1, 0));
         OneCardInvariantChecker.check(state);
     }
@@ -267,6 +275,43 @@ class OneCardEnginePlayTest {
         assertThat(third.events().getLast()).isInstanceOf(MatchEnded.class);
     }
 
+    @Test
+    void an_attack_larger_than_what_is_left_draws_only_what_is_there_and_is_not_a_pass() {
+        // OneCardTables 는 남는 카드를 버린 더미에 넣어 다시 채워지므로 직접 만든다 — 뽑을 더미 2장, 버린 더미는
+        // 맨 위 흑백 조커뿐이라 다시 채울 카드가 없다. 3인 × 17장 + 2 + 1 = 54.
+        List<PlayingCard> others = Deck.all().stream().filter(card -> !card.equals(BLACK_JOKER)).toList();
+        OneCardState state = new OneCardState(
+                List.of(others.subList(2, 19), others.subList(19, 36), others.subList(36, 53)),
+                others.subList(0, 2), List.of(BLACK_JOKER), 0, 1, null, 5, null, List.of(), 0, 0, 1, null);
+
+        OneCardEngine.Result result = engine(3).apply(state, 0, new Draw(), NOW);
+
+        OneCardState next = result.newState();
+        assertThat(result.events()).containsExactly(
+                new CardsDrawn(0, 2, DrawReason.ATTACK, 19, 0),
+                new HandUpdated(0, next.hands().get(0), others.subList(0, 2), 2),
+                new TurnChanged(1, 1, 0));
+        assertThat(next.passStreak()).isZero();
+        assertThat(next.attackStack()).isZero();
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void playing_or_drawing_a_card_resets_the_pass_streak() {
+        OneCardEngine engine = engine(3);
+        OneCardState passing = seats(hand(heart(9), club(3), club(4)), hand(spade(4), spade(6), spade(8)),
+                hand(diamond(4), diamond(6), diamond(8)))
+                .top(heart(5)).turn(0).passStreak(2).build();
+
+        OneCardState played = play(engine, passing, 0, heart(9));
+        OneCardState drew = engine.apply(passing, 0, new Draw(), NOW).newState();
+
+        assertThat(played.passStreak()).isZero();
+        assertThat(drew.passStreak()).isZero();
+        OneCardInvariantChecker.check(played);
+        OneCardInvariantChecker.check(drew);
+    }
+
     /** 맨 위 한 장을 빼고 53장을 전부 손패로 나눈 상태 — 뽑을 더미도, 다시 채울 버린 더미도 없다. */
     private static OneCardState everyCardInHands(int seatCount, PlayingCard top) {
         List<List<PlayingCard>> hands = new ArrayList<>();
@@ -282,23 +327,94 @@ class OneCardEnginePlayTest {
         return new OneCardState(hands, List.of(), List.of(top), 0, 1, null, 0, null, List.of(), 0, 0, 1, null);
     }
 
+    /** 좌석 0 의 19장 — ♣A~♣K 와 ♦A·3·4·6·8·9. 뽑을 더미 ♦10·♦J 에서 한 장을 먹으면 20장이 돼 파산한다(§10). */
+    private static List<PlayingCard> nineteenCards() {
+        List<PlayingCard> cards = new ArrayList<>(IntStream.rangeClosed(1, 13).mapToObj(OneCardTables::club).toList());
+        cards.addAll(List.of(diamond(1), diamond(3), diamond(4), diamond(6), diamond(8), diamond(9)));
+        return cards;
+    }
+
+    /** 2인 — 좌석 0 이 다음 먹기에서 파산한다. */
+    private static OneCardTables aboutToGoBankrupt() {
+        return seats(nineteenCards(), hand(spade(4), spade(6), spade(8)))
+                .top(heart(5)).drawPile(diamond(10), diamond(11)).turn(0);
+    }
+
+    /** 3인 — 좌석 0 이 다음 먹기에서 파산한다. 좌석 1·2 는 3장씩이라 순위에서 동순위다. */
+    private static OneCardTables threeSeatsAboutToGoBankrupt() {
+        return seats(nineteenCards(), hand(spade(4), spade(6), spade(8)), hand(heart(9), heart(10), heart(3)))
+                .top(heart(5)).drawPile(diamond(10), diamond(11)).turn(0);
+    }
+
     @Test
     void reaching_twenty_cards_is_bankruptcy_and_two_players_leaves_one_standing() {
-        List<PlayingCard> nineteen = new ArrayList<>(
-                IntStream.rangeClosed(1, 13).mapToObj(OneCardTables::club).toList());
-        nineteen.addAll(List.of(diamond(1), diamond(3), diamond(4), diamond(6), diamond(8), diamond(9)));
-        OneCardState state = seats(nineteen, hand(spade(4), spade(6), spade(8)))
-                .top(heart(5)).drawPile(diamond(10), diamond(11)).turn(0).build();
+        OneCardState state = aboutToGoBankrupt().build();
 
         OneCardEngine.Result result = engine(2).apply(state, 0, new Draw(), NOW);
 
         OneCardState next = result.newState();
+        List<PlayingCard> twenty = new ArrayList<>(nineteenCards());
+        twenty.add(diamond(10));
+        List<PlayingCard> pileAfter = new ArrayList<>(List.of(diamond(11)));
+        pileAfter.addAll(twenty);
         assertThat(next.hands().get(0)).isEmpty();
-        assertThat(next.drawPile()).endsWith(diamond(10));
+        // 손패는 섞지 않고 받은 순서 그대로 뽑을 더미 맨 아래로 간다(§10).
+        assertThat(next.drawPile()).containsExactlyElementsOf(pileAfter).hasSize(21);
         assertThat(next.eliminations()).containsExactly(new Elimination(0, Elimination.Reason.BANKRUPT, 20));
-        assertThat(result.events()).contains(new PlayerEliminated(0, Elimination.Reason.BANKRUPT, 20, 21));
+        assertThat(result.events()).containsSequence(
+                new HandUpdated(0, twenty, List.of(diamond(10)), 2),
+                new PlayerEliminated(0, Elimination.Reason.BANKRUPT, 20, 21),
+                new HandUpdated(0, List.of(), List.of(), 3));
+        assertThat(next.version()).isEqualTo(3);
         assertThat(next.result().reason()).isEqualTo(EndReason.LAST_STANDING);
         assertThat(next.result().winners()).containsExactly(1);
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void bankruptcy_on_the_turn_limit_ends_as_last_standing_not_a_stalemate() {
+        OneCardState state = aboutToGoBankrupt().turnCount(OneCardEngine.TURN_LIMIT - 1).build();
+
+        OneCardState next = engine(2).apply(state, 0, new Draw(), NOW).newState();
+
+        assertThat(next.turnCount()).isEqualTo(OneCardEngine.TURN_LIMIT);
+        assertThat(next.result().reason()).isEqualTo(EndReason.LAST_STANDING);
+        assertThat(next.result().winners()).containsExactly(1);
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void a_bot_left_alone_by_a_bankruptcy_is_last_standing_not_no_humans() {
+        OneCardState next = engine(2, 1).apply(aboutToGoBankrupt().build(), 0, new Draw(), NOW).newState();
+
+        assertThat(next.result().reason()).isEqualTo(EndReason.LAST_STANDING);
+        assertThat(next.result().winners()).containsExactly(1);
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void when_a_bankruptcy_leaves_only_bots_the_match_ends_as_no_humans_with_the_bankrupt_seat_last() {
+        OneCardState next = engine(3, 1, 2).apply(threeSeatsAboutToGoBankrupt().build(), 0, new Draw(), NOW)
+                .newState();
+
+        assertThat(next.result().reason()).isEqualTo(EndReason.NO_HUMANS);
+        assertThat(next.result().standings()).containsExactly(
+                new Standing(1, 1, 3, SeatStatus.ALIVE),
+                new Standing(2, 1, 3, SeatStatus.ALIVE),
+                new Standing(0, 3, 20, SeatStatus.BANKRUPT));
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void a_bankruptcy_among_three_humans_passes_the_turn_on_and_the_match_goes_on() {
+        OneCardEngine.Result result = engine(3).apply(threeSeatsAboutToGoBankrupt().build(), 0, new Draw(), NOW);
+
+        OneCardState next = result.newState();
+        assertThat(next.ended()).isFalse();
+        assertThat(next.eliminations()).containsExactly(new Elimination(0, Elimination.Reason.BANKRUPT, 20));
+        assertThat(result.events().getLast()).isEqualTo(new TurnChanged(1, 1, 0));
+        assertThat(next.turnSeat()).isEqualTo(1);
+        assertThat(next.passStreak()).isZero();
         OneCardInvariantChecker.check(next);
     }
 
@@ -325,6 +441,33 @@ class OneCardEnginePlayTest {
         OneCardState next = play(engine(2), state, 0, heart(9));
 
         assertThat(next.result().reason()).isEqualTo(EndReason.STALEMATE);
+    }
+
+    @Test
+    void finishing_with_the_last_card_on_the_turn_limit_is_a_win_not_a_stalemate() {
+        OneCardState state = seats(hand(heart(9)), hand(spade(4), spade(6)))
+                .top(heart(5)).turn(0).turnCount(OneCardEngine.TURN_LIMIT - 1).build();
+
+        OneCardState next = play(engine(2), state, 0, heart(9));
+
+        assertThat(next.turnCount()).isEqualTo(OneCardEngine.TURN_LIMIT);
+        assertThat(next.result().reason()).isEqualTo(EndReason.FINISHED);
+        assertThat(next.result().winners()).containsExactly(0);
+        OneCardInvariantChecker.check(next);
+    }
+
+    @Test
+    void drawing_on_the_turn_limit_ends_as_a_stalemate_without_announcing_another_turn() {
+        OneCardState state = seats(hand(heart(9), club(3), club(4)), hand(spade(4), spade(6), spade(8)))
+                .top(heart(5)).turn(0).turnCount(OneCardEngine.TURN_LIMIT - 1).build();
+
+        OneCardEngine.Result result = engine(2).apply(state, 0, new Draw(), NOW);
+
+        assertThat(result.newState().turnCount()).isEqualTo(OneCardEngine.TURN_LIMIT);
+        assertThat(result.newState().result().reason()).isEqualTo(EndReason.STALEMATE);
+        assertThat(result.events().getLast()).isInstanceOf(MatchEnded.class);
+        assertThat(result.events()).noneMatch(TurnChanged.class::isInstance);
+        OneCardInvariantChecker.check(result.newState());
     }
 
     @Test

@@ -3,6 +3,10 @@ package com.mirboard.domain.game.onecard.card;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 /** `docs/rules-onecard.md` §1 — 카드와 역할. */
@@ -43,6 +47,21 @@ class PlayingCardTest {
         assertThat(PlayingCard.of(Suit.CLUB, PlayingCard.KING).isExtraTurn()).isTrue();
         assertThat(PlayingCard.of(Suit.CLUB, 7).isSuitChange()).isTrue();
         assertThat(BLACK.isSkip() || BLACK.isReverse() || BLACK.isExtraTurn() || BLACK.isSuitChange()).isFalse();
+
+        // 54장은 공격·J·Q·K·7·일반 중 정확히 하나의 역할이다 — 겹치거나 빠진 카드가 없고 장수는 10/4/4/4/4/28.
+        Map<String, Predicate<PlayingCard>> roles = new LinkedHashMap<>();
+        roles.put("attack", PlayingCard::isAttack);
+        roles.put("skip", PlayingCard::isSkip);
+        roles.put("reverse", PlayingCard::isReverse);
+        roles.put("extraTurn", PlayingCard::isExtraTurn);
+        roles.put("suitChange", PlayingCard::isSuitChange);
+        roles.put("normal", PlayingCard::isNormal);
+        for (PlayingCard card : Deck.all()) {
+            long matching = roles.values().stream().filter(role -> role.test(card)).count();
+            assertThat(matching).as("역할이 정확히 하나여야 한다: %s", card).isEqualTo(1);
+        }
+        List<Long> sizes = roles.values().stream().map(role -> Deck.all().stream().filter(role).count()).toList();
+        assertThat(sizes).as("역할별 장수 %s", roles.keySet()).containsExactly(10L, 4L, 4L, 4L, 4L, 28L);
     }
 
     @Test

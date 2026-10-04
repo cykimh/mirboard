@@ -1,6 +1,7 @@
 package com.mirboard.domain.game.onecard.rules;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.mirboard.domain.game.onecard.card.PlayingCard;
 import com.mirboard.domain.game.onecard.card.Suit;
@@ -61,5 +62,7 @@ class TurnOrderTest {
     void next_alive_wraps_around_both_ways() {
         assertThat(TurnOrder.nextAlive(4, ALL, 3, +1)).isEqualTo(0);
         assertThat(TurnOrder.nextAlive(4, ALL, 0, -1)).isEqualTo(3);
+        // 살아 있는 좌석이 하나도 없으면 한 바퀴를 다 돌아도 못 찾는다 — 엔진이 이런 호출을 하면 버그다.
+        assertThatThrownBy(() -> TurnOrder.nextAlive(4, seat -> false, 0, 1)).isInstanceOf(IllegalStateException.class);
     }
 }

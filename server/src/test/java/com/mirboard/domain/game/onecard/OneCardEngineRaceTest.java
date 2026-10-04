@@ -17,13 +17,17 @@ import com.mirboard.domain.game.onecard.action.OneCardAction.PlayCard;
 import com.mirboard.domain.game.onecard.action.OneCardActionRejectedException;
 import com.mirboard.domain.game.onecard.action.RejectionReason;
 import com.mirboard.domain.game.onecard.card.PlayingCard;
+import com.mirboard.domain.game.onecard.card.Suit;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.CardsDrawn;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.DrawReason;
+import com.mirboard.domain.game.onecard.event.OneCardEvent.HandUpdated;
+import com.mirboard.domain.game.onecard.event.OneCardEvent.PileReshuffled;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.RaceOpened;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.RaceOutcome;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.RaceResolved;
 import com.mirboard.domain.game.onecard.event.OneCardEvent.TurnChanged;
 import com.mirboard.domain.game.onecard.invariant.OneCardInvariantChecker;
+import com.mirboard.domain.game.onecard.state.Elimination;
 import com.mirboard.domain.game.onecard.state.OneCardState;
 import com.mirboard.domain.game.onecard.state.RaceWindow;
 import java.util.Arrays;
@@ -132,6 +136,36 @@ class OneCardEngineRaceTest {
     }
 
     @Test
+    void being_caught_after_an_attack_card_keeps_the_stack_for_the_reserved_seat() {
+        OneCardEngine engine = humans(3);
+        OneCardState raced = engine.apply(aboutToGoDownToOne(heart(2)), 0, PlayCard.of(heart(2)), NOW).newState();
+
+        OneCardEngine.Result result = engine.apply(raced, 2, new Catch(raced.race().raceId()), NOW + 700);
+
+        OneCardState state = result.newState();
+        assertThat(state.hands().get(0)).hasSize(2);
+        assertThat(state.attackStack()).isEqualTo(2);
+        assertThat(result.events().getLast()).isEqualTo(new TurnChanged(1, 1, 2));
+        assertThat(result.events()).contains(new HandUpdated(0, state.hands().get(0),
+                List.of(raced.drawPile().getFirst()), raced.version() + 1));
+        assertThat(state.version()).isEqualTo(raced.version() + 1);
+        OneCardInvariantChecker.check(state);
+    }
+
+    @Test
+    void the_skipped_seat_may_catch_and_the_jack_still_skips_it() {
+        OneCardEngine engine = humans(3);
+        OneCardState raced = engine.apply(aboutToGoDownToOne(heart(PlayingCard.JACK)), 0,
+                PlayCard.of(heart(PlayingCard.JACK)), NOW).newState();
+
+        OneCardState after = engine.apply(raced, 1, new Catch(raced.race().raceId()), NOW + 500).newState();
+
+        assertThat(after.hands().get(0)).hasSize(2);
+        assertThat(after.turnSeat()).isEqualTo(2);
+        OneCardInvariantChecker.check(after);
+    }
+
+    @Test
     void a_jack_still_skips_and_an_attack_still_lands_after_the_race() {
         OneCardEngine engine = humans(3);
         OneCardState jack = engine.apply(aboutToGoDownToOne(heart(PlayingCard.JACK)), 0,
@@ -211,6 +245,54 @@ class OneCardEngineRaceTest {
 
         assertThat(raced.race().botPress()).isNull();
         assertThat(engine.timerDeadline(raced)).hasValue(NOW + 3_000);
+    }
+
+    @Test
+    void of_several_bots_only_the_fastest_press_is_kept() {
+        // 주인 봇(0)은 1.8초, 잡는 봇(2)은 1.2초 — 더 빠른 쪽이 이긴다.
+        OneCardEngine engine = engine(3, new RaceSettings(3_000, 1_800, 1_800, 1_200, 1_200, 8), 0, 2);
+        OneCardState raced = engine.apply(aboutToGoDownToOne(heart(9)), 0, PlayCard.of(heart(9)), NOW).newState();
+
+        assertThat(raced.race().botPress()).isEqualTo(new RaceWindow.BotPress(2, false, 1_200));
+        assertThat(engine.timerDeadline(raced)).hasValue(NOW + 1_200);
+        assertThat(engine.onTimer(raced).orElseThrow().events().getFirst())
+                .isEqualTo(new RaceResolved(raced.race().raceId(), RaceOutcome.CAUGHT, 2));
+    }
+
+    @Test
+    void a_catch_with_an_empty_pile_reshuffles_the_discards_and_keeps_the_top_and_the_declared_suit() {
+        OneCardEngine engine = humans(3);
+        OneCardState state = seats(hand(heart(7), club(3)), hand(spade(4), spade(6), spade(8)),
+                hand(diamond(4), diamond(6), diamond(8)))
+                .top(heart(5)).drawPile().turn(0).build();
+        OneCardState raced = engine.apply(state, 0, new PlayCard(heart(7), Suit.SPADE), NOW).newState();
+
+        OneCardEngine.Result result = engine.apply(raced, 2, new Catch(raced.race().raceId()), NOW + 600);
+
+        OneCardState after = result.newState();
+        assertThat(result.events()).extracting(Object::getClass).containsExactly(
+                RaceResolved.class, PileReshuffled.class, CardsDrawn.class, HandUpdated.class, TurnChanged.class);
+        assertThat(result.events()).filteredOn(CardsDrawn.class::isInstance)
+                .allSatisfy(e -> assertThat(((CardsDrawn) e).reason()).isEqualTo(DrawReason.PENALTY));
+        assertThat(after.topCard()).isEqualTo(heart(7));
+        assertThat(after.discardPile()).containsExactly(heart(7));
+        assertThat(after.declaredSuit()).isEqualTo(Suit.SPADE);
+        assertThat(after.hands().get(0)).hasSize(2);
+        OneCardInvariantChecker.check(after);
+    }
+
+    @Test
+    void an_eliminated_bot_does_not_press_so_the_window_runs_its_full_length() {
+        OneCardEngine engine = engine(4, FIXED, 2);
+        OneCardState state = seats(hand(heart(9), club(3)), hand(spade(4), spade(6), spade(8)), hand(),
+                hand(club(9), club(10), club(11)))
+                .eliminated(2, Elimination.Reason.BANKRUPT, 20).top(heart(5)).turn(0).build();
+
+        OneCardState raced = engine.apply(state, 0, PlayCard.of(heart(9)), NOW).newState();
+
+        assertThat(raced.race().botPress()).isNull();
+        assertThat(engine.timerDeadline(raced)).hasValue(NOW + 3_000);
+        OneCardInvariantChecker.check(raced);
     }
 
     @Test
