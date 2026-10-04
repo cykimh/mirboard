@@ -6,6 +6,8 @@ import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.onecard.action.OneCardAction;
+import com.mirboard.domain.game.onecard.bot.OneCardBotPolicy;
+import com.mirboard.domain.game.onecard.bot.OneCardBotView;
 import com.mirboard.domain.game.onecard.event.OneCardEvent;
 import com.mirboard.domain.game.onecard.event.OneCardMatchCompleted;
 import com.mirboard.domain.game.onecard.persistence.OneCardStateStore;
@@ -17,6 +19,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.function.BiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -127,6 +130,39 @@ public final class OneCardGameEngine implements GameEngine {
     @Override
     public List<GameAction> legalActions(GameState state, int seat) {
         return List.<GameAction>copyOf(rules.legalActions(ocState(state), seat));
+    }
+
+    /**
+     * 휴리스틱 {@link OneCardBotPolicy} — 공개 정보 뷰({@link OneCardBotView})만 본다. 결정적이라 {@code random}
+     * 은 쓰지 않는다. 경쟁 창의 누름은 여기서 하지 않는다(창을 열 때 추첨한 반응 시간으로 엔진 타이머가 맡는다).
+     */
+    @Override
+    public GameAction botAction(GameState state, int seat, Random random) {
+        return chooseBotAction(ocState(state), seat, OneCardBotPolicy::choose);
+    }
+
+    /**
+     * 정책 호출 + 안전망. 둘 수 없으면(남의 차례·경쟁 창·끝난 판) null. 정책이 예외를 던지거나 null·합법수 밖
+     * 액션을 내면 ERROR 로그 후 먹기({@code timeoutAction})로 떨어진다 — 턴 제한이 꺼진 방에서 정책 버그 하나로
+     * 방이 멈추지 않게(스컬킹 D-119 와 같은 안전망).
+     */
+    GameAction chooseBotAction(OneCardState state, int seat,
+                               BiFunction<OneCardBotView, List<OneCardAction>, OneCardAction> policy) {
+        if (state.race() != null || !rules.pendingSeats(state).contains(seat)) {
+            return null;
+        }
+        List<OneCardAction> legal = rules.legalActions(state, seat);
+        try {
+            OneCardAction chosen = policy.apply(OneCardBotView.of(state, seat), legal);
+            if (chosen != null && legal.contains(chosen)) {
+                return chosen;
+            }
+            log.error("OneCard bot policy returned a non-legal action, falling back: room={} seat={} action={}",
+                    context.roomId(), seat, chosen);
+        } catch (RuntimeException e) {
+            log.error("OneCard bot policy failed, falling back: room={} seat={}", context.roomId(), seat, e);
+        }
+        return rules.timeoutAction(state, seat);
     }
 
     @Override
