@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
  * @param eliminations 탈락 순서
  * @param passStreak   연속 패스 수(§11.3)
  * @param turnCount    내기·먹기 횟수(§11.3 차례 상한)
- * @param version      전이마다 1씩 오른다 — 비공개 손패 이벤트의 {@code handVersion}
+ * @param version      전이마다 오른다(단조 증가, 탈락이 낀 전이는 +2) — 비공개 손패 이벤트의 {@code handVersion}·창 번호
  * @param result       끝났으면 결과, 아니면 null
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)

@@ -33,7 +33,10 @@ public record RaceWindow(int raceId,
     public record BotPress(int seat, boolean call, long delayMillis) {
     }
 
-    /** 창이 저절로 닫히는 시각 — 가장 빠른 봇의 누름 또는 창 길이 중 이른 쪽. */
+    /**
+     * 창이 저절로 닫히는 시각 — 봇 누름이 있으면 그 시각, 없으면 창 끝. 엔진({@code fastestBot})은 창보다 빠른 봇만
+     * 남기므로 그 시각이 곧 이른 쪽이다.
+     */
     public long deadline() {
         return openedAt + (botPress != null ? botPress.delayMillis() : windowMillis);
     }

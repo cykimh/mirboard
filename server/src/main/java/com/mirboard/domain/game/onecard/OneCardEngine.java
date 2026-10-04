@@ -41,7 +41,7 @@ public final class OneCardEngine {
     /** 총 차례 상한 (§11.3). */
     public static final int TURN_LIMIT = 600;
 
-    /** 경쟁 버튼 지터 범위 — −100~100 (§9, 설계서 §4.4). */
+    /** 경쟁 버튼 지터 범위 — −100~100 (설계서 §4.4). */
     public static final int JITTER_RANGE = 100;
 
     private final GameContext context;
@@ -263,6 +263,7 @@ public final class OneCardEngine {
     }
 
     private void openRace(Table t, int owner, int next, long now, List<OneCardEvent> events) {
+        // 창 번호 = 창을 연 전이의 버전 — 매치 안에서 유일·단조(§9-5).
         int raceId = t.version;
         int slot = rng.nextInt(settings.slotCount());
         int jitterX = rng.nextInt(2 * JITTER_RANGE + 1) - JITTER_RANGE;
@@ -273,7 +274,7 @@ public final class OneCardEngine {
         events.add(new OneCardEvent.RaceOpened(raceId, owner, slot, jitterX, jitterY, settings.windowMillis()));
     }
 
-    /** §9-6 — 살아 있는 봇마다 반응 시간을 뽑아 가장 빠른 한 명만 남긴다. 창보다 늦으면 없음. */
+    /** §9-6 — 살아 있는 봇마다 반응 시간을 뽑아 가장 빠른 한 명만 남긴다. 창 길이 이상(같아도)이면 없음 — 그 창은 만료. */
     private RaceWindow.BotPress fastestBot(Table t, int owner) {
         RaceWindow.BotPress fastest = null;
         for (int seat = 0; seat < t.seatCount(); seat++) {
@@ -315,7 +316,8 @@ public final class OneCardEngine {
     // ---------- 탈주 (§10, §9.2) ----------
 
     /**
-     * 좌석 탈주 — 파산과 같은 탈락 경로. 이미 끝났거나 이미 탈락한 좌석이면 {@code NOT_APPLICABLE}(§10).
+     * 좌석 탈주 — 파산과 같은 탈락 경로. 이미 끝났거나 이미 탈락한 좌석이면 {@code NOT_APPLICABLE}(§10), 범위 밖
+     * 좌석도 마찬가지다. 탈락 뒤 1명이 남으면 {@code LAST_STANDING}, 살아 있는 사람이 없으면 {@code NO_HUMANS}(§11.1).
      * 경쟁 창이 열려 있으면 벌칙 없이 닫고(§9-7), 정해 둔 다음 차례로 넘기되 그 사람이 탈주자면 그다음 사람이
      * 공격 없이 받는다(§9.2). 창이 없고 탈주자의 차례였다면 걸린 공격은 사라진다(§10).
      */
@@ -360,7 +362,10 @@ public final class OneCardEngine {
         return List.of(state.turnSeat());
     }
 
-    /** 그 좌석이 지금 할 수 있는 액션 전부. 7 은 지정 무늬마다 다른 액션이다. */
+    /**
+     * 그 좌석이 지금 할 수 있는 액션 전부. 7 은 지정 무늬마다 다른 액션이다. 창이 열려 있으면 살아 있는 좌석마다
+     * 하나다 — 주인은 {@code CALL_ONE_CARD}, 나머지는 {@code CATCH}.
+     */
     public List<OneCardAction> legalActions(OneCardState state, int seat) {
         if (state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
             return List.of();
