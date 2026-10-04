@@ -32,7 +32,6 @@ export interface SettledTrick {
 
 export interface SkullKingRoomState {
   roomId: string | null;
-  lastSeq: number;
 
   // ── 공개 상태 (tableView 미러) ──
   phase: SkullKingPhase | null;
@@ -90,7 +89,6 @@ export interface SkullKingActions {
 
 const INITIAL: SkullKingRoomState = {
   roomId: null,
-  lastSeq: 0,
   phase: null,
   roundNumber: 0,
   handSize: 0,
@@ -214,7 +212,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
         roundScores: t.roundScores ?? {},
         // D-120 — 권위값으로 통째 교체(append 아님). 필드가 없는 구 응답이면 빈 목록.
         completedRounds: t.completedRounds ?? [],
-        lastSeq: snap.eventSeq,
         // 관전자는 privateHand 가 null 이다 (서버 계약).
         mySeat: snap.privateHand?.seat ?? -1,
         hand: snap.privateHand?.hand ?? [],
@@ -243,7 +240,7 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
     },
 
     applyEvent(envelope) {
-      const { type, seq, payload } = envelope;
+      const { type, payload } = envelope;
       const state = get();
 
       // D-122 — 매치가 끝났으면 이후 게임 이벤트는 반영하지 않는다. 탈주 조기 종료·강제
@@ -253,7 +250,8 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
       // 경우(탈주 조기 종료·정상 종료)만 덮는다. 강제 종료는 MATCH_ENDED 를 내지 않으므로 서버
       // 쪽 정지(D-122 c)가 유일한 방어다. resync 도 부르지 않는다
       // ('ignored') — 권위값은 applySnapshot 으로만 들어오고, 그쪽은 이 가드 밖이다.
-      // 연결 상태 배지는 게임 진행이 아니라 그대로 반영한다.
+      // 구멍 난 잔여 이벤트는 sink 앞에서 훅이 resync 로 돌린다(D-124) — 스냅샷이 종료 상태를
+      // 그대로 주므로 무해하다. 연결 상태 배지는 게임 진행이 아니라 그대로 반영한다.
       if (
         state.matchEnded &&
         type !== 'PLAYER_DISCONNECTED' &&
@@ -262,20 +260,12 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
         return 'ignored';
       }
 
-      let verdict: ApplyEventResult = 'applied';
-      if (seq !== undefined) {
-        if (seq <= state.lastSeq) verdict = 'duplicate';
-        else if (seq > state.lastSeq + 1) verdict = 'gap';
-      }
-
-      // 라운드 시작은 **seq 판정과 무관하게** 라운드 로컬 상태를 즉시 비운다 (D-103).
-      // 스컬킹은 라운드마다 재분배하므로 비공개 HAND_DEALT 가 좌석 수만큼 seq 를 태우고
-      // (본인 큐 핸들러는 lastSeq 를 전진시키지 않는다) 뒤따르는 BIDDING_STARTED 는 거의
-      // 항상 gap 이다. resync 도착 전까지 지난 라운드 예측값·트릭이 남으면 혼동이므로
-      // 화면만 먼저 비우고 판정값은 그대로 돌려준다(훅이 resync 를 부른다).
-      //
-      // duplicate 는 예외 — 이미 지난 이벤트의 재생이 진행 중인 라운드를 지워선 안 된다.
-      if (type === 'BIDDING_STARTED' && verdict !== 'duplicate') {
+      // 새 라운드 — 지난 라운드의 예측값·트릭·손패를 비운다 (D-103). 순번 판정은 훅이 이미
+      // 끝냈다(D-124): 중복은 여기까지 오지 않고(진행 중인 라운드를 지우지 않는다), 구멍이면
+      // resync 가 권위 상태를 준다. 서버는 BIDDING_STARTED 를 HAND_DEALT 보다 먼저 보내므로
+      // 라운드 경계에서 이 이벤트 자체는 구멍이 아니다 — 비공개 HAND_DEALT 가 태운 순번은 다음
+      // 공개 이벤트(BID_SUBMITTED)에서 구멍이 되어 라운드마다 resync 한 번을 부른다.
+      if (type === 'BIDDING_STARTED') {
         const p = payload as BiddingStartedPayload;
         set({
           phase: 'BIDDING',
@@ -301,12 +291,11 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             // (남겨두면 지난 라운드 끝의 0 이 그대로 보인다 — C5 실측).
             handCount: p.handSize,
           })),
-          ...(verdict === 'applied' && seq !== undefined ? { lastSeq: seq } : {}),
         });
-        return verdict;
+        return 'applied';
       }
 
-      // seq 없는 메타 이벤트는 lastSeq 판정 밖에서 처리한다 (연결 상태 배지).
+      // 순번 없는 메타 이벤트 (연결 상태 배지).
       if (type === 'PLAYER_DISCONNECTED' || type === 'PLAYER_RECONNECTED') {
         const { seat } = payload as { seat: number };
         const next = new Set(state.disconnectedSeats);
@@ -316,14 +305,11 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
         return 'applied';
       }
 
-      if (verdict !== 'applied') return verdict;
-      const advance = seq !== undefined ? { lastSeq: seq } : {};
-
       switch (type) {
         case 'BID_SUBMITTED': {
           // 값은 담지 않는다 — 전원 제출 전까지 남의 예측은 비공개다 (§5).
           const { seat } = payload as { seat: number };
-          set({ seats: patchSeat(state.seats, seat, { hasBid: true }), ...advance });
+          set({ seats: patchSeat(state.seats, seat, { hasBid: true }) });
           return 'applied';
         }
 
@@ -335,7 +321,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
               hasBid: true,
               bid: bids[s.seat] ?? s.bid,
             })),
-            ...advance,
           });
           return 'applied';
         }
@@ -346,7 +331,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             phase: 'PLAYING',
             currentTurnSeat: leadSeat,
             turnStartedAt: Date.now(),
-            ...advance,
           });
           return 'applied';
         }
@@ -368,14 +352,13 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             ...(p.seat === state.mySeat
               ? { selectedIndex: null, tigressDeclaration: null }
               : {}),
-            ...advance,
           });
           return 'applied';
         }
 
         case 'TURN_CHANGED': {
           const { currentTurnSeat } = payload as TurnChangedPayload;
-          set({ currentTurnSeat, turnStartedAt: Date.now(), ...advance });
+          set({ currentTurnSeat, turnStartedAt: Date.now() });
           return 'applied';
         }
 
@@ -391,7 +374,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             },
             trick: [],
             seats: patchSeat(state.seats, p.winnerSeat, { tricksWon: won }),
-            ...advance,
           });
           return 'applied';
         }
@@ -404,13 +386,12 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             roundScores: scores,
             cumulativeScores: p.cumulativeScores,
             // 라이브 패치 — 권위값은 resync 의 completedRounds 다. 같은 라운드를 다시
-            // 받아도(resync 로 lastSeq 가 되감긴 경우) 한 건만 남도록 upsert 한다.
+            // 받아도(resync 로 순번 기준점이 되감긴 경우) 한 건만 남도록 upsert 한다.
             completedRounds: upsertRound(state.completedRounds, {
               roundNumber: p.roundNumber,
               scores,
             }),
             currentTurnSeat: -1,
-            ...advance,
           });
           return 'applied';
         }
@@ -421,7 +402,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             desertedSeats: state.desertedSeats.includes(seat)
               ? state.desertedSeats
               : [...state.desertedSeats, seat].sort((a, b) => a - b),
-            ...advance,
           });
           return 'applied';
         }
@@ -432,7 +412,6 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
             matchEnded: p,
             cumulativeScores: p.finalScores,
             currentTurnSeat: -1,
-            ...advance,
           });
           return 'applied';
         }

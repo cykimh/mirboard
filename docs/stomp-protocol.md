@@ -49,7 +49,9 @@
 
 - `seq` 는 **게임 이벤트(`/topic/room/{id}` 의 엔진 발행분 + `HAND_DEALT`/
   `CARDS_RECEIVED`)에만** 부여된다. 메타/채팅/반응/프레즌스/`CHIPS_SETTLED`/`ERROR`
-  는 `seq: null`. 클라는 `seq <= localSeq` 인 이벤트를 무시(idempotent).
+  는 `seq: null`. 클라(`useStompRoom`, D-124)는 `seq <= lastSeq` 인 공개 이벤트를 버린다
+  (idempotent). 본인 큐 이벤트의 seq 는 판정에 쓰지 않으므로, 남의 비공개 이벤트가 소비한
+  번호는 다음 공개 이벤트에서 구멍(gap)으로 보여 resync 를 부른다.
 - **클라 → 서버는 envelope 을 쓰지 않는다.** 액션은 `@action` 판별자를 가진
   bare JSON, 채팅/반응은 `{message}`/`{emoji}` 를 그대로 발행한다. 서버는 클라가
   보낸 어떤 seq 도 신뢰하지 않고 자체 카운터만 쓴다.
@@ -61,6 +63,9 @@
   CARDS_PASSED, PLAYING_STARTED, ROUND_STARTED) 또는 seq gap
   (`seq > lastSeq + 1`) 에서만 REST `/resync` 로 권위 스냅샷을 재취득한다.
   초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지.
+  **순번 판정은 훅만 한다(D-124)** — 기준점은 resync 의 `eventSeq`, 판정은
+  `client/src/ws/seqGate.ts`. 게임 스토어는 판정이 끝난 이벤트만 받아 `applied`/`unhandled`/
+  `ignored` 만 돌려준다.
 
 ---
 

@@ -6,9 +6,9 @@ import type { ResyncEnvelope } from '@/types/stomp';
 
 /**
  * 특성화 테스트 — C1(D-103) 에서 `useStompRoom` 안에 있던 티츄 분기를 이 파일로 옮겼다.
- * 여기서 고정하는 것은 "옮기기 전과 동작이 같다" 이며, 특히 `applySnapshot` 의 5필드 매핑이
- * 중요하다: `eventSeq→lastSeq` 오타는 모든 이벤트를 gap 으로 만들어 resync 폭주가 되고,
- * `chips`/`disconnectedSeats` 오타는 예외 없이 배지만 사라진다.
+ * 여기서 고정하는 것은 "옮기기 전과 동작이 같다" 이며, 특히 `applySnapshot` 의 필드 매핑이
+ * 중요하다: `chips`/`disconnectedSeats` 오타는 예외 없이 배지만 사라진다. (순번 기준점
+ * `eventSeq` 는 D-124 부터 스토어가 아니라 훅이 가진다 — `ws/useStompRoom.sink.test.tsx`.)
  */
 
 const TABLE = { phase: 'PLAYING', handCounts: { 0: 14 } } as unknown as TableView;
@@ -30,7 +30,7 @@ describe('tichuRoomSink — 옮겨진 티츄 분기 (D-103)', () => {
     expect(tichuRoomSink).toBe(tichuRoomSink);
   });
 
-  it('applySnapshot 이 5필드를 값 단위로 매핑한다', () => {
+  it('applySnapshot 이 4필드를 값 단위로 매핑한다', () => {
     const snap: ResyncEnvelope<TableView, PrivateHand> = {
       roomId: 'r-1',
       phase: 'PLAYING',
@@ -46,7 +46,6 @@ describe('tichuRoomSink — 옮겨진 티츄 분기 (D-103)', () => {
     const s = useTichuStore.getState();
     expect(s.tableView).toBe(TABLE);
     expect(s.privateHand).toBe(HAND);
-    expect(s.lastSeq).toBe(42); // ← eventSeq→lastSeq. 틀리면 resync 폭주.
     expect([...s.disconnectedSeats]).toEqual([2, 3]);
     expect(s.chips).toEqual({ 10: 1000, 20: 500 });
     expect(s.errorMessage).toBeNull();
@@ -65,7 +64,6 @@ describe('tichuRoomSink — 옮겨진 티츄 분기 (D-103)', () => {
       }),
     ).not.toThrow();
 
-    expect(useTichuStore.getState().lastSeq).toBe(1);
     expect(useTichuStore.getState().chips).toEqual({});
   });
 
@@ -106,7 +104,7 @@ describe('tichuRoomSink — 옮겨진 티츄 분기 (D-103)', () => {
     expect(useTichuStore.getState().errorMessage).toBeNull();
   });
 
-  it('applyEvent 는 스토어 판정을 그대로 위임한다', () => {
+  it('applyEvent 는 스토어 반영 결과를 그대로 위임한다 (순번 판정은 훅, D-124)', () => {
     tichuRoomSink.applySnapshot({
       roomId: 'r-1',
       phase: 'PLAYING',
@@ -115,11 +113,9 @@ describe('tichuRoomSink — 옮겨진 티츄 분기 (D-103)', () => {
       privateHand: HAND,
     });
 
-    expect(tichuRoomSink.applyEvent({ type: 'PASSED', seq: 3, payload: { seat: 0 } }))
-      .toBe('duplicate');
-    expect(tichuRoomSink.applyEvent({ type: 'PASSED', seq: 99, payload: { seat: 0 } }))
-      .toBe('gap');
-    expect(tichuRoomSink.applyEvent({ type: 'NOPE', seq: 6, payload: {} }))
+    expect(tichuRoomSink.applyEvent({ type: 'PASSED', seq: 6, payload: { seat: 0 } }))
+      .toBe('applied');
+    expect(tichuRoomSink.applyEvent({ type: 'NOPE', seq: 7, payload: {} }))
       .toBe('unhandled');
   });
 

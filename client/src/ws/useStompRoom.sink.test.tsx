@@ -66,6 +66,10 @@ function makeSink(applyResult: ApplyEventResult = 'applied') {
 
 const frame = (body: unknown) => ({ body: JSON.stringify(body) });
 
+/** 공개 토픽에 이벤트 한 건. seq 를 생략하면 JSON 에서 키가 빠진다(서버 `NON_NULL` 과 같다). */
+const publish = (seq: number | undefined, type = 'X') =>
+  handlers.get(`/topic/room/${ROOM}`)!(frame({ type, seq, payload: {} }));
+
 beforeEach(() => {
   handlers.clear();
   activateCount = 0;
@@ -118,23 +122,20 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
   });
 
   it.each([
-    ['gap', true],
     ['unhandled', true],
     ['applied', false],
-    ['duplicate', false],
+    ['ignored', false],
   ] as const)(
-    'applyEvent 가 %s 를 반환하면 resync 재호출=%s',
+    '다음 순번 이벤트에 sink 가 %s 를 반환하면 resync 재호출=%s',
     async (result, shouldResync) => {
       const sink = makeSink(result);
       renderHook(() => useStompRoom(ROOM, TOKEN, sink));
       await waitFor(() => expect(sink.applySnapshot).toHaveBeenCalled());
       const before = resyncMock.mock.calls.length;
 
-      act(() => {
-        handlers.get(`/topic/room/${ROOM}`)!(frame({ type: 'X', seq: 1, payload: {} }));
-      });
+      act(() => publish(SNAP.eventSeq + 1));
 
-      expect(sink.applyEvent).toHaveBeenCalled();
+      expect(sink.applyEvent).toHaveBeenCalledTimes(1);
       if (shouldResync) {
         expect(resyncMock.mock.calls.length).toBeGreaterThan(before);
       } else {
@@ -142,6 +143,103 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
       }
     },
   );
+
+  describe('순번 판정은 훅이 한다 (D-124)', () => {
+    async function mounted(sink: ReturnType<typeof makeSink>) {
+      renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+      await waitFor(() => expect(sink.applySnapshot).toHaveBeenCalled());
+      return resyncMock.mock.calls.length;
+    }
+
+    it('지난 순번(중복)은 sink 로 넘기지 않고 resync 도 하지 않는다', async () => {
+      const sink = makeSink();
+      const before = await mounted(sink);
+
+      act(() => publish(SNAP.eventSeq));
+
+      expect(sink.applyEvent).not.toHaveBeenCalled();
+      expect(resyncMock.mock.calls.length).toBe(before);
+    });
+
+    it('구멍 난 순번은 sink 로 넘기지 않고 resync 한다', async () => {
+      const sink = makeSink();
+      const before = await mounted(sink);
+
+      act(() => publish(SNAP.eventSeq + 2));
+
+      expect(sink.applyEvent).not.toHaveBeenCalled();
+      expect(resyncMock.mock.calls.length).toBeGreaterThan(before);
+    });
+
+    it('반영한 이벤트마다 기준점이 전진한다', async () => {
+      const sink = makeSink();
+      const before = await mounted(sink);
+
+      act(() => {
+        publish(SNAP.eventSeq + 1);
+        publish(SNAP.eventSeq + 2);
+      });
+
+      expect(sink.applyEvent).toHaveBeenCalledTimes(2);
+      expect(resyncMock.mock.calls.length).toBe(before);
+    });
+
+    it('ignored 도 기준점을 전진시킨다 — 다음 순번이 구멍으로 보이지 않는다', async () => {
+      const sink = makeSink('ignored');
+      const before = await mounted(sink);
+
+      act(() => {
+        publish(SNAP.eventSeq + 1);
+        publish(SNAP.eventSeq + 2);
+      });
+
+      expect(sink.applyEvent).toHaveBeenCalledTimes(2);
+      expect(resyncMock.mock.calls.length).toBe(before);
+    });
+
+    it('unhandled 는 기준점을 전진시키지 않는다 — resync 가 다시 세운다', async () => {
+      const sink = makeSink('unhandled');
+      const before = await mounted(sink);
+
+      act(() => {
+        publish(SNAP.eventSeq + 1); // unhandled → resync
+        publish(SNAP.eventSeq + 2); // 기준점이 그대로라 구멍 → resync, sink 미호출
+      });
+
+      expect(sink.applyEvent).toHaveBeenCalledTimes(1);
+      expect(resyncMock.mock.calls.length).toBe(before + 2);
+    });
+
+    it('순번 없는 메타 이벤트는 판정 없이 넘기고 기준점을 건드리지 않는다', async () => {
+      const sink = makeSink();
+      const before = await mounted(sink);
+
+      act(() => {
+        publish(undefined, 'PLAYER_DISCONNECTED');
+        publish(SNAP.eventSeq + 1);
+      });
+
+      expect(sink.applyEvent).toHaveBeenCalledTimes(2);
+      expect(resyncMock.mock.calls.length).toBe(before);
+    });
+
+    it('방이 바뀌면 기준점이 0 으로 돌아간다', async () => {
+      const sink = makeSink();
+      const { rerender } = renderHook(({ room }) => useStompRoom(room, TOKEN, sink), {
+        initialProps: { room: ROOM },
+      });
+      await waitFor(() => expect(sink.applySnapshot).toHaveBeenCalled());
+      // 새 방의 resync 는 응답이 오지 않게 붙잡아, 기준점이 리셋값(0)인 구간을 본다.
+      resyncMock.mockImplementation(() => new Promise(() => {}));
+
+      rerender({ room: 'r-2' });
+      act(() => {
+        handlers.get('/topic/room/r-2')!(frame({ type: 'X', seq: 1, payload: {} }));
+      });
+
+      expect(sink.applyEvent).toHaveBeenCalledTimes(1);
+    });
+  });
 
   it('본인 큐 프레임은 ERROR·미지 타입까지 전량 applyPrivateEvent 로 간다', async () => {
     const sink = makeSink();
