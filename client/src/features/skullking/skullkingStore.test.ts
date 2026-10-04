@@ -590,7 +590,7 @@ describe('매치 종료 뒤 잔여 이벤트 무시 (D-122)', () => {
     expect(store().completedRounds).toEqual([]);
   });
 
-  it('BIDDING_STARTED 가 판정과 무관한 스크럽(D-103)도 하지 않는다', () => {
+  it('BIDDING_STARTED 의 라운드 스크럽(D-103)도 하지 않는다', () => {
     expect(
       store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 20)),
     ).toBe('ignored');

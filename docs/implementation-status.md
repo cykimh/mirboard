@@ -301,7 +301,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹 룰 + 두 봇
   평가, ~15s). 스컬킹 매치 기록 IT(D-115)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **413건 / 44파일** (D-122 시점 실측, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **420건 / 45파일** (D-124 시점 실측, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지

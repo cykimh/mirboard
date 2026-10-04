@@ -1446,6 +1446,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ### Task 6: `docs/rules-onecard.md` + D-125
 
+> **정본은 `docs/rules-onecard.md` 다.** 아래 Step 2 본문은 리뷰 보정(§3-5, §9.1, §9.2, §10, §11.3,
+> §12 #17–#21, §14) 전 초안이다.
+
 **Files:**
 - Create: `docs/rules-onecard.md`
 - Modify: `docs/decisions.md` (`## D-124` 바로 위)
