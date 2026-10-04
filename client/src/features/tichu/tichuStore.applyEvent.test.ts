@@ -22,11 +22,8 @@ function baseTable(overrides: Partial<TableView> = {}): TableView {
   };
 }
 
-function loadTable(table: TableView, lastSeq = 0) {
-  useTichuStore.setState({
-    tableView: table,
-    lastSeq,
-  });
+function loadTable(table: TableView) {
+  useTichuStore.setState({ tableView: table });
 }
 
 describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
@@ -34,15 +31,20 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     useTichuStore.getState().reset('room-patch');
   });
 
-  it('dedups events with seq <= lastSeq', () => {
-    loadTable(baseTable(), 10);
-    const r = useTichuStore.getState().applyEvent({
+  it('순번을 판정하지 않는다 — 중복·구멍 판정은 훅 몫 (D-124)', () => {
+    loadTable(baseTable());
+    const first = useTichuStore.getState().applyEvent({
       type: 'TURN_CHANGED',
-      seq: 10,
+      seq: 9,
       payload: { currentTurnSeat: 2 },
     });
-    expect(r).toBe('duplicate');
-    expect(useTichuStore.getState().tableView!.currentTurnSeat).toBe(0);
+    const replay = useTichuStore.getState().applyEvent({
+      type: 'TURN_CHANGED',
+      seq: 3,
+      payload: { currentTurnSeat: 1 },
+    });
+    expect([first, replay]).toEqual(['applied', 'applied']);
+    expect(useTichuStore.getState().tableView!.currentTurnSeat).toBe(1);
   });
 
   it('setReceived/clearReceived + reset 가 lastReceived 를 관리', () => {
@@ -60,15 +62,13 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('PLAYER_DISCONNECTED/RECONNECTED toggles disconnectedSeats (seq 무관)', () => {
-    loadTable(baseTable(), 3);
+    loadTable(baseTable());
     const d = useTichuStore.getState().applyEvent({
       type: 'PLAYER_DISCONNECTED',
       payload: { seat: 2 },
     });
     expect(d).toBe('applied');
     expect(useTichuStore.getState().disconnectedSeats.has(2)).toBe(true);
-    // seq 없는 메타 이벤트는 lastSeq 를 건드리지 않음.
-    expect(useTichuStore.getState().lastSeq).toBe(3);
 
     const r = useTichuStore.getState().applyEvent({
       type: 'PLAYER_RECONNECTED',
@@ -82,7 +82,6 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     useTichuStore.getState().applySnapshot({
       tableView: baseTable(),
       privateHand: { seat: 0, cards: [] },
-      eventSeq: 5,
       disconnectedSeats: [1, 3],
     });
     const s = useTichuStore.getState().disconnectedSeats;
@@ -91,18 +90,8 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(s.has(0)).toBe(false);
   });
 
-  it('detects gaps for resync fallback', () => {
-    loadTable(baseTable(), 5);
-    const r = useTichuStore.getState().applyEvent({
-      type: 'TURN_CHANGED',
-      seq: 7,
-      payload: { currentTurnSeat: 2 },
-    });
-    expect(r).toBe('gap');
-  });
-
   it('PLAYED reduces handCount and updates currentTop', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     const playedHand: Hand = {
       type: 'PAIR',
       cards: [
@@ -122,13 +111,12 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(table.handCounts[1]).toBe(12);
     expect(table.currentTopSeat).toBe(1);
     expect(table.currentTop?.type).toBe('PAIR');
-    expect(useTichuStore.getState().lastSeq).toBe(2);
   });
 
   it('PLAYED with BOMB triggers effect (Phase 8G)', async () => {
     const { useEffectStore } = await import('./effectStore');
     useEffectStore.getState().clear();
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     const bombHand: Hand = {
       type: 'BOMB',
       cards: [
@@ -151,7 +139,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   it('PLAYED with non-bomb hand does not trigger effect', async () => {
     const { useEffectStore } = await import('./effectStore');
     useEffectStore.getState().clear();
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     const pairHand: Hand = {
       type: 'PAIR',
       cards: [
@@ -170,7 +158,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('TURN_CHANGED updates currentTurnSeat', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     useTichuStore.getState().applyEvent({
       type: 'TURN_CHANGED',
       seq: 2,
@@ -185,7 +173,6 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
         currentTop: { type: 'SINGLE', cards: [], rank: 7, length: 1 },
         currentTopSeat: 2,
       }),
-      1,
     );
     useTichuStore.getState().applyEvent({
       type: 'TRICK_TAKEN',
@@ -200,7 +187,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('PLAYER_FINISHED appends to finishingOrder and zeros handCount', () => {
-    loadTable(baseTable({ handCounts: { 0: 0, 1: 14, 2: 14, 3: 14 } }), 1);
+    loadTable(baseTable({ handCounts: { 0: 0, 1: 14, 2: 14, 3: 14 } }));
     useTichuStore.getState().applyEvent({
       type: 'PLAYER_FINISHED',
       seq: 2,
@@ -212,7 +199,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('TICHU_DECLARED records declaration', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     useTichuStore.getState().applyEvent({
       type: 'TICHU_DECLARED',
       seq: 2,
@@ -222,7 +209,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('PLAYER_READY adds seat in sorted order, idempotent', () => {
-    loadTable(baseTable({ phase: 'DEALING', dealingCardCount: 8 }), 1);
+    loadTable(baseTable({ phase: 'DEALING', dealingCardCount: 8 }));
     useTichuStore.getState().applyEvent({
       type: 'PLAYER_READY',
       seq: 2,
@@ -237,7 +224,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('PASSING_SUBMITTED adds seat to submitted list', () => {
-    loadTable(baseTable({ phase: 'PASSING' }), 1);
+    loadTable(baseTable({ phase: 'PASSING' }));
     useTichuStore.getState().applyEvent({
       type: 'PASSING_SUBMITTED',
       seq: 2,
@@ -247,7 +234,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('WISH_MADE sets activeWishRank', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     useTichuStore.getState().applyEvent({
       type: 'WISH_MADE',
       seq: 2,
@@ -257,7 +244,7 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('TRICK_TAKEN preserves activeWishRank (wish 는 라운드 전체 유지)', () => {
-    loadTable(baseTable({ activeWishRank: 5 }), 1);
+    loadTable(baseTable({ activeWishRank: 5 }));
     useTichuStore.getState().applyEvent({
       type: 'TRICK_TAKEN',
       seq: 2,
@@ -267,33 +254,31 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     expect(useTichuStore.getState().tableView!.roundScores.B).toBe(10);
   });
 
-  it('DRAGON_GIVEN 은 seq 만 진행 — 점수 패치는 동반 TRICK_TAKEN 이 처리', () => {
-    loadTable(baseTable(), 1);
+  it('DRAGON_GIVEN 은 상태를 바꾸지 않는다 — 점수 패치는 동반 TRICK_TAKEN 이 처리', () => {
+    loadTable(baseTable());
     const r = useTichuStore.getState().applyEvent({
       type: 'DRAGON_GIVEN',
       seq: 2,
       payload: { fromSeat: 0, toSeat: 1 },
     });
     expect(r).toBe('applied');
-    expect(useTichuStore.getState().lastSeq).toBe(2);
     // tableView 자체는 동일.
     expect(useTichuStore.getState().tableView!.roundScores.A).toBe(0);
     expect(useTichuStore.getState().tableView!.roundScores.B).toBe(0);
   });
 
-  it('ROUND_ENDED sets banner state and advances seq', () => {
-    loadTable(baseTable(), 1);
+  it('ROUND_ENDED sets banner state', () => {
+    loadTable(baseTable());
     useTichuStore.getState().applyEvent({
       type: 'ROUND_ENDED',
       seq: 2,
       payload: { score: { teamAScore: 120, teamBScore: 80, firstFinisherSeat: 0 } },
     });
     expect(useTichuStore.getState().roundEnded?.teamAScore).toBe(120);
-    expect(useTichuStore.getState().lastSeq).toBe(2);
   });
 
   it('MATCH_ENDED sets banner state', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     useTichuStore.getState().applyEvent({
       type: 'MATCH_ENDED',
       seq: 2,
@@ -304,7 +289,8 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
   });
 
   it('lifecycle events (DEALING_PHASE_STARTED, etc.) return unhandled for resync fallback', () => {
-    loadTable(baseTable(), 1);
+    const table = baseTable();
+    loadTable(table);
     const r = useTichuStore.getState().applyEvent({
       type: 'DEALING_PHASE_STARTED',
       seq: 2,
@@ -312,11 +298,11 @@ describe('tichuStore.applyEvent — Phase 5d patch reducers', () => {
     });
     expect(r).toBe('unhandled');
     // store 는 변경되지 않음.
-    expect(useTichuStore.getState().lastSeq).toBe(1);
+    expect(useTichuStore.getState().tableView).toBe(table);
   });
 
   it('unknown event types return unhandled', () => {
-    loadTable(baseTable(), 1);
+    loadTable(baseTable());
     const r = useTichuStore.getState().applyEvent({
       type: 'TOTALLY_NEW_EVENT',
       seq: 2,

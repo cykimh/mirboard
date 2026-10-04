@@ -37,7 +37,6 @@ export const tichuRoomSink: RoomEventSink<TableView, PrivateHand> = {
       // 관전자 화면은 privateHand 를 읽지 않는다).
       tableView: snap.tableView,
       privateHand: snap.privateHand ?? ({ seat: -1, cards: [] } as PrivateHand),
-      eventSeq: snap.eventSeq,
       disconnectedSeats: snap.disconnectedSeats,
       chips: snap.chips ?? undefined,
     });

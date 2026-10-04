@@ -33,11 +33,10 @@ function baseTable(overrides: Partial<TableView> = {}): TableView {
 
 const emptyHand: PrivateHand = { seat: 0, cards: [] };
 
-function resyncWith(table: TableView, eventSeq = 1) {
+function resyncWith(table: TableView) {
   useTichuStore.getState().applySnapshot({
     tableView: table,
     privateHand: emptyHand,
-    eventSeq,
   });
 }
 
@@ -81,9 +80,9 @@ describe('tichuStore roundHistory — resync 복원 (D-108)', () => {
       ],
     });
 
-    resyncWith(table, 1);
-    resyncWith(table, 2);
-    resyncWith(table, 3);
+    resyncWith(table);
+    resyncWith(table);
+    resyncWith(table);
 
     expect(useTichuStore.getState().roundHistory).toHaveLength(1);
   });
@@ -100,7 +99,6 @@ describe('tichuStore roundHistory — resync 복원 (D-108)', () => {
           { teamAScore: 100, teamBScore: 0, firstFinisherSeat: 0, doubleVictory: false },
         ],
       }),
-      2,
     );
 
     expect(useTichuStore.getState().roundHistory).toHaveLength(1);
