@@ -24,6 +24,9 @@ interface ChatPayload {
  * 이벤트를 받을 자리가 없었다. 지금은 {@link RoomEventSink} 를 주입받고, 게임별 sink 가
  * 스토어에 꽂는다. 채팅·리액션·재접속 재가동은 게임과 무관하므로 그대로 훅에 남는다.
  *
+ * <p><b>D-124: 순번 판정(중복·구멍)은 이 훅만 한다.</b> 기준점은 resync 의 `eventSeq` 이고
+ * 판정은 `judgeSeq`(./seqGate) — 게임 스토어는 판정이 끝난 이벤트만 받는 순수 리듀서다.
+ *
  * @param sink 게임별 이벤트 싱크. **모듈 상수**를 넘길 것 — 규약은
  *             {@link RoomEventSink} javadoc 참조.
  */
@@ -87,7 +90,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       reconnectDelay: 2000,
       onConnect: () => {
         setConnected(true);
-        // 연결/재연결 직후 권위 있는 스냅샷으로 lastSeq 동기화.
+        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화.
         resync();
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
@@ -100,13 +103,11 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
             return;
           }
           const result = sinkRef.current.applyEvent(env);
-          if (result === 'unhandled' || result === 'gap') {
+          if (result === 'unhandled') {
             // 리듀서 없는 라이프사이클 이벤트 — 권위 스냅샷 재취득. 기준점은 그대로 둔다.
-            // ('gap' 은 스토어가 아직 자체 판정을 들고 있는 동안의 호환 — D-124 Task 5 에서 제거.)
             resync();
             return;
           }
-          if (result === 'duplicate') return; // 위와 같은 호환.
           // 'applied' | 'ignored' — 순번 있는 이벤트면 기준점을 전진시킨다.
           if (verdict === 'next' && typeof env.seq === 'number') lastSeqRef.current = env.seq;
         });

@@ -74,7 +74,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
   effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(스컬킹은 이
   세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120), 각
-  게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다.
+  게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
+  판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
 - **튜토리얼도 게임이 선언한다 (D-121)**: 각 게임이 `features/{game}/tutorial` 에
   `GameTutorial{steps, description, seenKey, bodyClassName?}` 을 두고, 게임 id 매핑은
   `features/tutorial/gameTutorials.ts` 한 곳뿐이다. 허브·대기실은 `tutorialFor(gameId)` 만 본다
