@@ -60,8 +60,9 @@
   DRAGON_GIVEN, PLAYER_READY, PASSING_SUBMITTED, ROUND_ENDED, MATCH_ENDED,
   PLAYER_DISCONNECTED, PLAYER_RECONNECTED, CHIPS_SETTLED) 는 store 부분 패치로
   직접 반영하고, 라이프사이클 이벤트(DEALING_PHASE_STARTED, PASSING_STARTED,
-  CARDS_PASSED, PLAYING_STARTED, ROUND_STARTED) 에서만 REST `/resync` 로 권위
-  스냅샷을 재취득한다. 초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지.
+  CARDS_PASSED, PLAYING_STARTED, ROUND_STARTED) 또는 seq gap
+  (`seq > lastSeq + 1`) 에서만 REST `/resync` 로 권위 스냅샷을 재취득한다.
+  초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지.
   **순번 판정은 훅만 한다(D-124)** — 기준점은 resync 의 `eventSeq`, 판정은
   `client/src/ws/seqGate.ts`. 게임 스토어는 판정이 끝난 이벤트만 받아 `applied`/`unhandled`/
   `ignored` 만 돌려준다.
