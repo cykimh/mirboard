@@ -36,7 +36,8 @@
 
 - **코드:** `card/Deck.java`(`SIZE=54`, `all()`), `card/PlayingCard.java`(`isAttack`·`attackValue`·
   `attackStrength`·`isSkip`·`isReverse`·`isExtraTurn`·`isSuitChange`·`isNormal`)
-- **테스트:** `card/PlayingCardTest`(6건) — 54장, 공격 값, 세기 순서, 특수 역할, 일반 카드, 잘못된 카드 거절
+- **테스트:** `card/PlayingCardTest`(6건) — 54장, 공격 값, 세기 순서, 특수 역할(54장이 공격·J·Q·K·7·일반 중
+  정확히 하나, 10/4/4/4/4/28), 일반 카드, 잘못된 카드 거절
 
 ## 2. 인원과 좌석
 
@@ -63,7 +64,8 @@
 
 - **코드:** `Dealer.deal`(시작 카드가 일반 카드가 아니면 맨 아래로 보내고 다시 뒤집기, 더미를 다 봐도 없으면
   처음부터 다시 나누기). 셔플은 `Dealer.Shuffler` 로 주입한다
-- **테스트:** `DealerTest`(8건) — 2~6인 분배, 맨 아래로 보내고 다시 뒤집기, 다시 나누기(§3-5), 인원 범위
+- **테스트:** `DealerTest`(8건) — 2~6인 분배, 맨 아래로 보내고 다시 뒤집기, 다시 나누기(§3-5 — 두 번째 분배의 손패·
+  시작 카드·54장 중복 없음까지 보고, 5초 안에 끝나야 한다), 인원 범위
 
 ## 4. 차례에 할 수 있는 것
 
@@ -74,7 +76,8 @@
 
 - **코드:** `OneCardEngine.apply`(`PLAY_CARD`·`DRAW`), 시간 초과는 `OneCardEngine.timeoutAction`(먹기),
   봇·검증용 목록은 `OneCardEngine.legalActions`
-- **테스트:** `OneCardEnginePlayTest` — `drawing_takes_one_card_even_when_a_card_could_be_played`,
+- **테스트:** `OneCardEnginePlayTest`(29건 — §2~§8·§10~§11 의 시작·내기·먹기·파산·종료) —
+  `drawing_takes_one_card_even_when_a_card_could_be_played`,
   `the_timeout_action_is_drawing_for_the_seat_on_turn_only`, `legal_actions_*`·`under_attack_*`
 
 ## 5. 내기
@@ -156,8 +159,11 @@
 
 - **코드:** `OneCardEngine.draw`, 다시 채우기는 `OneCardEngine.drawFromPile`(맨 위만 남기고 섞기, 그래도
   모자라면 있는 만큼만)
-- **테스트:** `OneCardEnginePlayTest` — `drawing_*`, `an_empty_pile_is_refilled_from_the_discard_pile_keeping_the_top`,
-  `with_nothing_left_to_draw_*`
+- **테스트:** `OneCardEnginePlayTest` — `drawing_takes_one_card_even_when_a_card_could_be_played`,
+  `an_empty_pile_is_refilled_from_the_discard_pile_keeping_the_top`,
+  `an_attack_larger_than_what_is_left_draws_only_what_is_there_and_is_not_a_pass`(누적이 더미보다 많을 때),
+  `with_nothing_left_to_draw_the_turn_is_a_pass_and_everyone_passing_is_a_stalemate`.
+  벌칙 먹기의 더미 채우기는 §9 의 `a_catch_with_an_empty_pile_*`
 
 ## 8. 특수 카드와 차례 순서
 
@@ -184,7 +190,8 @@
 
 - **코드:** `rules/TurnOrder.afterPlay`(§8.2 표), `rules/TurnOrder.nextAlive`(탈락 건너뛰기), Q 의 방향
   반전은 `OneCardEngine.play`
-- **테스트:** `rules/TurnOrderTest`(8건 — §8.2 표의 모든 행과 2인), `OneCardEnginePlayTest`(J·Q·K·2인)
+- **테스트:** `rules/TurnOrderTest`(8건 — §8.2 표의 모든 행과 2인), `OneCardEnginePlayTest`(J·Q·K·2인,
+  Q 가 낸 뒤 방향을 `CARD_PLAYED` 에 싣는 것)
 
 ## 9. 외치기 경쟁 ("원카드!" / "잡기!")
 
@@ -223,7 +230,11 @@
 - **코드:** 창 열기 `OneCardEngine.openRace`(슬롯·지터, 봇 추첨 `fastestBot`), 누름 `OneCardEngine.press`,
   시간 전이 `OneCardEngine.timerDeadline`·`onTimer`, 해소·벌칙 `OneCardEngine.resolveRace`, 설정 `RaceSettings`
   (`DEFAULT` — 창 3초, 봇 1.0~2.5초, 슬롯 8), 창 상태 `state/RaceWindow`
-- **테스트:** `OneCardEngineRaceTest`(12건 — 세 결과, 벌칙 뒤 차례(§9.1), K·J·공격, 창 번호 검사, 봇 반응),
+- **테스트:** `OneCardEngineRaceTest`(17건 — 세 결과, 벌칙 뒤 차례(§9.1), K·J·공격, 창 번호 검사, 봇 반응) 중
+  새로 더한 것: `being_caught_after_an_attack_card_keeps_the_stack_for_the_reserved_seat`(잡혀도 공격 누적 유지),
+  `the_skipped_seat_may_catch_and_the_jack_still_skips_it`, `of_several_bots_only_the_fastest_press_is_kept`,
+  `a_catch_with_an_empty_pile_reshuffles_the_discards_and_keeps_the_top_and_the_declared_suit`,
+  `an_eliminated_bot_does_not_press_so_the_window_runs_its_full_length`.
   창 중 탈주(§9.2)는 `OneCardEngineDesertionTest`
 - **갭:** "먼저"를 가르는 서버 도착 순서·락 경합(`BUSY` 재시도)·엔진 타이머 무장은 포트 어댑터 몫이라 S3 통합
   테스트에서 본다.
@@ -241,8 +252,14 @@
 
 - **코드:** 파산은 `OneCardEngine.draw` → `eliminate`(손패를 섞지 않고 더미 맨 아래로), 탈주는
   `OneCardEngine.desert`(이미 끝났거나 이미 탈락한 좌석이면 `NOT_APPLICABLE`)
-- **테스트:** `OneCardEnginePlayTest.reaching_twenty_cards_is_bankruptcy_and_two_players_leaves_one_standing`,
-  `OneCardEngineDesertionTest`(9건)
+- **테스트:** `OneCardEnginePlayTest.reaching_twenty_cards_is_bankruptcy_and_two_players_leaves_one_standing`
+  (손패 순서·이벤트 순서·버전까지), `a_bankruptcy_among_three_humans_passes_the_turn_on_and_the_match_goes_on`,
+  `OneCardEngineDesertionTest`(15건) 중 새로 더한 것:
+  `out_of_range_seats_and_a_seat_that_just_left_are_not_a_desertion`,
+  `a_bystander_deserting_leaves_the_pending_attack_and_the_turn_alone`,
+  `the_owner_deserting_during_an_attack_race_still_passes_the_attack_to_the_reserved_seat`,
+  `if_the_seat_a_jack_skipped_to_deserts_during_the_race_the_next_live_seat_plays`,
+  `deserting_passes_the_turn_on_in_the_reversed_direction_too`
 
 ## 11. 종료와 순위
 
@@ -277,8 +294,14 @@
 
 - **코드:** 종료 판정 `OneCardEngine.endIfDecided`(LAST_STANDING·NO_HUMANS)·`finish`, 교착·상한은
   `OneCardEngine.draw`·`play`, 순위 `rules/Ranking.rank`, 결과 `state/MatchResult`
-- **테스트:** `rules/RankingTest`(4건), `OneCardEnginePlayTest`(FINISHED, STALEMATE 두 경로),
-  `OneCardEngineDesertionTest`(LAST_STANDING, NO_HUMANS, 연속 패스 초기화)
+- **테스트:** `rules/RankingTest`(4건), `OneCardEnginePlayTest`(FINISHED, STALEMATE 두 경로) — 판정 순서는
+  `finishing_with_the_last_card_on_the_turn_limit_is_a_win_not_a_stalemate`(FINISHED 가 상한보다 먼저),
+  `drawing_on_the_turn_limit_ends_as_a_stalemate_without_announcing_another_turn`,
+  `bankruptcy_on_the_turn_limit_ends_as_last_standing_not_a_stalemate`(LAST_STANDING 이 상한보다 먼저),
+  `a_bot_left_alone_by_a_bankruptcy_is_last_standing_not_no_humans`(LAST_STANDING 이 NO_HUMANS 보다 먼저),
+  `when_a_bankruptcy_leaves_only_bots_the_match_ends_as_no_humans_with_the_bankrupt_seat_last`, 연속 패스 초기화는
+  `playing_or_drawing_a_card_resets_the_pass_streak`, `OneCardEngineDesertionTest`(LAST_STANDING, NO_HUMANS,
+  연속 패스 초기화) 중 `the_last_standing_bot_beats_no_humans_when_a_human_deserts_a_two_seat_table`
 
 ## 12. 우리가 정한 것 (미규정·하우스 룰 선택)
 
@@ -324,8 +347,20 @@
 - 시작 카드 다시 나누기(§3-5)가 실제로 끝나는지 확인한다. 셔플을 주입해 첫 분배는 일반 카드를 모두 손패로
   보내고 다시 나눌 때는 다른 순서를 주는 테스트로 본다(같은 순서를 되풀이하면 같은 실패가 반복된다).
 
-- **코드:** `invariant/OneCardInvariantChecker`(카드 보존, 공격 누적·지정 무늬와 맨 위 카드, 차례 좌석)
-- **테스트:** `invariant/OneCardInvariantCheckerTest`(5건 — 고의 위반 4건 + 통과 1건),
-  `OneCardMatchSimulationTest`(10건 — 인원별 2,000판 + 사람 1·봇 300판, 매 전이 불변식 검사). 차례 상한 도달은
+- **코드:** `invariant/OneCardInvariantChecker`(카드 보존, 공격 누적·지정 무늬와 맨 위 카드, 차례 좌석, 그리고
+  종료 판정이 빠지지 않았는지 — 열린 판은 생존자 2명 이상 · 연속 패스가 생존자 수 미만 · 차례 상한 미만 · 살아 있는
+  좌석의 손패가 비지 않음 · 창이 예약한 좌석이 살아 있음, 끝난 판은 `FINISHED` ⇔ 손패를 비운 생존자 ·
+  `LAST_STANDING` ⇒ 생존자 1명 · `NO_HUMANS`·`STALEMATE` ⇒ 생존자 2명 이상 · `STALEMATE` ⇒ 전원 연속 패스 또는 차례
+  상한, 그리고 차례 수는 어느 때나 상한 이하)
+- **테스트:** `invariant/OneCardInvariantCheckerTest`(23건 — 통과 1건 + 고의 위반 22건: 카드 보존·탈락자 손패·공격
+  누적·지정 무늬·방향·20장 생존자·차례 좌석·끝난 판의 차례/창, 그리고 위 종료 판정 규칙마다 하나. 새 규칙과 분기는
+  하나씩 끄면 해당 케이스만 실패한다), `OneCardJsonRoundTripTest`(5건 — 카드·상태·액션 JSON 왕복, 이벤트 11종의 envelope 이름·비공개
+  라우팅·키 집합), `OneCardMatchSimulationTest`(10건 — 인원별 2,000판 + 사람 1·봇 300판, 매 전이 불변식 검사와
+  이벤트만 듣는 클라이언트가 그린 테이블(공개 이벤트 + 비공개 손패)과 엔진 상태의 대조). 차례 상한 도달은
   2인 1% 미만 · 3인 1.0% · 4인 2.1% · 5인 2.3% · 6인 5.1%다(전략 없는 무작위 판, 시드 고정 — 테스트는 10% 미만을
-  요구한다). 탈락자 손패를 더미로 옮기지 않는 고의 결함을 넣으면 10건이 모두 실패한다(D-127 검출력 확인).
+  요구한다). 탈락자 손패를 더미로 옮기지 않는 고의 결함을 넣으면 10건이 모두 실패한다(엔진 `eliminate` 의
+  `t.drawPile.addAll(hand)` 를 지워 확인).
+- **합계:** 원카드 도메인 테스트 134건 — `PlayingCardTest` 6 + `DealerTest` 8 + `PlayRulesTest` 9 + `TurnOrderTest` 8 +
+  `RankingTest` 4 + `OneCardEnginePlayTest` 29 + `OneCardEngineRaceTest` 17 + `OneCardEngineDesertionTest` 15 +
+  `OneCardJsonRoundTripTest` 5 + `OneCardInvariantCheckerTest` 23 + `OneCardMatchSimulationTest` 10. 전부 Docker 가
+  필요 없다.
