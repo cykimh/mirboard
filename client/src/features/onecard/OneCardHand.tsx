@@ -49,10 +49,11 @@ export function OneCardHand({
   const canAct = myTurn && !raceOpen;
   const canSubmit = canAct && selected !== null && (!needSuit || suitChoice !== null);
 
-  const playLabel = !myTurn
-    ? '내 차례 아님'
-    : raceOpen
-      ? '경쟁 중'
+  // 경쟁 중에는 서버 불변식상 차례 좌석이 없다(turnSeat −1) — 그래서 `myTurn` 이 아니라 `raceOpen` 을 먼저 봐야 "경쟁 중"이 뜬다.
+  const playLabel = raceOpen
+    ? '경쟁 중'
+    : !myTurn
+      ? '내 차례 아님'
       : selected === null
         ? '카드를 고르세요'
         : needSuit && suitChoice === null

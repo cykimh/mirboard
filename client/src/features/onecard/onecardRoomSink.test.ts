@@ -62,7 +62,15 @@ describe('onecardRoomSink — ERROR 문구', () => {
 });
 
 describe('onecardRoomSink — 경쟁 누름의 거절', () => {
+  const resolved = (outcome: string, bySeat: number) => ({
+    type: 'RACE_RESOLVED',
+    payload: { raceId: 4, outcome, bySeat },
+  });
+  const turnChanged = { type: 'TURN_CHANGED', payload: { seat: 1, direction: 1, attackStack: 0 } };
+
   beforeEach(() => {
+    // 나는 1번 좌석, 창의 주인은 0번 — 나는 "잡기!" 쪽이다.
+    onecardRoomSink.applyPrivateEvent(envelope('HAND_DEALT', { seat: 1, hand: [], handVersion: 1 }));
     store().applyEvent({
       type: 'RACE_OPENED',
       payload: { raceId: 4, ownerSeat: 0, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000 },
@@ -77,10 +85,58 @@ describe('onecardRoomSink — 경쟁 누름의 거절', () => {
     expect(store().retryNonce).toBe(1);
   });
 
-  it('NO_RACE 는 오류 대신 "늦었어요"', () => {
+  it('NO_RACE 는 오류 대신 "늦었어요" — 해소 이벤트보다 먼저 닿은 프레임도 같다', () => {
     onecardRoomSink.applyPrivateEvent(errorEnvelope('NO_RACE'));
 
     expect(store().errorMessage).toBeNull();
     expect(store().raceNotice).toBe('LATE');
+  });
+
+  // 서버는 해소를 승자 처리 락 안에서 먼저 방송하고, 진 누름의 거절은 그 뒤에 보낸다 — 아래는 그 실제 순서다.
+  it('남이 이긴 뒤 NO_RACE 가 와도 오류 배너 없이 "늦었어요"', () => {
+    onecardRoomSink.applyEvent(resolved('CALLED', 0));
+    onecardRoomSink.applyEvent(turnChanged);
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('NO_RACE'));
+
+    expect(store().errorMessage).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+    expect(store().press).toBeNull();
+  });
+
+  it('남이 이긴 뒤 BUSY 가 와도 오류 배너도 재시도도 없이 "늦었어요"', () => {
+    onecardRoomSink.applyEvent(resolved('CAUGHT', 2));
+    onecardRoomSink.applyEvent(turnChanged);
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('BUSY'));
+
+    expect(store().errorMessage).toBeNull();
+    expect(store().retryNonce).toBe(0);
+    expect(store().raceNotice).toBe('LATE');
+    expect(store().press).toBeNull();
+  });
+
+  it('아무도 못 눌러 닫힌 창에 닿은 NO_RACE 도 "늦었어요"', () => {
+    onecardRoomSink.applyEvent(resolved('EXPIRED', -1));
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('NO_RACE'));
+
+    expect(store().errorMessage).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('BUSY 재시도가 소진되면 일반 오류가 아니라 "늦었어요"', () => {
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('BUSY'));
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('BUSY'));
+    onecardRoomSink.applyPrivateEvent(errorEnvelope('BUSY'));
+
+    expect(store().errorMessage).toBeNull();
+    expect(store().retryNonce).toBe(2);
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('내가 이기면 안내도 오류도 없다', () => {
+    onecardRoomSink.applyEvent(resolved('CAUGHT', 1));
+
+    expect(store().errorMessage).toBeNull();
+    expect(store().raceNotice).toBeNull();
+    expect(store().press).toBeNull();
   });
 });

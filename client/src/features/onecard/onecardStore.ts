@@ -47,6 +47,12 @@ export interface PendingPress {
   raceId: number;
   action: PressAction;
   attempts: number;
+  /**
+   * 창이 남의 누름·만료·취소로 닫혔다 — 이 누름의 거절(`NO_RACE`·`BUSY`)이 아직 오는 중이다. 서버는 해소를 승자 처리 락
+   * 안에서 먼저 방송하고 늦은 누름은 그 뒤에 처리하므로, 진 쪽에는 대개 해소 이벤트가 거절보다 먼저 닿는다. 이 표식이
+   * 있는 누름은 다시 보내지 않고, 오는 거절은 오류가 아니라 "늦었어요"로 끝낸다.
+   */
+  lost?: boolean;
 }
 
 /** 첫 누름 + 재시도 2회 (설계서 §4.4 — 락 경합 `BUSY` 는 창이 열린 동안 최대 2회 재시도). */
@@ -83,7 +89,7 @@ export interface OneCardRoomState {
   press: PendingPress | null;
   /** BUSY 재시도 신호 — 게임판이 이 값의 변화를 보고 같은 누름을 다시 보낸다. */
   retryNonce: number;
-  /** `NO_RACE` 로 거절된 누름 — 오류 대신 "늦었어요"를 잠깐 보여 준다. */
+  /** 경쟁에서 진 내 누름(남이 먼저 이겼거나 창이 닫힘) — 오류 대신 "늦었어요"를 잠깐 보여 준다. */
   raceNotice: 'LATE' | null;
 
   // ── 메타 ──
@@ -102,8 +108,11 @@ export interface OneCardActions {
   setSuitChoice: (suit: OneCardSuit | null) => void;
   startPress: (raceId: number, action: PressAction) => void;
   /**
-   * 내 누름이 거절됐다. 누름을 기다리던 중이면 처리하고 true — `BUSY` 는 창이 열려 있고 횟수가 남았으면 재시도
-   * 신호를 올리고, `NO_RACE` 는 "늦었어요"로 바꾼다. 기다리던 누름이 없거나 재시도할 수 없으면 false(일반 오류로).
+   * 내 요청이 `BUSY`·`NO_RACE` 로 거절됐다. 경쟁 누름의 거절이면 처리하고 true, 아니면 false(일반 오류로).
+   *
+   * <p>`NO_RACE` 는 누름(`CALL_ONE_CARD`·`CATCH`)에서만 나오므로 항상 "늦었어요"다 — 해소 이벤트가 먼저 와 누름 표식을
+   * 이미 바꿨어도 같다. `BUSY` 는 내기·먹기의 락 경합에서도 오므로 기다리는 누름이 있을 때만 경쟁 누름의 것으로 본다:
+   * 창이 열려 있고 횟수가 남았으면 재시도 신호를 올리고, 더 시도할 창이 없으면(횟수 소진·마감·남이 이김) "늦었어요".
    */
   notePressRejected: (code: 'BUSY' | 'NO_RACE') => boolean;
   clearRaceNotice: () => void;
@@ -173,7 +182,8 @@ function keepSelection(
  *
  * <p>공개 payload 가 증감이 아니라 **결과값**이라(D-128) 같은 이벤트를 두 번 적용해도 같다. 손패는 비공개
  * 이벤트·resync 가 **전체**를 싣고 `handVersion` 이 단조 증가하므로, 가진 것보다 낮은 버전은 버린다 — 순번이 없는
- * 비공개 이벤트(D-129)와 잠금 밖 resync 의 도착 순서가 뒤바뀌어도 손패가 되돌아가지 않는다.
+ * 비공개 이벤트(D-129)와 resync 응답(REST)은 서로 다른 길로 와서 도착 순서가 정해져 있지 않다. 뒤바뀌어도 손패가
+ * 되돌아가지 않는다. (D-126 이후 서버는 resync 를 방 락 안에서 읽지만, 응답과 STOMP 프레임의 순서는 그래도 보장되지 않는다.)
  */
 export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, get) => ({
   ...INITIAL,
@@ -213,6 +223,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
       turnSeat: t.turnSeat,
       drawPileCount: t.drawPileCount,
       race,
+      // 방금 닫힌 경쟁 안내는 서버 뷰에 없는 값이다 — 오래 떠났다 돌아와도 몇 분 전 줄이 남지 않게 비운다.
+      lastRace: null,
       result: t.result,
       ...mine,
       // 같은 창을 기다리던 누름만 남긴다.
@@ -266,6 +278,9 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           // 다음 차례는 TURN_CHANGED(또는 경쟁 창)가 정한다 — 그 사이 '내 차례'를 잘못 세우지 않는다.
           turnSeat: -1,
           lastRace: null,
+          // 경쟁 중에는 내기가 막혀 있어(requireTurn) 카드는 항상 창이 닫힌 뒤에 놓인다 — 거절이 끝내 안 온 진 누름이
+          // 남아 있다면 여기서 정리한다(안 하면 내 카드 내기의 BUSY 가 "늦었어요"로 잘못 읽힌다).
+          press: null,
           ...(p.seat === state.mySeat ? { selectedKey: null, suitChoice: null } : {}),
         });
         return 'applied';
@@ -317,6 +332,10 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
         const p = payload as RaceResolvedPayload;
         // 지금 창의 해소만 창을 닫는다(다른 창 번호면 다른 창이 열려 있는 것이다).
         const current = state.race?.raceId === p.raceId;
+        // 이 창에 내가 보낸 누름이 있었다면 — 내가 이겼으면 끝(안내 없음), 졌으면 "늦었어요". 진 사실은 해소 이벤트에서
+        // 바로 알리고(거절이 뒤따르는 순서에 기대지 않는다), 누름은 lost 로 남겨 오는 거절을 오류로 새지 않게 받는다.
+        const mine = state.press !== null && state.press.raceId === p.raceId;
+        const iWon = p.bySeat >= 0 && p.bySeat === state.mySeat;
         set({
           phase: current || state.race === null ? 'PLAYING' : state.phase,
           race: current ? null : state.race,
@@ -326,7 +345,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
             outcome: p.outcome,
             bySeat: p.bySeat,
           },
-          press: state.press?.raceId === p.raceId ? null : state.press,
+          press: !mine ? state.press : iWon ? null : { ...state.press!, lost: true },
+          raceNotice: mine && !iWon ? 'LATE' : state.raceNotice,
         });
         return 'applied';
       }
@@ -371,18 +391,23 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
 
   notePressRejected(code) {
     const { press, race, retryNonce } = get();
-    if (!press) return false;
+    // NO_RACE 는 OneCardEngine.press 에서만 나온다(CALL_ONE_CARD·CATCH) — 내가 누른 창이 이미 닫혔다는 뜻이다. 해소
+    // 이벤트가 먼저 와서 누름 표식을 바꿨거나 지웠어도(resync 등) 같다.
     if (code === 'NO_RACE') {
       set({ press: null, raceNotice: 'LATE' });
       return true;
     }
-    const open = race !== null && race.raceId === press.raceId && Date.now() < race.closesAt;
+    // BUSY 는 내기·먹기의 락 경합에서도 온다 — 기다리는 누름이 없으면 일반 오류로 둔다.
+    if (!press) return false;
+    const open =
+      !press.lost && race !== null && race.raceId === press.raceId && Date.now() < race.closesAt;
     if (open && press.attempts < MAX_PRESS_ATTEMPTS) {
       set({ press: { ...press, attempts: press.attempts + 1 }, retryNonce: retryNonce + 1 });
       return true;
     }
-    set({ press: null });
-    return false;
+    // 더 시도할 창이 없다(횟수 소진·마감·남이 이김) — "잠시 후 다시 시도하세요" 는 틀린 안내라 "늦었어요" 로 끝낸다.
+    set({ press: null, raceNotice: 'LATE' });
+    return true;
   },
 
   clearRaceNotice() {

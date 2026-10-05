@@ -1,12 +1,35 @@
+import { useState } from 'react';
 import type { OneCardClientRace, PressAction } from './onecardStore';
 import { racePosition } from './raceSlots';
 
 interface Props {
   race: OneCardClientRace;
   mySeat: number;
-  /** 내 누름이 응답을 기다리는 중 — 중복 누름을 막는다. */
+  /** 누를 수 없는 동안 — 내 누름이 응답을 기다리는 중(중복 누름 방지)이거나 연결이 끊겼다. */
   pending: boolean;
   onPress: (action: PressAction) => void;
+}
+
+/**
+ * 창 끝까지 남은 시간 막대. **창당 한 번만** 계산한다 — 렌더마다 `Date.now()` 로 다시 재면 진행 중인 CSS 애니메이션의
+ * duration 이 줄어들어 막대가 앞당겨지고 일찍 비는데(게임판은 스토어 전체를 구독해 누름·BUSY 신호·채팅 안읽음·끊김
+ * 배지마다 다시 그려진다), 부모가 `key` 에 창 번호와 마감 시각을 실어 resync 가 마감을 바꾸면 새로 맞춘다.
+ */
+function RaceTimer({ closesAt, windowMillis }: { closesAt: number; windowMillis: number }) {
+  const [timing] = useState(() => {
+    const remaining = Math.max(0, closesAt - Date.now());
+    return { remaining, start: windowMillis > 0 ? Math.min(1, remaining / windowMillis) : 0 };
+  });
+  return (
+    <span
+      className="oc-race-timer"
+      aria-hidden
+      style={{
+        ['--oc-race-start' as string]: String(timing.start),
+        animationDuration: `${timing.remaining}ms`,
+      }}
+    />
+  );
 }
 
 /**
@@ -20,8 +43,6 @@ interface Props {
 export function RaceButton({ race, mySeat, pending, onPress }: Props) {
   const owner = mySeat === race.ownerSeat;
   const { left, top } = racePosition(race.slot, race.jitterX, race.jitterY);
-  const remaining = Math.max(0, race.closesAt - Date.now());
-  const start = race.windowMillis > 0 ? Math.min(1, remaining / race.windowMillis) : 0;
 
   return (
     <div className="oc-race-layer">
@@ -36,14 +57,10 @@ export function RaceButton({ race, mySeat, pending, onPress }: Props) {
         onClick={() => onPress(owner ? 'CALL_ONE_CARD' : 'CATCH')}
       >
         <span className="oc-race-label">{owner ? '원카드!' : '잡기!'}</span>
-        <span
-          key={race.raceId}
-          className="oc-race-timer"
-          aria-hidden
-          style={{
-            ['--oc-race-start' as string]: String(start),
-            animationDuration: `${remaining}ms`,
-          }}
+        <RaceTimer
+          key={`${race.raceId}:${race.closesAt}`}
+          closesAt={race.closesAt}
+          windowMillis={race.windowMillis}
         />
       </button>
     </div>

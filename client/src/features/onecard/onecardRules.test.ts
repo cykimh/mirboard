@@ -37,6 +37,11 @@ describe('공격 값과 세기 (§1·§6.2)', () => {
     expect(isSuitChange(c('SPADE', 8))).toBe(false);
     expect(isSuitChange(BLACK)).toBe(false);
   });
+
+  it('7 판정은 joker 가 null 값이 아니라 키째 빠진 직렬화(NON_NULL)에서도 같다', () => {
+    const withoutJokerKey = { suit: 'SPADE', rank: 7 } as unknown as OneCardCard;
+    expect(isSuitChange(withoutJokerKey)).toBe(true);
+  });
 });
 
 describe('공격받는 중이 아닐 때 (§5.2)', () => {

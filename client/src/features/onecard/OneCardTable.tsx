@@ -84,12 +84,16 @@ export function OneCardTable({
     return usernames[uid] ?? `#${uid ?? seat}`;
   };
 
-  // BUSY 재시도 — 스토어가 신호(retryNonce)를 올리면 기다리던 누름을 다시 보낸다.
+  // BUSY 재시도 — 스토어가 신호(retryNonce)를 올리면 기다리던 누름을 다시 보낸다. 지금도 이 창을 기다리는 누름만
+  // 보낸다: 그 사이 남이 이겨 `lost` 가 됐거나 창이 닫혔으면 서버가 NO_RACE 로 거절할 뿐이다. 클라 시계 마감은 보지
+  // 않는다 — 서버는 창 끝 직후에 처리한 누름도 인정한다(D-128).
   useEffect(() => {
     if (s.retryNonce === 0) return;
     const timer = window.setTimeout(() => {
-      const press = useOneCardStore.getState().press;
-      if (press) sendAction({ '@action': press.action, raceId: press.raceId });
+      const { press, race } = useOneCardStore.getState();
+      if (press && !press.lost && race?.raceId === press.raceId) {
+        sendAction({ '@action': press.action, raceId: press.raceId });
+      }
     }, PRESS_RETRY_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [s.retryNonce, sendAction]);
@@ -103,7 +107,8 @@ export function OneCardTable({
   }, [s.raceNotice, clearRaceNotice]);
 
   const press = (action: PressAction) => {
-    if (!s.race || s.press) return;
+    // 끊긴 동안은 보내지 못한다(sendAction 이 조용히 무시한다) — 대기 누름만 남겨 같은 창 동안 버튼이 굳지 않게.
+    if (!connected || !s.race || s.press) return;
     s.startPress(s.race.raceId, action);
     sendAction({ '@action': action, raceId: s.race.raceId });
   };
@@ -136,13 +141,16 @@ export function OneCardTable({
     onExit();
   };
 
-  const announcement = s.race
-    ? `${nameOf(s.race.ownerSeat)} 카드 1장! ${
-        canPress ? (s.race.ownerSeat === mySeat ? '원카드! 버튼을 누르세요' : '잡기! 버튼을 누르세요') : '경쟁 중'
-      }`
-    : s.lastRace
-      ? raceResultText(s.lastRace, nameOf)
-      : '';
+  // 화면 문장과 알림 문장은 같은 것에서 나온다. 진 누름의 "늦었어요"도 화면에만 두지 않고 알린다.
+  const resultText = s.lastRace ? raceResultText(s.lastRace, nameOf) : '';
+  const announcement =
+    s.raceNotice === 'LATE'
+      ? [resultText, '늦었어요'].filter(Boolean).join(' — ')
+      : s.race
+        ? `${nameOf(s.race.ownerSeat)} 카드 1장! ${
+            canPress ? (s.race.ownerSeat === mySeat ? '원카드! 버튼을 누르세요' : '잡기! 버튼을 누르세요') : '경쟁 중'
+          }`
+        : resultText;
 
   return (
     <div className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
@@ -269,7 +277,12 @@ export function OneCardTable({
       )}
 
       {s.race && canPress && (
-        <RaceButton race={s.race} mySeat={mySeat} pending={s.press !== null} onPress={press} />
+        <RaceButton
+          race={s.race}
+          mySeat={mySeat}
+          pending={s.press !== null || !connected}
+          onPress={press}
+        />
       )}
 
       {/* 창이 열리고 닫힌 사실을 보조기기에 알린다 — 버튼에 자동 포커스를 주지 않는 대신이다. */}

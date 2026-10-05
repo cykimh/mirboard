@@ -32,6 +32,8 @@ const ERROR_LABEL: Record<string, string> = {
  *
  * <p>비공개 큐에는 손패 이벤트 두 종류와 `ERROR` 가 온다. 경쟁 누름의 거절은 일반 오류와 다르게 다룬다 — 락 경합
  * `BUSY` 는 창이 열린 동안 다시 보내고, 이미 닫힌 창의 `NO_RACE` 는 오류 대신 "늦었어요"로 보여 준다(설계서 §4.4).
+ * 서버는 해소를 승자 처리 락 안에서 먼저 방송하고 진 누름은 그 뒤에 거절하므로, 대개 공개 `RACE_RESOLVED` 가 이 거절보다
+ * 먼저 닿는다 — 스토어가 그 순서와 반대 순서(프레임 순서는 보장되지 않는다)를 모두 받는다.
  */
 export const onecardRoomSink: RoomEventSink<OneCardTableView, OneCardPrivateView> = {
   reset(roomId) {

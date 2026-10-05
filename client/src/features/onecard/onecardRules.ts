@@ -30,7 +30,7 @@ export function attackStrength(card: OneCardCard): number {
 
 /** 7 — 낼 때 무늬를 지정한다 (§8.1). */
 export function isSuitChange(card: OneCardCard): boolean {
-  return card.joker === null && card.rank === 7;
+  return !card.joker && card.rank === 7;
 }
 
 /** 기준 무늬 (§5.1) — 7 로 지정된 무늬, 없으면 맨 위 카드의 무늬(조커면 null). */

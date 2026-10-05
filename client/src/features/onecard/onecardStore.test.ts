@@ -177,6 +177,19 @@ describe('applySnapshot — resync 는 권위값', () => {
     store().applySnapshot(snapshot());
     expect(store().press).toBeNull();
   });
+
+  it('방금 닫힌 경쟁 안내는 서버 뷰에 없는 값이라 비운다 — 오래 떠난 뒤 돌아와도 낡은 줄이 남지 않는다', () => {
+    store().applySnapshot(snapshot());
+    store().applyEvent(
+      ev('RACE_OPENED', { raceId: 9, ownerSeat: 0, slot: 5, jitterX: 0, jitterY: 0, windowMillis: 3000 }, 11),
+    );
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 9, outcome: 'CAUGHT', bySeat: 2 }, 12));
+    expect(store().lastRace).not.toBeNull();
+
+    store().applySnapshot(snapshot());
+
+    expect(store().lastRace).toBeNull();
+  });
 });
 
 describe('applyPrivateHand — 손패 전체 + handVersion', () => {
@@ -377,16 +390,38 @@ describe('경쟁 누름 — 거절 처리 (설계서 §4.4)', () => {
     store().applyEvent(
       ev('RACE_OPENED', { raceId: 9, ownerSeat: 0, slot: 0, jitterX: 0, jitterY: 0, windowMillis }, 11),
     );
+  // 서버가 방송하는 순서(GameStompController 의 락 안 broadcast → 락 해제 → 늦은 요청 처리): 해소는 승자를 처리한 락 안에서
+  // 먼저 나가고(RACE_RESOLVED → TURN_CHANGED), 진 누름의 거절(NO_RACE)이나 락 경합 BUSY 는 그 뒤에 온다.
+  const resolve = (outcome: string, bySeat: number) =>
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 9, outcome, bySeat }, 12));
+  const turnChanged = () =>
+    store().applyEvent(ev('TURN_CHANGED', { seat: 1, direction: 1, attackStack: 0 }, 13));
 
   beforeEach(() => store().applySnapshot(snapshot()));
 
-  it('기다리는 누름이 없으면 false — 일반 오류로 보여 준다', () => {
+  it('BUSY 인데 기다리는 누름이 없으면 false — 카드 내기·먹기의 락 경합이라 일반 오류로 보여 준다', () => {
     open();
     expect(store().notePressRejected('BUSY')).toBe(false);
-    expect(store().notePressRejected('NO_RACE')).toBe(false);
   });
 
-  it('NO_RACE 는 "늦었어요" — 누름을 내린다', () => {
+  it('내가 이긴 경쟁 뒤의 BUSY 도 일반 오류다 — 이긴 누름은 남지 않는다', () => {
+    open();
+    store().startPress(9, 'CATCH');
+    resolve('CAUGHT', 1);
+
+    expect(store().press).toBeNull();
+    expect(store().raceNotice).toBeNull();
+    expect(store().notePressRejected('BUSY')).toBe(false);
+  });
+
+  it('NO_RACE 는 기다리는 누름이 없어도 "늦었어요" — NO_RACE 는 경쟁 누름에서만 나온다', () => {
+    open();
+
+    expect(store().notePressRejected('NO_RACE')).toBe(true);
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('NO_RACE 는 "늦었어요" — 해소 이벤트보다 먼저 와도 누름을 내린다', () => {
     open();
     store().startPress(9, 'CATCH');
 
@@ -398,7 +433,66 @@ describe('경쟁 누름 — 거절 처리 (설계서 §4.4)', () => {
     expect(store().raceNotice).toBeNull();
   });
 
-  it('BUSY 는 창이 열려 있는 동안 최대 2회 재시도 신호를 올린다', () => {
+  it('남이 이기면 해소 이벤트에서 바로 "늦었어요" — 뒤따르는 NO_RACE 는 오류가 아니다', () => {
+    open();
+    store().startPress(9, 'CATCH');
+
+    resolve('CALLED', 0); // 주인이 먼저 눌렀다
+    expect(store().raceNotice).toBe('LATE'); // 진 사실은 거절을 기다리지 않고 알린다
+    // 누름은 남긴다 — 이 누름의 거절이 아직 오는 중이다.
+    expect(store().press).toEqual({ raceId: 9, action: 'CATCH', attempts: 1, lost: true });
+
+    turnChanged();
+    expect(store().notePressRejected('NO_RACE')).toBe(true);
+    expect(store().press).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('남이 이긴 뒤에 온 BUSY 는 다시 보내지 않고 "늦었어요"로 끝낸다', () => {
+    open();
+    store().startPress(9, 'CATCH');
+    resolve('CAUGHT', 2);
+    turnChanged();
+
+    expect(store().notePressRejected('BUSY')).toBe(true);
+    expect(store().retryNonce).toBe(0);
+    expect(store().press).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('아무도 못 눌러 만료된 창에 닿은 누름도 "늦었어요"', () => {
+    open();
+    store().startPress(9, 'CATCH');
+
+    resolve('EXPIRED', -1);
+    expect(store().raceNotice).toBe('LATE');
+
+    expect(store().notePressRejected('NO_RACE')).toBe(true);
+    expect(store().press).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+  });
+
+  it('내가 이기면 안내가 없다', () => {
+    open();
+    store().startPress(9, 'CATCH');
+
+    resolve('CAUGHT', 1);
+
+    expect(store().press).toBeNull();
+    expect(store().raceNotice).toBeNull();
+  });
+
+  it('다른 창의 누름은 해소 이벤트가 건드리지 않는다', () => {
+    open();
+    store().startPress(9, 'CATCH');
+
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 8, outcome: 'CALLED', bySeat: 0 }, 12));
+
+    expect(store().press).toEqual({ raceId: 9, action: 'CATCH', attempts: 1 });
+    expect(store().raceNotice).toBeNull();
+  });
+
+  it('BUSY 는 창이 열려 있는 동안 최대 2회 재시도 신호를 올리고, 소진되면 "늦었어요"', () => {
     open();
     store().startPress(9, 'CALL_ONE_CARD');
 
@@ -406,17 +500,23 @@ describe('경쟁 누름 — 거절 처리 (설계서 §4.4)', () => {
     expect(store().notePressRejected('BUSY')).toBe(true);
     expect(store().press?.attempts).toBe(MAX_PRESS_ATTEMPTS);
     expect(store().retryNonce).toBe(2);
+    expect(store().raceNotice).toBeNull();
 
-    expect(store().notePressRejected('BUSY')).toBe(false);
+    // 다시 시도할 수 없다 — "잠시 후 다시 시도하세요" 는 틀린 안내다.
+    expect(store().notePressRejected('BUSY')).toBe(true);
     expect(store().press).toBeNull();
+    expect(store().raceNotice).toBe('LATE');
+    expect(store().retryNonce).toBe(2);
   });
 
-  it('BUSY 라도 창이 이미 닫힐 시각이 지났으면 재시도하지 않는다', () => {
+  it('BUSY 라도 창이 이미 닫힐 시각이 지났으면 재시도하지 않고 "늦었어요"', () => {
     open(1000);
     store().startPress(9, 'CATCH');
     vi.setSystemTime(NOW + 1500);
 
-    expect(store().notePressRejected('BUSY')).toBe(false);
+    expect(store().notePressRejected('BUSY')).toBe(true);
+    expect(store().retryNonce).toBe(0);
+    expect(store().raceNotice).toBe('LATE');
   });
 
   it('창이 새로 열리면 지난 누름과 안내를 지운다', () => {
@@ -429,6 +529,21 @@ describe('경쟁 누름 — 거절 처리 (설계서 §4.4)', () => {
     );
     expect(store().press).toBeNull();
     expect(store().raceNotice).toBeNull();
+  });
+
+  it('다음 카드가 놓이면 남은 진 누름을 정리한다 — 내 카드 내기의 BUSY 가 "늦었어요"가 되지 않게', () => {
+    open();
+    store().startPress(9, 'CATCH');
+    store().notePressRejected('BUSY'); // 락 경합 — 재시도 신호가 올라간 상태에서
+    resolve('CALLED', 0); // 남이 이겨 누름이 lost 로 남는다(재시도는 가드에 걸려 나가지 않는다)
+    expect(store().press?.lost).toBe(true);
+
+    store().applyEvent(
+      ev('CARD_PLAYED', { seat: 2, card: card('HEART', 4), declaredSuit: null, handCount: 2, attackStack: 0, direction: 1 }, 14),
+    );
+
+    expect(store().press).toBeNull();
+    expect(store().notePressRejected('BUSY')).toBe(false);
   });
 });
 
