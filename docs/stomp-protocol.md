@@ -53,8 +53,8 @@
   이벤트의 seq 는 판정에 쓰지 않는다.
 - **D-126 — 비공개 이벤트는 공개 순번을 쓰지 않는다.** 남의 비공개 이벤트가 번호를 쓰면 그
   이벤트를 받지 않는 클라에게 다음 공개 이벤트가 **항상 구멍**으로 보여 resync 를 부른다 — 티츄는
-  카드를 낼 때마다 4명 전원이 resync 했다. 그래서 티츄 `HAND_DEALT`/`CARDS_RECEIVED` 는 `seq: null`
-  이다. 스컬킹 `HAND_DEALT` 는 아직 순번을 쓴다(라운드당 1회 구멍, D-103 수용).
+  카드를 낼 때마다 4명 전원이 resync 했다. 그래서 티츄 `HAND_DEALT`/`CARDS_RECEIVED` 와 원카드
+  `HAND_DEALT`/`HAND_UPDATED`(D-129)는 `seq: null` 이다. 스컬킹 `HAND_DEALT` 는 아직 순번을 쓴다(라운드당 1회 구멍, D-103 수용).
 - **클라 → 서버는 envelope 을 쓰지 않는다.** 액션은 `@action` 판별자를 가진
   bare JSON, 채팅/반응은 `{message}`/`{emoji}` 를 그대로 발행한다. 서버는 클라가
   보낸 어떤 seq 도 신뢰하지 않고 자체 카운터만 쓴다.

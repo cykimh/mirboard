@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-128),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-129),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`·
@@ -23,7 +23,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 | 4 | WebSocket/STOMP 실시간 | ✅ | `infra.ws`, `infra.config.WebSocketConfig` |
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
-| 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼 — 카탈로그 열림 전환만 남음, 그때까지 COMING_SOON) | 🟡 | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127·D-128·D-129) |
+| 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼 — 카탈로그 열림 전환(D-116 병합 뒤 별건)과 S5 통합·배포가 남음, 그때까지 COMING_SOON) | 🟡 | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127·D-128·D-129) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -103,17 +103,18 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 - 엔드포인트 `ws://host/ws` (STOMP + SockJS), CONNECT JWT 인증.
 - **공개 토픽**: `/topic/lobby/chat`, `/topic/lobby/rooms`, `/topic/room/{id}`, `/topic/room/{id}/chat`.
-- **비공개 큐**: `/user/queue/room/{id}` (HAND_DEALT, CARDS_RECEIVED, ERROR). 브로커 prefix 는 `/queue`
+- **비공개 큐**: `/user/queue/room/{id}` (HAND_DEALT, CARDS_RECEIVED, 원카드 HAND_UPDATED, ERROR). 브로커 prefix 는 `/queue`
   (D-126 — 예전 `/user/queue` 설정에서는 Spring 이 바꾼 본인 세션 목적지가 버려져 한 번도 배달되지 않았다).
   `/queue/...` 직접 구독은 `StompAuthChannelInterceptor` 가 거절.
 - **클라→서버**: `/app/room/{id}/action`, `/app/lobby/chat`, `/app/room/{id}/chat`.
 - 모든 메시지는 `{ eventId, seq, type, ts, payload }` envelope. 서버는 클라가 보낸 `seq`를
   무시하고 `room:{id}:seq` INCR 값을 권위 카운터로 사용.
-- **비공개 이벤트는 순번을 쓰지 않는다(D-126, 티츄)**: `GameEvent.sequenced()` 포트 확장. 예전엔
+- **비공개 이벤트는 순번을 쓰지 않는다(D-126 티츄, D-129 원카드)**: `GameEvent.sequenced()` 포트 확장. 예전엔
   카드를 낼 때마다 비공개 `HAND_DEALT` 가 순번을 써서 다음 공개 이벤트가 항상 구멍 → 낼 때마다
   4명 전원 resync(봇 매치 모델 실측 플레이당 1.263회/클라). 지금은 공개 순번이 구멍 없이 이어지고,
   소원 해제는 공개 `WISH_CLEARED` 로 알리며, 클라 리듀서가 라운드 종료 뷰·종료 표시·에러 문구를 직접
   맞춘다 — 플레이당 0.036회, 남은 것은 라운드 경계(`ROUND_STARTED`)뿐(`TichuEventStreamIT` 가 단언).
+  원카드 손패 이벤트(`HAND_DEALT`·`HAND_UPDATED`)도 같은 확장을 쓴다(D-129 — 손패 순서는 `handVersion` 이 지킨다).
   스컬킹 `HAND_DEALT` 는 아직 순번을 쓴다(라운드당 1회 구멍, D-103 수용).
 
 처리 흐름과 이벤트 카탈로그는 `docs/architecture.md` §4.2 / `docs/stomp-protocol.md`.
@@ -313,7 +314,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **553건 / 58파일** (D-129 시점 실측 — 원카드 게임판·스토어·튜토리얼 121건 포함, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **594건 / 58파일** (D-129 시점 실측 — S4 로 늘어난 162건 포함, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지

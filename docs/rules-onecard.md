@@ -252,8 +252,9 @@
   아무도 안 누르면 엔진 타이머가 `EXPIRED` 로 닫음, 창 중 탈주 `CANCELLED`, 닫힌 창의 누름 거절)
 - **코드(S4):** 경쟁 버튼 `RaceButton`(슬롯 표 `raceSlots.ts` — 화면 기준 8자리 + 지터, 주인 "원카드!"·나머지 "잡기!",
   관전자·탈락자에게는 없음, 자동 포커스·단축키 없음, aria-live 알림), 누름 거절 처리 `onecardStore.notePressRejected`(`BUSY` 는
-  창이 열린 동안 2번까지 다시 보내기, `NO_RACE` 는 "늦었어요")
-- **테스트(S4):** `OneCardTable.test`(경쟁 8건), `onecardStore.test`(누름 거절), `raceSlots.test`(슬롯·지터 범위)
+  창이 열린 동안 2번까지 다시 보내기, `NO_RACE`·재시도 소진은 "늦었어요" — 해소 이벤트가 거절보다 먼저 닿으므로 진 누름은
+  `RACE_RESOLVED` 에서 `lost` 로 표시해 뒤따르는 거절을 오류 없이 받는다)
+- **테스트(S4):** `OneCardTable.test`(경쟁 17건), `onecardStore.test`(누름 거절), `raceSlots.test`(슬롯·지터 범위)
 
 ## 10. 파산과 탈락
 
