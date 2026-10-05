@@ -15,12 +15,15 @@ import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
+import com.mirboard.infra.ws.RoomActionLock;
 import com.mirboard.infra.ws.RoomPresence;
 import com.mirboard.infra.ws.RoomSeq;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,6 +40,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/rooms")
 public class RoomController {
 
+    private static final Logger log = LoggerFactory.getLogger(RoomController.class);
+
     private final RoomService rooms;
     private final GameEngineProvider engines;
     private final RoomSeq seqs;
@@ -44,6 +49,7 @@ public class RoomController {
     private final RoomPresence sessions;
     private final RoomChipStore chipStore;
     private final GameAbortService aborts;
+    private final RoomActionLock lock;
 
     public RoomController(RoomService rooms,
                           GameEngineProvider engines,
@@ -51,7 +57,8 @@ public class RoomController {
                           DesertionService desertion,
                           RoomPresence sessions,
                           RoomChipStore chipStore,
-                          GameAbortService aborts) {
+                          GameAbortService aborts,
+                          RoomActionLock lock) {
         this.rooms = rooms;
         this.engines = engines;
         this.seqs = seqs;
@@ -59,6 +66,7 @@ public class RoomController {
         this.sessions = sessions;
         this.chipStore = chipStore;
         this.aborts = aborts;
+        this.lock = lock;
     }
 
     @GetMapping
@@ -222,18 +230,42 @@ public class RoomController {
             throw new NotInRoomException(roomId);
         }
         GameEngine engine = engines.forRoom(room);
-        GameState state = engine.loadState()
-                .orElseThrow(() -> new ResyncNotAvailableException(roomId));
         int privateSeat = occupiedSeat(room, seat);
+        // D-126 — 상태·순번·뷰는 방 액션 락 안에서 같은 시점으로 읽는다. 액션은 이 락 안에서
+        // 저장 → 브로드캐스트(순번 발급)를 끝내므로, 따로 읽으면 그 사이 액션이 끼어 스냅샷과
+        // eventSeq 가 어긋난다(클라가 이벤트를 두 번 적용하거나 놓친다). 못 잡으면(약 3초) 예전처럼
+        // 잠금 없이 읽는다 — resync 가 실패하는 것보다 낫다.
+        boolean locked = lock.acquireWaiting(roomId);
+        if (!locked) {
+            log.warn("Resync without room lock (busy): roomId={}", roomId);
+        }
+        Snapshot snap;
+        try {
+            GameState state = engine.loadState()
+                    .orElseThrow(() -> new ResyncNotAvailableException(roomId));
+            snap = new Snapshot(
+                    engine.phaseName(state),
+                    seqs.current(roomId),
+                    engine.publicView(state),
+                    // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
+                    privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null);
+        } finally {
+            if (locked) {
+                lock.release(roomId);
+            }
+        }
         return new ResyncResponse(
                 roomId,
-                engine.phaseName(state),
-                seqs.current(roomId),
-                engine.publicView(state),
-                // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
-                privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null,
+                snap.phase(),
+                snap.eventSeq(),
+                snap.tableView(),
+                snap.privateHand(),
                 disconnectedSeats(room, me.userId()),
                 chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
+    }
+
+    /** 락 안에서 함께 읽어야 하는 resync 부분 — 게임 상태에서 나온 것과 그 시점의 순번. */
+    private record Snapshot(String phase, long eventSeq, Object tableView, Object privateHand) {
     }
 
     /**

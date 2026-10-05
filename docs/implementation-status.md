@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-122),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-126),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`(룰)가
@@ -106,6 +106,11 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - **클라→서버**: `/app/room/{id}/action`, `/app/lobby/chat`, `/app/room/{id}/chat`.
 - 모든 메시지는 `{ eventId, seq, type, ts, payload }` envelope. 서버는 클라가 보낸 `seq`를
   무시하고 `room:{id}:seq` INCR 값을 권위 카운터로 사용.
+- **비공개 이벤트는 순번을 쓰지 않는다(D-126, 티츄)**: `GameEvent.sequenced()` 포트 확장. 예전엔
+  카드를 낼 때마다 비공개 `HAND_DEALT` 가 순번을 써서 다음 공개 이벤트가 항상 구멍 → 낼 때마다
+  4명 전원 resync(봇 15라운드 매치 모델 실측 플레이당 1.26회/클라). 지금은 공개 순번이 구멍 없이
+  이어지고(`TichuEventStreamIT`), 소원 해제는 공개 `WISH_CLEARED` 로 알린다. 스컬킹 `HAND_DEALT`
+  는 아직 순번을 쓴다(라운드당 1회 구멍, D-103 수용).
 
 처리 흐름과 이벤트 카탈로그는 `docs/architecture.md` §4.2 / `docs/stomp-protocol.md`.
 관련 테스트: `GameStompControllerIntegrationTest`, `StompLobbyIntegrationTest`.
@@ -178,9 +183,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 - 새로고침/탭 복귀 시 WS 자동 재연결(동일 JWT) → `GET /api/rooms/{id}/resync` 로
   tableView + privateHand + seq 수신 → 토픽/큐 재구독.
 - `seq` 갭으로 누락 판단, 필요 시 전체 resync(RESYNC 이벤트)로 복구.
+- resync 는 방 액션 락 안에서 상태·`eventSeq`·뷰를 함께 읽는다(D-126) — 액션 사이에 끼어
+  스냅샷과 순번이 어긋나던(이벤트 이중 적용·누락) 경합 제거. 락을 약 3초 못 잡으면 잠금 없이 읽는다.
 - 손패는 항상 `/user/queue` 로만 복원(공개 토픽 누출 금지).
 
-관련 테스트: `RoomResyncIntegrationTest`, `RoomJoinOrReconnectIntegrationTest`.
+관련 테스트: `RoomResyncIntegrationTest`, `RoomJoinOrReconnectIntegrationTest`,
+`RoomControllerResyncLockTest`(D-126).
 
 ---
 

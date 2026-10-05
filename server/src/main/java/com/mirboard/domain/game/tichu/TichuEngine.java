@@ -281,6 +281,8 @@ public final class TichuEngine {
         if (wishBefore != null && wishBefore.isActive()
                 && action.cards().stream().anyMatch(c -> c.isNormal() && c.rank() == wishBefore.rank())) {
             updatedWish = wishBefore.fulfill();
+            // D-126 — 공개 뷰의 소원 표시가 사라지는 변화라 이벤트로 알린다.
+            events.add(new TichuEvent.WishCleared(wishBefore.rank()));
         }
 
         // 소원 지정 (D-109). fulfillment **뒤**에 둔다 — "마작을 낸 그 플레이가 자기
@@ -388,6 +390,10 @@ public final class TichuEngine {
         events.add(new TichuEvent.DragonGiven(seat, action.toSeat()));
         events.add(new TichuEvent.TrickTaken(action.toSeat(),
                 com.mirboard.domain.game.tichu.scoring.CardPoints.sum(trick.accumulatedCards())));
+        // 다음 트릭을 소원 없이 시작하므로 활성 소원이 사라진다(rules-tichu.md §9 (b)) — D-126.
+        if (trick.hasActiveWish()) {
+            events.add(new TichuEvent.WishCleared(trick.activeWish().rank()));
+        }
         events.add(new TichuEvent.TurnChanged(nextLead));
 
         return maybeEndRound(

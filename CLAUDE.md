@@ -229,8 +229,14 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 **이벤트 type 문자열은 게임 간 재사용된다**(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
 게임을 하나만 가지므로 충돌이 없다.
 
+**비공개 이벤트는 순번을 쓰지 않는다 (D-126)** — `GameEvent.sequenced()`(기본 true)를 false 로.
+`seq` 는 클라가 공개 토픽에서 구멍을 찾는 기준이라, 비공개 이벤트가 쓰면 다른 클라에게 다음 공개
+이벤트가 항상 구멍이 된다(티츄는 카드를 낼 때마다 전원 resync 했다). 티츄는 `!isPrivate()`, 스컬킹은
+아직 true. 공개 상태가 바뀌면 **반드시 공개 이벤트로** 알릴 것 — resync 가 우연히 고쳐 주는 것에 기대지
+말 것(소원 해제가 그랬다 → `WISH_CLEARED`). resync 는 방 액션 락 안에서 상태·`eventSeq` 를 함께 읽는다.
+
 - 서버 → 클라 공개 `/topic/room/{roomId}`
-  - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `ROUND_ENDED`, `MATCH_ENDED` 등
+  - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`

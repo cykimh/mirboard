@@ -163,12 +163,14 @@ HTTP 요청 (예: POST /api/rooms)
   3. room:{id}:lock 획득(SET NX EX 2s)으로 액션 직렬화, room:{id}:state(JSON) 로드
   4. ActionValidator — 현재 phase에 맞는 검증 (실패 시 lock 해제 + /user/queue 로 ERROR)
   5. TichuEngine.apply(state, seat, action) — 무상태 룰 적용 → (newState, events[])
-  6. room:{id}:state 저장, room:{id}:seq INCR, lock 해제
-  7. GameEventBroadcaster
+  6. room:{id}:state 저장
+  7. GameEventBroadcaster — 순번을 쓰는 이벤트마다 room:{id}:seq INCR 후 발행
        · 공개 이벤트 → /topic/room/{id}        (PLAYED, TURN_CHANGED, TRICK_TAKEN, ...)
-       · 비공개 이벤트 → /user/queue/room/{id}  (HAND_DEALT, RESYNC)
-       · 모든 메시지는 { eventId, seq(6단계 값), type, ts, payload } envelope 로 래핑
-  8. 클라 리듀서(tichuStore)가 이벤트 적용 → 리렌더
+       · 비공개 이벤트 → /user/queue/room/{id}  (HAND_DEALT, CARDS_RECEIVED — seq 없음, D-126)
+       · 모든 메시지는 { eventId, seq, type, ts, payload } envelope 로 래핑
+  8. lock 해제 — 저장·순번 발급이 모두 락 안이라, resync 가 같은 락 안에서 읽으면
+     스냅샷과 eventSeq 가 같은 시점이다(D-126)
+  9. 클라 리듀서(tichuStore)가 이벤트 적용 → 리렌더
 ```
 
 envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.md` 가 단일 진실 공급원.

@@ -453,6 +453,9 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 }
 ```
 - 좌석 식별은 **seat(0~3, playerIds 인덱스)**, `handCounts`/`declarations` 키도 seat.
+- `eventSeq`: 이 스냅샷에 반영된 마지막 공개 이벤트의 순번. D-126 부터 서버는 방 액션 락
+  안에서 상태·`eventSeq`·뷰를 함께 읽으므로, 클라는 `seq <= eventSeq` 이벤트를 버리고 그
+  다음부터 이어 붙이면 된다(락을 약 3초 안에 못 잡으면 예전처럼 잠금 없이 읽는다).
 - `disconnectedSeats`: 현재 끊긴 플레이어 좌석(재접속 배지 즉시 반영, D-75).
 - `chips`: D-82 방 단위 테이블 칩(userId→칩). 내기 없는 방은 빈 맵.
 - `completedRounds`: D-108 **끝난 라운드들의** 점수(순서 = 라운드 1..N). 바로 위

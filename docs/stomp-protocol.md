@@ -47,9 +47,13 @@
 }
 ```
 
-- `seq` 는 **게임 이벤트(`/topic/room/{id}` 의 엔진 발행분 + `HAND_DEALT`/
-  `CARDS_RECEIVED`)에만** 부여된다. 메타/채팅/반응/프레즌스/`CHIPS_SETTLED`/`ERROR`
-  는 `seq: null`. 클라는 `seq <= localSeq` 인 이벤트를 무시(idempotent).
+- `seq` 는 **순번을 쓰는 게임 이벤트**(`GameEvent.sequenced()` true — 공개 토픽의
+  엔진 발행분)에만 부여된다. 메타/채팅/반응/프레즌스/`CHIPS_SETTLED`/`ERROR` 는 `seq: null`.
+  클라는 `seq <= localSeq` 인 이벤트를 무시(idempotent).
+- **D-126 — 비공개 이벤트는 공개 순번을 쓰지 않는다(티츄).** 티츄 `HAND_DEALT`/
+  `CARDS_RECEIVED` 는 `seq: null` 이다. 예전에는 이들도 방 순번을 하나씩 써서, 그 이벤트를
+  받지 않는 클라에게 다음 공개 이벤트가 **항상 구멍**이었다 — 카드를 낼 때마다 4명 전원이
+  resync 했다. 스컬킹 `HAND_DEALT` 는 아직 순번을 쓴다(라운드당 1회 구멍, D-103 수용).
 - **클라 → 서버는 envelope 을 쓰지 않는다.** 액션은 `@action` 판별자를 가진
   bare JSON, 채팅/반응은 `{message}`/`{emoji}` 를 그대로 발행한다. 서버는 클라가
   보낸 어떤 seq 도 신뢰하지 않고 자체 카운터만 쓴다.
@@ -60,7 +64,12 @@
   직접 반영하고, 라이프사이클 이벤트(DEALING_PHASE_STARTED, PASSING_STARTED,
   CARDS_PASSED, PLAYING_STARTED, ROUND_STARTED) 또는 seq gap
   (`seq > lastSeq + 1`) 에서만 REST `/resync` 로 권위 스냅샷을 재취득한다.
-  초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지.
+  초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지. `WISH_CLEARED`(D-126)는 클라
+  리듀서가 붙기 전까지 미지 이벤트로 resync 된다(결과는 같고 횟수만 다르다).
+- **D-126 — resync 스냅샷과 `eventSeq` 는 같은 시점이다.** `/resync` 는 방 액션 락 안에서
+  상태·순번·뷰를 읽는다. 액션은 같은 락 안에서 저장→브로드캐스트(순번 발급)를 끝내므로,
+  스냅샷에 반영된 이벤트는 정확히 `seq <= eventSeq` 다 — 그 뒤 이벤트를 두 번 적용하거나
+  놓치지 않는다. 락을 약 3초 안에 못 잡으면 예전처럼 잠금 없이 읽는다.
 
 ---
 
@@ -85,7 +94,8 @@
 | `TURN_CHANGED` | `{ currentTurnSeat }` | 턴 전환 (만료 시각 필드 없음 — 카운트다운은 클라 로컬 근사, Phase 15#6) |
 | `TRICK_TAKEN` | `{ takerSeat, trickPoints }` | 트릭 종료/획득 |
 | `TICHU_DECLARED` | `{ seat, kind: "TICHU"\|"GRAND_TICHU" }` | 선언 알림 |
-| `WISH_MADE` | `{ rank }` | Mahjong 소원 (해소는 별도 이벤트 없이 상태로 반영) |
+| `WISH_MADE` | `{ rank }` | Mahjong 소원 (해소는 `WISH_CLEARED`) |
+| `WISH_CLEARED` | `{ rank }` | 활성 소원이 사라짐 — 소원 숫자가 나왔거나 용 트릭 양도(`rules-tichu.md` §9 (b)). D-126 |
 | `DRAGON_GIVEN` | `{ fromSeat, toSeat }` | 드래곤 트릭 양도 결과 |
 | `PLAYER_FINISHED` | `{ seat, order }` | 좌석 완주 (order 1~) |
 | `ROUND_ENDED` | `{ score: { teamAScore, teamBScore, firstFinisherSeat, doubleVictory } }` | 라운드 점수 |
@@ -110,8 +120,8 @@
 
 | type | payload | 의미 |
 | --- | --- | --- |
-| `HAND_DEALT` | `{ seat, cards, phaseCardCount: 8\|14 }` | 8장(Dealing 진입) 또는 14장(전환 후) 손패 스냅샷 |
-| `CARDS_RECEIVED` | `{ seat, received: [{ card, fromSeat }] }` | 패스로 받은 3장 + 출처 (스왑 직후) |
+| `HAND_DEALT` | `{ seat, cards, phaseCardCount: 8\|14 }` | 8장(Dealing 진입) 또는 14장(전환 후) 손패 스냅샷, 카드를 낸 뒤 남은 손패(D-62). seq: null (D-126) |
+| `CARDS_RECEIVED` | `{ seat, received: [{ card, fromSeat }] }` | 패스로 받은 3장 + 출처 (스왑 직후). seq: null (D-126) |
 | `ERROR` | `{ code, message }` | 본인의 잘못된 액션 (seq: null) |
 
 > 재접속 상태 복원은 WS 이벤트가 아니라 **REST `GET /api/rooms/{id}/resync`**
@@ -214,7 +224,8 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 5. `engine.apply(state, seat, action)` — 룰 위반 시 `GameActionRejectedException.code()`
    를 그대로 본인 큐 `ERROR` 코드로, 락 해제.
 6. 새 상태 저장, `engine.advance(...)` 로 라운드/매치 진행 이벤트 합류,
-   이벤트마다 `room:{id}:seq` INCR, envelope 을 공개/비공개로 분기 전송.
+   순번을 쓰는 이벤트마다 `room:{id}:seq` INCR(D-126 — `sequenced()` false 면 건너뜀),
+   envelope 을 공개/비공개로 분기 전송.
 7. 락 해제 후 봇 스케줄(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`) 트리거.
 
 > **D-122 — 끝난 방은 진행하지 않는다.** 봇 루프와 턴 타임아웃 발화도 위 1·3 과 같은 방

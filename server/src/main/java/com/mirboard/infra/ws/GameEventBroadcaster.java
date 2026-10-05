@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 /**
  * 엔진이 반환한 이벤트들을 STOMP 토픽/큐로 분기 발행. 공개 이벤트는 `/topic/room/{id}` 로,
  * 비공개 이벤트는 `/user/{userId}/queue/room/{id}` 로 보낸다. envelope 의 단조 증가 seq 는
- * {@link RoomSeq} 가 부여.
+ * {@link RoomSeq} 가 부여 — {@link GameEvent#sequenced()} 가 true 인 이벤트만(D-126).
  *
  * <p>Phase 6D-2: 직접 {@code SimpMessagingTemplate} 호출 대신 {@link StompPublisher}
  * 를 거쳐 모든 인스턴스로 fan-out. 단일 인스턴스 환경에선 InMemoryMessageGateway 가
@@ -36,7 +36,8 @@ public class GameEventBroadcaster {
 
     public void broadcast(String roomId, List<? extends GameEvent> events, List<Long> playerIds) {
         for (GameEvent ev : events) {
-            long seq = seqs.next(roomId);
+            // D-126 — 순번을 쓰지 않는 이벤트는 발급받지 않고 seq 를 비운다(NON_NULL 이라 JSON 에서 빠짐).
+            Long seq = ev.sequenced() ? seqs.next(roomId) : null;
             String eventId = UUID.randomUUID().toString();
             long ts = Instant.now(clock).toEpochMilli();
             var envelope = new StompEnvelope<>(eventId, ev.envelopeType(), ts, seq, ev);
