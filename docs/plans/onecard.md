@@ -369,3 +369,49 @@ default boolean sequenced() { return true; }
   항목도 그쪽에서 닫힌다. S2 코드는 이 메서드를 쓰지 않으므로 병합 순서와 무관하다.
   *(D-128 결과: D-126 이 아직 병합되지 않아 S3 는 포트 확장을 새로 만들지도 `sequenced()` 를 재정의하지도 않았다 —
   사용자 결정. 원카드 비공개 이벤트의 재정의는 S4 착수 조건이고, 위 두 위험 항목도 D-126 병합 뒤에 닫힌다.)*
+
+### S3 후속 (D-128 최종 리뷰)
+
+S3 병합 전 최종 리뷰에서 나온 것 중 이번에 고치지 않고 남긴 과제다(병합 전에 고친 것은 D-128 본문·`docs/game-port.md` §2).
+S4(AVAILABLE 전환) 착수 전에 아래 "운영" 항목과 "인프라"의 하드닝을 먼저 본다.
+
+- **인프라**
+  - `EngineTimerScheduler` ↔ `TurnTimeoutScheduler` 의 가드·member 파싱이 복제돼 있다. member 파싱·`inGameRoom`·
+    `LOCK_RETRY` 만 공용화하고 순환이 없어 불필요한 `@Lazy` 2개도 뺀다. 락 안 `timer` 재확인이 들어가 두 `fire` 본문이
+    갈라졌으므로 같은 과제로 다룬다(동작 무변경 리팩터 — D-122 로 다듬은 가드라 회귀 테스트를 먼저).
+  - **턴 타임아웃에도 같은 틈**(락 해제 → 세대 상승)이 원래부터 있다. 옛 턴 타이머가 막 차례를 받은 좌석에 `timeoutAction` 을
+    즉시 적용할 수 있다. 근본 수정은 세대 상승을 락 안으로 옮기는 것(봇 경로처럼)이며 컨트롤러·탈주·두 스케줄러 4곳의 순서를
+    바꾸므로 별도 과제다.
+  - 단일 폴러라 탈주 확정(`acquireWaiting` 최대 약 3초)이나 턴 타임아웃이 끝낸 매치의 기록기 DB 트랜잭션이 도는 동안 모든 방의
+    엔진 타이머(봇 누름 1.0~2.5초·창 만료 3초)가 밀린다. 팝한 항목의 `handle` 을 가상 스레드로 넘긴다(게임 중립).
+  - 발화 중 `saveState` 뒤 `advance`/`broadcast` 가 던지면 창은 닫혔는데 봇·타이머 재무장이 없다(턴 타임아웃과 같은 기존
+    패턴). 실패 가시성도 같이: `fire` 실패는 ERROR 로그만 남고 타이머는 이미 사라지며 무장 실패는 WARN 이다 — 한정 횟수
+    재무장·ERROR 승격을 S4 전 하드닝으로.
+  - 테스트: `fire` 예외 경로(`onTimer`/`saveState` 가 던질 때 락 해제·후속 호출 없음), `onTurnAdvanced` 의 방 없음 → `cleanup`
+    분기, 인터페이스의 실제 기본 메서드(`timer`/`onTimer` → empty) 실행.
+- **운영**
+  - `MIRBOARD_ONECARD_STATUS` 를 `docs/deploy.md`·`.env.example` 에 적는다. **S4 전에는 AVAILABLE 로 켜지 않는다** — 현 클라는
+    ONE_CARD 방을 기본 분기(티츄 게임판)로 그린다. S4 에서 코드 기본값 전환을 클라와 같은 배포로 한다.
+  - D-116·D-126 이 이 브랜치와 같은 문서(CLAUDE.md·README·케이스 스터디·decisions·status·roadmap·redis-keys)와 테스트 수를
+    건드린다 — 병합 뒤 인용 수치를 케이스 스터디 §부록 명령으로 다시 잰다. 또 운영은 `MIRBOARD_MESSAGING_GATEWAY=redis` 라 D-116
+    전에는 머신이 2대 이상일 때 `GameStartingEvent` 가 재발행돼 라운드 시작이 인스턴스마다 반복된다(티츄·스컬킹과 같은 기존
+    결함, 지금은 COMING_SOON·단일 머신이라 무영향). S4 의 AVAILABLE 전환은 두 작업 병합 뒤에 한다.
+- **테스트 보강**
+  - 단위·기록기: 뷰의 인자 순서·`handVersion`·좌석(`toTableView`/`toPrivateView` 를 값이 겹치지 않는 상태로), 봇 정책 경계(다음
+    사람 3장, J→Q, 평소 티어, 탈락자를 건너뛰는 뷰), 기록기(게스트가 낀 매치·사람이 이긴 봇 매치의 ELO 제외·
+    `payload_json`/`deserted` 단언), 시작 좌석 경계(2·6 수락, 0·1·7 거절).
+  - 경쟁 IT: 창 길이를 2~3초로 넓혀 의도한 경로를 타게, 락 경합·동시 누름 래치, `NO_RACE` ERROR 프레임 관찰(컨트롤러의 엔진
+    거절 → 본인 큐 경로 테스트가 저장소에 0건).
+  - 봇 풀매치 IT: `mirboard.bot.seed` 재현성 착시 정리, idle 전제(`botSeats == [1,2,3]`, `desertCount == 0`) 단언, 대기 조건 안
+    불변식 샘플링, `OneCardGameEngine` ERROR 로그 0건·DESERTED 아님, 실패 메시지에 상태 스냅샷.
+  - 어댑터: `isMatchOver`(끝난 상태)·`timeoutAction`·`loadState`/`saveState` 단위 테스트, 죽은 시계 입력 정리.
+- **코드 정리**
+  - 상태 저장소·매치 기록기가 스컬킹과 거의 같다 — 세 번째 개인전 게임이 생길 때 공통화한다(rule of three).
+  - 경쟁 창 설정을 `@ConfigurationProperties` 로 모으고 기본값 3곳 중복(yml·`@Value` 폴백·`RaceSettings.DEFAULT`)을 줄인다.
+  - 봇 정책의 매직 넘버에 이름 또는 `attackStrength ≤ 4` 전제 주석, 봇 뷰의 `baseSuit` 가 조커면 null 이라는 Javadoc,
+    기록기에 `standings.size() == playerIds.size()` 사전 검사.
+- **문서**: `rules-onecard.md` §14 의 "(S2)" 시점 수치·경로 표기(`bot/` 가 어느 루트인지), 인접 문서(`architecture.md` infra
+  `bot/` 목록, `api.md`·`qa-scenarios.md` 의 `GET /api/games` 예시, `stomp-protocol.md` 큐 카탈로그의 `HAND_UPDATED`,
+  `implementation-status.md` §14 포트 설명)는 S5 문서 정리에서, 케이스 스터디 부록 (2) 의 기존 어긋남("6파일 11행" 등)도 S5 재측정에서.
+- **S2 잔여**: 검사기 기존 분기의 직접 테스트·시뮬레이션 오라클 보강, 그리고 core `GameEvent.isPrivate()` 가 Jackson 에
+  `"private"` 키로 직렬화되는 문제(원카드는 자체 차단, 스컬킹·티츄 payload 에는 남아 있다).
