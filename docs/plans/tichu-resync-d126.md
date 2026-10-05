@@ -1,8 +1,7 @@
 # 티츄 매 플레이 resync 제거 (D-126)
 
-> 상태: **서버 완료**(브랜치 `worktree-fix-tichu-resync`), **클라 대기** — 원카드 S0(D-124, 순번 판정을
-> `useStompRoom` 으로 옮기고 `tichuStore` 를 순수 리듀서로 만든다)가 main 에 병합된 뒤 그 코드를 기준으로
-> 한다. 결정 배경은 `docs/decisions.md` D-126.
+> 상태: **완료** (2026-10-05) — 서버(2026-10-04) + 클라(원카드 S0 / D-124 의 순수 리듀서 위에). 결정 배경은
+> `docs/decisions.md` D-126.
 
 ## 1. 원인과 측정
 
@@ -14,11 +13,12 @@
 | 시점 | 플레이 수 | 클라 1명의 resync/플레이 | 클라 1명의 매치당 resync |
 | --- | --- | --- | --- |
 | 수정 전 | 391 | **1.263** | 569 |
-| 서버만 수정 (현재 클라) | 242 | 0.103 | 75 |
-| 클라 반영 후 (모델 예측) | 242 | **0.037** | 59 |
+| 서버만 수정 (클라 그대로) | 242 | 0.103 | 75 |
+| 서버 + 클라 (완료) | 503 | **0.036** | 113 (19라운드) |
 
-봇 매치 길이는 실행마다 다르다(라운드 수가 달라짐) — 비교는 플레이당 값으로 한다. 클라 반영 후 플레이
-배치에 남는 resync 는 라운드가 끝나는 플레이의 `ROUND_STARTED`(새 손패 8장을 resync 로 받는다)뿐이다.
+봇 매치 길이는 실행마다 다르다(라운드 수가 달라짐) — 비교는 플레이당 값으로 한다. 완료 후 플레이 배치에
+남는 resync 는 라운드가 끝나는 플레이의 `ROUND_STARTED`(새 손패 8장을 resync 로 받는다)뿐이고, IT 가 이를
+단언한다(`playBatchTriggers ⊆ {unhandled:ROUND_STARTED}`). 매치당 나머지는 라이프사이클 resync 다.
 라이프사이클 resync(`DEALING_PHASE_STARTED`·`PASSING_STARTED`·`CARDS_PASSED`→`PLAYING_STARTED`)는 그대로다.
 
 ## 2. 매 플레이 resync 에 숨어 있던 의존 (전수 확인)
@@ -27,11 +27,11 @@
 
 | 필드 / 클라 상태 | 바뀌는 때 | 이벤트·리듀서 | 조치 |
 | --- | --- | --- | --- |
-| `activeWishRank` → null | 소원 숫자가 나옴, 용 양도(§9 (b)) | **없었음** | 서버 `WISH_CLEARED` ✅, 클라 리듀서 ⏳ |
-| `phase`·`currentTurnSeat`·`currentTop`·`roundScores`(최종)·`activeWishRank` | 라운드 종료(`ROUND_END`) | `ROUND_ENDED` 리듀서가 `roundEnded` 만 세팅 | 비최종 라운드는 같은 배치 `ROUND_STARTED` resync 가 덮음. **최종 라운드는 남는다** — 마지막에 낸 좌석이 여전히 차례로 보인다 ⏳ |
-| `matchScores` | 라운드 종료 | 없음(`ROUND_STARTED` resync / `MATCH_ENDED.finalScores`) | `MATCH_ENDED` 때 반영 ⏳ |
-| `roundEnded`·`matchEnded` | `ROUND_ENDED`·`MATCH_ENDED` | 리듀서는 있었지만 **항상 구멍이라 실행된 적이 없다** | 이제 실행된다. 그런데 `applySnapshot` 이 둘을 null 로 지워서 라운드 종료 표시가 `ROUND_STARTED` resync 에 바로 지워진다(깜빡임) ⏳ |
-| `errorMessage` | 서버 `ERROR` | `applySnapshot` 이 지움 | 매 플레이 resync 가 사라지면 오래 남는다 ⏳ |
+| `activeWishRank` → null | 소원 숫자가 나옴, 용 양도(§9 (b)) | **없었음** | 서버 `WISH_CLEARED` + 클라 리듀서 ✅ |
+| `phase`·`currentTurnSeat`·`currentTop`·`roundScores`(최종)·`activeWishRank` | 라운드 종료(`ROUND_END`) | `ROUND_ENDED` 리듀서가 `roundEnded` 만 세팅 | 비최종 라운드는 같은 배치 `ROUND_STARTED` resync 가 덮지만 최종 라운드는 마지막에 낸 좌석이 차례로 남았다 → `ROUND_ENDED` 가 `ROUND_END` 뷰로 ✅ |
+| `matchScores` | 라운드 종료 | 없음(`ROUND_STARTED` resync / `MATCH_ENDED.finalScores`) | `MATCH_ENDED` 때 반영 ✅ |
+| `roundEnded`·`matchEnded` | `ROUND_ENDED`·`MATCH_ENDED` | 리듀서는 있었지만 **항상 구멍이라 실행된 적이 없다** | 이제 실행된다. `applySnapshot` 은 새 매치(`completedRounds` 빈 배열)일 때만 지운다 ✅ |
+| `errorMessage` | 서버 `ERROR` | `applySnapshot` 이 지움 | `TURN_CHANGED` 때 지운다 ✅ |
 | 나머지(`handCounts`·`declarations`·`readySeats`·`passingSubmittedSeats`·`finishingOrder`·`currentTop` 트릭 중) | — | `PLAYED`·`PLAYER_FINISHED`·`TICHU_DECLARED`·`PLAYER_READY`·`PASSING_SUBMITTED`·`TRICK_TAKEN`·`TURN_CHANGED` | 이미 맞음 |
 | 단계 전환(`DEALING`→`PASSING`→`PLAYING`, 새 라운드) | 라이프사이클 이벤트 | 미지 → resync | 그대로(설계상 resync) |
 
@@ -48,9 +48,11 @@
 - 테스트: `TichuEngineWishClearedTest`, `TichuEventSequencingTest`, `GameEventBroadcasterTest`,
   `RoomControllerResyncLockTest`, `TichuEventStreamIT`.
 
-## 4. 클라 (S0 병합 뒤)
+## 4. 클라 (완료 — S0 병합 뒤)
 
-S0 이후 `tichuStore.applyEvent` 는 순번을 모르는 순수 리듀서다. 아래는 그 코드 기준이다.
+S0 이후 `tichuStore.applyEvent` 는 순번을 모르는 순수 리듀서다. 아래는 그 코드 기준이다. 테스트:
+`tichuStore.d126.test.ts`(리듀서 7건), `tichuResyncFree.test.tsx`(실제 훅·sink·스토어 + 가짜 STOMP 로
+"소원 해제·매치 종료 배치가 resync 없이 반영" 2건).
 
 1. **`WISH_CLEARED`** — `advance({ ...table, activeWishRank: null })`. 테스트: 소원 표시가 resync 없이 사라진다
    (`applied` 반환, `activeWishRank` null).

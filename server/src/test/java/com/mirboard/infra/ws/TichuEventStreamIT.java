@@ -16,7 +16,6 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,18 +62,20 @@ import org.testcontainers.utility.DockerImageName;
 class TichuEventStreamIT {
 
     /**
-     * {@code tichuStore.applyEvent} 에 리듀서가 있는 공개 이벤트(2026-10-04 기준). 나머지는
-     * 'unhandled' 로 resync 를 부른다. 클라 리듀서가 늘면 같이 고칠 것 — 보고 수치에만 쓰인다.
+     * {@code tichuStore.applyEvent} 에 리듀서가 있는 공개 이벤트(D-126 기준). 나머지는 'unhandled'
+     * 로 resync 를 부른다. 클라 리듀서가 바뀌면 같이 고칠 것.
      */
     private static final Set<String> CLIENT_HANDLED = Set.of(
             "PLAYED", "PASSED", "TURN_CHANGED", "TRICK_TAKEN", "PLAYER_FINISHED",
-            "TICHU_DECLARED", "WISH_MADE", "DRAGON_GIVEN", "PLAYER_READY",
+            "TICHU_DECLARED", "WISH_MADE", "WISH_CLEARED", "DRAGON_GIVEN", "PLAYER_READY",
             "PASSING_SUBMITTED", "ROUND_ENDED", "PLAYER_DISCONNECTED",
             "PLAYER_RECONNECTED", "CHIPS_SETTLED", "MATCH_ENDED");
 
-    /** D-126 클라 반영 뒤(원카드 S0 병합 후) — {@code WISH_CLEARED} 리듀서가 생긴다. */
-    private static final Set<String> CLIENT_HANDLED_AFTER_D126 = union(
-            CLIENT_HANDLED, Set.of("WISH_CLEARED"));
+    /**
+     * 플레이 배치에서 resync 를 불러도 되는 유일한 이유 — 라운드를 끝낸 플레이 뒤의 새 라운드
+     * 시작(8장 손패는 resync 의 비공개 뷰로 받는다).
+     */
+    private static final Set<String> ALLOWED_PLAY_BATCH_TRIGGERS = Set.of("unhandled:ROUND_STARTED");
 
     @Container
     @ServiceConnection
@@ -117,12 +118,10 @@ class TichuEventStreamIT {
                 .filter(f -> f.kind() == Kind.TOPIC && "PLAYED".equals(f.envelope().type()))
                 .count();
         List<SeatTally> tallies = new ArrayList<>();
-        List<SeatTally> projected = new ArrayList<>();
         for (long userId : room.playerIds()) {
             tallies.add(simulateClient(frames, userId, CLIENT_HANDLED));
-            projected.add(simulateClient(frames, userId, CLIENT_HANDLED_AFTER_D126));
         }
-        writeReport(plays, tallies, projected);
+        writeReport(plays, tallies);
 
         List<Long> publicSeqs = frames.stream()
                 .filter(f -> f.kind() == Kind.TOPIC && f.envelope().seq() != null)
@@ -141,7 +140,12 @@ class TichuEventStreamIT {
                         .as("비공개 %s 는 순번을 쓰지 않는다", f.envelope().type())
                         .isNull());
         // 구멍 연쇄(미지 이벤트 뒤 같은 배치)는 클라 특성이라 빼고, 순번 자체가 만든 구멍만 본다.
-        assertThat(tallies).allSatisfy(t -> assertThat(t.rootGaps()).isZero());
+        assertThat(tallies).allSatisfy(t -> {
+            assertThat(t.rootGaps()).isZero();
+            assertThat(t.playBatchTriggers().keySet())
+                    .as("카드를 낸 배치의 resync 사유")
+                    .isSubsetOf(ALLOWED_PLAY_BATCH_TRIGGERS);
+        });
     }
 
     /**
@@ -158,6 +162,8 @@ class TichuEventStreamIT {
         int resyncs = 0;
         int resyncsInPlayBatches = 0;
         int resyncsThisBatch = 0;
+        Map<String, Integer> batchTriggers = new TreeMap<>();
+        Map<String, Integer> playBatchTriggers = new TreeMap<>();
         int gaps = 0;
         int rootGaps = 0;
         Map<String, Integer> triggers = new TreeMap<>();
@@ -169,9 +175,11 @@ class TichuEventStreamIT {
                 }
                 if (batchHasPlay) {
                     resyncsInPlayBatches += resyncsThisBatch;
+                    batchTriggers.forEach((k, v) -> playBatchTriggers.merge(k, v, Integer::sum));
                 }
                 batchHasPlay = false;
                 resyncsThisBatch = 0;
+                batchTriggers.clear();
                 continue;
             }
             StompEnvelope<?> env = f.envelope();
@@ -205,37 +213,26 @@ class TichuEventStreamIT {
             resyncsThisBatch++;
             resyncPending = true;
             triggers.merge(trigger, 1, Integer::sum);
+            batchTriggers.merge(trigger, 1, Integer::sum);
         }
-        return new SeatTally(userId, resyncs, resyncsInPlayBatches, gaps, rootGaps, triggers);
+        return new SeatTally(userId, resyncs, resyncsInPlayBatches, gaps, rootGaps, triggers,
+                playBatchTriggers);
     }
 
-    private static void writeReport(long plays, List<SeatTally> tallies,
-                                    List<SeatTally> projected) throws IOException {
+    private static void writeReport(long plays, List<SeatTally> tallies) throws IOException {
         StringBuilder sb = new StringBuilder();
         sb.append("plays=").append(plays).append('\n');
-        appendTallies(sb, "client=current", plays, tallies);
-        appendTallies(sb, "client=after-D126", plays, projected);
+        for (SeatTally t : tallies) {
+            sb.append(String.format(
+                    "user=%d resyncs=%d inPlayBatches=%d perPlay=%.3f gaps=%d rootGaps=%d"
+                            + " triggers=%s playBatchTriggers=%s%n",
+                    t.userId(), t.resyncs(), t.resyncsInPlayBatches(),
+                    plays == 0 ? 0.0 : (double) t.resyncsInPlayBatches() / plays,
+                    t.gaps(), t.rootGaps(), t.triggers(), t.playBatchTriggers()));
+        }
         Path out = Path.of("build", "d126-resync-stats.txt");
         Files.createDirectories(out.getParent());
         Files.writeString(out, sb.toString());
-    }
-
-    private static void appendTallies(StringBuilder sb, String label, long plays,
-                                      List<SeatTally> tallies) {
-        for (SeatTally t : tallies) {
-            sb.append(String.format(
-                    "%s user=%d resyncs=%d inPlayBatches=%d perPlay=%.3f gaps=%d rootGaps=%d"
-                            + " triggers=%s%n",
-                    label, t.userId(), t.resyncs(), t.resyncsInPlayBatches(),
-                    plays == 0 ? 0.0 : (double) t.resyncsInPlayBatches() / plays,
-                    t.gaps(), t.rootGaps(), t.triggers()));
-        }
-    }
-
-    private static Set<String> union(Set<String> a, Set<String> b) {
-        Set<String> all = new HashSet<>(a);
-        all.addAll(b);
-        return Set.copyOf(all);
     }
 
     enum Kind { TOPIC, USER, BATCH_END }
@@ -244,7 +241,7 @@ class TichuEventStreamIT {
     }
 
     record SeatTally(long userId, int resyncs, int resyncsInPlayBatches, int gaps, int rootGaps,
-                     Map<String, Integer> triggers) {
+                     Map<String, Integer> triggers, Map<String, Integer> playBatchTriggers) {
     }
 
     /** 발행 순서 그대로의 프레임 기록. 액션은 방 락으로 직렬화돼 있어 순서가 곧 발행 순서다. */

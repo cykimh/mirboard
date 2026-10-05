@@ -103,6 +103,7 @@ interface TrickTakenPayload { takerSeat: number; trickPoints: number }
 interface PlayerFinishedPayload { seat: number; order: number }
 interface TichuDeclaredPayload { seat: number; kind: TichuDeclaration }
 interface WishMadePayload { rank: number }
+interface WishClearedPayload { rank: number }
 interface DragonGivenPayload { fromSeat: number; toSeat: number }
 interface PlayerReadyPayload { seat: number }
 interface PassingSubmittedPayload { seat: number }
@@ -235,6 +236,10 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   },
 
   applySnapshot({ tableView, privateHand, disconnectedSeats, chips }) {
+    // D-126 — 끝난 라운드가 하나도 없으면 새 매치(리매치)다. 같은 매치 안의 resync(다음 라운드
+    // 시작·화면 복귀)는 종료 표시를 지우지 않는다 — 예전엔 ROUND_ENDED 리듀서가 늘 구멍에 막혀
+    // 돌지 않아 지울 것도 없었지만, 이제는 지우면 라운드 결과가 다음 라운드 resync 에 바로 사라진다.
+    const newMatch = (tableView.completedRounds ?? []).length === 0;
     set({
       tableView,
       privateHand,
@@ -249,8 +254,7 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       roundHistory: tableView.completedRounds ?? [],
       // D-82 — 리매치로 새 매치가 시작되면 resync 가 들어오므로 종료 배너를 정리.
       // (매치 중 재접속 시엔 어차피 null 이라 무해.)
-      matchEnded: null,
-      roundEnded: null,
+      ...(newMatch ? { matchEnded: null, roundEnded: null } : {}),
     });
   },
 
@@ -285,9 +289,11 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         if (!table) return 'unhandled';
         const p = envelope.payload as TurnChangedPayload;
         // Phase 15(#6) — 차례 전환 시각 기록 (클라 로컬 카운트다운 기준).
+        // D-126 — 지난 차례의 에러 문구도 지운다(예전엔 매 플레이 resync 가 지웠다).
         set({
           tableView: { ...table, currentTurnSeat: p.currentTurnSeat },
           turnStartedAt: Date.now(),
+          errorMessage: null,
         });
         return 'applied';
       }
@@ -335,6 +341,14 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         advance({ ...table, activeWishRank: p.rank });
         return 'applied';
       }
+      case 'WISH_CLEARED': {
+        // D-126 — 소원 숫자가 나왔거나 용 트릭을 양도했다. 예전엔 이벤트가 없어 매 플레이
+        // resync 가 우연히 지워 주던 표시다.
+        if (!table) return 'unhandled';
+        envelope.payload as WishClearedPayload;
+        advance({ ...table, activeWishRank: null });
+        return 'applied';
+      }
       case 'DRAGON_GIVEN': {
         // 발행 시점에 TRICK_TAKEN 도 같이 들어오므로 별도 패치 없음.
         if (!table) return 'unhandled';
@@ -361,6 +375,17 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       case 'ROUND_ENDED': {
         const p = envelope.payload as RoundEndedPayload;
         set((s) => ({
+          // D-126 — 서버 ROUND_END 뷰와 같게. 비최종 라운드는 같은 배치의 ROUND_STARTED resync 가
+          // 곧 덮지만, 최종 라운드는 resync 가 없어 마지막에 낸 좌석이 차례로 남았다.
+          tableView: s.tableView && {
+            ...s.tableView,
+            phase: 'ROUND_END',
+            currentTurnSeat: -1,
+            currentTop: null,
+            currentTopSeat: -1,
+            activeWishRank: null,
+            roundScores: { A: p.score.teamAScore, B: p.score.teamBScore },
+          },
           roundEnded: p.score,
           roundHistory: [
             ...s.roundHistory,
@@ -400,6 +425,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       case 'MATCH_ENDED': {
         const p = envelope.payload as MatchEndedPayload;
         set({
+          // D-126 — 누적 점수도 최종값으로(라운드 종료 뒤 resync 가 없다).
+          ...(table ? { tableView: { ...table, matchScores: p.finalScores } } : {}),
           matchEnded: {
             winningTeam: p.winningTeam,
             finalScores: p.finalScores,
