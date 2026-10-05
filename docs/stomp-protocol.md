@@ -237,6 +237,64 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 
 ---
 
+## 원카드 (gameType=ONE_CARD, D-128)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~6). 룰 정본은 `docs/rules-onecard.md`.
+클라 게임판(S4) 전까지 카탈로그 상태는 `COMING_SOON` 이다(`mirboard.onecard.status`).
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `PLAY_CARD` | `card: PlayingCard`, `declaredSuit?: Suit` | `declaredSuit` 는 7 에만, 7 이면 필수(아니면 `INVALID_SUIT_DECLARATION`) |
+| `DRAW` | — | 공격받는 중이면 누적 장수, 아니면 1장. 낼 수 있어도 먹을 수 있다(§4) |
+| `CALL_ONE_CARD` | `raceId` | 경쟁 창 주인만 — "원카드!" |
+| `CATCH` | `raceId` | 주인이 아닌 살아 있는 좌석 — "잡기!" |
+
+`PlayingCard` 직렬화: `{ "suit": "SPADE"|"HEART"|"DIAMOND"|"CLUB", "rank": 1..13, "joker": null }`
+(A=1, J=11, Q=12, K=13) 또는 `{ "suit": null, "rank": 0, "joker": "BLACK"|"COLOR" }`.
+
+**서버 → 클라 (공개)** — payload 는 증감이 아니라 **결과값**이다(같은 이벤트를 두 번 적용해도 같고, 하나가
+빠져도 다음 이벤트에서 맞춰진다):
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `MATCH_STARTED` | `{ firstSeat, startCard, handSize, drawPileCount }` | 분배 직후(§3) |
+| `CARD_PLAYED` | `{ seat, card, declaredSuit?, handCount, attackStack, direction }` | 낸 뒤의 손패 장수·공격 누적·방향 |
+| `CARDS_DRAWN` | `{ seat, count, reason, handCount, drawPileCount }` | **장수만**. `reason`: `TURN`·`ATTACK`·`PENALTY` |
+| `PILE_RESHUFFLED` | `{ drawPileCount }` | 버린 더미를 섞어 다시 채움(§7.1) |
+| `TURN_CHANGED` | `{ seat, direction, attackStack }` | 차례 — `attackStack > 0` 이면 공격받는 중 |
+| `RACE_OPENED` | `{ raceId, ownerSeat, slot, jitterX, jitterY, windowMillis }` | 외치기 경쟁 창 — 전원에게 같은 위치. **봇 반응 시각은 싣지 않는다** |
+| `RACE_RESOLVED` | `{ raceId, outcome, bySeat }` | `CALLED`·`CAUGHT`·`EXPIRED`·`CANCELLED`(창 중 탈주). 아무도 안 눌렀으면 `bySeat` −1 |
+| `PLAYER_ELIMINATED` | `{ seat, reason, cardsHeld, drawPileCount }` | `BANKRUPT`·`DESERTED`. `drawPileCount` 는 손패를 더미에 넣은 뒤 장수(최종값) |
+| `MATCH_ENDED` | `{ reason, standings: [{seat, rank, cardsLeft, status}] }` | `FINISHED`·`LAST_STANDING`·`NO_HUMANS`·`STALEMATE`. 순위는 1, 1, 3 식 |
+
+**서버 → 클라 (비공개)**: `HAND_DEALT` `{ seat, hand, handVersion }`, `HAND_UPDATED`
+`{ seat, hand, received, handVersion }` — 손패 **전체**를 싣는다(내기·먹기·벌칙·탈락마다). `handVersion` 은 상태
+버전이라 좌석마다 단조 증가하고 resync 의 `privateHand.handVersion` 과 같은 축이다 — 클라는 가진 것보다 낮은 버전을
+버린다. `received` 는 이번에 새로 받은 카드(애니메이션용). `ERROR` 원카드 고유 코드: `MATCH_OVER`·
+`PLAYER_ELIMINATED`·`RACE_IN_PROGRESS`·`NOT_YOUR_TURN`·`CARD_NOT_OWNED`·`INVALID_SUIT_DECLARATION`·
+`CARD_NOT_PLAYABLE`·`COUNTER_REQUIRED`·`NO_RACE`·`NOT_RACE_OWNER`·`OWNER_CANNOT_CATCH`.
+
+**경쟁 창(§9)**:
+- `slot` 은 `0..7` — 슬롯 8개는 클라가 게임판 기준 좌표로 정의하는 **프로토콜 상수**다. `jitterX`·`jitterY` 는
+  `−100..100`(슬롯 반경의 백분율). 창 길이 기본 3000ms(`mirboard.onecard.race-window-millis`).
+- 창이 열린 동안 `PLAY_CARD`·`DRAW` 는 `RACE_IN_PROGRESS`. `raceId` 가 지금 창과 다르면(이미 닫힘 포함) `NO_RACE`
+  — 클라는 "늦었어요" 정도로 보여 주면 된다. 서버가 먼저 처리한 누름이 이기고, 창 끝·봇 시각 직후에 처리된
+  누름도 인정한다(D-128). 락 경합으로 `BUSY` 를 받으면 창이 열려 있는 동안 짧게 재시도한다.
+- 봇은 창을 열 때 추첨한 반응 시간에 누르고, 아무도 안 누르면 창 끝에 닫힌다 — 둘 다 **엔진 타이머**(D-128,
+  `docs/game-port.md` §2)가 서버에서 처리하므로 클라가 보낼 것은 없다.
+
+**resync**: `tableView` = `{ phase, seats: [{seat, handCount, eliminated}], topCard, declaredSuit, attackStack,
+direction, turnSeat, drawPileCount, race, result }` — `phase` 는 `PLAYING`·`RACE`·`ENDED`, `race` 는
+`{ raceId, ownerSeat, slot, jitterX, jitterY, windowMillis, remainingMillis }`(창 끝까지 남은 시간 — 봇 시각 아님),
+`result` 는 `MATCH_ENDED` 와 같은 모양. `privateHand` = `{ seat, hand, handVersion }`.
+
+> **순번**: 지금은 비공개 `HAND_*` 도 방 순번(`seq`)을 쓴다 — 받지 않는 좌석에는 구멍으로 보여 resync 를 부른다.
+> 같은 문제를 고치는 D-126 이 `GameEvent.sequenced()` 를 넣으면 원카드 비공개 이벤트를 `false` 로 둔다(S4 착수 조건).
+
+---
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.

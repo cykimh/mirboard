@@ -4,7 +4,8 @@
 어긋나면 코드를 고치거나 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 각 절 끝에 `rules-skullking.md` 와
 같은 표기(**코드:** / **테스트:** / **갭:**)로 코드 위치와 테스트를 붙였다. 경로는
 `server/src/{main,test}/java/com/mirboard/domain/game/onecard/` 기준이고, 위치는 줄 번호 대신 메서드 이름으로
-적는다(줄 번호는 코드가 바뀌면 바로 틀린다). 포트 어댑터·저장·봇 정책·기록은 S3 범위다.
+적는다(줄 번호는 코드가 바뀌면 바로 틀린다). 포트 어댑터·저장·봇 정책·기록은 S3(D-128)에서 붙였다 — 서버 경로로
+확인한 것은 각 절의 **코드(S3):** / **테스트(S3):** 다(인프라 테스트는 `server/src/test/java/com/mirboard/infra/` 기준).
 
 > **출처와 하우스 룰.** 원카드는 모임마다 규칙이 크게 다르다. 이 문서는 D-123 에서 고른 **표준 기본형**만
 > 다룬다. 원문이 답하지 않거나 갈리는 항목을 우리가 정한 것은 본문에 **[결정]** 으로 표시하고 §12 에 모았다.
@@ -79,6 +80,8 @@
 - **테스트:** `OneCardEnginePlayTest`(29건 — §2~§8·§10~§11 의 시작·내기·먹기·파산·종료) —
   `drawing_takes_one_card_even_when_a_card_could_be_played`,
   `the_timeout_action_is_drawing_for_the_seat_on_turn_only`, `legal_actions_*`·`under_attack_*`
+- **코드(S3):** 시간 초과는 `infra/bot/TurnTimeoutScheduler` 가 포트의 `timeoutAction` 으로 적용한다.
+- **테스트(S3):** `bot/OneCardBotMatchSimulationIT.an_idle_human_is_carried_by_turn_timeouts_until_the_match_ends`
 
 ## 5. 내기
 
@@ -199,7 +202,8 @@
 2. 창은 **3초**다. 창이 열린 동안에는 아무도 내거나 먹을 수 없다. 턴 제한 시계는 창이 닫힌 뒤 다시 시작한다.
 3. 1장 남은 사람(**주인**)은 "원카드!", 살아 있는 다른 플레이어는 "잡기!"를 누를 수 있다. 관전자와
    탈락자는 누를 수 없다.
-4. **첫 누름이 창을 닫는다.** "먼저"는 서버에 먼저 도착해 처리된 요청이다.
+4. **첫 누름이 창을 닫는다.** "먼저"는 서버에 먼저 도착해 처리된 요청이다. **[결정]** 창 끝이나 봇이 누를
+   시각 직후(타이머 폴링·락 대기로 최대 수백 ms)에 처리된 누름도 인정한다(D-128).
 
    | 결과 | 조건 | 효과 |
    | --- | --- | --- |
@@ -236,8 +240,11 @@
   `a_catch_with_an_empty_pile_reshuffles_the_discards_and_keeps_the_top_and_the_declared_suit`,
   `an_eliminated_bot_does_not_press_so_the_window_runs_its_full_length`.
   창 중 탈주(§9.2)는 `OneCardEngineDesertionTest`
-- **갭:** "먼저"를 가르는 서버 도착 순서·락 경합(`BUSY` 재시도)·엔진 타이머 무장은 포트 어댑터 몫이라 S3 통합
-  테스트에서 본다.
+- **코드(S3):** 엔진 타이머(D-128) — 어댑터 `OneCardGameEngine.timer`(창 끝 또는 추첨된 봇 시각까지 남은 시간)·
+  `onTimer`, 무장 `infra/bot/TurnTimeoutScheduler`, 발화 `infra/bot/EngineTimerScheduler`. 창 길이·봇 반응 구간은
+  `mirboard.onecard.*` 설정(`OneCardGameDefinition`).
+- **테스트(S3):** `bot/OneCardRaceIT`(6건 — 주인이 먼저 `CALLED`, 사람이 잡음 `CAUGHT`, 창 안에 반응한 봇이 잡음,
+  아무도 안 누르면 엔진 타이머가 `EXPIRED` 로 닫음, 창 중 탈주 `CANCELLED`, 닫힌 창의 누름 거절)
 
 ## 10. 파산과 탈락
 
@@ -260,6 +267,8 @@
   `the_owner_deserting_during_an_attack_race_still_passes_the_attack_to_the_reserved_seat`,
   `if_the_seat_a_jack_skipped_to_deserts_during_the_race_the_next_live_seat_plays`,
   `deserting_passes_the_turn_on_in_the_reversed_direction_too`
+- **테스트(S3):** `bot/OneCardRaceIT.a_desertion_during_the_race_closes_it_without_penalty_and_the_reserved_seat_plays`
+  (탈주 서비스 경로)
 
 ## 11. 종료와 순위
 
@@ -302,6 +311,11 @@
   `when_a_bankruptcy_leaves_only_bots_the_match_ends_as_no_humans_with_the_bankrupt_seat_last`, 연속 패스 초기화는
   `playing_or_drawing_a_card_resets_the_pass_streak`, `OneCardEngineDesertionTest`(LAST_STANDING, NO_HUMANS,
   연속 패스 초기화) 중 `the_last_standing_bot_beats_no_humans_when_a_human_deserts_a_two_seat_table`
+- **코드(S3):** 매치 기록 `persistence/OneCardMatchRecorder`(V12 `onecard_match_results`/`participants`) — 승리는 1등
+  전원(동순위 포함), 개인전 ELO 점수는 `좌석 수 − 순위`, 탈주 좌석은 최하위·desert_count, 봇·게스트가 낀 매치는
+  ELO 제외. 어댑터 `OneCardGameEngine.advance` 가 매치를 끝낸 전이에서만 한 번 발행한다.
+- **테스트(S3):** `persistence/OneCardMatchRecorderIT`(4건), `bot/OneCardBotMatchSimulationIT`(4건 — 2·4·6인 봇 완주와
+  손을 놓은 사람이 낀 판, 방 FINISHED + 기록 1행)
 
 ## 12. 우리가 정한 것 (미규정·하우스 룰 선택)
 
@@ -328,6 +342,7 @@
 | 19 | 탈락 뒤 나가기 | 탈주 아님 — 순위·상태 그대로 | 이미 끝난 사람에게 이중 처분 없음 |
 | 20 | 벌칙 먹기 | 차례·공격 누적·차례 수에 영향 없음 | §9.1 — K·J 효과와 충돌 방지 |
 | 21 | 창 중 탈주 | 다음 차례는 낸 순간 정해 둠 — 그 사람이 나가면 그다음 사람이 공격 없이 받음 | §9.2 |
+| 22 | 늦게 처리된 누름 | 인정 — 서버가 먼저 처리한 누름이 이김 | 네트워크 지연에 관대, 봇 반응 구간에 흡수 (D-128) |
 
 ## 13. 범위 밖 (v1)
 
