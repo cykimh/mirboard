@@ -127,6 +127,11 @@
 | `CARDS_RECEIVED` | `{ seat, received: [{ card, fromSeat }] }` | 패스로 받은 3장 + 출처 (스왑 직후). seq: null (D-126) |
 | `ERROR` | `{ code, message }` | 본인의 잘못된 액션 (seq: null) |
 
+> **D-126 — 본인 큐 배달.** 클라는 늘 `/user/queue/room/{id}` 를 구독하고, Spring 이 이를 본인 세션 목적지
+> `/queue/room/{id}-user{세션}` 으로 바꾼다. 그래서 브로커 prefix 는 `/queue` 여야 한다(예전 `/user/queue` 설정에서는
+> 바뀐 목적지가 버려져 본인 큐가 한 번도 배달되지 않았고, 매 플레이 resync 가 그걸 가렸다). 클라가 `/queue/...` 를
+> **직접** 구독하는 것은 서버가 거절한다(남의 세션 큐 엿보기 방지).
+
 > 재접속 상태 복원은 WS 이벤트가 아니라 **REST `GET /api/rooms/{id}/resync`**
 > (docs/api.md) 다. 본인 큐의 메시지는 절대 `/topic` 으로 누출되어선 안 되며,
 > 서버 측 직렬화 시 `PrivateHand` 와 `TableView` DTO 를 분리된 타입으로 다룬다.
@@ -320,3 +325,5 @@ boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있
 - [x] 비참가자 액션은 `NOT_IN_ROOM` 으로 거부(공개 토픽에는 공개 정보만 흐른다 —
       State Hiding 은 발행 시점에 강제).
 - [x] 클라가 보낸 어떤 `seq` 도 서버는 신뢰하지 않고 자체 카운터를 사용.
+- [x] 본인 큐가 실제로 배달되는지(`HAND_DEALT`·`ERROR`)와, `/queue/...` 직접 구독이 거절되는지 테스트로
+      검증(D-126 — `GameStompControllerIntegrationTest`, `StompAuthChannelInterceptorTest`).

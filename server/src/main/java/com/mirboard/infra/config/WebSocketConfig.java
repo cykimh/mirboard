@@ -27,7 +27,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/user/queue");
+        // D-126 — 사용자 목적지(`/user/queue/x`)는 Spring 이 `/queue/x-user{세션}` 으로 바꿔 브로커에
+        // 넘긴다. 브로커를 `/user/queue` 로만 열어 두었을 땐 그 목적지가 버려져 본인 큐(손패·받은 카드·
+        // ERROR)가 한 번도 배달되지 않았다 — 티츄 매 플레이 resync 가 손패를 우연히 고쳐 가렸다.
+        // `/queue` 직접 구독은 StompAuthChannelInterceptor 가 막는다(남의 세션 큐 엿보기 방지).
+        registry.enableSimpleBroker("/topic", "/queue");
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }

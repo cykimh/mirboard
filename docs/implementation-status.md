@@ -103,7 +103,9 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 - 엔드포인트 `ws://host/ws` (STOMP + SockJS), CONNECT JWT 인증.
 - **공개 토픽**: `/topic/lobby/chat`, `/topic/lobby/rooms`, `/topic/room/{id}`, `/topic/room/{id}/chat`.
-- **비공개 큐**: `/user/queue/room/{id}` (HAND_DEALT, RESYNC, ERROR).
+- **비공개 큐**: `/user/queue/room/{id}` (HAND_DEALT, CARDS_RECEIVED, ERROR). 브로커 prefix 는 `/queue`
+  (D-126 — 예전 `/user/queue` 설정에서는 Spring 이 바꾼 본인 세션 목적지가 버려져 한 번도 배달되지 않았다).
+  `/queue/...` 직접 구독은 `StompAuthChannelInterceptor` 가 거절.
 - **클라→서버**: `/app/room/{id}/action`, `/app/lobby/chat`, `/app/room/{id}/chat`.
 - 모든 메시지는 `{ eventId, seq, type, ts, payload }` envelope. 서버는 클라가 보낸 `seq`를
   무시하고 `room:{id}:seq` INCR 값을 권위 카운터로 사용.
@@ -306,7 +308,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **1233건** (D-126 병합 시점 실측, 실패 0, 그중 Docker 불필요 1035건, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 375건(그중 Docker 불필요 371건), 원카드 도메인 180건(그중 Docker 불필요 176건) + 원카드 서버 경로 IT 10건·엔진 타이머 단위 15건. 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+- **서버**: **1236건** (D-126 병합 시점 실측, 실패 0, 그중 Docker 불필요 1037건, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 375건(그중 Docker 불필요 371건), 원카드 도메인 180건(그중 Docker 불필요 176건) + 원카드 서버 경로 IT 10건·엔진 타이머 단위 15건. 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇

@@ -18,6 +18,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final String AUTH_HEADER = "Authorization";
     private static final String BEARER = "Bearer ";
+    private static final String RAW_QUEUE_PREFIX = "/queue/";
 
     private final JwtService jwtService;
     private final SuspensionService suspensions;
@@ -50,6 +51,17 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 accessor.setUser(principal);
             } catch (InvalidCredentialsException e) {
                 throw new MessageDeliveryException("Invalid or expired JWT");
+            }
+        }
+
+        // D-126 — 비공개 큐는 늘 `/user/queue/...` 로 구독한다(Spring 이 본인 세션 목적지로 바꾼다).
+        // 브로커가 `/queue` 를 처리하므로, 변환 전 `/queue/...` 를 직접 구독하게 두면 남의 세션 id 를
+        // 아는 클라가 `/queue/room/{id}-user{세션}` 으로 남의 손패를 받을 수 있다(State Hiding).
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            String destination = accessor.getDestination();
+            if (destination != null && destination.startsWith(RAW_QUEUE_PREFIX)) {
+                throw new MessageDeliveryException(
+                        "Subscribe to /user/queue/..., not " + RAW_QUEUE_PREFIX + "...");
             }
         }
 

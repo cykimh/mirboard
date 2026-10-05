@@ -27,6 +27,7 @@
 
 | 필드 / 클라 상태 | 바뀌는 때 | 이벤트·리듀서 | 조치 |
 | --- | --- | --- | --- |
+| **본인 큐 전체**(`HAND_DEALT`·`CARDS_RECEIVED`·`ERROR`) | 카드를 낼 때·패스 교환·거절 | 브로커 prefix 가 `/user/queue` 라 **한 번도 배달되지 않았다** — 손패는 resync 로만 맞았고 에러 문구는 뜨지 않았다(실제 브라우저 검증에서 발견) | 브로커 `/queue` + `/queue` 직접 구독 거절 ✅ |
 | `activeWishRank` → null | 소원 숫자가 나옴, 용 양도(§9 (b)) | **없었음** | 서버 `WISH_CLEARED` + 클라 리듀서 ✅ |
 | `phase`·`currentTurnSeat`·`currentTop`·`roundScores`(최종)·`activeWishRank` | 라운드 종료(`ROUND_END`) | `ROUND_ENDED` 리듀서가 `roundEnded` 만 세팅 | 비최종 라운드는 같은 배치 `ROUND_STARTED` resync 가 덮지만 최종 라운드는 마지막에 낸 좌석이 차례로 남았다 → `ROUND_ENDED` 가 `ROUND_END` 뷰로 ✅ |
 | `matchScores` | 라운드 종료 | 없음(`ROUND_STARTED` resync / `MATCH_ENDED.finalScores`) | `MATCH_ENDED` 때 반영 ✅ |

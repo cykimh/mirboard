@@ -225,6 +225,13 @@ resync 가 `matchEnded` 를 null 로 덮어 정상 종료 때 종료 패널(리�
 resync 에 바로 지워지고 최종 라운드 뒤 마지막 좌석의 차례 표시가 남으므로 함께 배포한다. 측정·전수 확인은
 `docs/plans/tichu-resync-d126.md`.
 
+⑤ 실제 브라우저 검증에서 가장 큰 숨은 의존이 나왔다 — **본인 큐(`/user/queue/room/{id}`)가 한 번도 배달되지
+않았다.** 브로커를 `/user/queue` 로만 열어 두었는데 Spring 은 사용자 목적지를 `/queue/...-user{세션}` 으로 바꿔
+넘기므로 손패(`HAND_DEALT`)·받은 카드(`CARDS_RECEIVED`)·`ERROR` 가 전부 버려졌다. 손패가 맞아 보인 것은 매
+플레이 resync 덕이었다(D-62 의 "낸 패가 안 사라짐"이 `HandDealt` 재발행으로 고쳐진 것도 그 이벤트가 만든 순번
+구멍 → resync 때문이다). 브로커를 `/queue` 로 열고, 변환 전 `/queue/...` 를 클라가 직접 구독하는 길은
+`StompAuthChannelInterceptor` 가 막는다 — 남의 세션 id 를 아는 클라가 남의 손패를 받지 못하게(State Hiding).
+
 ## D-125 (2026-10-04) — 원카드 룰 명세 (원카드 S1, 코드 변경 0)
 
 `docs/rules-onecard.md` 를 원카드 룰의 정본으로 둔다. D-123 의 기준선(표준 기본형)에 설계서 §3.2 기본안을

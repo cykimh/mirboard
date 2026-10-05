@@ -36,6 +36,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 본인 손패는 **`/user/queue/room/{roomId}` 큐로만** 전송. 절대 `/topic/room/{roomId}` 로 새지 않도록 한다.
 - 직렬화 타입 자체를 분리한다: `TableView` (공개) vs `PrivateHand` (본인만). 같은 객체를 두 경로로 쓰지 말 것.
 - 공개 상태에는 각자의 손패 **장수(int)만** 노출. 카드 목록 금지.
+- 브로커 prefix 는 `/topic`·`/queue`(D-126). 클라는 `/user/queue/...` 로 구독하고 Spring 이 본인 세션 목적지
+  `/queue/...-user{세션}` 으로 바꾼다 — `/queue/...` **직접 구독은 인터셉터가 거절**(남의 손패 엿보기 방지).
+  예전 `/user/queue` prefix 에서는 본인 큐가 한 번도 배달되지 않았는데 매 플레이 resync 가 가렸다.
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
