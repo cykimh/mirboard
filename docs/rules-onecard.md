@@ -6,6 +6,8 @@
 `server/src/{main,test}/java/com/mirboard/domain/game/onecard/` 기준이고, 위치는 줄 번호 대신 메서드 이름으로
 적는다(줄 번호는 코드가 바뀌면 바로 틀린다). 포트 어댑터·저장·봇 정책·기록은 S3(D-128)에서 붙였다 — 서버 경로로
 확인한 것은 각 절의 **코드(S3):** / **테스트(S3):** 다(인프라 테스트는 `server/src/test/java/com/mirboard/infra/` 기준).
+클라 게임판(S4, D-129)이 룰을 비추는 곳은 **코드(S4):** / **테스트(S4):** 이고 경로는 `client/src/features/onecard/` 기준이다 —
+클라는 판정하지 않으며 표시만 미러한다(권위는 서버).
 
 > **출처와 하우스 룰.** 원카드는 모임마다 규칙이 크게 다르다. 이 문서는 D-123 에서 고른 **표준 기본형**만
 > 다룬다. 원문이 답하지 않거나 갈리는 항목을 우리가 정한 것은 본문에 **[결정]** 으로 표시하고 §12 에 모았다.
@@ -117,6 +119,9 @@
 - **코드:** `rules/PlayRules.canPlay`(§5.2·§5.3), 기준 무늬 `state/OneCardState.baseSuit`, 내기 처리
   `OneCardEngine.play`(§5.4 순서 — 효과, 0장이면 종료, 1장이면 경쟁, 다음 차례)
 - **테스트:** `rules/PlayRulesTest`(9건), `OneCardEnginePlayTest`(7 의 무늬 지정, 거절 사유)
+- **코드(S4):** `onecardRules.canPlay`(§5.2·§5.3·§6.2 의 미러 — 내 차례에 낼 수 없는 카드를 흐리게, 표시 전용), 7 의 무늬
+  고르기는 `OneCardHand`
+- **테스트(S4):** `onecardRules.test`(§5·§6.2 표), `tutorial/PlayQuiz.test`(퀴즈 정답을 `canPlay` 와 대조)
 
 ## 6. 공격과 반격
 
@@ -245,6 +250,10 @@
   `mirboard.onecard.*` 설정(`OneCardGameDefinition`).
 - **테스트(S3):** `bot/OneCardRaceIT`(6건 — 주인이 먼저 `CALLED`, 사람이 잡음 `CAUGHT`, 창 안에 반응한 봇이 잡음,
   아무도 안 누르면 엔진 타이머가 `EXPIRED` 로 닫음, 창 중 탈주 `CANCELLED`, 닫힌 창의 누름 거절)
+- **코드(S4):** 경쟁 버튼 `RaceButton`(슬롯 표 `raceSlots.ts` — 화면 기준 8자리 + 지터, 주인 "원카드!"·나머지 "잡기!",
+  관전자·탈락자에게는 없음, 자동 포커스·단축키 없음, aria-live 알림), 누름 거절 처리 `onecardStore.notePressRejected`(`BUSY` 는
+  창이 열린 동안 2번까지 다시 보내기, `NO_RACE` 는 "늦었어요")
+- **테스트(S4):** `OneCardTable.test`(경쟁 8건), `onecardStore.test`(누름 거절), `raceSlots.test`(슬롯·지터 범위)
 
 ## 10. 파산과 탈락
 

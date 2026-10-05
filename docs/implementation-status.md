@@ -23,7 +23,7 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 | 4 | WebSocket/STOMP 실시간 | ✅ | `infra.ws`, `infra.config.WebSocketConfig` |
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
-| 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 — 클라 게임판은 S4, 그때까지 COMING_SOON) | 🟡 | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `docs/rules-onecard.md` (D-127·D-128) |
+| 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼 — 카탈로그 열림 전환만 남음, 그때까지 COMING_SOON) | 🟡 | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127·D-128·D-129) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -308,12 +308,12 @@ UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 ## 13. 테스트 현황
 
-- **서버**: **1236건** (D-126 병합 시점 실측, 실패 0, 그중 Docker 불필요 1037건, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 375건(그중 Docker 불필요 371건), 원카드 도메인 180건(그중 Docker 불필요 176건) + 원카드 서버 경로 IT 10건·엔진 타이머 단위 15건. 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+- **서버**: **1238건** (D-129 시점 실측, 실패 0, 그중 Docker 불필요 1039건, 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 스컬킹 도메인 375건(그중 Docker 불필요 371건), 원카드 도메인 182건(그중 Docker 불필요 178건) + 원카드 서버 경로 IT 10건·엔진 타이머 단위 15건. 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **432건 / 48파일** (D-126 병합 시점 실측 — 카드 비행 오버레이 수정 포함, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **553건 / 58파일** (D-129 시점 실측 — 원카드 게임판·스토어·튜토리얼 121건 포함, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지

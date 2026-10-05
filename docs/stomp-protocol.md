@@ -126,6 +126,7 @@
 | `HAND_DEALT` | `{ seat, cards, phaseCardCount: 8\|14 }` | 8장(Dealing 진입) 또는 14장(전환 후) 손패 스냅샷, 카드를 낸 뒤 남은 손패(D-62). seq: null (D-126) |
 | `CARDS_RECEIVED` | `{ seat, received: [{ card, fromSeat }] }` | 패스로 받은 3장 + 출처 (스왑 직후). seq: null (D-126) |
 | `ERROR` | `{ code, message }` | 본인의 잘못된 액션 (seq: null) |
+| `HAND_UPDATED` | `{ seat, hand, received, handVersion }` | 원카드 — 손패 전체(아래 원카드 절). seq: null (D-129) |
 
 > **D-126 — 본인 큐 배달.** 클라는 늘 `/user/queue/room/{id}` 를 구독하고, Spring 이 이를 본인 세션 목적지
 > `/queue/room/{id}-user{세션}` 으로 바꾼다. 그래서 브로커 prefix 는 `/queue` 여야 한다(예전 `/user/queue` 설정에서는
@@ -260,7 +261,7 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 ## 원카드 (gameType=ONE_CARD, D-128)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~6). 룰 정본은 `docs/rules-onecard.md`.
-클라 게임판(S4) 전까지 카탈로그 상태는 `COMING_SOON` 이다(`mirboard.onecard.status`).
+클라 게임판(S4, D-129)은 준비됐고, 카탈로그 상태는 열림 전환(별건) 전까지 `COMING_SOON` 이다(`mirboard.onecard.status`).
 
 **클라 → 서버 `@action`**:
 
@@ -300,7 +301,7 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 `OWNER_CANNOT_CATCH`.
 
 **경쟁 창(§9)**:
-- `slot` 은 `0..7` — 슬롯 8개는 클라가 게임판 기준 좌표로 정의하는 **프로토콜 상수**다. `jitterX`·`jitterY` 는
+- `slot` 은 `0..7` — 슬롯 8개는 클라가 화면(뷰포트) 기준 좌표로 정의하는 **프로토콜 상수**다(`client/src/features/onecard/raceSlots.ts`, D-129). `jitterX`·`jitterY` 는
   `−100..100`(슬롯 반경의 백분율). 창 길이 기본 3000ms(`mirboard.onecard.race-window-millis`).
 - 창이 열린 동안 `PLAY_CARD`·`DRAW` 는 `RACE_IN_PROGRESS`. `raceId` 가 지금 창과 다르면(이미 닫힘 포함) `NO_RACE`
   — 클라는 "늦었어요" 정도로 보여 주면 된다. 서버가 먼저 처리한 누름이 이기고, 창 끝·봇 시각 직후에 처리된
@@ -314,8 +315,8 @@ boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있
 `{ raceId, ownerSeat, slot, jitterX, jitterY, windowMillis, remainingMillis }`(창 끝까지 남은 시간 — 봇 시각 아님),
 `result` 는 `MATCH_ENDED` 와 같은 모양. `privateHand` = `{ seat, hand, handVersion }`.
 
-> **순번**: 지금은 비공개 `HAND_*` 도 방 순번(`seq`)을 쓴다 — 받지 않는 좌석에는 구멍으로 보여 resync 를 부른다.
-> D-126 이 `GameEvent.sequenced()` 를 넣었다 — 원카드 비공개 이벤트를 `false` 로 재정의하는 것은 S4 다.
+> **순번**: 비공개 `HAND_*` 는 방 순번(`seq`)을 쓰지 않는다(D-129 — D-126 의 `GameEvent.sequenced()` 를 false 로 재정의).
+> 받지 않는 좌석에 구멍을 만들지 않으며, 손패의 순서는 `handVersion` 이 지킨다.
 
 ---
 
