@@ -26,6 +26,7 @@ interface UseGameTableEffectsArgs {
   cardAnimEnabled: boolean;
   currentTop: Hand | null;
   currentTopSeat: number;
+  isInPlaying: boolean;
   spectator: boolean;
   isInPassing: boolean;
   iAmPassSubmitted: boolean;
@@ -53,6 +54,7 @@ export function useGameTableEffects({
   cardAnimEnabled,
   currentTop,
   currentTopSeat,
+  isInPlaying,
   spectator,
   isInPassing,
   iAmPassSubmitted,
@@ -132,23 +134,33 @@ export function useGameTableEffects({
   }, [trickPlayKey, cardAnimEnabled, currentTop, currentTopSeat, mySeat]);
 
   // 비행 시작(다음 프레임에 settled=true 로 transition 발동) + 종료 후 정리.
+  // 비행 id 에만 묶는다 — fly 객체에 묶으면 settled 전이의 cleanup 이 정리 타이머를
+  // 지우고 새 effect 는 settled 라 조기 반환해, 오버레이가 다음 play 까지 남는다
+  // (rAF 가 멈추는 백그라운드 탭에서만 타이머가 먼저 이겨 가려졌던 버그).
+  const flyId = fly?.id ?? null;
   useEffect(() => {
-    if (!fly || fly.settled) return;
-    const id = fly.id;
+    if (flyId === null) return;
     const raf = requestAnimationFrame(() =>
       requestAnimationFrame(() =>
-        setFly((f) => (f && f.id === id ? { ...f, settled: true } : f)),
+        setFly((f) => (f && f.id === flyId ? { ...f, settled: true } : f)),
       ),
     );
     const timer = window.setTimeout(
-      () => setFly((f) => (f && f.id === id ? null : f)),
+      () => setFly((f) => (f && f.id === flyId ? null : f)),
       420,
     );
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(timer);
     };
-  }, [fly]);
+  }, [flyId]);
+
+  // 트릭이 걷히거나(TRICK_TAKEN) PLAYING 을 벗어나면(라운드 종료 → 다음 DEALING) 비행
+  // 중이던 카드도 즉시 걷는다. 중앙 트릭 패널은 PLAYING 에서만 렌더되지만 오버레이는
+  // 그 밖이라 따로 걷어야 한다. 비행 시작 effect 뒤에 둬야 같은 커밋에서 정리가 이긴다.
+  useEffect(() => {
+    if (!isInPlaying || !currentTop) setFly(null);
+  }, [isInPlaying, currentTop]);
 
   // Phase 13(#2) — 패스 3장이 모두 배정되면 별도 제출 버튼 없이 자동 제출.
   // 슬롯 재클릭으로 되돌릴 수 있는 단계가 끝난(3장 확정) 시점이라 안전.

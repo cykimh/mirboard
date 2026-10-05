@@ -93,6 +93,7 @@ export function GameTable({
     cardAnimEnabled,
     currentTop: m.tableView?.currentTop ?? null,
     currentTopSeat: m.tableView?.currentTopSeat ?? -1,
+    isInPlaying: m.isInPlaying,
     spectator,
     isInPassing: m.isInPassing,
     iAmPassSubmitted: m.iAmPassSubmitted,
