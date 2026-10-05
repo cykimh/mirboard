@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { RACE_SLOT_COUNT, racePosition } from '../raceSlots';
+import { RACE_SLOT_COUNT, raceLeftCss, racePosition } from '../raceSlots';
 
 /** 버튼이 뜨기까지의 대기(ms) — 매번 달라 미리 누를 수 없다. */
 export const PRACTICE_MIN_DELAY_MS = 600;
@@ -80,7 +80,7 @@ export function ReactionPractice({ random = Math.random }: Props) {
           <button
             type="button"
             className="oc-race-btn oc-race-call"
-            style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+            style={{ left: raceLeftCss(pos.left), top: `${pos.top}%` }}
             onClick={press}
           >
             <span className="oc-race-label">원카드!</span>

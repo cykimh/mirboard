@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { RACE_JITTER_RADIUS, RACE_SLOT_COUNT, RACE_SLOTS, racePosition } from './raceSlots';
+import {
+  RACE_JITTER_RADIUS,
+  RACE_SLOT_COUNT,
+  RACE_SLOTS,
+  raceLeftCss,
+  racePosition,
+} from './raceSlots';
 
 /**
  * 경쟁 버튼 위치는 프로토콜 상수다 — 슬롯 수가 서버(`RaceSettings` 슬롯 8)와 같아야 하고, 어떤 지터에서도 버튼 중심이
@@ -44,5 +50,13 @@ describe('경쟁 버튼 슬롯', () => {
     expect(racePosition(8, 0, 0)).toEqual(racePosition(0, 0, 0));
     expect(racePosition(-1, 0, 0)).toEqual(racePosition(7, 0, 0));
     expect(racePosition(0, 500, -500)).toEqual(racePosition(0, 100, -100));
+  });
+});
+
+describe('경쟁 버튼 가로 위치 CSS', () => {
+  it('가장자리에서 버튼 반폭(--oc-race-half-w)만큼 안쪽으로 보정한다 — 레이어와 연습 칸이 같은 식을 쓴다', () => {
+    expect(raceLeftCss(81)).toBe(
+      'clamp(var(--oc-race-half-w), 81%, calc(100% - var(--oc-race-half-w)))',
+    );
   });
 });

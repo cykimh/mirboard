@@ -39,3 +39,12 @@ export function racePosition(
     top: base.y + (clampJitter(jitterY) / 100) * RACE_JITTER_RADIUS.y,
   };
 }
+
+/**
+ * 버튼 중심의 가로 위치(`left`) CSS — 가장자리에서 버튼 반폭(`--oc-race-half-w`)만큼 안쪽으로 보정한다. 슬롯 표만으로는 버튼
+ * *중심*이 5~95% 라 좁은 화면에서 버튼이 가장자리에서 잘릴 수 있다. 변수는 버튼을 담는 쪽(`.oc-race-layer`·튜토리얼
+ * 연습 칸 `.oc-practice-area`)이 정의하고, 두 곳이 같은 식을 쓴다.
+ */
+export function raceLeftCss(leftPercent: number): string {
+  return `clamp(var(--oc-race-half-w), ${leftPercent}%, calc(100% - var(--oc-race-half-w)))`;
+}

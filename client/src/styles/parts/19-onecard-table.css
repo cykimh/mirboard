@@ -148,6 +148,13 @@ button.oc-badge {
   box-shadow: 0 0 0 2px var(--oc-race-catch);
 }
 
+/* 1장 남은 사람의 차례 — 둘 다 box-shadow 라 뒤의 규칙이 이기면 차례 링이 사라진다. 두 링을 겹쳐 그린다. */
+.oc-seat-turn.oc-seat-last {
+  box-shadow:
+    0 0 0 2px var(--oc-accent),
+    0 0 0 4px var(--oc-race-catch);
+}
+
 .oc-seat-top {
   display: flex;
   align-items: center;
@@ -435,11 +442,13 @@ button.oc-card {
   background: #7a6bd0;
 }
 
-/* 반투명 흰색은 라이트 테마에서 흰 글자가 된다 — 불투명 회색으로 고정한다(스컬킹 C5 실측과 같은 이유). */
+/* 반투명 흰색은 라이트 테마에서 흰 글자가 된다 — 불투명 회색으로 고정한다(스컬킹 C5 실측과 같은 이유). 전역
+ * `button:disabled { opacity: .5 }` 도 이겨야 한다 — 이 라벨이 곧 턴 안내("내 차례 아님"·"경쟁 중"·"카드를 고르세요")다. */
 .oc-play:disabled,
 .oc-draw:disabled {
   background: #8b90a6;
   color: #ffffff;
+  opacity: 1;
   cursor: default;
 }
 
@@ -472,9 +481,16 @@ button.oc-card {
 }
 
 /* ── 외치기 경쟁 버튼 (설계서 §4.10) ─────────────────────────────── */
-/* 화면 위 고정 레이어 — 게임판이 스크롤돼도 버튼은 화면 안에 뜬다. 채팅 패널(100) 위, 모달 오버레이(200) 아래. */
-.oc-race-layer {
+/* 버튼 반폭 — 버튼을 담는 레이어와 튜토리얼 연습 칸이 같은 값으로 `left` 를 clamp 한다(raceLeftCss). 버튼 min-width(112px)의
+ * 절반 이상이어야 clamp 한 중심에서도 버튼이 칸 안에 머문다. 변수가 없으면 clamp() 가 무효가 되어 left 가 auto 로 떨어진다. */
+.oc-race-layer,
+.oc-practice-area {
   --oc-race-half-w: 64px;
+}
+
+/* 화면 위 고정 레이어 — 게임판이 스크롤돼도 버튼은 화면 안에 뜬다. 채팅 패널(100)·규칙 다이얼로그(shadcn z-50) 위라
+ * 다이얼로그를 연 채로도 누를 수 있다 — 창은 3초뿐이다. */
+.oc-race-layer {
   position: fixed;
   inset: 0;
   z-index: 150;
@@ -550,6 +566,39 @@ button.oc-card {
   overflow: hidden;
   border-radius: 10px;
   border: 1px dashed color-mix(in srgb, currentColor 30%, transparent);
+}
+
+/* ── hover 보정 ───────────────────────────────────────────────────── */
+/* 전역 `button:hover:not(:disabled)`(01-base, 0,2,1)와 `.card-chip:hover:not(:disabled)`(08-hand, 0,3,0)는 단일 클래스(0,1,0)
+ * 배경을 덮는다 — 조커 면·경쟁 버튼·내기/먹기·무늬 버튼이 hover(모바일은 탭 뒤 남는 :hover)에서 회색 배경이 되어 글자가
+ * 읽히지 않는다. 19 가 08 뒤라 같은 (0,3,0)이 이긴다(`<span>` 칩도 :disabled 가 아니라 `.card-chip:hover` 에 걸리므로 같은
+ * 규칙이 필요하다). 색은 위 기본 규칙과 같아야 한다 — onecardCssNamespace.test 가 존재와 값을 고정한다. */
+.oc-play:hover:not(:disabled) {
+  background: #5b8def;
+}
+
+.oc-draw:hover:not(:disabled) {
+  background: #7a6bd0;
+}
+
+.oc-race-call:hover:not(:disabled) {
+  background: var(--oc-race-call);
+}
+
+.oc-race-catch:hover:not(:disabled) {
+  background: var(--oc-race-catch);
+}
+
+.oc-suit-opt:hover:not(:disabled) {
+  background: var(--oc-card-bg);
+}
+
+.oc-card-joker-black:hover:not(:disabled) {
+  background: var(--oc-joker-black-bg);
+}
+
+.oc-card-joker-color:hover:not(:disabled) {
+  background: var(--oc-joker-color-bg);
 }
 
 /* ── 종료 ─────────────────────────────────────────────────────────── */
