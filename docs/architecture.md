@@ -166,7 +166,7 @@ HTTP 요청 (예: POST /api/rooms)
   6. room:{id}:state 저장
   7. GameEventBroadcaster — 순번을 쓰는 이벤트마다 room:{id}:seq INCR 후 발행
        · 공개 이벤트 → /topic/room/{id}        (PLAYED, TURN_CHANGED, TRICK_TAKEN, ...)
-       · 비공개 이벤트 → /user/queue/room/{id}  (HAND_DEALT, CARDS_RECEIVED — seq 없음, D-126)
+       · 비공개 이벤트 → /user/queue/room/{id}  (HAND_DEALT, CARDS_RECEIVED, 원카드 HAND_UPDATED — seq 없음, D-126·D-129)
        · 모든 메시지는 { eventId, seq, type, ts, payload } envelope 로 래핑
   8. lock 해제 — 저장·순번 발급이 모두 락 안이라, resync 가 같은 락 안에서 읽으면
      스냅샷과 eventSeq 가 같은 시점이다(D-126)

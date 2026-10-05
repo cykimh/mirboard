@@ -225,6 +225,39 @@ npm --prefix client run dev
 복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
 복원. 다른 플레이어 상태는 변하지 않음.
 
+## 원카드 게임판 확인 (D-129)
+
+카탈로그 열림 전환 전에도 로컬에서는 환경 변수로 켜서 볼 수 있다 — `MIRBOARD_ONECARD_STATUS=AVAILABLE ./gradlew :server:bootRun`.
+경쟁 버튼을 눈으로 보려면 같은 줄에 창 길이와 봇 반응 구간(주인·잡는 쪽의 최소·최대 4개)을 늘려 얹는다. 설정 파일은 만들지
+않는다 — `.gitignore` 밖에 두면 `git add -A` 에 딸려 간다.
+
+```bash
+MIRBOARD_ONECARD_STATUS=AVAILABLE \
+MIRBOARD_ONECARD_RACE_WINDOW_MILLIS=20000 \
+MIRBOARD_ONECARD_BOT_REACTION_OWNER_MIN_MILLIS=18000 \
+MIRBOARD_ONECARD_BOT_REACTION_OWNER_MAX_MILLIS=19000 \
+MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MIN_MILLIS=18000 \
+MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MAX_MILLIS=19000 \
+./gradlew :server:bootRun
+```
+
+각각 `mirboard.onecard.race-window-millis`, `bot-reaction-{owner,catcher}-{min,max}-millis` 설정에 대응한다 — `@Value` 도 스프링의
+환경 변수 매핑(점·하이픈 → 밑줄, 대문자)으로 받고 `application.yml` 값보다 우선한다.
+
+1. 미르보드카페 → 새 방 만들기 → 원카드, 4인, 빈 좌석 봇으로 채우기 → 준비. 처음 들어간 대기실에서 원카드 튜토리얼(12단계)이
+   한 번 자동으로 뜬다 — 2단계 카드 그림(♥ 빨강, ♠ 검정, 두 조커), 11단계 퀴즈, 12단계 반응 연습 버튼이 칸 안에 뜨는지 본다.
+2. 게임판: 상대 좌석은 이름·장수만, 가운데에 뽑을 더미 장수·맨 위 카드(7 이면 지정 무늬)·진행 방향·차례가 보인다. 내 차례에
+   낼 수 없는 카드가 흐리다(맨 위와 무늬·숫자가 다르면). 7 을 고르면 무늬 버튼 4개가 뜨고 고르기 전에는 낼 수 없다.
+3. 공격을 받으면 "공격받는 중 +N"·"먹기 (N장)". 반격 못 하는 카드를 내면 오류 줄에 문구가 뜨고 × 로 닫힌다.
+4. 누군가 1장이 되면 화면 위쪽 무작위 자리에 버튼이 뜬다(주인 "원카드!" 초록, 나머지 "잡기!" 빨강, 안에 남은 시간 막대).
+   눌러서 "잡기 성공: 나 → 상대 벌칙 1장"이 가운데에 뜨는지, 상대 장수가 1 늘었는지 본다. 그동안 내기·먹기 버튼은 막힌다
+   ("경쟁 중" 라벨). 사람끼리 동시에 눌러 진 쪽에는 빨간 오류 줄 없이 "늦었어요"만 잠깐 뜬다.
+5. 판이 끝나면 순위 표(1, 1, 3 식 · 남은 장수 · 다 냄/파산/탈주)가 뜨고 방이 끝나도 게임판이 남는다. '메인으로'는 탈주 확인 없이 나간다.
+6. 모바일 폭(375px)과 라이트 테마에서 가로 스크롤 없이 손패가 여러 줄로 감기고, 헤더 버튼이 44px 인지 본다. 조커·경쟁 버튼·
+   내기/먹기에 마우스를 올려도(모바일은 탭한 뒤) 글자와 면이 읽히고, 비활성 "내 차례 아님" 라벨도 읽힌다.
+7. 브라우저 개발자 도구 네트워크: 카드를 내거나 먹어도 `/resync` 가 다시 불리지 않는다(입장·재연결·탭 복귀(`visibilitychange`·
+   `online`) 때만, D-129).
+
 ## 분산 시연 (멀티 인스턴스, Phase 6D)
 
 기본은 단일 인스턴스 + `mirboard.messaging.gateway=in-memory`. 멀티 인스턴스에서

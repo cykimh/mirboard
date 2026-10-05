@@ -7,6 +7,7 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
+import { OneCardTable } from '@/features/onecard/OneCardTable';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
@@ -41,6 +42,12 @@ const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
   IN_GAME: '게임 중',
   FINISHED: '종료',
 };
+
+/**
+ * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
+ * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
+ */
+const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD']);
 
 /** D-122 — 유지된 게임판이 쓰는 좌석 목록 스냅샷 (FINISHED 전이 직전 IN_GAME 메타). */
 interface HeldSeats {
@@ -267,11 +274,11 @@ export function RoomPage() {
   // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
   // 다른 게임의 코드 경로는 실행조차 되지 않는다.
-  // D-120: 스컬킹은 이 세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지한다(위
-  // boardHeld). 티츄는 아직 기존 동작 그대로다 — 매치 결과·'한 판 더' 게이팅이 먼저다.
+  // D-120: 종료 화면을 가진 게임(스컬킹·원카드)은 이 세션에서 본 IN_GAME→FINISHED 직후에도
+  // 게임판을 유지한다(위 boardHeld). 티츄는 아직 기존 동작 그대로다 — 매치 결과·'한 판 더' 게이팅이 먼저다.
   const roomFinished = room.status === 'FINISHED';
   if (
-    room.gameType === 'SKULL_KING' &&
+    BOARD_HELD_GAMES.has(room.gameType) &&
     (room.status === 'IN_GAME' || (boardHeld && roomFinished))
   ) {
     // D-122 — 유지된 게임판은 얼린 좌석 목록으로 그린다. 게임 중에는 라이브 메타 그대로.
@@ -279,20 +286,21 @@ export function RoomPage() {
       roomFinished && heldSeats
         ? heldSeats
         : { playerIds: room.playerIds, botSeats: room.botSeats ?? [] };
+    const board = {
+      roomId: room.roomId,
+      playerIds: seats.playerIds,
+      myUserId: user.userId,
+      spectator: iAmSpectator,
+      botSeats: seats.botSeats,
+      usernames,
+      turnSeconds: room.turnSeconds ?? 0,
+      spectatorCount: (room.spectatorIds ?? []).length,
+      onExit: handleLeave,
+      roomFinished,
+    };
     return (
       <main className="room-page">
-        <SkullKingTable
-          roomId={room.roomId}
-          playerIds={seats.playerIds}
-          myUserId={user.userId}
-          spectator={iAmSpectator}
-          botSeats={seats.botSeats}
-          usernames={usernames}
-          turnSeconds={room.turnSeconds ?? 0}
-          spectatorCount={(room.spectatorIds ?? []).length}
-          onExit={handleLeave}
-          roomFinished={roomFinished}
-        />
+        {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
       </main>
     );
   }

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 2종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-128까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M5 전부 완료, 결정 이력 D-129까지). 로비/방 → 두 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소.
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -75,8 +75,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
-  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(스컬킹은 이
-  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120), 각
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(스컬킹·원카드는 이
+  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129), 각
   게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
   판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
 - **튜토리얼도 게임이 선언한다 (D-121)**: 각 게임이 `features/{game}/tutorial` 에
@@ -84,7 +84,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `features/tutorial/gameTutorials.ts` 한 곳뿐이다. 허브·대기실은 `tutorialFor(gameId)` 만 본다
   (게임 튜토리얼 폴더 직접 import 금지 — `gameTutorials.test` 가 원문 검사). 자동 노출은 그 게임
   대기실 첫 입장 1회, 게임판은 수동만(타이머가 흐른다). 다이얼로그는 body 포털이라 게임판 스코프
-  밖이므로 게임 토큰은 `bodyClassName` 으로 푼다(스컬킹 `.sk-tokens`).
+  밖이므로 게임 토큰은 `bodyClassName` 으로 푼다(스컬킹 `.sk-tokens`, 원카드 `.oc-tokens`).
 - **시작된 게임의 좌석은 불변 (D-122)**: 좌석 인덱스가 STOMP 좌석 판정·비공개 이벤트 라우팅·resync 의
   기준이라, 진행 중 매치에서 탈주로 처리되지 않은 leave 는 no-op, FINISHED 방 leave 는 좌석 목록을
   건드리지 않는다. 매치를 액션 경로 밖에서 끝내는 쪽(탈주 MATCH_ENDED·강제 종료)은 방 액션 락 안에서
@@ -105,7 +105,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 9.4.1 (wrapper), Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-`, D-103) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 dark). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
@@ -224,6 +224,7 @@ npm --prefix client run build
 # 단위 테스트 (Vitest + jsdom)
 npm --prefix client run test
 npm --prefix client run test -- authStore   # 특정 테스트만
+npm --prefix client run test -- onecard     # 원카드 게임판·스토어·튜토리얼 (D-129)
 ```
 
 ## STOMP envelope 규약 (자주 참조됨)
@@ -239,18 +240,18 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 
 **비공개 이벤트는 순번을 쓰지 않는다 (D-126)** — `GameEvent.sequenced()`(기본 true)를 false 로.
 `seq` 는 클라가 공개 토픽에서 구멍을 찾는 기준이라, 비공개 이벤트가 쓰면 다른 클라에게 다음 공개
-이벤트가 항상 구멍이 된다(티츄는 카드를 낼 때마다 전원 resync 했다). 티츄는 `!isPrivate()`, 스컬킹은
+이벤트가 항상 구멍이 된다(티츄는 카드를 낼 때마다 전원 resync 했다). 티츄·원카드(D-129)는 `!isPrivate()`, 스컬킹은
 아직 true. 공개 상태가 바뀌면 **반드시 공개 이벤트로** 알릴 것 — resync 가 우연히 고쳐 주는 것에 기대지
 말 것(소원 해제가 그랬다 → `WISH_CLEARED`). resync 는 방 액션 락 안에서 상태·`eventSeq` 를 함께 읽는다.
 
 - 서버 → 클라 공개 `/topic/room/{roomId}`
   - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
-  - 원카드(D-128, 클라 S4 전 COMING_SOON): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
+  - 원카드(D-128·D-129, 열림 전환 전 COMING_SOON): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
-  - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
+  - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`, 순번 없음 — D-129), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
 - 클라 → 서버 `/app/room/{roomId}/action`
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)

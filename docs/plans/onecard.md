@@ -93,7 +93,7 @@
 
 ```
 onecard/
-  OneCardGameDefinition   @Component · ID "ONE_CARD" · 2~6인 · COMING_SOON → S4 에서 AVAILABLE (S3)
+  OneCardGameDefinition   @Component · ID "ONE_CARD" · 2~6인 · COMING_SOON → AVAILABLE 은 열림 전환에서 (S3 · D-129: S4 와 분리, D-116 병합 뒤 별건)
   OneCardEngine           순수 룰 엔진 — 저장소·시계 없음, 난수는 주입 (S2)
   OneCardGameEngine       포트 어댑터 — 상태 저장(Redis)·시계·로컬 발행 (S3)
   Dealer · RaceSettings   분배·시작 카드 / 창 길이·봇 반응 구간·슬롯 수 (S2)
@@ -157,13 +157,16 @@ S2(D-127)에서 처음 그림과 달라진 점: 단계 enum(`Phase`)·`ActionVal
   소비해, 그 이벤트를 못 받는 다른 클라에게는 다음 공개 이벤트가 구멍(gap)으로 보이고 resync 를
   부른다. 원카드는 내거나 먹을 때마다 비공개 `HAND_UPDATED` 가 나가므로 이대로면 매 차례 전원이
   resync 한다. *(D-128: S3 에서는 만들지 않았다 — D-126 병합 뒤 원카드 비공개 이벤트에 `sequenced()` 재정의만
-  더한다(S4 착수 조건, §4.5b). 그 전까지 원카드 비공개 이벤트도 방 순번을 쓴다.)*
+  더한다(S4 착수 조건, §4.5b). 그 전까지 원카드 비공개 이벤트도 방 순번을 쓴다.)* *(D-129: S4 에서 재정의했다 — 원카드
+  비공개 이벤트는 순번을 쓰지 않는다.)*
 - **비공개 payload 는 손패 전체 + `handVersion`**(상태 버전이라 좌석마다 단조 증가). 클라는 가진 것보다 낮은
   버전을 버린다 — 순번이 없어도 resync 스냅샷(비공개 뷰에도 `handVersion`)과 순서가 뒤바뀌어
   손패가 되돌아가지 않는다.
 - **공개 payload 는 증감이 아니라 결과값**(좌석 손패 장수, 맨 위 카드, 지정 무늬, 공격 누적, 방향,
   뽑을 더미 장수). resync 는 잠금 없이 상태와 순번을 따로 읽어, 그 사이 액션이 끼면 이벤트가 두 번
-  적용되거나 하나가 빠질 수 있다. 결과값이면 두 번 적용해도 같고, 빠져도 다음 이벤트에서 맞춰진다.
+  적용되거나 하나가 빠질 수 있다. 결과값이면 두 번 적용해도 같고, 빠져도 다음 이벤트에서 맞춰진다. *(D-126: resync 는 방 락 안에서
+  상태와 순번을 함께 읽는다 — 락을 약 3초 못 잡을 때만 잠금 없이 읽는 폴백이다. 결과값 원칙은 그 폴백과 REST 응답·STOMP 프레임의
+  도착 순서가 정해져 있지 않다는 점에 대한 방어로 남는다.)*
 
 ### 4.4 경쟁 창 흐름
 
@@ -194,7 +197,7 @@ A 가 카드를 내 손패 1장
   봇이 3초 안이면 그 봇이 누른다.
 - 슬롯: 클라가 게임판 기준 상대 좌표로 정의한 N개(프로토콜 상수, 기본 8) 중 서버가 하나를
   고르고, 지터(x·y 각각 −100~100 정수, 클라가 슬롯 반경의 백분율로 환산)를 더한다. 전원이 같은
-  위치를 받으므로 위치 운은 공평하다.
+  위치를 받으므로 위치 운은 공평하다. *(D-129: 슬롯 좌표는 게임판이 아니라 화면(뷰포트) 기준으로 바꿨다 — §4.10.)*
 
 **공정성.** 판정이 서버 도착 순서라 핑이 낮을수록 유리하다(`multi-game.md` §7 이 할리갈리
 판정 모델로 남겨 둔 선택지 중 "서버 도착 순서"). 버튼을 찾는 시간(수백 ms)이 핑 차(수십 ms)보다
@@ -239,7 +242,8 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 
 **S3 에서 만들지 않았다(D-128, 사용자 결정)** — 같은 확장을 D-126(티츄 resync)이 넣는다. D-126 이 병합되면 원카드
 비공개 이벤트 2종에 `sequenced()` 를 false 로 재정의만 더한다(S4 착수 조건). 그 전까지 원카드 비공개 이벤트도
-방 순번을 쓴다. 아래는 원래 설계다.
+방 순번을 쓴다. 아래는 원래 설계다. **D-129(S4)에서 재정의했다** — D-126 이 넣은 기본 메서드를 원카드 손패 이벤트 2종이
+false 로 바꾼다(`OneCardEvent.sequenced()` = `!isPrivate()`).
 
 ```java
 /** false 면 envelope 에 seq 를 붙이지 않는다(순번을 소비하지 않음). 기본 true — 기존 게임 동작 그대로. */
@@ -298,6 +302,8 @@ default boolean sequenced() { return true; }
 
 ### 4.10 클라이언트
 
+**구현됨(S4, D-129)** — 아래 설계대로 붙었고, 달라진 점은 *기울임* 메모로 단다.
+
 - `features/onecard/`: `onecardStore`(순수 리듀서) · `onecardRoomSink`(모듈 상수) · `OneCardTable` ·
   `RaceButton` · 좌석·더미·손패 컴포넌트 · `types/onecard.ts`.
 - `RoomPage` 의 IN_GAME 분기에 원카드를 추가하고, 종료 뒤 게임판 유지(D-120 `boardHeld`)를 스컬킹
@@ -306,12 +312,14 @@ default boolean sequenced() { return true; }
   게임판은 `.app-shell` 밖이라 box-sizing 을 스코프에서 명시한다.
 - **경쟁 버튼**: 게임판 위 오버레이 레이어. 슬롯 N개를 게임판 기준 % 좌표로 정의하고(손패·내
   좌석·더미 영역 회피) 서버 지터를 반경 안에서 적용한다. 최소 44×44px. 주인은 "원카드!",
-  나머지는 "잡기!". 관전자에게는 보이지 않는다.
+  나머지는 "잡기!". 관전자에게는 보이지 않는다. *(D-129: 좌표는 화면(뷰포트) 기준으로 바꿨다 — 게임판은 모바일에서
+  스크롤되므로 게임판 기준이면 버튼이 화면 밖에 뜰 수 있다. 슬롯 표는 `features/onecard/raceSlots.ts`, 버튼 안 막대가 창 끝까지
+  남은 시간이다. 탈락자에게도 보이지 않는다.)*
 - **접근성**: 실제 `<button>` + aria-live 안내. **자동 포커스와 전역 단축키는 두지 않는다.** 둘 다
   사실상 "위치와 무관하게 즉시 누르기"라 무작위 위치의 의미와 레이팅 공정성을 깬다. 고정 위치
   보조 모드는 비레이팅 방 한정으로 후속 검토한다.
 - **튜토리얼**: `features/onecard/tutorial` + 레지스트리(`gameTutorials.ts`) 한 줄. 마지막 단계에
-  "반응 연습"(무작위 위치 버튼 미니 게임, 로컬 전용)을 둔다.
+  "반응 연습"(무작위 위치 버튼 미니 게임, 로컬 전용)을 둔다. *(D-129: 규칙 10단계 + "낼 수 있을까?" 퀴즈 + 반응 연습 = 12단계로 만들었다.)*
 - **위키 링크**: `gameWiki.ts` 에 나무위키 원카드 문서.
 
 ## 5. 문서·계약 변경
@@ -335,12 +343,13 @@ default boolean sequenced() { return true; }
 | S1 | 룰 명세 `docs/rules-onecard.md`(§3.2 확정) | — | 없음(문서) | 사용자 검토 |
 | S2 | 순수 엔진 + 불변식 + 시뮬레이션 | S1 | 서버 신규 패키지 | 룰 단위 테스트, 2~6인 시뮬레이션 전부 종료, 54장 보존 |
 | S3 | 포트 확장 1건(엔진 타이머 — 비순번은 D-126 에 맡김) + 어댑터 + 봇 + 기록기(V12) + 라운드 시작 | S2 | 서버(인프라 1건) | 경쟁 통합 테스트 5종, 봇 풀매치 IT, 인프라 grep 0건, 티츄·스컬킹 회귀 |
-| S4 | 클라 게임판 + 경쟁 버튼 + 튜토리얼, `AVAILABLE` 전환 | S0·S3 | 클라(+정의 1줄) | Vitest, 브라우저 실측(데스크톱·모바일) |
+| S4 | 클라 게임판 + 경쟁 버튼 + 튜토리얼 + 비공개 이벤트 비순번 — `AVAILABLE` 전환은 D-116 병합 뒤 별건(D-129) | S0·S3·D-126 | 클라(+서버 재정의 1건) | Vitest, 브라우저 실측(데스크톱·모바일) |
 | S5 | 통합 리뷰 → 문서 수치 → 배포 | S4 | — | `check.sh` 전체, 운영 스모크 |
 
 - S0 과 S1 은 서로 독립이라 병행할 수 있다(worktree 분리). S2 는 신규 패키지라 S0 과 병행 가능.
 - S3 병합 때는 정의를 `COMING_SOON` 으로 둔다. 서버만 배포돼도 방을 만들 수 없다(`RoomService` 가
-  AVAILABLE 만 허용). S4 병합에서 `AVAILABLE` 로 바꾼다.
+  AVAILABLE 만 허용). S4 병합에서 `AVAILABLE` 로 바꾼다. *(D-129: 전환은 S4 와 분리했다 — D-116 병합 뒤 기본값 한 줄과 운영
+  문서를 바꾸는 별건이다.)*
 - 단계마다 Phase Gate(변경 요약 + 다음 진입 동의).
 - D 번호는 착수 시점의 다음 번호를 쓴다(D-116 은 다른 세션이 사용 중).
 
@@ -362,7 +371,8 @@ default boolean sequenced() { return true; }
   비공개 `HAND_DEALT`(D-62)가 순번을 소비해 공개 `TURN_CHANGED` 가 항상 구멍이 된다. 소원 해제처럼
   이벤트가 없는 변화가 이 resync 에 기대고 있어 고치려면 티츄 이벤트를 먼저 보강해야 한다 — 별도 과제.
 - **resync 가 잠금 없이 상태와 순번을 따로 읽는다**(모든 게임 공통). 원카드는 결과값 payload 로
-  흡수하고(§4.3), 근본 수정(상태 저장과 순번 발급을 한 번에)은 별도 과제로 둔다.
+  흡수하고(§4.3), 근본 수정(상태 저장과 순번 발급을 한 번에)은 별도 과제로 둔다. *(D-126 으로 닫혔다 — `RoomController.resync` 가 방
+  락 안에서 읽는다. 락을 약 3초 못 잡을 때만 잠금 없이 읽는 폴백이다. 아래 "D-126 과 겹치는 부분" 참고.)*
 - **D-126 과 겹치는 부분**(2026-10-04 기준 다른 세션에서 진행 중): 티츄 resync 수정이 §4.5b 와 같은
   `GameEvent.sequenced()` 기본 메서드와 "resync 를 방 락 안에서" 읽는 변경을 넣는다. 그쪽이 먼저 병합되면 S3 는
   포트 확장을 새로 만들지 않고 원카드 비공개 이벤트에서 `sequenced()` 를 false 로 재정의만 하며, 위 두 위험
@@ -373,7 +383,8 @@ default boolean sequenced() { return true; }
 ### S3 후속 (D-128 최종 리뷰)
 
 S3 병합 전 최종 리뷰에서 나온 것 중 이번에 고치지 않고 남긴 과제다(병합 전에 고친 것은 D-128 본문·`docs/game-port.md` §2).
-S4(AVAILABLE 전환) 착수 전에 아래 "운영" 항목과 "인프라"의 하드닝을 먼저 본다.
+S4(AVAILABLE 전환) 착수 전에 아래 "운영" 항목과 "인프라"의 하드닝을 먼저 본다. *(D-129: AVAILABLE 전환은 S4 와 분리됐다 — 이 하드닝은
+"열림 전환 전"에 본다.)*
 
 - **인프라**
   - `EngineTimerScheduler` ↔ `TurnTimeoutScheduler` 의 가드·member 파싱이 복제돼 있다. member 파싱·`inGameRoom`·
@@ -386,16 +397,17 @@ S4(AVAILABLE 전환) 착수 전에 아래 "운영" 항목과 "인프라"의 하�
     엔진 타이머(봇 누름 1.0~2.5초·창 만료 3초)가 밀린다. 팝한 항목의 `handle` 을 가상 스레드로 넘긴다(게임 중립).
   - 발화 중 `saveState` 뒤 `advance`/`broadcast` 가 던지면 창은 닫혔는데 봇·타이머 재무장이 없다(턴 타임아웃과 같은 기존
     패턴). 실패 가시성도 같이: `fire` 실패는 ERROR 로그만 남고 타이머는 이미 사라지며 무장 실패는 WARN 이다 — 한정 횟수
-    재무장·ERROR 승격을 S4 전 하드닝으로.
+    재무장·ERROR 승격을 S4 전 하드닝으로. *(D-129: 열림 전환 전으로 읽는다.)*
   - 테스트: `fire` 예외 경로(`onTimer`/`saveState` 가 던질 때 락 해제·후속 호출 없음), `onTurnAdvanced` 의 방 없음 → `cleanup`
     분기, 인터페이스의 실제 기본 메서드(`timer`/`onTimer` → empty) 실행.
 - **운영**
   - `MIRBOARD_ONECARD_STATUS` 를 `docs/deploy.md`·`.env.example` 에 적는다. **S4 전에는 AVAILABLE 로 켜지 않는다** — 현 클라는
-    ONE_CARD 방을 기본 분기(티츄 게임판)로 그린다. S4 에서 코드 기본값 전환을 클라와 같은 배포로 한다.
+    ONE_CARD 방을 기본 분기(티츄 게임판)로 그린다. S4 에서 코드 기본값 전환을 클라와 같은 배포로 한다. *(D-129: 클라는 S4 로
+    준비됐고, 전환은 D-116 병합 뒤 별건으로 뺐다.)*
   - D-116·D-126 이 이 브랜치와 같은 문서(CLAUDE.md·README·케이스 스터디·decisions·status·roadmap·redis-keys)와 테스트 수를
     건드린다 — 병합 뒤 인용 수치를 케이스 스터디 §부록 명령으로 다시 잰다. 또 운영은 `MIRBOARD_MESSAGING_GATEWAY=redis` 라 D-116
     전에는 머신이 2대 이상일 때 `GameStartingEvent` 가 재발행돼 라운드 시작이 인스턴스마다 반복된다(티츄·스컬킹과 같은 기존
-    결함, 지금은 COMING_SOON·단일 머신이라 무영향). S4 의 AVAILABLE 전환은 두 작업 병합 뒤에 한다.
+    결함, 지금은 COMING_SOON·단일 머신이라 무영향). S4 의 AVAILABLE 전환은 두 작업 병합 뒤에 한다. *(D-129: "S4 의 AVAILABLE 전환" = 열림 전환 별건.)*
 - **테스트 보강**
   - 단위·기록기: 뷰의 인자 순서·`handVersion`·좌석(`toTableView`/`toPrivateView` 를 값이 겹치지 않는 상태로), 봇 정책 경계(다음
     사람 3장, J→Q, 평소 티어, 탈락자를 건너뛰는 뷰), 기록기(게스트가 낀 매치·사람이 이긴 봇 매치의 ELO 제외·
@@ -411,7 +423,56 @@ S4(AVAILABLE 전환) 착수 전에 아래 "운영" 항목과 "인프라"의 하�
   - 봇 정책의 매직 넘버에 이름 또는 `attackStrength ≤ 4` 전제 주석, 봇 뷰의 `baseSuit` 가 조커면 null 이라는 Javadoc,
     기록기에 `standings.size() == playerIds.size()` 사전 검사.
 - **문서**: `rules-onecard.md` §14 의 "(S2)" 시점 수치·경로 표기(`bot/` 가 어느 루트인지), 인접 문서(`architecture.md` infra
-  `bot/` 목록, `api.md`·`qa-scenarios.md` 의 `GET /api/games` 예시, `stomp-protocol.md` 큐 카탈로그의 `HAND_UPDATED`,
+  `bot/` 목록, `api.md`·`qa-scenarios.md` 의 `GET /api/games` 예시, `stomp-protocol.md` 큐 카탈로그의 `HAND_UPDATED`(D-129: S4 에서 반영했다),
   `implementation-status.md` §14 포트 설명)는 S5 문서 정리에서, 케이스 스터디 부록 (2) 의 기존 어긋남("6파일 11행" 등)도 S5 재측정에서.
 - **S2 잔여**: 검사기 기존 분기의 직접 테스트·시뮬레이션 오라클 보강, 그리고 core `GameEvent.isPrivate()` 가 Jackson 에
   `"private"` 키로 직렬화되는 문제(원카드는 자체 차단, 스컬킹·티츄 payload 에는 남아 있다).
+
+### S4 후속 (D-129)
+
+S4 브라우저 실측(데스크톱·모바일, 라이트·다크)에서 본 것 중 이번에 고치지 않은 것이다.
+
+- **경쟁 창마다 봇 루프 WARN** — 창이 열리면 `pendingSeats` 가 비어 봇 루프가 `Bot loop: no pending bot action`(WARN)을 남긴다.
+  운영 로그 소음이라 그 경우는 DEBUG 로 낮춘다(인프라, 게임 중립 — 차례 없는 상태는 정상일 수 있다).
+- **카드 내기 연타** — `카드 내기` 를 빠르게 두 번 누르면 두 번째가 서버에서 거절된다(`NOT_YOUR_TURN` 등, 스컬킹도 같다). 보낸
+  뒤 다음 상태가 올 때까지 버튼을 잠그는 게임판 공용 처리를 검토한다.
+- **번들 크기** — 메인 번들이 566kB(원카드 +27kB, 500kB 경고는 그 전부터)다. 게임판을 `RoomPage` 에서 지연 로딩(`lazy`)해
+  게임별로 나누는 것을 검토한다.
+
+S4 최종 리뷰(2026-10-06)에서 나온 것 중 수정 묶음(D-129)에 넣지 않은 것이다 — 열림 전환 전에 다시 본다. (괄호는 리뷰 항목 번호.)
+
+- **라벨 헬퍼 직접 테스트**(T2-M6) — `types/onecard.ts` 의 `rankLabel`·`cardLabel`·`cardKey` 에 직접 테스트가 없다. 54장 `cardKey` 유일성과
+  `rankLabel` 1/11/12/13 매핑을 한두 줄 테스트로 고정한다(스토어가 `cardKey` 를 `selectedKey` 로 쓴다).
+- **누름 거절 테스트의 남은 공백**(T3-M2) — `RACE_RESOLVED` 의 `state.race === null` 분기와 `startPress` 의 안내 해제가 단언되지 않는다.
+- **슬롯 표 보장과 주석**(T4-M3) — `raceSlots.ts` 주석에 "버튼 폭 보정은 레이어(`raceLeftCss` 의 clamp)가 한다"를 밝히고, 가장자리 테스트
+  이름을 "버튼 중심이 …"로 낮춘다. 슬롯 수 8 은 리터럴만 단언해 서버 값이 바뀌어도 빨개지지 않는다.
+- **칩 접근성 계약 테스트**(T4-M7) — `OneCardCardChip` 의 `role="img"`+이름 / 버튼+`aria-label` / `aria-pressed` 토글 3케이스.
+- **튜토리얼 작은 중복·결합**(T4-M8) — 카드 팩토리 `c()` 가 `PlayQuiz.tsx`·`onecardTutorialSteps.tsx`(+테스트)에 반복된다. 단계 8·반응 연습의
+  봇 반응 "1.0~2.5초"는 서버 설정(`mirboard.onecard.bot-reaction-*`)을 사실처럼 박았다 — 설정 주석에 "튜토리얼 문구가 인용" 메모를 단다.
+- **게임판 테스트 남은 공백**(T5-M1) — 플레이어용 알림 문장("원카드!/잡기! 버튼을 누르세요"), `raceResultText` 의 CALLED·EXPIRED·CANCELLED,
+  공동 1위, DESERTED 상태, `isDisconnected` 태그, `iAmOut`.
+- **비시각 신호·DOM 순서**(T5-M5 b·c) — 낼 수 없는 카드 흐림을 `aria-disabled`/`aria-describedby` 로도 전하고, 경쟁 버튼의 DOM 순서(손패 뒤라
+  키보드 사용자가 3초 안에 닿기 어렵다)를 정한다. 후자는 "고정 위치 보조 모드"(§4.10 후속)와 함께 결정한다.
+- **이름 규칙 이중화**(T5-M6) — `OneCardSeat` 는 username 없는 봇을 '봇', `OneCardTable.nameOf` 는 '봇 N' 으로 만든다 → `nameOf(seat)` 를 prop
+  으로 내려 한 곳에서 계산한다. `OneCardMatchEnd.STATUS_TEXT` 와 `ELIMINATED_LABEL` 의 '파산/탈주' 문자열도 겹친다.
+- **`seatOrder` 테스트 위치**(T5-M7) — 직접 테스트가 스컬킹 `seatLayout.test` 에 있다 → `components/seatOrder.test.ts` 로(파일 수가 바뀌므로
+  수치 재측정과 함께).
+- **폰에서 더미·빈 칸이 윗카드보다 큼**(T6-M3) — ≤768px 에서 `.oc-card-compact`·`.oc-pile-back`·`.oc-top-empty` 크기가 17 의 `.card-chip` 크기에 밀리거나
+  어긋난다. `17-responsive.css` 맨 끝 `.oc-*` 블록으로 맞춘다.
+- **대비 다듬기**(T6-M5) — `.oc-seat-one`(흰 글자/#d9483d 11px) 4.25:1, 컬러 조커 라벨은 그라디언트 위에서 약하다(`text-shadow`).
+- **포털 토큰 한 규칙화**(T6-M6) — `.oc-tokens` 가 `.oc-table` 토큰 9개를 값까지 복제한다. `.oc-table, .oc-tokens { … }` 한 규칙으로 두면 어긋날 수
+  없어 동등성 테스트(`onecardCssNamespace.test`)를 정리할 수 있다.
+- **`RoomPage` 게임판 표**(T7-M1·M2·M3) — `BOARD_HELD_GAMES` 집합과 게임판 삼항이 따로라 세 번째 게임을 넣을 때 스컬킹 판이 붙을 수 있고, 무타입
+  `board` 스프레드는 오타 방어가 없다 → `Map<gameType, ComponentType<GameBoardProps>>` 한 표로(다음 게임 전에). 원카드 RoomPage 시나리오도 스컬킹과 `it.each` 로.
+- **서버 쪽 낡은 주석**(T8-M6) — `server/src/main/resources/application.yml` 의 onecard 절("클라 게임판(S4) 전에는 … S4 에서 AVAILABLE 로 바꾼다")과
+  `OneCardGameDefinition` Javadoc 이 D-129("전환은 별건")와 어긋난다. 열림 전환 때 읽는 주석이라 그때 고친다(이번 묶음은 서버 파일을 건드리지 않았다).
+- **케이스 스터디 재현 명령**(T8-M7) — `docs/case-study-multi-game.md` 의 "1238건 중 1039건(84%)" 재현 명령이 §부록에 없다(기존 공백). 서버 집계를 (6)으로
+  싣고 `check.sh server` 는 Gradle 캐시로 `FROM-CACHE` 에 끝날 수 있으니 `--rerun` 을 적는다.
+- **턴 카운트다운**(N-4) — `turnStartedAt` 은 쓰기만 하고 읽지 않는다. 원카드 게임판엔 카운트다운이 없는데, 턴 제한(`turnSeconds`)이 있는 방은 시간
+  초과가 자동 먹기라 남은 시간 표시가 필요할 수 있다. 붙이거나 필드를 지운다.
+- **원카드 순번 스트림 IT**(N-5) — "내거나 먹어도 resync 없음"은 `sequenced()` 단위 테스트와 공용 브로드캐스터(D-126 테스트)에만 기댄다.
+  `TichuEventStreamIT` 의 원카드판(봇 매치에서 공개 seq 연속·비공개 seq 부재)을 S5 에서(선택).
+- **같은 세션 프레임 순서**(N-6) — `WebSocketConfig` 가 `preservePublishOrder` 를 켜지 않아 같은 세션의 프레임 순서가 보장되지 않는다(실측 안 함). 클라는
+  해소 → 거절 / 거절 → 해소 두 순서를 모두 받게 했다(`lost` 표식). 인프라·게임 중립 후속: `setPreservePublishOrder(true)` 를 성능 영향 측정과 함께 검토.
+- **스컬킹 `.sk-play` hover** — `18-skullking-table.css` 의 `.sk-play` 도 전역 `button:hover:not(:disabled)` 에 배경이 덮인다(원카드 I-2 와 같은 문제,
+  이 브랜치 범위 밖).

@@ -1,0 +1,700 @@
+/* 원카드 게임판 (D-129) — 스컬킹 게임판(18)과 같은 규칙을 따른다.
+ *
+ * ⚠ 캐스케이드: index.css 에서 18 다음, **17-responsive 앞**에 import 된다. 그래서 이 파일에는 폭 미디어가
+ *   **0개**다 — 좌석은 auto-fit 그리드라 브레이크포인트 없이 줄바꿈되고 손패는 여러 줄로 감긴다. 카드 축소는
+ *   17 의 공용 규칙(.card-chip, .action-bar)을 상속한다. 폭·터치 규칙이 불가피하면 17-responsive.css **맨 끝**에
+ *   .oc-* 블록만 추가한다(D-88).
+ *
+ * ⚠ 네임스페이스: 모든 선택자는 `.oc-` 클래스를 포함한다. 공용 클래스(.card-chip, .my-hand, .action-bar …)를
+ *   단독으로 재정의하지 않는다 — 다른 게임판이 같은 클래스를 쓴다. (styles/onecardCssNamespace.test.ts 가 기계로 검사.)
+ *
+ * 테마: 중립색은 전역 토큰(--color-*)을 써서 라이트·다크가 저절로 따라간다. 카드 면은 두 테마 모두 밝은 종이색이다.
+ */
+
+/* 게임판은 `.app-shell` **밖**이라 tailwind 의 border-box 리셋이 닿지 않는다. 스코프 안에서만 명시한다. */
+.oc-table,
+.oc-table *,
+.oc-table *::before,
+.oc-table *::after {
+  box-sizing: border-box;
+}
+
+/* ── 토큰 ─────────────────────────────────────────────────────────── */
+.oc-table {
+  --oc-seat-min: 132px;
+  --oc-accent: #7c8ea0;
+  --oc-card-bg: #fbfaf6;
+  --oc-card-red: #c62f3a;
+  --oc-card-black: #1f2228;
+  --oc-joker-black-bg: #2b2d33;
+  --oc-joker-black-fg: #f3f3f6;
+  --oc-joker-color-bg: linear-gradient(135deg, #ef4f6b, #f3b63d 38%, #45b26b 66%, #4a86ee);
+  --oc-joker-color-fg: #ffffff;
+  --oc-race-call: #23955a;
+  --oc-race-catch: #d9483d;
+  --oc-accent-0: #5b8def;
+  --oc-accent-1: #e85d75;
+  --oc-accent-2: #3fa45b;
+  --oc-accent-3: #e0b32a;
+  --oc-accent-4: #7b5cd6;
+  --oc-accent-5: #2fb5c0;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  min-height: 100vh;
+}
+
+/* ── 헤더 ─────────────────────────────────────────────────────────── */
+.oc-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.oc-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.oc-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+button.oc-badge {
+  cursor: pointer;
+}
+
+.oc-badge-title {
+  font-weight: 700;
+}
+
+.oc-badge-turn {
+  border-color: var(--oc-accent);
+  font-weight: 700;
+}
+
+.oc-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(232, 93, 117, 0.18);
+  border: 1px solid rgba(232, 93, 117, 0.5);
+  font-size: 13px;
+}
+
+.oc-error-close {
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* ── 상대 좌석 그리드 — 폭 미디어 없이 2~6인 대응 ─────────────────── */
+/* max 는 1fr 이어야 auto-fit 이 min 기준으로 열을 센다(스컬킹 18 의 C5 실측과 같은 이유). */
+.oc-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--oc-seat-min), 1fr));
+  justify-items: center;
+  gap: 8px;
+}
+
+.oc-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 168px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--oc-accent);
+  background: var(--color-bg-surface);
+}
+
+.oc-seat-turn {
+  box-shadow: 0 0 0 2px var(--oc-accent);
+}
+
+.oc-seat-out {
+  opacity: 0.5;
+}
+
+.oc-seat-offline {
+  border-style: dashed;
+}
+
+.oc-seat-last {
+  box-shadow: 0 0 0 2px var(--oc-race-catch);
+}
+
+/* 1장 남은 사람의 차례 — 둘 다 box-shadow 라 뒤의 규칙이 이기면 차례 링이 사라진다. 두 링을 겹쳐 그린다. */
+.oc-seat-turn.oc-seat-last {
+  box-shadow:
+    0 0 0 2px var(--oc-accent),
+    0 0 0 4px var(--oc-race-catch);
+}
+
+.oc-seat-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oc-seat-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-bg-surface-elevated);
+  font-size: 16px;
+}
+
+.oc-seat-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.oc-seat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oc-seat-count {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.oc-seat-count-num {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-seat-count-unit {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.oc-seat-one {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--oc-race-catch);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.oc-seat-tag {
+  align-self: flex-start;
+  font-size: 11px;
+}
+
+/* ── 가운데 — 더미·맨 위 카드·상태 ─────────────────────────────────── */
+.oc-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--color-bg-surface-elevated);
+}
+
+.oc-piles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.oc-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.oc-pile-back {
+  display: block;
+  width: 62px;
+  height: 88px;
+  border-radius: 8px;
+  border: 2px solid #555555;
+  background: repeating-linear-gradient(45deg, #3b5ba9, #3b5ba9 6px, #2f4c92 6px, #2f4c92 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.oc-pile-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.oc-top-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 88px;
+  border-radius: 8px;
+  border: 2px dashed var(--color-border);
+}
+
+.oc-center-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.oc-attack {
+  border-color: var(--oc-race-catch);
+  background: rgba(217, 72, 61, 0.15);
+  font-weight: 700;
+}
+
+.oc-declared {
+  font-weight: 700;
+}
+
+.oc-race-status {
+  border-color: var(--oc-race-call);
+  font-weight: 700;
+}
+
+.oc-race-result,
+.oc-race-late {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oc-race-late {
+  color: var(--oc-race-catch);
+}
+
+/* ── 카드 ─────────────────────────────────────────────────────────── */
+.oc-card {
+  gap: 0;
+  border-color: rgba(0, 0, 0, 0.35);
+  background: var(--oc-card-bg);
+  font-weight: 700;
+  cursor: default;
+}
+
+button.oc-card {
+  cursor: pointer;
+}
+
+.oc-card-red {
+  color: var(--oc-card-red);
+}
+
+.oc-card-black {
+  color: var(--oc-card-black);
+}
+
+.oc-card-joker-black {
+  background: var(--oc-joker-black-bg);
+  color: var(--oc-joker-black-fg);
+}
+
+.oc-card-joker-color {
+  background: var(--oc-joker-color-bg);
+  color: var(--oc-joker-color-fg);
+}
+
+.oc-card-rank {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.oc-card-suit {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.oc-card-joker-mark {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.oc-card-name {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.oc-card-selected {
+  outline: 3px solid #e0b32a;
+  transform: translateY(-6px);
+}
+
+.oc-card-dimmed {
+  opacity: 0.4;
+}
+
+.oc-card-compact {
+  width: clamp(40px, 12vw, 52px);
+  height: auto;
+  aspect-ratio: 62 / 88;
+}
+
+/* ── 내 정보줄 / 손패 / 버튼 ─────────────────────────────────────── */
+.oc-me {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border-left: 4px solid var(--oc-accent);
+  background: var(--color-bg-surface);
+}
+
+.oc-me-turn {
+  box-shadow: 0 0 0 2px var(--oc-accent);
+}
+
+.oc-me-count {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 손패는 감긴다 — 원카드 손패는 20장 가까이 늘 수 있어 한 줄 겹치기(.overlap)를 쓰지 않는다. */
+.oc-hand-cards {
+  justify-content: center;
+  min-height: 96px;
+  padding-top: 8px;
+}
+
+.oc-hand-empty {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.oc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* 손패가 여러 줄로 감기면 마지막 줄이 버튼 줄에 붙는다(모바일 실측) — 띄운다. */
+  margin-top: 8px;
+}
+
+.oc-play,
+.oc-draw {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oc-play {
+  background: #5b8def;
+}
+
+.oc-draw {
+  background: #7a6bd0;
+}
+
+/* 반투명 흰색은 라이트 테마에서 흰 글자가 된다 — 불투명 회색으로 고정한다(스컬킹 C5 실측과 같은 이유). 전역
+ * `button:disabled { opacity: .5 }` 도 이겨야 한다 — 이 라벨이 곧 턴 안내("내 차례 아님"·"경쟁 중"·"카드를 고르세요")다. */
+.oc-play:disabled,
+.oc-draw:disabled {
+  background: #8b90a6;
+  color: #ffffff;
+  opacity: 1;
+  cursor: default;
+}
+
+.oc-suits {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px dashed #e0b32a;
+}
+
+.oc-suit-opt {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--oc-card-bg);
+  color: var(--oc-card-black);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.oc-suit-opt.oc-suit-red {
+  color: var(--oc-card-red);
+}
+
+.oc-suit-opt.selected {
+  outline: 3px solid #e0b32a;
+}
+
+/* ── 외치기 경쟁 버튼 (설계서 §4.10) ─────────────────────────────── */
+/* 버튼 반폭 — 버튼을 담는 레이어와 튜토리얼 연습 칸이 같은 값으로 `left` 를 clamp 한다(raceLeftCss). 버튼 min-width(112px)의
+ * 절반 이상이어야 clamp 한 중심에서도 버튼이 칸 안에 머문다. 변수가 없으면 clamp() 가 무효가 되어 left 가 auto 로 떨어진다. */
+.oc-race-layer,
+.oc-practice-area {
+  --oc-race-half-w: 64px;
+}
+
+/* 화면 위 고정 레이어 — 게임판이 스크롤돼도 버튼은 화면 안에 뜬다. 채팅 패널(100)·규칙 다이얼로그(shadcn z-50) 위라
+ * 다이얼로그를 연 채로도 누를 수 있다 — 창은 3초뿐이다. */
+.oc-race-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  pointer-events: none;
+}
+
+.oc-race-btn {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 112px;
+  min-height: 56px;
+  padding: 8px 16px;
+  overflow: hidden;
+  border: 3px solid #ffffff;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.oc-race-call {
+  background: var(--oc-race-call);
+}
+
+.oc-race-catch {
+  background: var(--oc-race-catch);
+}
+
+.oc-race-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.oc-race-label {
+  line-height: 1;
+}
+
+/* 창 끝까지 남은 시간 — 시작 비율(--oc-race-start)에서 0 으로 줄어든다. */
+.oc-race-timer {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  transform-origin: left center;
+  animation-name: oc-race-shrink;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes oc-race-shrink {
+  from {
+    transform: scaleX(var(--oc-race-start, 1));
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* 튜토리얼 반응 연습 칸 — 다이얼로그 안이라 고정 레이어 대신 이 칸 안에 버튼을 띄운다. */
+.oc-practice-area {
+  position: relative;
+  height: 200px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, currentColor 30%, transparent);
+}
+
+/* ── hover 보정 ───────────────────────────────────────────────────── */
+/* 전역 `button:hover:not(:disabled)`(01-base, 0,2,1)와 `.card-chip:hover:not(:disabled)`(08-hand, 0,3,0)는 단일 클래스(0,1,0)
+ * 배경을 덮는다 — 조커 면·경쟁 버튼·내기/먹기·무늬 버튼이 hover(모바일은 탭 뒤 남는 :hover)에서 회색 배경이 되어 글자가
+ * 읽히지 않는다. 19 가 08 뒤라 같은 (0,3,0)이 이긴다(`<span>` 칩도 :disabled 가 아니라 `.card-chip:hover` 에 걸리므로 같은
+ * 규칙이 필요하다). 색은 위 기본 규칙과 같아야 한다 — onecardCssNamespace.test 가 존재와 값을 고정한다. */
+.oc-play:hover:not(:disabled) {
+  background: #5b8def;
+}
+
+.oc-draw:hover:not(:disabled) {
+  background: #7a6bd0;
+}
+
+.oc-race-call:hover:not(:disabled) {
+  background: var(--oc-race-call);
+}
+
+.oc-race-catch:hover:not(:disabled) {
+  background: var(--oc-race-catch);
+}
+
+.oc-suit-opt:hover:not(:disabled) {
+  background: var(--oc-card-bg);
+}
+
+.oc-card-joker-black:hover:not(:disabled) {
+  background: var(--oc-joker-black-bg);
+}
+
+.oc-card-joker-color:hover:not(:disabled) {
+  background: var(--oc-joker-color-bg);
+}
+
+/* ── 종료 ─────────────────────────────────────────────────────────── */
+.oc-match-reason {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.oc-standings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-standings li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--color-bg-surface);
+}
+
+.oc-standings li.oc-standing-win {
+  background: rgba(224, 179, 42, 0.22);
+  font-weight: 700;
+}
+
+.oc-standings li.oc-standing-me {
+  outline: 2px solid var(--oc-accent-0);
+}
+
+.oc-standing-rank {
+  min-width: 2.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-standing-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-standing-cards {
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-standing-status {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.oc-finished-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.oc-finished-note p {
+  margin: 0;
+  font-weight: 700;
+}
+
+/* 화면에는 숨기고 보조기기에만 읽힌다(경쟁 알림). */
+.oc-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 포털 토큰 — 튜토리얼 다이얼로그 ─────────────────────────────── */
+/* 다이얼로그는 body 포털이라 .oc-table **밖**이다. 칩과 연습 버튼이 쓰는 토큰만 다시 푼다(GameTutorial.bodyClassName).
+ * 값은 위 .oc-table 토큰과 같아야 한다 — onecardCssNamespace.test 가 대조한다. */
+.oc-tokens {
+  --oc-card-bg: #fbfaf6;
+  --oc-card-red: #c62f3a;
+  --oc-card-black: #1f2228;
+  --oc-joker-black-bg: #2b2d33;
+  --oc-joker-black-fg: #f3f3f6;
+  --oc-joker-color-bg: linear-gradient(135deg, #ef4f6b, #f3b63d 38%, #45b26b 66%, #4a86ee);
+  --oc-joker-color-fg: #ffffff;
+  --oc-race-call: #23955a;
+  --oc-race-catch: #d9483d;
+}
