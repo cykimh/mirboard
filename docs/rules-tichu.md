@@ -234,12 +234,14 @@ Mahjong 으로 활성된 wish 가 있는 동안 모든 플레이어는 가능한
 
 **fulfill** 시점: 플레이 카드에 wish rank 가 한 번이라도 포함되면 `Wish.fulfill()` → activeWish.fulfilled=true. 이후 trick 진행 동안 다음 트릭으로 전파 (`TichuEngine.closeTrickAndContinue` 의 `trick.activeWish()` 유지). 그러나 fulfilled wish 는 더 이상 강제되지 않음 (`Wish.isActive()` → false).
 
+**해제 이벤트 (D-126)**: 활성 소원이 사라지는 두 경로 — 위 fulfill, 아래 갭 (b) 의 용 양도 — 에서 공개 `WishCleared(rank)`(`WISH_CLEARED`)를 낸다. 룰 동작은 그대로이고 알림만 더했다. 전에는 이벤트가 없어 클라의 소원 표시가 매 플레이 resync(순번 구멍 때문에 우연히 일어나던)에 기대 지워졌다.
+
 **코드:**
 - 검증: `ActionValidator.validatePlayCard` wish 분기 (`ActionValidator.java:76-86`)
 - fulfill: `TichuEngine.applyPlayCard` (`TichuEngine.java:247-253`)
 - enum: `Wish(int rank, boolean fulfilled)` (`card/Wish.java`)
 
-**테스트:** `ActionValidatorTest` (lead + 보유 + 미포함 → reject).
+**테스트:** `ActionValidatorTest` (lead + 보유 + 미포함 → reject), `TichuEngineWishClearedTest` (해제 이벤트, D-126).
 
 **갭:** `WishFulfillmentChecker` 가 콤보(스트레이트/풀하우스/연속페어)를 보지 않아, 콤보로만 wish rank 를 낼 수 있는 상황에서는 강제되지 않는다. wish + BOMB 인터럽트 시 fulfillment 처리도 명시 부재.
 

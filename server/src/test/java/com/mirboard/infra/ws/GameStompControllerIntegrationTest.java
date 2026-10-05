@@ -151,6 +151,57 @@ class GameStompControllerIntegrationTest {
         assertThat(wishMade.get("payload").get("rank").asInt()).isEqualTo(7);
     }
 
+    /**
+     * D-126 — 본인 큐(`/user/queue/room/{id}`)가 실제로 배달된다. 브로커를 `/user/queue` 로만 열어
+     * 두어 Spring 이 바꿔 쓰는 실제 목적지(`/queue/...-user{세션}`)가 버려졌고, 손패(HAND_DEALT)·
+     * 받은 카드·ERROR 가 한 번도 클라에 닿지 않았다. 매 플레이 resync 가 손패를 우연히 고쳐 가렸다.
+     */
+    @Test
+    void own_queue_receives_hand_after_play_without_seq_and_errors() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("pq_alice", "pq_bob", "pq_charlie", "pq_dave"));
+        Map<String, Long> userIds = userIdsFromMe(tokens);
+        String roomId = createRoom(tokens.get("pq_alice"), "pq-room");
+        joinRoom(tokens.get("pq_bob"), roomId);
+        joinRoom(tokens.get("pq_charlie"), roomId);
+        joinRoom(tokens.get("pq_dave"), roomId);
+        for (String u : List.of("pq_alice", "pq_bob", "pq_charlie", "pq_dave")) {
+            ready(tokens.get(u), roomId);
+        }
+        TichuState.Playing playing = forcePlayingFromDealing(
+                (TichuState.Dealing) stateStore.load(roomId).orElseThrow());
+        stateStore.save(roomId, playing);
+        int leadSeat = playing.trick().leadSeat();
+        List<Long> playerIds = List.of(
+                userIds.get("pq_alice"), userIds.get("pq_bob"),
+                userIds.get("pq_charlie"), userIds.get("pq_dave"));
+        String leaderToken = tokenForUserId(tokens, userIds, playerIds.get(leadSeat));
+
+        BlockingQueue<JsonNode> mine = new ArrayBlockingQueue<>(16);
+        StompSession leader = connect(leaderToken);
+        leader.subscribe("/user/queue/room/" + roomId, collector(mine));
+        Thread.sleep(150);
+
+        Map<String, Object> mahjong = new HashMap<>();
+        mahjong.put("suit", null);
+        mahjong.put("rank", Card.mahjong().rank());
+        mahjong.put("special", Special.MAHJONG.name());
+        leader.send("/app/room/" + roomId + "/action",
+                Map.of("@action", "PLAY_CARD", "cards", List.of(mahjong)));
+
+        JsonNode hand = mine.poll(3, TimeUnit.SECONDS);
+        assertThat(hand).as("낸 뒤 본인 큐로 남은 손패가 와야 한다").isNotNull();
+        assertThat(hand.get("type").asText()).isEqualTo("HAND_DEALT");
+        assertThat(hand.get("payload").get("cards")).hasSize(13);
+        assertThat(hand.has("seq")).as("비공개 이벤트는 순번을 쓰지 않는다").isFalse();
+
+        // Playing 중 그랜드 티츄는 거절된다 — ERROR 도 본인 큐로 와야 한다.
+        leader.send("/app/room/" + roomId + "/action", Map.of("@action", "DECLARE_GRAND_TICHU"));
+        JsonNode error = mine.poll(3, TimeUnit.SECONDS);
+        assertThat(error).as("거절은 본인 큐 ERROR 로 와야 한다").isNotNull();
+        assertThat(error.get("type").asText()).isEqualTo("ERROR");
+    }
+
     // ---------- helpers ----------
 
     private StompSession connect(String token) throws Exception {

@@ -28,4 +28,17 @@ public interface GameEvent {
     default boolean isPrivate() {
         return privateSeat() >= 0;
     }
+
+    /**
+     * false 면 envelope 에 seq 를 붙이지 않는다(방 순번을 소비하지 않음). 기본 true — 기존 게임
+     * 동작 그대로.
+     *
+     * <p>D-126: 방 순번은 클라가 <b>공개 토픽</b>에서 구멍을 찾는 기준이다. 비공개 이벤트가 순번을
+     * 쓰면 그 이벤트를 받지 않는 클라에게 다음 공개 이벤트가 항상 구멍으로 보여 resync 를 부른다
+     * (티츄는 카드를 낼 때마다 4명 전원이 resync 했다). 그래서 비공개 이벤트는 false 로 두는 것이
+     * 맞지만, 기본값을 바꾸면 그 resync 에 기대고 있는 게임의 동작이 바뀌므로 게임이 옵트인한다.
+     */
+    default boolean sequenced() {
+        return true;
+    }
 }

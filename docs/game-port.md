@@ -92,9 +92,16 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 매치의 좌석 인덱스는 액션 좌석 판정·비공개 이벤트 라우팅이 쓰므로 당기면 손패가 남에게 간다.
 새 게임은 이미 탈주한 좌석에 `NOT_APPLICABLE` 을 돌려주면 된다(별도 처리 불필요).
 
-`GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` 만
-노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
+`GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` +
+`sequenced()` 만 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
 `(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
+
+*(D-126)* `GameEvent.sequenced()`(기본 true)가 false 면 브로드캐스터는 방 순번을 발급하지
+않고 envelope 의 `seq` 를 비운다. 방 순번은 클라가 **공개 토픽**에서 구멍을 찾는 기준이라,
+비공개 이벤트가 순번을 쓰면 그 이벤트를 받지 않는 클라에게 다음 공개 이벤트가 항상 구멍으로
+보여 resync 를 부른다. 새 게임은 비공개 이벤트를 false 로 두는 것이 맞다(티츄는
+`!isPrivate()`, 원카드는 S4 에서). 기본값이 true 인 것은 스컬킹이 아직 그 구멍을 라운드 경계 resync 로 쓰고
+있어서다(D-103) — 옮기려면 그 resync 에 기대는 화면 상태를 먼저 이벤트로 옮겨야 한다.
 
 ### D-98 구현에서 고친 3곳
 

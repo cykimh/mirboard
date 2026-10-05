@@ -199,6 +199,39 @@ COMING_SOON — 클라 게임판 S4 전까지 방 생성 불가)·라운드 시�
 이벤트는 손패 전체와 `handVersion` 을 싣는 `HAND_UPDATED` 하나로 통일해 설계서의 `CARDS_RECEIVED` 를 대신했다.
 검증은 매 전이 불변식 검사와 2~6인 무작위 시뮬레이션(인원별 2,000판)이다.
 
+## D-126 (2026-10-04) — 티츄 매 플레이 resync 제거: 비공개 이벤트는 순번을 쓰지 않는다 + `WISH_CLEARED` + resync 를 방 락 안에서
+
+카드를 낼 때마다 비공개 `HAND_DEALT`(D-62)가 방 공통 순번을 하나 썼다. 클라는 본인 큐 이벤트로
+`lastSeq` 를 올리지 않으므로 다음 공개 이벤트가 **모든 클라에서 항상 구멍**이었고, 한 번 낼 때마다
+4명이 전부 REST resync 했다 — `TURN_CHANGED` 등 플레이 리듀서는 사실상 죽은 코드였다. 같은 이유로
+라운드 마지막 배치(`PLAYER_FINISHED`~`MATCH_ENDED`)도 통째로 구멍이라 `MATCH_ENDED` 리듀서가 돌지 않고,
+resync 가 `matchEnded` 를 null 로 덮어 정상 종료 때 종료 패널(리매치 버튼)이 뜨지 않았다(탈주 종료만 떴다).
+
+결정은 넷이다. ① 포트 확장 `GameEvent.sequenced()`(기본 true) — false 면 브로드캐스터가 `RoomSeq.next`
+를 부르지 않고 seq 를 비운다. 원카드 설계(D-123 §4.5b)가 S3 에서 넣기로 한 것과 **같은 시그니처**다
+(D-128 이 이 확장을 이 결정에 맡겼다 — 원카드 S4 는 재정의만 한다). 티츄는 비공개 이벤트(`HAND_DEALT`·
+`CARDS_RECEIVED`)만 false 다. 기본값을 바꾸지 않는 이유는 스컬킹 `HAND_DEALT` 도 같은 구조(라운드당 1회 구멍, D-103 이 수용)인데 스컬킹 리듀서 감사는
+이번 범위 밖이기 때문이다. ② 매 플레이 resync 가 우연히 고쳐 주던 공개 상태를 이벤트로 옮긴다. 소원이
+사라지는 두 경로(소원 숫자를 낸 플레이, 용 양도 — `rules-tichu.md` §9 (b))에 공개 `WISH_CLEARED{rank}`
+를 낸다. 룰은 바꾸지 않는다. ③ resync 는 `RoomActionLock` 을 잡고(`acquireWaiting`) 상태·순번·뷰를
+읽는다. 액션은 같은 락 안에서 저장→브로드캐스트(순번 발급)를 끝내므로 스냅샷과 `eventSeq` 가 같은
+시점이 된다. 지금까지는 어긋난 스냅샷(이벤트 이중 적용·누락)을 다음 플레이의 resync 가 지웠지만, 이제는
+라운드 내내 남으므로 같이 고친다. 락을 약 3초 안에 못 잡으면 예전처럼 잠금 없이 읽는다(가용성 우선).
+비용은 resync 가 락을 쥔 몇 ms 동안 사람 액션이 `BUSY` 가 될 수 있다는 것이다(봇은 50ms 뒤 재시도).
+④ 클라는 resync 에 기대던 화면 상태를 리듀서로 옮긴다. `WISH_CLEARED`, `ROUND_ENDED` 때 공개 뷰를
+`ROUND_END` 형태로 바꾸고, 같은 매치 안의 resync 는 라운드·매치 종료 표시를 지우지 않으며, 에러 문구는
+차례가 넘어가면 지운다. 클라는 원카드 S0(D-124)이 만든 순수 리듀서(`tichuStore.applyEvent`) 위에 얹었다.
+서버만 먼저 나가면 상태는 맞지만(`WISH_CLEARED` 는 미지 이벤트라 resync 된다) 라운드 종료 표시가 다음 라운드
+resync 에 바로 지워지고 최종 라운드 뒤 마지막 좌석의 차례 표시가 남으므로 함께 배포한다. 측정·전수 확인은
+`docs/plans/tichu-resync-d126.md`.
+
+⑤ 실제 브라우저 검증에서 가장 큰 숨은 의존이 나왔다 — **본인 큐(`/user/queue/room/{id}`)가 한 번도 배달되지
+않았다.** 브로커를 `/user/queue` 로만 열어 두었는데 Spring 은 사용자 목적지를 `/queue/...-user{세션}` 으로 바꿔
+넘기므로 손패(`HAND_DEALT`)·받은 카드(`CARDS_RECEIVED`)·`ERROR` 가 전부 버려졌다. 손패가 맞아 보인 것은 매
+플레이 resync 덕이었다(D-62 의 "낸 패가 안 사라짐"이 `HandDealt` 재발행으로 고쳐진 것도 그 이벤트가 만든 순번
+구멍 → resync 때문이다). 브로커를 `/queue` 로 열고, 변환 전 `/queue/...` 를 클라가 직접 구독하는 길은
+`StompAuthChannelInterceptor` 가 막는다 — 남의 세션 id 를 아는 클라가 남의 손패를 받지 못하게(State Hiding).
+
 ## D-125 (2026-10-04) — 원카드 룰 명세 (원카드 S1, 코드 변경 0)
 
 `docs/rules-onecard.md` 를 원카드 룰의 정본으로 둔다. D-123 의 기준선(표준 기본형)에 설계서 §3.2 기본안을

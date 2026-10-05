@@ -18,6 +18,7 @@ import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
+import com.mirboard.infra.ws.RoomActionLock;
 import com.mirboard.infra.ws.RoomPresence;
 import com.mirboard.infra.ws.RoomSeq;
 import java.util.List;
@@ -46,7 +47,7 @@ class RoomControllerLeaveTest {
 
     private final RoomController controller = new RoomController(
             rooms, engines, mock(RoomSeq.class), desertion, mock(RoomPresence.class),
-            mock(RoomChipStore.class), mock(GameAbortService.class));
+            mock(RoomChipStore.class), mock(GameAbortService.class), mock(RoomActionLock.class));
 
     private final AuthPrincipal me = new AuthPrincipal(ME, "me");
 

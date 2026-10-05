@@ -36,6 +36,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 본인 손패는 **`/user/queue/room/{roomId}` 큐로만** 전송. 절대 `/topic/room/{roomId}` 로 새지 않도록 한다.
 - 직렬화 타입 자체를 분리한다: `TableView` (공개) vs `PrivateHand` (본인만). 같은 객체를 두 경로로 쓰지 말 것.
 - 공개 상태에는 각자의 손패 **장수(int)만** 노출. 카드 목록 금지.
+- 브로커 prefix 는 `/topic`·`/queue`(D-126). 클라는 `/user/queue/...` 로 구독하고 Spring 이 본인 세션 목적지
+  `/queue/...-user{세션}` 으로 바꾼다 — `/queue/...` **직접 구독은 인터셉터가 거절**(남의 손패 엿보기 방지).
+  예전 `/user/queue` prefix 에서는 본인 큐가 한 번도 배달되지 않았는데 매 플레이 resync 가 가렸다.
 
 ### 개인정보 최소화 (Schema-Level)
 - `users` 테이블에 **추가 절대 금지** 컬럼: `email`, `phone`, `real_name`, `birth_date`, `address`, 기타 식별/연락 정보.
@@ -196,6 +199,7 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*Test"     # 원카드 엔진·어댑터·봇 (D-127/D-128, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.OneCardRaceIT"   # 원카드 경쟁 창 서버 경로 (D-128, Docker)
+./gradlew :server:test --tests "com.mirboard.infra.ws.TichuEventStreamIT"   # 티츄 공개 순번 무구멍 + 플레이당 resync 측정 → server/build/d126-resync-stats.txt (D-126, Docker)
 MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.tichu.bot.HeuristicBotEvaluationTest"   # 티츄 봇 대형 평가 (~1m30s)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest"
@@ -233,8 +237,14 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 **이벤트 type 문자열은 게임 간 재사용된다**(`TURN_CHANGED` 등) — 토픽이 방 단위이고 방이
 게임을 하나만 가지므로 충돌이 없다.
 
+**비공개 이벤트는 순번을 쓰지 않는다 (D-126)** — `GameEvent.sequenced()`(기본 true)를 false 로.
+`seq` 는 클라가 공개 토픽에서 구멍을 찾는 기준이라, 비공개 이벤트가 쓰면 다른 클라에게 다음 공개
+이벤트가 항상 구멍이 된다(티츄는 카드를 낼 때마다 전원 resync 했다). 티츄는 `!isPrivate()`, 스컬킹은
+아직 true. 공개 상태가 바뀌면 **반드시 공개 이벤트로** 알릴 것 — resync 가 우연히 고쳐 주는 것에 기대지
+말 것(소원 해제가 그랬다 → `WISH_CLEARED`). resync 는 방 액션 락 안에서 상태·`eventSeq` 를 함께 읽는다.
+
 - 서버 → 클라 공개 `/topic/room/{roomId}`
-  - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `ROUND_ENDED`, `MATCH_ENDED` 등
+  - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128, 클라 S4 전 COMING_SOON): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`

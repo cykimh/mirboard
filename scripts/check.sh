@@ -102,6 +102,8 @@ case "$SUBCMD" in
             --tests "com.mirboard.domain.game.tichu.invariant.*" \
             --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest" \
             --tests "com.mirboard.domain.game.tichu.TichuSpecialCardScenarioTest" \
+            --tests "com.mirboard.domain.game.tichu.TichuEngineWishClearedTest" \
+            --tests "com.mirboard.domain.game.tichu.event.*" \
             --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest" \
             --tests "com.mirboard.domain.game.tichu.persistence.TichuMatchStateTest" \
             --tests "com.mirboard.domain.game.tichu.bot.*" \

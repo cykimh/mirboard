@@ -24,6 +24,7 @@ import java.util.Map;
         @JsonSubTypes.Type(value = TichuEvent.TrickTaken.class, name = "TRICK_TAKEN"),
         @JsonSubTypes.Type(value = TichuEvent.TichuDeclared.class, name = "TICHU_DECLARED"),
         @JsonSubTypes.Type(value = TichuEvent.WishMade.class, name = "WISH_MADE"),
+        @JsonSubTypes.Type(value = TichuEvent.WishCleared.class, name = "WISH_CLEARED"),
         @JsonSubTypes.Type(value = TichuEvent.DragonGiven.class, name = "DRAGON_GIVEN"),
         @JsonSubTypes.Type(value = TichuEvent.PlayerFinished.class, name = "PLAYER_FINISHED"),
         @JsonSubTypes.Type(value = TichuEvent.HandDealt.class, name = "HAND_DEALT"),
@@ -45,6 +46,7 @@ public sealed interface TichuEvent extends GameEvent
                 TichuEvent.TrickTaken,
                 TichuEvent.TichuDeclared,
                 TichuEvent.WishMade,
+                TichuEvent.WishCleared,
                 TichuEvent.DragonGiven,
                 TichuEvent.PlayerFinished,
                 TichuEvent.HandDealt,
@@ -68,6 +70,7 @@ public sealed interface TichuEvent extends GameEvent
             case TrickTaken __ -> "TRICK_TAKEN";
             case TichuDeclared __ -> "TICHU_DECLARED";
             case WishMade __ -> "WISH_MADE";
+            case WishCleared __ -> "WISH_CLEARED";
             case DragonGiven __ -> "DRAGON_GIVEN";
             case PlayerFinished __ -> "PLAYER_FINISHED";
             case HandDealt __ -> "HAND_DEALT";
@@ -100,6 +103,15 @@ public sealed interface TichuEvent extends GameEvent
         };
     }
 
+    /**
+     * D-126 — 비공개 이벤트는 방 순번을 쓰지 않는다. 쓰면 그 이벤트를 받지 않는 클라에게 다음
+     * 공개 이벤트가 구멍이 된다(카드를 낼 때마다 {@code HAND_DEALT} 때문에 전원이 resync 했다).
+     */
+    @Override
+    default boolean sequenced() {
+        return !isPrivate();
+    }
+
     record Played(int seat, Hand hand) implements TichuEvent {
     }
 
@@ -116,6 +128,13 @@ public sealed interface TichuEvent extends GameEvent
     }
 
     record WishMade(int rank) implements TichuEvent {
+    }
+
+    /**
+     * 활성 소원이 사라졌다는 공개 알림(D-126) — 소원 숫자가 나왔거나(달성) 용 트릭을 양도했다
+     * (`rules-tichu.md` §9 (b)). 이게 없을 때는 클라 소원 표시가 매 플레이 resync 에 기대 지워졌다.
+     */
+    record WishCleared(int rank) implements TichuEvent {
     }
 
     record DragonGiven(int fromSeat, int toSeat) implements TichuEvent {
