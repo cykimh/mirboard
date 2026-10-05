@@ -156,7 +156,7 @@ record BidsRevealed(Map<Integer, Integer> bids) implements SkullKingEvent {}
 | 영역 | 선택 |
 | --- | --- |
 | Backend | Spring Boot 4.0.1 / Java 25 (Virtual Threads), Gradle 9.4.1 |
-| Data | PostgreSQL 16 (Flyway V1~V10), Redis 7 + **Lua 원자 스크립트 9개** |
+| Data | PostgreSQL 16 (Flyway V1~V12), Redis 7 + **Lua 원자 스크립트 12개** |
 | Realtime | WebSocket + STOMP (SockJS 폴백) |
 | Frontend | Vite + React 18 + TypeScript, Zustand, Tailwind + shadcn/ui |
 | Test | JUnit 5 + Mockito + Testcontainers / Vitest + RTL |

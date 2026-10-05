@@ -17,7 +17,10 @@ import java.util.stream.IntStream;
  * 붙었다 떨어진다. 그래서 {@code race}·{@code result} 를 nullable 로 두고 단계는 파생한다.
  *
  * <p>Redis 에 JSON 으로 저장된다(D-128). 모르는 필드는 무시한다 — 배포 뒤 필드를 늘렸다가 되돌려도 진행 중
- * 매치를 읽을 수 있게 하려는 것으로, 스컬킹 매치 상태(D-120)와 같은 이유다. 안에 든 레코드도 같다.
+ * 매치를 읽을 수 있게 하려는 것으로, 스컬킹 매치 상태(D-120)와 같은 이유다. 상태 레코드 6종 — 이 레코드와 안에
+ * 든 {@link RaceWindow}·{@link RaceWindow.BotPress}·{@link Elimination}·{@link MatchResult}·
+ * {@link MatchResult.Standing} — 이 모두 그렇다. 카드({@code PlayingCard})와 enum 은 해당하지 않는다 — 롤백
+ * 뒤에도 읽히려면 그 모양(카드 필드·enum 상수)은 바뀌지 않아야 한다.
  *
  * @param hands        좌석별 손패. 탈락자는 빈 목록
  * @param drawPile     뽑을 더미, 0번이 맨 위

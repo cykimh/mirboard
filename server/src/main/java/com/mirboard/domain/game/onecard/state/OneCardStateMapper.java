@@ -41,7 +41,8 @@ public final class OneCardStateMapper {
      * 열린 경쟁 창의 공개 부분.
      *
      * @param remainingMillis 창 끝까지 남은 시간(재접속한 클라가 버튼을 얼마나 보여 줄지). 봇이 누를
-     *                        시각이 아니다 — 그건 서버만 안다
+     *                        시각이 아니다 — 그건 서버만 안다. 항상 {@code 0..windowMillis} 다(창이 열린 시각보다
+     *                        시계가 이른 인스턴스가 읽어도 창 길이를 넘지 않는다)
      */
     public record RaceView(int raceId, int ownerSeat, int slot, int jitterX, int jitterY,
                            long windowMillis, long remainingMillis) {
@@ -73,7 +74,8 @@ public final class OneCardStateMapper {
         if (race == null) {
             return null;
         }
-        long remaining = Math.max(0L, race.openedAt() + race.windowMillis() - now);
+        // 0..windowMillis 로 자른다 — now 가 openedAt 보다 이르면(인스턴스 간 시계 차) 창 길이를 넘는 값이 나간다.
+        long remaining = Math.min(race.windowMillis(), Math.max(0L, race.openedAt() + race.windowMillis() - now));
         return new RaceView(race.raceId(), race.ownerSeat(), race.slot(), race.jitterX(), race.jitterY(),
                 race.windowMillis(), remaining);
     }

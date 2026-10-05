@@ -236,11 +236,11 @@ npm --prefix client run test -- authStore   # 특정 테스트만
 - 서버 → 클라 공개 `/topic/room/{roomId}`
   - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
-  - 원카드(D-128, 클라 S4 전 COMING_SOON): `MATCH_STARTED`, `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
+  - 원카드(D-128, 클라 S4 전 COMING_SOON): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
-  - 원카드: `HAND_DEALT`, `HAND_UPDATED`(손패 전체 + `handVersion`), `ERROR`
+  - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
 - 클라 → 서버 `/app/room/{roomId}/action`
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)

@@ -54,6 +54,17 @@ class OneCardGameDefinitionTest {
                 .hasMessageContaining("owner reaction range");
     }
 
+    /**
+     * 환경 변수가 "설정은 됐으나 빈 값"이면 스프링의 enum 변환이 null 을 준다. 그대로 두면 카탈로그 정렬에서 원인 모를
+     * NPE 로 기동이 멈추므로, 설정 키를 밝히며 생성자에서 바로 실패한다({@code RaceSettings} 와 같은 방식).
+     */
+    @Test
+    void a_missing_status_fails_at_startup_naming_the_setting() {
+        assertThatThrownBy(() -> definition(null, 3_000, 1_000, 2_500, 1_000, 2_500))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("mirboard.onecard.status");
+    }
+
     @Test
     void the_factory_builds_a_port_adapter_for_the_room() {
         GameEngine engine = defaults().newEngine(new GameContext("room-9", List.of(1L, 2L)));

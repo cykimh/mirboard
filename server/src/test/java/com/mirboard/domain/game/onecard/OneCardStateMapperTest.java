@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.game.onecard.state.Elimination;
+import com.mirboard.domain.game.onecard.state.MatchResult;
 import com.mirboard.domain.game.onecard.state.OneCardState;
 import com.mirboard.domain.game.onecard.state.OneCardStateMapper;
 import com.mirboard.domain.game.onecard.state.OneCardStateMapper.PrivateView;
@@ -28,6 +29,9 @@ class OneCardStateMapperTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final long OPENED_AT = 10_000L;
+    /** 공개 뷰 최상위 필드의 허용 목록 — 새 최상위 필드가 몰래 공개되면 이 목록과 달라져 테스트가 깨진다. */
+    private static final List<String> PUBLIC_TOP_LEVEL = List.of("phase", "seats", "topCard", "declaredSuit",
+            "attackStack", "direction", "turnSeat", "drawPileCount", "race", "result");
 
     private static OneCardState threeSeats() {
         return seats(hand(heart(9), club(3), club(4)), hand(spade(4), spade(6)), hand(diamond(4)))
@@ -54,7 +58,7 @@ class OneCardStateMapperTest {
         assertThat(view.phase()).isEqualTo("PLAYING");
         assertThat(view.race()).isNull();
         JsonNode json = JSON.readTree(JSON.writeValueAsString(view));
-        assertThat(fieldNames(json)).doesNotContain("hands", "hand", "drawPile", "discardPile");
+        assertThat(fieldNames(json)).containsExactlyInAnyOrderElementsOf(PUBLIC_TOP_LEVEL);
         assertThat(fieldNames(json.get("seats").get(0))).containsExactlyInAnyOrder("seat", "handCount", "eliminated");
     }
 
@@ -81,6 +85,45 @@ class OneCardStateMapperTest {
                 .top(heart(5)).race(race).build();
 
         assertThat(OneCardStateMapper.toTableView(state, OPENED_AT + 9_000).race().remainingMillis()).isZero();
+    }
+
+    /** 창을 연 인스턴스보다 시계가 이른 인스턴스가 읽어도 남은 시간이 창 길이를 넘지 않는다(클라 진행바가 100% 를 넘지 않게). */
+    @Test
+    void the_time_left_never_exceeds_the_window_when_the_clock_is_behind_the_opening() {
+        RaceWindow race = new RaceWindow(7, 0, 3, 0, 0, OPENED_AT, 3_000, 1, null);
+        OneCardState state = seats(hand(heart(9)), hand(spade(4), spade(6)))
+                .top(heart(5)).race(race).build();
+
+        assertThat(OneCardStateMapper.toTableView(state, OPENED_AT - 5_000).race().remainingMillis())
+                .isEqualTo(3_000);
+        assertThat(OneCardStateMapper.toTableView(state, OPENED_AT).race().remainingMillis()).isEqualTo(3_000);
+    }
+
+    /**
+     * 끝난 판의 공개 뷰 — {@code result} 는 영속 상태의 {@code MatchResult} 를 그대로 싣는다. 거기에 필드가 늘면 테스트
+     * 없이 공개로 새므로(State Hiding), 최상위와 결과·순위 한 줄의 필드 이름을 허용 목록으로 고정한다.
+     */
+    @Test
+    void a_finished_tables_public_view_serializes_only_the_allow_listed_fields_and_the_result() throws Exception {
+        OneCardState open = seats(hand(), hand(spade(4), spade(6)), hand(diamond(4))).top(heart(2)).turn(-1).build();
+        OneCardState finished = new OneCardState(open.hands(), open.drawPile(), open.discardPile(), -1, 1, null, 0,
+                null, List.of(), 0, 12, 9, new MatchResult(MatchResult.EndReason.FINISHED, List.of(
+                        new MatchResult.Standing(0, 1, 0, MatchResult.SeatStatus.FINISHED),
+                        new MatchResult.Standing(2, 2, 1, MatchResult.SeatStatus.ALIVE),
+                        new MatchResult.Standing(1, 3, 2, MatchResult.SeatStatus.ALIVE))));
+
+        TableView view = OneCardStateMapper.toTableView(finished, OPENED_AT);
+
+        assertThat(view.phase()).isEqualTo("ENDED");
+        assertThat(view.race()).isNull();
+        JsonNode json = JSON.readTree(JSON.writeValueAsString(view));
+        assertThat(fieldNames(json)).containsExactlyInAnyOrderElementsOf(PUBLIC_TOP_LEVEL);
+        JsonNode result = json.get("result");
+        assertThat(fieldNames(result)).containsExactlyInAnyOrder("reason", "standings");
+        assertThat(result.get("reason").asText()).isEqualTo("FINISHED");
+        assertThat(result.get("standings")).hasSize(3);
+        assertThat(fieldNames(result.get("standings").get(0)))
+                .containsExactlyInAnyOrder("seat", "rank", "cardsLeft", "status");
     }
 
     @Test

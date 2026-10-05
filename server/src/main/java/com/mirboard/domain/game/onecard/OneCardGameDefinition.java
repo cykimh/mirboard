@@ -7,6 +7,7 @@ import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.onecard.persistence.OneCardStateStore;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -47,7 +48,10 @@ public final class OneCardGameDefinition implements GameDefinition {
         this.stateStore = stateStore;
         this.clock = clock;
         this.publisher = publisher;
-        this.status = status;
+        // 환경 변수가 빈 값이면 스프링의 enum 변환이 null 을 준다 — 카탈로그 정렬에서 원인 모를 NPE 로 멈추기 전에 여기서 밝힌다.
+        this.status = Objects.requireNonNull(status,
+                "mirboard.onecard.status(환경 변수 MIRBOARD_ONECARD_STATUS)가 비어 있다 — "
+                        + "AVAILABLE, COMING_SOON, DISABLED 중 하나여야 한다");
         this.raceSettings = new RaceSettings(raceWindowMillis, ownerMinMillis, ownerMaxMillis,
                 catcherMinMillis, catcherMaxMillis, RaceSettings.DEFAULT.slotCount());
     }
@@ -82,7 +86,11 @@ public final class OneCardGameDefinition implements GameDefinition {
         return status;
     }
 
-    /** 설정에서 만든 경쟁 창 설정 — 라운드 시작({@code OneCardRoundStarter})도 같은 값을 쓴다. */
+    /**
+     * 설정에서 만든 경쟁 창 설정 — 엔진 어댑터({@link OneCardGameEngine})가 쓴다. 라운드 시작
+     * ({@code OneCardRoundStarter})은 쓰지 않는다: 시작에는 경쟁 창이 없어 스타터는 {@link RaceSettings#DEFAULT} 로
+     * 엔진을 만들고, {@code startMatch} 는 설정을 읽지 않는다.
+     */
     public RaceSettings raceSettings() {
         return raceSettings;
     }

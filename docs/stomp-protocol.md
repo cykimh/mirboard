@@ -265,7 +265,7 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 
 | type | payload | 의미 |
 | --- | --- | --- |
-| `MATCH_STARTED` | `{ firstSeat, startCard, handSize, drawPileCount }` | 분배 직후(§3) |
+| `MATCH_STARTED` | `{ firstSeat, startCard, handSize, drawPileCount }` | **타입만 정의 — 서버는 시작 때 보내지 않는다**(스컬킹의 첫 라운드와 같다). 시작 상태(분배 직후, §3)는 게임판 진입 resync 의 `tableView` 로 받는다 |
 | `CARD_PLAYED` | `{ seat, card, declaredSuit?, handCount, attackStack, direction }` | 낸 뒤의 손패 장수·공격 누적·방향 |
 | `CARDS_DRAWN` | `{ seat, count, reason, handCount, drawPileCount }` | **장수만**. `reason`: `TURN`·`ATTACK`·`PENALTY` |
 | `PILE_RESHUFFLED` | `{ drawPileCount }` | 버린 더미를 섞어 다시 채움(§7.1) |
@@ -273,14 +273,17 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 | `RACE_OPENED` | `{ raceId, ownerSeat, slot, jitterX, jitterY, windowMillis }` | 외치기 경쟁 창 — 전원에게 같은 위치. **봇 반응 시각은 싣지 않는다** |
 | `RACE_RESOLVED` | `{ raceId, outcome, bySeat }` | `CALLED`·`CAUGHT`·`EXPIRED`·`CANCELLED`(창 중 탈주). 아무도 안 눌렀으면 `bySeat` −1 |
 | `PLAYER_ELIMINATED` | `{ seat, reason, cardsHeld, drawPileCount }` | `BANKRUPT`·`DESERTED`. `drawPileCount` 는 손패를 더미에 넣은 뒤 장수(최종값) |
-| `MATCH_ENDED` | `{ reason, standings: [{seat, rank, cardsLeft, status}] }` | `FINISHED`·`LAST_STANDING`·`NO_HUMANS`·`STALEMATE`. 순위는 1, 1, 3 식 |
+| `MATCH_ENDED` | `{ reason, standings: [{seat, rank, cardsLeft, status}] }` | `reason`: `FINISHED`·`LAST_STANDING`·`NO_HUMANS`·`STALEMATE`. 순위는 1, 1, 3 식. `status`: `FINISHED`(마지막 카드를 냄)·`ALIVE`(끝까지 살아 있음)·`BANKRUPT`·`DESERTED` — `cardsLeft` 는 살아 있으면 남은 장수, 탈락했으면 탈락 순간의 장수 |
 
 **서버 → 클라 (비공개)**: `HAND_DEALT` `{ seat, hand, handVersion }`, `HAND_UPDATED`
-`{ seat, hand, received, handVersion }` — 손패 **전체**를 싣는다(내기·먹기·벌칙·탈락마다). `handVersion` 은 상태
-버전이라 좌석마다 단조 증가하고 resync 의 `privateHand.handVersion` 과 같은 축이다 — 클라는 가진 것보다 낮은 버전을
-버린다. `received` 는 이번에 새로 받은 카드(애니메이션용). `ERROR` 원카드 고유 코드: `MATCH_OVER`·
-`PLAYER_ELIMINATED`·`RACE_IN_PROGRESS`·`NOT_YOUR_TURN`·`CARD_NOT_OWNED`·`INVALID_SUIT_DECLARATION`·
-`CARD_NOT_PLAYABLE`·`COUNTER_REQUIRED`·`NO_RACE`·`NOT_RACE_OWNER`·`OWNER_CANNOT_CATCH`.
+`{ seat, hand, received, handVersion }` — 손패 **전체**를 싣는다. `HAND_UPDATED` 는 내기·먹기·벌칙·탈락마다
+나간다. `HAND_DEALT` 는 `MATCH_STARTED` 처럼 **타입만 정의**돼 있고 서버는 시작 때 보내지 않는다(1판 = 1라운드라
+이후에도 나갈 자리가 없다) — 시작 손패는 게임판 진입 resync 의 `privateHand`(`handVersion` 1)로 받는다.
+`handVersion` 은 상태 버전이라 좌석마다 단조 증가하고 resync 의 `privateHand.handVersion` 과 같은 축이다 —
+클라는 가진 것보다 낮은 버전을 버린다. `received` 는 이번에 새로 받은 카드(애니메이션용). `ERROR` 원카드
+고유 코드: `MATCH_OVER`·`PLAYER_ELIMINATED`·`RACE_IN_PROGRESS`·`NOT_YOUR_TURN`·`CARD_NOT_OWNED`·
+`INVALID_SUIT_DECLARATION`·`CARD_NOT_PLAYABLE`·`COUNTER_REQUIRED`·`NO_RACE`·`NOT_RACE_OWNER`·
+`OWNER_CANNOT_CATCH`.
 
 **경쟁 창(§9)**:
 - `slot` 은 `0..7` — 슬롯 8개는 클라가 게임판 기준 좌표로 정의하는 **프로토콜 상수**다. `jitterX`·`jitterY` 는
@@ -292,7 +295,8 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
   `docs/game-port.md` §2)가 서버에서 처리하므로 클라가 보낼 것은 없다.
 
 **resync**: `tableView` = `{ phase, seats: [{seat, handCount, eliminated}], topCard, declaredSuit, attackStack,
-direction, turnSeat, drawPileCount, race, result }` — `phase` 는 `PLAYING`·`RACE`·`ENDED`, `race` 는
+direction, turnSeat, drawPileCount, race, result }` — `phase` 는 `PLAYING`·`RACE`·`ENDED`, `seats[].eliminated` 는
+boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있으면 `null`, `race` 는
 `{ raceId, ownerSeat, slot, jitterX, jitterY, windowMillis, remainingMillis }`(창 끝까지 남은 시간 — 봇 시각 아님),
 `result` 는 `MATCH_ENDED` 와 같은 모양. `privateHand` = `{ seat, hand, handVersion }`.
 
