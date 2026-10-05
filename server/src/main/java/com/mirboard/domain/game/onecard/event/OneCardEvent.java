@@ -79,6 +79,16 @@ public sealed interface OneCardEvent extends GameEvent
         };
     }
 
+    /**
+     * D-129 — 손패를 담은 비공개 이벤트는 방 순번을 쓰지 않는다(D-126 의 포트 확장). 쓰면 그 이벤트를 받지 않는
+     * 좌석에는 다음 공개 이벤트가 구멍으로 보인다 — 원카드는 내거나 먹을 때마다 {@code HAND_UPDATED} 가 나가므로
+     * 매 차례 전원이 resync 했다(설계서 §4.5b).
+     */
+    @Override
+    default boolean sequenced() {
+        return !isPrivate();
+    }
+
     /** 먹은 이유 (§6.3, §7, §9.1). */
     enum DrawReason {
         TURN,
