@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { GAME_TUTORIALS, tutorialFor } from './gameTutorials';
 import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
 import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
+import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
 
 /**
  * D-121 — 튜토리얼 레지스트리. 클라에서 "튜토리얼용 게임 id" 를 아는 곳은 여기 하나뿐이다.
@@ -24,6 +25,11 @@ describe('tutorialFor', () => {
 
   it('스컬킹 id 로 스컬킹 튜토리얼을 돌려준다', () => {
     expect(tutorialFor('SKULL_KING')).toBe(SKULL_KING_TUTORIAL);
+  });
+
+  it('원카드 id 로 원카드 튜토리얼을 돌려준다', () => {
+    expect(tutorialFor('ONE_CARD')).toBe(ONE_CARD_TUTORIAL);
+    expect(tutorialFor('one_card')).toBe(ONE_CARD_TUTORIAL);
   });
 
   it('대소문자를 정규화한다 (loadGame 과 같은 규약)', () => {
@@ -67,6 +73,6 @@ describe('GAME_TUTORIALS', () => {
 describe('게임 중립 페이지는 게임 튜토리얼 폴더를 직접 import 하지 않는다', () => {
   it.each(['../../pages/GameHubPage.tsx', '../../pages/RoomPage.tsx'])('%s', (path) => {
     const source = readSource(path);
-    expect(source).not.toMatch(/features\/(tichu|skullking)\/tutorial/);
+    expect(source).not.toMatch(/features\/(tichu|skullking|onecard)\/tutorial/);
   });
 });
