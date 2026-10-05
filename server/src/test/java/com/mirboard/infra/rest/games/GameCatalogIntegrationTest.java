@@ -62,15 +62,18 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
-    /** D-102 — 카탈로그 2게임 체제. 정렬은 status → displayName 이라 "스컬킹" 이 먼저다. */
+    /**
+     * D-102 — 정렬은 status → displayName 이라 "스컬킹" 이 먼저다. D-128 — 원카드는 클라 게임판(S4) 전까지
+     * COMING_SOON 이라 AVAILABLE 두 게임 뒤에 온다.
+     */
     @Test
-    void catalog_returns_both_games_when_authenticated() throws Exception {
+    void catalog_lists_every_game_when_authenticated() throws Exception {
         String token = authenticate();
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games").isArray())
-                .andExpect(jsonPath("$.games.length()").value(2))
+                .andExpect(jsonPath("$.games.length()").value(3))
                 .andExpect(jsonPath("$.games[0].id").value("SKULL_KING"))
                 .andExpect(jsonPath("$.games[0].displayName").value("스컬킹"))
                 .andExpect(jsonPath("$.games[0].minPlayers").value(2))
@@ -90,7 +93,13 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions[0]").value("TARGET_SCORE"))
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions[1]").value("TEAMS"))
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions[2]").value("BETTING"))
-                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"));
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[2].displayName").value("원카드"))
+                .andExpect(jsonPath("$.games[2].minPlayers").value(2))
+                .andExpect(jsonPath("$.games[2].maxPlayers").value(6))
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
+                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
     }
 
     @Test

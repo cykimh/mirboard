@@ -2,6 +2,7 @@ package com.mirboard.domain.game.onecard.state;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.onecard.card.PlayingCard;
 import com.mirboard.domain.game.onecard.card.Suit;
@@ -14,6 +15,12 @@ import java.util.stream.IntStream;
  * <p>단계(진행·경쟁·종료)를 sealed 하위 타입으로 나누지 않은 것은 의도적이다 — 스컬킹은 단계마다 들고
  * 있는 것이 달랐지만, 원카드는 세 단계가 같은 테이블(손패·더미·차례)을 공유하고 경쟁 창과 결과만
  * 붙었다 떨어진다. 그래서 {@code race}·{@code result} 를 nullable 로 두고 단계는 파생한다.
+ *
+ * <p>Redis 에 JSON 으로 저장된다(D-128). 모르는 필드는 무시한다 — 배포 뒤 필드를 늘렸다가 되돌려도 진행 중
+ * 매치를 읽을 수 있게 하려는 것으로, 스컬킹 매치 상태(D-120)와 같은 이유다. 상태 레코드 6종 — 이 레코드와 안에
+ * 든 {@link RaceWindow}·{@link RaceWindow.BotPress}·{@link Elimination}·{@link MatchResult}·
+ * {@link MatchResult.Standing} — 이 모두 그렇다. 카드({@code PlayingCard})와 enum 은 해당하지 않는다 — 롤백
+ * 뒤에도 읽히려면 그 모양(카드 필드·enum 상수)은 바뀌지 않아야 한다.
  *
  * @param hands        좌석별 손패. 탈락자는 빈 목록
  * @param drawPile     뽑을 더미, 0번이 맨 위
@@ -30,6 +37,7 @@ import java.util.stream.IntStream;
  * @param result       끝났으면 결과, 아니면 null
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record OneCardState(List<List<PlayingCard>> hands,
                            List<PlayingCard> drawPile,
                            List<PlayingCard> discardPile,
