@@ -72,6 +72,12 @@ describe('원카드 튜토리얼 — 룰 문서와 맞물린 문구 (§ 인용)'
     expect(bodyText('낼 수 있는 카드')).toContain('7 은 와일드가 아닙니다');
   });
 
+  it('낼 수 있는 카드는 공격받는 중이 아닐 때의 규칙이고, 예시 카드의 뜻을 밝힌다 (§5.2·§5.3)', () => {
+    const text = bodyText('낼 수 있는 카드');
+    expect(text).toContain('공격받는 중이 아닐 때');
+    expect(text).toContain('맨 위 ♥9 → ♥3(같은 무늬)·♠9(같은 숫자)');
+  });
+
   it('반격 세기 순서 (§6.2)', () => {
     expect(bodyText('공격과 반격')).toContain('2 < A < 흑백 조커 < 컬러 조커');
   });

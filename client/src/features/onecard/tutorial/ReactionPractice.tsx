@@ -63,14 +63,17 @@ export function ReactionPractice({ random = Math.random }: Props) {
     setPhase('done');
   };
 
+  // 버튼이 뜬 순간도 알린다 — 실전 경쟁이 aria-live 로 창이 열린 사실을 알리는 것과 같다(연습도 같아야 연습이 된다).
   const status =
     phase === 'waiting'
       ? '곧 나타납니다…'
-      : phase === 'done'
-        ? result !== null
-          ? `반응 시간 ${result}ms — 봇은 1.0~2.5초 사이에 누릅니다.`
-          : '3초가 지났습니다 — 실제 판이면 벌칙 없이 닫힙니다.'
-        : '';
+      : phase === 'showing'
+        ? '버튼이 나타났습니다 — 지금 누르세요!'
+        : phase === 'done'
+          ? result !== null
+            ? `반응 시간 ${result}ms — 봇은 1.0~2.5초 사이에 누릅니다.`
+            : '3초가 지났습니다 — 실제 판이면 벌칙 없이 닫힙니다.'
+          : '';
 
   return (
     <div className="tutorial-practice">

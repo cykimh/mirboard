@@ -114,7 +114,7 @@ export const ONE_CARD_TUTORIAL_STEPS: TutorialStep[] = [
     source: '§5',
     body: (
       <>
-        <p>맨 위 카드와 비교해 다음 중 하나면 낼 수 있습니다.</p>
+        <p>공격받는 중이 아닐 때, 맨 위 카드와 비교해 다음 중 하나면 낼 수 있습니다.</p>
         <ul style={LIST}>
           <li>
             <strong>같은 무늬</strong> — 7 로 무늬를 지정했다면 그 무늬
@@ -127,6 +127,7 @@ export const ONE_CARD_TUTORIAL_STEPS: TutorialStep[] = [
           </li>
         </ul>
         <CardRow cards={[c('HEART', 9), c('HEART', 3), c('SPADE', 9)]} />
+        <p style={{ textAlign: 'center', fontSize: '0.85rem', opacity: 0.8 }}>맨 위 ♥9 → ♥3(같은 무늬)·♠9(같은 숫자)</p>
         <p>
           <strong>7 은 와일드가 아닙니다</strong> — 다른 카드처럼 무늬나 숫자가 맞아야 냅니다.
         </p>

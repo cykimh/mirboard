@@ -52,6 +52,18 @@ describe('ReactionPractice', () => {
     expect(screen.getByRole('button', { name: '다시' })).toBeEnabled();
   });
 
+  it('버튼이 뜨면 알림 영역도 알린다 — 실전 경쟁의 aria-live 알림과 같다', () => {
+    render(<ReactionPractice random={() => 0} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '시작' }));
+    expect(status()).not.toHaveTextContent('지금 누르세요');
+    act(() => {
+      vi.advanceTimersByTime(PRACTICE_MIN_DELAY_MS);
+    });
+
+    expect(status()).toHaveTextContent('지금 누르세요!');
+  });
+
   it('버튼은 칸 가장자리에서 버튼 반폭만큼 안쪽으로 보정된 자리에 뜬다 — 경쟁 레이어와 같은 clamp', () => {
     render(<ReactionPractice random={() => 0} />);
 

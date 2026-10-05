@@ -42,6 +42,19 @@ describe('PlayQuiz', () => {
     expect(status()).toHaveTextContent('아니에요 — 낼 수 있습니다.');
   });
 
+  it('고른 답 버튼은 눌린 상태로 알린다 (aria-pressed) — 다음 문제로 가면 풀린다', () => {
+    render(<PlayQuiz />);
+    expect(screen.getByRole('button', { name: '낼 수 있다', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '낼 수 없다', pressed: false })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '낼 수 없다' }));
+    expect(screen.getByRole('button', { name: '낼 수 없다', pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '낼 수 있다', pressed: false })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 문제' }));
+    expect(screen.getByRole('button', { name: '낼 수 없다', pressed: false })).toBeInTheDocument();
+  });
+
   it('다음 문제로 넘어가며 마지막 다음은 처음이다', () => {
     render(<PlayQuiz />);
     const next = () => fireEvent.click(screen.getByRole('button', { name: '다음 문제' }));

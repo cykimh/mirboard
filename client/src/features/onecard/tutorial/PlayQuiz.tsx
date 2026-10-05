@@ -109,10 +109,22 @@ export function PlayQuiz() {
         <OneCardCardChip card={q.candidate} compact />
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-        <Button type="button" size="sm" variant={picked === true ? 'default' : 'outline'} onClick={() => setPicked(true)}>
+        <Button
+          type="button"
+          size="sm"
+          variant={picked === true ? 'default' : 'outline'}
+          aria-pressed={picked === true}
+          onClick={() => setPicked(true)}
+        >
           낼 수 있다
         </Button>
-        <Button type="button" size="sm" variant={picked === false ? 'default' : 'outline'} onClick={() => setPicked(false)}>
+        <Button
+          type="button"
+          size="sm"
+          variant={picked === false ? 'default' : 'outline'}
+          aria-pressed={picked === false}
+          onClick={() => setPicked(false)}
+        >
           낼 수 없다
         </Button>
       </div>
