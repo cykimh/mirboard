@@ -21,8 +21,10 @@ import org.springframework.stereotype.Component;
  * 남아 있으므로 다른 인스턴스가 자동 인계한다 — 리더 선출이 필요 없고, 리더 부재라는
  * 장애 모드도 생기지 않는다.
  *
- * <p>정밀도는 폴링 주기(기본 1s)에 좌우된다. 턴 제한(30~90s)·탈주 유예(120s) 에는
- * 충분하며, 더 짧은 타이머가 필요해지면 그때 주기를 조정한다.
+ * <p>정밀도는 폴링 주기(기본 250ms, {@code mirboard.scheduling.poll-interval-millis})에 좌우된다.
+ * 턴 제한(30~90s)·탈주 유예(120s) 에는 충분하다. 다만 엔진 타이머({@code game} 종류, D-128)는
+ * 수백 ms~수 초짜리라 이 해상도 — 그리고 폴러가 한 스레드로 종류를 차례로 처리해서 생기는 지연 — 를
+ * 그대로 받는다. 더 정밀한 타이머가 필요해지면 그때 주기를 조정한다.
  */
 @Component
 public class DeadlineQueue {

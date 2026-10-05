@@ -4,6 +4,7 @@ import { roomsApi } from '@/api/rooms';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import type { RoomEventSink } from './roomEventSink';
+import { judgeSeq } from './seqGate';
 import type { ResyncEnvelope, StompEnvelope } from '@/types/stomp';
 
 interface ChatPayload {
@@ -23,6 +24,9 @@ interface ChatPayload {
  * 이벤트를 받을 자리가 없었다. 지금은 {@link RoomEventSink} 를 주입받고, 게임별 sink 가
  * 스토어에 꽂는다. 채팅·리액션·재접속 재가동은 게임과 무관하므로 그대로 훅에 남는다.
  *
+ * <p><b>D-124: 순번 판정(중복·구멍)은 이 훅만 한다.</b> 기준점은 resync 의 `eventSeq` 이고
+ * 판정은 `judgeSeq`(./seqGate) — 게임 스토어는 판정이 끝난 이벤트만 받는 순수 리듀서다.
+ *
  * @param sink 게임별 이벤트 싱크. **모듈 상수**를 넘길 것 — 규약은
  *             {@link RoomEventSink} javadoc 참조.
  */
@@ -38,6 +42,12 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
   // 그래서 sink 메서드는 호출 시점에 getState() 를 읽어야 한다(RoomEventSink 규약 2).
   const sinkRef = useRef(sink);
   sinkRef.current = sink;
+  /**
+   * D-124 — 공개 이벤트 순번의 기준점. 스토어가 아니라 훅이 가진다(판정을 게임마다 복사하지
+   * 않도록). resync 스냅샷의 `eventSeq` 가 권위값이고, sink 가 반영했거나 의도적으로 버린
+   * 순번 있는 이벤트마다 전진한다.
+   */
+  const lastSeqRef = useRef(0);
   const resetChat = useRoomChatStore((s) => s.reset);
   const appendChat = useRoomChatStore((s) => s.appendIncoming);
   const appendReaction = useReactionStore((s) => s.add);
@@ -54,6 +64,8 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       );
       // 껍데기를 가공하지 않고 그대로 넘긴다 — 게임별 필드 해석은 sink 책임.
       sinkRef.current.applySnapshot(snap);
+      // 순번 기준점은 스냅샷이 다시 세운다 (D-124).
+      lastSeqRef.current = snap.eventSeq;
     } catch (err) {
       sinkRef.current.setError((err as Error).message);
     }
@@ -61,6 +73,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
 
   useEffect(() => {
     sinkRef.current.reset(roomId);
+    lastSeqRef.current = 0;
     resetChat(roomId);
     resetReactions();
     resync();
@@ -77,16 +90,26 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       reconnectDelay: 2000,
       onConnect: () => {
         setConnected(true);
-        // 연결/재연결 직후 권위 있는 스냅샷으로 lastSeq 동기화.
+        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화.
         resync();
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
-          const result = sinkRef.current.applyEvent(env);
-          if (result === 'unhandled' || result === 'gap') {
-            // 라이프사이클 이벤트 또는 갭 — 권위 있는 스냅샷 재취득.
+          // D-124 — 순번 판정은 여기서만 한다. sink 는 판정이 끝난 이벤트만 받는다.
+          const verdict = judgeSeq(lastSeqRef.current, env.seq);
+          if (verdict === 'duplicate') return;
+          if (verdict === 'gap') {
+            // 놓친 이벤트가 있다 — 권위 스냅샷 재취득(기준점도 스냅샷이 다시 세운다).
             resync();
+            return;
           }
-          // 'applied' / 'duplicate' / 'ignored' 인 경우엔 추가 동작 없음.
+          const result = sinkRef.current.applyEvent(env);
+          if (result === 'unhandled') {
+            // 리듀서 없는 라이프사이클 이벤트 — 권위 스냅샷 재취득. 기준점은 그대로 둔다.
+            resync();
+            return;
+          }
+          // 'applied' | 'ignored' — 순번 있는 이벤트면 기준점을 전진시킨다.
+          if (verdict === 'next' && typeof env.seq === 'number') lastSeqRef.current = env.seq;
         });
         // 본인 큐는 프레임을 가리지 않고 전량 게임 sink 로 넘긴다 — `ERROR` 까지 포함(D-103).
         // 게임마다 에러 코드가 달라 라벨링 위치가 게임 쪽이어야 하고, 같은 큐인데

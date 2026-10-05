@@ -151,6 +151,16 @@ mirboard:
       stomp-default:
         limit: ${MIRBOARD_RATELIMIT_STOMP_LIMIT:60}
         window: 10s
+  onecard:
+    # D-128 — 원카드. 클라 게임판(S4) 전에는 카탈로그에 "준비 중"으로만 보이고 방을 만들 수 없다.
+    # S4 에서 AVAILABLE 로 바꾼다(통합 테스트는 AVAILABLE 로 켜서 방을 만든다).
+    status: ${MIRBOARD_ONECARD_STATUS:COMING_SOON}
+    # "원카드!/잡기!" 경쟁 창 길이와 봇 반응 시간 구간(ms) — 창마다 봇별로 균등 추첨(룰 §9).
+    race-window-millis: 3000
+    bot-reaction-owner-min-millis: 1000
+    bot-reaction-owner-max-millis: 2500
+    bot-reaction-catcher-min-millis: 1000
+    bot-reaction-catcher-max-millis: 2500
   moderation:
     # D-86 — 채팅 금칙어(같은 길이 '*' 마스킹, 대소문자 무시). 운영자가 콤마로 커스터마이즈.
     # 자모 분리 우회 등 고급 회피 대응은 범위 밖. 비우면 마스킹 없음. (예시: 비속어)

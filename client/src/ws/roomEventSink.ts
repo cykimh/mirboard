@@ -33,11 +33,13 @@ export interface RoomEventSink<TTable = unknown, TPrivate = unknown> {
   /** 방 진입/전환 시 게임 상태 초기화. */
   reset(roomId: string): void;
 
-  /** REST `/resync` 응답을 권위 스냅샷으로 반영 (lastSeq 재설정 포함). */
+  /** REST `/resync` 응답을 권위 스냅샷으로 반영. 순번 기준점(`eventSeq`)은 훅이 가진다(D-124). */
   applySnapshot(snapshot: ResyncEnvelope<TTable, TPrivate>): void;
 
   /**
-   * 공개 토픽 이벤트의 부분 패치. 반환값이 `'gap'`/`'unhandled'` 면 훅이 `/resync` 를 부른다.
+   * 공개 토픽 이벤트의 부분 패치 — **순번 판정이 끝난 이벤트만 온다(D-124).** 훅이 중복은 버리고
+   * 구멍은 `/resync` 로 돌린 뒤, 바로 다음 순번이거나 순번 없는 메타 이벤트만 넘긴다. 그래서
+   * 구현은 `lastSeq` 를 갖지 않는 순수 리듀서다. 반환값이 `'unhandled'` 면 훅이 `/resync` 를 부른다.
    *
    * <p>시그니처는 티츄 스토어의 `applyEvent` 와 글자 그대로 같다 — 어댑터 없이 만족하도록.
    */

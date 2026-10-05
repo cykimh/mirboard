@@ -81,23 +81,17 @@ beforeEach(() => {
   useSkullKingStore.getState().reset('r-1');
 });
 
-describe('applyEvent — seq 4값 계약', () => {
+describe('applyEvent — 반환값 계약 (순번 판정은 훅, D-124)', () => {
   beforeEach(() => store().applySnapshot(snapshot()));
 
-  it('중복 seq 는 duplicate', () => {
-    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 10))).toBe('duplicate');
-    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 5))).toBe('duplicate');
-  });
-
-  it('연속 seq 는 applied 이고 lastSeq 를 전진시킨다', () => {
+  it('리듀서가 있는 타입은 applied', () => {
     expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 11))).toBe('applied');
-    expect(store().lastSeq).toBe(11);
   });
 
-  it('구멍 난 seq 는 gap (상태 무변경)', () => {
-    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 13))).toBe('gap');
-    expect(store().seats[0].hasBid).toBe(false);
-    expect(store().lastSeq).toBe(10);
+  it('순번을 판정하지 않는다 — 중복·구멍 판정은 훅 몫', () => {
+    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 0 }, 99))).toBe('applied');
+    expect(store().applyEvent(ev('BID_SUBMITTED', { seat: 1 }, 3))).toBe('applied');
+    expect(store().seats.filter((s) => s.hasBid).map((s) => s.seat)).toEqual([0, 1]);
   });
 
   it('리듀서 없는 타입은 unhandled — 스컬킹에 없는 CHIPS_SETTLED 포함', () => {
@@ -136,7 +130,7 @@ describe('입찰 — State Hiding (§5)', () => {
   });
 });
 
-describe('BIDDING_STARTED — 판정과 무관한 라운드 스크럽 (D-103)', () => {
+describe('BIDDING_STARTED — 라운드 스크럽 (D-103)', () => {
   beforeEach(() => {
     store().applySnapshot(
       snapshot({
@@ -155,14 +149,12 @@ describe('BIDDING_STARTED — 판정과 무관한 라운드 스크럽 (D-103)', 
     );
   });
 
-  it('gap 이어도 지난 라운드 예측값·승수·트릭을 즉시 비운다', () => {
-    // seq 를 크게 띄워 gap 을 만든다 — 실제로 라운드 경계에서 거의 항상 이렇게 온다
-    // (비공개 HAND_DEALT 가 좌석 수만큼 seq 를 태우므로).
+  it('지난 라운드 예측값·승수·트릭을 즉시 비운다', () => {
     const verdict = store().applyEvent(
-      ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 99),
+      ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 11),
     );
 
-    expect(verdict).toBe('gap'); // 훅이 resync 를 부른다
+    expect(verdict).toBe('applied');
     expect(store().phase).toBe('BIDDING');
     expect(store().roundNumber).toBe(4);
     expect(store().handSize).toBe(4);
@@ -170,7 +162,6 @@ describe('BIDDING_STARTED — 판정과 무관한 라운드 스크럽 (D-103)', 
     expect(store().seats.every((s) => s.tricksWon === 0)).toBe(true);
     expect(store().roundScores).toEqual({});
     expect(store().settledTrick).toBeNull();
-    expect(store().lastSeq).toBe(10); // gap 이므로 전진하지 않는다 (resync 가 권위)
   });
 
   /**
@@ -184,32 +175,11 @@ describe('BIDDING_STARTED — 판정과 무관한 라운드 스크럽 (D-103)', 
       roundNumber: 3,
     });
 
-    store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 99));
+    store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 11));
 
     expect(store().seats.every((s) => s.handCount === 4)).toBe(true);
     expect(store().hand).toEqual([]);
     expect(store().selectedIndex).toBeNull();
-  });
-
-  it('연속 seq 면 applied 이고 lastSeq 도 전진한다', () => {
-    const verdict = store().applyEvent(
-      ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 11),
-    );
-
-    expect(verdict).toBe('applied');
-    expect(store().lastSeq).toBe(11);
-    expect(store().roundNumber).toBe(4);
-  });
-
-  /** 지난 이벤트의 재생이 진행 중인 라운드를 지우면 안 된다. */
-  it('duplicate 면 스크럽하지 않는다', () => {
-    const verdict = store().applyEvent(
-      ev('BIDDING_STARTED', { roundNumber: 1, handSize: 1 }, 4),
-    );
-
-    expect(verdict).toBe('duplicate');
-    expect(store().roundNumber).toBe(3); // 그대로
-    expect(store().seats[0].bid).toBe(2); // 그대로
   });
 });
 
@@ -375,23 +345,20 @@ describe('탈주 · 매치 종료', () => {
 describe('연결 상태 메타 (seq 없음)', () => {
   beforeEach(() => store().applySnapshot(snapshot()));
 
-  it('끊김/재접속이 Set 을 토글하고 lastSeq 판정에 영향이 없다', () => {
+  it('끊김/재접속이 Set 을 토글한다', () => {
     expect(store().applyEvent(ev('PLAYER_DISCONNECTED', { seat: 1 }))).toBe('applied');
     expect([...store().disconnectedSeats]).toEqual([1]);
-    expect(store().lastSeq).toBe(10);
 
     expect(store().applyEvent(ev('PLAYER_RECONNECTED', { seat: 1 }))).toBe('applied');
     expect([...store().disconnectedSeats]).toEqual([]);
-    expect(store().lastSeq).toBe(10);
   });
 });
 
 describe('applySnapshot / applyPrivateHand', () => {
-  it('공개+비공개 뷰를 함께 반영하고 lastSeq 를 권위값으로 재설정한다', () => {
+  it('공개+비공개 뷰를 함께 반영한다', () => {
     store().applySnapshot(snapshot({ eventSeq: 77 }));
 
     const s = store();
-    expect(s.lastSeq).toBe(77);
     expect(s.phase).toBe('BIDDING');
     expect(s.handSize).toBe(3);
     expect(s.mySeat).toBe(2);
@@ -443,7 +410,6 @@ describe('applySnapshot / applyPrivateHand', () => {
     store().reset('r-2');
 
     expect(store().roomId).toBe('r-2');
-    expect(store().lastSeq).toBe(0);
     expect(store().seats).toEqual([]);
     expect(store().hand).toEqual([]);
     expect(store().phase).toBeNull();
@@ -503,7 +469,7 @@ describe('completedRounds — 권위값 교체 + 라이브 upsert (D-120)', () =
     expect(store().completedRounds[1].scores[0].total).toBe(30);
     expect(store().completedRounds[1].scores[1].total).toBe(-10);
 
-    // resync 로 lastSeq 가 되감긴 뒤 같은 라운드가 다시 와도 한 건만 남는다.
+    // resync 로 순번 기준점이 되감긴 뒤 같은 라운드가 다시 와도 한 건만 남는다.
     store().applySnapshot(
       snapshot({ eventSeq: 10, tableView: { ...TABLE, completedRounds: store().completedRounds } }),
     );
@@ -624,7 +590,7 @@ describe('매치 종료 뒤 잔여 이벤트 무시 (D-122)', () => {
     expect(store().completedRounds).toEqual([]);
   });
 
-  it('BIDDING_STARTED 가 판정과 무관한 스크럽(D-103)도 하지 않는다', () => {
+  it('BIDDING_STARTED 의 라운드 스크럽(D-103)도 하지 않는다', () => {
     expect(
       store().applyEvent(ev('BIDDING_STARTED', { roundNumber: 4, handSize: 4 }, 20)),
     ).toBe('ignored');
@@ -632,10 +598,9 @@ describe('매치 종료 뒤 잔여 이벤트 무시 (D-122)', () => {
     expect(store().hand).toHaveLength(3);
   });
 
-  it('잔여 이벤트는 resync 를 부르지 않는다 — gap 이어도 ignored', () => {
-    expect(store().applyEvent(ev('CARD_PLAYED', {}, 99))).toBe('ignored');
-    expect(store().applyEvent(ev('WHO_KNOWS', {}, 12))).toBe('ignored');
-    expect(store().lastSeq).toBe(11);
+  it('잔여 이벤트는 ignored — resync 를 부르지 않는다', () => {
+    expect(store().applyEvent(ev('CARD_PLAYED', {}, 12))).toBe('ignored');
+    expect(store().applyEvent(ev('WHO_KNOWS', {}, 13))).toBe('ignored');
   });
 
   it('HAND_DEALT 로 손패를 갈지 않는다', () => {
@@ -652,7 +617,6 @@ describe('매치 종료 뒤 잔여 이벤트 무시 (D-122)', () => {
     store().applySnapshot(
       snapshot({ eventSeq: 30, tableView: { ...TABLE, roundNumber: 3, matchResult: RESULT } }),
     );
-    expect(store().lastSeq).toBe(30);
     expect(store().matchEnded).toEqual(RESULT);
 
     // 서버가 매치가 끝나지 않았다고 말하면(진행 중 상태) 그 말이 이긴다 — 다시 이벤트를 받는다.

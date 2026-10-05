@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Card, Hand, PrivateHand, TableView, TichuDeclaration } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
+import type { ApplyEventResult } from '@/types/stomp';
 import { effectForHandType, useEffectStore } from './effectStore';
 
 /**
@@ -12,7 +13,6 @@ export interface TichuRoomState {
   roomId: string | null;
   tableView: TableView | null;
   privateHand: PrivateHand | null;
-  lastSeq: number;
   selectedCardKeys: Set<string>;
   /** 패스 단계 전용: 슬롯별 카드 키. */
   passSelection: Record<PassSlot, string | null>;
@@ -58,20 +58,17 @@ export interface TichuActions {
     snapshot: {
       tableView: TableView;
       privateHand: PrivateHand;
-      eventSeq: number;
       disconnectedSeats?: number[];
       chips?: Record<number, number>;
     },
   ) => void;
-  applyTableView: (table: TableView, seq?: number) => void;
   applyPrivateHand: (hand: PrivateHand) => void;
   /**
-   * Phase 5d: 공개/비공개 이벤트를 받아 가능한 경우 부분 패치로 store 에 반영한다.
+   * Phase 5d: 공개 이벤트를 부분 패치로 store 에 반영한다. 순번 판정(중복·구멍)은 훅이
+   * 이미 끝냈다(D-124) — 여기 오는 것은 바로 다음 순번이거나 순번 없는 메타 이벤트뿐이다.
    * 반환값:
-   *   'applied'    — 패치 성공, lastSeq 가 envelope.seq 로 갱신됨.
-   *   'duplicate'  — envelope.seq <= lastSeq, 이미 처리한 이벤트.
-   *   'gap'        — envelope.seq > lastSeq + 1, /resync 권유.
-   *   'unhandled'  — 본 이벤트 타입은 reducer 가 없음, /resync 권유.
+   *   'applied'    — 패치 성공.
+   *   'unhandled'  — 본 이벤트 타입은 reducer 가 없음, 훅이 /resync 한다.
    */
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
   setError: (message: string | null) => void;
@@ -89,8 +86,6 @@ export interface TichuActions {
   /** Phase 5e: 드래그 종료 시 호출. fromKey 위치의 카드를 toKey 직전으로 이동. */
   reorderHand: (fromKey: string, toKey: string) => void;
 }
-
-export type ApplyEventResult = 'applied' | 'duplicate' | 'gap' | 'unhandled';
 
 const EMPTY_PASS: Record<PassSlot, string | null> = {
   left: null,
@@ -204,7 +199,6 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   roomId: null,
   tableView: null,
   privateHand: null,
-  lastSeq: 0,
   selectedCardKeys: new Set(),
   passSelection: { ...EMPTY_PASS },
   pendingPassCardKey: null,
@@ -224,7 +218,6 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       roomId,
       tableView: null,
       privateHand: null,
-      lastSeq: 0,
       selectedCardKeys: new Set(),
       passSelection: { ...EMPTY_PASS },
       pendingPassCardKey: null,
@@ -241,11 +234,10 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
     });
   },
 
-  applySnapshot({ tableView, privateHand, eventSeq, disconnectedSeats, chips }) {
+  applySnapshot({ tableView, privateHand, disconnectedSeats, chips }) {
     set({
       tableView,
       privateHand,
-      lastSeq: eventSeq,
       errorMessage: null,
       // 재동기화 시 카운트다운은 정확한 잔여시간을 알 수 없으므로 현재시각 기준 근사.
       turnStartedAt: Date.now(),
@@ -262,25 +254,13 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
     });
   },
 
-  applyTableView(table, seq) {
-    if (seq !== undefined && seq <= get().lastSeq) return;
-    set({ tableView: table, lastSeq: seq ?? get().lastSeq });
-  },
-
   applyPrivateHand(hand) {
     set({ privateHand: hand });
   },
 
   applyEvent(envelope) {
-    const seq = envelope.seq;
-    const lastSeq = get().lastSeq;
-    if (seq !== undefined) {
-      if (seq <= lastSeq) return 'duplicate';
-      if (seq > lastSeq + 1) return 'gap';
-    }
-
     const table = get().tableView;
-    const advance = (next: TableView) => set({ tableView: next, lastSeq: seq ?? lastSeq });
+    const advance = (next: TableView) => set({ tableView: next });
 
     switch (envelope.type) {
       case 'PLAYED': {
@@ -295,11 +275,10 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         return 'applied';
       }
       case 'PASSED': {
-        // TableView 에 passedSeats 는 노출되지 않으므로 seq 만 진행 (다음 TURN_CHANGED 가 차례 갱신).
+        // TableView 에 passedSeats 는 노출되지 않으므로 반영할 것이 없다 (다음 TURN_CHANGED 가 차례 갱신).
         if (!table) return 'unhandled';
         // payload 는 검증 위해 캐스트만.
         envelope.payload as PassedPayload;
-        advance(table);
         return 'applied';
       }
       case 'TURN_CHANGED': {
@@ -308,7 +287,6 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         // Phase 15(#6) — 차례 전환 시각 기록 (클라 로컬 카운트다운 기준).
         set({
           tableView: { ...table, currentTurnSeat: p.currentTurnSeat },
-          lastSeq: seq ?? lastSeq,
           turnStartedAt: Date.now(),
         });
         return 'applied';
@@ -361,26 +339,19 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         // 발행 시점에 TRICK_TAKEN 도 같이 들어오므로 별도 패치 없음.
         if (!table) return 'unhandled';
         envelope.payload as DragonGivenPayload;
-        advance(table);
         return 'applied';
       }
       case 'PLAYER_READY': {
         if (!table) return 'unhandled';
         const p = envelope.payload as PlayerReadyPayload;
-        if (table.readySeats.includes(p.seat)) {
-          advance(table);
-          return 'applied';
-        }
+        if (table.readySeats.includes(p.seat)) return 'applied';
         advance({ ...table, readySeats: [...table.readySeats, p.seat].sort() });
         return 'applied';
       }
       case 'PASSING_SUBMITTED': {
         if (!table) return 'unhandled';
         const p = envelope.payload as PassingSubmittedPayload;
-        if (table.passingSubmittedSeats.includes(p.seat)) {
-          advance(table);
-          return 'applied';
-        }
+        if (table.passingSubmittedSeats.includes(p.seat)) return 'applied';
         advance({
           ...table,
           passingSubmittedSeats: [...table.passingSubmittedSeats, p.seat].sort(),
@@ -400,7 +371,6 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
               doubleVictory: p.score.doubleVictory ?? false,
             },
           ],
-          lastSeq: seq ?? lastSeq,
         }));
         return 'applied';
       }
@@ -408,23 +378,23 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         const p = envelope.payload as { seat: number };
         const next = new Set(get().disconnectedSeats);
         next.add(p.seat);
-        set({ disconnectedSeats: next, lastSeq: seq ?? lastSeq });
+        set({ disconnectedSeats: next });
         return 'applied';
       }
       case 'PLAYER_RECONNECTED': {
         const p = envelope.payload as { seat: number };
         const next = new Set(get().disconnectedSeats);
         next.delete(p.seat);
-        set({ disconnectedSeats: next, lastSeq: seq ?? lastSeq });
+        set({ disconnectedSeats: next });
         return 'applied';
       }
       case 'CHIPS_SETTLED': {
-        // D-82 — 방 칩 정산(공개 메타 이벤트, seq 무관). stacks/deltas 키는 userId 문자열.
+        // D-82 — 방 칩 정산(공개 메타 이벤트, 순번 없음). stacks/deltas 키는 userId 문자열.
         const p = envelope.payload as {
           stacks: Record<number, number>;
           deltas: Record<number, number>;
         };
-        set({ chips: p.stacks ?? {}, chipDeltas: p.deltas ?? {}, lastSeq: seq ?? lastSeq });
+        set({ chips: p.stacks ?? {}, chipDeltas: p.deltas ?? {} });
         return 'applied';
       }
       case 'MATCH_ENDED': {
@@ -437,7 +407,6 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
             mvpUserId: p.mvpUserId ?? null,
             mvpStat: p.mvpStat ?? null,
           },
-          lastSeq: seq ?? lastSeq,
         });
         return 'applied';
       }

@@ -1,5 +1,6 @@
 package com.mirboard.domain.game.core;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -10,7 +11,8 @@ import java.util.Random;
  * 만들어진다 — 인프라는 게임 이름을 직접 쓰지 않는다.
  *
  * <p>표면은 티츄 구현에서 역산했다. 여섯 가지 책임이 있다: ① 액션 적용 ② 상태 직렬화
- * ③ 공개/비공개 뷰 ④ 단계 이름 ⑤ 라운드·매치 진행 ⑥ 봇·타임아웃용 합법 액션.
+ * ③ 공개/비공개 뷰 ④ 단계 이름 ⑤ 라운드·매치 진행 ⑥ 봇·타임아웃용 합법 액션. 여기에 기본값이 있는
+ * 선택형 확장이 하나 붙었다: ⑦ 엔진 타이머(D-128 — 시간이 지나면 저절로 일어나는 전이, 구현하지 않으면 없음).
  * 자세한 근거와 "요트가 깨는 지점"은 {@code docs/game-port.md}.
  *
  * <p><b>포트에 없는 것</b>(의도적): 팀, 칩/판돈, ELO, 좌석 수 4 고정, 트릭·리드수트.
@@ -98,6 +100,39 @@ public interface GameEngine {
 
     /** 턴 제한 초과 시 적용할 안전 액션 (결정적). null 이면 아무것도 안 한다. */
     GameAction timeoutAction(GameState state, int seat);
+
+    // ---------- ⑦ 엔진 타이머 (D-128) ----------
+
+    /**
+     * D-128 — 이 상태에 <b>시간이 지나면 저절로 일어나는 전이</b>가 있으면 지금부터 남은 시간.
+     * 기본은 없음(티츄·스컬킹).
+     *
+     * <p>턴 제한과는 별개다 — 방의 턴 제한이 꺼져 있어도 걸린다. 인프라는 진행 직후마다
+     * ({@code TurnTimeoutScheduler.onTurnAdvanced}) 이 값을 물어 턴 데드라인과 같은 세대 번호로
+     * 데드라인을 걸고, 만료되면 {@link #onTimer} 를 부른다. "남은 시간"을 돌려주는 것은 재무장해도
+     * 처음부터 다시 세지 않게 하려는 것이다 — 게임은 시작 시각을 상태에 두고 자기 시계로 계산한다.
+     *
+     * <p>인프라는 <b>발화 때도</b> 락 안에서 이 값을 다시 묻는다 — 비어 있으면 낡은 발화로 보고 아무것도
+     * 하지 않고, 0 보다 크면 그 시간 뒤로 다시 걸며, 0 이하(이미 지남 포함)일 때만 {@link #onTimer} 를
+     * 부른다. 그러니 같은 상태에서 시계가 흐르면 이 값은 줄어 결국 0 이하가 돼야 하고, 0 이하라고 답한
+     * 상태에서는 {@code onTimer} 가 전이를 돌려줘야 한다(비어 있으면 인프라는 WARN 만 남기고 타이머를 버린다).
+     */
+    default Optional<Duration> timer(GameState state) {
+        return Optional.empty();
+    }
+
+    /**
+     * D-128 — {@link #timer} 가 만료됐을 때의 전이. 비어 있으면 아무 일도 없다.
+     *
+     * <p>인프라는 방 액션 락을 쥔 채 {@code timer(state)} 를 다시 물어 <b>0 이하일 때만</b> 부른다. 세대 번호는
+     * 대부분의 낡은 발화를 거르지만, 진행 경로가 락을 푼 <em>뒤에</em> 세대를 올리므로 락 해제와 세대 상승 사이
+     * 틈이 있어 그 틈에 만기된 옛 타이머는 세대 검사를 통과할 수 있다 — 이 재확인이 마지막 방어선이다. 그래서
+     * 불린 시점의 상태는 만기이고, 구현이 시각을 다시 볼 필요는 없다. 시스템 전이를 {@link GameAction} 으로 두지
+     * 않은 것은 의도적이다: 액션은 클라 JSON 에서 역직렬화되므로 그 계층에 두면 클라가 위조해 보낼 수 있다.
+     */
+    default Optional<Result> onTimer(GameState state) {
+        return Optional.empty();
+    }
 
     // ---------- ⑤ 라운드 · 매치 진행 ----------
 
