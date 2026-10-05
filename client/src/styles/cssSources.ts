@@ -11,4 +11,5 @@ function readCss(relative: string): string {
 }
 
 export const skullkingCssSource = readCss('./parts/18-skullking-table.css');
+export const onecardCssSource = readCss('./parts/19-onecard-table.css');
 export const indexCssSource = readCss('./index.css');

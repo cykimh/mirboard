@@ -178,3 +178,12 @@
     min-height: 44px;
   }
 }
+
+/* D-129 — 원카드 헤더 버튼(채팅·규칙·나가기)도 44px 하한. 스컬킹 블록과 같은 이유다(알약 ~22px, 버튼 사이 6px).
+   터치 기기에서만 — 데스크톱 마우스 무영향. */
+@media (pointer: coarse) {
+  .oc-header button.oc-badge {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
