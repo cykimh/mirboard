@@ -1,0 +1,401 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LATE_NOTICE_MS, OneCardTable, PRESS_RETRY_DELAY_MS } from './OneCardTable';
+import { useOneCardStore } from './onecardStore';
+import { useAuthStore } from '@/features/auth/authStore';
+import type {
+  OneCardCard,
+  OneCardMatchResult,
+  OneCardRaceView,
+  OneCardSeatView,
+  OneCardSuit,
+  OneCardTableView,
+} from '@/types/onecard';
+
+// 소켓만 모킹하고 스토어는 실물을 seed 한다 (스컬킹 게임판 테스트와 같은 방식).
+const sendAction = vi.fn();
+vi.mock('@/ws/useStompRoom', () => ({
+  useStompRoom: () => ({
+    connected: true,
+    sendAction: (a: Record<string, unknown>) => sendAction(a),
+    sendChat: vi.fn(),
+    sendReaction: vi.fn(),
+    chatPanelOpenRef: { current: false },
+  }),
+}));
+
+const c = (suit: OneCardSuit, rank: number): OneCardCard => ({ suit, rank, joker: null });
+const seatOf = (n: number, over: Partial<OneCardSeatView> = {}): OneCardSeatView => ({
+  seat: n,
+  handCount: 5,
+  eliminated: null,
+  ...over,
+});
+
+const NOW = 1_000_000;
+
+function seed(opts: {
+  seatCount: number;
+  mySeat: number;
+  hand?: OneCardCard[];
+  turnSeat?: number;
+  topCard?: OneCardCard | null;
+  declaredSuit?: OneCardSuit | null;
+  attackStack?: number;
+  seats?: OneCardSeatView[];
+  race?: OneCardRaceView | null;
+  result?: OneCardMatchResult | null;
+}) {
+  const table: OneCardTableView = {
+    phase: opts.result ? 'ENDED' : opts.race ? 'RACE' : 'PLAYING',
+    seats: opts.seats ?? Array.from({ length: opts.seatCount }, (_, i) => seatOf(i)),
+    topCard: opts.topCard === undefined ? c('HEART', 9) : opts.topCard,
+    declaredSuit: opts.declaredSuit ?? null,
+    attackStack: opts.attackStack ?? 0,
+    direction: 1,
+    turnSeat: opts.turnSeat ?? -1,
+    drawPileCount: 30,
+    race: opts.race ?? null,
+    result: opts.result ?? null,
+  };
+  useOneCardStore.getState().reset('r-1');
+  useOneCardStore.getState().applySnapshot({
+    roomId: 'r-1',
+    phase: table.phase,
+    eventSeq: 1,
+    tableView: table,
+    privateHand:
+      opts.mySeat >= 0 ? { seat: opts.mySeat, hand: opts.hand ?? [], handVersion: 1 } : null,
+    disconnectedSeats: [],
+    chips: null,
+  });
+}
+
+const RACE: OneCardRaceView = {
+  raceId: 7,
+  ownerSeat: 1,
+  slot: 2,
+  jitterX: 30,
+  jitterY: -40,
+  windowMillis: 3000,
+  remainingMillis: 3000,
+};
+
+const playerIds = (n: number) => Array.from({ length: n }, (_, i) => 100 + i);
+
+function renderTable(over: Partial<Parameters<typeof OneCardTable>[0]> = {}) {
+  const n = over.playerIds?.length ?? 4;
+  return render(<OneCardTable roomId="r-1" playerIds={playerIds(n)} myUserId={100} {...over} />);
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  vi.setSystemTime(NOW);
+  sendAction.mockReset();
+  useAuthStore.setState({ token: 'tok' } as never);
+  useOneCardStore.getState().reset('r-1');
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('OneCardTable — 좌석', () => {
+  it.each([2, 4, 6])('%i인이면 상대 좌석 %i-1 개와 내 정보줄을 그린다', (n) => {
+    seed({ seatCount: n, mySeat: 0 });
+    const { container } = renderTable({ playerIds: playerIds(n) });
+
+    expect(container.querySelectorAll('.oc-seat')).toHaveLength(n - 1);
+    expect(container.querySelector('.oc-me')).not.toBeNull();
+  });
+
+  it('상대 좌석은 이름과 장수만 보여 주고, 1장이면 표시를 세운다', () => {
+    seed({ seatCount: 3, mySeat: 0, seats: [seatOf(0), seatOf(1, { handCount: 1 }), seatOf(2)] });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    const one = container.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(within(one).getByText('1장!')).toBeInTheDocument();
+    expect(container.querySelector('[data-seat="2"]')!.textContent).not.toContain('1장!');
+  });
+
+  it('탈락한 좌석에는 사유를 단다', () => {
+    seed({
+      seatCount: 3,
+      mySeat: 0,
+      seats: [seatOf(0), seatOf(1, { eliminated: 'BANKRUPT', handCount: 0 }), seatOf(2)],
+    });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    expect(within(container.querySelector('[data-seat="1"]') as HTMLElement).getByText('파산')).toBeInTheDocument();
+  });
+
+  it('관전자는 모든 좌석을 보고 손패·버튼이 없다', () => {
+    seed({ seatCount: 4, mySeat: -1, turnSeat: 2 });
+    const { container } = renderTable({ spectator: true });
+
+    expect(container.querySelectorAll('.oc-seat')).toHaveLength(4);
+    expect(screen.queryByRole('region', { name: '내 손패' })).toBeNull();
+    expect(screen.getByText('관전 모드')).toBeInTheDocument();
+  });
+});
+
+describe('OneCardTable — 내기·먹기', () => {
+  const HAND = [c('CLUB', 4), c('HEART', 3), c('SPADE', 9), c('CLUB', 7)];
+
+  it('손패를 무늬·숫자 순으로 보여 주고, 내 차례면 낼 수 없는 카드를 흐리게 한다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const hand = screen.getByRole('region', { name: '내 손패' });
+    const names = within(hand)
+      .getAllByRole('button', { pressed: false })
+      .map((b) => b.getAttribute('aria-label'));
+    expect(names).toEqual(['스페이드 9', '하트 3', '클로버 4', '클로버 7']);
+    expect(within(hand).getByRole('button', { name: '클로버 4' })).toHaveClass('oc-card-dimmed');
+    expect(within(hand).getByRole('button', { name: '하트 3' })).not.toHaveClass('oc-card-dimmed');
+  });
+
+  it('카드를 고르고 내면 그 카드를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '하트 3' }));
+    fireEvent.click(screen.getByRole('button', { name: '카드 내기' }));
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLAY_CARD', card: c('HEART', 3) });
+  });
+
+  it('7 은 무늬를 골라야 낼 수 있고, 고른 무늬를 함께 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND, topCard: c('CLUB', 9) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '클로버 7' }));
+    expect(screen.getByRole('button', { name: '무늬를 고르세요' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: '하트' }));
+    fireEvent.click(screen.getByRole('button', { name: '카드 내기' }));
+
+    expect(sendAction).toHaveBeenCalledWith({
+      '@action': 'PLAY_CARD',
+      card: c('CLUB', 7),
+      declaredSuit: 'HEART',
+    });
+  });
+
+  it('먹기 버튼은 공격받는 중이면 누적 장수를 보여 주고 DRAW 를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND, topCard: c('HEART', 2), attackStack: 4 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.getByText('공격받는 중 +4')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '먹기 (4장)' }));
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'DRAW' });
+  });
+
+  it('내 차례가 아니면 내기·먹기를 막는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.getByRole('button', { name: '내 차례 아님' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '먹기 (1장)' })).toBeDisabled();
+  });
+
+  it('가운데에 맨 위 카드·지정 무늬·더미 장수·차례를 보여 준다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, topCard: c('HEART', 7), declaredSuit: 'CLUB' });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const center = screen.getByRole('region', { name: '테이블' });
+    expect(within(center).getByRole('img', { name: '하트 7' })).toBeInTheDocument();
+    expect(within(center).getByText('지정 ♣ 클로버')).toBeInTheDocument();
+    expect(within(center).getByText('뽑을 더미 30장')).toBeInTheDocument();
+    expect(within(center).getByText('#101 차례')).toBeInTheDocument();
+  });
+
+  it('거절 문구를 보여 주고 닫을 수 있다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => useOneCardStore.getState().setError('지금 낼 수 없는 카드입니다.'));
+    expect(screen.getByRole('alert')).toHaveTextContent('지금 낼 수 없는 카드입니다.');
+
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('OneCardTable — 원카드 경쟁', () => {
+  it('주인에게는 "원카드!" — 누르면 창 번호와 함께 CALL_ONE_CARD 를 보내고 다시 누를 수 없다', () => {
+    seed({ seatCount: 3, mySeat: 1, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const button = screen.getByRole('button', { name: '원카드!' });
+    fireEvent.click(button);
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'CALL_ONE_CARD', raceId: 7 });
+    expect(screen.getByRole('button', { name: '원카드!' })).toBeDisabled();
+  });
+
+  it('다른 사람에게는 "잡기!" — CATCH 를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3), c('CLUB', 5)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'CATCH', raceId: 7 });
+  });
+
+  it('버튼은 서버가 고른 슬롯·지터 자리에 뜬다 — 자동 포커스는 주지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const button = screen.getByRole('button', { name: '잡기!' });
+    // 슬롯 2(78%, 18%) + 지터(+30% × 10, −40% × 6) = (81%, 15.6%)
+    expect(button.style.left).toContain('81%');
+    expect(button.style.top).toBe('15.6%');
+    expect(document.activeElement).not.toBe(button);
+  });
+
+  it('창이 열린 동안 내기·먹기 버튼을 막는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.getByRole('button', { name: '내 차례 아님' })).toBeDisabled();
+  });
+
+  it('관전자와 탈락자에게는 버튼이 없고, 창이 열린 사실은 알림으로 읽힌다', () => {
+    seed({ seatCount: 3, mySeat: -1, race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102], spectator: true });
+    expect(screen.queryByRole('button', { name: /원카드!|잡기!/ })).toBeNull();
+    expect(screen.getByText('#101 카드 1장! 경쟁 중')).toBeInTheDocument();
+    unmount();
+
+    seed({
+      seatCount: 3,
+      mySeat: 2,
+      seats: [seatOf(0), seatOf(1), seatOf(2, { eliminated: 'BANKRUPT', handCount: 0 })],
+      race: RACE,
+    });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(screen.queryByRole('button', { name: /원카드!|잡기!/ })).toBeNull();
+  });
+
+  it('BUSY 로 거절되면 잠시 뒤 같은 누름을 다시 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+    act(() => {
+      useOneCardStore.getState().notePressRejected('BUSY');
+    });
+    expect(sendAction).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(PRESS_RETRY_DELAY_MS);
+    });
+    expect(sendAction).toHaveBeenCalledTimes(2);
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'CATCH', raceId: 7 });
+  });
+
+  it('이미 닫힌 창이면 "늦었어요"를 잠깐 보여 준다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+    act(() => {
+      useOneCardStore.getState().notePressRejected('NO_RACE');
+    });
+    expect(screen.getByText('늦었어요 — 이미 끝난 경쟁입니다')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(LATE_NOTICE_MS);
+    });
+    expect(screen.queryByText('늦었어요 — 이미 끝난 경쟁입니다')).toBeNull();
+  });
+
+  it('창이 닫히면 결과를 한 줄로 보여 주고 알림도 같은 문장이다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => {
+      useOneCardStore.getState().applyEvent({
+        type: 'RACE_RESOLVED',
+        payload: { raceId: 7, outcome: 'CAUGHT', bySeat: 2 },
+      });
+    });
+
+    expect(screen.getAllByText('잡기 성공: #102 → #101 벌칙 1장')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: '잡기!' })).toBeNull();
+  });
+});
+
+describe('OneCardTable — 종료·나가기', () => {
+  const RESULT: OneCardMatchResult = {
+    reason: 'FINISHED',
+    standings: [
+      { seat: 1, rank: 1, cardsLeft: 0, status: 'FINISHED' },
+      { seat: 0, rank: 2, cardsLeft: 3, status: 'ALIVE' },
+      { seat: 2, rank: 3, cardsLeft: 21, status: 'BANKRUPT' },
+    ],
+  };
+
+  it('결과가 오면 순위를 보여 주고 손패 입력을 내린다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], result: RESULT });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const end = screen.getByRole('region', { name: '판 종료' });
+    expect(within(end).getByRole('heading')).toHaveTextContent('판 종료');
+    const rows = within(end).getAllByRole('listitem').map((li) => li.textContent);
+    expect(rows).toEqual(['1위#1010장다 냄', '2위#100 (나)3장', '3위#10221장파산']);
+    expect(screen.queryByRole('region', { name: '내 손패' })).toBeNull();
+  });
+
+  it('내가 1등이면 승리 표시', () => {
+    seed({ seatCount: 3, mySeat: 1, result: RESULT });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.getByRole('heading')).toHaveTextContent('승리 🎉');
+  });
+
+  it('게임 중 나가기는 탈주 확인을 묻고, 취소하면 나가지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    const onExit = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderTable({ playerIds: [100, 101, 102], onExit });
+
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    expect(confirm).toHaveBeenCalled();
+    expect(onExit).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('끝난 판이나 이미 탈락한 좌석은 묻지 않고 나간다', () => {
+    seed({ seatCount: 3, mySeat: 0, result: RESULT });
+    const onExit = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm');
+    renderTable({ playerIds: [100, 101, 102], onExit });
+
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onExit).toHaveBeenCalledTimes(1);
+    confirm.mockRestore();
+  });
+
+  it('방은 끝났는데 결과가 없으면 종료 안내와 메인으로 버튼', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)] });
+    const onExit = vi.fn();
+    renderTable({ playerIds: [100, 101, 102], onExit, roomFinished: true });
+
+    expect(screen.getByText('게임이 종료되었습니다.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '내 손패' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '메인으로' }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('규칙 버튼은 원카드 튜토리얼을 연다', () => {
+    seed({ seatCount: 3, mySeat: 0 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    expect(screen.getByText('미르보드 원카드에 오신 걸 환영합니다')).toBeInTheDocument();
+  });
+});
