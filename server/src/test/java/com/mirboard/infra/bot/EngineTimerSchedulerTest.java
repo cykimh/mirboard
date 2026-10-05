@@ -157,6 +157,8 @@ class EngineTimerSchedulerTest {
             when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
             when(lock.tryAcquire("r1")).thenReturn(true);
             engineWithState();
+            // 락 안 재확인 — 인프라는 timer 가 만기(0 이하)라고 답할 때만 onTimer 를 부른다.
+            when(engine.timer(state)).thenReturn(Optional.of(Duration.ZERO));
             when(engine.onTimer(state)).thenReturn(Optional.of(
                     new GameEngine.Result(next, List.of(event))));
 
@@ -169,6 +171,60 @@ class EngineTimerSchedulerTest {
             order.verify(lock).release("r1");
             order.verify(botScheduler).scheduleBots("r1");
             order.verify(turnTimeout).onTurnAdvanced("r1");
+        }
+
+        /**
+         * D-128 — 진행 경로는 락을 푼 뒤 세대를 올리므로, 그 틈에 만기된 옛 타이머가 락 앞뒤의 세대 검사와 락을
+         * 모두 통과할 수 있다. 그때 상태는 이미 넘어갔다(예: 막 새 창이 열렸다) — 지금 상태에 아직 남은 시간이 있으면
+         * 전이를 적용하지 않고 같은 세대로 그 시간 뒤에 다시 걸어야 한다.
+         */
+        @Test
+        void a_timer_with_time_left_is_rearmed_with_the_same_generation_instead_of_firing() {
+            when(generations.current("r1")).thenReturn(5L);
+            when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
+            when(lock.tryAcquire("r1")).thenReturn(true);
+            engineWithState();
+            when(engine.timer(state)).thenReturn(Optional.of(Duration.ofMillis(2500)));
+            // 옛 발화가 새 상태에 적용되면 막 열린 창이 0초 만에 닫힌다 — 아래에서 안 불렸음을 확인한다.
+            when(engine.onTimer(state)).thenReturn(Optional.of(
+                    new GameEngine.Result(next, List.of(event))));
+
+            scheduler.handle("r1#5");
+
+            verify(deadlines).schedule(EngineTimerScheduler.KIND, "r1#5", Duration.ofMillis(2500));
+            verify(engine, never()).onTimer(any());
+            verify(engine, never()).saveState(any());
+            verify(matchProgress, never()).advance(any(), any(), any(), any());
+            verify(broadcaster, never()).broadcast(anyString(), any(), any());
+            verify(lock).release("r1");
+            verify(botScheduler, never()).scheduleBots(anyString());
+            verify(turnTimeout, never()).onTurnAdvanced(anyString());
+        }
+
+        /**
+         * 같은 틈에서 상태가 이미 타이머 없는 상태로 넘어간 경우 — 낡은 발화는 아무것도 하지 않는다. 재무장도 없다
+         * (새 상태의 타이머는 그 상태를 만든 쪽의 {@code onTurnAdvanced} 가 새 세대로 건다).
+         */
+        @Test
+        void a_state_that_no_longer_declares_a_timer_means_the_stale_firing_does_nothing() {
+            when(generations.current("r1")).thenReturn(5L);
+            when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
+            when(lock.tryAcquire("r1")).thenReturn(true);
+            engineWithState();
+            when(engine.timer(state)).thenReturn(Optional.empty());
+            when(engine.onTimer(state)).thenReturn(Optional.of(
+                    new GameEngine.Result(next, List.of(event))));
+
+            scheduler.handle("r1#5");
+
+            verify(engine, never()).onTimer(any());
+            verify(engine, never()).saveState(any());
+            verify(matchProgress, never()).advance(any(), any(), any(), any());
+            verify(broadcaster, never()).broadcast(anyString(), any(), any());
+            verify(deadlines, never()).schedule(anyString(), anyString(), any());
+            verify(lock).release("r1");
+            verify(botScheduler, never()).scheduleBots(anyString());
+            verify(turnTimeout, never()).onTurnAdvanced(anyString());
         }
 
         @Test
@@ -226,12 +282,17 @@ class EngineTimerSchedulerTest {
             when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
             when(lock.tryAcquire("r1")).thenReturn(true);
             engineWithState();
+            // 만기라고 답했는데 엔진이 줄 전이가 없다(계약 위반) — WARN 만 남기고 아무것도 하지 않는다.
+            when(engine.timer(state)).thenReturn(Optional.of(Duration.ZERO));
             when(engine.onTimer(state)).thenReturn(Optional.empty());
 
             scheduler.handle("r1#5");
 
+            // timer 가 비어 있어서가 아니라(위 테스트) 엔진에 물었는데 전이가 없어서 멈춘 것임을 고정한다.
+            verify(engine).onTimer(state);
             verify(engine, never()).saveState(any());
             verify(broadcaster, never()).broadcast(anyString(), any(), any());
+            verify(deadlines, never()).schedule(anyString(), anyString(), any());
             verify(lock).release("r1");
             verify(botScheduler, never()).scheduleBots(anyString());
             verify(turnTimeout, never()).onTurnAdvanced(anyString());

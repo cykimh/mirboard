@@ -1,6 +1,6 @@
 # GameEngine 포트 설계 (D-97 설계 · D-98 구현)
 
-> 상태: **구현 완료** (S1, D-98) · 설계 2026-07-30 · 반영 2026-07-30 · 엔진 타이머 추가 D-128(2026-10-04)
+> 상태: **구현 완료** (S1, D-98) · 설계 2026-07-30 · 반영 2026-07-30 · 엔진 타이머 추가 D-128(2026-10-05)
 > 이 문서는 **계약 정본**이다. 포트를 바꾸면 여기를 먼저 고친다.
 > 구현 순서와 세션 분할은 `docs/plans/multi-game-sessions.md`.
 
@@ -21,8 +21,9 @@ CLAUDE.md 의 "새 게임 = Bean 추가" 문구는 이제 **인게임까지 참*
 
 ## 1. 포트 표면 — 티츄 구현에서 역산
 
-지금 인게임이 실제로 요구하는 것은 6가지다. 각각의 현재 구현과 "요트가 깨는 지점"을
-같이 적는다 — **포트는 두 번째 게임이 아니라 세 번째 게임에서 검증**되기 때문이다.
+지금 인게임이 실제로 요구하는 것은 6가지이고, 기본값이 있는 **선택형 확장** 하나(⑦, D-128)가 붙었다.
+각각의 현재 구현과 "요트가 깨는 지점"을 같이 적는다 — **포트는 두 번째 게임이 아니라 세 번째 게임에서
+검증**되기 때문이다.
 
 | # | 책임 | 현재(티츄) | 스컬킹 | 요트가 깨는 지점 |
 | --- | --- | --- | --- | --- |
@@ -33,6 +34,7 @@ CLAUDE.md 의 "새 게임 = Bean 추가" 문구는 이제 **인게임까지 참*
 | 4 | 단계 이름 | `phaseName(state)` | 입찰/플레이 | 굴림/기록 |
 | 5 | 라운드·매치 진행 | `MatchProgressService.onRoundEnd` + `TichuMatchState.isMatchOver` | **10라운드 고정** | **12칸 채우면 종료** |
 | 6 | 합법 액션 | `LegalActionEnumerator.enumerate` + `TimeoutActionPolicy.choose` | 동일 | 조합 폭발(주사위 고정 2^5 × 남은 칸) |
+| 7 | 엔진 타이머 *(선택, D-128)* | 없음(기본 empty) | 없음(기본 empty) | 해당 없음 — 원카드의 경쟁 창이 쓴다(§2) |
 
 ### 확정한 인터페이스
 
@@ -64,13 +66,13 @@ public interface GameEngine {                       // per-room. newEngine(ctx) 
     default GameAction botAction(GameState state, int seat, Random random) { ... }  // 기본 균등분포
     GameAction timeoutAction(GameState state, int seat);
 
-    // ⑤ 라운드 · 매치 진행
-    Advance advance(GameState newState, List<GameEvent> outbound);
-    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
-
     // ⑦ 엔진 타이머 (D-128) — 기본 없음. 시간이 지나면 저절로 일어나는 전이(§2)
     default Optional<Duration> timer(GameState state) { return Optional.empty(); }  // 지금부터 남은 시간
     default Optional<Result> onTimer(GameState state) { return Optional.empty(); }  // 만료 시 전이
+
+    // ⑤ 라운드 · 매치 진행
+    Advance advance(GameState newState, List<GameEvent> outbound);
+    DesertOutcome desert(int seat, long deserterUserId, List<GameEvent> outbound);
 
     record Result(GameState newState, List<GameEvent> events) {}
     record Advance(boolean roundCompleted, boolean matchCompleted) {}
@@ -225,9 +227,24 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 - **남은 시간**을 돌려준다. 재무장해도 처음부터 다시 세지 않게, 게임은 시작 시각을 상태에 두고 자기
   시계로 계산한다(원카드: 창 연 시각 + 가장 빠른 봇 반응 또는 창 길이).
 - **발화**: `EngineTimerScheduler` 가 턴 타임아웃과 같은 가드를 거친다 — 세대 → IN_GAME → 락(실패 시 200ms
-  재시도) → 락 안 재확인. 적용만 `timeoutAction` 대신 `onTimer` 이고, 결과는 다른 진행과 같은 길(저장 →
-  `advance` → 브로드캐스트 → 봇·타이머 재무장)을 탄다. 세대 번호가 "타이머를 건 뒤 상태 무변경"을
-  보장하므로 `onTimer` 는 시각을 다시 보지 않는다.
+  재시도) → 락 안 재확인(세대·방 상태). 적용만 `timeoutAction` 대신 `onTimer` 이고, 결과는 다른 진행과 같은
+  길(저장 → `advance` → 브로드캐스트 → 봇·타이머 재무장)을 탄다.
+- **락 안 `timer` 재확인 — 마지막 방어선**: 인프라는 락을 쥔 채 상태를 읽고 `timer(state)` 를 **다시 물어 0
+  이하일 때만** `onTimer` 를 부른다. 비어 있으면(낡은 발화) 아무것도 하지 않고, 0 보다 크면 같은 세대로 그 시간
+  뒤에 다시 걸고 끝낸다(저장·브로드캐스트·재무장 없음). 만기라고 답했는데 `onTimer` 가 비어 있으면(계약 위반)
+  WARN 만 남기고 버린다.
+  - 왜 필요한가: 세대 번호는 대부분의 낡은 발화를 거르지만, 진행 경로(액션·탈주·턴 타임아웃·엔진 타이머 발화)는
+    락을 푼 *뒤에* 세대를 올려(봇 경로만 락 안) **락 해제와 세대 상승 사이에 틈**이 있다. 그 틈에 만기된 옛
+    타이머는 락 앞뒤의 세대 검사를 모두 통과해 이미 넘어간 상태를 만난다. 세대 번호가 "상태 무변경"을 보장한다고
+    믿으면 안 된다.
+  - 게임에 주는 뜻: 불린 시점의 상태는 만기라서 `onTimer` 가 시각을 다시 볼 필요는 없다. 대신 `timer` 는 같은
+    상태에서 시계가 흐르면 줄어 결국 0 이하가 돼야 하고, 0 이하일 때 `onTimer` 는 전이를 줘야 한다.
+  - *처음 설계는 "세대 번호가 보장하므로 `onTimer` 는 시각을 다시 보지 않는다"였다 — S3 최종 리뷰에서 바로잡았다.
+    턴 타임아웃에도 같은 틈이 원래부터 있으나 이번엔 고치지 않았다(`docs/plans/onecard.md` §7 후속).*
+- **해상도**: 폴링 주기(`mirboard.scheduling.poll-interval-millis`, 기본 250ms) 단위다. 타이머는 만기 시각에
+  정확히 깨지 않고 다음 폴링에서 발견되며(최대 한 주기), 락 경합이면 200ms 뒤 재시도한다. 폴러가 단일 스레드로
+  종류(`turn`·`game`·`desertion`)를 차례로 처리하므로 다른 핸들러가 느리면(탈주 확정의 락 대기는 최대 약 3초)
+  그만큼 더 늦는다. 게임은 이 지연을 설정으로 흡수한다 — 원카드는 창 끝·봇 시각 직후에 처리된 누름도 인정한다.
 - **취소**: 세대가 오르면(누가 행동함) 두 종류가 함께 지워진다. `cancel()`(D-122)도 마찬가지다.
 - **왜 `GameAction` 이 아니라 `Result` 인가**: 액션은 클라 JSON 에서 역직렬화된다. "창 닫기" 같은 시스템
   전이를 그 계층에 두면 클라가 위조해 보낼 수 있다.

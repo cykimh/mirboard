@@ -249,7 +249,9 @@ public final class OneCardEngine {
 
     /**
      * 경쟁 창의 시간 전이 — 추첨해 둔 봇의 누름이 창보다 빠르면 그 누름, 아니면 아무도 안 누른 채 닫힘(§9-4).
-     * 발화를 믿는다: 시각을 다시 보지 않는다(설계서 §4.5).
+     * 시각을 다시 보지 않는다 — 부르는 쪽(인프라)이 락 안에서 {@code timer(state)} 가 만기(0 이하)임을 다시
+     * 확인한 상태에만 부르는 것이 포트 계약이다(`docs/game-port.md` §2, 세대 번호만으로는 낡은 발화를 다 못 거른다).
+     * 만기 판정은 {@link #timerDeadline} 과 어댑터의 시계가 맡는다 — 순수 엔진에는 시계가 없다.
      */
     public Optional<Result> onTimer(OneCardState state) {
         if (state.ended() || state.race() == null) {

@@ -33,6 +33,13 @@ import org.springframework.stereotype.Component;
  * 재확인. 적용 단계만 {@code timeoutAction} 대신 {@code onTimer} 이고, 결과는 다른 진행과 같은 경로를
  * 탄다(저장 → {@code matchProgress.advance} → 브로드캐스트 → 봇·타이머 재무장).
  *
+ * <p><b>마지막 방어선은 락 안의 {@code timer} 재확인이다(D-128).</b> 세대 번호는 대부분의 낡은 발화를
+ * 거르지만, 진행 경로(컨트롤러·탈주·두 스케줄러)는 락을 푼 <em>뒤에</em> 세대를 올리므로 그 틈이 있다 — 틈에
+ * 만기된 옛 타이머는 락 앞뒤의 세대 검사를 모두 통과해 이미 넘어간 상태를 만난다. 그래서 락 안에서 상태를 읽은 뒤
+ * {@code timer(state)} 를 다시 묻는다: 비어 있으면 낡은 발화라 멈추고, 아직 남았으면 같은 세대로 그 시간 뒤에
+ * 다시 걸고 멈추며, 0 이하일 때만 {@code onTimer} 를 적용한다. (턴 타임아웃에도 같은 틈이 있으나 이번에는
+ * 고치지 않았다.)
+ *
  * <p>게임을 모른다 — 무엇이 언제 일어나는지는 엔진이 답한다.
  */
 @Component
@@ -121,8 +128,30 @@ public class EngineTimerScheduler implements DeadlineHandler {
             GameState state = engine.loadState().orElse(null);
             if (state == null) return;
 
+            // 세대 검사만으로는 락 해제~세대 상승 틈에 만기된 옛 타이머를 못 거른다 — 지금 상태가 정말 만기인지
+            // 락 안에서 다시 묻는다(이 틈에 전이가 한 번 이상 끼었을 수 있다).
+            Optional<Duration> left = engine.timer(state);
+            if (left.isEmpty()) {
+                // 이 상태에는 타이머가 없다 — 상태가 넘어간 뒤의 낡은 발화. 새 상태의 타이머는 그걸 만든 쪽이 건다.
+                log.debug("Engine timer stale, state declares none: roomId={} gen={}", roomId, capturedGen);
+                return;
+            }
+            if (left.get().isPositive()) {
+                // 아직 만기가 아니다 — 같은 세대로 남은 시간 뒤에 다시 건다(저장·브로드캐스트·재무장 없음).
+                // 세대가 그 사이 오르면 다음 발화가 세대 검사에서 버려진다.
+                deadlines.schedule(KIND, TurnTimeoutScheduler.member(roomId, capturedGen), left.get());
+                log.debug("Engine timer not due yet, rearmed: roomId={} gen={} left={}",
+                        roomId, capturedGen, left.get());
+                return;
+            }
+
             Optional<GameEngine.Result> result = engine.onTimer(state);
-            if (result.isEmpty()) return;
+            if (result.isEmpty()) {
+                // 만기라고 답했는데 전이가 없다 — 포트 계약 위반. 타이머는 이미 팝돼 사라지므로 조용히 두지 않는다.
+                log.warn("Engine timer due but onTimer returned nothing: roomId={} gen={} phase={}",
+                        roomId, capturedGen, engine.phaseName(state));
+                return;
+            }
 
             GameState newState = result.get().newState();
             engine.saveState(newState);

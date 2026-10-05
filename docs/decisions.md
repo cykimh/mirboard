@@ -181,7 +181,9 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 포트에 선택형 엔진 타이머를 더했다 — `GameEngine.timer(state)`(지금부터 남은 시간)·`onTimer(state)`(만료 시
 전이), 기본은 없음이라 티츄·스컬킹은 그대로다. 무장은 `TurnTimeoutScheduler.onTurnAdvanced` 가 턴 데드라인과
 같은 세대 번호로 `deadlines:game` 에 걸고(호출 지점 변경 0, 턴 제한을 꺼도 걸림) 발화는 새 `EngineTimerScheduler`
-가 턴 타임아웃과 같은 가드로 한다. 원카드는 순수 엔진(D-127)을 감싼 어댑터·정의(`mirboard.onecard.status`, 기본
+가 턴 타임아웃과 같은 가드로 한다. 발화 시 락 안에서 `timer(state)` 로 남은 시간을 다시 확인해 만기일 때만
+`onTimer` 를 부른다(세대 번호만으로는 락 해제와 세대 상승 사이 틈에 만기된 옛 타이머를 못 거르므로 이것이 마지막
+방어선이다). 원카드는 순수 엔진(D-127)을 감싼 어댑터·정의(`mirboard.onecard.status`, 기본
 COMING_SOON — 클라 게임판 S4 전까지 방 생성 불가)·라운드 시작·휴리스틱 봇·기록기(V12)로 붙었고, 인프라 코드에는
 게임 이름이 없다. 계획 단계에서 사용자가 정한 셋: 비공개 이벤트 비순번(설계 §4.5b)은 같은 확장을 넣는 D-126 에
 맡기고 원카드는 병합 뒤 재정의만 한다(S4 착수 조건), 창 끝·봇 시각 직후에 처리된 누름도 인정한다(서버가 먼저
