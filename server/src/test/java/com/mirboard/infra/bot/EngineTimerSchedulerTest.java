@@ -277,7 +277,7 @@ class EngineTimerSchedulerTest {
         }
 
         @Test
-        void nothing_due_means_nothing_is_saved_broadcast_or_rearmed() {
+        void a_due_timer_without_an_engine_transition_touches_nothing() {
             when(generations.current("r1")).thenReturn(5L);
             when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
             when(lock.tryAcquire("r1")).thenReturn(true);
