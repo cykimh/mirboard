@@ -43,14 +43,21 @@ vi.mock('@/api/users', () => ({ usersApi: { names } }));
 
 // 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120). 텍스트는
 // 대기실 튜토리얼 테스트(D-121)가 IN_GAME 분기 진입을 확인하는 데 쓴다.
-const { skullProps, tichuProps } = vi.hoisted(() => ({
+const { skullProps, tichuProps, oneCardProps } = vi.hoisted(() => ({
   skullProps: [] as Record<string, unknown>[],
   tichuProps: [] as Record<string, unknown>[],
+  oneCardProps: [] as Record<string, unknown>[],
 }));
 vi.mock('@/features/skullking/SkullKingTable', () => ({
   SkullKingTable: (props: Record<string, unknown>) => {
     skullProps.push(props);
     return <div data-testid="skullking-table">스컬킹 게임판</div>;
+  },
+}));
+vi.mock('@/features/onecard/OneCardTable', () => ({
+  OneCardTable: (props: Record<string, unknown>) => {
+    oneCardProps.push(props);
+    return <div data-testid="onecard-table">원카드 게임판</div>;
   },
 }));
 vi.mock('@/features/tichu/GameTable', () => ({
@@ -188,6 +195,7 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
     vi.clearAllMocks();
     skullProps.length = 0;
     tichuProps.length = 0;
+    oneCardProps.length = 0;
     names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
   });
@@ -272,6 +280,30 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
 
     expect(await screen.findByText('게임이 종료되었습니다.')).toBeInTheDocument();
     expect(screen.queryByTestId('skullking-table')).toBeNull();
+  });
+
+  // D-129 — 원카드는 종료 화면(순위)을 가진 두 번째 게임이다. 이 분기가 없으면 원카드 방이 티츄 게임판으로 떨어진다.
+  it('원카드 게임 중이면 원카드 게임판을 그린다 — 티츄 게임판으로 떨어지지 않는다', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2, 3] });
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByTestId('tichu-table')).toBeNull();
+    expect(oneCardProps.at(-1)!.playerIds).toEqual([1, 2, 3]);
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(false);
+  });
+
+  it('원카드도 게임 중 FINISHED 를 받으면 게임판을 유지하고 roomFinished 를 넘긴다', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME' });
+    await screen.findByTestId('onecard-table');
+
+    act(() => {
+      metaCallback()({ ...ROOM, gameType: 'ONE_CARD', status: 'FINISHED' } as Room);
+    });
+
+    expect(screen.getByTestId('onecard-table')).toBeInTheDocument();
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
   });
 
   it('티츄 방은 기존대로 FINISHED 전이 시 종료 카드로 바뀐다', async () => {
