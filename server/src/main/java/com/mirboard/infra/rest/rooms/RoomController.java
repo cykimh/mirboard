@@ -12,6 +12,7 @@ import com.mirboard.domain.lobby.room.RoomNotFoundException;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.infra.bot.GameProgressKick;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
@@ -50,6 +51,7 @@ public class RoomController {
     private final RoomChipStore chipStore;
     private final GameAbortService aborts;
     private final RoomActionLock lock;
+    private final GameProgressKick kick;
 
     public RoomController(RoomService rooms,
                           GameEngineProvider engines,
@@ -58,7 +60,8 @@ public class RoomController {
                           RoomPresence sessions,
                           RoomChipStore chipStore,
                           GameAbortService aborts,
-                          RoomActionLock lock) {
+                          RoomActionLock lock,
+                          GameProgressKick kick) {
         this.rooms = rooms;
         this.engines = engines;
         this.seqs = seqs;
@@ -67,6 +70,7 @@ public class RoomController {
         this.chipStore = chipStore;
         this.aborts = aborts;
         this.lock = lock;
+        this.kick = kick;
     }
 
     @GetMapping
@@ -254,6 +258,9 @@ public class RoomController {
                 lock.release(roomId);
             }
         }
+        // S5 — 클라가 판을 다시 보는 순간: 멈춘 진행(재기동 뒤 봇 차례·사라진 엔진 타이머)을 다시 건다. 락을 푼 뒤에
+        // 걸고(킥이 같은 락을 기다리지 않게), 킥은 비동기라 이 응답을 늦추지 않는다. 턴 데드라인은 건드리지 않는다.
+        kick.kick(roomId, me.userId());
         return new ResyncResponse(
                 roomId,
                 snap.phase(),

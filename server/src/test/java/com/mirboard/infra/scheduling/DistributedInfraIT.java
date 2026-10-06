@@ -223,6 +223,23 @@ class DistributedInfraIT {
         assertThat(deadlines.pollDue("desertion")).isEmpty();
     }
 
+    /**
+     * S5 — 진행 킥은 이 세대의 엔진 타이머를 <b>없을 때만</b> 건다(ZADD NX). 이미 걸린 무장을 덮으면 킥이 락 없이 읽은 낡은 남은
+     * 시간으로 정상 무장을 늦출 수 있었다. pop 된 항목은 없는 것이라 다시 걸린다.
+     */
+    @Test
+    void schedule_if_absent_never_overwrites_an_armed_deadline() {
+        deadlines.schedule("game", "room-1#3", Duration.ofHours(1));
+
+        assertThat(deadlines.scheduleIfAbsent("game", "room-1#3", Duration.ZERO)).isFalse();
+        assertThat(deadlines.pollDue("game")).as("1시간 무장이 그대로 — 0 으로 덮이지 않았다").isEmpty();
+
+        deadlines.schedule("game", "room-2#1", Duration.ZERO);
+        assertThat(deadlines.pollDue("game")).containsExactly("room-2#1");
+        assertThat(deadlines.scheduleIfAbsent("game", "room-2#1", Duration.ZERO)).as("pop 뒤에는 없다").isTrue();
+        assertThat(deadlines.pollDue("game")).containsExactly("room-2#1");
+    }
+
     @Test
     void concurrent_pollers_never_receive_the_same_deadline_twice() throws Exception {
         // 8개 폴러가 동시에 덤벼도 200개 항목이 정확히 한 번씩만 배분돼야 한다.
