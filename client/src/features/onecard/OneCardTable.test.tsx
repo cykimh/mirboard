@@ -612,6 +612,60 @@ describe('OneCardTable — 낡은 창 복구 (S5)', () => {
     expect(sendAction).toHaveBeenCalledTimes(2);
     expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'CATCH', raceId: 7 });
   });
+
+  /** 떠난 게임판의 타이머가 전역 스토어에 신호를 올리면, 다음에 마운트하는 원카드 방 게임판이 그 신호로 쓸데없이 다시 받는다. */
+  it('언마운트하면 낡은 창 타이머를 거둔다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102] });
+
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(RACE.remainingMillis + STALE_RACE_GRACE_MS * 2);
+    });
+
+    expect(useOneCardStore.getState().resyncNonce).toBe(0);
+  });
+
+  /** 스냅샷이 마감을 다시 맞추면(남은 시간이 늘어남) 낡은 창 확인도 새 마감 기준으로 다시 선다. */
+  it('스냅샷이 마감을 늦추면 낡은 창 확인도 그만큼 늦어진다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE }); // 마감 = NOW + 3000
+    renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+    act(() =>
+      onecardRoomSink.applySnapshot(
+        snapshotOf({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: { ...RACE, remainingMillis: 3_000 } }),
+      ),
+    ); // 새 마감 = NOW + 5000
+    act(() => {
+      vi.advanceTimersByTime(2_500); // NOW + 4500 = 옛 마감 + 1.5초, 새 마감 + 1.5초(NOW + 6500) 전
+    });
+    expect(requestResync).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(2_000); // NOW + 6500
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * 스토어는 모듈 전역이고 reset 은 훅 effect(첫 렌더 뒤)에서만 불린다 — 이전 방 세션이 다시 받기 신호를 올린 채 끝났다면
+   * 다음 원카드 방의 첫 렌더가 그 값을 읽는다. 값이 아니라 **변화**에 반응해야 마운트 직후 REST resync 가 훅 자신의 것에
+   * 더해 한 번 더 나가지 않는다.
+   */
+  it('이전 세션이 남긴 다시 받기 신호로는 마운트 직후 다시 청하지 않고, 새 신호는 그대로 통한다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    useOneCardStore.setState({ resyncNonce: 2 }); // 이전 방 세션이 남긴 값
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(requestResync).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(RACE.remainingMillis + STALE_RACE_GRACE_MS); // 이 창의 낡은 창 신호
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('OneCardTable — 종료·나가기', () => {

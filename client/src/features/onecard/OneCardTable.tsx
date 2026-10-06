@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
@@ -115,10 +115,14 @@ export function OneCardTable({
     return () => window.clearTimeout(timer);
   }, [staleRaceId, staleRaceClosesAt]);
 
-  // 스토어가 다시 받기를 청하면(낡은 창 — 마감 초과·창이 열린 채 NO_RACE) 훅으로 권위 스냅샷을 받는다.
+  // 스토어가 다시 받기를 청하면(낡은 창 — 마감 초과·창이 열린 채 NO_RACE) 훅으로 권위 스냅샷을 받는다. 처리한 값을 ref 로
+  // 기억한다 — 스토어는 모듈 전역이라 이전 방 세션이 남긴 값을 첫 렌더가 읽을 수 있는데, 값이 아니라 변화에만 반응해야
+  // 마운트 직후 REST resync 가 훅 자신의 것에 더해 한 번 더 나가지 않는다.
+  const handledResyncNonce = useRef(s.resyncNonce);
   useEffect(() => {
-    if (s.resyncNonce === 0) return;
-    requestResync();
+    if (s.resyncNonce === handledResyncNonce.current) return;
+    handledResyncNonce.current = s.resyncNonce;
+    if (s.resyncNonce !== 0) requestResync();
   }, [s.resyncNonce, requestResync]);
 
   // "늦었어요"는 잠깐만.
@@ -130,7 +134,7 @@ export function OneCardTable({
   }, [s.raceNotice, clearRaceNotice]);
 
   const press = (action: PressAction) => {
-    // 끊긴 동안은 보내지 못한다(sendAction 이 조용히 무시한다) — 대기 누름만 남겨 같은 창 동안 버튼이 굳지 않게.
+    // 끊긴 동안은 보내지 못하므로(sendAction 이 조용히 무시한다) 누름 표식도 남기지 않는다 — 남기면 그 창 동안 버튼이 잠긴다.
     if (!connected || !s.race || s.press) return;
     s.startPress(s.race.raceId, action);
     sendAction({ '@action': action, raceId: s.race.raceId });

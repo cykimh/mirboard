@@ -3,8 +3,9 @@ import { INFRA_ERROR_LABELS, errorText } from './errorLabels';
 
 /**
  * S5 — 게임과 무관하게 인프라가 보내는 거절 코드(인게임 컨트롤러·레이트 리미터)의 한국어 문구는 한 곳에 둔다. 라벨이
- * 없으면 `CODE: 영문 메시지` 가 그대로 보였다 — Redis 장애의 INTERNAL_ERROR, 연타의 RATE_LIMITED, 끈 게임의
- * GAME_NOT_AVAILABLE 이 실제로 닿는 경로다.
+ * 없으면 `CODE: 서버 메시지` 가 그대로 보였다 — Redis 장애의 INTERNAL_ERROR(영문 메시지), 끈 게임의 GAME_NOT_AVAILABLE 이
+ * 실제로 닿는 경로다. RATE_LIMITED 는 서버 메시지가 이미 한국어라 코드 접두(`RATE_LIMITED: 요청이 너무 빠릅니다…`)만
+ * 걷어 낸다.
  */
 describe('인프라 거절 문구', () => {
   it.each([

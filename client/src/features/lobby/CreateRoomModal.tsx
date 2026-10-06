@@ -222,6 +222,7 @@ export function CreateRoomModal({
               onValueChange={(v) => v !== '' && setTurnSeconds(Number(v))}
               className="justify-start"
             >
+              {/* 서버 RoomCreationDefaultsTest 가 이 선택지 목록(0·30·60·90)을 복사해 단언한다 — 같이 바꿀 것. */}
               {[
                 { v: 0, label: '끔' },
                 { v: 30, label: '30초' },

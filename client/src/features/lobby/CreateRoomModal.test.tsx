@@ -223,4 +223,36 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (S5)', () => {
     expect(lastCreateOpts().capacity).toBe(6);
     expect(lastCreateOpts().turnSeconds).toBe(0);
   });
+
+  /**
+   * 게임을 바꾸면 이전 게임에서 고른 인원·턴 제한을 새 게임의 처음 선택으로 되돌린다 — 티츄·스컬킹 사용자에게 걸리는 유일한
+   * 동작 변화(예전엔 티츄에서 고른 60초가 스컬킹으로 바꿔도 남았다). 폼 안의 Radix Select 는 숨은 네이티브 select 를 함께
+   * 렌더하므로 그걸로 게임을 바꾼다.
+   */
+  function switchGame(id: string) {
+    const native = document.querySelector('select[aria-hidden="true"]') as HTMLSelectElement;
+    fireEvent.change(native, { target: { value: id } });
+  }
+  const checked = (name: string) => screen.getByRole('radio', { name }).getAttribute('aria-checked');
+
+  it('게임을 바꾸면 고른 인원·턴 제한이 새 게임의 처음 선택으로 되돌아간다', async () => {
+    openModal([DECLARED, VARIABLE]);
+    fireEvent.click(screen.getByRole('radio', { name: '6' }));
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+
+    switchGame('SKULL_KING');
+
+    await waitFor(() => expect(checked('끔')).toBe('true'));
+    expect(checked('8')).toBe('true');
+  });
+
+  it('선언 없는 게임에서 고른 턴 제한은 선언한 게임으로 바꾸면 선언값으로 바뀐다', async () => {
+    openModal([VARIABLE, DECLARED]);
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+
+    switchGame('ONE_CARD');
+
+    await waitFor(() => expect(checked('30초')).toBe('true'));
+    expect(checked('4')).toBe('true');
+  });
 });

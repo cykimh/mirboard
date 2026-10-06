@@ -12,6 +12,7 @@ import { useLobbyStomp } from '@/ws/useLobbyStomp';
 import { TierBadge } from '@/components/TierBadge';
 import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
+import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { t } from '@/i18n/messages';
 import type { GameSummary, Room } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -351,9 +352,9 @@ export function GameHubPage() {
                       )}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {/* S5 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름. 모르는 게임은 원문. */}
+                      {/* D-130 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름과 한글 상태 라벨. 모르는 게임·상태는 원문. */}
                       {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}
-                      {room.status}
+                      {ROOM_STATUS_LABEL[room.status] ?? room.status}
                     </span>
                     <Button
                       type="button"

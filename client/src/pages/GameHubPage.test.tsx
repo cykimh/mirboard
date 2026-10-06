@@ -142,9 +142,9 @@ describe('GameHubPage — 대기 중인 방 목록 (S5)', () => {
     list.mockResolvedValue({ rooms: [room('a', 'SKULL_KING', 8), room('b', 'MYSTERY', 4)] });
     renderHub();
 
-    expect(await screen.findByText(/스컬킹 · 1 \/ 8/)).toBeInTheDocument();
-    expect(screen.getByText(/MYSTERY · 1 \/ 4/)).toBeInTheDocument();
+    expect(await screen.findByText(/스컬킹 · 1 \/ 8 · 대기 중/)).toBeInTheDocument();
+    expect(screen.getByText(/MYSTERY · 1 \/ 4 · 대기 중/)).toBeInTheDocument();
     expect(screen.queryByText(/SKULL_KING ·/)).toBeNull();
+    expect(screen.queryByText(/WAITING/)).toBeNull(); // enum 원문이 아니라 한글 상태 라벨
   });
 });
-

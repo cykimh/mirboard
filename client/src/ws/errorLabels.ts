@@ -3,7 +3,8 @@
  * 인게임 컨트롤러(`GameStompController`: 방·좌석·진행 상태·역직렬화·락 경합·예기치 못한 실패)와 레이트 리미터
  * (`StompRateLimitInterceptor`). 게임 sink 는 자기 거절 사유 표를 먼저 보고 없으면 여기를 본다({@link errorText}).
  *
- * <p>지금은 원카드 sink 만 쓴다. 티츄·스컬킹 sink 는 이 코드 일부를 자기 표에 들고 있다(옮기는 것은 후속).
+ * <p>아직 쓰는 sink 는 원카드뿐이다 — 스컬킹 sink 는 이 중 3코드를 자기 표에 중복해 들고, 티츄 sink 는 표가 없어
+ * `CODE: 원문` 을 그대로 보인다(둘에 적용하는 것은 후속).
  */
 export const INFRA_ERROR_LABELS: Readonly<Record<string, string>> = {
   BUSY: '다른 처리가 진행 중입니다. 잠시 후 다시 시도하세요.',
