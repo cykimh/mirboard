@@ -14,6 +14,7 @@ import com.mirboard.domain.game.onecard.persistence.OneCardStateStore;
 import com.mirboard.domain.game.onecard.state.MatchResult;
 import com.mirboard.domain.game.onecard.state.OneCardState;
 import com.mirboard.domain.game.onecard.state.OneCardStateMapper;
+import com.mirboard.domain.game.onecard.state.RaceWindow;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -35,6 +36,9 @@ import org.springframework.context.ApplicationEventPublisher;
  *
  * <p>1판 = 1매치 = 1라운드라 라운드가 끝나면 곧 매치가 끝난다. 본 클래스는 상태를 갖지 않는다(저장소 참조만)
  * — 동시성 직렬화는 호출자의 방 액션 락이 맡는다.
+ *
+ * <p>S5 — 경쟁 창이 닫힐 때마다 결과 한 줄을 남기고(누름·엔진 타이머·탈주 세 경로, {@link #logRaceResolved}),
+ * 매치 종료 기록이 실패해도 진행을 끊지 않는다({@link #record}).
  */
 public final class OneCardGameEngine implements GameEngine {
 
@@ -83,10 +87,13 @@ public final class OneCardGameEngine implements GameEngine {
         return OneCardAction.class;
     }
 
-    /** 사람·봇·타임아웃 공용. 지금 시각은 경쟁 창을 열 때만 쓰인다. */
+    /** 사람·봇·타임아웃 공용. 지금 시각은 경쟁 창을 열 때(와 S5 경쟁 결과 로그)에만 쓰인다. */
     @Override
     public Result apply(GameState state, int seat, GameAction action) {
-        OneCardEngine.Result result = rules.apply(ocState(state), seat, ocAction(action), clock.millis());
+        OneCardState before = ocState(state);
+        long now = clock.millis();
+        OneCardEngine.Result result = rules.apply(before, seat, ocAction(action), now);
+        logRaceResolved(before.race(), result.events(), "PRESS", now);
         return new Result(result.newState(), List.<GameEvent>copyOf(result.events()));
     }
 
@@ -184,8 +191,11 @@ public final class OneCardGameEngine implements GameEngine {
 
     @Override
     public Optional<Result> onTimer(GameState state) {
-        return rules.onTimer(ocState(state))
-                .map(result -> new Result(result.newState(), List.<GameEvent>copyOf(result.events())));
+        OneCardState before = ocState(state);
+        return rules.onTimer(before).map(result -> {
+            logRaceResolved(before.race(), result.events(), "TIMER", clock.millis());
+            return new Result(result.newState(), List.<GameEvent>copyOf(result.events()));
+        });
     }
 
     // ---------- 매치 진행 ----------
@@ -223,6 +233,7 @@ public final class OneCardGameEngine implements GameEngine {
             case CONTINUED -> {
                 stateStore.save(context.roomId(), desertion.newState());
                 outbound.addAll(desertion.events());
+                logRaceResolved(state.race(), desertion.events(), "DESERTION", clock.millis());
                 log.warn("OneCard desertion continued: room={} seat={} userId={}",
                         context.roomId(), seat, deserterUserId);
                 return DesertOutcome.MATCH_CONTINUES;
@@ -230,6 +241,7 @@ public final class OneCardGameEngine implements GameEngine {
             case MATCH_ENDED -> {
                 stateStore.save(context.roomId(), desertion.newState());
                 outbound.addAll(desertion.events());
+                logRaceResolved(state.race(), desertion.events(), "DESERTION", clock.millis());
                 record(desertion.newState().result());
                 log.warn("OneCard desertion ended match: room={} seat={} userId={} reason={}",
                         context.roomId(), seat, deserterUserId, desertion.newState().result().reason());
@@ -241,11 +253,66 @@ public final class OneCardGameEngine implements GameEngine {
 
     // ---------- internals ----------
 
-    /** 로컬 발행 — 기록기({@code OneCardMatchRecorder})가 듣는다. */
+    /**
+     * 로컬 발행 — 기록기({@code OneCardMatchRecorder})가 듣는다.
+     *
+     * <p>S5 — 기록기는 동기 리스너(@Transactional)라 DB 장애가 여기로 올라온다. 그대로 던지면 호출한 진행 경로(컨트롤러·
+     * 봇·타이머·탈주)가 저장 뒤의 방송·FINISHED 전이·재무장을 건너뛰어, 마지막 {@code CARD_PLAYED}·{@code MATCH_ENDED} 가
+     * 아무에게도 안 가고 방이 IN_GAME 에 남았다. 기록이 빠지는 쪽이 결과 화면이 안 뜨는 쪽보다 덜 아프다 — 결과를 실어
+     * ERROR(Sentry)로 남겨 수동으로 복구할 수 있게 하고 진행은 계속한다. 다른 인스턴스로 다시 보내는 경로는 만들지 않는다
+     * (D-116 원칙 — 기록은 끝낸 인스턴스에서 한 번).
+     */
     private void record(MatchResult result) {
-        publisher.publishEvent(new OneCardMatchCompleted(context.roomId(), context.playerIds(), result));
+        try {
+            publisher.publishEvent(new OneCardMatchCompleted(context.roomId(), context.playerIds(), result));
+        } catch (RuntimeException e) {
+            log.error("OneCard match record failed, the match still ends: room={} players={} result={}",
+                    context.roomId(), context.playerIds(), result, e);
+        }
         log.info("OneCard match ended: room={} reason={} winners={}",
                 context.roomId(), result.reason(), result.winners());
+    }
+
+    /**
+     * S5 — 경쟁 창이 닫히면 결과 한 줄(INFO). 설계서 §4.4·§7 과 D-128 이 "배포 후 경쟁 결과 로그로 다시 본다"고 미룬
+     * 판단(사람·봇 승률, 반응 시간 분포, 핑 유리, 단일 폴러 지연)과 누름 자동화 탐지(창이 열리자마자의 누름이 반복되는
+     * 계정)의 근거다. 창이 닫히는 세 경로({@code via} = PRESS·TIMER·DESERTION)에서 부른다.
+     *
+     * <ul>
+     *   <li>{@code latencyMs} — 창을 연 뒤 이 전이를 처리하기까지. 누름이면 그 사람의 반응 + 왕복 시간이다.</li>
+     *   <li>{@code lateMs} — 타이머 경로만: 정해 둔 마감(봇 누름 또는 창 끝)보다 얼마나 늦게 처리했나. 나머지는 {@code -}.</li>
+     * </ul>
+     *
+     * <p><b>사용자별 값은 로그로만 둔다</b> — 메트릭 태그로 두면 공개된 {@code /actuator/prometheus} 로 나간다. 여러
+     * 인스턴스면 창을 연 시각({@code openedAt})과 지금 시각이 다른 시계일 수 있다(그 차이만큼 두 값이 흔들린다).
+     *
+     * <p><b>집계는 {@code room}+{@code raceId} 로 묶어 마지막 줄을 정본으로 센다.</b> 이 줄은 호출자가 저장·방송하기 <em>전에</em>
+     * 찍힌다 — 저장이 실패하면 상태에는 창이 그대로 남고, 나중에 다른 경로(타이머·킥이 다시 건 타이머)가 같은 창을 닫으며 다른
+     * 결과로 한 줄 더 찍는다.
+     */
+    private void logRaceResolved(RaceWindow race, List<OneCardEvent> events, String via, long now) {
+        if (race == null) {
+            return;
+        }
+        for (OneCardEvent event : events) {
+            if (event instanceof OneCardEvent.RaceResolved resolved && resolved.raceId() == race.raceId()) {
+                int owner = race.ownerSeat();
+                int by = resolved.bySeat();
+                log.info("OneCard race resolved: room={} raceId={} outcome={} via={} ownerSeat={} ownerUser={}"
+                                + " ownerBot={} bySeat={} byUser={} byBot={} latencyMs={} windowMs={} lateMs={}",
+                        context.roomId(), race.raceId(), resolved.outcome(), via, owner, userOf(owner), isBot(owner),
+                        by, userOf(by), isBot(by), now - race.openedAt(), race.windowMillis(),
+                        via.equals("TIMER") ? String.valueOf(now - race.deadline()) : "-");
+            }
+        }
+    }
+
+    private String userOf(int seat) {
+        return seat >= 0 && seat < context.playerIds().size() ? String.valueOf(context.playerIds().get(seat)) : "-";
+    }
+
+    private boolean isBot(int seat) {
+        return seat >= 0 && context.botSeats().contains(seat);
     }
 
     private static OneCardState ocState(GameState state) {
