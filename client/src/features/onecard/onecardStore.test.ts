@@ -645,3 +645,4 @@ describe('낡은 창 복구 — 다시 받기 신호 (S5)', () => {
     expect(store().resyncNonce).toBe(0);
   });
 });
+

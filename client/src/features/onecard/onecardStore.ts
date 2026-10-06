@@ -122,6 +122,7 @@ export interface OneCardActions {
    * <p>`NO_RACE` 는 누름(`CALL_ONE_CARD`·`CATCH`)에서만 나오므로 항상 "늦었어요"다 — 해소 이벤트가 먼저 와 누름 표식을
    * 이미 바꿨어도 같다. `BUSY` 는 내기·먹기의 락 경합에서도 오므로 기다리는 누름이 있을 때만 경쟁 누름의 것으로 본다:
    * 창이 열려 있고 횟수가 남았으면 재시도 신호를 올리고, 더 시도할 창이 없으면(횟수 소진·마감·남이 이김) "늦었어요".
+   * S5 — 기다리는 누름이 없어도 창이 열려 있으면 경쟁 누름의 것이다(스냅샷이 표식을 비운 뒤 늦게 온 BUSY) — 조용히 삼킨다.
    */
   notePressRejected: (code: 'BUSY' | 'NO_RACE') => boolean;
   clearRaceNotice: () => void;
@@ -405,6 +406,7 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
 
   notePressRejected(code) {
     const { press, race, retryNonce } = get();
+    // NO_RACE 는 OneCardEngine.press 에서만 나온다(CALL_ONE_CARD·CATCH) — 내가 누른 창이 이미 닫혔다는 뜻이다. 해소
     // 이벤트가 먼저 와서 누름 표식을 바꿨거나 지웠어도(resync 등) 같다.
     if (code === 'NO_RACE') {
       set({ press: null, raceNotice: 'LATE' });
