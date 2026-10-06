@@ -409,6 +409,44 @@ describe('useStompRoom — S5 보강 (낡은 resync·접속 순서·다시 받�
     expect(sink.applyEvent).toHaveBeenCalledTimes(1);
   });
 
+  /** 실패 경로의 세대 가드 — 이전 방의 요청이 늦게 실패해도 새 방 화면에 오류가 뜨면 안 된다. */
+  it('방이 바뀐 뒤 실패한 이전 방의 resync 는 setError 로 가지 않는다', async () => {
+    const pending: Array<{ roomId: string; reject: (err: Error) => void }> = [];
+    resyncMock.mockImplementation(
+      (_token: string, roomId: string) => new Promise((_resolve, reject) => pending.push({ roomId, reject })),
+    );
+    const sink = makeSink();
+    const { rerender } = renderHook(({ room }) => useStompRoom(room, TOKEN, sink), {
+      initialProps: { room: 'A' },
+    });
+    await waitFor(() => expect(pending.some((p) => p.roomId === 'A')).toBe(true));
+
+    rerender({ room: 'B' });
+    await waitFor(() => expect(pending.some((p) => p.roomId === 'B')).toBe(true));
+
+    await act(async () =>
+      pending.filter((p) => p.roomId === 'A').forEach((p) => p.reject(new Error('A 의 요청이 늦게 실패'))),
+    );
+
+    expect(sink.setError).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 언마운트도 방 전환과 같다 — 언마운트 직전에 보낸 resync(락 대기로 최대 ~3초)가 끝나면 모듈 전역 스토어에 적용돼, 그 사이
+   * 같은 게임의 다른 방 게임판이 마운트됐다면 그 방 화면이 이전 방 스냅샷으로 덮인다.
+   */
+  it('언마운트 뒤 도착한 resync 응답은 sink 로 가지 않는다', async () => {
+    const pending = heldResyncs();
+    const sink = makeSink();
+    const { unmount } = renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+    await waitFor(() => expect(pending).toHaveLength(2)); // 마운트 + 접속 직후
+
+    unmount();
+    await act(async () => pending.forEach((resolve) => resolve({ ...SNAP, eventSeq: 9 })));
+
+    expect(sink.applySnapshot).not.toHaveBeenCalled();
+  });
+
   it('게임판이 권위 스냅샷을 다시 청할 수 있다 — requestResync', async () => {
     const sink = makeSink();
     const { result } = renderHook(() => useStompRoom(ROOM, TOKEN, sink));
