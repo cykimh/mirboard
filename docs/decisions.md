@@ -382,6 +382,25 @@ D-102 보류 ②를 해소한다. 지금까지 스컬킹 봇은 포트 기본 `b
 
 대가는 이렇다. 매치를 끝낸 게스트 행은 참가자 FK 때문에 영구히 남는다(개인정보 없음). 게스트는 로그아웃하거나 12h가 지나면 같은 신원으로 돌아올 수 없다. 게스트가 한 명이라도 낀 매치는 실유저 레이팅도 움직이지 않는다. 식별이 규약에 기대므로 UsernamePolicy가 하이픈을 허용하면 위조할 수 있게 된다(테스트로 고정). `Fly-Client-IP`를 위조할 수 없다는 전제와 경로 변형 내성은 배포 후 실측으로 확인한다. *배제: 공유 데모+가드레일, DB 행 없는 JWT 신원, 별도 guest 테이블, is_bot 재사용, native 전략+internal-proxies.*
 
+## D-116 (2026-10-03) — 도메인 이벤트는 발행한 인스턴스에서만 처리: `DomainEventBus` 폐기 (D-37 6D-3 번복)
+
+D-37(6D-3)의 `DomainEventBus` 는 도메인 이벤트를 로컬 발행한 뒤 Redis Pub/Sub 로 다른
+인스턴스에서도 **다시** 발행했다. 그런데 리스너의 부수효과는 전부 공유 저장소(Postgres·Redis)에
+쓰이고, 클라로 가는 프레임은 `StompPublisher` 가 이미 모든 인스턴스 브로커로 fan-out 한다 —
+재발행은 같은 일을 인스턴스 수만큼 반복할 뿐이다. 운영 설정(`gateway=redis`) + 2대 이상에서
+`TichuMatchCompleted` 는 매치 기록·전적·ELO·desert·칩 정산이 두 번, `GameStartingEvent` 는
+라운드 재딜링(나중 패가 먼저 패를 덮고 클라는 `HAND_DEALT` 를 두 번 받는다 — 도착 순서가
+뒤집히면 서버와 다른 패를 쥔다)으로 나타난다. `RoomChangedEvent` 는 수신 측 역직렬화가
+처음부터 실패해(`isDestroyed()` → `destroyed` 필드) WARN 만 남겼는데 아무도 몰랐다 —
+fan-out 에 기대는 소비자가 없다는 증거다.
+
+`DomainEventBus` 를 **삭제**하고 발행자(`RoomService`·`TichuGameEngine`)는
+`ApplicationEventPublisher` 로 로컬 발행한다(D-115 의 `SkullKingMatchCompleted` 와 같은 방식).
+이벤트별 local-only 표시는 기각 — 정당한 소비자가 0인데 기본값이 fan-out 인 장치를 남기면 다음
+이벤트가 같은 함정에 빠진다. 인스턴스 메모리를 갱신해야 하는 이벤트가 생기면 그때 명시적
+opt-in 채널로 만든다. 회귀 방지는 `DomainEventSingleDeliveryIT`(redis 게이트웨이 2-인스턴스:
+딜링 1회 · 매치 기록/칩 정산 1회 · B 의 도메인 이벤트 수신 0건).
+
 ## D-115 (2026-10-03) — 게임별 전적·레이팅: `user_game_stats` 테이블 (M6-1)
 
 D-102 보류 ①(스컬킹 매치 영속·ELO)을 푼다. 막고 있던 것은 `users.rating`·`win_count`·
@@ -1865,6 +1884,7 @@ local `ApplicationEventPublisher` 로 변환 — 기존 `@EventListener` 들은 
 프로파일은 Dockerfile 없이 표현이 까다로워 로컬 두 프로세스 패턴으로 대체.
 한계: 발행 인스턴스 재시작 시 in-flight 이벤트 유실 가능 (instanceId 기반 dedup
 의 자연 결과). MVP 범위 밖이라 보류.
+*변경 → D-116* (6D-3 의 도메인 이벤트 클러스터 fan-out 폐기 — 리스너가 인스턴스마다 중복 실행).
 
 ## D-36 (2026-05-14) — Phase 6C 마감: 디자인 토큰 + 공용 컴포넌트 + 모바일
 

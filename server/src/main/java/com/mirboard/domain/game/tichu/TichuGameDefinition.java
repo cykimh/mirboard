@@ -8,9 +8,9 @@ import com.mirboard.domain.game.core.RoomOption;
 import com.mirboard.domain.game.tichu.lifecycle.TichuRoundStarter;
 import com.mirboard.domain.game.tichu.persistence.TichuGameStateStore;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.EnumSet;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>D-98: {@link #newEngine} 이 드디어 호출부를 갖는다 — 인게임 디스패치가
  * {@code GameEngineProvider} → {@code GameRegistry.require(gameType).newEngine(ctx)} 로
- * 흐르므로, 티츄 어댑터가 필요한 저장소/이벤트버스를 여기서 주입받아 넘긴다.
+ * 흐르므로, 티츄 어댑터가 필요한 저장소/이벤트 발행자를 여기서 주입받아 넘긴다.
  */
 @Component
 public final class TichuGameDefinition implements GameDefinition {
@@ -28,12 +28,12 @@ public final class TichuGameDefinition implements GameDefinition {
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
     private final TichuRoundStarter roundStarter;
-    private final DomainEventBus events;
+    private final ApplicationEventPublisher events;
 
     public TichuGameDefinition(TichuGameStateStore stateStore,
                                TichuMatchStateStore matchStateStore,
                                TichuRoundStarter roundStarter,
-                               DomainEventBus events) {
+                               ApplicationEventPublisher events) {
         this.stateStore = stateStore;
         this.matchStateStore = matchStateStore;
         this.roundStarter = roundStarter;

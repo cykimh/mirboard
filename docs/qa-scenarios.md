@@ -286,9 +286,9 @@ Sticky session 불필요 — 사용자가 어느 인스턴스에 붙어 있든 �
 Redis 단일 진실 공급원이라 두 인스턴스가 같은 상태를 본다.
 
 **한계 (현재 시점)**:
-- ApplicationEvent 의 인스턴스 간 fan-out 은 `DomainEventBus` 가 처리하지만 동일
-  이벤트가 두 번 처리되지 않게 `instanceId` 만으로 dedup — 발행 인스턴스 재시작 시
-  유실 가능성 있음 (현재 MVP 범위에선 무시).
+- 도메인 이벤트(ApplicationEvent)는 인스턴스 간에 전파하지 않는다 — 발행한 인스턴스에서만
+  리스너가 돈다(D-116). 리스너 부수효과(매치 기록·칩 정산·라운드 딜링)는 공유 저장소에 쓰이고
+  클라 프레임은 `stomp:routes` 로 이미 모든 인스턴스에 가므로, 재처리는 중복 기록일 뿐이다.
 - 게임 액션 처리 락 (`room:{id}:lock`) 은 Redis SET NX 라 이미 분산 안전.
 
 ## Phase 6 시연 체크리스트
@@ -350,8 +350,9 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 위 "분산 시연 (멀티 인스턴스, Phase 6D)" 섹션의 단계 따라 진행.
 
-추가 확인: `redis-cli MONITOR` 로 `PUBLISH stomp:routes ...` 와 `PUBLISH domain:event
-...` 명령이 흐르는지 관찰.
+추가 확인: `redis-cli MONITOR` 로 `PUBLISH stomp:routes ...` 명령이 흐르는지 관찰.
+`PUBLISH domain:event ...` 는 **나오지 않아야** 한다(D-116 — 도메인 이벤트는 로컬 처리).
+게임 한 판을 끝낸 뒤 `tichu_match_results` 에 그 방 행이 1개인지도 본다(2개면 중복 기록).
 
 ### 시나리오 6 — 게임별 튜토리얼 (D-121)
 

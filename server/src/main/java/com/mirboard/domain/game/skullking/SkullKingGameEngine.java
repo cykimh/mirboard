@@ -308,8 +308,8 @@ public final class SkullKingGameEngine implements GameEngine {
     /**
      * D-115 — 순수 엔진이 매치 종료({@code MatchEnded})를 냈으면 기록 이벤트를 발행한다.
      * 완주 라운드 수·승자는 엔진이 정한 값을 그대로 쓴다(조기 종료 계산을 여기서 반복하지
-     * 않는다). 인스턴스 간 전파(DomainEventBus)가 아니라 로컬 발행 — 각 인스턴스가 다시
-     * 기록하면 같은 매치가 중복으로 남는다.
+     * 않는다). 로컬 발행만(D-116) — 각 인스턴스가 다시 기록하면 같은
+     * 매치가 중복으로 남는다.
      */
     private void recordIfEnded(List<SkullKingEvent> events, SkullKingMatchState match) {
         for (SkullKingEvent event : events) {
