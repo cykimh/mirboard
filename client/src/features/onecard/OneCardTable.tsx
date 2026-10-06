@@ -23,7 +23,7 @@ export const PRESS_RETRY_DELAY_MS = 120;
 /** "늦었어요"를 보여 주는 시간. */
 export const LATE_NOTICE_MS = 1500;
 /**
- * S5 — 경쟁 창이 마감 뒤 이만큼 지나도 열려 있으면 해소 이벤트를 놓쳤거나 서버 타이머가 사라진 것으로 보고 권위 스냅샷을
+ * D-130 — 경쟁 창이 마감 뒤 이만큼 지나도 열려 있으면 해소 이벤트를 놓쳤거나 서버 타이머가 사라진 것으로 보고 권위 스냅샷을
  * 다시 받는다(서버 resync 는 진행 킥으로 사라진 타이머를 다시 건다). 폴링 주기·왕복 시간보다 넉넉히.
  */
 export const STALE_RACE_GRACE_MS = 1500;
@@ -103,7 +103,7 @@ export function OneCardTable({
     return () => window.clearTimeout(timer);
   }, [s.retryNonce, sendAction]);
 
-  // S5 — 낡은 창 복구. 창이 마감 + 유예 뒤에도 열려 있으면 그 창을 낡았다고 표시한다(창마다 한 번 — 스토어가 거른다).
+  // D-130 — 낡은 창 복구. 창이 마감 + 유예 뒤에도 열려 있으면 그 창을 낡았다고 표시한다(창마다 한 번 — 스토어가 거른다).
   const staleRaceId = s.race?.raceId;
   const staleRaceClosesAt = s.race?.closesAt;
   useEffect(() => {

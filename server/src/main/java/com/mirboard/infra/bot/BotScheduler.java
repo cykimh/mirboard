@@ -69,7 +69,7 @@ import org.springframework.stereotype.Component;
  * 종료로 끝난 방에서 이미 돌던 루프가 버려진 라운드를 계속 두던 경로를 막는다. 게임 중립
  * 판정(방 상태)이다.
  *
- * <p>S5 — 이 인스턴스에서 방마다 <b>살아 있는 루프 수</b>를 센다(락 경합으로 잠시 뒤 다시 도는 토막도 같은
+ * <p>D-130 — 이 인스턴스에서 방마다 <b>살아 있는 루프 수</b>를 센다(락 경합으로 잠시 뒤 다시 도는 토막도 같은
  * 루프다). 진행 킥({@link GameProgressKick})은 resync·구독마다 불리므로 {@link #scheduleBotsIfIdle} 로만 건다 —
  * 살아 있는 루프 위에 하나 더 걸면 두 루프가 번갈아 락을 잡아 봇이 지연 없이 연달아 둔다. 다른 인스턴스의 루프는
  * 보이지 않는다(그때 겹쳐도 락 안 재조회 덕에 같은 수를 두 번 두지는 않고 속도만 빨라진다).
@@ -80,7 +80,7 @@ public class BotScheduler {
     private static final Logger log = LoggerFactory.getLogger(BotScheduler.class);
     private static final int MAX_BOT_ACTIONS_PER_ROOM = 5000;
 
-    /** S5 — 방별로 살아 있는 루프 토막 수(이 인스턴스). 0 이 되면 키를 지운다. */
+    /** D-130 — 방별로 살아 있는 루프 토막 수(이 인스턴스). 0 이 되면 키를 지운다. */
     private final ConcurrentHashMap<String, Integer> liveLoops = new ConcurrentHashMap<>();
 
     private final RoomService roomService;
@@ -123,7 +123,7 @@ public class BotScheduler {
     }
 
     /**
-     * S5 — 진행 킥 전용 진입점. 이 인스턴스에 이 방의 루프가 하나도 살아 있지 않을 때만 건다(확인과 등록이 원자적이라
+     * D-130 — 진행 킥 전용 진입점. 이 인스턴스에 이 방의 루프가 하나도 살아 있지 않을 때만 건다(확인과 등록이 원자적이라
      * 동시에 들어온 킥 둘이 둘 다 걸지 않는다).
      *
      * @return 루프를 걸었으면 true
@@ -219,7 +219,7 @@ public class BotScheduler {
 
             int botSeat = nextBotSeat(room, engine, state);
             if (botSeat < 0) {
-                // S5 — 정상 경로다(봇 방의 사람 차례 인계, 경쟁 창, 같은 방에 겹쳐 돈 루프). WARN 이던 때는 봇 방 사람
+                // D-130 — 정상 경로다(봇 방의 사람 차례 인계, 경쟁 창, 같은 방에 겹쳐 돈 루프). WARN 이던 때는 봇 방 사람
                 // 차례마다 남아 Sentry breadcrumb 을 채웠다. 정말 이상한 "Bot has no legal action" 은 WARN 그대로다.
                 log.debug("Bot loop: no pending bot action. roomId={} phase={} botSeats={} pending={}",
                         roomId, engine.phaseName(state), room.botSeats(),

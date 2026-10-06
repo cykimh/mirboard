@@ -11,7 +11,7 @@ interface ErrorPayload {
 
 /**
  * 서버 거절 사유(원카드 `RejectionReason`) → 사용자 문구. 게임 중립 인프라 코드(BUSY·RATE_LIMITED·INTERNAL_ERROR 등)는
- * 공용 표(`ws/errorLabels`)가 맡는다(S5).
+ * 공용 표(`ws/errorLabels`)가 맡는다(D-130).
  */
 const ERROR_LABEL: Record<string, string> = {
   MATCH_OVER: '이미 끝난 판입니다.',

@@ -27,7 +27,7 @@ interface ChatPayload {
  * <p><b>D-124: 순번 판정(중복·구멍)은 이 훅만 한다.</b> 기준점은 resync 의 `eventSeq` 이고
  * 판정은 `judgeSeq`(./seqGate) — 게임 스토어는 판정이 끝난 이벤트만 받는 순수 리듀서다.
  *
- * <p><b>S5 — resync 응답이 기준점보다 낡으면 버린다.</b> 서버는 상태와 순번을 방 락 안에서 함께 읽지만(D-126) REST
+ * <p><b>D-130 — resync 응답이 기준점보다 낡으면 버린다.</b> 서버는 상태와 순번을 방 락 안에서 함께 읽지만(D-126) REST
  * 응답과 STOMP 프레임의 도착 순서는 정해져 있지 않다 — 늦게 닿은 응답이 이미 반영한 이벤트를 되돌려, 사람 차례에서는
  * 다음 이벤트가 오지 않아 판이 멈췄다. 서버 순번은 방이 살아 있는 동안 줄지 않는다. 방이 바뀐 뒤 도착한 이전 방의
  * 응답도 버린다(방 전환마다 오르는 세대 — 안 그러면 이전 방 응답이 새 방의 기준점을 올려 새 방 스냅샷을 '낡음'으로
@@ -58,7 +58,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
    */
   const lastSeqRef = useRef(0);
   /**
-   * S5 — 방 전환(reset)마다 오르는 세대. 그 전에 보낸 resync 의 늦은 응답(이전 방 — 토큰이 바뀌었다면 이전 사용자)을
+   * D-130 — 방 전환(reset)마다 오르는 세대. 그 전에 보낸 resync 의 늦은 응답(이전 방 — 토큰이 바뀌었다면 이전 사용자)을
    * 버린다.
    */
   const epochRef = useRef(0);
@@ -77,9 +77,9 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
         token,
         roomId,
       );
-      // S5 — 그 사이 방이 바뀌었다(reset) — 이전 방의 응답이 새 방의 기준점을 올리지 않게 버린다.
+      // D-130 — 그 사이 방이 바뀌었다(reset) — 이전 방의 응답이 새 방의 기준점을 올리지 않게 버린다.
       if (epoch !== epochRef.current) return;
-      // S5 — 이미 반영한 공개 이벤트보다 낡은 응답(그 뒤 프레임이 먼저 닿았다)은 버린다. 같은 순번은 적용한다.
+      // D-130 — 이미 반영한 공개 이벤트보다 낡은 응답(그 뒤 프레임이 먼저 닿았다)은 버린다. 같은 순번은 적용한다.
       if (snap.eventSeq < lastSeqRef.current) return;
       // 껍데기를 가공하지 않고 그대로 넘긴다 — 게임별 필드 해석은 sink 책임.
       sinkRef.current.applySnapshot(snap);
@@ -116,7 +116,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       onConnect: () => {
         if (disposed) return;
         setConnected(true);
-        // S5 — 구독을 모두 보낸 뒤에 resync 한다(맨 끝). resync 를 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에
+        // D-130 — 구독을 모두 보낸 뒤에 resync 한다(맨 끝). resync 를 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에
         // 낸 이벤트가 스냅샷에도 프레임에도 없다. 이 순서는 그 틈을 좁힐 뿐 보장은 아니다 — SUBSCRIBE 등록은 서버에서
         // 비동기이고 단순 브로커는 SUBSCRIBE 영수증을 주지 않는다. 남은 틈은 다음 이벤트의 구멍 판정·탭 복귀 resync·
         // (원카드) 해소 없는 창 resync 가 메운다. 그 사이 닿은 프레임보다 낡은 응답은 위에서 버린다.
@@ -183,7 +183,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       onStompError: () => {
         if (!disposed) setConnected(false);
       },
-      // S5 — 네트워크 끊김·서버 재시작·배포(1006/1001)는 onDisconnect 가 아니라 이것만 부른다(onDisconnect 는 클라가 먼저
+      // D-130 — 네트워크 끊김·서버 재시작·배포(1006/1001)는 onDisconnect 가 아니라 이것만 부른다(onDisconnect 는 클라가 먼저
       // DISCONNECT 를 보내 영수증을 받을 때만). 없으면 끊긴 뒤에도 "연결"로 보여 재연결 배너가 안 뜨고 보내기가 조용히 버려졌다.
       onWebSocketClose: () => {
         if (!disposed) setConnected(false);

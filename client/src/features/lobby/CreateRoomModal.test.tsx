@@ -31,7 +31,7 @@ const VARIABLE: GameSummary = {
   supportedRoomOptions: [],
 };
 
-/** 원카드 — 2~6인 가변, 방 만들기 처음 선택을 선언한다(S5: 4명·턴 제한 30초). */
+/** 원카드 — 2~6인 가변, 방 만들기 처음 선택을 선언한다(D-130: 4명·턴 제한 30초). */
 const DECLARED: GameSummary = {
   id: 'ONE_CARD',
   displayName: '원카드',
@@ -191,7 +191,7 @@ describe('CreateRoomModal — 봇 채우기 기본값 (D-117)', () => {
   });
 });
 
-describe('CreateRoomModal — 게임이 선언한 처음 선택 (S5)', () => {
+describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockResolvedValue({ roomId: 'room-1' });

@@ -98,7 +98,7 @@ public class DeadlinePoller {
                 // Redis 장애 등 — 다음 사이클에 재시도.
                 log.warn("데드라인 폴링 실패(다음 주기 재시도): kind={} err={}", kind, e.toString());
             } catch (Throwable e) {
-                // S5 — Error 가 주기 작업 밖으로 새면 폴링이 영영 멈춘다. 남기고 다음 주기에 다시 한다.
+                // D-130 — Error 가 주기 작업 밖으로 새면 폴링이 영영 멈춘다. 남기고 다음 주기에 다시 한다.
                 log.error("데드라인 폴링 중 오류(다음 주기 재시도): kind={} err={}", kind, e.toString(), e);
             }
         }

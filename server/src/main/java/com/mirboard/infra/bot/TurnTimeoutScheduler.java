@@ -152,7 +152,7 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
      * D-128 — 엔진이 시간 전이를 선언하면 남은 시간 뒤로 엔진 타이머를 건다. 실패해도 턴 타이머는
      * 막지 않는다(로그만) — 엔진 타이머가 없는 게임의 진행이 이 경로 때문에 멈추면 안 된다.
      *
-     * <p>S5 — 실패는 ERROR 다. 타이머가 없으면 경쟁 창이 진행 킥({@link GameProgressKick})이 다시 걸 때까지 닫히지
+     * <p>D-130 — 실패는 ERROR 다. 타이머가 없으면 경쟁 창이 진행 킥({@link GameProgressKick})이 다시 걸 때까지 닫히지
      * 않는다 — WARN 이던 때는 그렇게 사라진 타이머가 Sentry(ERROR 만)에 보이지 않았다.
      */
     private void armEngineTimer(String roomId, Room room, long gen) {

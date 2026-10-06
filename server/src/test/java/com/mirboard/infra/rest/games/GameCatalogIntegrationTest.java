@@ -82,7 +82,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].supportedRoomOptions").isArray())
                 .andExpect(jsonPath("$.games[0].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
-                // S5 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
+                // D-130 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(8))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(0))
                 .andExpect(jsonPath("$.games[1].id").value("TICHU"))
@@ -105,7 +105,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[2].maxPlayers").value(6))
                 .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
-                // S5 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
+                // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
                 .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(30));
     }

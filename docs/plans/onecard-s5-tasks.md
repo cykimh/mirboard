@@ -31,7 +31,8 @@
     §8 "남은 후속"에 최종 리뷰 follow-up 이전: 스컬킹 `recordIfEnded` 격리는 우선순위 높음, 턴 카운트다운은 "공개 전환 전 재검토").
 - **표기 — 'S5 —' → 'D-130 —'.** 이 브랜치가 더한 줄만 치환했다(코드·테스트 주석, vitest `describe`/`it` 이름의 `(S5)`, 계약 문서의 `(S5)`·`S5 —`,
   `onecard.md` §7 의 `*(S5: …)*`). 제외: `onecard.md` 의 단계 이름(§6 표·§8 제목 "S5 — 공개 전 보강"·"S5 후반"), 이 계획서, 스컬킹의 기존 S5(D-102) 꼬리표,
-  `V10__more_bots.sql` 같은 기존 파일의 기존 줄. 이 계획서 본문의 'S5 —' 인용은 실행 기록이라 그대로다.
+  `V10__more_bots.sql` 같은 기존 파일의 기존 줄. 이 계획서 본문의 'S5 —' 인용은 실행 기록이라 그대로다. 이 브랜치가 더한 'S5' 포함 94줄 중 **88줄(47파일)**을
+  치환했고, 남은 6줄은 `onecard.md` 의 단계 이름(§6 표 행·§8 제목)·"S5 후반"과 §8 후속의 리뷰 항목 ID(`S5T2-M4` 등)다.
 
 **새 수치**(재측정 — `npm --prefix client run test` 마지막 두 줄, `./gradlew :server:test --rerun`)
 
@@ -44,7 +45,7 @@
 | `com.mirboard.domain.game.onecard.*Test` (단위) / 도메인 전체 | 185 / 189 | **186 / 190** |
 | `com.mirboard.infra.scheduling.*Test` | 3 | 3 |
 
-인프라 게임 이름 grep(`onecard|one_card|원카드`) 0건, D-116 겹침 파일 변경 0 은 그대로다.
+치환(주석·문서·테스트 이름만 바뀐다) 뒤에 다시 쟀고 같다. 인프라 게임 이름 grep(`onecard|one_card|원카드`) 0건, D-116 겹침 파일 변경 0 은 그대로다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -128,7 +128,7 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
   });
 });
 
-describe('GameHubPage — 대기 중인 방 목록 (S5)', () => {
+describe('GameHubPage — 대기 중인 방 목록 (D-130)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();

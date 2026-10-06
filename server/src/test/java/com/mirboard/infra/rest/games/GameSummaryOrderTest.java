@@ -91,7 +91,7 @@ class GameSummaryOrderTest {
                 .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
-    /** S5 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */
+    /** D-130 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */
     @Test
     void room_creation_defaults_come_from_the_definition() {
         var plain = GameCatalogController.GameSummary.of(new ShuffledOptionsGame(Set.of()));

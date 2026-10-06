@@ -18,7 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * S5 — 진행 킥. 방 진행이 메모리의 봇 루프와 유실될 수 있는 타이머에만 기대지 않게, 클라가 방을 다시 볼 때 — resync
+ * D-130 — 진행 킥. 방 진행이 메모리의 봇 루프와 유실될 수 있는 타이머에만 기대지 않게, 클라가 방을 다시 볼 때 — resync
  * 응답 뒤({@code RoomController}), 게임 토픽 구독({@code WsSessionLifecycleListener}) — 멈춘 진행을 다시 건다.
  *
  * <ul>

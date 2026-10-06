@@ -15,7 +15,7 @@ import type {
 
 // 소켓만 모킹하고 스토어는 실물을 seed 한다 (스컬킹 게임판 테스트와 같은 방식).
 const sendAction = vi.fn();
-/** S5 — 훅의 권위 스냅샷 재요청. 훅이 주는 것처럼 렌더마다 같은 참조다. */
+/** D-130 — 훅의 권위 스냅샷 재요청. 훅이 주는 것처럼 렌더마다 같은 참조다. */
 const requestResync = vi.fn();
 let socketConnected = true;
 vi.mock('@/ws/useStompRoom', () => ({
@@ -512,7 +512,7 @@ describe('OneCardTable — 원카드 경쟁', () => {
   });
 });
 
-describe('OneCardTable — 낡은 창 복구 (S5)', () => {
+describe('OneCardTable — 낡은 창 복구 (D-130)', () => {
   // 서버가 실제로 만드는 순서로 넣는다. 해소 이벤트가 끝내 안 오는 경우는 둘이다 — 엔진 타이머가 사라져 서버에서도 창이
   // 열린 채 멈췄거나(C-I2 경로 1·4: 서버 resync 가 진행 킥으로 타이머를 다시 건다), 서버는 창을 닫아 저장했는데 방송이
   // 실패했다(경로 3: 누름은 NO_RACE 로만 돌아온다).

@@ -55,7 +55,7 @@ describe('onecardRoomSink — ERROR 문구', () => {
     expect(store().errorMessage).toBe('SOMETHING_NEW: detail');
   });
 
-  /** S5 — 인프라 거절(게임 중립)은 공용 문구로. 예전에는 `INTERNAL_ERROR: Failed to apply action` 처럼 영문 원문이 보였다. */
+  /** D-130 — 인프라 거절(게임 중립)은 공용 문구로. 예전에는 `INTERNAL_ERROR: Failed to apply action` 처럼 영문 원문이 보였다. */
   it.each(['INVALID_ACTION', 'INTERNAL_ERROR', 'NOT_IN_ROOM', 'ROOM_NOT_FOUND', 'GAME_NOT_AVAILABLE', 'RATE_LIMITED'])(
     '인프라 거절 %s 도 한국어 문구로 보여 준다',
     (code) => {

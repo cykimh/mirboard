@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 /**
- * S5 — 봇 루프는 이 인스턴스에서 방마다 몇 개가 살아 있는지 센다. 진행 킥({@link GameProgressKick})은 resync·구독마다
+ * D-130 — 봇 루프는 이 인스턴스에서 방마다 몇 개가 살아 있는지 센다. 진행 킥({@link GameProgressKick})은 resync·구독마다
  * 불리므로, 살아 있는 루프가 있는데도 하나 더 걸면 두 루프가 번갈아 락을 잡아 봇이 지연 없이 연달아 둔다. 그래서 킥은
  * {@link BotScheduler#scheduleBotsIfIdle} 로만 건다. 루프가 "봇이 기다리지 않음"으로 끝나는 것은 그런 겹친 루프·사람
  * 차례 인계마다 일어나는 정상 경로라 DEBUG 로 남긴다(예전 WARN 은 봇 방 사람 차례마다 Sentry breadcrumb 을 채웠다).

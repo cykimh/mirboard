@@ -62,7 +62,7 @@ export function CreateRoomModal({
   const [creating, setCreating] = useState(false);
   const [fillWithBots, setFillWithBots] = useState(defaultFillWithBots ?? false);
   const [targetScore, setTargetScore] = useState(1000);
-  // S5 — null = 아직 안 고름(게임이 선언한 처음 선택을 쓴다). 인원과 같은 방식.
+  // D-130 — null = 아직 안 고름(게임이 선언한 처음 선택을 쓴다). 인원과 같은 방식.
   const [turnSeconds, setTurnSeconds] = useState<number | null>(null);
   const [stake, setStake] = useState(0);
   // D-99 — 인원 가변 게임에서만 쓰는 좌석 수. null = 아직 안 고름(게임이 선언한 처음 선택).
@@ -85,10 +85,10 @@ export function CreateRoomModal({
           (_, i) => game.minPlayers + i,
         )
       : [];
-  // S5 — 게임이 선언한 인원을 처음 선택으로(원카드 4, 나머지는 maxPlayers). 서버의 capacity 생략 기본(maxPlayers)과
+  // D-130 — 게임이 선언한 인원을 처음 선택으로(원카드 4, 나머지는 maxPlayers). 서버의 capacity 생략 기본(maxPlayers)과
   // 다를 수 있지만 인원 가변 게임에서는 늘 capacity 를 보내므로 실제로 갈리지 않는다.
   const selectedSeats = capacity ?? game?.defaultPlayers ?? game?.maxPlayers ?? 0;
-  // S5 — 턴 제한도 게임이 선언한 값이 처음 선택이다(원카드 30초 — 자리 비운 사람이 판을 멈추지 않게, 나머지는 끔).
+  // D-130 — 턴 제한도 게임이 선언한 값이 처음 선택이다(원카드 30초 — 자리 비운 사람이 판을 멈추지 않게, 나머지는 끔).
   const selectedTurnSeconds = turnSeconds ?? game?.defaultTurnSeconds ?? 0;
 
   // D-106 — 게임이 선언한 옵션만 노출한다. 스컬킹은 10라운드 고정(목표 점수 무의미)·

@@ -205,7 +205,7 @@ class OneCardGameEngineTest {
     }
 
     /**
-     * S5 — 경쟁 창이 닫힐 때마다 결과 한 줄(INFO). 설계서 §4.4·§7 과 D-128 이 "배포 후 경쟁 결과 로그로 다시 본다"고
+     * D-130 — 경쟁 창이 닫힐 때마다 결과 한 줄(INFO). 설계서 §4.4·§7 과 D-128 이 "배포 후 경쟁 결과 로그로 다시 본다"고
      * 미뤄 둔 판단(사람·봇 승률, 반응 시간 분포, 핑 유리, 폴러 지연)과 누름 자동화 탐지의 근거다. 창이 닫히는 세 경로 —
      * 누름(apply)·엔진 타이머(onTimer)·탈주(desert) — 모두에서 남긴다. 사용자별 값이라 로그로만 둔다(메트릭 태그는
      * 공개 {@code /actuator/prometheus} 로 나간다). 열 이름이 바뀌면 로그를 읽는 쪽이 깨지므로 문장 전체를 고정한다.
@@ -298,7 +298,7 @@ class OneCardGameEngineTest {
     }
 
     /**
-     * S5 — 매치 종료 기록기({@code OneCardMatchRecorder})는 동기 리스너라 DB 장애가 어댑터로 올라온다. 예전에는 그대로
+     * D-130 — 매치 종료 기록기({@code OneCardMatchRecorder})는 동기 리스너라 DB 장애가 어댑터로 올라온다. 예전에는 그대로
      * 던져 호출한 진행 경로가 저장 뒤 방송·FINISHED 전이·재무장을 건너뛰었다 — 마지막 {@code CARD_PLAYED}·
      * {@code MATCH_ENDED} 가 아무에게도 안 가고 방은 IN_GAME 에 남았다. 기록이 빠지는 쪽이 덜 아프다: 결과를 실어
      * ERROR 로 남기고(수동 복구용) 진행은 계속한다.

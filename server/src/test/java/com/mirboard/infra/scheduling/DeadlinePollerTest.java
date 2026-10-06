@@ -20,7 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * S5 — 데드라인 폴러의 주기 작업은 무엇이 던져도 멈추지 않는다.
+ * D-130 — 데드라인 폴러의 주기 작업은 무엇이 던져도 멈추지 않는다.
  *
  * <p>{@code scheduleWithFixedDelay} 는 작업이 한 번이라도 던지면 이후 실행을 <b>조용히</b> 멈추고 예외는 아무도 읽지
  * 않는 {@code Future} 에 묻는다. 폴러는 {@code RuntimeException} 만 잡고 있어서 {@code Error}(스택 넘침·메모리 부족) 한

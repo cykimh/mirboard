@@ -6,7 +6,7 @@ import type { ApplyEventResult } from '@/types/stomp';
 // ── @stomp/stompjs 가짜 ──────────────────────────────────────────────
 // activate() 시 onConnect 를 즉시 호출하고, subscribe 핸들러를 목적지별로 캡처한다.
 const handlers = new Map<string, (frame: { body: string }) => void>();
-/** 구독·resync 호출 순서 기록 (S5 — 접속 직후 순서). */
+/** 구독·resync 호출 순서 기록 (D-130 — 접속 직후 순서). */
 const calls: string[] = [];
 let activateCount = 0;
 let deactivateCount = 0;
@@ -317,7 +317,7 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
   });
 });
 
-describe('useStompRoom — S5 보강 (낡은 resync·접속 순서·다시 받기)', () => {
+describe('useStompRoom — D-130 보강 (낡은 resync·접속 순서·다시 받기)', () => {
   /** 응답을 테스트가 원하는 순서로 풀 수 있게 붙잡아 둔다. */
   function heldResyncs() {
     const pending: Array<(snap: unknown) => void> = [];

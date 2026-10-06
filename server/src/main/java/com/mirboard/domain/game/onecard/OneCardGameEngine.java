@@ -37,7 +37,7 @@ import org.springframework.context.ApplicationEventPublisher;
  * <p>1판 = 1매치 = 1라운드라 라운드가 끝나면 곧 매치가 끝난다. 본 클래스는 상태를 갖지 않는다(저장소 참조만)
  * — 동시성 직렬화는 호출자의 방 액션 락이 맡는다.
  *
- * <p>S5 — 경쟁 창이 닫힐 때마다 결과 한 줄을 남기고(누름·엔진 타이머·탈주 세 경로, {@link #logRaceResolved}),
+ * <p>D-130 — 경쟁 창이 닫힐 때마다 결과 한 줄을 남기고(누름·엔진 타이머·탈주 세 경로, {@link #logRaceResolved}),
  * 매치 종료 기록이 실패해도 진행을 끊지 않는다({@link #record}).
  */
 public final class OneCardGameEngine implements GameEngine {
@@ -87,7 +87,7 @@ public final class OneCardGameEngine implements GameEngine {
         return OneCardAction.class;
     }
 
-    /** 사람·봇·타임아웃 공용. 지금 시각은 경쟁 창을 열 때(와 S5 경쟁 결과 로그)에만 쓰인다. */
+    /** 사람·봇·타임아웃 공용. 지금 시각은 경쟁 창을 열 때(와 D-130 경쟁 결과 로그)에만 쓰인다. */
     @Override
     public Result apply(GameState state, int seat, GameAction action) {
         OneCardState before = ocState(state);
@@ -256,7 +256,7 @@ public final class OneCardGameEngine implements GameEngine {
     /**
      * 로컬 발행 — 기록기({@code OneCardMatchRecorder})가 듣는다.
      *
-     * <p>S5 — 기록기는 동기 리스너(@Transactional)라 DB 장애가 여기로 올라온다. 그대로 던지면 호출한 진행 경로(컨트롤러·
+     * <p>D-130 — 기록기는 동기 리스너(@Transactional)라 DB 장애가 여기로 올라온다. 그대로 던지면 호출한 진행 경로(컨트롤러·
      * 봇·타이머·탈주)가 저장 뒤의 방송·FINISHED 전이·재무장을 건너뛰어, 마지막 {@code CARD_PLAYED}·{@code MATCH_ENDED} 가
      * 아무에게도 안 가고 방이 IN_GAME 에 남았다. 기록이 빠지는 쪽이 결과 화면이 안 뜨는 쪽보다 덜 아프다 — 결과를 실어
      * ERROR(Sentry)로 남겨 수동으로 복구할 수 있게 하고 진행은 계속한다. 다른 인스턴스로 다시 보내는 경로는 만들지 않는다
@@ -274,7 +274,7 @@ public final class OneCardGameEngine implements GameEngine {
     }
 
     /**
-     * S5 — 경쟁 창이 닫히면 결과 한 줄(INFO). 설계서 §4.4·§7 과 D-128 이 "배포 후 경쟁 결과 로그로 다시 본다"고 미룬
+     * D-130 — 경쟁 창이 닫히면 결과 한 줄(INFO). 설계서 §4.4·§7 과 D-128 이 "배포 후 경쟁 결과 로그로 다시 본다"고 미룬
      * 판단(사람·봇 승률, 반응 시간 분포, 핑 유리, 단일 폴러 지연)과 누름 자동화 탐지(창이 열리자마자의 누름이 반복되는
      * 계정)의 근거다. 창이 닫히는 세 경로({@code via} = PRESS·TIMER·DESERTION)에서 부른다.
      *

@@ -34,7 +34,7 @@ export interface RoomEventSink<TTable = unknown, TPrivate = unknown> {
   reset(roomId: string): void;
 
   /**
-   * REST `/resync` 응답을 권위 스냅샷으로 반영. 순번 기준점(`eventSeq`)은 훅이 가진다(D-124). S5 — 기준점보다 낡은
+   * REST `/resync` 응답을 권위 스냅샷으로 반영. 순번 기준점(`eventSeq`)은 훅이 가진다(D-124). D-130 — 기준점보다 낡은
    * 응답(그 뒤 프레임이 먼저 닿았다)은 훅이 버려 여기로 오지 않는다.
    */
   applySnapshot(snapshot: ResyncEnvelope<TTable, TPrivate>): void;

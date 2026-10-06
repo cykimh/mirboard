@@ -58,7 +58,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.RedisConnectionFailureException;
 
 /**
- * S5 — 진행 킥의 끝-끝 시나리오. 리뷰가 재현한 세 정지(C-I1·C-I2)를 실제 부품으로 만들고, 킥 한 번(재접속이면 몇 번)이 판을
+ * D-130 — 진행 킥의 끝-끝 시나리오. 리뷰가 재현한 세 정지(C-I1·C-I2)를 실제 부품으로 만들고, 킥 한 번(재접속이면 몇 번)이 판을
  * 다시 움직이는지 본다.
  *
  * <p>실제 {@link OneCardGameEngine}·{@link GameStompController}·{@link TurnTimeoutScheduler}·{@link EngineTimerScheduler}·

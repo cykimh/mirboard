@@ -87,7 +87,7 @@ public final class OneCardGameDefinition implements GameDefinition {
     }
 
     /**
-     * S5 — 방 만들기의 처음 선택은 4명(설계 §3.1). 6석이 기본이면 친구 넷이 기본값으로 만든 방이 시작하지 않고(정원은 만든
+     * D-130 — 방 만들기의 처음 선택은 4명(설계 §3.1). 6석이 기본이면 친구 넷이 기본값으로 만든 방이 시작하지 않고(정원은 만든
      * 뒤 못 바꾼다) 게스트 첫 판이 봇 5명이 된다.
      */
     @Override
@@ -96,7 +96,7 @@ public final class OneCardGameDefinition implements GameDefinition {
     }
 
     /**
-     * S5 — 턴 제한 30초가 처음 선택이다(사용자 결정). 끔이면 자리를 비운 한 명이 판을 무기한 멈추고, 남은 사람이 나가면
+     * D-130 — 턴 제한 30초가 처음 선택이다(사용자 결정). 끔이면 자리를 비운 한 명이 판을 무기한 멈추고, 남은 사람이 나가면
      * (탈주) 결국 그 사람이 이긴다. 시간 초과는 먹기라 자리를 비운 사람은 파산으로 정리된다.
      */
     @Override

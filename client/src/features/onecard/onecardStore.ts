@@ -92,12 +92,12 @@ export interface OneCardRoomState {
   /** 경쟁에서 진 내 누름(남이 먼저 이겼거나 창이 닫힘) — 오류 대신 "늦었어요"를 잠깐 보여 준다. */
   raceNotice: 'LATE' | null;
   /**
-   * S5 — 낡았다고 의심돼 권위 스냅샷을 청한 창 번호(창마다 한 번). 해소 이벤트가 끝내 안 오는 창 — 서버 타이머가
+   * D-130 — 낡았다고 의심돼 권위 스냅샷을 청한 창 번호(창마다 한 번). 해소 이벤트가 끝내 안 오는 창 — 서버 타이머가
    * 사라졌거나 방송이 실패했다 — 은 클라가 스스로 닫을 길이 없다.
    */
   staleRaceResyncFor: number | null;
   /**
-   * S5 — 다시 받기 신호. 게임판이 이 값의 변화를 보고 훅의 `requestResync` 를 부른다 — sink·스토어는 훅을 모른다(D-103).
+   * D-130 — 다시 받기 신호. 게임판이 이 값의 변화를 보고 훅의 `requestResync` 를 부른다 — sink·스토어는 훅을 모른다(D-103).
    */
   resyncNonce: number;
 
@@ -125,11 +125,11 @@ export interface OneCardActions {
    *
    * <p>`BUSY` 는 내기·먹기의 락 경합에서도 오므로 기다리는 누름이 있을 때만 경쟁 누름의 것으로 본다: 창이 열려 있고 횟수가
    * 남았으면 재시도 신호를 올리고, 더 시도할 창이 없으면(횟수 소진·마감·남이 이김) "늦었어요".
-   * S5 — 기다리는 누름이 없어도 창이 열려 있으면 경쟁 누름의 것이다(스냅샷이 표식을 비운 뒤 늦게 온 BUSY) — 조용히 삼킨다.
+   * D-130 — 기다리는 누름이 없어도 창이 열려 있으면 경쟁 누름의 것이다(스냅샷이 표식을 비운 뒤 늦게 온 BUSY) — 조용히 삼킨다.
    */
   notePressRejected: (code: 'BUSY' | 'NO_RACE') => boolean;
   clearRaceNotice: () => void;
-  /** S5 — 이 창이 낡았다고 의심되면 권위 스냅샷을 청한다. 같은 창으로는 한 번만(신호를 올리지 않는다). */
+  /** D-130 — 이 창이 낡았다고 의심되면 권위 스냅샷을 청한다. 같은 창으로는 한 번만(신호를 올리지 않는다). */
   requestRaceResync: (raceId: number) => void;
 }
 
@@ -244,7 +244,7 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
       lastRace: null,
       result: t.result,
       ...mine,
-      // S5 — 기다리던 누름은 같은 창이라도 비운다. 끊긴 사이에 보낸 누름은 버려졌을 수 있다(소켓이 이미 죽어 있었다) —
+      // D-130 — 기다리던 누름은 같은 창이라도 비운다. 끊긴 사이에 보낸 누름은 버려졌을 수 있다(소켓이 이미 죽어 있었다) —
       // 남겨 두면 그 창 동안 다시 누를 수 없었다. 다시 누른 것이 늦으면 서버가 NO_RACE 로 거절할 뿐이다.
       press: null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
@@ -413,14 +413,14 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
     // 이벤트가 먼저 와서 누름 표식을 바꿨거나 지웠어도(resync 등) 같다.
     if (code === 'NO_RACE') {
       set({ press: null, raceNotice: 'LATE' });
-      // S5 — 그 창을 기다리던 누름인데 창이 아직 열려 보인다: 해소 이벤트를 못 받았다(서버는 닫아 저장했는데 방송이
+      // D-130 — 그 창을 기다리던 누름인데 창이 아직 열려 보인다: 해소 이벤트를 못 받았다(서버는 닫아 저장했는데 방송이
       // 실패했거나, 순서가 뒤바뀌어 오는 중이다). 창마다 한 번 권위 스냅샷을 받는다 — 뒤바뀐 경우면 한 번 더 받을 뿐이다.
       if (race !== null && press?.raceId === race.raceId) get().requestRaceResync(race.raceId);
       return true;
     }
     // BUSY 는 내기·먹기의 락 경합에서도 온다 — 창이 없을 때 기다리는 누름이 없으면 일반 오류로 둔다.
     if (!press) {
-      // S5 — 창이 열려 보이는데 기다리는 누름이 없다: resync 스냅샷이 표식을 비운 뒤 그 누름의 BUSY 가 늦게 왔다(창이 열린
+      // D-130 — 창이 열려 보이는데 기다리는 누름이 없다: resync 스냅샷이 표식을 비운 뒤 그 누름의 BUSY 가 늦게 왔다(창이 열린
       // 동안 내기·먹기는 버튼이 막혀 BUSY 는 누름의 것이다). 버튼은 이미 다시 누를 수 있다 — 빨간 오류 없이 삼킨다.
       return race !== null;
     }

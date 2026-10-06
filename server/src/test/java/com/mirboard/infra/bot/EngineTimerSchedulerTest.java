@@ -147,7 +147,7 @@ class EngineTimerSchedulerTest {
         }
 
         /**
-         * S5 — 조용히 사라지던 타이머가 보이게. 무장 실패는 그 창이 진행 킥({@link GameProgressKick}) 전까지 닫히지
+         * D-130 — 조용히 사라지던 타이머가 보이게. 무장 실패는 그 창이 진행 킥({@link GameProgressKick}) 전까지 닫히지
          * 않는다는 뜻이라 WARN 이 아니라 ERROR 다(Sentry 는 ERROR 만 올린다).
          */
         @Test

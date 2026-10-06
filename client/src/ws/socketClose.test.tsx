@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RoomEventSink } from './roomEventSink';
 
 /**
- * S5 — 소켓이 갑자기 끊기면(네트워크 끊김·서버 재시작·배포, close 1006/1001) 연결 표시가 내려간다.
+ * D-130 — 소켓이 갑자기 끊기면(네트워크 끊김·서버 재시작·배포, close 1006/1001) 연결 표시가 내려간다.
  *
  * <p>@stomp/stompjs 의 {@code onDisconnect} 는 <b>클라가 먼저 DISCONNECT 를 보내 영수증을 받을 때만</b> 불린다. 갑작스러운
  * 끊김은 {@code onWebSocketClose} 만 부르는데 두 훅은 그것을 등록하지 않아 끊긴 뒤에도 "● 연결"이었다 — 재연결 배너가
@@ -79,7 +79,7 @@ afterEach(() => {
   sockets.length = 0;
 });
 
-describe('갑작스러운 끊김 (S5)', () => {
+describe('갑작스러운 끊김 (D-130)', () => {
   it('방 소켓 — 끊기면 connected 가 false 로 내려간다', async () => {
     const { result } = renderHook(() => useStompRoom('r-1', 'tok', sink));
     await waitFor(() => expect(sockets).toHaveLength(1));

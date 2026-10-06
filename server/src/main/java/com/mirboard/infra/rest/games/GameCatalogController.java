@@ -43,7 +43,7 @@ public class GameCatalogController {
      * D-106 — `supportedRoomOptions` 는 방 만들기 UI 가 무엇을 노출할지 정하는 근거다.
      * 게임이 안 쓰는 설정을 화면에 띄우지 않기 위한 것이며, 서버도 같은 집합으로 검증한다.
      *
-     * <p>S5 — `defaultPlayers`·`defaultTurnSeconds` 는 방 만들기 모달의 처음 선택이다(사용자는 바꿀 수 있다).
+     * <p>D-130 — `defaultPlayers`·`defaultTurnSeconds` 는 방 만들기 모달의 처음 선택이다(사용자는 바꿀 수 있다).
      */
     public record GameSummary(
             String id,

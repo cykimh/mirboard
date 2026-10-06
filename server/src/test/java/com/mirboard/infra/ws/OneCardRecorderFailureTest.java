@@ -43,7 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
- * S5 — 매치를 끝내는 마지막 카드는 기록기(DB)가 실패해도 모두에게 나가고 방이 끝난다. 실제 컨트롤러·진행 서비스·원카드
+ * D-130 — 매치를 끝내는 마지막 카드는 기록기(DB)가 실패해도 모두에게 나가고 방이 끝난다. 실제 컨트롤러·진행 서비스·원카드
  * 어댑터를 묶고 저장소·브로커만 모의로 둔다. 예전에는 동기 기록기의 예외가 컨트롤러까지 올라와 저장 뒤의 방송과 FINISHED
  * 전이를 건너뛰었다 — 상태는 끝났는데 클라는 직전 화면에 멈추고 방은 IN_GAME 에 남았다(C-M2·P-F7).
  */
