@@ -597,7 +597,7 @@ PrivateHand X, 액션 송신 거절). 로그 MDC 일관성 확인.
 | --- | --- | --- |
 | 6D-1 | `MessageGateway` + Redis/InMemory 구현체 + 단위 테스트 | ✅ 완료 |
 | 6D-2 | STOMP broadcast 멀티인스턴스화 (StompPublisher/Relay/Route) | ✅ 완료 |
-| 6D-3 | `DomainEventBus` — local + Redis Pub/Sub fan-out + instanceId self-skip | ✅ 완료 |
+| 6D-3 | `DomainEventBus` — local + Redis Pub/Sub fan-out + instanceId self-skip | ✅ 완료 → D-116 에서 폐기(리스너 중복 실행) |
 | 6D-4 | README 분산 시연 가이드 + application.yml gateway 토글 | ✅ 완료 |
 | (보류) | docker-compose `multi` 프로파일 — Dockerfile 추가 후 별도 사이클 | 보류 |
 
@@ -1007,6 +1007,11 @@ Hiding), 끝난 방에서도 타이머·봇이 계속 진행하던 경로. 좌�
 라운드 경계뿐). 실제 브라우저 검증에서 **본인 큐가 한 번도 배달되지 않았다**는 것(브로커 prefix `/user/queue`)을
 찾아 같이 고쳤다 — 손패는 resync 로만 맞고 에러 문구는 뜨지 않았다. 부수 효과로 정상 종료 때 뜨지 않던 티츄 종료
 패널(리매치 버튼)이 뜬다. `docs/plans/tichu-resync-d126.md`.
+
+**트랙 외 잠복 결함(D-116, 2026-10-03)**: `DomainEventBus`(6D-3)가 도메인 이벤트를 다른 인스턴스에서
+다시 발행해, redis 게이트웨이 + 2대 이상이면 매치 기록·ELO·칩 정산과 라운드 딜링이 인스턴스마다
+반복됐다. 리스너 부수효과는 공유 저장소에, 클라 프레임은 이미 `stomp:routes` 로 퍼지므로 fan-out 을
+없애고 로컬 발행으로 바꿨다. `DomainEventSingleDeliveryIT` 가 2-인스턴스에서 1회 처리를 고정한다.
 
 ---
 

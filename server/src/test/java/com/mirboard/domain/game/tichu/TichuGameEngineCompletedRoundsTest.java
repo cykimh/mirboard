@@ -17,13 +17,13 @@ import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-108 — 끝난 라운드 점수가 공개 뷰에 실리는지 고정한다. 이 값이 resync 응답을 타고
@@ -43,7 +43,7 @@ class TichuGameEngineCompletedRoundsTest {
             mock(TichuGameStateStore.class),
             matchStates,
             mock(TichuRoundStarter.class),
-            mock(DomainEventBus.class));
+            mock(ApplicationEventPublisher.class));
 
     private static TichuState.Dealing dealingState() {
         List<PlayerState> players = IntStream.range(0, 4)

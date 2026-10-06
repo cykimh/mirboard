@@ -9,8 +9,8 @@ import java.util.Set;
  * ({@code SkullKingMatchRecorder})이 듣는다.
  *
  * <p>클라에 나가는 {@link SkullKingEvent.MatchEnded} 와 달리 서버 내부 이벤트라 좌석→유저
- * 매핑({@code playerIds})과 탈주 좌석을 함께 싣는다. 인스턴스 간 전파(DomainEventBus)를 하지
- * 않는다 — 각 인스턴스가 다시 기록하면 같은 매치가 중복으로 남는다.
+ * 매핑({@code playerIds})과 탈주 좌석을 함께 싣는다. 인스턴스 간 전파는 하지
+ * 않는다(D-116) — 각 인스턴스가 다시 기록하면 같은 매치가 중복으로 남는다.
  *
  * @param playerIds     좌석 순서대로의 유저 id (봇 포함)
  * @param finalScores   좌석 → 최종 누적 점수

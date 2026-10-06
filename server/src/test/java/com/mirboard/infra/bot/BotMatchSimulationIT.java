@@ -141,8 +141,8 @@ class BotMatchSimulationIT {
     }
 
     /**
-     * MatchCompleted 이벤트를 room 별로 캡처하는 테스트 sink. DomainEventBus 의
-     * 동기 listener — IT scope spring bean 으로 등록.
+     * MatchCompleted 이벤트를 room 별로 캡처하는 테스트 sink. 로컬
+     * ApplicationEvent 의 동기 listener — IT scope spring bean 으로 등록.
      */
     static class MatchCompletedSink {
         private final ConcurrentHashMap<String, CompletableFuture<TichuMatchCompleted>>

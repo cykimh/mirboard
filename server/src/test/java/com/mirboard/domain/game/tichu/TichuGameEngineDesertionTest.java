@@ -1,10 +1,9 @@
 package com.mirboard.domain.game.tichu;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.mirboard.domain.game.core.GameContext;
@@ -18,12 +17,12 @@ import com.mirboard.domain.game.tichu.persistence.TichuMatchState;
 import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.scoring.RoundScore;
 import com.mirboard.domain.game.tichu.state.Team;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-98 — 탈주의 <b>게임 규칙</b>은 엔진이 답한다. 티츄는 2:2 고정이라 한 명이 빠지면
@@ -37,7 +36,7 @@ class TichuGameEngineDesertionTest {
     private final TichuGameStateStore stateStore = mock(TichuGameStateStore.class);
     private final TichuMatchStateStore matchStateStore = mock(TichuMatchStateStore.class);
     private final TichuRoundStarter roundStarter = mock(TichuRoundStarter.class);
-    private final DomainEventBus events = mock(DomainEventBus.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
     private TichuGameEngine engineWithStake(int stake) {
         return new TichuGameEngine(
@@ -92,7 +91,7 @@ class TichuGameEngineDesertionTest {
         GameEngine.DesertOutcome processed = engineWithStake(0).desert(0, 10L, outbound);
 
         assertThat(processed).isEqualTo(GameEngine.DesertOutcome.NOT_APPLICABLE);
-        verify(events, never()).publish(any());
+        verifyNoInteractions(events);
         assertThat(outbound).isEmpty();
     }
 
@@ -124,7 +123,7 @@ class TichuGameEngineDesertionTest {
 
     private TichuMatchCompleted capturePublished() {
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(events).publish(captor.capture());
+        verify(events).publishEvent(captor.capture());
         assertThat(captor.getValue()).isInstanceOf(TichuMatchCompleted.class);
         return (TichuMatchCompleted) captor.getValue();
     }

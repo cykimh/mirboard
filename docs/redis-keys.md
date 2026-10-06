@@ -227,5 +227,6 @@ TTL 도 있다" 가 항상 참이다.
   (`TwoInstanceHandoffIT`)가 데드라인 인계·중복 실행 0·교차 프레즌스 조회를 검증한다.
 - STOMP 브로커는 여전히 Spring 내장 `SimpleBroker` 지만, fan-out 은 `MessageGateway`
   추상화 뒤에 있다(Phase 6D). `MIRBOARD_MESSAGING_GATEWAY=redis` 로 켜면 STOMP
-  broadcast(`stomp:routes` 채널, `StompMessageRelay`)와 도메인 이벤트(`DomainEventBus`)가
-  Redis Pub/Sub 위로 흐르므로 **sticky session 없이** 작동한다. 기본값은 `in-memory`.
+  broadcast(`stomp:routes` 채널, `StompMessageRelay`)가 Redis Pub/Sub 위로 흐르므로
+  **sticky session 없이** 작동한다. 기본값은 `in-memory`. 도메인 이벤트는 이 채널을 타지
+  않는다 — 발행한 인스턴스에서만 처리한다(D-116, 구 `domain:event` 채널 폐기).

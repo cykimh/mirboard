@@ -59,6 +59,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   오지 않게 하려는 분리이므로 새 게임도 이 형태를 따를 것.
   유일한 예외: `RoomChipService` 는 칩 정산이 팀 승패에 묶여 있어 티츄를 직접 참조한다
   (칩은 포트 밖 — `docs/game-port.md` §2).
+- **도메인 이벤트는 로컬 발행만 (D-116)**: `ApplicationEventPublisher` 로 발행하고 다른
+  인스턴스로 재발행하지 않는다. 리스너 부수효과(매치 기록·ELO·칩 정산·라운드 딜링)는 공유
+  저장소에 쓰이고 클라 프레임은 `StompPublisher` 가 이미 모든 인스턴스로 fan-out 하므로,
+  다른 인스턴스에서 또 돌면 중복 기록이 된다(구 `DomainEventBus` 의 결함).
 - **방 옵션도 게임이 선언한다 (D-106)**: `GameDefinition.supportedRoomOptions()` →
   `Set<RoomOption>`(`TARGET_SCORE`·`TEAMS`·`BETTING`). **기본은 빈 집합(옵트인)**이라 새 게임은
   아무것도 안 써야 맞다 — 안 쓰는 설정이 방 만들기·대기실에 뜨지 않는다. 티츄만 셋 다 선언.

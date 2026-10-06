@@ -107,7 +107,7 @@ infra/
 ├── ws/                      GameStompController, RoomChatController, GameEventBroadcaster,
 │   └── lobby/               LobbyStompController, WsSessionRegistry, 세션 라이프사이클·탈주 핸들러
 ├── bot/                     BotScheduler, TurnTimeoutScheduler
-├── messaging/               MessageGateway(in-memory/redis), DomainEventBus, StompPublisher
+├── messaging/               MessageGateway(in-memory/redis), StompPublisher/Relay
 ├── metrics/                 MirboardMetrics (Prometheus)
 └── web/                     GlobalExceptionHandler, ApiErrorEnvelope, JSON 401, MdcKeys
 ```
@@ -201,7 +201,7 @@ envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.m
 | 모드 | 값 | 동작 |
 |------|----|------|
 | 단일 인스턴스(기본) | `in-memory` | Spring ApplicationEvent + STOMP SimpleBroker (in-process) |
-| 멀티 인스턴스(opt-in) | `redis` | Redis Pub/Sub fan-out, `DomainEventBus` 가 instanceId로 중복 제거 |
+| 멀티 인스턴스(opt-in) | `redis` | STOMP 프레임만 Redis Pub/Sub fan-out. 도메인 이벤트는 발행 인스턴스에서만 처리(D-116) |
 
 프로덕션(`application-prod.yml`)은 `redis` 를 강제. `infra/ws/WsSessionRegistry`(in-memory
 세션→방 매핑)는 **단일 인스턴스 전제**(Phase 19, D-75)다.

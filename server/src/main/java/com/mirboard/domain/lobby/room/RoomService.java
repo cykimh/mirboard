@@ -5,7 +5,6 @@ import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.core.RoomOption;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
-import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -19,6 +18,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -29,7 +29,8 @@ public class RoomService {
     private final RoomRepository repository;
     private final GameRegistry games;
     private final Clock clock;
-    private final DomainEventBus events;
+    /** D-116 — 로컬 발행만. GameStartingEvent 가 다른 인스턴스에서 또 처리되면 라운드를 재딜링한다. */
+    private final ApplicationEventPublisher events;
     private final MirboardMetrics metrics;
     private final Random random;
     private final BotUserRegistry bots;
@@ -38,7 +39,7 @@ public class RoomService {
     public RoomService(RoomRepository repository,
                        GameRegistry games,
                        Clock clock,
-                       DomainEventBus events,
+                       ApplicationEventPublisher events,
                        MirboardMetrics metrics,
                        BotUserRegistry bots) {
         this(repository, games, clock, events, metrics, bots, new SecureRandom());
@@ -48,7 +49,7 @@ public class RoomService {
     public RoomService(RoomRepository repository,
                        GameRegistry games,
                        Clock clock,
-                       DomainEventBus events,
+                       ApplicationEventPublisher events,
                        MirboardMetrics metrics,
                        BotUserRegistry bots,
                        Random random) {
@@ -144,7 +145,7 @@ public class RoomService {
         repository.create(roomId, hostUserId, name, gameType, capacity, now, teamPolicy,
                 fillWithBots, targetScore, turnSeconds, stake);
         Room room = getRoom(roomId);
-        events.publish(RoomChangedEvent.updated(room));
+        events.publishEvent(RoomChangedEvent.updated(room));
         metrics.roomOpened(gameType);
         log.info("Room created: roomId={} gameType={} hostUserId={} capacity={} teamPolicy={} fillWithBots={} targetScore={} turnSeconds={} stake={}",
                 roomId, gameType, hostUserId, capacity, teamPolicy, fillWithBots,
@@ -218,7 +219,7 @@ public class RoomService {
         }
         repository.updateTeamPolicy(roomId, newPolicy);
         Room updated = getRoom(roomId);
-        events.publish(RoomChangedEvent.updated(updated));
+        events.publishEvent(RoomChangedEvent.updated(updated));
         log.info("Team policy updated: roomId={} requesterId={} newPolicy={}",
                 roomId, requesterId, newPolicy);
         return updated;
@@ -232,7 +233,7 @@ public class RoomService {
         long now = Instant.now(clock).toEpochMilli();
         repository.join(roomId, userId, now);
         Room room = getRoom(roomId);
-        events.publish(RoomChangedEvent.updated(room));
+        events.publishEvent(RoomChangedEvent.updated(room));
         metrics.roomJoined();
         log.info("Room join: roomId={} userId={} occupancy={}/{} status={}",
                 roomId, userId, room.playerIds().size(), room.capacity(), room.status());
@@ -250,7 +251,7 @@ public class RoomService {
         // D-82 — 방 단위 테이블 칩: ready 전 계정 잔액 검증 없음(게임 시작 시 전원 동일 칩).
         int code = repository.setReady(roomId, userId, ready);
         Room room = getRoom(roomId);
-        events.publish(RoomChangedEvent.updated(room));
+        events.publishEvent(RoomChangedEvent.updated(room));
         log.info("Room ready toggle: roomId={} userId={} ready={} started={}",
                 roomId, userId, ready, code == 1);
         if (code == 1) {
@@ -294,10 +295,10 @@ public class RoomService {
             Collections.shuffle(shuffled, random);
             repository.replacePlayerOrder(roomId, shuffled);
             room = getRoom(roomId);
-            events.publish(RoomChangedEvent.updated(room));
+            events.publishEvent(RoomChangedEvent.updated(room));
             log.info("Seats shuffled (RANDOM): roomId={} newOrder={}", roomId, shuffled);
         }
-        events.publish(new com.mirboard.domain.game.core.GameStartingEvent(
+        events.publishEvent(new com.mirboard.domain.game.core.GameStartingEvent(
                 room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
         metrics.gameStarted(room.gameType());
         log.info("Game starting: roomId={} gameType={} players={}",
@@ -309,7 +310,7 @@ public class RoomService {
         repository.leave(roomId, userId);
         repository.clearReady(roomId, userId); // Phase 16(#2) — ready 플래그 정리.
         Optional<Room> remaining = repository.findById(roomId);
-        events.publish(remaining
+        events.publishEvent(remaining
                 .map(RoomChangedEvent::updated)
                 .orElseGet(() -> RoomChangedEvent.destroyed(roomId)));
         log.info("Room leave: roomId={} userId={} destroyed={}",
@@ -319,7 +320,7 @@ public class RoomService {
     public void markFinished(String roomId) {
         repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
         repository.findById(roomId)
-                .ifPresent(room -> events.publish(RoomChangedEvent.updated(room)));
+                .ifPresent(room -> events.publishEvent(RoomChangedEvent.updated(room)));
         log.info("Room finished: roomId={}", roomId);
     }
 
@@ -369,7 +370,7 @@ public class RoomService {
         checkHostAbort(roomId, userId);
         repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
         repository.findById(roomId)
-                .ifPresent(updated -> events.publish(RoomChangedEvent.updated(updated)));
+                .ifPresent(updated -> events.publishEvent(RoomChangedEvent.updated(updated)));
         log.warn("Room aborted by host: roomId={} hostUserId={}", roomId, userId);
     }
 
@@ -384,7 +385,7 @@ public class RoomService {
         }
         repository.markFinished(roomId, Instant.now(clock).toEpochMilli());
         repository.findById(roomId)
-                .ifPresent(updated -> events.publish(RoomChangedEvent.updated(updated)));
+                .ifPresent(updated -> events.publishEvent(RoomChangedEvent.updated(updated)));
         log.warn("Room aborted by admin: roomId={}", roomId);
     }
 
@@ -416,7 +417,7 @@ public class RoomService {
         repository.findById(roomId).ifPresent(room -> {
             if (room.playerIds().isEmpty() && room.spectatorIds().isEmpty()
                     && repository.deleteRoom(roomId)) {
-                events.publish(RoomChangedEvent.destroyed(roomId));
+                events.publishEvent(RoomChangedEvent.destroyed(roomId));
                 log.info("Room destroyed (empty — no players/spectators): roomId={}", roomId);
             }
         });

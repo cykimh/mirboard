@@ -1,22 +1,20 @@
 package com.mirboard.domain.lobby.room;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
-import com.mirboard.infra.messaging.DomainEventBus;
 import com.mirboard.infra.metrics.MirboardMetrics;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-122 — 리매치는 게임이 선언한다({@code GameDefinition.supportsRematch()}). 리매치가 없는 게임은
@@ -28,7 +26,7 @@ class RoomServiceRematchTest {
 
     private final RoomRepository repository = mock(RoomRepository.class);
     private final GameRegistry games = mock(GameRegistry.class);
-    private final DomainEventBus events = mock(DomainEventBus.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final RoomService service = new RoomService(repository, games, Clock.systemUTC(), events,
             mock(MirboardMetrics.class), mock(BotUserRegistry.class));
 
@@ -47,6 +45,6 @@ class RoomServiceRematchTest {
         assertThatThrownBy(() -> service.rematch("r1", 7L))
                 .isInstanceOf(GameNotInProgressException.class);
 
-        verify(events, never()).publish(any());
+        verifyNoInteractions(events);
     }
 }

@@ -14,12 +14,12 @@ import com.mirboard.domain.game.tichu.persistence.TichuMatchStateStore;
 import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TrickState;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-118 — 포트 {@code botAction} 이 휴리스틱 정책에 위임하는지. 이전 랜덤 봇은 선언을 하지
@@ -32,7 +32,7 @@ class TichuGameEngineBotActionTest {
             mock(TichuGameStateStore.class),
             mock(TichuMatchStateStore.class),
             mock(TichuRoundStarter.class),
-            mock(DomainEventBus.class));
+            mock(ApplicationEventPublisher.class));
 
     private static Card n(Suit s, int r) {
         return Card.normal(s, r);

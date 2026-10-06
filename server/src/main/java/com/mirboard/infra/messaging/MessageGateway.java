@@ -15,8 +15,10 @@ import java.util.function.BiConsumer;
  * <ul>
  *   <li>{@code stomp:topic:<destination>} — 공개 STOMP 토픽 broadcast</li>
  *   <li>{@code stomp:user:<userId>:<destination>} — 본인 큐 전달</li>
- *   <li>{@code domain:event:<type>} — ApplicationEvent 의 클러스터 fan-out</li>
  * </ul>
+ *
+ * <p>도메인 이벤트(ApplicationEvent)는 이 gateway 를 타지 않는다 — 발행한 인스턴스에서만
+ * 처리한다(D-116). 리스너의 부수효과가 공유 저장소에 쓰여 인스턴스마다 다시 돌면 중복된다.
  *
  * <p>payload 는 UTF-8 JSON 문자열. 구현체는 직렬화/역직렬화에 관여하지 않음.
  */

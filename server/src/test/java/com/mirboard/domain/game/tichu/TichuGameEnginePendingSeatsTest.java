@@ -15,12 +15,12 @@ import com.mirboard.domain.game.tichu.state.PassCardsSelection;
 import com.mirboard.domain.game.tichu.state.PlayerState;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TrickState;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-98 — {@code pendingSeats} 는 BotScheduler 의 {@code hasPendingAction} 과
@@ -38,7 +38,7 @@ class TichuGameEnginePendingSeatsTest {
             mock(TichuGameStateStore.class),
             mock(TichuMatchStateStore.class),
             mock(TichuRoundStarter.class),
-            mock(DomainEventBus.class));
+            mock(ApplicationEventPublisher.class));
 
     private static final Card A_CARD = Card.normal(Suit.JADE, 5);
 

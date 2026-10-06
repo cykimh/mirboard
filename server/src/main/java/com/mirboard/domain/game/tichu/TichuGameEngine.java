@@ -22,12 +22,12 @@ import com.mirboard.domain.game.tichu.state.TableView;
 import com.mirboard.domain.game.tichu.state.Team;
 import com.mirboard.domain.game.tichu.state.TichuState;
 import com.mirboard.domain.game.tichu.state.TichuStateMapper;
-import com.mirboard.infra.messaging.DomainEventBus;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * D-98 — 티츄의 {@link GameEngine} 포트 어댑터. 방 하나에 대응하는 per-room 인스턴스로
@@ -54,13 +54,14 @@ public final class TichuGameEngine implements GameEngine {
     private final TichuGameStateStore stateStore;
     private final TichuMatchStateStore matchStateStore;
     private final TichuRoundStarter roundStarter;
-    private final DomainEventBus events;
+    /** D-116 — 로컬 발행만. 매치 기록·칩 정산은 공유 저장소에 쓰므로 인스턴스마다 돌면 중복된다. */
+    private final ApplicationEventPublisher events;
 
     public TichuGameEngine(GameContext context,
                            TichuGameStateStore stateStore,
                            TichuMatchStateStore matchStateStore,
                            TichuRoundStarter roundStarter,
-                           DomainEventBus events) {
+                           ApplicationEventPublisher events) {
         this.context = context;
         this.rules = new TichuEngine(context);
         this.stateStore = stateStore;
@@ -217,7 +218,7 @@ public final class TichuGameEngine implements GameEngine {
                 afterRound.roundScores().size(),
                 mvp.map(MvpCalculator.Mvp::userId).orElse(null),
                 mvp.map(MvpCalculator.Mvp::stat).orElse(null)));
-        events.publish(new TichuMatchCompleted(
+        events.publishEvent(new TichuMatchCompleted(
                 context.roomId(),
                 context.playerIds(),
                 afterRound.cumulativeA(),
@@ -246,7 +247,7 @@ public final class TichuGameEngine implements GameEngine {
             return DesertOutcome.NOT_APPLICABLE;
         }
         Team winner = Team.ofSeat(seat).opponent();
-        events.publish(new TichuMatchCompleted(
+        events.publishEvent(new TichuMatchCompleted(
                 context.roomId(),
                 context.playerIds(),
                 matchState.cumulativeA(),
