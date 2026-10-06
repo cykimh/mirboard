@@ -115,7 +115,11 @@ class BotSchedulerTest {
      */
     @Test
     void a_segment_that_ends_with_an_exception_still_returns_its_share() {
-        when(roomService.getRoom(ROOM)).thenThrow(new IllegalStateException("simulated redis blip"));
+        humanTurnInABotRoom();
+        Room room = roomService.getRoom(ROOM);
+        // 첫 방 조회만 순단한다 — 그 뒤 걸리는 루프(아래 await)는 정상으로 끝난다.
+        when(roomService.getRoom(ROOM)).thenThrow(new IllegalStateException("simulated redis blip")).thenReturn(room);
+        when(lock.tryAcquire(ROOM)).thenReturn(true);
         BotScheduler bots = scheduler(0);
 
         bots.scheduleBots(ROOM);
