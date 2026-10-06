@@ -84,6 +84,13 @@ class GameSummaryOrderTest {
                 .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
+    /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
+    @Test
+    void declaration_order_is_the_contract() {
+        assertThat(RoomOption.values())
+                .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
+    }
+
     /** S5 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */
     @Test
     void room_creation_defaults_come_from_the_definition() {
@@ -143,13 +150,6 @@ class GameSummaryOrderTest {
         public GameEngine newEngine(GameContext ctx) {
             throw new UnsupportedOperationException("카탈로그 매핑만 검증한다");
         }
-    }
-
-    /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
-    @Test
-    void declaration_order_is_the_contract() {
-        assertThat(RoomOption.values())
-                .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
     @Test
