@@ -71,7 +71,13 @@ public class DeadlinePoller {
         log.info("데드라인 폴러 기동: kinds={} intervalMs={}", handlers.keySet(), intervalMillis);
     }
 
-    /** 한 사이클. 테스트에서 주기를 기다리지 않고 직접 부를 수 있게 package-private. */
+    /**
+     * 한 사이클. 테스트에서 주기를 기다리지 않고 직접 부를 수 있게 package-private.
+     *
+     * <p>S5 — <b>무엇도 밖으로 던지지 않는다.</b> {@code scheduleWithFixedDelay} 는 작업이 한 번이라도 던지면 이후
+     * 실행을 조용히 멈추고 예외는 아무도 읽지 않는 {@code Future} 에 묻는다. {@code RuntimeException} 만 잡던 때는
+     * {@code Error}(스택 넘침·메모리 부족) 한 번에 이 인스턴스의 턴·엔진·탈주 데드라인이 로그 없이 전부 멈췄다.
+     */
     void pollOnce() {
         for (var entry : handlers.entrySet()) {
             String kind = entry.getKey();
@@ -80,8 +86,9 @@ public class DeadlinePoller {
                 for (String member : queue.pollDue(kind)) {
                     try {
                         handler.handle(member);
-                    } catch (RuntimeException e) {
-                        // 한 항목의 실패가 나머지를 막지 않게. 재시도는 핸들러 책임.
+                    } catch (Throwable e) {
+                        // 한 항목의 실패가 나머지를 막지 않게 — Error 도 잡는다. 이미 pop 한 나머지 항목은 이 인스턴스만
+                        // 가지고 있어서 여기서 빠져나가면 그 타이머들은 영영 사라진다. 재시도는 핸들러 책임.
                         log.error("데드라인 처리 실패: kind={} member={} err={}",
                                 kind, member, e.toString(), e);
                     }
@@ -89,6 +96,9 @@ public class DeadlinePoller {
             } catch (RuntimeException e) {
                 // Redis 장애 등 — 다음 사이클에 재시도.
                 log.warn("데드라인 폴링 실패(다음 주기 재시도): kind={} err={}", kind, e.toString());
+            } catch (Throwable e) {
+                // S5 — Error 가 주기 작업 밖으로 새면 폴링이 영영 멈춘다. 남기고 다음 주기에 다시 한다.
+                log.error("데드라인 폴링 중 오류(다음 주기 재시도): kind={} err={}", kind, e.toString(), e);
             }
         }
     }
