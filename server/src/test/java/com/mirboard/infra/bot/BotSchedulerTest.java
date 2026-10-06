@@ -109,6 +109,21 @@ class BotSchedulerTest {
         verify(lock, timeout(2_000)).release(ROOM);
     }
 
+    /**
+     * 토막이 예외로 끝나도(예: 방을 읽는 순간 Redis 가 순단했다) 센 몫을 돌려줘야 한다. 정상 종료 때만 덜면 그 방의
+     * {@link BotScheduler#scheduleBotsIfIdle} 가 재기동 전까지 늘 false 라 진행 킥이 다시 죽는다 — C-I1 이 돌아온다.
+     */
+    @Test
+    void a_segment_that_ends_with_an_exception_still_returns_its_share() {
+        when(roomService.getRoom(ROOM)).thenThrow(new IllegalStateException("simulated redis blip"));
+        BotScheduler bots = scheduler(0);
+
+        bots.scheduleBots(ROOM);
+
+        // 루프 스레드에서 새는 예외가 이 시나리오의 전제다 — Awaitility 가 기본으로 다른 스레드의 미처리 예외를 테스트 실패로 올리지 않게.
+        await().dontCatchUncaughtExceptions().atMost(Duration.ofSeconds(2)).until(() -> bots.scheduleBotsIfIdle(ROOM));
+    }
+
     @Test
     void a_loop_ending_on_a_human_turn_is_a_debug_line_not_a_warning() {
         humanTurnInABotRoom();

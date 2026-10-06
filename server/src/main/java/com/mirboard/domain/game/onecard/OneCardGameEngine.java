@@ -286,9 +286,9 @@ public final class OneCardGameEngine implements GameEngine {
      * <p><b>사용자별 값은 로그로만 둔다</b> — 메트릭 태그로 두면 공개된 {@code /actuator/prometheus} 로 나간다. 여러
      * 인스턴스면 창을 연 시각({@code openedAt})과 지금 시각이 다른 시계일 수 있다(그 차이만큼 두 값이 흔들린다).
      *
-     * <p><b>집계는 {@code room}+{@code raceId} 로 묶어 마지막 줄을 정본으로 센다.</b> 이 줄은 호출자가 저장·방송하기 <em>전에</em>
-     * 찍힌다 — 저장이 실패하면 상태에는 창이 그대로 남고, 나중에 다른 경로(타이머·킥이 다시 건 타이머)가 같은 창을 닫으며 다른
-     * 결과로 한 줄 더 찍는다.
+     * <p><b>집계는 {@code room}+{@code raceId} 로 묶어 마지막 줄을 정본으로 센다.</b> PRESS·TIMER 줄은 호출자가 저장·방송하기
+     * <em>전에</em> 찍힌다(DESERTION 은 어댑터가 저장한 <em>뒤</em>에 찍는다) — 저장이 실패하면 상태에는 창이 그대로 남고, 나중에
+     * 다른 경로(타이머·킥이 다시 건 타이머)가 같은 창을 닫으며 다른 결과로 한 줄 더 찍는다.
      */
     private void logRaceResolved(RaceWindow race, List<OneCardEvent> events, String via, long now) {
         if (race == null) {

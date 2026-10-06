@@ -117,7 +117,8 @@ class RoomControllerResyncLockTest {
 
     /**
      * S5 — resync 는 클라가 방을 다시 보는 순간이라, 멈춘 진행(재기동 뒤 봇 차례·사라진 엔진 타이머)을 다시 거는 자리다.
-     * 락을 푼 <b>뒤</b>에 건다 — 킥은 비동기라 응답을 늦추지 않고, 락 안에서 걸면 킥이 같은 락을 기다린다.
+     * 락을 푼 <b>뒤</b>에 건다 — 킥은 비동기라 응답을 늦추지 않고, 락 안에서 걸면 킥이 건 봇 루프가 이 락과 부딪쳐
+     * 쓸데없이 재시도한다(킥 자신은 락을 잡지 않는다).
      */
     @Test
     void the_progress_kick_goes_out_after_the_lock_is_released() {

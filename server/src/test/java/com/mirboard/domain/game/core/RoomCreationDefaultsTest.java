@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
  * 끔 — 이라 티츄·스컬킹은 한 줄도 바꾸지 않는다. 원카드만 4명·30초(설계 §3.1 의 기본 4, 버티기 대응 — 사용자 결정).
  *
  * <p>서버의 capacity 생략 기본({@code RoomService} — maxPlayers)은 그대로다. 인원 가변 게임은 클라가 늘 capacity 를
- * 보내므로 이 값은 클라 모달의 처음 선택으로만 쓰인다. 정의는 저장소를 생성자로 받지만 이 메서드는 쓰지 않으므로 null 로
- * 진짜 인스턴스를 만든다({@link RematchSupportTest} 와 같은 방식).
+ * 보내므로 이 값은 클라 모달의 처음 선택으로만 쓰인다. 정의는 저장소를 생성자로 받지만 이 메서드는 쓰지 않으므로 null
+ * (원카드는 모의 저장소)로 인스턴스를 만든다({@link RematchSupportTest} 와 같은 방식).
  */
 class RoomCreationDefaultsTest {
 

@@ -3,10 +3,11 @@ package com.mirboard.infra.scheduling;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.mirboard.testsupport.LogCapture;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -108,7 +109,15 @@ class DeadlinePollerTest {
         DeadlinePoller poller = new DeadlinePoller(queue, List.of(handler(member -> { })), 10);
 
         assertThatCode(poller::pollOnce).doesNotThrowAnyException();
+        assertThatCode(poller::pollOnce).doesNotThrowAnyException(); // 다음 주기에도 다시 pop 을 시도한다
 
-        assertThat(logs.events()).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+        verify(queue, times(2)).pollDue(KIND);
+        assertThat(logs.events())
+                .filteredOn(event -> event.getLevel() == Level.ERROR)
+                .hasSize(2)
+                .allSatisfy(event -> {
+                    assertThat(event.getFormattedMessage()).contains("kind=" + KIND);
+                    assertThat(event.getThrowableProxy()).as("스택이 함께 남는다").isNotNull();
+                });
     }
 }

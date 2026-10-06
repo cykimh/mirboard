@@ -278,6 +278,23 @@ class OneCardGameEngineTest {
                         .contains("bySeat=-1 byUser=- byBot=false latencyMs=800 windowMs=3000 lateMs=-");
             }
         }
+
+        /** 탈주가 매치를 끝내는 갈래(MATCH_ENDED)도 같은 줄을 남긴다 — 위 테스트는 매치가 이어지는 갈래만 본다. */
+        @Test
+        void a_desertion_that_ends_the_match_during_the_race_also_logs() {
+            OneCardState twoSeats = seats(hand(heart(9), club(3)), hand(spade(4), spade(6))).top(heart(5)).turn(0).build();
+            OneCardState raced = (OneCardState) engine(NOW, 2).apply(twoSeats, 0, PlayCard.of(heart(9))).newState();
+            when(store.load("room-1")).thenReturn(Optional.of(raced));
+
+            try (LogCapture logs = LogCapture.of(OneCardGameEngine.class)) {
+                assertThat(engine(NOW + 800, 2).desert(1, 101L, new ArrayList<>()))
+                        .isEqualTo(GameEngine.DesertOutcome.MATCH_ENDED);
+
+                assertThat(raceLines(logs)).singleElement().asString()
+                        .contains("outcome=CANCELLED via=DESERTION")
+                        .contains("latencyMs=800");
+            }
+        }
     }
 
     /**

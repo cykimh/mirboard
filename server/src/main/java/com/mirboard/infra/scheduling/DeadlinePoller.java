@@ -74,9 +74,10 @@ public class DeadlinePoller {
     /**
      * 한 사이클. 테스트에서 주기를 기다리지 않고 직접 부를 수 있게 package-private.
      *
-     * <p>S5 — <b>무엇도 밖으로 던지지 않는다.</b> {@code scheduleWithFixedDelay} 는 작업이 한 번이라도 던지면 이후
-     * 실행을 조용히 멈추고 예외는 아무도 읽지 않는 {@code Future} 에 묻는다. {@code RuntimeException} 만 잡던 때는
-     * {@code Error}(스택 넘침·메모리 부족) 한 번에 이 인스턴스의 턴·엔진·탈주 데드라인이 로그 없이 전부 멈췄다.
+     * <p>D-130 — <b>{@code Error} 까지 잡아 다음 주기로 넘긴다</b>(로깅 자체가 실패하는 힙 고갈은 예외).
+     * {@code scheduleWithFixedDelay} 는 작업이 한 번이라도 던지면 이후 실행을 조용히 멈추고 예외는 아무도 읽지 않는
+     * {@code Future} 에 묻는다. {@code RuntimeException} 만 잡던 때는 {@code Error}(스택 넘침·메모리 부족) 한 번에 이
+     * 인스턴스의 턴·엔진·탈주 데드라인이 로그 없이 전부 멈췄다.
      */
     void pollOnce() {
         for (var entry : handlers.entrySet()) {

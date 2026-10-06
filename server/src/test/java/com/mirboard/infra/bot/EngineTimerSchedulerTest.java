@@ -165,6 +165,11 @@ class EngineTimerSchedulerTest {
 
                 assertThat(logs.messages(Level.ERROR)).anyMatch(m -> m.contains("Engine timer arm failed"));
                 assertThat(logs.messages(Level.WARN)).noneMatch(m -> m.contains("Engine timer arm failed"));
+                assertThat(logs.events())
+                        .filteredOn(event -> event.getLevel() == Level.ERROR
+                                && event.getFormattedMessage().contains("Engine timer arm failed"))
+                        .singleElement()
+                        .satisfies(event -> assertThat(event.getThrowableProxy()).as("스택이 함께 남는다").isNotNull());
             }
         }
     }

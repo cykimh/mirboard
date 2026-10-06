@@ -41,8 +41,8 @@ import org.springframework.stereotype.Component;
  * 하지 않는다.
  *
  * <p>게임을 모른다 — 누가 기다리는지·타이머가 있는지는 엔진 포트가 답한다. 호출한 요청(resync 응답·구독 처리)을
- * 늦추지 않게 가상 스레드에서 돌고, 실패는 남기고 삼킨다(킥이 없던 때와 같아질 뿐이다). {@code Error} 는 ERROR 로 남긴다 —
- * 가상 스레드의 기본 처리기(stderr)로 가면 Sentry 에 보이지 않는다.
+ * 늦추지 않게 가상 스레드에서 돌고, 실패는 남기고 삼킨다(킥이 없던 때와 같아질 뿐이다 — 실행기가 제출을 거절한 경우도
+ * 같다). {@code Error} 는 ERROR 로 남긴다 — 가상 스레드의 기본 처리기(stderr)로 가면 Sentry 에 보이지 않는다.
  */
 @Component
 public class GameProgressKick {
@@ -87,15 +87,23 @@ public class GameProgressKick {
      * @param userId 방을 다시 보는 사람(resync 요청자·게임 토픽 구독자). 참가자·관전자가 아니면 아무것도 안 한다
      */
     public void kick(String roomId, long userId) {
-        executor.execute(() -> {
-            try {
-                kickNow(roomId, userId);
-            } catch (RuntimeException e) {
-                log.warn("Progress kick failed: roomId={} err={}", roomId, e.toString());
-            } catch (Error e) {
-                log.error("Progress kick failed: roomId={}", roomId, e);
-            }
-        });
+        try {
+            executor.execute(() -> {
+                try {
+                    kickNow(roomId, userId);
+                } catch (RuntimeException e) {
+                    // 스택까지 남긴다 — 엔진 timer 의 NPE 같은 예기치 못한 실패는 메시지만으로는 어디서 났는지 모른다.
+                    log.warn("Progress kick failed: roomId={} err={}", roomId, e.toString(), e);
+                } catch (Error e) {
+                    log.error("Progress kick failed: roomId={}", roomId, e);
+                }
+            });
+        } catch (RuntimeException e) {
+            // D-130 — 제출 자체가 거절돼도(종료 중·자원 부족) 호출한 요청(resync 응답·구독 처리)으로 던지지 않는다.
+            log.warn("Progress kick not submitted: roomId={} err={}", roomId, e.toString(), e);
+        } catch (Error e) {
+            log.error("Progress kick not submitted: roomId={}", roomId, e);
+        }
     }
 
     /** 한 번의 킥. 테스트가 실행기 없이 부를 수 있게 package-private. */

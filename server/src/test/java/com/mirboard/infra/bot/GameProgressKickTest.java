@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -309,7 +311,42 @@ class GameProgressKickTest {
 
                 assertThat(logs.messages(Level.WARN)).singleElement().asString().contains("redis down");
                 assertThat(logs.messages(Level.ERROR)).singleElement().asString().contains("Progress kick failed");
+                // 예기치 못한 RuntimeException(엔진 timer 의 NPE 등)도 어디서 났는지 알 수 있게 WARN·ERROR 모두 스택과 함께.
+                assertThat(logs.events())
+                        .filteredOn(event -> event.getLevel() == Level.WARN || event.getLevel() == Level.ERROR)
+                        .hasSize(2)
+                        .allSatisfy(event -> assertThat(event.getThrowableProxy()).as("스택이 함께 남는다").isNotNull());
             }
+        }
+
+        /**
+         * 실행기가 제출을 거절해도(종료 중·스레드를 못 만듦) 호출한 요청 — resync 응답·구독 처리 — 으로 던지지 않는다.
+         * 안 그러면 {@code RoomController.resync} 가 스냅샷을 다 만든 뒤 500 이 된다(킥이 없던 때와 같아지는 것이 계약이다).
+         */
+        @Test
+        void a_rejected_submission_is_logged_and_swallowed() {
+            Executor rejecting = task -> {
+                throw new RejectedExecutionException("simulated shutdown");
+            };
+            Executor exhausted = task -> {
+                throw new OutOfMemoryError("simulated");
+            };
+
+            try (LogCapture logs = LogCapture.of(GameProgressKick.class)) {
+                assertThatCode(() -> new GameProgressKick(roomService, engines, bots, deadlines, generations, rejecting)
+                        .kick(ROOM, PLAYER)).doesNotThrowAnyException();
+                assertThatCode(() -> new GameProgressKick(roomService, engines, bots, deadlines, generations, exhausted)
+                        .kick(ROOM, PLAYER)).doesNotThrowAnyException();
+
+                assertThat(logs.events()).filteredOn(event -> event.getLevel() == Level.WARN)
+                        .singleElement().satisfies(event -> {
+                            assertThat(event.getFormattedMessage()).contains("simulated shutdown");
+                            assertThat(event.getThrowableProxy()).isNotNull();
+                        });
+                assertThat(logs.events()).filteredOn(event -> event.getLevel() == Level.ERROR)
+                        .singleElement().satisfies(event -> assertThat(event.getThrowableProxy()).isNotNull());
+            }
+            verifyNoInteractions(roomService);
         }
     }
 }

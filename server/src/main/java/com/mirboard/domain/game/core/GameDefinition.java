@@ -62,8 +62,8 @@ public interface GameDefinition {
     }
 
     /**
-     * S5 — 방 만들기 모달이 처음 고르는 턴 제한(초). <b>기본은 0(끔)</b> — 서버 기본({@code RoomService
-     * .DEFAULT_TURN_SECONDS})과 같다. 모달의 선택지(0·30·60·90) 중 하나여야 처음부터 선택돼 보인다.
+     * S5 — 방 만들기 모달이 처음 고르는 턴 제한(초). <b>기본은 0(끔)</b> — 서버 기본
+     * ({@code RoomService.DEFAULT_TURN_SECONDS})과 같다. 모달의 선택지(0·30·60·90) 중 하나여야 처음부터 선택돼 보인다.
      */
     default int defaultTurnSeconds() {
         return 0;
