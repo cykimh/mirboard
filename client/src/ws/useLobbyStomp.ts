@@ -49,6 +49,8 @@ export function useLobbyStomp(token: string | null) {
       },
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
+      // S5 — 갑작스러운 끊김(네트워크·서버 재시작)은 onDisconnect 가 아니라 이것만 부른다.
+      onWebSocketClose: () => setConnected(false),
     });
 
     client.activate();

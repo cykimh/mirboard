@@ -27,6 +27,13 @@ interface ChatPayload {
  * <p><b>D-124: 순번 판정(중복·구멍)은 이 훅만 한다.</b> 기준점은 resync 의 `eventSeq` 이고
  * 판정은 `judgeSeq`(./seqGate) — 게임 스토어는 판정이 끝난 이벤트만 받는 순수 리듀서다.
  *
+ * <p><b>S5 — resync 응답이 기준점보다 낡으면 버린다.</b> 서버는 상태와 순번을 방 락 안에서 함께 읽지만(D-126) REST
+ * 응답과 STOMP 프레임의 도착 순서는 정해져 있지 않다 — 늦게 닿은 응답이 이미 반영한 이벤트를 되돌려, 사람 차례에서는
+ * 다음 이벤트가 오지 않아 판이 멈췄다. 서버 순번은 방이 살아 있는 동안 줄지 않는다. 방이 바뀐 뒤 도착한 이전 방의
+ * 응답도 버린다(방 전환마다 오르는 세대 — 안 그러면 이전 방 응답이 새 방의 기준점을 올려 새 방 스냅샷을 '낡음'으로
+ * 버렸다). 게임판은 `requestResync` 로 권위 스냅샷을 다시 청할 수 있다(게임 스토어가 "다시 받아야 함"을 표시하면 —
+ * 훅은 여전히 스토어를 모른다).
+ *
  * @param sink 게임별 이벤트 싱크. **모듈 상수**를 넘길 것 — 규약은
  *             {@link RoomEventSink} javadoc 참조.
  */
@@ -48,6 +55,11 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
    * 순번 있는 이벤트마다 전진한다.
    */
   const lastSeqRef = useRef(0);
+  /**
+   * S5 — 방 전환(reset)마다 오르는 세대. 그 전에 보낸 resync 의 늦은 응답(이전 방 — 토큰이 바뀌었다면 이전 사용자)을
+   * 버린다.
+   */
+  const epochRef = useRef(0);
   const resetChat = useRoomChatStore((s) => s.reset);
   const appendChat = useRoomChatStore((s) => s.appendIncoming);
   const appendReaction = useReactionStore((s) => s.add);
@@ -57,21 +69,28 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
 
   const resync = useCallback(async () => {
     if (!token) return;
+    const epoch = epochRef.current;
     try {
       const snap = await roomsApi.resync<ResyncEnvelope<TTable, TPrivate>>(
         token,
         roomId,
       );
+      // S5 — 그 사이 방이 바뀌었다(reset) — 이전 방의 응답이 새 방의 기준점을 올리지 않게 버린다.
+      if (epoch !== epochRef.current) return;
+      // S5 — 이미 반영한 공개 이벤트보다 낡은 응답(그 뒤 프레임이 먼저 닿았다)은 버린다. 같은 순번은 적용한다.
+      if (snap.eventSeq < lastSeqRef.current) return;
       // 껍데기를 가공하지 않고 그대로 넘긴다 — 게임별 필드 해석은 sink 책임.
       sinkRef.current.applySnapshot(snap);
       // 순번 기준점은 스냅샷이 다시 세운다 (D-124).
       lastSeqRef.current = snap.eventSeq;
     } catch (err) {
+      if (epoch !== epochRef.current) return;
       sinkRef.current.setError((err as Error).message);
     }
   }, [token, roomId]);
 
   useEffect(() => {
+    epochRef.current += 1; // reset 보다 먼저 — 이 앞에 보낸 resync 의 응답은 이제 낡았다
     sinkRef.current.reset(roomId);
     lastSeqRef.current = 0;
     resetChat(roomId);
@@ -90,8 +109,10 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       reconnectDelay: 2000,
       onConnect: () => {
         setConnected(true);
-        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화.
-        resync();
+        // S5 — 구독을 모두 보낸 뒤에 resync 한다(맨 끝). resync 를 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에
+        // 낸 이벤트가 스냅샷에도 프레임에도 없다. 이 순서는 그 틈을 좁힐 뿐 보장은 아니다 — SUBSCRIBE 등록은 서버에서
+        // 비동기이고 단순 브로커는 SUBSCRIBE 영수증을 주지 않는다. 남은 틈은 다음 이벤트의 구멍 판정·탭 복귀 resync·
+        // (원카드) 해소 없는 창 resync 가 메운다. 그 사이 닿은 프레임보다 낡은 응답은 위에서 버린다.
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
           // D-124 — 순번 판정은 여기서만 한다. sink 는 판정이 끝난 이벤트만 받는다.
@@ -142,9 +163,14 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
           if (env.type !== 'REACTION') return;
           appendReaction(env.payload.fromSeat, env.payload.emoji);
         });
+        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화 — 구독을 모두 보낸 뒤에.
+        resync();
       },
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
+      // S5 — 네트워크 끊김·서버 재시작·배포(1006/1001)는 onDisconnect 가 아니라 이것만 부른다(onDisconnect 는 클라가 먼저
+      // DISCONNECT 를 보내 영수증을 받을 때만). 없으면 끊긴 뒤에도 "연결"로 보여 재연결 배너가 안 뜨고 보내기가 조용히 버려졌다.
+      onWebSocketClose: () => setConnected(false),
     });
     client.activate();
     clientRef.current = client;
@@ -208,5 +234,5 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     [roomId],
   );
 
-  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef };
+  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef, requestResync: resync };
 }
