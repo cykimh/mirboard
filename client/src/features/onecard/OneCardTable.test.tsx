@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LATE_NOTICE_MS, OneCardTable, PRESS_RETRY_DELAY_MS } from './OneCardTable';
+import { LATE_NOTICE_MS, OneCardTable, PRESS_RETRY_DELAY_MS, STALE_RACE_GRACE_MS } from './OneCardTable';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -15,6 +15,8 @@ import type {
 
 // 소켓만 모킹하고 스토어는 실물을 seed 한다 (스컬킹 게임판 테스트와 같은 방식).
 const sendAction = vi.fn();
+/** S5 — 훅의 권위 스냅샷 재요청. 훅이 주는 것처럼 렌더마다 같은 참조다. */
+const requestResync = vi.fn();
 let socketConnected = true;
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
@@ -23,6 +25,7 @@ vi.mock('@/ws/useStompRoom', () => ({
     sendChat: vi.fn(),
     sendReaction: vi.fn(),
     chatPanelOpenRef: { current: false },
+    requestResync,
   }),
 }));
 
@@ -36,7 +39,7 @@ const seatOf = (n: number, over: Partial<OneCardSeatView> = {}): OneCardSeatView
 
 const NOW = 1_000_000;
 
-function seed(opts: {
+interface SeedOptions {
   seatCount: number;
   mySeat: number;
   hand?: OneCardCard[];
@@ -47,7 +50,15 @@ function seed(opts: {
   seats?: OneCardSeatView[];
   race?: OneCardRaceView | null;
   result?: OneCardMatchResult | null;
-}) {
+}
+
+function seed(opts: SeedOptions) {
+  useOneCardStore.getState().reset('r-1');
+  useOneCardStore.getState().applySnapshot(snapshotOf(opts));
+}
+
+/** resync 응답 모양 — 훅이 sink 로 넘기는 그대로. */
+function snapshotOf(opts: SeedOptions) {
   const table: OneCardTableView = {
     phase: opts.result ? 'ENDED' : opts.race ? 'RACE' : 'PLAYING',
     seats: opts.seats ?? Array.from({ length: opts.seatCount }, (_, i) => seatOf(i)),
@@ -60,8 +71,7 @@ function seed(opts: {
     race: opts.race ?? null,
     result: opts.result ?? null,
   };
-  useOneCardStore.getState().reset('r-1');
-  useOneCardStore.getState().applySnapshot({
+  return {
     roomId: 'r-1',
     phase: table.phase,
     eventSeq: 1,
@@ -70,7 +80,7 @@ function seed(opts: {
       opts.mySeat >= 0 ? { seat: opts.mySeat, hand: opts.hand ?? [], handVersion: 1 } : null,
     disconnectedSeats: [],
     chips: null,
-  });
+  };
 }
 
 const RACE: OneCardRaceView = {
@@ -94,6 +104,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   vi.setSystemTime(NOW);
   sendAction.mockReset();
+  requestResync.mockReset();
   socketConnected = true;
   useAuthStore.setState({ token: 'tok' } as never);
   useOneCardStore.getState().reset('r-1');
@@ -498,6 +509,108 @@ describe('OneCardTable — 원카드 경쟁', () => {
 
     expect(screen.getAllByText('잡기 성공: #102 → #101 벌칙 1장')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: '잡기!' })).toBeNull();
+  });
+});
+
+describe('OneCardTable — 낡은 창 복구 (S5)', () => {
+  // 서버가 실제로 만드는 순서로 넣는다. 해소 이벤트가 끝내 안 오는 경우는 둘이다 — 엔진 타이머가 사라져 서버에서도 창이
+  // 열린 채 멈췄거나(C-I2 경로 1·4: 서버 resync 가 진행 킥으로 타이머를 다시 건다), 서버는 창을 닫아 저장했는데 방송이
+  // 실패했다(경로 3: 누름은 NO_RACE 로만 돌아온다).
+  const errorEnvelope = (code: string) => ({ eventId: 'e', type: 'ERROR', ts: 0, payload: { code, message: 'detail' } });
+
+  it('창이 마감 + 1.5초가 지나도 열려 있으면 권위 스냅샷을 창마다 한 번 다시 청한다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => {
+      vi.advanceTimersByTime(RACE.remainingMillis + STALE_RACE_GRACE_MS - 1);
+    });
+    expect(requestResync).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+
+    // 서버도 창을 아직 들고 있다(타이머 유실) — 스냅샷은 남은 시간 0 인 같은 창. 같은 창으로는 더 청하지 않는다.
+    act(() =>
+      onecardRoomSink.applySnapshot(
+        snapshotOf({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: { ...RACE, remainingMillis: 0 } }),
+      ),
+    );
+    act(() => {
+      vi.advanceTimersByTime(STALE_RACE_GRACE_MS * 3);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+
+    // 서버 resync 의 진행 킥이 다시 건 타이머가 발화해 창이 닫힌다.
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'RACE_RESOLVED', payload: { raceId: 7, outcome: 'EXPIRED', bySeat: -1 } });
+    });
+    expect(screen.queryByRole('button', { name: '잡기!' })).toBeNull();
+  });
+
+  it('제때 닫힌 창은 다시 청하지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+      onecardRoomSink.applyEvent({ type: 'RACE_RESOLVED', payload: { raceId: 7, outcome: 'CAUGHT', bySeat: 2 } });
+      vi.advanceTimersByTime(STALE_RACE_GRACE_MS * 3);
+    });
+
+    expect(requestResync).not.toHaveBeenCalled();
+  });
+
+  it('해소 이벤트 없이 내 누름이 NO_RACE 로 돌아오면 한 번 다시 청하고, 스냅샷이 창을 닫는다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+    act(() => onecardRoomSink.applyPrivateEvent(errorEnvelope('NO_RACE')));
+
+    expect(requestResync).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    // 스냅샷 — 서버는 이미 창을 닫고 좌석 1 차례로 넘겼다.
+    act(() => onecardRoomSink.applySnapshot(snapshotOf({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], turnSeat: 1 })));
+    expect(screen.queryByRole('button', { name: '잡기!' })).toBeNull();
+  });
+
+  it('해소 → 차례 → NO_RACE 의 보통 순서에서는 다시 청하지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'RACE_RESOLVED', payload: { raceId: 7, outcome: 'CALLED', bySeat: 1 } });
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', payload: { seat: 0, direction: 1, attackStack: 0 } });
+      onecardRoomSink.applyPrivateEvent(errorEnvelope('NO_RACE'));
+    });
+
+    expect(requestResync).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 끊긴 줄 모르고 누른 경우(F2) — 누름은 버려졌는데 표식만 남아 그 창 동안 버튼이 잠겼다. 재접속 resync 의 스냅샷이 오면
+   * 같은 창이라도 다시 누를 수 있다.
+   */
+  it('resync 스냅샷이 오면 같은 창을 다시 누를 수 있다', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+    expect(screen.getByRole('button', { name: '잡기!' })).toBeDisabled();
+
+    act(() =>
+      onecardRoomSink.applySnapshot(
+        snapshotOf({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: { ...RACE, remainingMillis: 2_000 } }),
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '잡기!' }));
+
+    expect(sendAction).toHaveBeenCalledTimes(2);
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'CATCH', raceId: 7 });
   });
 });
 
