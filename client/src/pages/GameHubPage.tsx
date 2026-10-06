@@ -351,7 +351,8 @@ export function GameHubPage() {
                       )}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {room.gameType} · {room.playerCount} / {room.capacity} ·{' '}
+                      {/* S5 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름. 모르는 게임은 원문. */}
+                      {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}
                       {room.status}
                     </span>
                     <Button
