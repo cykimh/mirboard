@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
@@ -22,6 +22,11 @@ import { ONE_CARD_TUTORIAL } from './tutorial/onecardTutorial';
 export const PRESS_RETRY_DELAY_MS = 120;
 /** "늦었어요"를 보여 주는 시간. */
 export const LATE_NOTICE_MS = 1500;
+/**
+ * D-130 — 경쟁 창이 마감 뒤 이만큼 지나도 열려 있으면 해소 이벤트를 놓쳤거나 서버 타이머가 사라진 것으로 보고 권위 스냅샷을
+ * 다시 받는다(서버 resync 는 진행 킥으로 사라진 타이머를 다시 건다). 폴링 주기·왕복 시간보다 넉넉히.
+ */
+export const STALE_RACE_GRACE_MS = 1500;
 
 interface Props {
   roomId: string;
@@ -57,7 +62,7 @@ export function OneCardTable({
   roomFinished = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(
+  const { connected, sendAction, sendChat, chatPanelOpenRef, requestResync } = useStompRoom(
     roomId,
     token,
     onecardRoomSink,
@@ -98,6 +103,28 @@ export function OneCardTable({
     return () => window.clearTimeout(timer);
   }, [s.retryNonce, sendAction]);
 
+  // D-130 — 낡은 창 복구. 창이 마감 + 유예 뒤에도 열려 있으면 그 창을 낡았다고 표시한다(창마다 한 번 — 스토어가 거른다).
+  const staleRaceId = s.race?.raceId;
+  const staleRaceClosesAt = s.race?.closesAt;
+  useEffect(() => {
+    if (staleRaceId === undefined || staleRaceClosesAt === undefined) return;
+    const timer = window.setTimeout(() => {
+      const { race, requestRaceResync } = useOneCardStore.getState();
+      if (race?.raceId === staleRaceId) requestRaceResync(staleRaceId);
+    }, Math.max(0, staleRaceClosesAt + STALE_RACE_GRACE_MS - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [staleRaceId, staleRaceClosesAt]);
+
+  // 스토어가 다시 받기를 청하면(낡은 창 — 마감 초과·창이 열린 채 NO_RACE) 훅으로 권위 스냅샷을 받는다. 처리한 값을 ref 로
+  // 기억한다 — 스토어는 모듈 전역이라 이전 방 세션이 남긴 값을 첫 렌더가 읽을 수 있는데, 값이 아니라 변화에만 반응해야
+  // 마운트 직후 REST resync 가 훅 자신의 것에 더해 한 번 더 나가지 않는다.
+  const handledResyncNonce = useRef(s.resyncNonce);
+  useEffect(() => {
+    if (s.resyncNonce === handledResyncNonce.current) return;
+    handledResyncNonce.current = s.resyncNonce;
+    if (s.resyncNonce !== 0) requestResync();
+  }, [s.resyncNonce, requestResync]);
+
   // "늦었어요"는 잠깐만.
   const clearRaceNotice = s.clearRaceNotice;
   useEffect(() => {
@@ -107,7 +134,7 @@ export function OneCardTable({
   }, [s.raceNotice, clearRaceNotice]);
 
   const press = (action: PressAction) => {
-    // 끊긴 동안은 보내지 못한다(sendAction 이 조용히 무시한다) — 대기 누름만 남겨 같은 창 동안 버튼이 굳지 않게.
+    // 끊긴 동안은 보내지 못하므로(sendAction 이 조용히 무시한다) 누름 표식도 남기지 않는다 — 남기면 그 창 동안 버튼이 잠긴다.
     if (!connected || !s.race || s.press) return;
     s.startPress(s.race.raceId, action);
     sendAction({ '@action': action, raceId: s.race.raceId });

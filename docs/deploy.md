@@ -173,6 +173,83 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 
 ---
 
+## 원카드 공개 상태 (`MIRBOARD_ONECARD_STATUS`, D-128)
+
+원카드의 카탈로그 상태는 설정이다(`mirboard.onecard.status`, 코드 기본값은 `application.yml`). 운영에서는 시크릿으로만
+덮어쓴다 — `fly.toml` 의 `[env]` 에 같은 키를 두지 않는다(두 곳에 있으면 어느 값이 이기는지 헷갈린다).
+
+| 값 | 허브 카탈로그 | 새 원카드 방 | 진행 중인 원카드 방 |
+| --- | --- | --- | --- |
+| `AVAILABLE` | 보인다 | 만들 수 있다 | 정상 |
+| `COMING_SOON` | "Coming Soon" | 404 `GAME_NOT_AVAILABLE` | **끝까지 정상 진행** |
+| `DISABLED` | 안 보인다 | 404 `GAME_NOT_AVAILABLE` | **멈춘다** — 액션은 `GAME_NOT_AVAILABLE`, resync 404, 봇·턴·경쟁 타이머가 오류로 멈추고 '나가기'도 404. 방은 마지막 입장부터 6시간(방 해시 TTL)까지 IN_GAME 으로 남고 결과는 기록되지 않는다 |
+
+**되돌리기는 `COMING_SOON` 으로만 한다.** 새 방만 막고 진행 중인 판은 끝까지 간다. 이미 열려 있던 WAITING 원카드 방은
+허브 목록에 남고 입장·준비·시작이 된다(막는 것은 방 만들기뿐이다).
+
+```bash
+# 끄기(되돌리기) — 머신이 재시작된다
+flyctl secrets set MIRBOARD_ONECARD_STATUS=COMING_SOON -a mirboard
+# 다시 열기 — 시크릿을 지우면 코드 기본값으로 돌아간다(공개 전환으로 코드 기본값이 AVAILABLE 이 된 뒤 — 그 전에는
+# `secrets set MIRBOARD_ONECARD_STATUS=AVAILABLE`)
+flyctl secrets unset MIRBOARD_ONECARD_STATUS -a mirboard
+```
+
+- **`DISABLED` 는 진행 중인 원카드 방도 대기 중인 방도 없을 때만.** 경과 시간으로는 보장되지 않는다 — `COMING_SOON` 뒤에도 남은
+  WAITING 방은 입장·준비·시작될 수 있고, 방 해시 TTL(6시간)은 **입장할 때마다** 다시 걸린다(게임 상태 키는 저장할 때마다
+  6시간씩 밀린다). Redis 에서 직접 확인한 뒤에만 바꾼다 — 아래 출력에 `IN_GAME` 줄도 `WAITING` 줄도 없을 때(빈 출력이거나
+  `FINISHED` 만):
+
+  ```bash
+  flyctl ssh console -a mirboard-redis
+  # 머신 안(sh)에서 — REDISCLI_AUTH 에 Redis 비밀번호(시크릿 REDIS_PASSWORD)를 넣는다
+  export REDISCLI_AUTH="$REDIS_PASSWORD"
+  redis-cli --scan --pattern 'room:*' | while read -r k; do
+    [ "$(redis-cli TYPE "$k")" = hash ] && [ "$(redis-cli HGET "$k" gameType)" = ONE_CARD ] && echo "$k $(redis-cli HGET "$k" status)"
+  done
+  ```
+
+  (`room:*` 키 가운데 해시이고 `gameType` 이 `ONE_CARD` 인 것만 — 방 해시다. `redis-cli` 7.4 의 `--scan` 에는 `--type` 이
+  없어서 키마다 `TYPE` 을 본다. 스크립트는 `redis:7-alpine` 에서 검증했다 — 운영 머신 셸에 `REDIS_PASSWORD` 가 보이는지는
+  처음 쓸 때 한 번 확인한다.)
+
+  `WAITING` 방은 `DISABLED` 뒤에도 입장·준비·시작되고(시작 경로에 게임 상태 검사가 없다) 시작하는 순간 위 표의 '멈춘다'가
+  된다. `COMING_SOON` 은 새 방을 막으므로 `IN_GAME`·`WAITING` 줄은 늘지 않는다 — 비워질 때까지 기다린다.
+- **잘못된 값은 앱 전체 기동 실패다**(빈 값·오타 — 의도된 fail-fast). 사고 중에 쓰는 손잡이이므로 값은 위 명령을
+  그대로 복사한다(대문자).
+- 시크릿을 바꾸면 머신이 재시작된다. 재시작 순간 봇 차례였던 방은 클라가 다시 붙을 때(resync·게임 토픽 구독) 진행
+  킥이 봇 루프와 사라진 경쟁 타이머를 다시 건다(D-130) — 판이 멈춘 채 남지 않는다.
+- **시크릿 변경은 앱 전체 재시작이다** — 다른 게임의 진행 중 방도 끊긴다. 콜드 스타트 ~100초가 탈주 유예 120초에 가깝다
+  (`fly.toml`·`mirboard.desertion.grace-seconds`) — 진행 중인 방이 많으면 피하고, 바꾼 뒤 재접속을 확인한다.
+
+**경쟁 튜닝**(룰 §9). 환경 변수 이름은 설정 키에서 나온다(Spring relaxed binding). 잘못된 조합(최소 > 최대, 창 ≤ 0)도
+기동 실패다(`RaceSettings`). 봇 반응 구간을 바꾸면 튜토리얼의 "1.0~2.5초"(`onecardTutorialSteps.tsx`·`ReactionPractice.tsx`),
+창 길이를 바꾸면 "3초"(같은 두 파일, `PRACTICE_WINDOW_MS`)도 같은 배포에서 고친다.
+
+| 환경 변수 | 기본 | 뜻 |
+| --- | --- | --- |
+| `MIRBOARD_ONECARD_RACE_WINDOW_MILLIS` | `3000` | "원카드!/잡기!" 경쟁 창 길이 |
+| `MIRBOARD_ONECARD_BOT_REACTION_OWNER_MIN_MILLIS` · `..._OWNER_MAX_MILLIS` | `1000` · `2500` | 1장 남은 봇이 "원카드!"를 누르는 반응 시간 구간 |
+| `MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MIN_MILLIS` · `..._CATCHER_MAX_MILLIS` | `1000` · `2500` | 다른 봇이 "잡기!"를 누르는 반응 시간 구간 |
+
+튜닝 근거는 경쟁 결과 로그다(D-130) — 창이 닫힐 때마다 INFO 한 줄. 사용자별 값이라 메트릭이 아니라 로그로만 남긴다.
+
+```bash
+flyctl logs -a mirboard | grep "OneCard race resolved"
+# OneCard race resolved: room=… raceId=… outcome=CAUGHT via=PRESS ownerSeat=0 ownerUser=… ownerBot=true
+#   bySeat=2 byUser=… byBot=false latencyMs=420 windowMs=3000 lateMs=-
+```
+
+`flyctl logs` 는 실시간 스트림이라 기간 분포를 보려면 파일로 받아 둔다(`… | grep "OneCard race resolved" > race-$(date +%F).log`).
+
+`outcome` 은 CALLED·CAUGHT·EXPIRED·CANCELLED, `via` 는 PRESS(사람 누름)·TIMER(봇 누름·창 만료)·DESERTION(창 중 탈주).
+`latencyMs` 는 창을 연 뒤 처리까지(누름이면 반응 + 왕복 시간 — 창이 열리자마자의 누름이 반복되는 계정은 자동화를
+의심한다), `lateMs` 는 타이머 경로가 정해 둔 마감보다 늦게 처리된 시간(단일 폴러 지연)이다. **집계는 `room`+`raceId` 로
+묶어 마지막 줄을 정본으로 센다** — PRESS·TIMER 줄은 저장 전에 찍히므로(DESERTION 은 어댑터가 저장한 뒤에 찍는다), 저장이
+실패한 뒤 같은 창이 다른 경로(타이머·킥이 다시 건 타이머)로 닫히면 같은 창이 두 번(다른 결과로) 찍힐 수 있다.
+
+---
+
 ## CD (GitHub Actions)
 
 `.github/workflows/deploy.yml` — `main` 푸시 + 수동 실행(`workflow_dispatch`).

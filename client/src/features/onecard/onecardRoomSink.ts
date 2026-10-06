@@ -1,4 +1,5 @@
 import type { RoomEventSink } from '@/ws/roomEventSink';
+import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
 import type { HandPayload, OneCardPrivateView, OneCardTableView } from '@/types/onecard';
 import { useOneCardStore } from './onecardStore';
@@ -8,7 +9,10 @@ interface ErrorPayload {
   message: string;
 }
 
-/** 서버 거절 사유(원카드 `RejectionReason` + 인프라 공통) → 사용자 문구. */
+/**
+ * 서버 거절 사유(원카드 `RejectionReason`) → 사용자 문구. 게임 중립 인프라 코드(BUSY·RATE_LIMITED·INTERNAL_ERROR 등)는
+ * 공용 표(`ws/errorLabels`)가 맡는다(D-130).
+ */
 const ERROR_LABEL: Record<string, string> = {
   MATCH_OVER: '이미 끝난 판입니다.',
   PLAYER_ELIMINATED: '탈락한 좌석은 더 할 수 없습니다.',
@@ -21,9 +25,6 @@ const ERROR_LABEL: Record<string, string> = {
   NO_RACE: '이미 끝난 경쟁입니다.',
   NOT_RACE_OWNER: '"원카드!"는 카드가 1장 남은 사람만 누를 수 있습니다.',
   OWNER_CANNOT_CATCH: '자기 자신은 잡을 수 없습니다.',
-  BUSY: '다른 처리가 진행 중입니다. 잠시 후 다시 시도하세요.',
-  GAME_NOT_STARTED: '아직 게임이 시작되지 않았습니다.',
-  GAME_NOT_IN_PROGRESS: '이미 끝난 게임입니다.',
 };
 
 /**
@@ -55,7 +56,7 @@ export const onecardRoomSink: RoomEventSink<OneCardTableView, OneCardPrivateView
     } else if (envelope.type === 'ERROR') {
       const p = envelope.payload as ErrorPayload;
       if ((p.code === 'BUSY' || p.code === 'NO_RACE') && store.notePressRejected(p.code)) return;
-      store.setError(ERROR_LABEL[p.code] ?? `${p.code}: ${p.message}`);
+      store.setError(errorText(p.code, p.message, ERROR_LABEL));
     }
     // 그 외 타입은 조용히 무시한다.
   },

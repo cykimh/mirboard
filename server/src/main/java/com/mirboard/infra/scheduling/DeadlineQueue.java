@@ -71,6 +71,18 @@ public class DeadlineQueue {
     }
 
     /**
+     * D-130 — 그 항목이 큐에 없을 때만 건다(`ZADD NX`). 더했으면 true. 이미 걸린 무장(정상 무장·락 경합 재시도·미만기 재무장)을
+     * 덮지 않는다 — 진행 킥이 "사라졌나"를 따로 읽고 쓰면, 그 사이 걸린 정상 무장을 킥이 락 없이 읽은 낡은 남은 시간으로
+     * 덮을 수 있었다. pop 된 항목·취소된 항목은 없는 것이다.
+     */
+    public boolean scheduleIfAbsent(String kind, String member, Duration delay) {
+        long dueAt = clock.millis() + Math.max(0L, delay.toMillis());
+        Boolean added = redis.opsForZSet().addIfAbsent(key(kind), member, dueAt);
+        redis.expire(key(kind), Duration.ofHours(12));
+        return Boolean.TRUE.equals(added);
+    }
+
+    /**
      * 만료분을 원자적으로 pop. 반환된 항목은 <b>이 인스턴스가 단독 소유</b>하므로
      * 호출자가 반드시 처리해야 한다(다시 큐에 없음).
      */

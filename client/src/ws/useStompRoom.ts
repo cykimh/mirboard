@@ -27,6 +27,15 @@ interface ChatPayload {
  * <p><b>D-124: 순번 판정(중복·구멍)은 이 훅만 한다.</b> 기준점은 resync 의 `eventSeq` 이고
  * 판정은 `judgeSeq`(./seqGate) — 게임 스토어는 판정이 끝난 이벤트만 받는 순수 리듀서다.
  *
+ * <p><b>D-130 — resync 응답이 기준점보다 낡으면 버린다.</b> 서버는 상태와 순번을 방 락 안에서 함께 읽지만(D-126) REST
+ * 응답과 STOMP 프레임의 도착 순서는 정해져 있지 않다 — 늦게 닿은 응답이 이미 반영한 이벤트를 되돌려, 사람 차례에서는
+ * 다음 이벤트가 오지 않아 판이 멈췄다. 서버 순번은 방이 살아 있는 동안 줄지 않는다. 방이 바뀐 뒤 도착한 이전 방의
+ * 응답도 버린다(방 전환마다 오르는 세대 — 안 그러면 이전 방 응답이 새 방의 기준점을 올려 새 방 스냅샷을 '낡음'으로
+ * 버렸다). 정리된 이전 소켓의 콜백(구독·닫힘)도 무시한다(D-130 — `deactivate()` 는 비동기라 DISCONNECT 영수증이 올
+ * 때까지 그 소켓의 핸들러가 계속 돈다). 언마운트도 세대를 올려 직전에 보낸 resync 의 늦은 응답을 닫는다. 게임판은
+ * `requestResync` 로 권위 스냅샷을 다시 청할 수 있다(게임 스토어가 "다시 받아야 함"을 표시하면 — 훅은 여전히 스토어를
+ * 모른다).
+ *
  * @param sink 게임별 이벤트 싱크. **모듈 상수**를 넘길 것 — 규약은
  *             {@link RoomEventSink} javadoc 참조.
  */
@@ -48,6 +57,11 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
    * 순번 있는 이벤트마다 전진한다.
    */
   const lastSeqRef = useRef(0);
+  /**
+   * D-130 — 방 전환(reset)마다 오르는 세대. 그 전에 보낸 resync 의 늦은 응답(이전 방 — 토큰이 바뀌었다면 이전 사용자)을
+   * 버린다.
+   */
+  const epochRef = useRef(0);
   const resetChat = useRoomChatStore((s) => s.reset);
   const appendChat = useRoomChatStore((s) => s.appendIncoming);
   const appendReaction = useReactionStore((s) => s.add);
@@ -57,21 +71,28 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
 
   const resync = useCallback(async () => {
     if (!token) return;
+    const epoch = epochRef.current;
     try {
       const snap = await roomsApi.resync<ResyncEnvelope<TTable, TPrivate>>(
         token,
         roomId,
       );
+      // D-130 — 그 사이 방이 바뀌었다(reset) — 이전 방의 응답이 새 방의 기준점을 올리지 않게 버린다.
+      if (epoch !== epochRef.current) return;
+      // D-130 — 이미 반영한 공개 이벤트보다 낡은 응답(그 뒤 프레임이 먼저 닿았다)은 버린다. 같은 순번은 적용한다.
+      if (snap.eventSeq < lastSeqRef.current) return;
       // 껍데기를 가공하지 않고 그대로 넘긴다 — 게임별 필드 해석은 sink 책임.
       sinkRef.current.applySnapshot(snap);
       // 순번 기준점은 스냅샷이 다시 세운다 (D-124).
       lastSeqRef.current = snap.eventSeq;
     } catch (err) {
+      if (epoch !== epochRef.current) return;
       sinkRef.current.setError((err as Error).message);
     }
   }, [token, roomId]);
 
   useEffect(() => {
+    epochRef.current += 1; // resync() 보다 먼저 — 이 앞에 보낸 resync 의 응답은 이제 낡았다
     sinkRef.current.reset(roomId);
     lastSeqRef.current = 0;
     resetChat(roomId);
@@ -83,16 +104,24 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     if (!token) return;
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const brokerURL = `${proto}//${window.location.host}/ws`;
+    // D-130 — deactivate() 는 비동기라(DISCONNECT 영수증을 기다린다) 정리된 뒤에도 이 소켓의 구독·닫힘 콜백이 한동안 돈다.
+    // 그 콜백이 새 방의 상태·연결 표시를 건드리지 않도록 정리된 뒤엔 전부 무시한다. 기준은 `clientRef` 가 아니라 이 지역
+    // 플래그다 — 모의 Client 는 activate() 가 onConnect 를 동기로 부르는데 그 시점엔 clientRef 가 아직 비어 있다.
+    let disposed = false;
 
     const client = new Client({
       brokerURL,
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 2000,
       onConnect: () => {
+        if (disposed) return;
         setConnected(true);
-        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화.
-        resync();
+        // D-130 — 구독을 모두 보낸 뒤에 resync 한다(맨 끝). resync 를 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에
+        // 낸 이벤트가 스냅샷에도 프레임에도 없다. 이 순서는 그 틈을 좁힐 뿐 보장은 아니다 — SUBSCRIBE 등록은 서버에서
+        // 비동기이고 단순 브로커는 SUBSCRIBE 영수증을 주지 않는다. 남은 틈은 다음 이벤트의 구멍 판정·탭 복귀 resync·
+        // (원카드) 해소 없는 창 resync 가 메운다. 그 사이 닿은 프레임보다 낡은 응답은 위에서 버린다.
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
+          if (disposed) return;
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
           // D-124 — 순번 판정은 여기서만 한다. sink 는 판정이 끝난 이벤트만 받는다.
           const verdict = judgeSeq(lastSeqRef.current, env.seq);
@@ -115,11 +144,13 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
         // 게임마다 에러 코드가 달라 라벨링 위치가 게임 쪽이어야 하고, 같은 큐인데
         // HAND_DEALT 는 게임이 ERROR 는 훅이 처리하는 비대칭도 없어진다.
         client.subscribe(`/user/queue/room/${roomId}`, (frame) => {
+          if (disposed) return;
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;
           sinkRef.current.applyPrivateEvent(env);
         });
         // Phase 8B — 인-게임 채팅 구독.
         client.subscribe(`/topic/room/${roomId}/chat`, (frame) => {
+          if (disposed) return;
           const env = JSON.parse(frame.body) as StompEnvelope<ChatPayload>;
           if (env.type !== 'CHAT') return;
           appendChat(
@@ -135,6 +166,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
         });
         // P2(7) — 이모지 반응 구독.
         client.subscribe(`/topic/room/${roomId}/reaction`, (frame) => {
+          if (disposed) return;
           const env = JSON.parse(frame.body) as StompEnvelope<{
             fromSeat: number;
             emoji: string;
@@ -142,9 +174,20 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
           if (env.type !== 'REACTION') return;
           appendReaction(env.payload.fromSeat, env.payload.emoji);
         });
+        // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화 — 구독을 모두 보낸 뒤에.
+        resync();
       },
-      onDisconnect: () => setConnected(false),
-      onStompError: () => setConnected(false),
+      onDisconnect: () => {
+        if (!disposed) setConnected(false);
+      },
+      onStompError: () => {
+        if (!disposed) setConnected(false);
+      },
+      // D-130 — 네트워크 끊김·서버 재시작·배포(1006/1001)는 onDisconnect 가 아니라 이것만 부른다(onDisconnect 는 클라가 먼저
+      // DISCONNECT 를 보내 영수증을 받을 때만). 없으면 끊긴 뒤에도 "연결"로 보여 재연결 배너가 안 뜨고 보내기가 조용히 버려졌다.
+      onWebSocketClose: () => {
+        if (!disposed) setConnected(false);
+      },
     });
     client.activate();
     clientRef.current = client;
@@ -162,6 +205,9 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     window.addEventListener('online', onResume);
 
     return () => {
+      disposed = true;
+      // 언마운트·전환·토큰 변경 — 이미 날아간 resync 의 늦은 응답(언마운트 직전에 보낸 것 포함)도 이제 낡았다.
+      epochRef.current += 1;
       document.removeEventListener('visibilitychange', onResume);
       window.removeEventListener('online', onResume);
       client.deactivate();
@@ -208,5 +254,5 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     [roomId],
   );
 
-  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef };
+  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef, requestResync: resync };
 }

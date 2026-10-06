@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -20,6 +21,7 @@ import com.mirboard.domain.lobby.room.RoomChipStore;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.infra.bot.GameProgressKick;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
@@ -49,10 +51,11 @@ class RoomControllerResyncLockTest {
     private final RoomActionLock lock = mock(RoomActionLock.class);
     private final GameEngine engine = mock(GameEngine.class);
     private final GameState state = mock(GameState.class);
+    private final GameProgressKick kick = mock(GameProgressKick.class);
 
     private final RoomController controller = new RoomController(
             rooms, engines, seqs, mock(DesertionService.class), mock(RoomPresence.class),
-            mock(RoomChipStore.class), mock(GameAbortService.class), lock);
+            mock(RoomChipStore.class), mock(GameAbortService.class), lock, kick);
 
     private final AuthPrincipal me = new AuthPrincipal(ME, "me");
 
@@ -109,5 +112,33 @@ class RoomControllerResyncLockTest {
         assertThatThrownBy(() -> controller.resync(ROOM, me))
                 .isInstanceOf(ResyncNotAvailableException.class);
         verify(lock).release(ROOM);
+        verify(kick, never()).kick(anyString(), anyLong());
+    }
+
+    /**
+     * D-130 — resync 는 클라가 방을 다시 보는 순간이라, 멈춘 진행(재기동 뒤 봇 차례·사라진 엔진 타이머)을 다시 거는 자리다.
+     * 락을 푼 <b>뒤</b>에 건다 — 킥은 비동기라 응답을 늦추지 않고, 락 안에서 걸면 킥이 건 봇 루프가 이 락과 부딪쳐
+     * 쓸데없이 재시도한다(킥 자신은 락을 잡지 않는다).
+     */
+    @Test
+    void the_progress_kick_goes_out_after_the_lock_is_released() {
+        givenGameInProgress();
+        when(lock.acquireWaiting(ROOM)).thenReturn(true);
+
+        controller.resync(ROOM, me);
+
+        InOrder order = inOrder(lock, kick);
+        order.verify(lock).release(ROOM);
+        order.verify(kick).kick(ROOM, ME);
+    }
+
+    @Test
+    void an_unlocked_fallback_read_still_kicks() {
+        givenGameInProgress();
+        when(lock.acquireWaiting(ROOM)).thenReturn(false);
+
+        controller.resync(ROOM, me);
+
+        verify(kick).kick(ROOM, ME);
     }
 }

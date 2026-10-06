@@ -11,13 +11,18 @@
   단계에서 검증(정지 계정 차단 포함, D-86), 실패 시 `ERROR` 프레임 후 연결 종료.
 - 클라는 CONNECT 직후 자기 큐 `/user/queue/...` 와 필요한 토픽을 구독한다.
 - Phase 19(#1·#3, D-75): 서버가 `SessionSubscribeEvent`(`/topic/room/{id}`
-  `/meta` `/chat` 정규식 매칭)로 세션→방을 `WsSessionRegistry`(in-memory,
-  단일 인스턴스 전제 D-03)에 기록하고, `SessionDisconnectEvent` 시
+  `/meta` `/chat` 정규식 매칭)로 세션→방을 `RoomPresence`(Redis 세션 카운터 —
+  인스턴스 간 공유, D-96)에 기록하고, `SessionDisconnectEvent` 시
   `RoomDisconnectHandler` 가 처리한다 — **WAITING**: 즉시 leave/
   stopSpectating(빈 방·관전자0 방 즉시 소멸). **IN_GAME**:
   `DesertionGraceScheduler` 가 `mirboard.desertion.grace-seconds`(기본
   **120s**, D-79) 후 재접속 없으면 탈주 확정(상대팀 승리, `desert_count`+1·
   lose+1·ELO−). **FINISHED**: no-op.
+- **D-130 — 진행 킥.** 게임 토픽 그 자체(`/topic/room/{id}` — `/meta`·`/chat`·`/reaction` 은 아님)를 구독할 때와
+  REST resync 응답 뒤에, 그 방의 **참가자·관전자**이면 서버가 그 방의 멈춘 진행을 다시 건다: 봇 차례인데 그
+  인스턴스에 봇 루프가 없으면 루프를, 상태가 선언한 엔진 타이머가 큐에 없으면 그 타이머를(남은 시간 그대로 — 큐에
+  **없을 때만** 더하는 ZADD NX 라 걸린 무장을 덮지 않는다). 턴 데드라인은 건드리지 않는다 — resync 를 반복해도 시간
+  초과가 밀리지 않는다. 재기동(배포·자동 정지) 뒤에도 판이 멈춘 채 남지 않게 하려는 것이다.
 
 ## 토픽 / 큐 카탈로그
 
@@ -29,7 +34,7 @@
 | TOPIC | `/topic/room/{roomId}/meta` | 서버→방 | 대기실 메타 (`ROOM_META_UPDATED`, `ROOM_DESTROYED`) — Phase 13C, RoomPage 폴링 대체 |
 | TOPIC | `/topic/room/{roomId}/chat` | 서버→방 | 인-게임 채팅 (`CHAT`) — 참가자+관전자 |
 | TOPIC | `/topic/room/{roomId}/reaction` | 서버→방 | 이모지 반응 (`REACTION`) |
-| QUEUE | `/user/queue/room/{roomId}` | 서버→본인 | `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR` |
+| QUEUE | `/user/queue/room/{roomId}` | 서버→본인 | `HAND_DEALT`, `CARDS_RECEIVED`(티츄), `HAND_UPDATED`(원카드), `ERROR` |
 | APP   | `/app/lobby/chat` | 클라→서버 | `{ message }` (≤500자) |
 | APP   | `/app/room/{roomId}/chat` | 클라→서버 | `{ message }` (≤500자, 참가자·관전자만) |
 | APP   | `/app/room/{roomId}/reaction` | 클라→서버 | `{ emoji }` (서버 화이트리스트 8종) |
@@ -65,7 +70,10 @@
   직접 반영하고, 라이프사이클 이벤트(DEALING_PHASE_STARTED, PASSING_STARTED,
   CARDS_PASSED, PLAYING_STARTED, ROUND_STARTED) 또는 seq gap
   (`seq > lastSeq + 1`) 에서만 REST `/resync` 로 권위 스냅샷을 재취득한다.
-  초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지.
+  초기 mount 및 STOMP onConnect 직후 `/resync` 는 유지 — onConnect 에서는 **구독을 모두 보낸 뒤에**
+  resync 한다(D-130 — 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에 낸 이벤트가 스냅샷에도 프레임에도 없다).
+  이 순서는 틈을 **좁힐 뿐 보장은 아니다** — SUBSCRIBE 등록은 서버에서 비동기이고 단순 브로커는 SUBSCRIBE 영수증을
+  주지 않는다. 남은 틈은 다음 이벤트의 구멍 판정·탭 복귀 resync·(원카드) 해소 없는 창 resync 가 메운다.
   **순번 판정은 훅만 한다(D-124)** — 기준점은 resync 의 `eventSeq`, 판정은
   `client/src/ws/seqGate.ts`. 게임 스토어는 판정이 끝난 이벤트만 받아 `applied`/`unhandled`/
   `ignored` 만 돌려준다.
@@ -73,13 +81,22 @@
   상태·순번·뷰를 읽는다. 액션은 같은 락 안에서 저장→브로드캐스트(순번 발급)를 끝내므로,
   스냅샷에 반영된 이벤트는 정확히 `seq <= eventSeq` 다 — 그 뒤 이벤트를 두 번 적용하거나
   놓치지 않는다. 락을 약 3초 안에 못 잡으면 예전처럼 잠금 없이 읽는다.
+- **D-130 — 기준점보다 낡은 resync 응답은 클라가 버린다.** 서버가 같은 시점으로 읽어도 REST 응답과 STOMP 프레임의
+  **도착** 순서는 정해져 있지 않다 — 그 뒤 프레임이 먼저 닿아 반영됐는데 응답을 적용하면 공개 상태와 기준점이
+  되돌아간다(사람 차례면 다음 이벤트가 오지 않아 판이 멈춘다). 그래서 클라(`useStompRoom`)는 응답의 `eventSeq` 가
+  지금 기준점보다 **작으면** 버리고, 같거나 크면 적용한다. 서버 순번은 방이 살아 있는 동안 줄지 않는다(`RoomSeq`).
+  **방이 바뀐 뒤 도착한 이전 방의 응답도 버린다** — 클라는 방 전환(reset)마다 세대를 올리고, 요청 때 잡은 세대와 다른
+  응답은 적용하지 않는다(안 그러면 이전 방 응답이 새 방의 기준점을 올려 새 방 스냅샷을 '낡음'으로 버린다).
+  **정리된 이전 소켓의 콜백(구독·닫힘)도 무시한다**(D-130) — `deactivate()` 는 비동기라 DISCONNECT 영수증이 올 때까지 그
+  소켓의 핸들러가 계속 돌아, 걸러내지 않으면 이전 방의 resync 가 이 세대 검사를 통과하고 늦은 영수증·닫힘이 새 소켓의
+  `connected` 를 내린다. 언마운트도 세대를 올려 직전에 보낸 resync 의 늦은 응답을 닫는다.
 
 ---
 
 ## 서버 → 클라 (공개) — `/topic/room/{roomId}`
 
-좌석 식별은 전부 **seat(0~3, playerIds 인덱스)** 기준이다. userId 가 필요한 화면은
-`Room.playerIds` 로 매핑한다.
+좌석 식별은 전부 **seat(`playerIds` 인덱스, 0 ~ 정원−1)** 기준이다 — 티츄 0~3, 스컬킹·원카드는 방 인원만큼
+(아래 게임별 절). userId 가 필요한 화면은 `Room.playerIds` 로 매핑한다.
 
 **게임 이벤트 (seq 있음)** — 서버 `TichuEvent.envelopeType()` 과 1:1:
 
@@ -308,6 +325,14 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
   누름도 인정한다(D-128). 락 경합으로 `BUSY` 를 받으면 창이 열려 있는 동안 짧게 재시도한다.
 - 봇은 창을 열 때 추첨한 반응 시간에 누르고, 아무도 안 누르면 창 끝에 닫힌다 — 둘 다 **엔진 타이머**(D-128,
   `docs/game-port.md` §2)가 서버에서 처리하므로 클라가 보낼 것은 없다.
+- **D-130 — 해소 이벤트가 끝내 안 오는 창.** 서버 타이머가 사라졌거나(무장·발화 실패) 해소를 저장한 뒤 방송이 실패하면
+  `RACE_RESOLVED` 가 오지 않는다. 클라는 창이 마감 + 1.5초가 지나도 열려 있거나, 그 창을 기다리던 누름이 창이 열린
+  채 `NO_RACE` 로 거절되면 **창마다 한 번** resync 한다 — 서버 resync 는 진행 킥으로 사라진 타이머를 다시 건다.
+  resync 스냅샷을 받으면 기다리던 누름 표식은 같은 창이라도 비운다(끊긴 사이 보낸 누름은 버려졌을 수 있다). 그 뒤
+  늦게 온 그 누름의 `BUSY` 는 창이 열려 있으면 조용히 삼킨다(창 동안 내기·먹기는 막혀 있어 그 `BUSY` 는 누름의 것이다).
+- **D-130 — 경쟁 결과 로그.** 창이 닫힐 때마다 서버가 INFO 한 줄(`OneCard race resolved: … outcome via owner… by…
+  latencyMs windowMs lateMs`)을 남긴다. 사용자별 값이라 메트릭이 아니라 로그로만 둔다. PRESS·TIMER 줄은 저장 전에 찍혀(DESERTION
+  은 저장 뒤) 저장 실패 뒤 같은 창이 두 번 찍힐 수 있으므로 `room`+`raceId` 의 마지막 줄이 정본이다(`docs/deploy.md`).
 
 **resync**: `tableView` = `{ phase, seats: [{seat, handCount, eliminated}], topCard, declaredSuit, attackStack,
 direction, turnSeat, drawPileCount, race, result }` — `phase` 는 `PLAYING`·`RACE`·`ENDED`, `seats[].eliminated` 는

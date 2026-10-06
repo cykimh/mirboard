@@ -1,14 +1,17 @@
 package com.mirboard.infra.bot;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
 import com.mirboard.domain.game.core.GameState;
@@ -22,6 +25,7 @@ import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
 import com.mirboard.infra.ws.RoomActionLock;
+import com.mirboard.testsupport.LogCapture;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -140,6 +144,33 @@ class EngineTimerSchedulerTest {
             turnTimeout.onTurnAdvanced("r1");
 
             verify(deadlines).schedule(TurnTimeoutScheduler.KIND, "r1#4", Duration.ofSeconds(30));
+        }
+
+        /**
+         * D-130 — 조용히 사라지던 타이머가 보이게. 무장 실패는 그 창이 진행 킥({@link GameProgressKick}) 전까지 닫히지
+         * 않는다는 뜻이라 WARN 이 아니라 ERROR 다(Sentry 는 ERROR 만 올린다).
+         */
+        @Test
+        void a_failed_arm_is_logged_as_an_error() {
+            when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
+            when(generations.current("r1")).thenReturn(3L);
+            when(generations.bump("r1")).thenReturn(4L);
+            engineWithState();
+            when(engine.timer(state)).thenReturn(Optional.of(Duration.ofMillis(1500)));
+            doThrow(new IllegalStateException("simulated blip on ZADD deadlines:game"))
+                    .when(deadlines).schedule(eq(EngineTimerScheduler.KIND), anyString(), any());
+
+            try (LogCapture logs = LogCapture.of(TurnTimeoutScheduler.class)) {
+                turnTimeout.onTurnAdvanced("r1");
+
+                assertThat(logs.messages(Level.ERROR)).anyMatch(m -> m.contains("Engine timer arm failed"));
+                assertThat(logs.messages(Level.WARN)).noneMatch(m -> m.contains("Engine timer arm failed"));
+                assertThat(logs.events())
+                        .filteredOn(event -> event.getLevel() == Level.ERROR
+                                && event.getFormattedMessage().contains("Engine timer arm failed"))
+                        .singleElement()
+                        .satisfies(event -> assertThat(event.getThrowableProxy()).as("스택이 함께 남는다").isNotNull());
+            }
         }
     }
 

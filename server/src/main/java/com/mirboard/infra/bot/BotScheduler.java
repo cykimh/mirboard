@@ -18,6 +18,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -67,12 +68,20 @@ import org.springframework.stereotype.Component;
  * <p>D-122 — <b>IN_GAME 인 방만</b> 진행한다(락 전·락 안 두 번 확인). 탈주 조기 종료·강제
  * 종료로 끝난 방에서 이미 돌던 루프가 버려진 라운드를 계속 두던 경로를 막는다. 게임 중립
  * 판정(방 상태)이다.
+ *
+ * <p>D-130 — 이 인스턴스에서 방마다 <b>살아 있는 루프 수</b>를 센다(락 경합으로 잠시 뒤 다시 도는 토막도 같은
+ * 루프다). 진행 킥({@link GameProgressKick})은 resync·구독마다 불리므로 {@link #scheduleBotsIfIdle} 로만 건다 —
+ * 살아 있는 루프 위에 하나 더 걸면 두 루프가 번갈아 락을 잡아 봇이 지연 없이 연달아 둔다. 다른 인스턴스의 루프는
+ * 보이지 않는다(그때 겹쳐도 락 안 재조회 덕에 같은 수를 두 번 두지는 않고 속도만 빨라진다).
  */
 @Component
 public class BotScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BotScheduler.class);
     private static final int MAX_BOT_ACTIONS_PER_ROOM = 5000;
+
+    /** D-130 — 방별로 살아 있는 루프 토막 수(이 인스턴스). 0 이 되면 키를 지운다. */
+    private final ConcurrentHashMap<String, Integer> liveLoops = new ConcurrentHashMap<>();
 
     private final RoomService roomService;
     private final GameEngineProvider engines;
@@ -109,7 +118,43 @@ public class BotScheduler {
 
     /** 비동기 진입점. 호출자는 락 비점유 상태여야 한다. */
     public void scheduleBots(String roomId) {
-        executor.execute(() -> runRoom(roomId, 0));
+        liveLoops.merge(roomId, 1, Integer::sum);
+        start(roomId, () -> runRoom(roomId, 0));
+    }
+
+    /**
+     * D-130 — 진행 킥 전용 진입점. 이 인스턴스에 이 방의 루프가 하나도 살아 있지 않을 때만 건다(확인과 등록이 원자적이라
+     * 동시에 들어온 킥 둘이 둘 다 걸지 않는다).
+     *
+     * @return 루프를 걸었으면 true
+     */
+    public boolean scheduleBotsIfIdle(String roomId) {
+        if (liveLoops.putIfAbsent(roomId, 1) != null) {
+            return false;
+        }
+        start(roomId, () -> runRoom(roomId, 0));
+        return true;
+    }
+
+    /** 루프 한 토막을 가상 스레드로 돌린다. 부르는 쪽이 {@link #liveLoops} 에 몫을 먼저 더해 두고, 토막이 끝나면 덜어 낸다. */
+    private void start(String roomId, Runnable body) {
+        try {
+            executor.execute(() -> {
+                try {
+                    body.run();
+                } finally {
+                    loopEnded(roomId);
+                }
+            });
+        } catch (RuntimeException | Error e) {
+            // 종료 중 거절·메모리 부족 등 — 돌지 못한 토막의 몫을 되돌린다(안 그러면 그 방의 킥이 재기동 전까지 늘 막힌다).
+            loopEnded(roomId);
+            throw e;
+        }
+    }
+
+    private void loopEnded(String roomId) {
+        liveLoops.computeIfPresent(roomId, (id, live) -> live > 1 ? live - 1 : null);
     }
 
     private void runRoom(String roomId, int iterations) {
@@ -141,8 +186,9 @@ public class BotScheduler {
         }
 
         if (!lock.tryAcquire(roomId)) {
-            // 다른 액션 처리 중 — 잠시 후 재시도.
-            executor.execute(() -> {
+            // 다른 액션 처리 중 — 잠시 후 재시도. 이어 가는 토막도 살아 있는 루프로 센다(지금 토막이 끝나기 전에 더한다).
+            liveLoops.merge(roomId, 1, Integer::sum);
+            start(roomId, () -> {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
@@ -173,7 +219,9 @@ public class BotScheduler {
 
             int botSeat = nextBotSeat(room, engine, state);
             if (botSeat < 0) {
-                log.warn("Bot loop: no pending bot action. roomId={} phase={} botSeats={} pending={}",
+                // D-130 — 정상 경로다(봇 방의 사람 차례 인계, 경쟁 창, 같은 방에 겹쳐 돈 루프). WARN 이던 때는 봇 방 사람
+                // 차례마다 남아 Sentry breadcrumb 을 채웠다. 정말 이상한 "Bot has no legal action" 은 WARN 그대로다.
+                log.debug("Bot loop: no pending bot action. roomId={} phase={} botSeats={} pending={}",
                         roomId, engine.phaseName(state), room.botSeats(),
                         engine.pendingSeats(state));
                 return;

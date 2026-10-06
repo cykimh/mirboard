@@ -6,6 +6,8 @@ import type { ApplyEventResult } from '@/types/stomp';
 // ── @stomp/stompjs 가짜 ──────────────────────────────────────────────
 // activate() 시 onConnect 를 즉시 호출하고, subscribe 핸들러를 목적지별로 캡처한다.
 const handlers = new Map<string, (frame: { body: string }) => void>();
+/** 구독·resync 호출 순서 기록 (D-130 — 접속 직후 순서). */
+const calls: string[] = [];
 let activateCount = 0;
 let deactivateCount = 0;
 let clientCount = 0;
@@ -24,6 +26,7 @@ vi.mock('@stomp/stompjs', () => ({
       this.onConnect();
     }
     subscribe(dest: string, cb: (frame: { body: string }) => void) {
+      calls.push(`sub:${dest}`);
       handlers.set(dest, cb);
       return { unsubscribe: () => {} };
     }
@@ -37,7 +40,12 @@ vi.mock('@stomp/stompjs', () => ({
 
 const resyncMock = vi.fn();
 vi.mock('@/api/rooms', () => ({
-  roomsApi: { resync: (...args: unknown[]) => resyncMock(...args) },
+  roomsApi: {
+    resync: (...args: unknown[]) => {
+      calls.push('resync');
+      return resyncMock(...args);
+    },
+  },
 }));
 
 import { useStompRoom } from './useStompRoom';
@@ -72,6 +80,7 @@ const publish = (seq: number | undefined, type = 'X') =>
 
 beforeEach(() => {
   handlers.clear();
+  calls.length = 0;
   activateCount = 0;
   deactivateCount = 0;
   clientCount = 0;
@@ -305,5 +314,151 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
 
     expect(clientCount).toBe(0);
     expect(resyncMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useStompRoom — D-130 보강 (낡은 resync·접속 순서·다시 받기)', () => {
+  /** 응답을 테스트가 원하는 순서로 풀 수 있게 붙잡아 둔다. */
+  function heldResyncs() {
+    const pending: Array<(snap: unknown) => void> = [];
+    resyncMock.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    return pending;
+  }
+
+  /**
+   * 응답과 STOMP 프레임의 도착 순서는 정해져 있지 않다 — 락 안에서 seq 5 를 읽은 응답이 그 뒤 seq 6·7 프레임보다 늦게
+   * 닿을 수 있다. 그 응답을 적용하면 공개 상태와 기준점이 되돌아가, 사람 차례에서는 다음 이벤트가 오지 않아 판이 멈췄다.
+   */
+  it('기준점보다 낡은 응답은 버린다 — 이미 반영한 이벤트를 되돌리지 않는다', async () => {
+    const pending = heldResyncs();
+    const sink = makeSink();
+    renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+    await waitFor(() => expect(pending).toHaveLength(2)); // 마운트 + 접속 직후
+
+    await act(async () => pending[0]({ ...SNAP, eventSeq: 5 }));
+    act(() => {
+      publish(6);
+      publish(7);
+    });
+    await act(async () => pending[1]({ ...SNAP, eventSeq: 5 })); // 6·7 보다 먼저 읽은 낡은 응답
+
+    expect(sink.applySnapshot).toHaveBeenCalledTimes(1);
+    const before = resyncMock.mock.calls.length;
+    act(() => publish(8)); // 기준점이 7 그대로면 '다음'이다
+    expect(sink.applyEvent).toHaveBeenCalledTimes(3);
+    expect(resyncMock.mock.calls.length).toBe(before);
+  });
+
+  it('기준점과 같은 순번의 응답은 그대로 적용한다', async () => {
+    const pending = heldResyncs();
+    const sink = makeSink();
+    renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    await act(async () => pending[0]({ ...SNAP, eventSeq: 5 }));
+    await act(async () => pending[1]({ ...SNAP, eventSeq: 5 }));
+
+    expect(sink.applySnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * resync 를 먼저 보내면 서버가 스냅샷을 읽은 뒤·구독을 등록하기 전에 낸 이벤트가 스냅샷에도 프레임에도 없다. 공개 토픽과
+   * 본인 큐(손패) 둘 다 resync 앞이어야 한다. 서버 등록이 비동기라 틈을 좁힐 뿐 보장은 아니다(SUBSCRIBE 영수증이 없다).
+   */
+  it('접속하면 공개 토픽·본인 큐를 구독한 뒤에 resync 한다', async () => {
+    renderHook(() => useStompRoom(ROOM, TOKEN, makeSink()));
+    await waitFor(() => expect(calls.filter((c) => c === 'resync')).toHaveLength(2));
+
+    const afterMount = calls.indexOf('resync') + 1; // 첫 resync 는 마운트 때 것
+    const connectResync = calls.indexOf('resync', afterMount);
+    const topic = calls.indexOf(`sub:/topic/room/${ROOM}`, afterMount);
+    const queue = calls.indexOf(`sub:/user/queue/room/${ROOM}`, afterMount);
+    expect(topic).toBeGreaterThanOrEqual(0);
+    expect(queue).toBeGreaterThanOrEqual(0);
+    expect(topic).toBeLessThan(connectResync);
+    expect(queue).toBeLessThan(connectResync);
+  });
+
+  /**
+   * 방이 바뀌는 사이(게임판이 마운트된 채 roomId 가 바뀜 — 뒤로/앞으로) 이전 방의 resync 응답이 늦게 닿으면 새 방의 기준점을
+   * 올려, 새 방의 정상 스냅샷과 이벤트를 전부 '낡음'·'중복'으로 버렸다(사전 리뷰 I-1). 방 전환마다 오르는 세대로 버린다.
+   */
+  it('방이 바뀐 뒤 도착한 이전 방의 응답은 버린다 — 새 방의 기준점을 올리지 않는다', async () => {
+    const pending: Array<{ roomId: string; resolve: (snap: unknown) => void }> = [];
+    resyncMock.mockImplementation(
+      (_token: string, roomId: string) => new Promise((resolve) => pending.push({ roomId, resolve })),
+    );
+    const of = (roomId: string) => pending.filter((p) => p.roomId === roomId);
+    const sink = makeSink();
+    const { rerender } = renderHook(({ room }) => useStompRoom(room, TOKEN, sink), {
+      initialProps: { room: 'A' },
+    });
+    await waitFor(() => expect(of('A').length).toBeGreaterThan(0));
+
+    rerender({ room: 'B' });
+    await waitFor(() => expect(of('B').length).toBeGreaterThan(0));
+
+    // 이전 방 A 의 늦은 응답(순번 50)이 먼저, 새 방 B 의 응답(순번 3)이 뒤에 닿는다.
+    await act(async () => of('A').forEach((p) => p.resolve({ ...SNAP, roomId: 'A', eventSeq: 50 })));
+    await act(async () => of('B').forEach((p) => p.resolve({ ...SNAP, roomId: 'B', eventSeq: 3 })));
+
+    const applied = sink.applySnapshot.mock.calls.map((call) => (call[0] as { roomId: string }).roomId);
+    expect(applied).not.toContain('A');
+    expect(applied.at(-1)).toBe('B');
+    act(() => handlers.get('/topic/room/B')!(frame({ type: 'X', seq: 4, payload: {} })));
+    expect(sink.applyEvent).toHaveBeenCalledTimes(1);
+  });
+
+  /** 실패 경로의 세대 가드 — 이전 방의 요청이 늦게 실패해도 새 방 화면에 오류가 뜨면 안 된다. */
+  it('방이 바뀐 뒤 실패한 이전 방의 resync 는 setError 로 가지 않는다', async () => {
+    const pending: Array<{ roomId: string; reject: (err: Error) => void }> = [];
+    resyncMock.mockImplementation(
+      (_token: string, roomId: string) => new Promise((_resolve, reject) => pending.push({ roomId, reject })),
+    );
+    const sink = makeSink();
+    const { rerender } = renderHook(({ room }) => useStompRoom(room, TOKEN, sink), {
+      initialProps: { room: 'A' },
+    });
+    await waitFor(() => expect(pending.some((p) => p.roomId === 'A')).toBe(true));
+
+    rerender({ room: 'B' });
+    await waitFor(() => expect(pending.some((p) => p.roomId === 'B')).toBe(true));
+
+    await act(async () =>
+      pending.filter((p) => p.roomId === 'A').forEach((p) => p.reject(new Error('A 의 요청이 늦게 실패'))),
+    );
+
+    expect(sink.setError).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 언마운트도 방 전환과 같다 — 언마운트 직전에 보낸 resync(락 대기로 최대 ~3초)가 끝나면 모듈 전역 스토어에 적용돼, 그 사이
+   * 같은 게임의 다른 방 게임판이 마운트됐다면 그 방 화면이 이전 방 스냅샷으로 덮인다.
+   */
+  it('언마운트 뒤 도착한 resync 응답은 sink 로 가지 않는다', async () => {
+    const pending = heldResyncs();
+    const sink = makeSink();
+    const { unmount } = renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+    await waitFor(() => expect(pending).toHaveLength(2)); // 마운트 + 접속 직후
+
+    unmount();
+    await act(async () => pending.forEach((resolve) => resolve({ ...SNAP, eventSeq: 9 })));
+
+    expect(sink.applySnapshot).not.toHaveBeenCalled();
+  });
+
+  it('게임판이 권위 스냅샷을 다시 청할 수 있다 — requestResync', async () => {
+    const sink = makeSink();
+    const { result } = renderHook(() => useStompRoom(ROOM, TOKEN, sink));
+    await waitFor(() => expect(sink.applySnapshot).toHaveBeenCalled());
+    const before = resyncMock.mock.calls.length;
+    const applied = sink.applySnapshot.mock.calls.length;
+
+    await act(async () => {
+      await result.current.requestResync();
+    });
+
+    expect(resyncMock.mock.calls.length).toBe(before + 1);
+    expect(sink.applySnapshot.mock.calls.length).toBe(applied + 1);
   });
 });

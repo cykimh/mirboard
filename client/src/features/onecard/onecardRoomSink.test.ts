@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
+import { INFRA_ERROR_LABELS } from '@/ws/errorLabels';
 
 /**
  * 원카드 비공개 큐 → 스토어. 손패 이벤트 두 종류는 같은 경로(`handVersion` 가드)로, `ERROR` 는 문구로, 경쟁
@@ -53,6 +54,17 @@ describe('onecardRoomSink — ERROR 문구', () => {
 
     expect(store().errorMessage).toBe('SOMETHING_NEW: detail');
   });
+
+  /** D-130 — 인프라 거절(게임 중립)은 공용 문구로. 예전에는 `INTERNAL_ERROR: Failed to apply action` 처럼 영문 원문이 보였다. */
+  it.each(['INVALID_ACTION', 'INTERNAL_ERROR', 'NOT_IN_ROOM', 'ROOM_NOT_FOUND', 'GAME_NOT_AVAILABLE', 'RATE_LIMITED'])(
+    '인프라 거절 %s 도 한국어 문구로 보여 준다',
+    (code) => {
+      onecardRoomSink.applyPrivateEvent(errorEnvelope(code, 'English detail'));
+
+      expect(store().errorMessage).toBe(INFRA_ERROR_LABELS[code]);
+      expect(store().errorMessage).not.toContain('English detail');
+    },
+  );
 
   it('기다리는 누름이 없으면 BUSY 도 일반 오류다 — 카드를 낼 때의 락 경합', () => {
     onecardRoomSink.applyPrivateEvent(errorEnvelope('BUSY'));

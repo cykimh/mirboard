@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameHubPage } from './GameHubPage';
 import { useAuthStore } from '@/features/auth/authStore';
-import type { GameSummary } from '@/types/api';
+import type { GameSummary, Room } from '@/types/api';
 
 /**
  * D-121 — 허브의 '게임 방법'은 게임 카드마다 달린다. 허브는 게임을 고를 수 없으므로
@@ -41,6 +41,28 @@ const CATALOG = [
   game('TICHU', '티츄'),
   game('COMING_SOON', '준비 중 게임', 'COMING_SOON'),
 ];
+
+function room(roomId: string, gameType: string, capacity: number): Room {
+  return {
+    roomId,
+    name: `방 ${roomId}`,
+    gameType,
+    hostId: 2,
+    status: 'WAITING',
+    capacity,
+    playerCount: 1,
+    playerIds: [2],
+    spectatorIds: [],
+    teamPolicy: 'SEQUENTIAL',
+    createdAt: 0,
+    fillWithBots: false,
+    botSeats: [],
+    targetScore: 1000,
+    turnSeconds: 0,
+    stake: 0,
+    readyUserIds: [],
+  };
+}
 
 function renderHub() {
   return render(
@@ -103,5 +125,26 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
     // 다른 게임의 열람 기록은 건드리지 않는다.
     expect(localStorage.getItem('mirboard.tutorial.seen.v1')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('GameHubPage — 대기 중인 방 목록 (D-130)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    catalog.mockResolvedValue({ games: CATALOG });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  /** 대기실 헤더(D-110)처럼 카탈로그의 표시 이름을 쓴다 — `SKULL_KING`·`ONE_CARD` 원문이 나란히 보였다. */
+  it('게임 종류를 표시 이름으로, 카탈로그에 없는 게임은 원문으로 보여 준다', async () => {
+    list.mockResolvedValue({ rooms: [room('a', 'SKULL_KING', 8), room('b', 'MYSTERY', 4)] });
+    renderHub();
+
+    expect(await screen.findByText(/스컬킹 · 1 \/ 8 · 대기 중/)).toBeInTheDocument();
+    expect(screen.getByText(/MYSTERY · 1 \/ 4 · 대기 중/)).toBeInTheDocument();
+    expect(screen.queryByText(/SKULL_KING ·/)).toBeNull();
+    expect(screen.queryByText(/WAITING/)).toBeNull(); // enum 원문이 아니라 한글 상태 라벨
   });
 });

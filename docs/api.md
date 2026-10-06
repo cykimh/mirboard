@@ -150,7 +150,9 @@
       "minPlayers": 4,
       "maxPlayers": 4,
       "status": "AVAILABLE",
-      "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"]
+      "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"],
+      "defaultPlayers": 4,
+      "defaultTurnSeconds": 0
     },
     {
       "id": "SKULL_KING",
@@ -159,7 +161,20 @@
       "minPlayers": 2,
       "maxPlayers": 8,
       "status": "AVAILABLE",
-      "supportedRoomOptions": []
+      "supportedRoomOptions": [],
+      "defaultPlayers": 8,
+      "defaultTurnSeconds": 0
+    },
+    {
+      "id": "ONE_CARD",
+      "displayName": "원카드",
+      "shortDescription": "2~6인 손패 털기. 공격을 쌓아 넘기고, 한 장 남으면 누구보다 먼저 \"원카드!\"를 외친다.",
+      "minPlayers": 2,
+      "maxPlayers": 6,
+      "status": "COMING_SOON",
+      "supportedRoomOptions": [],
+      "defaultPlayers": 4,
+      "defaultTurnSeconds": 30
     }
   ]
 }
@@ -174,12 +189,16 @@
   것이므로, 새 게임은 아무것도 안 써도 무관한 설정이 화면에 뜨지 않는다.
   모든 게임에 통하는 설정(방 이름·`capacity`·`turnSeconds`·`fillWithBots`)은 여기
   들어가지 않는다.
+- `defaultPlayers`·`defaultTurnSeconds`(D-130): 방 만들기 모달의 **처음 선택**(사용자는 바꿀 수 있다). 게임이
+  선언하며(`GameDefinition.defaultPlayers()`·`defaultTurnSeconds()`) 기본은 `maxPlayers`·`0`(끔) — 티츄·스컬킹은
+  지금까지와 같다. 원카드만 4명·30초다. 서버의 `capacity`·`turnSeconds` 생략 기본(`maxPlayers`·0, 아래 방 만들기)과는
+  별개다 — 인원 가변 게임은 클라가 늘 `capacity` 를 보낸다.
 
 ### GET `/api/games/{gameId}`
 단일 게임 상세. 응답은 위 항목 형식과 동일하되 룰 요약 등 추가 필드가 들어갈 수 있다
 (MVP에서는 카탈로그와 동일 페이로드).
 
-에러: `NOT_FOUND` — 등록되지 않은 gameId.
+에러: 404 `GAME_NOT_AVAILABLE` — 등록되지 않았거나 `DISABLED` 인 gameId.
 
 ---
 
@@ -456,6 +475,13 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - `eventSeq`: 이 스냅샷에 반영된 마지막 공개 이벤트의 순번. D-126 부터 서버는 방 액션 락
   안에서 상태·`eventSeq`·뷰를 함께 읽으므로, 클라는 `seq <= eventSeq` 이벤트를 버리고 그
   다음부터 이어 붙이면 된다(락을 약 3초 안에 못 잡으면 예전처럼 잠금 없이 읽는다).
+  **D-130 — 응답이 그 뒤 프레임보다 늦게 닿으면 클라가 버린다**: `eventSeq` 가 클라 기준점(이미 반영한 마지막
+  순번)보다 작으면 적용하지 않는다(같거나 크면 적용). 서버 순번은 방이 살아 있는 동안 줄지 않는다. 방이 바뀐 뒤 도착한
+  이전 방의 응답도 버린다(클라가 방 전환마다 올리는 세대 — `docs/stomp-protocol.md`). 정리된 이전 소켓의 콜백도 무시한다.
+- **D-130 — 진행 킥.** 응답을 만든 뒤(락 해제 뒤, 비동기라 응답을 늦추지 않는다) 서버는 그 방의 멈춘 진행을 다시
+  건다 — 봇 차례인데 봇 루프가 없으면 루프를, 상태가 선언한 엔진 타이머가 큐에 없으면 그 타이머를(없을 때만 더한다 —
+  ZADD NX). 턴 데드라인은 건드리지 않는다(resync 를 반복해도 시간 초과가 밀리지 않는다). 게임 토픽 구독 때도 같고, 둘 다
+  그 방의 참가자·관전자일 때만이다(`docs/stomp-protocol.md`).
 - `disconnectedSeats`: 현재 끊긴 플레이어 좌석(재접속 배지 즉시 반영, D-75).
 - `chips`: D-82 방 단위 테이블 칩(userId→칩). 내기 없는 방은 빈 맵.
 - `completedRounds`: D-108 **끝난 라운드들의** 점수(순서 = 라운드 1..N). 바로 위
@@ -509,6 +535,38 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
   마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
   resync 한다.
+
+**원카드(`gameType=ONE_CARD`)의 `tableView`** — 서버 `OneCardStateMapper.TableView`, 클라 `types/onecard.ts` 미러와
+1:1(실제 MVC 직렬화로 대조, D-130 프로토콜 리뷰). 아래는 4인 방에서 좌석 3 이 탈주했고 좌석 0 이 1장이 되어 경쟁 창이
+열린 순간이다.
+```json
+{
+  "phase": "RACE",
+  "seats": [
+    { "seat": 0, "handCount": 1, "eliminated": null },
+    { "seat": 1, "handCount": 5, "eliminated": null },
+    { "seat": 2, "handCount": 7, "eliminated": null },
+    { "seat": 3, "handCount": 0, "eliminated": "DESERTED" }
+  ],
+  "topCard": { "suit": "HEART", "rank": 9, "joker": null },
+  "declaredSuit": null,
+  "attackStack": 0,
+  "direction": 1,
+  "turnSeat": -1,
+  "drawPileCount": 23,
+  "race": { "raceId": 41, "ownerSeat": 0, "slot": 5, "jitterX": -32, "jitterY": 18,
+            "windowMillis": 3000, "remainingMillis": 1840 },
+  "result": null
+}
+```
+- `phase`: `PLAYING`·`RACE`·`ENDED`. 경쟁 창이 열렸거나 끝났으면 `turnSeat` 은 −1.
+- `seats[].eliminated`: 살아 있으면 `null`, 탈락했으면 사유 `"BANKRUPT"`·`"DESERTED"`(boolean 아님).
+- `race.remainingMillis`: 창 끝까지 남은 시간 — 봇이 누를 시각은 어디에도 싣지 않는다. 창이 없으면 `race: null`.
+- `result`: 끝났으면 `MATCH_ENDED` payload 와 같은 `{ reason, standings: [{seat, rank, cardsLeft, status}] }`.
+- `privateHand` = `{ "seat": 0, "hand": [{ "suit": "CLUB", "rank": 3, "joker": null }], "handVersion": 41 }` —
+  손패 전체와 상태 버전. 클라는 가진 것보다 낮은 `handVersion` 의 손패를 버린다(비공개 `HAND_UPDATED` 와 같은 축).
+  `chips` 는 늘 `{}`(내기 미지원).
+
 - **`privateHand` 는 요청자가 실제로 앉은 좌석에만**(D-122 심층 방어, 모든 게임 공통). 좌석은
   `playerIds` 의 인덱스인데, 게임이 시작된 뒤 목록이 정원(`capacity`)보다 줄었다면 인덱스가
   당겨져 남의 좌석을 가리킬 수 있으므로 `privateHand: null`(관전자 뷰)을 준다. 목록에 없는

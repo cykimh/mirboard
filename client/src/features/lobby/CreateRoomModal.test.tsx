@@ -31,6 +31,19 @@ const VARIABLE: GameSummary = {
   supportedRoomOptions: [],
 };
 
+/** 원카드 — 2~6인 가변, 방 만들기 처음 선택을 선언한다(D-130: 4명·턴 제한 30초). */
+const DECLARED: GameSummary = {
+  id: 'ONE_CARD',
+  displayName: '원카드',
+  shortDescription: '',
+  minPlayers: 2,
+  maxPlayers: 6,
+  status: 'AVAILABLE',
+  supportedRoomOptions: [],
+  defaultPlayers: 4,
+  defaultTurnSeconds: 30,
+};
+
 /** availableGames 를 한 개만 넘기면 모달이 그 게임을 자동 선택한다(Radix Select 조작 회피). */
 function openModal(games: GameSummary[], extra: { defaultFillWithBots?: boolean } = {}) {
   render(
@@ -81,7 +94,7 @@ describe('CreateRoomModal — 인원 선택 (D-99)', () => {
     expect(seats).toEqual(['2', '3', '4', '5', '6', '7', '8']);
   });
 
-  it('인원 가변 게임의 기본 인원은 maxPlayers (서버 기본값과 동일)', async () => {
+  it('선언이 없으면 인원 가변 게임의 처음 인원은 maxPlayers', async () => {
     openModal([VARIABLE]);
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
@@ -175,5 +188,71 @@ describe('CreateRoomModal — 봇 채우기 기본값 (D-117)', () => {
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().fillWithBots).toBe(false);
+  });
+});
+
+describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMock.mockResolvedValue({ roomId: 'room-1' });
+  });
+
+  it('게임이 선언한 인원·턴 제한을 처음부터 골라 둔다', () => {
+    openModal([DECLARED]);
+
+    expect(screen.getByRole('radio', { name: '4' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '30초' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('바꾸지 않으면 선언한 값으로 보낸다', async () => {
+    openModal([DECLARED]);
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+
+    expect(lastCreateOpts().capacity).toBe(4);
+    expect(lastCreateOpts().turnSeconds).toBe(30);
+  });
+
+  it('사용자가 바꾼 값을 그대로 보낸다', async () => {
+    openModal([DECLARED]);
+    fireEvent.click(screen.getByRole('radio', { name: '6' }));
+    fireEvent.click(screen.getByRole('radio', { name: '끔' }));
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+
+    expect(lastCreateOpts().capacity).toBe(6);
+    expect(lastCreateOpts().turnSeconds).toBe(0);
+  });
+
+  /**
+   * 게임을 바꾸면 이전 게임에서 고른 인원·턴 제한을 새 게임의 처음 선택으로 되돌린다 — 티츄·스컬킹 사용자에게 걸리는 유일한
+   * 동작 변화(예전엔 티츄에서 고른 60초가 스컬킹으로 바꿔도 남았다). 폼 안의 Radix Select 는 숨은 네이티브 select 를 함께
+   * 렌더하므로 그걸로 게임을 바꾼다.
+   */
+  function switchGame(id: string) {
+    const native = document.querySelector('select[aria-hidden="true"]') as HTMLSelectElement;
+    fireEvent.change(native, { target: { value: id } });
+  }
+  const checked = (name: string) => screen.getByRole('radio', { name }).getAttribute('aria-checked');
+
+  it('게임을 바꾸면 고른 인원·턴 제한이 새 게임의 처음 선택으로 되돌아간다', async () => {
+    openModal([DECLARED, VARIABLE]);
+    fireEvent.click(screen.getByRole('radio', { name: '6' }));
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+
+    switchGame('SKULL_KING');
+
+    await waitFor(() => expect(checked('끔')).toBe('true'));
+    expect(checked('8')).toBe('true');
+  });
+
+  it('선언 없는 게임에서 고른 턴 제한은 선언한 게임으로 바꾸면 선언값으로 바뀐다', async () => {
+    openModal([VARIABLE, DECLARED]);
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+
+    switchGame('ONE_CARD');
+
+    await waitFor(() => expect(checked('30초')).toBe('true'));
+    expect(checked('4')).toBe('true');
   });
 });

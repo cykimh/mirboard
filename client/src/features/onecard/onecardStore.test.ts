@@ -156,7 +156,11 @@ describe('applySnapshot — resync 는 권위값', () => {
     expect(store().result).toEqual(result);
   });
 
-  it('같은 창을 기다리던 누름만 남기고 오류 문구는 지운다', () => {
+  /**
+   * D-130 — 기다리던 누름은 같은 창이라도 비운다. 끊긴 사이에 보낸 누름은 버려졌을 수 있는데(소켓이 이미 죽어 있었다) 남겨 두면
+   * 그 창 동안 다시 누를 수 없어 주인이면 봇에게 잡혔다. 다시 누른 것이 늦으면 서버가 NO_RACE 로 거절할 뿐이다.
+   */
+  it('기다리던 누름은 같은 창이어도 비우고 오류 문구도 지운다', () => {
     const race = {
       raceId: 7,
       ownerSeat: 0,
@@ -171,11 +175,9 @@ describe('applySnapshot — resync 는 권위값', () => {
     store().setError('무언가');
 
     store().applySnapshot(snapshot({ tableView: { ...TABLE, phase: 'RACE', race } }));
-    expect(store().press?.raceId).toBe(7);
-    expect(store().errorMessage).toBeNull();
-
-    store().applySnapshot(snapshot());
+    expect(store().race?.raceId).toBe(7);
     expect(store().press).toBeNull();
+    expect(store().errorMessage).toBeNull();
   });
 
   it('방금 닫힌 경쟁 안내는 서버 뷰에 없는 값이라 비운다 — 오래 떠난 뒤 돌아와도 낡은 줄이 남지 않는다', () => {
@@ -399,9 +401,26 @@ describe('경쟁 누름 — 거절 처리 (설계서 §4.4)', () => {
 
   beforeEach(() => store().applySnapshot(snapshot()));
 
-  it('BUSY 인데 기다리는 누름이 없으면 false — 카드 내기·먹기의 락 경합이라 일반 오류로 보여 준다', () => {
-    open();
+  it('창이 없을 때 기다리는 누름 없는 BUSY 는 false — 카드 내기·먹기의 락 경합이라 일반 오류로 보여 준다', () => {
     expect(store().notePressRejected('BUSY')).toBe(false);
+  });
+
+  /**
+   * D-130 — 누름 → (재접속·탭 복귀·구멍) resync 스냅샷이 같은 창으로 와서 표식을 비움 → 그 누름의 BUSY 가 늦게 도착. 창이 열린
+   * 동안 내기·먹기는 막혀 있어 이 BUSY 는 누름의 것이다 — 일반 오류(빨간 줄)로 새지 않게 처리됐다고 답하고, 재시도·"늦었어요"도
+   * 없다(버튼은 이미 다시 누를 수 있다).
+   */
+  it('스냅샷이 누름을 비운 뒤 온 BUSY 는 창이 열려 있으면 오류 없이 삼킨다', () => {
+    const race = { raceId: 7, ownerSeat: 0, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000, remainingMillis: 2000 };
+    const racing = snapshot({ tableView: { ...TABLE, phase: 'RACE', turnSeat: -1, race } });
+    store().applySnapshot(racing);
+    store().startPress(7, 'CATCH');
+    store().applySnapshot(racing); // 같은 창 — 누름 표식이 비었다
+
+    expect(store().notePressRejected('BUSY')).toBe(true);
+    expect(store().errorMessage).toBeNull();
+    expect(store().raceNotice).toBeNull();
+    expect(store().retryNonce).toBe(0);
   });
 
   it('내가 이긴 경쟁 뒤의 BUSY 도 일반 오류다 — 이긴 누름은 남지 않는다', () => {
@@ -559,3 +578,71 @@ describe('선택', () => {
     expect(store().suitChoice).toBeNull();
   });
 });
+
+describe('낡은 창 복구 — 다시 받기 신호 (D-130)', () => {
+  // 서버가 실제로 내는 순서로 넣는다 — 창 9(주인 좌석 0, seq 11) → 해소(12) → 차례(13, 좌석 1) → 좌석 1 이 1장이 되는
+  // 카드(14) → 창 10(주인 좌석 1, seq 15). 창 사이에는 늘 해소·차례·카드가 있다.
+  const open = (raceId: number, seq: number, ownerSeat = 0) =>
+    store().applyEvent(
+      ev('RACE_OPENED', { raceId, ownerSeat, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000 }, seq),
+    );
+  const closeAndPlayOn = (outcome: string, bySeat: number) => {
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 9, outcome, bySeat }, 12));
+    store().applyEvent(ev('TURN_CHANGED', { seat: 1, direction: 1, attackStack: 0 }, 13));
+    store().applyEvent(
+      ev('CARD_PLAYED', { seat: 1, card: card('HEART', 4), declaredSuit: null, handCount: 1, attackStack: 0, direction: 1 }, 14),
+    );
+  };
+
+  beforeEach(() => store().applySnapshot(snapshot()));
+
+  it('창마다 한 번만 다시 받기를 청한다', () => {
+    open(9, 11);
+
+    store().requestRaceResync(9);
+    store().requestRaceResync(9);
+    expect(store().resyncNonce).toBe(1);
+
+    closeAndPlayOn('EXPIRED', -1);
+    open(10, 15, 1);
+    store().requestRaceResync(10);
+    expect(store().resyncNonce).toBe(2);
+  });
+
+  /**
+   * 서버가 창을 닫아 저장했는데 방송이 실패하면(C-I2) 해소 이벤트가 끝내 안 온다 — 내 누름은 NO_RACE 로 거절되는데 창은
+   * 계속 열려 보인다. 그 창을 기다리던 누름의 NO_RACE 면 권위 스냅샷을 다시 받는다.
+   */
+  it('창이 열린 채 그 창을 기다리던 누름이 NO_RACE 를 받으면 다시 받기를 청한다', () => {
+    open(9, 11);
+    store().startPress(9, 'CATCH');
+
+    expect(store().notePressRejected('NO_RACE')).toBe(true);
+
+    expect(store().raceNotice).toBe('LATE');
+    expect(store().resyncNonce).toBe(1);
+  });
+
+  it('해소 이벤트가 먼저 와 창이 닫혔으면 NO_RACE 가 와도 다시 받지 않는다 — 서버가 보내는 보통 순서', () => {
+    open(9, 11);
+    store().startPress(9, 'CATCH');
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 9, outcome: 'CALLED', bySeat: 0 }, 12));
+    store().applyEvent(ev('TURN_CHANGED', { seat: 1, direction: 1, attackStack: 0 }, 13));
+
+    store().notePressRejected('NO_RACE');
+
+    expect(store().resyncNonce).toBe(0);
+  });
+
+  it('지난 창의 누름에 늦게 온 NO_RACE 는 새 창을 의심하지 않는다', () => {
+    open(9, 11);
+    store().startPress(9, 'CATCH');
+    closeAndPlayOn('CALLED', 0);
+    open(10, 15, 1); // 새 창이 열려 누름 표식은 비었다
+
+    store().notePressRejected('NO_RACE');
+
+    expect(store().resyncNonce).toBe(0);
+  });
+});
+

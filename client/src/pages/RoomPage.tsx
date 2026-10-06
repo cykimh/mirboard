@@ -8,11 +8,12 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
 import { OneCardTable } from '@/features/onecard/OneCardTable';
+import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
-import type { Room, RoomOption, RoomStatus, TeamPolicy } from '@/types/api';
+import type { Room, RoomOption, TeamPolicy } from '@/types/api';
 import {
   Card,
   CardContent,
@@ -36,13 +37,6 @@ import {
  * shadcn 으로 재디자인. IN_GAME 의 GameTable 은 20e 범위라 레거시 레이아웃
  * 유지(.app-shell 밖에 둬 스코프 base 영향 없음). 상태/WS/핸들러 불변.
  */
-// D-110 — 대기실 헤더에 enum 원문(WAITING 등) 대신 쓰는 라벨.
-const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
-  WAITING: '대기 중',
-  IN_GAME: '게임 중',
-  FINISHED: '종료',
-};
-
 /**
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
  * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.

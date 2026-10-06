@@ -16,6 +16,12 @@ export interface GameSummary {
   maxPlayers: number;
   status: GameStatus;
   supportedRoomOptions: RoomOption[];
+  /**
+   * D-130 — 방 만들기 모달의 처음 선택(게임이 선언, `GameDefinition.defaultPlayers()`·`defaultTurnSeconds()`). 서버는 늘
+   * 싣는다 — 선택 필드인 것은 이 필드를 모르는 픽스처와의 호환 때문이고, 없으면 maxPlayers·0(끔)으로 본다.
+   */
+  defaultPlayers?: number;
+  defaultTurnSeconds?: number;
 }
 
 export interface CatalogResponse {
