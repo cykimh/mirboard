@@ -147,3 +147,4 @@ describe('GameHubPage — 대기 중인 방 목록 (S5)', () => {
     expect(screen.queryByText(/SKULL_KING ·/)).toBeNull();
   });
 });
+
