@@ -9,11 +9,8 @@ import static org.mockito.Mockito.verify;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.infra.bot.GameProgressKick;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -25,19 +22,13 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
  * 클라가 다시 붙으며 이 구독을 보낸다. 그때 진행 킥을 건다. 같은 세션이 함께 구독하는 대기실 메타·채팅·리액션
  * 토픽에는 걸지 않는다(한 접속에 한 번이면 된다).
  */
-@ExtendWith(MockitoExtension.class)
 class WsSessionLifecycleListenerTest {
 
-    @Mock
-    private RoomPresence presence;
-
-    @Mock
-    private RoomDisconnectHandler disconnects;
-
-    @Mock
-    private GameProgressKick kick;
-
-    private WsSessionLifecycleListener listener;
+    private final RoomPresence presence = mock(RoomPresence.class);
+    private final RoomDisconnectHandler disconnects = mock(RoomDisconnectHandler.class);
+    private final GameProgressKick kick = mock(GameProgressKick.class);
+    private final WsSessionLifecycleListener listener =
+            new WsSessionLifecycleListener(presence, disconnects, kick);
 
     private static SessionSubscribeEvent subscribe(String destination) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
@@ -50,7 +41,6 @@ class WsSessionLifecycleListenerTest {
 
     @Test
     void subscribing_the_game_topic_kicks_the_room() {
-        listener = new WsSessionLifecycleListener(presence, disconnects, kick);
         listener.onSubscribe(subscribe("/topic/room/r1"));
 
         verify(presence).join("ws-1", 11L, "r1");
@@ -62,7 +52,6 @@ class WsSessionLifecycleListenerTest {
     @ValueSource(strings = {"/topic/room/r1/meta", "/topic/room/r1/chat", "/topic/room/r1/reaction",
             "/topic/lobby/chat"})
     void other_topics_do_not_kick(String destination) {
-        listener = new WsSessionLifecycleListener(presence, disconnects, kick);
         listener.onSubscribe(subscribe(destination));
 
         verify(kick, never()).kick(anyString(), anyLong());

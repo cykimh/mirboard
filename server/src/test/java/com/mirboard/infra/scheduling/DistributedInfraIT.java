@@ -215,14 +215,6 @@ class DistributedInfraIT {
         assertThat(deadlines.pollDue("turn")).isEmpty();
     }
 
-    @Test
-    void cancel_removes_a_pending_deadline() {
-        deadlines.schedule("desertion", "room-1:7", Duration.ZERO);
-        deadlines.cancel("desertion", "room-1:7");
-
-        assertThat(deadlines.pollDue("desertion")).isEmpty();
-    }
-
     /**
      * S5 — 진행 킥은 이 세대의 엔진 타이머를 <b>없을 때만</b> 건다(ZADD NX). 이미 걸린 무장을 덮으면 킥이 락 없이 읽은 낡은 남은
      * 시간으로 정상 무장을 늦출 수 있었다. pop 된 항목은 없는 것이라 다시 걸린다.
@@ -238,6 +230,14 @@ class DistributedInfraIT {
         assertThat(deadlines.pollDue("game")).containsExactly("room-2#1");
         assertThat(deadlines.scheduleIfAbsent("game", "room-2#1", Duration.ZERO)).as("pop 뒤에는 없다").isTrue();
         assertThat(deadlines.pollDue("game")).containsExactly("room-2#1");
+    }
+
+    @Test
+    void cancel_removes_a_pending_deadline() {
+        deadlines.schedule("desertion", "room-1:7", Duration.ZERO);
+        deadlines.cancel("desertion", "room-1:7");
+
+        assertThat(deadlines.pollDue("desertion")).isEmpty();
     }
 
     @Test
