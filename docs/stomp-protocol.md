@@ -11,8 +11,8 @@
   단계에서 검증(정지 계정 차단 포함, D-86), 실패 시 `ERROR` 프레임 후 연결 종료.
 - 클라는 CONNECT 직후 자기 큐 `/user/queue/...` 와 필요한 토픽을 구독한다.
 - Phase 19(#1·#3, D-75): 서버가 `SessionSubscribeEvent`(`/topic/room/{id}`
-  `/meta` `/chat` 정규식 매칭)로 세션→방을 `WsSessionRegistry`(in-memory,
-  단일 인스턴스 전제 D-03)에 기록하고, `SessionDisconnectEvent` 시
+  `/meta` `/chat` 정규식 매칭)로 세션→방을 `RoomPresence`(Redis 세션 카운터 —
+  인스턴스 간 공유, D-96)에 기록하고, `SessionDisconnectEvent` 시
   `RoomDisconnectHandler` 가 처리한다 — **WAITING**: 즉시 leave/
   stopSpectating(빈 방·관전자0 방 즉시 소멸). **IN_GAME**:
   `DesertionGraceScheduler` 가 `mirboard.desertion.grace-seconds`(기본
@@ -331,8 +331,8 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
   resync 스냅샷을 받으면 기다리던 누름 표식은 같은 창이라도 비운다(끊긴 사이 보낸 누름은 버려졌을 수 있다). 그 뒤
   늦게 온 그 누름의 `BUSY` 는 창이 열려 있으면 조용히 삼킨다(창 동안 내기·먹기는 막혀 있어 그 `BUSY` 는 누름의 것이다).
 - **S5 — 경쟁 결과 로그.** 창이 닫힐 때마다 서버가 INFO 한 줄(`OneCard race resolved: … outcome via owner… by…
-  latencyMs windowMs lateMs`)을 남긴다. 사용자별 값이라 메트릭이 아니라 로그로만 둔다. 줄은 저장 전에 찍혀 저장 실패 뒤
-  같은 창이 두 번 찍힐 수 있으므로 `room`+`raceId` 의 마지막 줄이 정본이다(`docs/deploy.md`).
+  latencyMs windowMs lateMs`)을 남긴다. 사용자별 값이라 메트릭이 아니라 로그로만 둔다. PRESS·TIMER 줄은 저장 전에 찍혀(DESERTION
+  은 저장 뒤) 저장 실패 뒤 같은 창이 두 번 찍힐 수 있으므로 `room`+`raceId` 의 마지막 줄이 정본이다(`docs/deploy.md`).
 
 **resync**: `tableView` = `{ phase, seats: [{seat, handCount, eliminated}], topCard, declaredSuit, attackStack,
 direction, turnSeat, drawPileCount, race, result }` — `phase` 는 `PLAYING`·`RACE`·`ENDED`, `seats[].eliminated` 는

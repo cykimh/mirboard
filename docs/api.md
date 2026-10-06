@@ -198,7 +198,7 @@
 단일 게임 상세. 응답은 위 항목 형식과 동일하되 룰 요약 등 추가 필드가 들어갈 수 있다
 (MVP에서는 카탈로그와 동일 페이로드).
 
-에러: `NOT_FOUND` — 등록되지 않은 gameId.
+에러: 404 `GAME_NOT_AVAILABLE` — 등록되지 않았거나 `DISABLED` 인 gameId.
 
 ---
 
@@ -535,6 +535,7 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - 방이 `FINISHED` 여도 방 해시가 살아 있는 동안(`room_finish.lua` 가 TTL 을 600s 로 줄인다)
   마지막 상태를 돌려준다. 종료 전이 직후 스컬킹 게임판을 유지하는 클라(D-120)가 이 구간에
   resync 한다.
+
 **원카드(`gameType=ONE_CARD`)의 `tableView`** — 서버 `OneCardStateMapper.TableView`, 클라 `types/onecard.ts` 미러와
 1:1(실제 MVC 직렬화로 대조, S5 프로토콜 리뷰). 아래는 4인 방에서 좌석 3 이 탈주했고 좌석 0 이 1장이 되어 경쟁 창이
 열린 순간이다.

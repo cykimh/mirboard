@@ -1,5 +1,51 @@
 # 원카드 S5 구현 계획 — 공개 전 보강 (통합 리뷰 반영)
 
+## 정오표 (최종 리뷰 반영, 2026-10-06)
+
+이 계획의 본문은 **실행 기록이라 그대로 둔다**. 8태스크 구현(`878d5e5..a57c5f0`) 뒤 최종 브랜치 리뷰(opus, `s5-final-review`)가 필수 2건·권장 묶음을
+짚었고 사용자가 "필수 + 권장 전부"와 'S5 —' → 'D-130 —' 치환을 승인해 한 묶음으로 고쳤다. 본문의 코드·문구·수치가 아래와 다른 곳은 이 절이 맞다.
+
+**바뀐 것**
+
+- **훅 — 정리된 이전 소켓의 콜백 무시(필수 I-1, Task 5).** 본문의 세대 표식은 REST 응답만 덮었다. stompjs `deactivate()` 는 비동기라 방을 바꾼
+  뒤에도 DISCONNECT 영수증이 올 때까지 이전 소켓의 구독·닫힘 콜백이 돌아, 이전 방의 resync 가 새 세대로 세대 가드를 통과해 이전 방 스냅샷이 새 방에
+  적용되고(기준점이 부풀어 새 방의 이벤트가 전부 '중복'), 늦은 영수증·닫힘이 새 소켓의 `connected` 를 내렸다 — Task 5 의 `<` 가드가 이 오염을 "다음
+  resync 가 고치던 상태"에서 영구 정지로 바꿨다. 소켓 effect 지역 `disposed` 플래그(onConnect·구독 핸들러 4개·닫힘 콜백 3종, 로비 훅도)와 정리 때
+  세대 +1(언마운트 직전에 보낸 resync 의 늦은 응답도 닫는다, N-1)을 더했다. 모의 `Client` 는 `deactivate()` 가 즉시 끝나 이 부류가 안 보이므로 **진짜
+  stompjs 를 가짜 WebSocket 위에서 돌리는 테스트**(`staleSocket.test.tsx` 3건 — 방 2·로비 1)를 두었다. 훅·소켓 생명주기를 바꾸는 계획은 이런 테스트를 최소
+  1건 두는 것을 규칙으로 한다.
+- **런북 — DISABLED 확인 조건(필수 I-2, Task 8).** 본문의 조건("아래가 아무것도 출력하지 않거나 `IN_GAME` 줄이 없을 때")은 WAITING 방을 보지 않았다 —
+  WAITING 방은 `DISABLED` 뒤에도 입장·준비·시작되고(시작 경로에 게임 상태 검사가 없다) 시작하는 순간 봇·타이머가 멈춘다. 이제 "`IN_GAME` 줄도 `WAITING`
+  줄도 없을 때(빈 출력이거나 `FINISHED` 만)"이고 그 경고 한 줄이 붙는다(`docs/deploy.md`·`.env.example`). Task 8 Step 1 의 본문 문구는 이것으로 읽는다.
+- **권장 묶음.**
+  - 서버 — 진행 킥 `kick` 이 `executor.execute` 의 거절을 삼키고 로그만 남기며(resync 500 방지) WARN 에도 스택을 싣는다. 테스트: 예외로 끝난 봇 루프 토막의
+    몫 반환(S5T2-M1), 엔진 타이머 무장 실패·킥의 ERROR 스택 단언(S5T2-M3), 킥 제출 거절 삼킴(S5T2-M5), 폴러 pop `Error` 의 다음 주기·스택(S5T1-M2),
+    탈주가 매치를 끝내는 갈래의 경쟁 결과 로그(S5T3-M1). 주석: `RoomController` 킥 설명(S5T2-M5), 경쟁 결과 로그 "저장 전에 찍힘"을 PRESS·TIMER 로
+    좁힘(S5T3-M3), 폴러 Javadoc "최선"(S5T1-M4), `GameDefinition`·`RoomCreationDefaultsTest`(S5T4-M5).
+  - 클라 — 원카드 게임판의 다시 받기 effect 가 값이 아니라 **변화**에 반응(`handledResyncNonce`, 이전 세션이 남긴 신호로 마운트 직후 REST 가 한 번 더 나가던
+    것 — S5T6-M2), 낡은 창 타이머의 정리·deps 테스트(S5T6-M1), 방 만들기 모달의 게임 전환 되돌림 테스트 2건(숨은 네이티브 select — 본문의 "Select 조작은
+    자동 테스트 밖" 전제는 틀렸다, S5T4-M1)·선택지 사본 주석(S5T4-M3), 전환 뒤 실패한 이전 방 resync 가 `setError` 로 가지 않는 테스트(S5T5-M1), 허브
+    방 목록 상태 칸을 한글 라벨로(`ROOM_STATUS_LABEL` 을 `features/lobby/roomStatusLabel.ts` 로 꺼냄, S5T7-M2), 주석·JSDoc 정정(S5T5-M3·S5T6-M3·S5T7-M1·M4).
+  - 문서 — `deploy.md`(튜토리얼 결합 "1.0~2.5초"·"3초"·시크릿 변경의 앱 전체 재시작·로그 파일 보관·"다시 열기"의 기본값 조건), `api.md`(빈 줄·404
+    `GAME_NOT_AVAILABLE`), `stomp-protocol.md`(`RoomPresence`), `game-port.md`(문장 순서), `onecard.md`(§6 S5 행·§8 표 4행 괄호·"둘 다 늘 보내므로"·
+    §8 "남은 후속"에 최종 리뷰 follow-up 이전: 스컬킹 `recordIfEnded` 격리는 우선순위 높음, 턴 카운트다운은 "공개 전환 전 재검토").
+- **표기 — 'S5 —' → 'D-130 —'.** 이 브랜치가 더한 줄만 치환했다(코드·테스트 주석, vitest `describe`/`it` 이름의 `(S5)`, 계약 문서의 `(S5)`·`S5 —`,
+  `onecard.md` §7 의 `*(S5: …)*`). 제외: `onecard.md` 의 단계 이름(§6 표·§8 제목 "S5 — 공개 전 보강"·"S5 후반"), 이 계획서, 스컬킹의 기존 S5(D-102) 꼬리표,
+  `V10__more_bots.sql` 같은 기존 파일의 기존 줄. 이 계획서 본문의 'S5 —' 인용은 실행 기록이라 그대로다.
+
+**새 수치**(재측정 — `npm --prefix client run test` 마지막 두 줄, `./gradlew :server:test --rerun`)
+
+| 항목 | 본문 | 정오표 |
+| --- | --- | --- |
+| 클라 (파일 / 테스트) | 60 / 632 | **61 / 642** (+`staleSocket.test.tsx`; 훅 +5, 모달 +2, 게임판 +3) |
+| 서버 전체 (skipped / failed) | 1283 (5 / 0) | **1286** (5 / 0) |
+| 서버 Docker 불필요 | 1083 (84%) | **1086** (84%) |
+| `com.mirboard.infra.bot.*Test` | 44 | **46** |
+| `com.mirboard.domain.game.onecard.*Test` (단위) / 도메인 전체 | 185 / 189 | **186 / 190** |
+| `com.mirboard.infra.scheduling.*Test` | 3 | 3 |
+
+인프라 게임 이름 grep(`onecard|one_card|원카드`) 0건, D-116 겹침 파일 변경 0 은 그대로다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 원카드 공개(AVAILABLE) 전에 통합 리뷰(프로토콜·동시성·보안·운영 4렌즈)가 재현한 결함을 고친다 — 재기동·타이머 유실 뒤 영구히
