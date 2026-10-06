@@ -39,6 +39,19 @@ class OneCardGameDefinitionTest {
         assertThat(def.supportsRematch()).isFalse();
     }
 
+    /**
+     * S5 — 방 만들기의 처음 선택은 4명·턴 제한 30초다. 6석이 기본이면 친구 넷이 기본값으로 만든 방이 영원히 시작하지 않고
+     * (정원은 만든 뒤 못 바꾼다) 게스트 첫 판이 봇 5명이 된다. 턴 제한이 꺼져 있으면 자리를 비운 한 명이 판을 무기한 멈추고
+     * 결국 이긴다(버티기 — 사용자 결정으로 원카드만 30초). 30 은 방 만들기 모달의 선택지(0·30·60·90)다.
+     */
+    @Test
+    void room_creation_starts_at_four_seats_and_a_thirty_second_turn_limit() {
+        OneCardGameDefinition def = defaults();
+
+        assertThat(def.defaultPlayers()).isEqualTo(4).isBetween(def.minPlayers(), def.maxPlayers());
+        assertThat(def.defaultTurnSeconds()).isEqualTo(30);
+    }
+
     @Test
     void status_and_race_timing_come_from_configuration_with_the_protocol_slot_count() {
         OneCardGameDefinition def = definition(GameStatus.AVAILABLE, 2_000, 100, 200, 300, 400);

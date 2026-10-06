@@ -62,9 +62,10 @@ export function CreateRoomModal({
   const [creating, setCreating] = useState(false);
   const [fillWithBots, setFillWithBots] = useState(defaultFillWithBots ?? false);
   const [targetScore, setTargetScore] = useState(1000);
-  const [turnSeconds, setTurnSeconds] = useState(0);
+  // S5 — null = 아직 안 고름(게임이 선언한 처음 선택을 쓴다). 인원과 같은 방식.
+  const [turnSeconds, setTurnSeconds] = useState<number | null>(null);
   const [stake, setStake] = useState(0);
-  // D-99 — 인원 가변 게임에서만 쓰는 좌석 수. null = 아직 안 고름(서버 기본값).
+  // D-99 — 인원 가변 게임에서만 쓰는 좌석 수. null = 아직 안 고름(게임이 선언한 처음 선택).
   const [capacity, setCapacity] = useState<number | null>(null);
 
   // 모달이 열릴 때 기본 게임을 첫 AVAILABLE 로 맞춘다.
@@ -84,8 +85,11 @@ export function CreateRoomModal({
           (_, i) => game.minPlayers + i,
         )
       : [];
-  // 서버 기본값(maxPlayers)과 같은 값을 기본 선택으로 — 클라·서버 기본이 갈리지 않게.
-  const selectedSeats = capacity ?? game?.maxPlayers ?? 0;
+  // S5 — 게임이 선언한 인원을 처음 선택으로(원카드 4, 나머지는 maxPlayers). 서버의 capacity 생략 기본(maxPlayers)과
+  // 다를 수 있지만 인원 가변 게임에서는 늘 capacity 를 보내므로 실제로 갈리지 않는다.
+  const selectedSeats = capacity ?? game?.defaultPlayers ?? game?.maxPlayers ?? 0;
+  // S5 — 턴 제한도 게임이 선언한 값이 처음 선택이다(원카드 30초 — 자리 비운 사람이 판을 멈추지 않게, 나머지는 끔).
+  const selectedTurnSeconds = turnSeconds ?? game?.defaultTurnSeconds ?? 0;
 
   // D-106 — 게임이 선언한 옵션만 노출한다. 스컬킹은 10라운드 고정(목표 점수 무의미)·
   // 개인전(팀 없음)·칩 정산 미지원(내기 불가)이라 셋 다 안 뜬다. 서버도 같은 집합으로
@@ -100,11 +104,12 @@ export function CreateRoomModal({
   // usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰면 state 와 무관하게 꺼짐.
   const stakeOn = usesBetting && stake > 0;
 
-  // 게임을 바꾸면 이전 게임의 좌석 수는 무효 — 새 게임의 기본값으로 되돌린다.
+  // 게임을 바꾸면 이전 게임의 좌석 수·턴 제한은 무효 — 새 게임의 처음 선택으로 되돌린다.
   // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
   // 입력은 사라지지만 state 는 남아, 그대로 보내면 서버가 거절한다.
   useEffect(() => {
     setCapacity(null);
+    setTurnSeconds(null);
     if (!usesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
     if (!usesBetting) setStake(0);
   }, [selectedGame, usesTargetScore, usesBetting]);
@@ -124,7 +129,7 @@ export function CreateRoomModal({
           // D-106 — 게임이 안 쓰는 옵션은 아예 보내지 않는다(D-99 의 capacity 와 같은 방식).
           // 서버는 기본값 아닌 값이 오면 UNSUPPORTED_ROOM_OPTION 으로 거절한다.
           targetScore: usesTargetScore ? targetScore : undefined,
-          turnSeconds,
+          turnSeconds: selectedTurnSeconds,
           stake: usesBetting ? stake : undefined,
           capacity: seatChoices.length > 0 ? selectedSeats : undefined,
         },
@@ -213,7 +218,7 @@ export function CreateRoomModal({
             <Label>턴 제한</Label>
             <ToggleGroup
               type="single"
-              value={String(turnSeconds)}
+              value={String(selectedTurnSeconds)}
               onValueChange={(v) => v !== '' && setTurnSeconds(Number(v))}
               className="justify-start"
             >

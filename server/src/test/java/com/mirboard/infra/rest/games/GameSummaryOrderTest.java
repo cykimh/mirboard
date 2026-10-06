@@ -84,6 +84,67 @@ class GameSummaryOrderTest {
                 .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
     }
 
+    /** S5 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */
+    @Test
+    void room_creation_defaults_come_from_the_definition() {
+        var plain = GameCatalogController.GameSummary.of(new ShuffledOptionsGame(Set.of()));
+        var declared = GameCatalogController.GameSummary.of(new DeclaredDefaultsGame());
+
+        assertThat(plain.defaultPlayers()).isEqualTo(4);
+        assertThat(plain.defaultTurnSeconds()).isZero();
+        assertThat(declared.defaultPlayers()).isEqualTo(3);
+        assertThat(declared.defaultTurnSeconds()).isEqualTo(60);
+    }
+
+    /** 처음 선택을 선언한 정의(2~4인 · 기본 3명 · 60초). */
+    private record DeclaredDefaultsGame() implements GameDefinition {
+
+        @Override
+        public String id() {
+            return "DECLARED";
+        }
+
+        @Override
+        public String displayName() {
+            return "기본값 선언 게임";
+        }
+
+        @Override
+        public String shortDescription() {
+            return "";
+        }
+
+        @Override
+        public int minPlayers() {
+            return 2;
+        }
+
+        @Override
+        public int maxPlayers() {
+            return 4;
+        }
+
+        @Override
+        public GameStatus status() {
+            return GameStatus.AVAILABLE;
+        }
+
+        @Override
+        public int defaultPlayers() {
+            return 3;
+        }
+
+        @Override
+        public int defaultTurnSeconds() {
+            return 60;
+        }
+
+        @Override
+        public GameEngine newEngine(GameContext ctx) {
+            throw new UnsupportedOperationException("카탈로그 매핑만 검증한다");
+        }
+    }
+
     /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
     @Test
     void declaration_order_is_the_contract() {

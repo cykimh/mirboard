@@ -50,6 +50,25 @@ public interface GameDefinition {
         return false;
     }
 
+    /**
+     * S5 — 방 만들기 모달이 처음 고르는 인원. <b>기본은 {@link #maxPlayers()}</b> — 지금까지의 동작 그대로라 재정의하지
+     * 않은 게임은 바뀌지 않는다. {@code minPlayers()..maxPlayers()} 안이어야 한다.
+     *
+     * <p>클라의 처음 선택일 뿐이다 — 서버의 capacity 생략 기본({@code RoomService}, maxPlayers)은 따로다. 인원 가변
+     * 게임은 클라가 늘 capacity 를 보내므로 둘이 실제로 갈리지 않는다.
+     */
+    default int defaultPlayers() {
+        return maxPlayers();
+    }
+
+    /**
+     * S5 — 방 만들기 모달이 처음 고르는 턴 제한(초). <b>기본은 0(끔)</b> — 서버 기본({@code RoomService
+     * .DEFAULT_TURN_SECONDS})과 같다. 모달의 선택지(0·30·60·90) 중 하나여야 처음부터 선택돼 보인다.
+     */
+    default int defaultTurnSeconds() {
+        return 0;
+    }
+
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
     GameEngine newEngine(GameContext ctx);
 }

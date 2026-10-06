@@ -82,6 +82,9 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].supportedRoomOptions").isArray())
                 .andExpect(jsonPath("$.games[0].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
+                // S5 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
+                .andExpect(jsonPath("$.games[0].defaultPlayers").value(8))
+                .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(0))
                 .andExpect(jsonPath("$.games[1].id").value("TICHU"))
                 .andExpect(jsonPath("$.games[1].displayName").value("티츄"))
                 .andExpect(jsonPath("$.games[1].minPlayers").value(4))
@@ -94,12 +97,17 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions[1]").value("TEAMS"))
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions[2]").value("BETTING"))
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[1].defaultPlayers").value(4))
+                .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(0))
                 .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
                 .andExpect(jsonPath("$.games[2].displayName").value("원카드"))
                 .andExpect(jsonPath("$.games[2].minPlayers").value(2))
                 .andExpect(jsonPath("$.games[2].maxPlayers").value(6))
                 .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
+                // S5 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
+                .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))
+                .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(30));
     }
 
     @Test
@@ -111,6 +119,8 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.id").value("TICHU"))
                 // D-106 — 목록과 단건이 같은 record 를 쓴다. 한쪽만 필드가 빠지는 회귀 방지.
                 .andExpect(jsonPath("$.supportedRoomOptions.length()").value(3))
+                .andExpect(jsonPath("$.defaultPlayers").value(4))
+                .andExpect(jsonPath("$.defaultTurnSeconds").value(0))
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
     }
 
