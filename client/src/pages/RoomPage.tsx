@@ -45,9 +45,11 @@ interface HeldSeats {
 }
 
 /**
- * 대기실 + 게임 테이블 컨테이너. Phase 20d(D-76): 대기실/에러/로딩 셸을
- * shadcn 으로 재디자인. IN_GAME 의 GameTable 은 20e 범위라 레거시 레이아웃
- * 유지(.app-shell 밖에 둬 스코프 base 영향 없음). 상태/WS/핸들러 불변.
+ * 대기실 + 게임판 컨테이너. 대기실/에러/로딩 셸은 shadcn(D-76, `.app-shell` 안). IN_GAME 은 게임별 게임판 —
+ * 티츄(`GameTable`)·스컬킹(`SkullKingTable`)·원카드(`OneCardTable`)로 가르는 곳은 이 파일 한 곳뿐이고(D-103), 각
+ * 게임판이 자기 소켓·sink 를 소유한다. 게임판은 `.app-shell` 밖이다(스코프 base 가 닿지 않는다 — 게임판 CSS 는 자기
+ * 스코프에서 명시). 종료 화면을 가진 게임(`BOARD_HELD_GAMES`)은 이 세션이 IN_GAME→FINISHED 를 보면 게임판을 내리지
+ * 않고 `roomFinished` 를 넘긴다(D-120·D-129).
  */
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();

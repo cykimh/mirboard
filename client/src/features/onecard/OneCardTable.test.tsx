@@ -808,6 +808,18 @@ describe('OneCardTable — 턴 카운트다운 (D-131)', () => {
     expect(Math.max(...shown)).toBeLessThanOrEqual(30);
   });
 
+  it('resync 의 남은 시간이 방의 턴 제한보다 커도 턴 제한으로 자른다', () => {
+    // 무장한 인스턴스와 resync 를 읽은 인스턴스의 시계 차이 등으로 서버 값이 턴 제한을 넘으면 '31초'가 보였다(최종 리뷰 F-client-1).
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 30_500 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    expect(countdown()).toHaveTextContent('30초');
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(countdown()).toHaveTextContent('29초');
+  });
+
   it('턴 제한이 꺼진 방은 보이지 않는다', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 12_345 });
     renderTable({ playerIds: [100, 101, 102], turnSeconds: 0 });

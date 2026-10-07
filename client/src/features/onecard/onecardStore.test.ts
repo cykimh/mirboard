@@ -694,6 +694,19 @@ describe('턴 카운트다운 기준 (D-131)', () => {
     expect(store().turnClock).toEqual({ since: NOW + 2_000, remainingMs: null });
   });
 
+  it('RACE_OPENED 만으로도 세기를 멈춘다 — 앞선 CARD_PLAYED 에 기대지 않는다', () => {
+    // 서버 순서상 CARD_PLAYED 가 늘 먼저 비우지만, 구멍 뒤 상태처럼 차례가 남은 채 창이 열리는 경우를 막는 심층 방어다
+    // (이 줄을 지워도 다른 테스트는 모두 통과했다 — 최종 리뷰 S5bT5-M2).
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, turnSeat: 2 }, turnRemainingMs: 20_000 }));
+    expect(store().turnClock).not.toBeNull();
+
+    store().applyEvent(
+      ev('RACE_OPENED', { raceId: 3, ownerSeat: 1, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000 }, 11),
+    );
+
+    expect(store().turnClock).toBeNull();
+  });
+
   it('탈락(탈주)도 서버가 지금 차례의 데드라인을 다시 거는 순간이다 — 차례가 그대로여도 다시 센다', () => {
     store().applySnapshot(snapshot({ turnRemainingMs: 3_000 }));
     vi.setSystemTime(NOW + 1_000);

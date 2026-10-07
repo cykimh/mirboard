@@ -14,8 +14,11 @@ export const TURN_URGENT_SECONDS = 5;
  */
 export function OneCardTurnCountdown({ turnSeconds }: { turnSeconds: number }) {
   const clock = useOneCardStore((s) => s.turnClock);
+  // 서버 값도 한 턴(방의 턴 제한)을 넘지 않게 자른다 — 무장한 인스턴스와 resync 를 읽은 인스턴스의 시계 차이 등으로 넘으면
+  // '31초'가 보였다.
+  const fullTurnMs = turnSeconds * 1000;
   const deadline =
-    turnSeconds > 0 && clock !== null ? clock.since + (clock.remainingMs ?? turnSeconds * 1000) : null;
+    turnSeconds > 0 && clock !== null ? clock.since + Math.min(clock.remainingMs ?? fullTurnMs, fullTurnMs) : null;
   // 마지막 틱의 시각과 그때의 기준. 기준이 바뀐 첫 그리기는 지난 틱의 시각이 아니라 지금 시각으로 센다 — 먹기 뒤
   // TURN_CHANGED 처럼 마운트된 채 기준만 바뀌면, 낡은 시각으로는 방의 턴 제한보다 큰 값(31초)이 한 프레임 보였다.
   const [tick, setTick] = useState(() => ({ deadline, now: Date.now() }));
@@ -48,7 +51,7 @@ export function OneCardTurnCountdown({ turnSeconds }: { turnSeconds: number }) {
       title="0초가 되면 자동으로 먹습니다"
     >
       <span aria-hidden>⏱ </span>
-      {seconds}초
+      <span className="oc-countdown-num">{seconds}</span>초
     </span>
   );
 }

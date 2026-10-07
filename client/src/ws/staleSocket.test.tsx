@@ -95,15 +95,25 @@ function topicFrame(ws: FakeWS, room: string, seq: number) {
   });
 }
 
-/** 본인 큐 프레임 한 건(비공개 — 손패·ERROR)이 그 소켓에 닿는다. */
+/** 본인 큐 프레임 한 건(비공개 — 손패·ERROR)이 그 소켓에 닿는다. 게임 중립 훅의 테스트라 게임 공용 코드(BUSY — 방 락 경합)를 싣는다. */
 function queueFrame(ws: FakeWS, room: string, type: string) {
   const id = subscriptionId(ws, `/user/queue/room/${room}`);
-  const body = JSON.stringify({ type, payload: { code: 'NO_RACE', message: 'late' } });
+  const body = JSON.stringify({ type, payload: { code: 'BUSY', message: 'busy' } });
   act(() => {
     ws.onmessage?.({
       data: `MESSAGE\nsubscription:${id}\nmessage-id:q-${room}\ndestination:/user/queue/room/${room}\n\n${body}\0`,
     });
   });
+}
+
+/**
+ * 정리된 이전 소켓의 stompjs 핸들러가 아직 그대로인가 — 아래 프레임이 실제로 훅 콜백까지 가는지의 사전조건이다. stompjs 가
+ * 정리 때 핸들러를 바꾸면(7.3 은 null 이 아니라 no-op 함수로 바꾼다 — stomp-handler `_closeWebsocket`, augment-websocket
+ * `terminate`) 프레임이 훅에 닿지 않아, 가드가 없어도 통과하는 공회전 테스트가 된다. 그래서 null 여부가 아니라 같은 함수인지 본다.
+ */
+function expectLiveHandler(ws: FakeWS, handler: FakeWS['onmessage']) {
+  expect(handler).not.toBeNull();
+  expect(ws.onmessage).toBe(handler);
 }
 
 /** cleanup 이 보낸 DISCONNECT 의 영수증이 뒤늦게 닿는다 — 이때에야 stompjs 가 onDisconnect 를 부른다. */
@@ -166,6 +176,7 @@ describe('정리된 이전 소켓의 콜백 (D-130)', () => {
     });
     await waitFor(() => expect(sockets).toHaveLength(1));
     accept(sockets[0]);
+    const handlerA = sockets[0].onmessage;
     await waitFor(() => expect(sink.applySnapshot).toHaveBeenCalled());
 
     rerender({ room: 'B' });
@@ -177,6 +188,7 @@ describe('정리된 이전 소켓의 콜백 (D-130)', () => {
     const appliedBefore = appliedRooms().length;
 
     // 이전 소켓 A 는 아직 닫히지 않았다(영수증 대기) — A 의 공개 프레임(순번 200)이 닿는다.
+    expectLiveHandler(sockets[0], handlerA);
     topicFrame(sockets[0], 'A', 200);
     await act(async () => {});
     expect(appliedRooms().slice(appliedBefore)).not.toContain('A');
@@ -199,12 +211,14 @@ describe('정리된 이전 소켓의 콜백 (D-130)', () => {
     });
     await waitFor(() => expect(sockets).toHaveLength(1));
     accept(sockets[0]);
+    const handlerA = sockets[0].onmessage;
 
     rerender({ room: 'B' });
     await waitFor(() => expect(sockets).toHaveLength(2));
     accept(sockets[1]);
     sink.applyPrivateEvent.mockClear();
 
+    expectLiveHandler(sockets[0], handlerA);
     queueFrame(sockets[0], 'A', 'ERROR');
     expect(sink.applyPrivateEvent).not.toHaveBeenCalled();
 
