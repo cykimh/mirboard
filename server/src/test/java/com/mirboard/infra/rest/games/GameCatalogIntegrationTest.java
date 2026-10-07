@@ -63,8 +63,8 @@ class GameCatalogIntegrationTest {
     }
 
     /**
-     * D-102 — 정렬은 status → displayName 이라 "스컬킹" 이 먼저다. D-128 — 원카드는 클라 게임판(S4) 전까지
-     * COMING_SOON 이라 AVAILABLE 두 게임 뒤에 온다.
+     * D-102 — 정렬은 status → displayName 이다. D-131 — 원카드가 공개돼(AVAILABLE) 세 게임이 모두 같은 상태라 이름순 —
+     * 스컬킹 · 원카드 · 티츄. (닫는 설정의 원카드는 {@code OneCardClosedIntegrationTest}.)
      */
     @Test
     void catalog_lists_every_game_when_authenticated() throws Exception {
@@ -85,29 +85,30 @@ class GameCatalogIntegrationTest {
                 // D-130 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(8))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(0))
-                .andExpect(jsonPath("$.games[1].id").value("TICHU"))
-                .andExpect(jsonPath("$.games[1].displayName").value("티츄"))
-                .andExpect(jsonPath("$.games[1].minPlayers").value(4))
-                .andExpect(jsonPath("$.games[1].maxPlayers").value(4))
+                .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[1].displayName").value("원카드"))
+                .andExpect(jsonPath("$.games[1].minPlayers").value(2))
+                .andExpect(jsonPath("$.games[1].maxPlayers").value(6))
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions.length()").value(0))
+                // D-131 — 공개. 설정을 주지 않은 컨텍스트의 기본값이다.
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
+                .andExpect(jsonPath("$.games[1].defaultPlayers").value(4))
+                .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(30))
+                .andExpect(jsonPath("$.games[2].id").value("TICHU"))
+                .andExpect(jsonPath("$.games[2].displayName").value("티츄"))
+                .andExpect(jsonPath("$.games[2].minPlayers").value(4))
+                .andExpect(jsonPath("$.games[2].maxPlayers").value(4))
                 // D-106 — 배열 순서는 RoomOption 선언 순서다. 클라가 인덱스가 아니라
                 // includes() 로 읽으므로 순서 자체가 기능은 아니지만, 카탈로그는 계약이라
                 // 필드명·값 집합·순서가 말없이 바뀌면 클라가 조용히 어긋난다.
-                .andExpect(jsonPath("$.games[1].supportedRoomOptions.length()").value(3))
-                .andExpect(jsonPath("$.games[1].supportedRoomOptions[0]").value("TARGET_SCORE"))
-                .andExpect(jsonPath("$.games[1].supportedRoomOptions[1]").value("TEAMS"))
-                .andExpect(jsonPath("$.games[1].supportedRoomOptions[2]").value("BETTING"))
-                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[1].defaultPlayers").value(4))
-                .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(0))
-                .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
-                .andExpect(jsonPath("$.games[2].displayName").value("원카드"))
-                .andExpect(jsonPath("$.games[2].minPlayers").value(2))
-                .andExpect(jsonPath("$.games[2].maxPlayers").value(6))
-                .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
-                // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(3))
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions[0]").value("TARGET_SCORE"))
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions[1]").value("TEAMS"))
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions[2]").value("BETTING"))
+                .andExpect(jsonPath("$.games[2].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))
-                .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(30));
+                .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(0));
     }
 
     @Test

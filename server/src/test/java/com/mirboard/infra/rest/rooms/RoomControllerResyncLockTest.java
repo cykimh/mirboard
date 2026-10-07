@@ -22,12 +22,14 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.bot.GameProgressKick;
+import com.mirboard.infra.bot.TurnTimeoutScheduler;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.RoomActionLock;
 import com.mirboard.infra.ws.RoomPresence;
 import com.mirboard.infra.ws.RoomSeq;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -52,10 +54,11 @@ class RoomControllerResyncLockTest {
     private final GameEngine engine = mock(GameEngine.class);
     private final GameState state = mock(GameState.class);
     private final GameProgressKick kick = mock(GameProgressKick.class);
+    private final TurnTimeoutScheduler turnTimeout = mock(TurnTimeoutScheduler.class);
 
     private final RoomController controller = new RoomController(
             rooms, engines, seqs, mock(DesertionService.class), mock(RoomPresence.class),
-            mock(RoomChipStore.class), mock(GameAbortService.class), lock, kick);
+            mock(RoomChipStore.class), mock(GameAbortService.class), lock, kick, turnTimeout);
 
     private final AuthPrincipal me = new AuthPrincipal(ME, "me");
 
@@ -140,5 +143,50 @@ class RoomControllerResyncLockTest {
         controller.resync(ROOM, me);
 
         verify(kick).kick(ROOM, ME);
+    }
+
+    /**
+     * D-131 — 남은 턴 시간도 스냅샷과 같은 락 안에서 읽는다. 진행 경로는 저장·방송·다음 턴 데드라인 재무장을 모두 이 락 안에서
+     * 끝내므로, 락 안에서 읽은 값은 함께 읽은 상태의 턴 것이다(락 밖에서 읽으면 새 상태 + 이전 턴의 남은 시간이 나올 수 있다).
+     */
+    @Test
+    void the_turn_remaining_time_is_read_inside_the_lock_with_the_snapshot() {
+        givenGameInProgress();
+        when(lock.acquireWaiting(ROOM)).thenReturn(true);
+        when(engine.pendingSeats(state)).thenReturn(List.of(0));
+        when(turnTimeout.turnRemaining(any())).thenReturn(Optional.of(Duration.ofMillis(12_345)));
+
+        var res = controller.resync(ROOM, me);
+
+        assertThat(res.turnRemainingMs()).isEqualTo(12_345L);
+        InOrder order = inOrder(lock, engine, turnTimeout);
+        order.verify(lock).acquireWaiting(ROOM);
+        order.verify(engine).loadState();
+        order.verify(turnTimeout).turnRemaining(any());
+        order.verify(lock).release(ROOM);
+    }
+
+    /** 기다리는 좌석이 없으면(원카드 경쟁 창·끝난 매치) 걸린 데드라인이 있어도 발화해 봐야 아무 일이 없다 — 남은 시간이 아니다. */
+    @Test
+    void nobody_on_the_clock_means_no_remaining_time() {
+        givenGameInProgress();
+        when(lock.acquireWaiting(ROOM)).thenReturn(true);
+        when(engine.pendingSeats(state)).thenReturn(List.of());
+
+        var res = controller.resync(ROOM, me);
+
+        assertThat(res.turnRemainingMs()).isNull();
+        verify(turnTimeout, never()).turnRemaining(any());
+    }
+
+    /** 턴 제한이 꺼졌거나 지금 세대의 데드라인이 없으면 null — 클라는 세지 않는다. */
+    @Test
+    void no_armed_deadline_means_no_remaining_time() {
+        givenGameInProgress();
+        when(lock.acquireWaiting(ROOM)).thenReturn(true);
+        when(engine.pendingSeats(state)).thenReturn(List.of(0));
+        when(turnTimeout.turnRemaining(any())).thenReturn(Optional.empty());
+
+        assertThat(controller.resync(ROOM, me).turnRemainingMs()).isNull();
     }
 }

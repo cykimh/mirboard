@@ -72,7 +72,7 @@ public class DesertionService {
                     roomId, deserterUserId);
             return false;
         }
-        // MATCH_CONTINUES 재무장은 락 해제 후 — BotScheduler 계약(호출자 락 비점유).
+        // MATCH_CONTINUES 의 봇 재무장은 락 해제 후 — BotScheduler 계약(호출자 락 비점유). 턴 데드라인은 락 안(D-131).
         boolean needsReschedule = false;
         boolean processed;
         try {
@@ -108,6 +108,14 @@ public class DesertionService {
             } else {
                 // D-102/D-104 — 남은 사람끼리 계속. 방은 IN_GAME 유지, 다음 차례가
                 // 사람이면 타이머, 봇이면 봇 루프가 이어받도록 재무장한다.
+                // D-131 — 턴 데드라인은 락을 풀기 전에 건다(resync 가 같은 락 안에서 남은 턴 시간을 읽는다). 실패해도 봇
+                // 루프 재무장(락 해제 뒤)을 건너뛰지 않고, 이미 저장·방송된 탈주를 처리 실패로 남기지 않는다(호출자는 D-122
+                // 가드로 좌석을 그대로 둔다 — 진행 중 매치라서).
+                try {
+                    turnTimeout.onTurnAdvanced(roomId);
+                } catch (RuntimeException e) {
+                    log.error("Turn rearm after desertion failed: roomId={} err={}", roomId, e.toString(), e);
+                }
                 needsReschedule = true;
             }
             log.warn("Desertion processed: roomId={} deserterUserId={} seat={} outcome={}",
@@ -122,7 +130,6 @@ public class DesertionService {
         }
         if (needsReschedule) {
             botScheduler.scheduleBots(roomId);
-            turnTimeout.onTurnAdvanced(roomId);
         }
         return processed;
     }

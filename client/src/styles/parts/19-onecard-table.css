@@ -288,7 +288,24 @@ button.oc-badge {
   gap: 6px;
 }
 
-.oc-attack {
+/* D-131 — 차례 옆 남은 시간. 숫자 폭이 흔들리지 않게 고정폭 숫자, 5초 이하는 경고 테두리·배경(아래 .oc-attack 과 같은
+   규칙 — 이 블록보다 뒤에 두어 굵기 700 이 이긴다. 글자색은 그대로 — 대비). */
+.oc-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* 10초 → 9초처럼 자릿수가 줄어도 배지 폭이 그대로다 — 가운데 정렬된 줄(.oc-center-info)의 다른 배지가 밀리지 않는다.
+   턴 제한 선택지가 최대 두 자리(90초)라 2ch. */
+.oc-countdown-num {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+}
+
+/* 공격 누적과 남은 시간 5초 이하(D-131)는 같은 "위험" 모양을 쓴다 — 한 규칙으로 두어 한쪽만 바뀌지 않게. */
+.oc-attack,
+.oc-countdown-urgent {
   border-color: var(--oc-race-catch);
   background: rgba(217, 72, 61, 0.15);
   font-weight: 700;

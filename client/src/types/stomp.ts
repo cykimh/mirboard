@@ -41,4 +41,9 @@ export interface ResyncEnvelope<TTable = unknown, TPrivate = unknown> {
   privateHand: TPrivate | null;
   disconnectedSeats?: number[];
   chips?: Record<number, number> | null;
+  /**
+   * D-131 — 지금 턴의 남은 시간(ms, 0 이상). 서버가 실제로 발화할 턴 데드라인 기준이라 재접속 직후에도 맞다. 턴 제한 끔·기다리는
+   * 좌석 없음(경쟁 창·끝난 매치)·걸린 데드라인 없음이면 null. 게임 중립 — 쓰는 게임판만 읽는다.
+   */
+  turnRemainingMs?: number | null;
 }

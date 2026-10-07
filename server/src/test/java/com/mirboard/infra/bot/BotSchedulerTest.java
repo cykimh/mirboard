@@ -3,13 +3,17 @@ package com.mirboard.infra.bot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
+import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
@@ -126,6 +130,38 @@ class BotSchedulerTest {
 
         // 루프 스레드에서 새는 예외가 이 시나리오의 전제다 — Awaitility 가 기본으로 다른 스레드의 미처리 예외를 테스트 실패로 올리지 않게.
         await().dontCatchUncaughtExceptions().atMost(Duration.ofSeconds(2)).until(() -> bots.scheduleBotsIfIdle(ROOM));
+    }
+
+    /**
+     * D-131 — 봇 수 뒤의 재무장도 컨트롤러·탈주 계속과 같은 규칙이다: 던져도(Redis 순간 장애) 잡아 ERROR 로 남기고 루프를
+     * 이어 간다. 봇 수는 이미 저장·방송됐다 — 예외가 바깥 catch 로 빠지면 재귀가 돌지 않아, 다음 차례가 봇인 방이 다음
+     * resync·구독 킥까지 멈췄다(최종 리뷰 F-server-1).
+     */
+    @Test
+    void a_failed_rearm_after_a_bot_move_keeps_the_loop_going() {
+        GameAction action = mock(GameAction.class);
+        TurnTimeoutScheduler turnTimeout = mock(TurnTimeoutScheduler.class);
+        doThrow(new IllegalStateException("simulated blip on ZADD deadlines:turn"))
+                .when(turnTimeout).onTurnAdvanced(ROOM);
+        humanTurnInABotRoom();
+        // 첫 토막은 봇(좌석 1) 차례 — 수를 둔다. 이어지는 토막은 사람 차례라 할 일 없이 끝난다.
+        when(engine.pendingSeats(state)).thenReturn(List.of(1), List.of(0));
+        when(engine.botAction(eq(state), eq(1), any())).thenReturn(action);
+        when(engine.apply(state, 1, action)).thenReturn(new GameEngine.Result(state, List.of()));
+        when(lock.tryAcquire(ROOM)).thenReturn(true);
+        BotScheduler bots = new BotScheduler(roomService, engines, mock(GameEventBroadcaster.class), lock,
+                mock(MatchProgressService.class), mock(BotUserRegistry.class), turnTimeout, 1L, 0);
+
+        try (LogCapture logs = LogCapture.of(BotScheduler.class)) {
+            bots.scheduleBots(ROOM);
+
+            // 재귀가 이어졌다 — 다음 토막이 상태를 다시 읽고 락을 다시 잡았다 풀었다.
+            verify(engine, timeout(2_000).times(2)).loadState();
+            verify(lock, timeout(2_000).times(2)).release(ROOM);
+            verify(engine, times(1)).apply(state, 1, action);
+            assertThat(logs.messages(Level.ERROR)).anyMatch(m -> m.contains("Turn rearm after bot action failed"));
+            assertThat(logs.messages(Level.ERROR)).noneMatch(m -> m.contains("BotScheduler error in room"));
+        }
     }
 
     @Test

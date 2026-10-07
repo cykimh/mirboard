@@ -72,6 +72,13 @@ public class RoomService {
     public static final java.util.Set<Integer> ALLOWED_STAKES =
             java.util.Set.of(0, 10, 50, 100, 500);
 
+    /**
+     * 인원을 받지 않는 짧은 오버로드들은 "생략"의 뜻이 둘로 갈린다 — 받지 않은 턴 제한은 {@link #DEFAULT_TURN_SECONDS}
+     * (0=끔)를 <b>명시</b>해 넘기고, 인원은 null(게임 선언 {@code defaultPlayers()}, D-131)로 넘긴다. 턴 제한까지 게임 선언
+     * ({@code defaultTurnSeconds()})을 따르려면 마지막 오버로드에 null 을 넘긴다(운영 호출자 {@code RoomController} 가 그렇게
+     * 한다 — REST 요청에서 필드를 뺀 것이 "생략"이다). 짧은 오버로드는 테스트용이라 바꾸지 않았다(null 이면 원카드 테스트에
+     * 선언값 30초 턴이 생긴다, {@code docs/plans/onecard.md} §9).
+     */
     public Room createRoom(long hostUserId, String name, String gameType) {
         return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false,
                 DEFAULT_TARGET_SCORE, DEFAULT_TURN_SECONDS);
@@ -118,13 +125,14 @@ public class RoomService {
      * 방 메타라 TichuMatchState 까진 흘리지 않고 스케줄러가 room 으로 참조.
      * D-81 — `stake` 판돈(가상 칩, 0=내기 없음). 허용값 외/음수는 거절하고,
      * stake>0 이면 봇 채우기 금지(봇=무한 잔액 → 칩 파밍 방지).
-     * D-99 — `requestedCapacity` 방 인원. **null 이면 `def.maxPlayers()`**(현행 호환).
-     * 게임이 정한 `minPlayers()..maxPlayers()` 를 벗어나면 InvalidCapacityException.
-     * 티츄는 min=max=4 라 4 또는 미지정만 통과한다.
+     * D-99 — `requestedCapacity` 방 인원. 게임이 정한 `minPlayers()..maxPlayers()` 를 벗어나면
+     * InvalidCapacityException. 티츄는 min=max=4 라 4 또는 미지정만 통과한다.
+     * D-131 — 생략(null)한 인원·턴 제한은 게임 선언 `def.defaultPlayers()`·`def.defaultTurnSeconds()` 다(방 만들기 모달의
+     * 처음 선택과 같은 값, D-130). 티츄·스컬킹은 선언이 예전 생략 기본(최대 인원·끔)과 같아 동작이 바뀌지 않는다.
      */
     public Room createRoom(long hostUserId, String name, String gameType,
                            TeamPolicy teamPolicy, boolean fillWithBots, int targetScore,
-                           int turnSeconds, int stake, Integer requestedCapacity) {
+                           Integer requestedTurnSeconds, int stake, Integer requestedCapacity) {
         GameDefinition def = games.require(gameType);
         if (def.status() != GameStatus.AVAILABLE) {
             throw new com.mirboard.domain.game.core.GameNotFoundException(gameType);
@@ -136,7 +144,8 @@ public class RoomService {
             throw new StakedRoomNoBotsException();
         }
         requireSupportedRoomOptions(def, targetScore, stake);
-        int capacity = requestedCapacity == null ? def.maxPlayers() : requestedCapacity;
+        int capacity = requestedCapacity == null ? def.defaultPlayers() : requestedCapacity;
+        int turnSeconds = requestedTurnSeconds == null ? def.defaultTurnSeconds() : requestedTurnSeconds;
         if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
             throw new InvalidCapacityException(capacity, def.minPlayers(), def.maxPlayers());
         }

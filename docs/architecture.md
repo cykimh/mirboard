@@ -168,9 +168,12 @@ HTTP 요청 (예: POST /api/rooms)
        · 공개 이벤트 → /topic/room/{id}        (PLAYED, TURN_CHANGED, TRICK_TAKEN, ...)
        · 비공개 이벤트 → /user/queue/room/{id}  (HAND_DEALT, CARDS_RECEIVED, 원카드 HAND_UPDATED — seq 없음, D-126·D-129)
        · 모든 메시지는 { eventId, seq, type, ts, payload } envelope 로 래핑
-  8. lock 해제 — 저장·순번 발급이 모두 락 안이라, resync 가 같은 락 안에서 읽으면
-     스냅샷과 eventSeq 가 같은 시점이다(D-126)
-  9. 클라 리듀서(tichuStore)가 이벤트 적용 → 리렌더
+  8. 다음 턴 데드라인·엔진 타이머 재무장(TurnTimeoutScheduler.onTurnAdvanced — D-131, 락 안.
+     실패해도 잡아 ERROR — 액션은 이미 저장·방송됐다)
+  9. lock 해제 — 저장·순번 발급·재무장이 모두 락 안이라, resync 가 같은 락 안에서 읽으면
+     스냅샷·eventSeq·turnRemainingMs 가 같은 시점이다(D-126·D-131)
+ 10. 락 해제 뒤 봇 스케줄(BotScheduler — 봇 차례면 비동기 루프)
+ 11. 클라 리듀서(게임별 스토어 — tichuStore 등)가 이벤트 적용 → 리렌더
 ```
 
 envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.md` 가 단일 진실 공급원.
@@ -184,7 +187,8 @@ envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.m
 `GameRegistry` 는 Spring 컨텍스트의 모든 `GameDefinition` Bean을 자동 수집한다.
 방 생성·카탈로그·엔진 인스턴스화가 전부 이 레지스트리를 경유하므로, 새 게임은
 `GameDefinition @Component` 등록만으로 연결된다(로비/REST 코드 무변경). 현재 등록:
-`TichuGameDefinition` (id `TICHU`, 4인, `AVAILABLE`).
+`TichuGameDefinition`(id `TICHU`, 4인)·`SkullKingGameDefinition`(id `SKULL_KING`, 2~8인)·
+`OneCardGameDefinition`(id `ONE_CARD`, 2~6인 — 공개 상태는 설정 `mirboard.onecard.status`, 기본 `AVAILABLE`, D-131).
 
 ### 4.4 봇 / 타임아웃 스케줄러
 

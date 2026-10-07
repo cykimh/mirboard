@@ -91,7 +91,7 @@ Object>` 로 우회했고, 부수 효과로 액션 역직렬화와 Redis 직렬�
 적어 뒀습니다: 칩 정산은 "어느 팀이 이겼는가"에 묶여 있어, 방금 포트에서 뺀 팀 개념을
 도로 끌어올려야 합니다.
 
-`코드:` `domain/game/core/GameEngine.java`(149줄) · `infra/ws/GameEngineProvider.java` ·
+`코드:` `domain/game/core/GameEngine.java`(149줄 — 스컬킹을 붙인 시점(D-102), D-131 기준 184줄은 §8) · `infra/ws/GameEngineProvider.java` ·
 `테스트:` `TichuGameEngine*Test` · `결정:` D-98
 
 ---
@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1288건 중 1086건(84%)이 Docker 불필요**합니다.
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1327건 중 1121건(84%)이 Docker 불필요**합니다(D-131 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -245,9 +245,8 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 
 ## §7 남은 것 — 스스로 공개하는 부채
 
-포트가 **완성됐다고 주장하지 않습니다.** 두 번째 게임까지만 검증됐습니다. 세 번째 게임은 원카드로
-정했고(D-123) 아직 구현 전입니다. 원래 후보였던 요트는 `game-port.md` §4 가 "종이 통과도 남은 과제"로
-적어 둔 채 뒤로 밀렸습니다.
+포트가 **완성됐다고 주장하지 않습니다.** 세 번째 게임 원카드가 붙어(§8 — D-131 공개) 검증한 게임이 셋이 됐을 뿐입니다.
+원래 후보였던 요트는 `game-port.md` §4 가 "종이 통과도 남은 과제"로 적어 둔 채 뒤로 밀렸습니다.
 
 - ~~**`MirboardMetrics:33` 의 `.tag("gameType","TICHU")` 하드코딩**~~ — §5 에서 실코드 잔여를
   "2파일"이라고 쓴 이유입니다. 칩 정산과 달리 이건 문서화된 예외가 아니라 잔재였습니다.
@@ -262,14 +261,59 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 
 ---
 
+## §8 세 번째 게임 — 시간이 흐르는 게임 (원카드, D-123~D-131)
+
+**문제** — 원카드의 "원카드!/잡기!"는 **아무도 행동하지 않아도** 상태가 바뀝니다. 1장 남은 순간 서버가 경쟁 창을 열고,
+봇은 추첨한 반응 시간에 누르고, 아무도 안 누르면 창이 저절로 닫힙니다. 포트는 "누가 행동하면 상태가 바뀐다"만 말할 수
+있었습니다 — 시간은 인프라(턴 타임아웃)의 것이었고, 게임은 `timeoutAction` 으로 "무엇을"만 답했습니다.
+
+**후보와 배제**
+
+- 시스템 전이를 액션(`CloseRace`)으로 — 액션 계층은 클라 JSON 에서 역직렬화되므로 **클라가 창 닫기를 위조**할 수 있다.
+- 게임이 자기 스케줄러를 소유 — 인프라를 우회해 다중 인스턴스 인계(D-96 데드라인 큐)·세대 가드·IN_GAME 가드를 다시 만든다.
+- **선택: 포트에 `timer(state)`/`onTimer(state)`**(기본 없음 — 티츄·스컬킹 0줄). 무장은 이미 액션·봇·타임아웃·탈주·라운드
+  시작 5곳이 부르는 `onTurnAdvanced` 에 얹어 **호출 지점이 늘지 않았고**, 발화는 턴 타임아웃과 같은 가드를 공유합니다.
+
+**결과** — 서버 통합 머지(`36d99e0`)에서 바뀐 공용 코드는 포트 `GameEngine.java` 와 인프라 3파일(`EngineTimerScheduler` 신규,
+`TurnTimeoutScheduler` 무장 한 곳, `DeadlineQueue`)뿐입니다. 비공개 손패 이벤트의 순번 문제는 티츄 결함 수정(D-126)이 같은 포트
+확장(`GameEvent.sequenced()`)을 먼저 들여와 원카드는 재정의만 했습니다. 클라 머지(`27910d1`)는 37파일 +4,948/−45 인데 공용 파일은
+`RoomPage`(게임판 분기)·게임 id 매핑 두 곳(튜토리얼·위키 링크 각 한 항목)·CSS 진입점(`@import` 와 `17-responsive` 의 터치 하한)·좌석
+순서 공용화뿐이고(원카드 전용 신규 파일 `types/onecard.ts`·`19-onecard-table.css` 와 테스트는 빼고) `useStompRoom` 은 0줄입니다.
+
+- `grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra` → **0건**.
+- 포트 `domain/game/core` 515줄(그중 `GameEngine.java` 184줄) 뒤에 티츄 6,009줄 · 스컬킹 3,766줄 · 원카드 2,612줄
+  (`wc -l`, D-131 기준 — 부록 (8). §5 의 수치는 스컬킹을 붙인 시점).
+
+**대가 — 시간은 인프라의 가정을 건드렸습니다.** "포트 확장 1건"은 맞지만, 처음으로 *시간에 기대는* 게임이 붙자 기존 가정 셋이
+드러났습니다.
+
+1. **세대 번호는 "상태 무변경"을 보장하지 않는다**(S3 최종 리뷰). 진행 경로가 락을 푼 뒤에 세대를 올려 그 틈에 만기된 옛 타이머가
+   가드를 통과했습니다 → 발화 쪽이 락 안에서 `timer(state)` 를 다시 묻는 것이 마지막 방어선입니다(D-128).
+2. **메모리의 봇 루프와 유실될 수 있는 타이머에만 기대면 멈춘다**(D-130). 재기동 뒤 봇 차례에서 매치가 영구 정지하는 결함은
+   티츄·스컬킹에도 있었지만, 경쟁 창은 타이머가 한 번 사라지면 영원히 열려 있어 드러났습니다 → 클라가 판을 다시 볼 때의 진행 킥.
+3. **resync 와 재무장의 순서**(D-131). 턴 카운트다운을 위해 resync 에 남은 턴 시간을 싣자, 상태는 락 안에서 읽는데 다음 턴
+   데드라인은 락을 푼 뒤에 걸려 **새 상태 + 이전 턴의 남은 시간**이 나갈 수 있었습니다 → 락을 쥔 진행 경로의 재무장을 락 안으로.
+   덤으로 1번의 틈도 그 경로에서는 닫혔습니다.
+
+셋 다 게임 중립으로 고쳤고(인프라에 게임 이름 0), 티츄·스컬킹도 같은 수정의 덕을 봅니다. 두 번째 게임이 계약의 **모양**
+(2치 → 3치)을 고쳤다면 세 번째 게임은 인프라의 **시간 모델**을 고쳤습니다.
+
+`코드:` `domain/game/core/GameEngine.java`(`timer`·`onTimer`) · `infra/bot/EngineTimerScheduler.java` · `infra/bot/GameProgressKick.java` ·
+`infra/bot/TurnTimeoutScheduler.java`(`turnRemaining`) · `테스트:` `EngineTimerSchedulerTest` · `OneCardRaceIT`(경쟁 창 서버 경로) ·
+`GameProgressKickScenarioTest` · `TurnRemainingTest` · `결정:` D-123 · D-126 · D-128 · D-130 · D-131
+
+---
+
 ## 부록 — 재현 명령
 
 ```bash
 # (1) 인프라가 두 번째 게임의 이름을 아는가
 grep -rniE 'skullking' server/src/main/java/com/mirboard/infra   # → 0건
 
-# (2) 인프라의 티츄 잔여 참조 → 6파일 11행, 그중 실코드 2파일 6행
+# (2) 인프라의 티츄 잔여 참조 → 스컬킹 통합 시점 6파일 11행, 그중 실코드 2파일 6행
 #     (-i 필수: MirboardMetrics 는 대문자 문자열 "TICHU" 라 대소문자 구분 grep 이 놓친다)
+#     D-131 시점 → 7파일 16행, 실코드 2파일 6행: RoomChipService 5행(문서화된 예외) + UserController 의
+#     LEGACY_GAME="TICHU" 1행(D-115 구 클라 호환). MirboardMetrics 의 하드코딩은 D-107 에서 해소돼 javadoc 만 남았다
 grep -rniE 'tichu' server/src/main/java/com/mirboard/infra --include='*.java'
 
 # (3) 스컬킹 통합에서 실제로 바뀐 파일
@@ -280,8 +324,35 @@ git diff --stat d1c5ca1^ 95b4bc6 -- client/src | tail -1
 
 # (5) 룰 테스트는 Docker 없이 돈다
 ./scripts/check.sh rules
+
+# (6) 서버 테스트 수·Docker 불필요 비율(§3). check.sh server 는 빌드 캐시로 FROM-CACHE 에 끝나 실측이 안 될 수 있어 --rerun.
+#     클래스는 XML 파일 이름의 바깥 클래스로 센다 — @DisplayName 을 단 @Nested 는 스위트 이름이 표시 이름이 된다.
+./gradlew :server:test --rerun
+python3 - <<'EOF'
+import glob, os, re, xml.etree.ElementTree as ET
+t = s = f = d = 0
+for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
+    r = ET.parse(p).getroot(); n = int(r.get('tests'))
+    outer = os.path.basename(p)[5:-4].split('$')[0]
+    t += n; s += int(r.get('skipped')); f += int(r.get('failures')) + int(r.get('errors'))
+    if not re.search(r'(IT|IntegrationTest)$', outer): d += n
+print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
+EOF
+# → tests=1327 skipped=5 failed=0 dockerfree=1121 (84%)   (D-131 시점)
+
+# (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
+grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
+git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/infra server/src/main/java/com/mirboard/domain/game/core
+git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
+git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
+
+# (8) 포트 뒤 게임별 코드 규모(§8) — main 소스 줄 수
+for d in core tichu skullking onecard; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
+# → core 515 · tichu 6009 · skullking 3766 · onecard 2612, GameEngine.java 184   (D-131 시점)
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·
 [rules-skullking.md](rules-skullking.md)(룰 ↔ 코드 1:1) ·
-[decisions.md](decisions.md)(D-97 ~ D-104)
+[rules-onecard.md](rules-onecard.md) · [plans/onecard.md](plans/onecard.md)(세 번째 게임 설계·단계) ·
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131)

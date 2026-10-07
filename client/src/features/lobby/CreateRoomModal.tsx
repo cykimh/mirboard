@@ -85,8 +85,8 @@ export function CreateRoomModal({
           (_, i) => game.minPlayers + i,
         )
       : [];
-  // D-130 — 게임이 선언한 인원을 처음 선택으로(원카드 4, 나머지는 maxPlayers). 서버의 capacity 생략 기본(maxPlayers)과
-  // 다를 수 있지만 인원 가변 게임에서는 늘 capacity 를 보내므로 실제로 갈리지 않는다.
+  // D-130 — 게임이 선언한 인원을 처음 선택으로(원카드 4, 나머지는 maxPlayers). D-131 — 서버의 capacity 생략 기본도 같은
+  // 선언값이라(RoomService) 모달과 인원을 뺀 요청이 같은 방을 연다.
   const selectedSeats = capacity ?? game?.defaultPlayers ?? game?.maxPlayers ?? 0;
   // D-130 — 턴 제한도 게임이 선언한 값이 처음 선택이다(원카드 30초 — 자리 비운 사람이 판을 멈추지 않게, 나머지는 끔).
   const selectedTurnSeconds = turnSeconds ?? game?.defaultTurnSeconds ?? 0;

@@ -36,7 +36,7 @@ import org.springframework.stereotype.Controller;
  *   <li>{@link GameEngine#apply} 호출 — 검증/룰 적용.</li>
  *   <li>새 상태 저장 + {@link MatchProgressService#advance} 로 라운드/매치 진행 →
  *       발생 이벤트들을 {@link GameEventBroadcaster} 로 한 번에 분기 발행.</li>
- *   <li>락 해제 후 봇/타임아웃 재스케줄.</li>
+ *   <li>다음 턴 데드라인 재무장(락 안, D-131) → 락 해제 후 봇 재스케줄.</li>
  * </ol>
  *
  * <p>D-98: 과거 {@code @Payload TichuAction} 으로 타입이 고정돼 있어 티츄 외의 게임은
@@ -182,13 +182,21 @@ public class GameStompController {
             matchProgress.advance(engine, room, result.newState(), outbound);
 
             broadcaster.broadcast(roomId, outbound, room.playerIds());
+            // Phase 13D — 다음 턴 타임아웃 타이머 (re)스케줄 (turnSeconds=0 이면 취소만).
+            // D-131 — 락을 풀기 전에 건다. resync 는 같은 락 안에서 상태와 남은 턴 시간을 함께 읽으므로, 락을 푼 뒤에
+            // 걸면 그 틈(락을 기다리던 resync 가 곧바로 들어오는 자리)에서 새 상태 + 이전 턴의 남은 시간이 나갔다.
+            // 실패해도(Redis 순간 장애) 액션은 이미 저장·방송됐다 — 잡아서 아래 봇 루프 스케줄을 건너뛰지 않는다(탈주 계속
+            // 경로와 같다). 던지게 두면 봇 차례로 넘어간 판이 다음 resync·구독 전까지 멈췄다.
+            try {
+                turnTimeout.onTurnAdvanced(roomId);
+            } catch (RuntimeException e) {
+                log.error("Turn rearm after action failed: roomId={} err={}", roomId, e.toString(), e);
+            }
         } finally {
             lock.release(roomId);
         }
-        // 락 해제 후 봇 차례면 비동기로 봇 액션 트리거.
+        // 락 해제 후 봇 차례면 비동기로 봇 액션 트리거(쥔 채 걸면 루프가 이 락과 부딪쳐 재시도한다).
         botScheduler.scheduleBots(roomId);
-        // Phase 13D — 다음 턴 타임아웃 타이머 (re)스케줄 (turnSeconds=0 이면 no-op).
-        turnTimeout.onTurnAdvanced(roomId);
     }
 
     /** 지금 방 상태. 방이 사라졌으면 null. */

@@ -80,13 +80,15 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/auth/
 ```bash
 # 카탈로그 조회 (인증 필요)
 curl -s http://localhost:8080/api/games -H "Authorization: Bearer $TOKEN"
-# → {"games":[{"id":"TICHU","displayName":"티츄",
-#              "shortDescription":"4인 파트너 카드 게임. 56장 덱과 4장의 특수 카드...",
-#              "minPlayers":4,"maxPlayers":4,"status":"AVAILABLE"},
-#             {"id":"SKULL_KING","displayName":"스컬킹",
+# → {"games":[{"id":"SKULL_KING","displayName":"스컬킹",
 #              "shortDescription":"2~8인 트릭테이킹. 매 라운드 자기 승수를 예측하고...",
-#              "minPlayers":2,"maxPlayers":8,"status":"AVAILABLE"}]}
-# 순서는 보장하지 않는다 — GameRegistry 가 GameDefinition Bean 을 모아 만든다.
+#              "minPlayers":2,"maxPlayers":8,"status":"AVAILABLE", ...},
+#             {"id":"ONE_CARD","displayName":"원카드",
+#              "minPlayers":2,"maxPlayers":6,"status":"AVAILABLE","defaultPlayers":4,"defaultTurnSeconds":30, ...},
+#             {"id":"TICHU","displayName":"티츄",
+#              "shortDescription":"4인 파트너 카드 게임. 56장 덱과 4장의 특수 카드...",
+#              "minPlayers":4,"maxPlayers":4,"status":"AVAILABLE", ...}]}
+# 정렬은 상태 → 표시 이름(가나다) — GameRegistry 가 GameDefinition Bean 을 모아 만든다(필드 전체는 docs/api.md).
 
 # 단일 게임
 curl -s http://localhost:8080/api/games/TICHU -H "Authorization: Bearer $TOKEN"
@@ -225,14 +227,13 @@ npm --prefix client run dev
 복귀 → `useStompRoom` 이 `/resync` 호출 → 게임 상태 (TableView + 본인 손패) 즉시
 복원. 다른 플레이어 상태는 변하지 않음.
 
-## 원카드 게임판 확인 (D-129)
+## 원카드 게임판 확인 (D-129·D-131)
 
-카탈로그 열림 전환 전에도 로컬에서는 환경 변수로 켜서 볼 수 있다 — `MIRBOARD_ONECARD_STATUS=AVAILABLE ./gradlew :server:bootRun`.
-경쟁 버튼을 눈으로 보려면 같은 줄에 창 길이와 봇 반응 구간(주인·잡는 쪽의 최소·최대 4개)을 늘려 얹는다. 설정 파일은 만들지
-않는다 — `.gitignore` 밖에 두면 `git add -A` 에 딸려 간다.
+D-131 부터 원카드는 기본 공개(`AVAILABLE`)라 그냥 `./gradlew :server:bootRun` 으로 보인다. 경쟁 버튼을 눈으로 보려면 창 길이와
+봇 반응 구간(주인·잡는 쪽의 최소·최대 4개)을 늘려 얹는다. 설정 파일은 만들지 않는다 — `.gitignore` 밖에 두면 `git add -A` 에
+딸려 간다.
 
 ```bash
-MIRBOARD_ONECARD_STATUS=AVAILABLE \
 MIRBOARD_ONECARD_RACE_WINDOW_MILLIS=20000 \
 MIRBOARD_ONECARD_BOT_REACTION_OWNER_MIN_MILLIS=18000 \
 MIRBOARD_ONECARD_BOT_REACTION_OWNER_MAX_MILLIS=19000 \
@@ -256,7 +257,16 @@ MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MAX_MILLIS=19000 \
 6. 모바일 폭(375px)과 라이트 테마에서 가로 스크롤 없이 손패가 여러 줄로 감기고, 헤더 버튼이 44px 인지 본다. 조커·경쟁 버튼·
    내기/먹기에 마우스를 올려도(모바일은 탭한 뒤) 글자와 면이 읽히고, 비활성 "내 차례 아님" 라벨도 읽힌다.
 7. 브라우저 개발자 도구 네트워크: 카드를 내거나 먹어도 `/resync` 가 다시 불리지 않는다(입장·재연결·탭 복귀(`visibilitychange`·
-   `online`) 때만, D-129).
+   `online`) 때만, D-129 — 해소 이벤트가 끝내 안 오는 창의 창당 1회는 예외, D-130).
+8. **방 만들기 처음 선택 되돌림(D-130)**: 새 방 만들기에서 티츄 → 턴 제한 60초 → 원카드로 바꾸면 인원 4·턴 30초, 다시
+   스컬킹으로 바꾸면 인원 8·턴 '끔'으로 보인다(자동 테스트 `CreateRoomModal.test.tsx` 도 있다).
+9. **턴 카운트다운(D-131)**: 턴 30초 방(원카드 기본)에서 가운데 "○○ 차례" 옆에 `⏱ N초`가 1초씩 준다. 5초 이하면 빨간 테두리·
+   배경으로 바뀌고 0초에서 멈춘 뒤 곧 자동 먹기(`CARDS_DRAWN`)와 다음 차례로 다시 30초가 된다. 누군가 1장이 되어 경쟁 버튼이
+   뜬 동안은 카운트다운이 사라지고, 창이 닫힌 뒤 다음 차례부터 30초로 다시 센다. 내 차례 중간에 새로고침(F5)해도 30초로 돌아가지
+   않고 남은 시간에서 이어진다(resync `turnRemainingMs`). 턴 제한 '끔'으로 만든 방에서는 보이지 않는다. 스크린리더가 매초 읽지
+   않는다(`aria-live="off"`).
+10. **경쟁 버튼·늦은 누름**: 4 의 "늦었어요"는 빨간 오류 줄 없이 잠깐만 뜨고, 버튼에 마우스를 올려도(모바일은 탭한 뒤) 글자가
+   읽힌다(전역 `button:hover` 배경에 덮이지 않는지 — 라이트·다크 둘 다).
 
 ## 분산 시연 (멀티 인스턴스, Phase 6D)
 
@@ -358,8 +368,9 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 1. 새 시크릿 창(빈 localStorage)으로 로그인 → 미르보드카페.
 2. **기대**: 허브에서는 튜토리얼이 **자동으로 뜨지 않는다**. 헤더에 '게임 방법' 버튼이 없고,
-   티츄·스컬킹 게임 카드마다 '게임 방법' 버튼이 있다(튜토리얼이 없는 게임 카드에는 없음).
-3. 스컬킹 카드 '게임 방법' → 스컬킹 13단계, 티츄 카드 → 티츄 9단계가 열린다. 닫는다.
+   티츄·스컬킹·원카드 게임 카드 3장 모두에 '게임 방법' 버튼이 있다(튜토리얼이 없는 게임 카드에는 없음).
+3. 스컬킹 카드 '게임 방법' → 스컬킹 13단계, 티츄 카드 → 티츄 9단계, 원카드 카드 → 원카드 12단계(퀴즈·반응 연습 포함)가
+   열린다. 닫는다.
 4. 다른 시크릿 창(빈 localStorage)으로 스컬킹 방을 만들거나 입장 → **대기실 첫 입장에 스컬킹
    튜토리얼이 1회 자동으로 뜬다**. 닫고(✕ 또는 마지막 '시작하기') 나갔다 다시 들어오면 안 뜬다.
    대기실 헤더 '게임 방법' 으로는 언제든 다시 연다.

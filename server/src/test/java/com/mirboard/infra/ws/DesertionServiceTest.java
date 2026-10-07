@@ -5,20 +5,26 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.testsupport.LogCapture;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.springframework.dao.QueryTimeoutException;
 
 /**
  * D-98 이후 본 서비스는 게임을 모른다 — 여기서 검증하는 것은 <b>인프라 절차</b>다:
@@ -110,6 +116,59 @@ class DesertionServiceTest {
         verify(botScheduler).scheduleBots("r1");
         verify(turnTimeout).onTurnAdvanced("r1");
         verify(lock).release("r1");
+    }
+
+    /**
+     * D-131 — 남은 사람끼리 계속하면 다음 턴 데드라인을 <b>락을 풀기 전에</b> 건다(resync 가 같은 락 안에서 상태와 남은 턴
+     * 시간을 함께 읽는다). 봇 루프는 락을 푼 뒤 — 호출자가 락을 쥔 채 걸면 루프가 이 락과 부딪쳐 재시도한다.
+     */
+    @Test
+    void continued_desertion_rearms_the_turn_inside_the_lock_and_bots_after_it() {
+        List<Long> players = List.of(10L, 20L, 30L, 40L);
+        when(bots.isBot(10L)).thenReturn(false);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(inGame(players));
+        when(engines.forRoom(any())).thenReturn(engine);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_CONTINUES);
+
+        service.processDesertion("r1", 10L);
+
+        InOrder order = inOrder(broadcaster, turnTimeout, lock, botScheduler);
+        order.verify(broadcaster).broadcast(eq("r1"), any(), eq(players));
+        order.verify(turnTimeout).onTurnAdvanced("r1");
+        order.verify(lock).release("r1");
+        order.verify(botScheduler).scheduleBots("r1");
+    }
+
+    /**
+     * D-131 — 락 안의 턴 재무장이 던져도(Redis 순간 장애) 락을 푼 뒤의 봇 루프 재무장을 건너뛰지 않고, 이미 저장·방송된
+     * 탈주를 처리 실패(false·"Desertion processing error")로 남기지 않는다. 잡지 않으면 남은 사람끼리 계속하는 판이 봇 차례에서
+     * 멈췄다(호출자는 false 를 받아도 D-122 가드로 좌석을 그대로 둔다 — 진행 중 매치라서).
+     */
+    @Test
+    void a_failed_turn_rearm_after_a_continued_desertion_still_schedules_bots_and_counts_as_processed() {
+        List<Long> players = List.of(10L, 20L, 30L, 40L);
+        when(bots.isBot(10L)).thenReturn(false);
+        when(lock.acquireWaiting("r1")).thenReturn(true);
+        when(roomService.getRoom("r1")).thenReturn(inGame(players));
+        when(engines.forRoom(any())).thenReturn(engine);
+        when(engine.desert(eq(0), eq(10L), any()))
+                .thenReturn(GameEngine.DesertOutcome.MATCH_CONTINUES);
+        doThrow(new QueryTimeoutException("redis blip")).when(turnTimeout).onTurnAdvanced("r1");
+
+        try (LogCapture logs = LogCapture.of(DesertionService.class)) {
+            boolean processed = service.processDesertion("r1", 10L);
+
+            assertThat(processed).isTrue();
+            verify(lock).release("r1");
+            verify(botScheduler).scheduleBots("r1");
+            assertThat(logs.events()).anySatisfy(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getFormattedMessage()).contains("Turn rearm after desertion failed");
+                assertThat(event.getThrowableProxy()).isNotNull();
+            });
+        }
     }
 
     /** 엔진이 탈주로 보지 않으면(티츄: 리매치 대기 방, D-82) 매치를 건드리지 않는다. */

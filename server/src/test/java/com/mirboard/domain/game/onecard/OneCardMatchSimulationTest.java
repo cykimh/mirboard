@@ -140,6 +140,18 @@ class OneCardMatchSimulationTest {
         mirror.apply(events);
         mirror.assertMatches(state);
 
+        // D-131 — 클라 턴 시계 모델(onecardStore turnClock). 서버는 성공한 전이마다 턴 데드라인을 처음부터 다시 건다(기다리는
+        // 좌석이 없으면 걸려 있어도 발화해 봐야 아무 일이 없다). 클라는 그 순간을 TURN_CHANGED 또는 투영 차례가 있는(≥0)
+        // PLAYER_ELIMINATED 로만 알고, 카드·창·종료에서 세기를 멈춘다. 기다리는 좌석이 남는 전이가 다시 셀 이벤트를 내지
+        // 않으면 서버는 다시 걸었는데 클라는 줄어든 값을 계속 센다 — 같은 좌석으로 이어지는 전이라면 위의 차례 대조는 그대로
+        // 통과한다(최종 리뷰 F-client-5). 거꾸로 기다리는 좌석이 없으면 클라도 세지 않아야 한다.
+        boolean waiting = !engine.pendingSeats(state).isEmpty();
+        EventMirror.Clock clock = mirror.clock();
+        if (waiting ? clock != EventMirror.Clock.RESTARTED : clock != EventMirror.Clock.NONE) {
+            throw new AssertionError("기다리는 좌석 " + engine.pendingSeats(state) + " 인데 클라 턴 시계가 " + clock
+                    + " 다(다시 셀 이벤트: TurnChanged·차례 있는 PlayerEliminated): " + events);
+        }
+
         // 엔진 타이머는 경쟁 창이 열린 동안에만 있다(설계서 §4.5).
         if (engine.timerDeadline(state).isPresent() != (state.race() != null)) {
             throw new AssertionError("timerDeadline " + engine.timerDeadline(state) + " but race=" + state.race());
@@ -178,6 +190,12 @@ class OneCardMatchSimulationTest {
         private int openRaceOwner = -1;
         private int lastRaceId = -1;
         private MatchEnded matchEnded;
+        /** 클라 턴 시계의 투영 — 세지 않음 / 이전 전이에서 다시 센 것을 이어 셈 / 이번 전이에서 다시 셈. */
+        enum Clock { NONE, CARRIED, RESTARTED }
+
+        private Clock clock = Clock.NONE;
+        /** 클라 스토어의 차례 — 엔진 상태와 달리 CARD_PLAYED 가 바로 −1 로 비운다(다음 차례 이벤트까지). */
+        private int clientTurnSeat = -1;
 
         EventMirror(int seatCount) {
             handCounts = new int[seatCount];
@@ -192,8 +210,15 @@ class OneCardMatchSimulationTest {
             return new AssertionError(what + ": 이벤트로 그린 값 " + projected + " ≠ 상태 " + actual);
         }
 
+        Clock clock() {
+            return clock;
+        }
+
         void apply(List<OneCardEvent> events) {
             Arrays.fill(versionInTransition, -1);
+            if (clock == Clock.RESTARTED) {
+                clock = Clock.CARRIED;
+            }
             for (int i = 0; i < events.size(); i++) {
                 OneCardEvent event = events.get(i);
                 if (matchEnded != null) {
@@ -213,6 +238,7 @@ class OneCardMatchSimulationTest {
                         drawPileCount = started.drawPileCount();
                         top = started.startCard();
                         turnSeat = started.firstSeat();
+                        clientTurnSeat = started.firstSeat();
                         direction = 1;
                         attackStack = 0;
                         declaredSuit = null;
@@ -220,6 +246,8 @@ class OneCardMatchSimulationTest {
                     case HandDealt dealt -> receiveHand(dealt.seat(), dealt.hand(), dealt.handVersion());
                     case HandUpdated updated -> receiveHand(updated.seat(), updated.hand(), updated.handVersion());
                     case CardPlayed played -> {
+                        clientTurnSeat = -1;
+                        clock = Clock.NONE;
                         handCounts[played.seat()] = played.handCount();
                         top = played.card();
                         declaredSuit = played.declaredSuit();
@@ -235,6 +263,8 @@ class OneCardMatchSimulationTest {
                         turnSeat = changed.seat();
                         direction = changed.direction();
                         attackStack = changed.attackStack();
+                        clientTurnSeat = changed.seat();
+                        clock = Clock.RESTARTED;
                     }
                     case RaceOpened opened -> {
                         if (openRaceId != -1) {
@@ -247,12 +277,18 @@ class OneCardMatchSimulationTest {
                         openRaceOwner = opened.ownerSeat();
                         lastRaceId = opened.raceId();
                         turnSeat = -1;
+                        clientTurnSeat = -1;
+                        clock = Clock.NONE;
                     }
                     case RaceResolved resolved -> {
                         resolveRace(resolved);
                         openRaceId = -1;
                     }
                     case PlayerEliminated out -> {
+                        // 클라는 차례가 정해져 있을 때만(카드 직후·경쟁 창이 아닐 때) 탈락에서 다시 센다(onecardStore).
+                        if (clientTurnSeat >= 0) {
+                            clock = Clock.RESTARTED;
+                        }
                         handCounts[out.seat()] = 0;
                         eliminated.add(out.seat());
                         drawPileCount = out.drawPileCount();
@@ -263,6 +299,8 @@ class OneCardMatchSimulationTest {
                         }
                         matchEnded = end;
                         turnSeat = -1;
+                        clientTurnSeat = -1;
+                        clock = Clock.NONE;
                     }
                 }
             }

@@ -86,10 +86,10 @@ class RoomCapacityIntegrationTest {
     }
 
     @Test
-    void variable_game_without_capacity_defaults_to_max_players() throws Exception {
+    void variable_game_without_capacity_defaults_to_declared_players() throws Exception {
         String token = registerAndLogin("cap_default_user", "validpass1");
 
-        // 현행 호환 — capacity 미지정이면 def.maxPlayers().
+        // D-131 — capacity 미지정이면 게임 선언 def.defaultPlayers()(스컬킹은 최대 8 과 같다 — 예전 생략 기본 그대로).
         mockMvc.perform(create(token, Map.of(
                         "name", "기본 인원 방", "gameType", VARIABLE_GAME)))
                 .andExpect(status().isCreated())

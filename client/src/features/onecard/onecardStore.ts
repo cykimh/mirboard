@@ -42,6 +42,17 @@ export interface LastRace {
 
 export type PressAction = 'CALL_ONE_CARD' | 'CATCH';
 
+/**
+ * D-131 — 턴 카운트다운의 기준. 서버가 턴 데드라인을 다시 거는 순간의 공개 이벤트(`TURN_CHANGED`·`PLAYER_ELIMINATED`)에서
+ * "지금부터 한 턴 전체"로, resync 에서는 서버가 알려 준 남은 시간으로 잡는다. 표시 쪽이 방의 턴 제한으로 마감 시각을 계산한다.
+ */
+export interface TurnClock {
+  /** 이 클라 시계로 기준을 잡은 시각(ms). */
+  since: number;
+  /** 그때 남은 시간(ms). null 이면 한 턴 전체(방의 턴 제한) — 서버가 바로 그 순간 데드라인을 처음부터 다시 걸었다. */
+  remainingMs: number | null;
+}
+
 /** 내가 보낸 누름 — 응답(창 해소·거절)을 기다리는 동안만 있다. */
 export interface PendingPress {
   raceId: number;
@@ -104,7 +115,11 @@ export interface OneCardRoomState {
   // ── 메타 ──
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
-  turnStartedAt: number;
+  /**
+   * D-131 — 턴 카운트다운 기준. null 이면 세지 않는다 — 경쟁 창이 열렸거나(다음 차례는 창이 닫힌 뒤 시작된다) 카드가 막 놓였거나
+   * (다음 차례 미정) 매치가 끝났거나 서버가 남은 시간을 주지 않았다(턴 제한 끔·데드라인 없음).
+   */
+  turnClock: TurnClock | null;
 }
 
 export interface OneCardActions {
@@ -158,7 +173,7 @@ const INITIAL: OneCardRoomState = {
   resyncNonce: 0,
   disconnectedSeats: new Set(),
   errorMessage: null,
-  turnStartedAt: 0,
+  turnClock: null,
 };
 
 /** 좌석 하나만 갱신한 새 배열. */
@@ -249,7 +264,11 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
       press: null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
-      turnStartedAt: Date.now(),
+      // D-131 — 서버가 아는 남은 시간이 기준이다(재접속 직후에도 맞다). 없으면 세지 않는다.
+      turnClock:
+        typeof snap.turnRemainingMs === 'number'
+          ? { since: Date.now(), remainingMs: snap.turnRemainingMs }
+          : null,
     });
   },
 
@@ -293,8 +312,9 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           attackStack: p.attackStack,
           direction: p.direction,
           seats: patchSeat(state.seats, p.seat, { handCount: p.handCount }),
-          // 다음 차례는 TURN_CHANGED(또는 경쟁 창)가 정한다 — 그 사이 '내 차례'를 잘못 세우지 않는다.
+          // 다음 차례는 TURN_CHANGED(또는 경쟁 창)가 정한다 — 그 사이 '내 차례'를 잘못 세우지 않는다. 카운트다운도 멈춘다.
           turnSeat: -1,
+          turnClock: null,
           lastRace: null,
           // 경쟁 중에는 내기가 막혀 있어(requireTurn) 카드는 항상 창이 닫힌 뒤에 놓인다 — 거절이 끝내 안 온 진 누름이
           // 남아 있다면 여기서 정리한다(안 하면 내 카드 내기의 BUSY 가 "늦었어요"로 잘못 읽힌다).
@@ -326,7 +346,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           turnSeat: p.seat,
           direction: p.direction,
           attackStack: p.attackStack,
-          turnStartedAt: Date.now(),
+          // D-131 — 서버는 이 이벤트를 낸 진행 직후(같은 락 안) 턴 데드라인을 처음부터 다시 건다.
+          turnClock: { since: Date.now(), remainingMs: null },
           // 매 플레이 resync 가 지워 주던 거절 문구를 차례가 바뀔 때 지운다(D-126 의 티츄와 같은 처리).
           errorMessage: null,
         });
@@ -339,6 +360,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           phase: 'RACE',
           race: toClientRace(p, p.windowMillis),
           turnSeat: -1,
+          // D-131 — 창이 열린 동안 다음 차례는 멈춰 있다(§4.4 — 기다리는 좌석 없음). 창이 닫히면 TURN_CHANGED 가 다시 센다.
+          turnClock: null,
           lastRace: null,
           press: null,
           raceNotice: null,
@@ -375,13 +398,19 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           // 탈락자 손패는 뽑을 더미 맨 아래로 간다(§10) — 장수는 0, 더미 장수는 최종값.
           seats: patchSeat(state.seats, p.seat, { eliminated: p.reason, handCount: 0 }),
           drawPileCount: p.drawPileCount,
+          // D-131 — 탈락(탈주·파산) 처리 뒤 서버는 지금 차례의 턴 데드라인을 처음부터 다시 건다 — 차례가 그대로여도(다른
+          // 사람이 나갔다). 차례가 정해지지 않았으면(−1 — 카드 직후·경쟁 창) 세지 않는다. 창이 열리면 서버가 turnSeat 를 −1 로
+          // 두고, 창이 열린 채 나가면 해소(취소)를 탈락보다 먼저 보내므로 창 여부는 따로 볼 필요가 없다(다음 TURN_CHANGED 가 센다).
+          ...(state.turnSeat >= 0
+            ? { turnClock: { since: Date.now(), remainingMs: null } }
+            : {}),
         });
         return 'applied';
       }
 
       case 'MATCH_ENDED': {
         const p = payload as MatchEndedPayload;
-        set({ phase: 'ENDED', result: p, turnSeat: -1, race: null, press: null });
+        set({ phase: 'ENDED', result: p, turnSeat: -1, race: null, press: null, turnClock: null });
         return 'applied';
       }
 

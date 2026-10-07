@@ -283,8 +283,14 @@ public class BotScheduler {
         List<GameEvent> outbound = new ArrayList<>(result.events());
         matchProgress.advance(engine, room, result.newState(), outbound);
         broadcaster.broadcast(roomId, outbound, room.playerIds());
-        // Phase 13D — 봇 액션 후에도 다음 턴 타임아웃 (re)스케줄 (인간 차례면 카운트 시작).
-        turnTimeout.onTurnAdvanced(roomId);
+        // Phase 13D — 봇 액션 후에도 다음 턴 타임아웃 (re)스케줄 (인간 차례면 카운트 시작). 락 안이다(D-131).
+        // 실패해도(Redis 순간 장애) 봇 수는 이미 저장·방송됐다 — 잡아서 재귀(다음 봇 수)를 건너뛰지 않는다. 던지게 두면
+        // runRoom 의 catch 가 루프를 끝내 다음 차례가 봇인 방이 다음 resync·구독 킥까지 멈췄다(컨트롤러·탈주 계속과 같은 규칙).
+        try {
+            turnTimeout.onTurnAdvanced(roomId);
+        } catch (RuntimeException e) {
+            log.error("Turn rearm after bot action failed: roomId={} err={}", roomId, e.toString(), e);
+        }
         log.debug("Bot action applied: roomId={} seat={} action={} eventsCount={}",
                 roomId, seat, action.getClass().getSimpleName(), outbound.size());
     }

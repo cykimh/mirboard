@@ -15,6 +15,7 @@ import { ELIMINATED_LABEL, OneCardSeat, seatAccent } from './OneCardSeat';
 import { OneCardCenter, raceResultText } from './OneCardCenter';
 import { OneCardHand } from './OneCardHand';
 import { OneCardMatchEnd } from './OneCardMatchEnd';
+import { OneCardTurnCountdown } from './OneCardTurnCountdown';
 import { RaceButton } from './RaceButton';
 import { ONE_CARD_TUTORIAL } from './tutorial/onecardTutorial';
 
@@ -249,6 +250,8 @@ export function OneCardTable({
         lastRace={s.lastRace}
         late={s.raceNotice === 'LATE'}
         nameOf={nameOf}
+        // D-131 — 서버 남은 시간 기준 카운트다운. 방이 끝났으면(강제 종료 — 결과 없음) 세지 않는다.
+        countdown={roomFinished ? null : <OneCardTurnCountdown turnSeconds={turnSeconds} />}
       />
 
       {s.result && (

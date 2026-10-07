@@ -310,13 +310,26 @@ public final class SkullKingGameEngine implements GameEngine {
      * 완주 라운드 수·승자는 엔진이 정한 값을 그대로 쓴다(조기 종료 계산을 여기서 반복하지
      * 않는다). 로컬 발행만(D-116) — 각 인스턴스가 다시 기록하면 같은
      * 매치가 중복으로 남는다.
+     *
+     * <p>D-131 — 기록기({@code SkullKingMatchRecorder})는 동기 리스너(@Transactional)라 DB 장애가 여기로 올라온다. 그대로
+     * 던지면 호출한 진행 경로(컨트롤러·봇·타이머·탈주)가 저장 뒤의 방송·FINISHED 전이를 건너뛰어 마지막 {@code ROUND_ENDED}·
+     * {@code MATCH_ENDED} 가 아무에게도 안 가고 방이 IN_GAME 에 남았다(끝난 매치라 진행 킥 대상도 아니다). 원카드(D-130)와
+     * 같이 결과를 실어 ERROR(Sentry)로 남기고 진행은 계속한다. 이 이벤트의 리스너는 기록기 하나뿐이라 발행 지점에서 잡아도
+     * 건너뛸 다른 리스너가 없다(리스너가 둘인 티츄는 기록기가 스스로 삼킨다).
      */
     private void recordIfEnded(List<SkullKingEvent> events, SkullKingMatchState match) {
         for (SkullKingEvent event : events) {
             if (event instanceof SkullKingEvent.MatchEnded ended) {
-                publisher.publishEvent(new SkullKingMatchCompleted(
-                        context.roomId(), context.playerIds(), ended.finalScores(),
-                        ended.winners(), match.desertedSeats(), ended.roundsPlayed()));
+                try {
+                    publisher.publishEvent(new SkullKingMatchCompleted(
+                            context.roomId(), context.playerIds(), ended.finalScores(),
+                            ended.winners(), match.desertedSeats(), ended.roundsPlayed()));
+                } catch (RuntimeException e) {
+                    log.error("SkullKing match record failed, the match still ends: room={} players={} winners={} "
+                                    + "scores={} rounds={} deserted={}",
+                            context.roomId(), context.playerIds(), ended.winners(), ended.finalScores(),
+                            ended.roundsPlayed(), match.desertedSeats(), e);
+                }
             }
         }
     }

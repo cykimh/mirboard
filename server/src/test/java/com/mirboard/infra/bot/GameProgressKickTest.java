@@ -2,13 +2,16 @@ package com.mirboard.infra.bot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -36,8 +39,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -347,6 +353,131 @@ class GameProgressKickTest {
                         .singleElement().satisfies(event -> assertThat(event.getThrowableProxy()).isNotNull());
             }
             verifyNoInteractions(roomService);
+        }
+    }
+
+    /**
+     * D-131 — 같은 방의 킥은 한 번에 하나만 돈다(S5T2-M4). 관전은 로그인한 누구에게나 열려 있어 참가자·관전자 게이트를 지나고
+     * SUBSCRIBE 는 레이트리밋 밖이라, 구독 폭주마다 상태 GET·봇 루프·타이머 확인이 겹쳐 돌았다(킥마다의 가상 스레드와 방 읽기는
+     * 그대로다 — 합치기는 그 뒤의 일만 합친다). 참가 확인을 지난 뒤 같은 방 킥이 돌고 있으면 건너뛴다 — 돌고 있는 킥이 같은 일을
+     * 하고 있다. 끝나면(예외여도) 반드시 빠져 다음 킥이 다시 돈다.
+     */
+    @Nested
+    class Coalescing {
+
+        @Test
+        void a_second_kick_while_one_is_running_for_the_same_room_does_no_work() throws Exception {
+            inGame(List.of(1), 0, List.of(1));
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicInteger loads = new AtomicInteger();
+            // 첫 킥만 상태를 읽는 자리에서 멈춘다 — 그 사이 같은 방 킥이 일을 하면 여기를 그냥 지나간다.
+            when(engine.loadState()).thenAnswer(invocation -> {
+                if (loads.incrementAndGet() == 1) {
+                    entered.countDown();
+                    assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                }
+                return Optional.of(state);
+            });
+            Thread first = Thread.ofVirtual().start(() -> kick.kickNow(ROOM, PLAYER));
+            assertThat(entered.await(5, TimeUnit.SECONDS)).as("첫 킥이 상태를 읽는 중").isTrue();
+
+            kick.kickNow(ROOM, PLAYER);
+            kick.kickNow(ROOM, 20L);
+
+            // 참가 확인(방 읽기)은 하지만 그 뒤의 일 — 엔진·상태·봇 루프 — 은 첫 킥 하나만 한다.
+            verify(engine).loadState();
+            release.countDown();
+            first.join(5_000);
+            assertThat(first.isAlive()).isFalse();
+            verify(bots).scheduleBotsIfIdle(ROOM);
+        }
+
+        /**
+         * 참가 확인을 지난 킥만 진행 중 집합에 든다. 공개 토픽은 로그인한 누구나 구독할 수 있어(SUBSCRIBE 는 레이트리밋 밖)
+         * 슬롯을 참가 확인보다 먼저 잡으면, 비참가자의 킥이 방을 읽는 동안 슬롯을 쥔다 — 그 사이 들어온 참가자의 킥은
+         * 건너뛰어지고 비참가자의 킥은 게이트에서 끝나, 복구(멈춘 봇 루프·사라진 엔진 타이머)가 통째로 빠진다. 슬롯을 앞에
+         * 두는 변이를 이 테스트가 잡는다.
+         */
+        @Test
+        void a_stranger_kick_in_flight_does_not_hold_back_a_participant_kick() throws Exception {
+            inGame(List.of(1), 0, List.of(1));
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicInteger reads = new AtomicInteger();
+            // 첫 방 읽기(비참가자의 킥)만 멈춘다.
+            when(roomService.getRoom(ROOM)).thenAnswer(invocation -> {
+                if (reads.incrementAndGet() == 1) {
+                    entered.countDown();
+                    assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                }
+                return room(RoomStatus.IN_GAME, List.of(1), 0);
+            });
+            Thread stranger = Thread.ofVirtual().start(() -> kick.kickNow(ROOM, 99L));
+            try {
+                assertThat(entered.await(5, TimeUnit.SECONDS)).as("비참가자의 킥이 방을 읽는 중").isTrue();
+
+                kick.kickNow(ROOM, PLAYER);
+
+                verify(engine).loadState();
+                verify(bots).scheduleBotsIfIdle(ROOM);
+            } finally {
+                release.countDown();
+                stranger.join(5_000);
+            }
+            assertThat(stranger.isAlive()).isFalse();
+        }
+
+        @Test
+        void the_next_kick_after_one_finished_runs_again() {
+            inGame(List.of(1), 0, List.of(1));
+
+            kick.kickNow(ROOM, PLAYER);
+            kick.kickNow(ROOM, PLAYER);
+
+            verify(engine, times(2)).loadState();
+            verify(bots, times(2)).scheduleBotsIfIdle(ROOM);
+        }
+
+        @Test
+        void a_kick_that_failed_still_lets_the_next_one_run() {
+            inGame(List.of(1), 0, List.of(1));
+            when(engine.loadState())
+                    .thenThrow(new IllegalStateException("redis blip"))
+                    .thenReturn(Optional.of(state));
+
+            assertThatThrownBy(() -> kick.kickNow(ROOM, PLAYER)).hasMessageContaining("redis blip");
+            kick.kickNow(ROOM, PLAYER);
+
+            verify(engine, times(2)).loadState();
+            verify(bots).scheduleBotsIfIdle(ROOM);
+        }
+
+        @Test
+        void a_running_kick_does_not_hold_back_another_room() throws Exception {
+            inGame(List.of(1), 0, List.of(1));
+            GameEngine otherEngine = mock(GameEngine.class);
+            when(roomService.getRoom("r2")).thenReturn(new Room("r2", "방", "ANY", 10L, RoomStatus.IN_GAME, 2, 2,
+                    List.of(10L, 20L), Set.of(), TeamPolicy.SEQUENTIAL, 0L, true, List.of(1), 1000, 0, 0, Set.of()));
+            when(engines.forRoom(argThat(room -> room != null && room.roomId().equals("r2")))).thenReturn(otherEngine);
+            when(otherEngine.loadState()).thenReturn(Optional.of(state));
+            when(otherEngine.pendingSeats(state)).thenReturn(List.of(1));
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            when(engine.loadState()).thenAnswer(invocation -> {
+                entered.countDown();
+                assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                return Optional.of(state);
+            });
+            Thread first = Thread.ofVirtual().start(() -> kick.kickNow(ROOM, PLAYER));
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+
+            kick.kickNow("r2", PLAYER);
+
+            verify(bots).scheduleBotsIfIdle("r2");
+            release.countDown();
+            first.join(5_000);
+            verify(bots).scheduleBotsIfIdle(ROOM);
         }
     }
 }

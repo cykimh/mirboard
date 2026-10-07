@@ -33,7 +33,9 @@ import org.springframework.stereotype.Component;
  * 실행이 아니라 Redis 데드라인 큐의 지연 실행.
  *
  * <p>매 액션 적용 후 (인간/봇/타임아웃) {@link #onTurnAdvanced(String)} 가 호출되어
- * per-room generation 을 증가시키고 새 타이머를 (re)스케줄한다. 발화된 task 는
+ * per-room generation 을 증가시키고 새 타이머를 (re)스케줄한다. D-131 — 방 액션 락을 쥔 진행 경로(컨트롤러·봇·두
+ * 스케줄러·탈주)는 락을 풀기 전에 부른다 — resync 가 같은 락 안에서 상태와 남은 턴 시간({@link #turnRemaining})을 함께
+ * 읽기 때문이다. 락 밖에서 부르는 곳은 매치 시작(라운드 스타터 — 시작 상태 저장 직후)뿐이다. 발화된 task 는
  * 캡처한 generation 이 현재와 다르면 abort — 그 사이 누군가 행동했다는 뜻
  * (중복 자동행동 방지). {@link RoomActionLock} 2초 TTL 로 human/bot/timeout 3자
  * 경합을 직렬화.
@@ -127,6 +129,21 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
         if (turnSeconds <= 0) return;  // 타이머 끔 — 기존 동작 호환.
 
         deadlines.schedule(KIND, member(roomId, gen), Duration.ofSeconds(turnSeconds));
+    }
+
+    /**
+     * D-131 — 지금 턴의 남은 시간: 지금 세대의 턴 데드라인까지(이미 지났으면 0 — 폴러가 곧 꺼낸다). 턴 제한이 꺼졌거나
+     * IN_GAME 이 아니거나 지금 세대의 데드라인이 없으면 empty. 이전 세대의 항목은 발화해도 버려지므로 남은 시간이 아니다.
+     *
+     * <p>호출자(resync)는 방 액션 락 안에서 상태와 함께 읽는다 — 진행 경로가 저장·방송·재무장을 모두 그 락 안에서 끝내므로
+     * 락 안에서 읽은 값은 함께 읽은 상태의 턴 것이다. 기다리는 좌석이 있는지는 상태를 아는 호출자가 본다.
+     */
+    public Optional<Duration> turnRemaining(Room room) {
+        if (room.turnSeconds() <= 0 || room.status() != RoomStatus.IN_GAME) {
+            return Optional.empty();
+        }
+        long gen = generations.current(room.roomId());
+        return deadlines.remaining(KIND, member(room.roomId(), gen));
     }
 
     /**
@@ -232,15 +249,22 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
             acted = true;
             log.info("Turn timeout auto-action: roomId={} seat={} action={}",
                     roomId, seat, action.getClass().getSimpleName());
+            // 다음 턴 타이머 재스케줄. D-131 — 락 안에서(resync 가 같은 락 안에서 상태와 남은 턴 시간을 함께 읽는다).
+            // 실패는 따로 잡아 재무장 실패로 남긴다 — 자동 액션은 이미 저장·방송됐고(acted), 아래 일반 문구는 자동 액션
+            // 자체가 실패한 것처럼 읽힌다. 봇 스케줄은 락을 푼 뒤 그대로 건다(컨트롤러·봇·탈주 계속과 같은 규칙).
+            try {
+                onTurnAdvanced(roomId);
+            } catch (RuntimeException e) {
+                log.error("Turn rearm after timeout failed: roomId={} err={}", roomId, e.toString(), e);
+            }
         } catch (RuntimeException e) {
             log.error("TurnTimeoutScheduler error in room {}: {}", roomId, e.getMessage(), e);
         } finally {
             lock.release(roomId);
         }
         if (acted) {
-            // 봇이 이어받을 수 있으면 진행 + 다음 턴 타이머 재스케줄.
+            // 봇이 이어받을 수 있으면 진행 — 락을 푼 뒤에(쥔 채 걸면 루프가 이 락과 부딪쳐 재시도한다).
             botScheduler.scheduleBots(roomId);
-            onTurnAdvanced(roomId);
         }
     }
 

@@ -19,7 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 한 매치(여러 라운드 합산) 가 종료되면 {@link TichuMatchCompleted} 를 받아
@@ -29,6 +30,15 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>D-115 — 승패·레이팅·탈주 수는 {@code users} 가 아니라 게임별 {@code user_game_stats}
  * (TICHU 행)에 쌓는다. {@code users} 의 옛 컬럼은 이관 후 쓰기를 멈췄다.
+ *
+ * <p>D-131 — <b>기록 실패는 여기서 끝낸다</b>(ERROR 후 삼킨다). 이 이벤트는 엔진이 동기로 발행하고 리스너가 둘이다 — 이
+ * 기록기와 {@code RoomChipService}(칩 정산). 스프링 멀티캐스터는 첫 예외에서 멈추고 그 예외를 발행자에게 던지므로, 기록
+ * 예외가 진행 경로로 새어 마지막 방송·리매치 대기를 건너뛰고, 기록이 먼저 불리는 순서면 칩 정산까지 빠졌다. 발행 지점에서
+ * 잡으면 앞의 것만 막는다. 트랜잭션 경계를 {@link TransactionTemplate} 으로 직접 감싸는 것은 커밋 실패까지 잡기 위해서다 —
+ * {@code @Transactional} 프록시의 커밋은 메서드 본문이 돌아온 뒤라 본문 안의 try/catch 에 걸리지 않는다. 다른 인스턴스로 다시
+ * 보내는 경로는 만들지 않는다(D-116 — 기록은 끝낸 인스턴스에서 한 번). 결과는 로그로 남겨 수동 복구할 수 있게 한다.
+ * 템플릿은 기본 전파(REQUIRED)라 <b>바깥 트랜잭션이 없다는 전제</b>에 기댄다 — 진행 경로는 트랜잭션 밖에서 발행한다(있으면 기록
+ * 실패가 바깥을 rollback-only 로 표시한 채 삼켜져 바깥 커밋에서 샌다, {@code docs/game-port.md} 기록기 계약 3).
  */
 @Component
 public class MatchResultRecorder {
@@ -42,6 +52,7 @@ public class MatchResultRecorder {
     private final RatedMatchPolicy ratedMatchPolicy;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final TransactionTemplate transactions;
 
     public MatchResultRecorder(TichuMatchResultRepository matchRepo,
                                TichuMatchParticipantRepository participantRepo,
@@ -49,7 +60,8 @@ public class MatchResultRecorder {
                                BotUserRegistry bots,
                                RatedMatchPolicy ratedMatchPolicy,
                                ObjectMapper objectMapper,
-                               Clock clock) {
+                               Clock clock,
+                               PlatformTransactionManager transactionManager) {
         this.matchRepo = matchRepo;
         this.participantRepo = participantRepo;
         this.stats = stats;
@@ -57,11 +69,23 @@ public class MatchResultRecorder {
         this.ratedMatchPolicy = ratedMatchPolicy;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.transactions = new TransactionTemplate(transactionManager);
     }
 
     @EventListener
-    @Transactional
     public void onMatchCompleted(TichuMatchCompleted event) {
+        try {
+            transactions.executeWithoutResult(status -> record(event));
+        } catch (RuntimeException e) {
+            log.error("Tichu match record failed, the match still ends: room={} players={} winner={} A={} B={} "
+                            + "rounds={} deserterUserId={}",
+                    event.roomId(), event.playerIds(), event.winningTeam(), event.cumulativeTeamAScore(),
+                    event.cumulativeTeamBScore(), event.roundScores().size(), event.deserterUserId(), e);
+        }
+    }
+
+    /** 한 트랜잭션 — 매치·참가자 행과 게임별 전적. */
+    private void record(TichuMatchCompleted event) {
         // Phase 16(#4) — 봇 포함 매치도 win/lose·match_result 는 기록하되 ELO(rating)
         // 만 제외 (rating 인플레이션 방지). D-117 — 게스트가 낀 매치도 같은 규칙.
         // 정회원 4인 매치만 ELO 반영.
