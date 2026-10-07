@@ -95,6 +95,17 @@ function topicFrame(ws: FakeWS, room: string, seq: number) {
   });
 }
 
+/** 본인 큐 프레임 한 건(비공개 — 손패·ERROR)이 그 소켓에 닿는다. */
+function queueFrame(ws: FakeWS, room: string, type: string) {
+  const id = subscriptionId(ws, `/user/queue/room/${room}`);
+  const body = JSON.stringify({ type, payload: { code: 'NO_RACE', message: 'late' } });
+  act(() => {
+    ws.onmessage?.({
+      data: `MESSAGE\nsubscription:${id}\nmessage-id:q-${room}\ndestination:/user/queue/room/${room}\n\n${body}\0`,
+    });
+  });
+}
+
 /** cleanup 이 보낸 DISCONNECT 의 영수증이 뒤늦게 닿는다 — 이때에야 stompjs 가 onDisconnect 를 부른다. */
 function lateDisconnectReceipt(ws: FakeWS) {
   const receiptId = /receipt:(close-\d+)/.exec(ws.sent.join(''))?.[1];
@@ -174,6 +185,31 @@ describe('정리된 이전 소켓의 콜백 (D-130)', () => {
     const eventsBefore = sink.applyEvent.mock.calls.length;
     topicFrame(sockets[1], 'B', 4);
     expect(sink.applyEvent.mock.calls.length - eventsBefore).toBe(1);
+  });
+
+  /**
+   * 재리뷰 N-2 — 본인 큐 핸들러의 가드(`if (disposed) return`)를 고정한다. 이전 방 A 의 소켓이 영수증을 기다리는 틈에 A 의
+   * 비공개 프레임(손패·ERROR)이 닿아도 새 방 B 의 sink 로 가지 않는다 — 가면 B 판에 A 의 손패가 깔리거나 A 의 거절 문구가
+   * 뜬다. 대조로 B 의 본인 큐 프레임은 그대로 간다.
+   */
+  it('방 소켓 — 전환 뒤 이전 소켓에 닿은 이전 방의 본인 큐 프레임이 새 방 sink 로 가지 않는다', async () => {
+    const sink = makeSink();
+    const { rerender } = renderHook(({ room }) => useStompRoom(room, 'tok', sink), {
+      initialProps: { room: 'A' },
+    });
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    accept(sockets[0]);
+
+    rerender({ room: 'B' });
+    await waitFor(() => expect(sockets).toHaveLength(2));
+    accept(sockets[1]);
+    sink.applyPrivateEvent.mockClear();
+
+    queueFrame(sockets[0], 'A', 'ERROR');
+    expect(sink.applyPrivateEvent).not.toHaveBeenCalled();
+
+    queueFrame(sockets[1], 'B', 'ERROR');
+    expect(sink.applyPrivateEvent).toHaveBeenCalledTimes(1);
   });
 
   it('로비 소켓 — 토큰이 바뀐 뒤 늦게 닿은 이전 소켓의 DISCONNECT 영수증이 새 소켓의 connected 를 내리지 않는다', async () => {

@@ -33,11 +33,6 @@ import {
 } from '@/components/ui/select';
 
 /**
- * 대기실 + 게임 테이블 컨테이너. Phase 20d(D-76): 대기실/에러/로딩 셸을
- * shadcn 으로 재디자인. IN_GAME 의 GameTable 은 20e 범위라 레거시 레이아웃
- * 유지(.app-shell 밖에 둬 스코프 base 영향 없음). 상태/WS/핸들러 불변.
- */
-/**
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
  * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
  */
@@ -49,6 +44,11 @@ interface HeldSeats {
   botSeats: number[];
 }
 
+/**
+ * 대기실 + 게임 테이블 컨테이너. Phase 20d(D-76): 대기실/에러/로딩 셸을
+ * shadcn 으로 재디자인. IN_GAME 의 GameTable 은 20e 범위라 레거시 레이아웃
+ * 유지(.app-shell 밖에 둬 스코프 base 영향 없음). 상태/WS/핸들러 불변.
+ */
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();
   const token = useAuthStore((s) => s.token);
