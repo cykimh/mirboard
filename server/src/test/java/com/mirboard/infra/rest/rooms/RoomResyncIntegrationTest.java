@@ -1,5 +1,7 @@
 package com.mirboard.infra.rest.rooms;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -79,7 +81,29 @@ class RoomResyncIntegrationTest {
                 .andExpect(jsonPath("$.tableView.matchScores.A").value(0))
                 .andExpect(jsonPath("$.tableView.matchScores.B").value(0))
                 .andExpect(jsonPath("$.privateHand.seat").value(0))
-                .andExpect(jsonPath("$.privateHand.cards.length()").value(8));
+                .andExpect(jsonPath("$.privateHand.cards.length()").value(8))
+                // D-131 — 턴 제한이 꺼진 방(생략 — 티츄 선언 0)은 남은 턴 시간이 없다.
+                .andExpect(jsonPath("$.turnRemainingMs").value(nullValue()));
+    }
+
+    /**
+     * D-131 — 턴 제한이 있는 방의 resync 는 지금 턴의 남은 시간을 싣는다(지금 세대 턴 데드라인 − 지금). 매치 시작(라운드
+     * 스타터)이 건 데드라인이라 턴 제한 이하·0 초과다. 클라는 이 값으로 카운트다운을 맞춘다 — 재접속 직후에도.
+     */
+    @Test
+    void resync_carries_the_turn_time_left_when_the_room_has_a_turn_limit() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("rs6_alice", "rs6_bob", "rs6_charlie", "rs6_dave"));
+        String roomId = createRoomAndJoinAll(tokens,
+                Map.of("name", "timed-room", "gameType", "TICHU", "turnSeconds", 30));
+
+        MvcResult res = mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
+                        .header("Authorization", "Bearer " + tokens.get("rs6_alice")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long left = objectMapper.readTree(res.getResponse().getContentAsString()).get("turnRemainingMs").asLong();
+        assertThat(left).isPositive().isLessThanOrEqualTo(30_000L);
     }
 
     @Test
@@ -188,8 +212,11 @@ class RoomResyncIntegrationTest {
     }
 
     private String createRoomOnly(String token) throws Exception {
-        var body = objectMapper.writeValueAsString(
-                Map.of("name", "resync-room", "gameType", "TICHU"));
+        return createRoomOnly(token, Map.of("name", "resync-room", "gameType", "TICHU"));
+    }
+
+    private String createRoomOnly(String token, Map<String, Object> request) throws Exception {
+        var body = objectMapper.writeValueAsString(request);
         MvcResult created = mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,9 +228,13 @@ class RoomResyncIntegrationTest {
     }
 
     private String createRoomAndJoinAll(Map<String, String> tokens) throws Exception {
+        return createRoomAndJoinAll(tokens, Map.of("name", "resync-room", "gameType", "TICHU"));
+    }
+
+    private String createRoomAndJoinAll(Map<String, String> tokens, Map<String, Object> request) throws Exception {
         List<String> ordered = List.copyOf(tokens.keySet());
         String host = ordered.get(0);
-        String roomId = createRoomOnly(tokens.get(host));
+        String roomId = createRoomOnly(tokens.get(host), request);
         for (int i = 1; i < ordered.size(); i++) {
             mockMvc.perform(post("/api/rooms/" + roomId + "/join")
                             .header("Authorization", "Bearer " + tokens.get(ordered.get(i))))

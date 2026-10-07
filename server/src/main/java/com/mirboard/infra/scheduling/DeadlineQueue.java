@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -80,6 +81,18 @@ public class DeadlineQueue {
         Boolean added = redis.opsForZSet().addIfAbsent(key(kind), member, dueAt);
         redis.expire(key(kind), Duration.ofHours(12));
         return Boolean.TRUE.equals(added);
+    }
+
+    /**
+     * D-131 — 그 항목이 걸려 있으면 만기까지 남은 시간(이미 지났으면 0), 없으면 empty. pop 된 항목·취소된 항목은 없는 것이다.
+     * 읽기만 한다(ZSCORE).
+     */
+    public Optional<Duration> remaining(String kind, String member) {
+        Double dueAt = redis.opsForZSet().score(key(kind), member);
+        if (dueAt == null) {
+            return Optional.empty();
+        }
+        return Optional.of(Duration.ofMillis(Math.max(0L, dueAt.longValue() - clock.millis())));
     }
 
     /**

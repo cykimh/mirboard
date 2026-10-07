@@ -34,11 +34,12 @@ import org.springframework.stereotype.Component;
  * 탄다(저장 → {@code matchProgress.advance} → 브로드캐스트 → 봇·타이머 재무장).
  *
  * <p><b>마지막 방어선은 락 안의 {@code timer} 재확인이다(D-128).</b> 세대 번호는 대부분의 낡은 발화를
- * 거르지만, 진행 경로(컨트롤러·매치가 이어지는 탈주·두 스케줄러)는 락을 푼 <em>뒤에</em> 세대를 올리므로 그 틈이 있다 — 틈에
+ * 거르지만, 진행 경로(컨트롤러·매치가 이어지는 탈주·두 스케줄러)는 락을 푼 <em>뒤에</em> 세대를 올렸으므로 그 틈이 있었다 — 틈에
  * 만기된 옛 타이머는 락 앞뒤의 세대 검사를 모두 통과해 이미 넘어간 상태를 만난다. 그래서 락 안에서 상태를 읽은 뒤
  * {@code timer(state)} 를 다시 묻는다: 비어 있으면 낡은 발화라 멈추고, 아직 남았으면 같은 세대로 그 시간 뒤에
- * 다시 걸고 멈추며, 0 이하일 때만 {@code onTimer} 를 적용한다. (턴 타임아웃에도 같은 틈이 있다 —
- * 후속 과제로 남겼다(D-128).)
+ * 다시 걸고 멈추며, 0 이하일 때만 {@code onTimer} 를 적용한다. (D-131 — 락을 쥔 진행 경로는 이제 락을 풀기 전에 세대를
+ * 올린다(resync 의 남은 턴 시간 때문). 틈은 락 밖에서 재무장하는 매치 시작(라운드 스타터)에만 남고, 이 재확인은 그대로
+ * 마지막 방어선이다.)
  *
  * <p>게임을 모른다 — 무엇이 언제 일어나는지는 엔진이 답한다.
  */
@@ -161,15 +162,16 @@ public class EngineTimerScheduler implements DeadlineHandler {
             advanced = true;
             log.info("Engine timer fired: roomId={} phase={} events={}",
                     roomId, engine.phaseName(newState), outbound.size());
+            // 턴·엔진 타이머를 새 상태로 다시 건다. D-131 — 락 안에서(resync 가 같은 락 안에서 남은 턴 시간을 읽는다).
+            turnTimeout.onTurnAdvanced(roomId);
         } catch (RuntimeException e) {
             log.error("EngineTimerScheduler error in room {}: {}", roomId, e.getMessage(), e);
         } finally {
             lock.release(roomId);
         }
         if (advanced) {
-            // 다음 차례가 봇이면 이어받고, 턴·엔진 타이머를 새 상태로 다시 건다.
+            // 다음 차례가 봇이면 이어받는다 — 락을 푼 뒤에.
             botScheduler.scheduleBots(roomId);
-            turnTimeout.onTurnAdvanced(roomId);
         }
     }
 

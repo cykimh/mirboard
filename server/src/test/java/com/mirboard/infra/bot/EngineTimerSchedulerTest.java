@@ -199,9 +199,10 @@ class EngineTimerSchedulerTest {
             order.verify(engine).saveState(next);
             order.verify(matchProgress).advance(eq(engine), any(), eq(next), eq(List.of(event)));
             order.verify(broadcaster).broadcast("r1", List.of(event), List.of(10L, 20L));
+            // D-131 — 재무장은 락 안(resync 가 같은 락 안에서 남은 턴 시간을 읽는다), 봇 루프는 락을 푼 뒤.
+            order.verify(turnTimeout).onTurnAdvanced("r1");
             order.verify(lock).release("r1");
             order.verify(botScheduler).scheduleBots("r1");
-            order.verify(turnTimeout).onTurnAdvanced("r1");
         }
 
         /**

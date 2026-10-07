@@ -13,6 +13,7 @@ import com.mirboard.domain.lobby.room.RoomService;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.bot.GameProgressKick;
+import com.mirboard.infra.bot.TurnTimeoutScheduler;
 import com.mirboard.infra.ws.DesertionService;
 import com.mirboard.infra.ws.GameAbortService;
 import com.mirboard.infra.ws.GameEngineProvider;
@@ -21,6 +22,7 @@ import com.mirboard.infra.ws.RoomPresence;
 import com.mirboard.infra.ws.RoomSeq;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -52,6 +54,7 @@ public class RoomController {
     private final GameAbortService aborts;
     private final RoomActionLock lock;
     private final GameProgressKick kick;
+    private final TurnTimeoutScheduler turnTimeout;
 
     public RoomController(RoomService rooms,
                           GameEngineProvider engines,
@@ -61,7 +64,8 @@ public class RoomController {
                           RoomChipStore chipStore,
                           GameAbortService aborts,
                           RoomActionLock lock,
-                          GameProgressKick kick) {
+                          GameProgressKick kick,
+                          TurnTimeoutScheduler turnTimeout) {
         this.rooms = rooms;
         this.engines = engines;
         this.seqs = seqs;
@@ -71,6 +75,7 @@ public class RoomController {
         this.aborts = aborts;
         this.lock = lock;
         this.kick = kick;
+        this.turnTimeout = turnTimeout;
     }
 
     @GetMapping
@@ -91,15 +96,13 @@ public class RoomController {
         int targetScore = req.targetScore() == null
                 ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_TARGET_SCORE
                 : req.targetScore();
-        int turnSeconds = req.turnSeconds() == null
-                ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_TURN_SECONDS
-                : req.turnSeconds();
         int stake = req.stake() == null
                 ? com.mirboard.domain.lobby.room.RoomService.DEFAULT_STAKE
                 : req.stake();
-        // D-99 — capacity 는 선택. null 이면 RoomService 가 def.maxPlayers() 로 채운다.
+        // D-131 — 인원·턴 제한은 선택. 생략(null)은 그대로 넘긴다 — RoomService 가 게임 선언
+        // (def.defaultPlayers()·def.defaultTurnSeconds())으로 채운다(D-99 의 capacity 와 같은 자리).
         return rooms.createRoom(me.userId(), req.name(), req.gameType(), policy,
-                fillWithBots, targetScore, turnSeconds, stake, req.capacity());
+                fillWithBots, targetScore, req.turnSeconds(), stake, req.capacity());
     }
 
     /** Phase 8C — WAITING 방에서 호스트가 팀 정책 변경. */
@@ -252,7 +255,8 @@ public class RoomController {
                     seqs.current(roomId),
                     engine.publicView(state),
                     // 관전자는 손패 없음 — 공개 뷰만 받음. 비공개 상태가 없는 게임도 null.
-                    privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null);
+                    privateSeat >= 0 ? engine.privateView(state, privateSeat).orElse(null) : null,
+                    turnRemainingMs(room, engine, state));
         } finally {
             if (locked) {
                 lock.release(roomId);
@@ -269,11 +273,26 @@ public class RoomController {
                 snap.tableView(),
                 snap.privateHand(),
                 disconnectedSeats(room, me.userId()),
-                chipStore.stacks(roomId)); // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
+                chipStore.stacks(roomId), // D-82 — 방 칩 스택(입장/재접속 시 즉시 표시).
+                snap.turnRemainingMs());
     }
 
-    /** 락 안에서 함께 읽어야 하는 resync 부분 — 게임 상태에서 나온 것과 그 시점의 순번. */
-    private record Snapshot(String phase, long eventSeq, Object tableView, Object privateHand) {
+    /** 락 안에서 함께 읽어야 하는 resync 부분 — 게임 상태에서 나온 것과 그 시점의 순번·남은 턴 시간. */
+    private record Snapshot(String phase, long eventSeq, Object tableView, Object privateHand,
+                            Long turnRemainingMs) {
+    }
+
+    /**
+     * D-131 — 함께 읽은 상태의 턴이 끝나기까지 남은 시간(ms). 기다리는 좌석이 없으면(경쟁 창·끝난 매치 — 걸린 데드라인이
+     * 발화해도 아무 일이 없다) null, 턴 제한이 꺼졌거나 지금 세대의 데드라인이 없어도 null. 게임을 모른다 — 누가 기다리는지는
+     * 엔진 포트가, 데드라인은 턴 타임아웃 스케줄러가 답한다. 락 안에서 부른다: 진행 경로가 저장·방송·다음 턴 데드라인 재무장을
+     * 모두 이 락 안에서 끝내므로, 여기서 읽은 값은 함께 읽은 상태의 턴 것이다.
+     */
+    private Long turnRemainingMs(Room room, GameEngine engine, GameState state) {
+        if (engine.pendingSeats(state).isEmpty()) {
+            return null;
+        }
+        return turnTimeout.turnRemaining(room).map(Duration::toMillis).orElse(null);
     }
 
     /**
@@ -318,9 +337,10 @@ public class RoomController {
                                 TeamPolicy teamPolicy,
                                 Boolean fillWithBots,
                                 Integer targetScore,
+                                // D-131 — null 이면 GameDefinition.defaultTurnSeconds().
                                 Integer turnSeconds,
                                 Integer stake,
-                                // D-99 — 방 인원. null 이면 GameDefinition.maxPlayers().
+                                // D-99 — 방 인원. D-131 — null 이면 GameDefinition.defaultPlayers().
                                 Integer capacity) {
     }
 
@@ -348,6 +368,8 @@ public class RoomController {
             Object privateHand,
             List<Integer> disconnectedSeats,
             // D-82 — 방 단위 테이블 칩 스택(userId→칩). 내기 없는 방은 빈 맵.
-            java.util.Map<Long, Long> chips) {
+            java.util.Map<Long, Long> chips,
+            // D-131 — 지금 턴의 남은 시간(ms, 0 이상). 턴 제한 끔·기다리는 좌석 없음·걸린 데드라인 없음이면 null.
+            Long turnRemainingMs) {
     }
 }

@@ -1,15 +1,20 @@
 package com.mirboard.infra.ws;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.core.GameEngine;
@@ -22,11 +27,14 @@ import com.mirboard.domain.lobby.room.TeamPolicy;
 import com.mirboard.infra.bot.BotScheduler;
 import com.mirboard.infra.bot.TurnTimeoutScheduler;
 import com.mirboard.infra.metrics.MirboardMetrics;
+import com.mirboard.testsupport.LogCapture;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.springframework.dao.QueryTimeoutException;
 
 /**
  * D-122 — 끝난 방(FINISHED)의 STOMP 액션은 적용하지 않는다. 게임 중립 가드(방 상태)라 강제
@@ -109,5 +117,48 @@ class GameStompControllerGuardTest {
 
         verify(engine).apply(eq(state), eq(0), eq(new Poke(1)));
         verify(engine).saveState(state);
+    }
+
+    /**
+     * D-131 — 다음 턴 데드라인은 방송 뒤, <b>락을 풀기 전에</b> 건다. resync 는 같은 락 안에서 상태와 남은 턴 시간을 함께
+     * 읽으므로, 락을 푼 뒤에 걸면 그 틈(락을 기다리던 resync 가 곧바로 들어오는 자리)에서 새 상태 + 이전 턴의 남은 시간이
+     * 나갔다. 봇 루프는 락을 푼 뒤에 건다 — 쥔 채 걸면 루프가 이 락과 부딪쳐 재시도한다.
+     */
+    @Test
+    void the_next_turn_deadline_is_armed_before_the_lock_is_released() {
+        when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME));
+        engineAcceptsAnything();
+
+        controller.onAction("r1", Map.of("n", 1), ME);
+
+        InOrder order = inOrder(broadcaster, turnTimeout, lock, botScheduler);
+        order.verify(broadcaster).broadcast(eq("r1"), any(), any());
+        order.verify(turnTimeout).onTurnAdvanced("r1");
+        order.verify(lock).release("r1");
+        order.verify(botScheduler).scheduleBots("r1");
+    }
+
+    /**
+     * D-131 — 락 안으로 옮긴 재무장이 던져도(Redis 순간 장애) 락은 풀리고 봇 루프는 걸린다. 예전 순서(봇 → 재무장)에서는
+     * 재무장이 실패해도 봇이 걸렸다 — 그대로 두면 사람이 낸 직후 봇 차례로 넘어간 판이, 화면만 보고 기다리는 동안 아무것도
+     * 진행 킥(resync·구독)을 부르지 않아 멈췄다. 탈주 계속 경로({@code DesertionService})와 같이 잡아 ERROR(스택 포함)로 남긴다.
+     */
+    @Test
+    void a_failed_turn_rearm_still_releases_the_lock_and_schedules_bots() {
+        when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME));
+        engineAcceptsAnything();
+        doThrow(new QueryTimeoutException("redis blip")).when(turnTimeout).onTurnAdvanced("r1");
+
+        try (LogCapture logs = LogCapture.of(GameStompController.class)) {
+            assertThatCode(() -> controller.onAction("r1", Map.of("n", 1), ME)).doesNotThrowAnyException();
+
+            verify(lock).release("r1");
+            verify(botScheduler).scheduleBots("r1");
+            assertThat(logs.events()).anySatisfy(event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+                assertThat(event.getFormattedMessage()).contains("Turn rearm after action failed").contains("roomId=r1");
+                assertThat(event.getThrowableProxy()).isNotNull();
+            });
+        }
     }
 }
