@@ -270,7 +270,8 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 2. `flyctl secrets list -a mirboard` — `MIRBOARD_ONECARD_STATUS` 가 **없다**(있으면 위 "지금 값 확인"대로 지운다).
 3. 허브의 원카드 카드에 'Coming Soon' 이 없고, 원카드 4인 봇 채우기 방 한 판이 끝까지 간다 — 내 차례 카운트다운이 줄고
    0 에서 자동으로 먹으며, 1장 남으면 경쟁 버튼이 뜬다(`docs/qa-scenarios.md` "원카드 게임판 확인").
-4. `flyctl logs -a mirboard | grep "OneCard race resolved"` 가 그 판에서 1줄 이상 나온다(위 "경쟁 튜닝").
+4. 그 판이 끝난 뒤 `flyctl logs -a mirboard --no-tail | grep "OneCard race resolved"` 가 1줄 이상 나온다(위 "경쟁 튜닝" — `--no-tail` 없이
+   쓰면 실시간 스트림이라 끝나지 않으니, 판을 하는 동안 띄워 두는 용도로만 쓴다).
 5. Sentry·로그에 `match record failed` ERROR 가 0건이다(위 "매치 기록 실패" — 있으면 그 절대로 영향 범위부터 본다).
 
 ---
