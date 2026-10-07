@@ -10,6 +10,8 @@ import com.mirboard.infra.scheduling.DeadlineQueue;
 import com.mirboard.infra.scheduling.RoomGeneration;
 import com.mirboard.infra.ws.GameEngineProvider;
 import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -36,6 +38,11 @@ import org.springframework.stereotype.Component;
  * <p><b>참가자·관전자의 킥만 받는다.</b> 공개 토픽 구독은 로그인한 누구나 할 수 있고 SUBSCRIBE 는 레이트리밋 밖이라,
  * 아무나의 구독 폭주가 킥마다 Redis 왕복 몇 번씩으로 커지지 않게 한다(킥은 어차피 방을 읽는다).
  *
+ * <p><b>같은 방의 킥은 한 번에 하나만 돈다</b>(D-131). 관전은 로그인한 누구에게나 열려 있어 관전 한 번이면 위 게이트를
+ * 지난다 — 그 뒤의 구독 폭주가 킥마다 상태 GET·봇 루프 확인으로 커지지 않게, 참가 확인을 지난 킥은 방별 진행 중 집합에
+ * 들고 같은 방 킥이 이미 돌고 있으면 건너뛴다(돌고 있는 킥이 같은 일을 하고 있다). 끝나면 — 예외여도 — 반드시 뺀다.
+ * 집합은 인스턴스 메모리라 다른 인스턴스의 킥과는 합쳐지지 않는다(겹쳐도 무해 — 아래 두 동작이 각자 멱등이다).
+ *
  * <p><b>턴 진행({@code onTurnAdvanced})은 부르지 않는다.</b> 부르면 세대가 오르고 턴 데드라인이 처음부터 다시 걸려,
  * resync 를 반복하는 클라가 시간 초과를 끝없이 미룰 수 있다. 끝난 방·대기실·없는 방·시작 전 게임은 아무것도
  * 하지 않는다.
@@ -55,6 +62,8 @@ public class GameProgressKick {
     private final DeadlineQueue deadlines;
     private final RoomGeneration generations;
     private final Executor executor;
+    /** D-131 — 지금 이 인스턴스에서 킥이 돌고 있는 방. */
+    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
     @Autowired
     public GameProgressKick(RoomService rooms,
@@ -120,6 +129,19 @@ public class GameProgressKick {
         if (!room.playerIds().contains(userId) && !room.spectatorIds().contains(userId)) {
             return;
         }
+        if (!inFlight.add(roomId)) {
+            log.debug("Progress kick skipped, one is already running: roomId={}", roomId);
+            return;
+        }
+        try {
+            resume(roomId, room);
+        } finally {
+            inFlight.remove(roomId);
+        }
+    }
+
+    /** (a)·(b) — 참가 확인과 합치기를 지난 한 번의 일. */
+    private void resume(String roomId, Room room) {
         GameEngine engine = engines.forRoom(room);
         GameState state = engine.loadState().orElse(null);
         if (state == null || engine.isRoundOver(state)) {
