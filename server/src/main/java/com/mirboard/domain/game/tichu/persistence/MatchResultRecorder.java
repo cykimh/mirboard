@@ -37,6 +37,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 잡으면 앞의 것만 막는다. 트랜잭션 경계를 {@link TransactionTemplate} 으로 직접 감싸는 것은 커밋 실패까지 잡기 위해서다 —
  * {@code @Transactional} 프록시의 커밋은 메서드 본문이 돌아온 뒤라 본문 안의 try/catch 에 걸리지 않는다. 다른 인스턴스로 다시
  * 보내는 경로는 만들지 않는다(D-116 — 기록은 끝낸 인스턴스에서 한 번). 결과는 로그로 남겨 수동 복구할 수 있게 한다.
+ * 템플릿은 기본 전파(REQUIRED)라 <b>바깥 트랜잭션이 없다는 전제</b>에 기댄다 — 진행 경로는 트랜잭션 밖에서 발행한다(있으면 기록
+ * 실패가 바깥을 rollback-only 로 표시한 채 삼켜져 바깥 커밋에서 샌다, {@code docs/game-port.md} 기록기 계약 3).
  */
 @Component
 public class MatchResultRecorder {

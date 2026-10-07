@@ -72,6 +72,13 @@ public class RoomService {
     public static final java.util.Set<Integer> ALLOWED_STAKES =
             java.util.Set.of(0, 10, 50, 100, 500);
 
+    /**
+     * 인원을 받지 않는 짧은 오버로드들은 "생략"의 뜻이 둘로 갈린다 — 받지 않은 턴 제한은 {@link #DEFAULT_TURN_SECONDS}
+     * (0=끔)를 <b>명시</b>해 넘기고, 인원은 null(게임 선언 {@code defaultPlayers()}, D-131)로 넘긴다. 턴 제한까지 게임 선언
+     * ({@code defaultTurnSeconds()})을 따르려면 마지막 오버로드에 null 을 넘긴다(운영 호출자 {@code RoomController} 가 그렇게
+     * 한다 — REST 요청에서 필드를 뺀 것이 "생략"이다). 짧은 오버로드는 테스트용이라 바꾸지 않았다(null 이면 원카드 테스트에
+     * 선언값 30초 턴이 생긴다, {@code docs/plans/onecard.md} §9).
+     */
     public Room createRoom(long hostUserId, String name, String gameType) {
         return createRoom(hostUserId, name, gameType, TeamPolicy.SEQUENTIAL, false,
                 DEFAULT_TARGET_SCORE, DEFAULT_TURN_SECONDS);

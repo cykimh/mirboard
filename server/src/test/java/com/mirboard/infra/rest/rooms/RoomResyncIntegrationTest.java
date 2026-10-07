@@ -93,12 +93,12 @@ class RoomResyncIntegrationTest {
     @Test
     void resync_carries_the_turn_time_left_when_the_room_has_a_turn_limit() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs6_alice", "rs6_bob", "rs6_charlie", "rs6_dave"));
+                List.of("rs7_alice", "rs7_bob", "rs7_charlie", "rs7_dave"));
         String roomId = createRoomAndJoinAll(tokens,
                 Map.of("name", "timed-room", "gameType", "TICHU", "turnSeconds", 30));
 
         MvcResult res = mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
-                        .header("Authorization", "Bearer " + tokens.get("rs6_alice")))
+                        .header("Authorization", "Bearer " + tokens.get("rs7_alice")))
                 .andExpect(status().isOk())
                 .andReturn();
 

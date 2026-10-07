@@ -48,6 +48,8 @@ import org.testcontainers.utility.DockerImageName;
         "mirboard.bot.seed=4242",
         "mirboard.bot.delay-millis=0",
         "mirboard.scheduling.poll-interval-millis=50",
+        // D-131 기본값과 같지만 지우지 말 것 — 환경변수 MIRBOARD_ONECARD_STATUS(되돌리기 시험으로 COMING_SOON 을 export 한
+        // 개발 환경, .env.example)는 기본값을 이기지만 테스트 속성은 못 이긴다. 환경의 되돌리기 설정과 무관하게 연다.
         "mirboard.onecard.status=AVAILABLE",
         "mirboard.onecard.race-window-millis=300",
         "mirboard.onecard.bot-reaction-owner-min-millis=20",

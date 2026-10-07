@@ -86,7 +86,7 @@ class RoomCapacityIntegrationTest {
     }
 
     @Test
-    void variable_game_without_capacity_defaults_to_max_players() throws Exception {
+    void variable_game_without_capacity_defaults_to_declared_players() throws Exception {
         String token = registerAndLogin("cap_default_user", "validpass1");
 
         // D-131 — capacity 미지정이면 게임 선언 def.defaultPlayers()(스컬킹은 최대 8 과 같다 — 예전 생략 기본 그대로).

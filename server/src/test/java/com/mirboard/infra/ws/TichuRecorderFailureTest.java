@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +54,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -124,6 +126,7 @@ class TichuRecorderFailureTest {
             verify(roomService, never()).markFinished(ROOM);
             assertChipsSettled();
             assertRecordFailureLogged(logs, DataAccessResourceFailureException.class);
+            assertListenersRanIn(order);
         }
     }
 
@@ -142,6 +145,7 @@ class TichuRecorderFailureTest {
             assertThat(outbound).singleElement().isInstanceOf(TichuEvent.MatchEnded.class);
             assertChipsSettled();
             assertRecordFailureLogged(logs, DataAccessResourceFailureException.class);
+            assertListenersRanIn(order);
         }
     }
 
@@ -209,6 +213,22 @@ class TichuRecorderFailureTest {
     private void assertChipsSettled() {
         verify(chipStore).setStacks(eq(ROOM), any());
         verify(stomp).publishToTopic(eq("/topic/room/" + ROOM), any());
+    }
+
+    /**
+     * 파라미터가 정말 그 순서로 돌았는지 — "등록 순서 = 호출 순서"는 가정이다. 한쪽에 {@code @Order} 가 붙는 식으로 가정이
+     * 깨지면 두 파라미터가 같은 순서로 돌아도 나머지 단언은 통과한다(최종 리뷰 S5bT2-M1). 운영 순서는 컴포넌트 스캔상
+     * RECORDER_FIRST(domain → infra)다.
+     */
+    private void assertListenersRanIn(ListenerOrder order) {
+        InOrder calls = inOrder(matchRepo, chipStore);
+        if (order == ListenerOrder.RECORDER_FIRST) {
+            calls.verify(matchRepo).save(any());
+            calls.verify(chipStore).setStacks(eq(ROOM), any());
+        } else {
+            calls.verify(chipStore).setStacks(eq(ROOM), any());
+            calls.verify(matchRepo).save(any());
+        }
     }
 
     /**
