@@ -303,6 +303,18 @@ button.oc-badge {
   font-weight: 700;
 }
 
+/* D-131 — 차례 옆 남은 시간. 숫자 폭이 흔들리지 않게 고정폭 숫자, 5초 이하는 경고 테두리·배경(글자색은 그대로 — 대비). */
+.oc-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.oc-countdown-urgent {
+  border-color: var(--oc-race-catch);
+  background: rgba(217, 72, 61, 0.15);
+  font-weight: 700;
+}
+
 .oc-race-result,
 .oc-race-late {
   margin: 0;

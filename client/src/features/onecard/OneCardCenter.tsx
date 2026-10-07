@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { SUIT_LABEL, SUIT_SYMBOL, type OneCardCard, type OneCardSuit } from '@/types/onecard';
 import type { LastRace } from './onecardStore';
 import { OneCardCardChip } from './OneCardCardChip';
@@ -30,6 +31,8 @@ interface Props {
   lastRace: LastRace | null;
   late: boolean;
   nameOf: (seat: number) => string;
+  /** D-131 — 차례 옆에 붙는 남은 시간(경쟁 중에는 그리지 않는다). */
+  countdown?: ReactNode;
 }
 
 /** 가운데 — 뽑을 더미, 맨 위 카드와 지정 무늬, 공격 누적, 진행 방향, 차례, 경쟁 결과. 모두 공개 정보다. */
@@ -44,6 +47,7 @@ export function OneCardCenter({
   lastRace,
   late,
   nameOf,
+  countdown,
 }: Props) {
   return (
     <section className="oc-center" aria-label="테이블">
@@ -72,7 +76,12 @@ export function OneCardCenter({
         {raceOpen ? (
           <span className="oc-badge oc-race-status">원카드 경쟁 중</span>
         ) : (
-          turnName && <span className="oc-badge">{turnName} 차례</span>
+          turnName && (
+            <>
+              <span className="oc-badge">{turnName} 차례</span>
+              {countdown}
+            </>
+          )
         )}
       </div>
 

@@ -37,7 +37,11 @@ const PRIVATE: OneCardPrivateView = {
 };
 
 const snapshot = (
-  over: Partial<{ tableView: OneCardTableView; privateHand: OneCardPrivateView | null }> = {},
+  over: Partial<{
+    tableView: OneCardTableView;
+    privateHand: OneCardPrivateView | null;
+    turnRemainingMs: number | null;
+  }> = {},
 ) => ({
   roomId: 'r-1',
   phase: 'PLAYING',
@@ -646,3 +650,83 @@ describe('낡은 창 복구 — 다시 받기 신호 (D-130)', () => {
   });
 });
 
+describe('턴 카운트다운 기준 (D-131)', () => {
+  it('resync 의 남은 시간으로 맞춘다 — 재접속 직후에도 서버 데드라인과 같다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 12_345 }));
+
+    expect(store().turnClock).toEqual({ since: NOW, remainingMs: 12_345 });
+  });
+
+  it('서버가 남은 시간을 주지 않으면(턴 제한 끔·기다리는 좌석 없음) 세지 않는다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 12_345 }));
+    store().applySnapshot(snapshot({ turnRemainingMs: null }));
+    expect(store().turnClock).toBeNull();
+
+    store().applySnapshot(snapshot());
+    expect(store().turnClock).toBeNull();
+  });
+
+  it('TURN_CHANGED 는 서버가 턴 데드라인을 다시 거는 순간이다 — 한 턴 전체로 다시 센다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 2_000 }));
+    vi.setSystemTime(NOW + 5_000);
+
+    store().applyEvent(ev('TURN_CHANGED', { seat: 2, direction: 1, attackStack: 0 }, 11));
+
+    expect(store().turnClock).toEqual({ since: NOW + 5_000, remainingMs: null });
+  });
+
+  it('카드가 놓이고 경쟁 창이 열린 동안은 세지 않는다 — 다음 차례는 창이 닫힌 뒤 시작된다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 20_000 }));
+
+    store().applyEvent(
+      ev('CARD_PLAYED', { seat: 1, card: card('HEART', 5), handCount: 1, attackStack: 0, direction: 1 }, 11),
+    );
+    expect(store().turnClock).toBeNull();
+
+    store().applyEvent(
+      ev('RACE_OPENED', { raceId: 3, ownerSeat: 1, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000 }, 12),
+    );
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 3, outcome: 'CALLED', bySeat: 1 }, 13));
+    expect(store().turnClock).toBeNull();
+
+    vi.setSystemTime(NOW + 2_000);
+    store().applyEvent(ev('TURN_CHANGED', { seat: 2, direction: 1, attackStack: 0 }, 14));
+    expect(store().turnClock).toEqual({ since: NOW + 2_000, remainingMs: null });
+  });
+
+  it('탈락(탈주)도 서버가 지금 차례의 데드라인을 다시 거는 순간이다 — 차례가 그대로여도 다시 센다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 3_000 }));
+    vi.setSystemTime(NOW + 1_000);
+
+    // 좌석 2 가 나갔다 — 차례(좌석 1)는 그대로지만 서버는 탈주 처리 뒤 턴 데드라인을 처음부터 다시 건다.
+    store().applyEvent(ev('PLAYER_ELIMINATED', { seat: 2, reason: 'DESERTED', drawPileCount: 35 }, 11));
+
+    expect(store().turnClock).toEqual({ since: NOW + 1_000, remainingMs: null });
+  });
+
+  it('창이 열린 채 나가면 해소(취소) → 탈락 → TURN_CHANGED 순서로 오고, 다음 차례는 TURN_CHANGED 부터 센다', () => {
+    // 서버 순서(OneCardEngine.desert): 창이 열려 있으면 먼저 RACE_RESOLVED(CANCELLED, -1)로 닫고, 그다음 PLAYER_ELIMINATED,
+    // 그다음 TURN_CHANGED(또는 MATCH_ENDED). 해소는 차례를 정하지 않으므로(turnSeat −1 그대로) 그 사이의 탈락은 세지 않는다.
+    const race = { raceId: 3, ownerSeat: 1, slot: 0, jitterX: 0, jitterY: 0, windowMillis: 3000, remainingMillis: 2000 };
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, phase: 'RACE', turnSeat: -1, race } }));
+
+    store().applyEvent(ev('RACE_RESOLVED', { raceId: 3, outcome: 'CANCELLED', bySeat: -1 }, 11));
+    expect(store().turnClock).toBeNull();
+
+    store().applyEvent(ev('PLAYER_ELIMINATED', { seat: 2, reason: 'DESERTED', drawPileCount: 35 }, 12));
+    expect(store().turnSeat).toBe(-1);
+    expect(store().turnClock).toBeNull();
+
+    vi.setSystemTime(NOW + 500);
+    store().applyEvent(ev('TURN_CHANGED', { seat: 0, direction: 1, attackStack: 0 }, 13));
+    expect(store().turnClock).toEqual({ since: NOW + 500, remainingMs: null });
+  });
+
+  it('매치가 끝나면 세지 않는다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 20_000 }));
+
+    store().applyEvent(ev('MATCH_ENDED', { reason: 'FINISHED', standings: [] }, 11));
+
+    expect(store().turnClock).toBeNull();
+  });
+});

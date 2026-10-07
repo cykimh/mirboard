@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LATE_NOTICE_MS, OneCardTable, PRESS_RETRY_DELAY_MS, STALE_RACE_GRACE_MS } from './OneCardTable';
+import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -50,6 +51,8 @@ interface SeedOptions {
   seats?: OneCardSeatView[];
   race?: OneCardRaceView | null;
   result?: OneCardMatchResult | null;
+  /** D-131 — resync 의 남은 턴 시간(ms). */
+  turnRemainingMs?: number | null;
 }
 
 function seed(opts: SeedOptions) {
@@ -80,6 +83,7 @@ function snapshotOf(opts: SeedOptions) {
       opts.mySeat >= 0 ? { seat: opts.mySeat, hand: opts.hand ?? [], handVersion: 1 } : null,
     disconnectedSeats: [],
     chips: null,
+    turnRemainingMs: opts.turnRemainingMs ?? null,
   };
 }
 
@@ -735,5 +739,132 @@ describe('OneCardTable — 종료·나가기', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '규칙' }));
     expect(screen.getByText('미르보드 원카드에 오신 걸 환영합니다')).toBeInTheDocument();
+  });
+});
+
+describe('OneCardTable — 턴 카운트다운 (D-131)', () => {
+  const countdown = () => document.querySelector('.oc-countdown');
+
+  it('resync 의 남은 시간으로 맞춰 보이고, 시간이 흐르면 줄어든다(올림 초)', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 12_345 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    expect(countdown()).toHaveTextContent('13초');
+    act(() => {
+      vi.advanceTimersByTime(345);
+    });
+    expect(countdown()).toHaveTextContent('12초');
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(countdown()).toHaveTextContent('7초');
+  });
+
+  it('TURN_CHANGED 가 오면 한 턴 전체(방의 턴 제한)부터 다시 센다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 4_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(countdown()).toHaveTextContent('1초');
+
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 2, payload: { seat: 2, direction: 1, attackStack: 0 } } as never);
+    });
+
+    expect(countdown()).toHaveTextContent('30초');
+  });
+
+  it('먹기 뒤 TURN_CHANGED 로 기준이 바뀌는 순간에도 방의 턴 제한보다 큰 값을 그리지 않는다', () => {
+    // 먹기(CARDS_DRAWN)는 차례를 지우지 않아 카운트다운이 마운트된 채 기준만 바뀐다. 첫 그리기가 지난 틱의 시각으로 세면
+    // '31초'가 한 프레임 보였다. act 는 effect 까지 비운 뒤의 DOM 만 보여 주므로 텍스트 노드의 변화를 직접 기록한다.
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 4_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+    act(() => {
+      vi.advanceTimersByTime(3_400);
+    });
+    expect(countdown()).toHaveTextContent('1초');
+    const records: MutationRecord[] = [];
+    const observer = new MutationObserver((batch) => records.push(...batch));
+    observer.observe(countdown()!, { characterData: true, characterDataOldValue: true, subtree: true });
+
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARDS_DRAWN',
+        seq: 2,
+        payload: { seat: 1, count: 1, reason: 'TURN', handCount: 8, drawPileCount: 29 },
+      } as never);
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 3, payload: { seat: 2, direction: 1, attackStack: 0 } } as never);
+    });
+    records.push(...observer.takeRecords());
+    observer.disconnect();
+
+    const shown = records
+      .flatMap((r) => [r.oldValue, r.target.nodeValue])
+      .filter((v): v is string => v !== null && /^\d+$/.test(v))
+      .map(Number);
+    expect(countdown()).toHaveTextContent('30초');
+    expect(shown.length).toBeGreaterThan(0);
+    expect(Math.max(...shown)).toBeLessThanOrEqual(30);
+  });
+
+  it('턴 제한이 꺼진 방은 보이지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 12_345 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 0 });
+
+    expect(countdown()).toBeNull();
+  });
+
+  it('서버가 남은 시간을 주지 않으면(데드라인 없음) 보이지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: null });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    expect(countdown()).toBeNull();
+  });
+
+  it('경쟁 창이 열린 동안은 보이지 않고, 창이 닫힌 뒤 다음 차례부터 다시 센다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 20_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+    expect(countdown()).not.toBeNull();
+
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARD_PLAYED',
+        seq: 2,
+        payload: { seat: 1, card: c('HEART', 5), handCount: 1, attackStack: 0, direction: 1 },
+      } as never);
+      onecardRoomSink.applyEvent({ type: 'RACE_OPENED', seq: 3, payload: { ...RACE, raceId: 8 } } as never);
+    });
+    expect(countdown()).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+      onecardRoomSink.applyEvent({ type: 'RACE_RESOLVED', seq: 4, payload: { raceId: 8, outcome: 'EXPIRED', bySeat: -1 } } as never);
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 5, payload: { seat: 2, direction: 1, attackStack: 0 } } as never);
+    });
+    expect(countdown()).toHaveTextContent('30초');
+  });
+
+  it(`${TURN_URGENT_SECONDS}초 이하면 강조하고, 0 에서 멈춘다 — 매초 낭독하지 않는다`, () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, turnRemainingMs: 6_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    expect(countdown()).not.toHaveClass('oc-countdown-urgent');
+    expect(countdown()).toHaveAttribute('aria-live', 'off');
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(countdown()).toHaveClass('oc-countdown-urgent');
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(countdown()).toHaveTextContent('0초');
+  });
+
+  it('방은 끝났는데 결과가 없으면(강제 종료) 세지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 20_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30, roomFinished: true });
+
+    expect(countdown()).toBeNull();
   });
 });
