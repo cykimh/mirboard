@@ -16,9 +16,10 @@ import org.springframework.stereotype.Component;
  * 원카드의 카탈로그 메타데이터 + 엔진 팩토리 (D-128). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·
  * 디스패치 수정 없이 이 Bean 등록으로 인게임까지 연결된다(D-102 가 실증한 약속).
  *
- * <p><b>공개 상태는 설정이다</b>({@code mirboard.onecard.status}, 기본 {@code COMING_SOON}). 클라 게임판(S4)
- * 전에는 카탈로그에 "준비 중"으로만 보이고 방을 만들 수 없다({@code RoomService} 가 AVAILABLE 만 허용).
- * 통합 테스트는 AVAILABLE 로 켜서 방을 만든다.
+ * <p><b>공개 상태는 설정이다</b>({@code mirboard.onecard.status} = 환경 변수 {@code MIRBOARD_ONECARD_STATUS}, 기본
+ * {@code AVAILABLE} — D-131 공개). {@code COMING_SOON} 을 주면 카탈로그에 "준비 중"으로만 보이고 방을 만들 수 없다
+ * ({@code RoomService} 가 AVAILABLE 만 허용), {@code DISABLED} 면 카탈로그에서도 빠진다 — 운영의 되돌리기 손잡이다
+ * ({@code docs/deploy.md}). 기본값은 {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다.
  *
  * <p>경쟁 창 길이와 봇 반응 구간도 설정에서 읽는다(룰 §9). 슬롯 수는 클라와 맞춘 프로토콜 상수라 열지 않는다.
  * {@code supportedRoomOptions()} 는 재정의하지 않는다 — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
@@ -39,7 +40,7 @@ public final class OneCardGameDefinition implements GameDefinition {
             OneCardStateStore stateStore,
             Clock clock,
             ApplicationEventPublisher publisher,
-            @Value("${mirboard.onecard.status:COMING_SOON}") GameStatus status,
+            @Value("${mirboard.onecard.status:AVAILABLE}") GameStatus status,
             @Value("${mirboard.onecard.race-window-millis:3000}") long raceWindowMillis,
             @Value("${mirboard.onecard.bot-reaction-owner-min-millis:1000}") long ownerMinMillis,
             @Value("${mirboard.onecard.bot-reaction-owner-max-millis:2500}") long ownerMaxMillis,

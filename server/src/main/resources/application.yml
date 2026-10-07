@@ -152,9 +152,9 @@ mirboard:
         limit: ${MIRBOARD_RATELIMIT_STOMP_LIMIT:60}
         window: 10s
   onecard:
-    # D-128 — 원카드. 클라 게임판(S4) 전에는 카탈로그에 "준비 중"으로만 보이고 방을 만들 수 없다.
-    # S4 에서 AVAILABLE 로 바꾼다(통합 테스트는 AVAILABLE 로 켜서 방을 만든다).
-    status: ${MIRBOARD_ONECARD_STATUS:COMING_SOON}
+    # D-128 — 원카드 공개 상태. D-131 — 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_ONECARD_STATUS 로 —
+    # COMING_SOON(카탈로그 "준비 중", 방 생성 거절)·DISABLED(카탈로그에서도 뺌). 런북은 docs/deploy.md.
+    status: ${MIRBOARD_ONECARD_STATUS:AVAILABLE}
     # "원카드!/잡기!" 경쟁 창 길이와 봇 반응 시간 구간(ms) — 창마다 봇별로 균등 추첨(룰 §9).
     race-window-millis: 3000
     bot-reaction-owner-min-millis: 1000

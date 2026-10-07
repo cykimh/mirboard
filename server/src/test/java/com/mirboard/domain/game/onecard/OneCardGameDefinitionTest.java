@@ -9,9 +9,17 @@ import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.onecard.action.OneCardAction;
 import com.mirboard.domain.game.onecard.persistence.OneCardStateStore;
+import java.lang.reflect.Parameter;
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
+import org.springframework.core.io.ClassPathResource;
 
 /** D-128 — 카탈로그 메타데이터, 설정에서 오는 공개 상태·경쟁 창, 엔진 팩토리. */
 class OneCardGameDefinitionTest {
@@ -23,7 +31,7 @@ class OneCardGameDefinitionTest {
     }
 
     private static OneCardGameDefinition defaults() {
-        return definition(GameStatus.COMING_SOON, 3_000, 1_000, 2_500, 1_000, 2_500);
+        return definition(GameStatus.AVAILABLE, 3_000, 1_000, 2_500, 1_000, 2_500);
     }
 
     @Test
@@ -34,7 +42,7 @@ class OneCardGameDefinitionTest {
         assertThat(def.displayName()).isEqualTo("원카드");
         assertThat(def.minPlayers()).isEqualTo(2);
         assertThat(def.maxPlayers()).isEqualTo(6);
-        assertThat(def.status()).isEqualTo(GameStatus.COMING_SOON);
+        assertThat(def.status()).isEqualTo(GameStatus.AVAILABLE);
         assertThat(def.supportedRoomOptions()).isEmpty();
         assertThat(def.supportsRematch()).isFalse();
     }
@@ -52,11 +60,39 @@ class OneCardGameDefinitionTest {
         assertThat(def.defaultTurnSeconds()).isEqualTo(30);
     }
 
+    /**
+     * D-131 — 원카드는 공개됐다: 설정을 주지 않으면 {@code AVAILABLE}. 기본값은 두 곳에 있다 — {@code application.yml} 의 환경
+     * 변수 기본값({@code ${MIRBOARD_ONECARD_STATUS:…}}, 운영이 실제로 타는 값)과 정의 생성자의 {@code @Value} 기본값(설정
+     * 파일이 키를 빼먹은 경우). 둘이 갈리면 어느 쪽으로 뜨느냐에 따라 공개 여부가 달라진다. 실제 컨텍스트에서의 값은
+     * {@code GameCatalogIntegrationTest} 가, 닫는 설정(COMING_SOON)의 거절 경로는 {@code OneCardClosedIntegrationTest} 가 본다.
+     */
+    @Test
+    void with_no_setting_the_game_is_available() {
+        YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
+        yaml.setResources(new ClassPathResource("application.yml"));
+        Properties properties = yaml.getObject();
+        Parameter statusParameter = Arrays.stream(OneCardGameDefinition.class.getConstructors()[0].getParameters())
+                .filter(parameter -> parameter.getType() == GameStatus.class)
+                .findFirst().orElseThrow();
+
+        assertThat(fallbackOf(properties.getProperty("mirboard.onecard.status")))
+                .as("application.yml 의 MIRBOARD_ONECARD_STATUS 기본값").isEqualTo("AVAILABLE");
+        assertThat(fallbackOf(statusParameter.getAnnotation(Value.class).value()))
+                .as("@Value 기본값").isEqualTo("AVAILABLE");
+    }
+
+    /** {@code ${KEY:기본값}} 의 기본값. */
+    private static String fallbackOf(String placeholder) {
+        Matcher matcher = Pattern.compile("\\$\\{[^:}]+:([^}]*)}").matcher(placeholder);
+        assertThat(matcher.matches()).as(placeholder).isTrue();
+        return matcher.group(1);
+    }
+
     @Test
     void status_and_race_timing_come_from_configuration_with_the_protocol_slot_count() {
-        OneCardGameDefinition def = definition(GameStatus.AVAILABLE, 2_000, 100, 200, 300, 400);
+        OneCardGameDefinition def = definition(GameStatus.COMING_SOON, 2_000, 100, 200, 300, 400);
 
-        assertThat(def.status()).isEqualTo(GameStatus.AVAILABLE);
+        assertThat(def.status()).isEqualTo(GameStatus.COMING_SOON);
         assertThat(def.raceSettings()).isEqualTo(new RaceSettings(2_000, 100, 200, 300, 400, 8));
     }
 

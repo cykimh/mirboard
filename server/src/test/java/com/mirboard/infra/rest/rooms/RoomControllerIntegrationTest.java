@@ -101,6 +101,24 @@ class RoomControllerIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("ROOM_NOT_FOUND"));
     }
 
+    /**
+     * D-131 — 원카드는 공개됐다: 설정 없이 방을 만들 수 있고, 인원·턴 제한을 생략하면 게임 선언(4명·30초)으로 열린다 —
+     * 방 만들기 모달의 처음 선택과 같다. (닫는 설정의 거절은 {@code OneCardClosedIntegrationTest}.)
+     */
+    @Test
+    void a_one_card_room_opens_with_its_declared_choices_when_they_are_omitted() throws Exception {
+        String token = registerAndLogin("one_card_host", "validpass1");
+
+        mockMvc.perform(post("/api/rooms")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("name", "원카드 방", "gameType", "ONE_CARD"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameType").value("ONE_CARD"))
+                .andExpect(jsonPath("$.capacity").value(4))
+                .andExpect(jsonPath("$.turnSeconds").value(30));
+    }
+
     @Test
     void create_with_unavailable_game_returns_404() throws Exception {
         String token = registerAndLogin("bad_game_user", "validpass1");
