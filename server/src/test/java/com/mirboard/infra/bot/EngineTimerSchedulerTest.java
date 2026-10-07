@@ -206,9 +206,38 @@ class EngineTimerSchedulerTest {
         }
 
         /**
-         * D-128 — 진행 경로는 락을 푼 뒤 세대를 올리므로, 그 틈에 만기된 옛 타이머가 락 앞뒤의 세대 검사와 락을
-         * 모두 통과할 수 있다. 그때 상태는 이미 넘어갔다(예: 막 새 창이 열렸다) — 지금 상태에 아직 남은 시간이 있으면
-         * 전이를 적용하지 않고 같은 세대로 그 시간 뒤에 다시 걸어야 한다.
+         * 재무장이 던져도(Redis 순간 장애) 전이는 이미 저장·방송됐다 — 재무장 실패로 따로 남기고(엔진 타이머 실패처럼 읽히는
+         * 일반 문구가 아니라) 봇 루프는 락을 푼 뒤 그대로 건다. 컨트롤러·봇·탈주 계속과 같은 규칙(최종 리뷰 S5bT4-M4).
+         */
+        @Test
+        void a_failed_rearm_after_a_timer_transition_is_its_own_error_and_bots_still_run() {
+            when(generations.current("r1")).thenReturn(5L);
+            when(roomService.getRoom("r1")).thenReturn(room(RoomStatus.IN_GAME, 0));
+            when(lock.tryAcquire("r1")).thenReturn(true);
+            engineWithState();
+            when(engine.timer(state)).thenReturn(Optional.of(Duration.ZERO));
+            when(engine.onTimer(state)).thenReturn(Optional.of(
+                    new GameEngine.Result(next, List.of(event))));
+            doThrow(new IllegalStateException("simulated blip on INCR")).when(turnTimeout).onTurnAdvanced("r1");
+
+            try (LogCapture logs = LogCapture.of(EngineTimerScheduler.class)) {
+                scheduler.handle("r1#5");
+
+                assertThat(logs.messages(Level.ERROR)).anyMatch(m -> m.contains("Turn rearm after engine timer failed"));
+                assertThat(logs.messages(Level.ERROR)).noneMatch(m -> m.contains("EngineTimerScheduler error"));
+            }
+            InOrder order = inOrder(broadcaster, turnTimeout, lock, botScheduler);
+            order.verify(broadcaster).broadcast("r1", List.of(event), List.of(10L, 20L));
+            order.verify(turnTimeout).onTurnAdvanced("r1");
+            order.verify(lock).release("r1");
+            order.verify(botScheduler).scheduleBots("r1");
+        }
+
+        /**
+         * D-128 — 세대를 올리는 쪽이 락을 푼 뒤에 올리면(D-131 부터는 락 밖에서 재무장하는 매치 시작(라운드 스타터)뿐이다 — 락을
+         * 쥔 진행 경로는 락 안에서 올린다), 그 틈에 만기된 옛 타이머가 락 앞뒤의 세대 검사와 락을 모두 통과할 수 있다. 그때
+         * 상태는 이미 넘어갔다(예: 막 새 창이 열렸다) — 지금 상태에 아직 남은 시간이 있으면 전이를 적용하지 않고 같은 세대로 그
+         * 시간 뒤에 다시 걸어야 한다.
          */
         @Test
         void a_timer_with_time_left_is_rearmed_with_the_same_generation_instead_of_firing() {

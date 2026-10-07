@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameState;
@@ -21,6 +22,7 @@ import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.MatchProgressService;
 import com.mirboard.infra.ws.RoomActionLock;
+import com.mirboard.testsupport.LogCapture;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -86,7 +88,11 @@ class TurnRemainingTest {
             verifyNoInteractions(zset, generations);
         }
 
-        /** 폴러가 아직 꺼내지 않은 만기 항목(폴링 주기·락 경합 재시도) — 음수가 아니라 0 이다. */
+        /**
+         * 폴러가 아직 꺼내지 않은 만기 항목(폴링 주기 사이, 또는 락 경합으로 다시 건 항목이 밀린 폴링을 기다리는 동안) — 음수가
+         * 아니라 0 이다. 폴러가 꺼낸(원자 pop) 뒤 락 경합으로 다시 걸기 전까지는 항목이 없어 empty 다(docs/api.md — 만기 순간
+         * 짧게 null).
+         */
         @Test
         void an_overdue_deadline_answers_zero() {
             when(zset.score("deadlines:turn", "r1#5")).thenReturn((double) (NOW - 500));
@@ -154,6 +160,37 @@ class TurnRemainingTest {
             order.verify(broadcaster).broadcast(eq(ROOM), any(), any());
             order.verify(generations).bump(ROOM);
             order.verify(deadlines).schedule(TurnTimeoutScheduler.KIND, "r1#6", Duration.ofSeconds(30));
+            order.verify(lock).release(ROOM);
+            order.verify(botScheduler).scheduleBots(ROOM);
+        }
+
+        /**
+         * 재무장이 던져도(Redis 순간 장애) 자동 액션은 이미 저장·방송됐다 — 재무장 실패로 따로 남기고(자동 액션 실패처럼 읽히는
+         * 일반 문구가 아니라) 봇 루프는 락을 푼 뒤 그대로 건다. 컨트롤러·봇·탈주 계속과 같은 규칙(최종 리뷰 S5bT4-M4).
+         */
+        @Test
+        void a_failed_rearm_after_a_timeout_is_its_own_error_and_bots_still_run() {
+            GameEngine engine = mock(GameEngine.class);
+            GameState state = mock(GameState.class);
+            GameAction action = mock(GameAction.class);
+            when(roomService.getRoom(ROOM)).thenReturn(room(RoomStatus.IN_GAME, 30));
+            when(generations.current(ROOM)).thenReturn(5L);
+            when(generations.bump(ROOM)).thenThrow(new IllegalStateException("simulated blip on INCR"));
+            when(lock.tryAcquire(ROOM)).thenReturn(true);
+            when(engines.forRoom(any())).thenReturn(engine);
+            when(engine.loadState()).thenReturn(Optional.of(state));
+            when(engine.pendingSeat(state)).thenReturn(0);
+            when(engine.timeoutAction(state, 0)).thenReturn(action);
+            when(engine.apply(state, 0, action)).thenReturn(new GameEngine.Result(state, List.of()));
+
+            try (LogCapture logs = LogCapture.of(TurnTimeoutScheduler.class)) {
+                scheduler.handle("r1#5");
+
+                assertThat(logs.messages(Level.ERROR)).anyMatch(m -> m.contains("Turn rearm after timeout failed"));
+                assertThat(logs.messages(Level.ERROR)).noneMatch(m -> m.contains("TurnTimeoutScheduler error in room"));
+            }
+            InOrder order = inOrder(broadcaster, lock, botScheduler);
+            order.verify(broadcaster).broadcast(eq(ROOM), any(), any());
             order.verify(lock).release(ROOM);
             order.verify(botScheduler).scheduleBots(ROOM);
         }

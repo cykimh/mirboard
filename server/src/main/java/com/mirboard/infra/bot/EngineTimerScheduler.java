@@ -163,7 +163,13 @@ public class EngineTimerScheduler implements DeadlineHandler {
             log.info("Engine timer fired: roomId={} phase={} events={}",
                     roomId, engine.phaseName(newState), outbound.size());
             // 턴·엔진 타이머를 새 상태로 다시 건다. D-131 — 락 안에서(resync 가 같은 락 안에서 남은 턴 시간을 읽는다).
-            turnTimeout.onTurnAdvanced(roomId);
+            // 실패는 따로 잡아 재무장 실패로 남긴다 — 전이는 이미 저장·방송됐고(advanced), 아래 일반 문구는 발화 자체가
+            // 실패한 것처럼 읽힌다. 봇 스케줄은 락을 푼 뒤 그대로 건다(컨트롤러·봇·탈주 계속과 같은 규칙).
+            try {
+                turnTimeout.onTurnAdvanced(roomId);
+            } catch (RuntimeException e) {
+                log.error("Turn rearm after engine timer failed: roomId={} err={}", roomId, e.toString(), e);
+            }
         } catch (RuntimeException e) {
             log.error("EngineTimerScheduler error in room {}: {}", roomId, e.getMessage(), e);
         } finally {

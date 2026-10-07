@@ -250,7 +250,13 @@ public class TurnTimeoutScheduler implements DeadlineHandler {
             log.info("Turn timeout auto-action: roomId={} seat={} action={}",
                     roomId, seat, action.getClass().getSimpleName());
             // 다음 턴 타이머 재스케줄. D-131 — 락 안에서(resync 가 같은 락 안에서 상태와 남은 턴 시간을 함께 읽는다).
-            onTurnAdvanced(roomId);
+            // 실패는 따로 잡아 재무장 실패로 남긴다 — 자동 액션은 이미 저장·방송됐고(acted), 아래 일반 문구는 자동 액션
+            // 자체가 실패한 것처럼 읽힌다. 봇 스케줄은 락을 푼 뒤 그대로 건다(컨트롤러·봇·탈주 계속과 같은 규칙).
+            try {
+                onTurnAdvanced(roomId);
+            } catch (RuntimeException e) {
+                log.error("Turn rearm after timeout failed: roomId={} err={}", roomId, e.toString(), e);
+            }
         } catch (RuntimeException e) {
             log.error("TurnTimeoutScheduler error in room {}: {}", roomId, e.getMessage(), e);
         } finally {
