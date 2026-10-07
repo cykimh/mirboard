@@ -175,8 +175,10 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 
 ## 원카드 공개 상태 (`MIRBOARD_ONECARD_STATUS`, D-128)
 
-원카드의 카탈로그 상태는 설정이다(`mirboard.onecard.status`, 코드 기본값은 `application.yml`). 운영에서는 시크릿으로만
-덮어쓴다 — `fly.toml` 의 `[env]` 에 같은 키를 두지 않는다(두 곳에 있으면 어느 값이 이기는지 헷갈린다).
+원카드의 카탈로그 상태는 설정이다(`mirboard.onecard.status`, 코드 기본값은 `application.yml` — **D-131 부터 `AVAILABLE`**, 공개).
+운영에서는 시크릿으로만 덮어쓴다 — `fly.toml` 의 `[env]` 에 같은 키를 두지 않는다(두 곳에 있으면 어느 값이 이기는지 헷갈린다).
+평소에는 시크릿을 **두지 않는다**(코드 기본값 그대로 공개). 공개 전(D-131 이전)에 `AVAILABLE` 로 열어 둔 시크릿이 남아 있으면
+지운다 — 아래 "지금 값 확인".
 
 | 값 | 허브 카탈로그 | 새 원카드 방 | 진행 중인 원카드 방 |
 | --- | --- | --- | --- |
@@ -190,9 +192,12 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 ```bash
 # 끄기(되돌리기) — 머신이 재시작된다
 flyctl secrets set MIRBOARD_ONECARD_STATUS=COMING_SOON -a mirboard
-# 다시 열기 — 시크릿을 지우면 코드 기본값으로 돌아간다(공개 전환으로 코드 기본값이 AVAILABLE 이 된 뒤 — 그 전에는
-# `secrets set MIRBOARD_ONECARD_STATUS=AVAILABLE`)
+# 다시 열기 — 시크릿을 지우면 코드 기본값(AVAILABLE)으로 돌아간다. 이것도 머신 재시작이다
 flyctl secrets unset MIRBOARD_ONECARD_STATUS -a mirboard
+# 지금 값 확인 — 이름과 digest 만 보인다(값은 안 보인다). 목록에 MIRBOARD_ONECARD_STATUS 가 없으면 코드 기본값(공개)이다.
+# 있으면 실제 상태는 허브 카탈로그로 본다(로그인 뒤 원카드 카드에 'Coming Soon' 이 붙었는가). 공개 전에 AVAILABLE 로
+# 열어 둔 것이면 위 unset 으로 지워 코드 기본값을 따르게 한다.
+flyctl secrets list -a mirboard
 ```
 
 - **`DISABLED` 는 진행 중인 원카드 방도 대기 중인 방도 없을 때만.** 경과 시간으로는 보장되지 않는다 — `COMING_SOON` 뒤에도 남은
@@ -217,10 +222,13 @@ flyctl secrets unset MIRBOARD_ONECARD_STATUS -a mirboard
   된다. `COMING_SOON` 은 새 방을 막으므로 `IN_GAME`·`WAITING` 줄은 늘지 않는다 — 비워질 때까지 기다린다.
 - **잘못된 값은 앱 전체 기동 실패다**(빈 값·오타 — 의도된 fail-fast). 사고 중에 쓰는 손잡이이므로 값은 위 명령을
   그대로 복사한다(대문자).
-- 시크릿을 바꾸면 머신이 재시작된다. 재시작 순간 봇 차례였던 방은 클라가 다시 붙을 때(resync·게임 토픽 구독) 진행
-  킥이 봇 루프와 사라진 경쟁 타이머를 다시 건다(D-130) — 판이 멈춘 채 남지 않는다.
 - **시크릿 변경은 앱 전체 재시작이다** — 다른 게임의 진행 중 방도 끊긴다. 콜드 스타트 ~100초가 탈주 유예 120초에 가깝다
-  (`fly.toml`·`mirboard.desertion.grace-seconds`) — 진행 중인 방이 많으면 피하고, 바꾼 뒤 재접속을 확인한다.
+  (`fly.toml`·`mirboard.desertion.grace-seconds`) — 진행 중인 방이 많으면 피하고, 바꾼 뒤 재접속을 확인한다. 재시작 순간 봇
+  차례였던 방은 클라가 다시 붙을 때(resync·게임 토픽 구독) 진행 킥이 봇 루프와 사라진 경쟁 타이머를 다시 건다(D-130) — 판이
+  멈춘 채 남지 않는다.
+- **머신은 1대로 둔다**(`fly scale count 1`). 진행 킥은 **이 인스턴스의** 봇 루프만 보고(다른 인스턴스의 루프 위에 겹쳐 걸면
+  봇이 지연 없이 연달아 둔다), 같은 방 킥 합치기(D-131)도 인스턴스 메모리다. 엔진 타이머·턴 데드라인은 Redis 라 인계되지만,
+  원카드 경쟁 창의 정확도는 단일 폴러 지연을 그대로 받는다(`docs/plans/onecard.md` §8 남은 후속 — 봇 차례도 데드라인으로).
 
 **경쟁 튜닝**(룰 §9). 환경 변수 이름은 설정 키에서 나온다(Spring relaxed binding). 잘못된 조합(최소 > 최대, 창 ≤ 0)도
 기동 실패다(`RaceSettings`). 봇 반응 구간을 바꾸면 튜토리얼의 "1.0~2.5초"(`onecardTutorialSteps.tsx`·`ReactionPractice.tsx`),
@@ -247,6 +255,13 @@ flyctl logs -a mirboard | grep "OneCard race resolved"
 의심한다), `lateMs` 는 타이머 경로가 정해 둔 마감보다 늦게 처리된 시간(단일 폴러 지연)이다. **집계는 `room`+`raceId` 로
 묶어 마지막 줄을 정본으로 센다** — PRESS·TIMER 줄은 저장 전에 찍히므로(DESERTION 은 어댑터가 저장한 뒤에 찍는다), 저장이
 실패한 뒤 같은 창이 다른 경로(타이머·킥이 다시 건 타이머)로 닫히면 같은 창이 두 번(다른 결과로) 찍힐 수 있다.
+
+**매치 기록 실패**(D-130·D-131, 세 게임 공통). 매치가 끝날 때 전적·ELO 기록(DB)이 실패해도 판은 정상으로 끝난다(마지막 방송·
+FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR 가 남는다 —
+`Tichu|SkullKing|OneCard match record failed, the match still ends: room=… players=… …`(결과값과 스택 포함). 이 줄이 보이면 그 매치의
+`*_match_results`·참가자 행과 `user_game_stats`(승패·레이팅·탈주)가 **통째로 빠졌다**(한 트랜잭션이라 일부만 남지 않는다).
+자동 재시도는 없다 — 로그의 room·players·결과로 영향 범위(누구의 전적이 빠졌는가)를 확인하고, 같은 시각의 DB 장애 원인부터
+본다. 수동 복구(빠진 행 다시 넣기)는 별건이다.
 
 ---
 

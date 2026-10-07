@@ -144,17 +144,6 @@
 {
   "games": [
     {
-      "id": "TICHU",
-      "displayName": "티츄",
-      "shortDescription": "4인 파트너 카드 게임. 56장 덱과 4장의 특수카드.",
-      "minPlayers": 4,
-      "maxPlayers": 4,
-      "status": "AVAILABLE",
-      "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"],
-      "defaultPlayers": 4,
-      "defaultTurnSeconds": 0
-    },
-    {
       "id": "SKULL_KING",
       "displayName": "스컬킹",
       "shortDescription": "2~8인 트릭테이킹. 매 라운드 자기 승수를 예측한다.",
@@ -171,17 +160,28 @@
       "shortDescription": "2~6인 손패 털기. 공격을 쌓아 넘기고, 한 장 남으면 누구보다 먼저 \"원카드!\"를 외친다.",
       "minPlayers": 2,
       "maxPlayers": 6,
-      "status": "COMING_SOON",
+      "status": "AVAILABLE",
       "supportedRoomOptions": [],
       "defaultPlayers": 4,
       "defaultTurnSeconds": 30
+    },
+    {
+      "id": "TICHU",
+      "displayName": "티츄",
+      "shortDescription": "4인 파트너 카드 게임. 56장 덱과 4장의 특수카드.",
+      "minPlayers": 4,
+      "maxPlayers": 4,
+      "status": "AVAILABLE",
+      "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"],
+      "defaultPlayers": 4,
+      "defaultTurnSeconds": 0
     }
   ]
 }
 ```
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
-- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순.
+- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 세 게임이 모두 공개라(D-131) 스컬킹·원카드·티츄.
 - `supportedRoomOptions`(D-106): 이 게임이 **실제로 쓰는** 방 설정. 값은
   `TARGET_SCORE`·`TEAMS`·`BETTING` 이고 enum 선언 순서로 정렬된다. 방 만들기 UI 와
   대기실은 여기 있는 것만 노출하고, 서버도 같은 집합으로 검증한다
@@ -191,8 +191,8 @@
   들어가지 않는다.
 - `defaultPlayers`·`defaultTurnSeconds`(D-130): 방 만들기 모달의 **처음 선택**(사용자는 바꿀 수 있다). 게임이
   선언하며(`GameDefinition.defaultPlayers()`·`defaultTurnSeconds()`) 기본은 `maxPlayers`·`0`(끔) — 티츄·스컬킹은
-  지금까지와 같다. 원카드만 4명·30초다. 서버의 `capacity`·`turnSeconds` 생략 기본(`maxPlayers`·0, 아래 방 만들기)과는
-  별개다 — 인원 가변 게임은 클라가 늘 `capacity` 를 보낸다.
+  지금까지와 같다. 원카드만 4명·30초다. **D-131 — 방 만들기에서 `capacity`·`turnSeconds` 를 생략해도 서버가 이 값을
+  쓴다**(아래 방 만들기) — 모달의 처음 선택과 생략한 요청이 같은 방을 연다.
 
 ### GET `/api/games/{gameId}`
 단일 게임 상세. 응답은 위 항목 형식과 동일하되 룰 요약 등 추가 필드가 들어갈 수 있다
@@ -248,12 +248,15 @@
 - `gameType` 은 `GameRegistry` 에 등록되고 `status==AVAILABLE` 인 ID여야 한다.
 - 선택: `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`(D-81),
   `capacity`(D-99).
-- `capacity`(D-99): 방 인원. **생략하면 `GameDefinition.maxPlayers()`**. 게임이 정한
+- `capacity`(D-99): 방 인원. **생략하면 게임 선언 `defaultPlayers`**(D-131 — 카탈로그와 같은 값, 티츄 4·스컬킹 8·원카드 4. 예전
+  생략 기본 `maxPlayers` 와는 원카드만 다르다). 게임이 정한
   `minPlayers() <= capacity <= maxPlayers()` 를 벗어나면 `INVALID_CAPACITY`. 인원이
   고정된 게임(티츄는 `min=max=4`)은 그 값 하나만 통과하므로 사실상 생략과 동일하다 —
   클라는 `minPlayers === maxPlayers` 인 게임에서 이 필드를 아예 보내지 않는다.
   `fillWithBots` 의 좌석 채우기도 확정된 `capacity` 를 따른다(시드 봇은 4명뿐이므로
   `capacity - 1 > 4` 인 방은 봇으로 채울 수 없다 — 봇 풀 확장은 스컬킹 통합 시 별건).
+- `turnSeconds`(Phase 13D): 개인 턴 제한(초, 0=끔). **생략하면 게임 선언 `defaultTurnSeconds`**(D-131 — 티츄·스컬킹 0,
+  원카드 30). 턴 제한이 있는 방의 resync 는 지금 턴의 남은 시간을 싣는다(`turnRemainingMs`, 아래 resync).
 - `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
   고정·불변. **stake>0 이면 `fillWithBots` 불가**(봇=무한 잔액 → 칩 파밍 방지).
 - **게임별 옵션 게이팅(D-106)**: `targetScore`·`stake` 는 게임의 `supportedRoomOptions`
@@ -267,7 +270,7 @@
   "좌석 순서")만 가른다.
 
 응답 `201` — Room (위 형식과 동일, 본인이 host로 자동 join 됨).
-에러: `INVALID_INPUT` (gameType 미등록 또는 COMING_SOON/DISABLED 상태),
+에러: `GAME_NOT_AVAILABLE` 404 (gameType 미등록 또는 COMING_SOON/DISABLED 상태 — `OneCardClosedIntegrationTest`),
 `INVALID_CAPACITY` (게임 허용 인원 범위 밖 — `details` 에 `capacity`/`minPlayers`/
 `maxPlayers`), `INVALID_STAKE` (허용값 외 판돈), `STAKED_ROOM_NO_BOTS` (판돈 방 + 봇
 동시 요청), `UNSUPPORTED_ROOM_OPTION` (게임이 안 쓰는 방 설정 — `TARGET_SCORE`/`BETTING`
@@ -468,7 +471,8 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
     { "suit": null, "rank": 0, "special": "PHOENIX" }
   ]},
   "disconnectedSeats": [3],
-  "chips": { "17": 1000, "18": 900, "19": 1100, "20": 1000 }
+  "chips": { "17": 1000, "18": 900, "19": 1100, "20": 1000 },
+  "turnRemainingMs": 17450
 }
 ```
 - 좌석 식별은 **seat(0~3, playerIds 인덱스)**, `handCounts`/`declarations` 키도 seat.
@@ -484,6 +488,15 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   그 방의 참가자·관전자일 때만이다(`docs/stomp-protocol.md`).
 - `disconnectedSeats`: 현재 끊긴 플레이어 좌석(재접속 배지 즉시 반영, D-75).
 - `chips`: D-82 방 단위 테이블 칩(userId→칩). 내기 없는 방은 빈 맵.
+- `turnRemainingMs`(D-131, 게임 중립): 지금 턴이 시간 초과로 끝나기까지 남은 ms(0 이상) — 서버가 실제로 발화할 턴 데드라인
+  (지금 세대의 `deadlines:turn` 항목) − 지금. 재접속 직후에도 카운트다운이 맞게 하려는 값이다. **null** 이면 세지 않는다: 턴
+  제한 끔(`turnSeconds` 0)·IN_GAME 아님·기다리는 좌석 없음(원카드 경쟁 창·끝난 매치 — 걸린 데드라인이 발화해도 아무 일이
+  없다)·지금 세대의 데드라인 없음. 스냅샷과 **같은 락 안에서** 읽는다 — 진행 경로가 저장·방송·다음 턴 데드라인 재무장을 모두
+  그 락 안에서 끝내므로 함께 읽은 상태의 턴 값이다(락을 약 3초 못 잡아 잠금 없이 읽은 응답과 매치 시작 직후 ms 단위 틈은
+  예외 — null 이나 이전 값일 수 있고 다음 `TURN_CHANGED` 가 바로잡는다). 대기 좌석이 여럿인 단계(티츄 Dealing·Passing,
+  스컬킹 BIDDING)에서는 첫 대기 좌석(`pendingSeat`)의 자동 처리까지 남은 시간이다 — 시간 초과는 그 좌석 하나만 처리하고
+  다시 처음부터 걸며, 다른 좌석의 행동도 다시 처음부터 건다(각 좌석의 남은 시간으로 보이면 안 된다). 지금은 원카드 게임판만
+  쓴다(원카드는 대기 좌석이 늘 0~1개).
 - `completedRounds`: D-108 **끝난 라운드들의** 점수(순서 = 라운드 1..N). 바로 위
   `roundScores` 와 혼동 주의 — 그쪽은 **현재 라운드**의 팀별 점수다. 클라는 이 값으로
   라운드 내역을 통째로 교체하므로(append 아님), 재접속·새 기기에서도 내역이 온전하다.
@@ -565,7 +578,8 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
 - `result`: 끝났으면 `MATCH_ENDED` payload 와 같은 `{ reason, standings: [{seat, rank, cardsLeft, status}] }`.
 - `privateHand` = `{ "seat": 0, "hand": [{ "suit": "CLUB", "rank": 3, "joker": null }], "handVersion": 41 }` —
   손패 전체와 상태 버전. 클라는 가진 것보다 낮은 `handVersion` 의 손패를 버린다(비공개 `HAND_UPDATED` 와 같은 축).
-  `chips` 는 늘 `{}`(내기 미지원).
+  `chips` 는 늘 `{}`(내기 미지원). 위 예시(경쟁 창)의 봉투 `turnRemainingMs` 는 null 이다 — 창이 열린 동안은 기다리는 좌석이
+  없다. 창이 닫히면 `TURN_CHANGED` 와 함께 다음 차례의 턴 데드라인이 처음부터 걸린다(카운트다운 — `docs/stomp-protocol.md`).
 
 - **`privateHand` 는 요청자가 실제로 앉은 좌석에만**(D-122 심층 방어, 모든 게임 공통). 좌석은
   `playerIds` 의 인덱스인데, 게임이 시작된 뒤 목록이 정원(`capacity`)보다 줄었다면 인덱스가

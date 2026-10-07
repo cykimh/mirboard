@@ -252,7 +252,11 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 6. 새 상태 저장, `engine.advance(...)` 로 라운드/매치 진행 이벤트 합류,
    순번을 쓰는 이벤트마다 `room:{id}:seq` INCR(D-126 — `sequenced()` false 면 건너뜀),
    envelope 을 공개/비공개로 분기 전송.
-7. 락 해제 후 봇 스케줄(`BotScheduler`)·턴 타임아웃(`TurnTimeoutScheduler`) 트리거.
+7. 재무장(`TurnTimeoutScheduler.onTurnAdvanced` — 세대를 올려 이전 항목을 지우고, 엔진 타이머는 턴 제한과 무관하게(D-128),
+   다음 턴 데드라인은 턴 제한이 있을 때만 건다) — D-131 부터
+   **락 안**(방송 뒤). resync 가 같은 락 안에서 `turnRemainingMs` 를 읽는다. 재무장이 던져도 잡아 ERROR 로 남기고 다음
+   단계로 간다(액션은 이미 저장·방송됐다).
+8. 락 해제 후 봇 스케줄(`BotScheduler`) — 쥔 채 걸면 봇 루프가 이 락과 부딪쳐 재시도한다.
 
 > **D-122 — 끝난 방은 진행하지 않는다.** 봇 루프와 턴 타임아웃 발화(D-128 부터 엔진 타이머 발화도)도 위
 > 1·3 과 같은 방 상태 가드(락 전·락 안)를 거친다 — 게임 중립 판정이라 엔진 상태로는 매치가 안 끝난 강제
@@ -278,7 +282,7 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
 ## 원카드 (gameType=ONE_CARD, D-128)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~6). 룰 정본은 `docs/rules-onecard.md`.
-클라 게임판(S4, D-129)은 준비됐고, 카탈로그 상태는 열림 전환(별건) 전까지 `COMING_SOON` 이다(`mirboard.onecard.status`).
+D-131 부터 공개(`AVAILABLE`)다 — 되돌리기는 설정 `mirboard.onecard.status`(운영 런북 `docs/deploy.md`).
 
 **클라 → 서버 `@action`**:
 
@@ -330,6 +334,11 @@ envelope 없이 **`@action` 판별자를 가진 bare JSON** 을 보낸다(Jackso
   채 `NO_RACE` 로 거절되면 **창마다 한 번** resync 한다 — 서버 resync 는 진행 킥으로 사라진 타이머를 다시 건다.
   resync 스냅샷을 받으면 기다리던 누름 표식은 같은 창이라도 비운다(끊긴 사이 보낸 누름은 버려졌을 수 있다). 그 뒤
   늦게 온 그 누름의 `BUSY` 는 창이 열려 있으면 조용히 삼킨다(창 동안 내기·먹기는 막혀 있어 그 `BUSY` 는 누름의 것이다).
+- **D-131 — 턴 카운트다운.** 턴 제한이 있는 방이면 게임판이 차례 옆에 남은 시간을 센다. 기준은 서버다 — resync 의
+  `turnRemainingMs`(지금 세대 턴 데드라인까지, `docs/api.md`)로 맞추고, 서버가 턴 데드라인을 처음부터 다시 거는 순간의 공개
+  이벤트에서 방의 턴 제한부터 다시 센다: `TURN_CHANGED`, 그리고 `PLAYER_ELIMINATED`(차례가 그대로인 탈주 뒤에도 서버는
+  데드라인을 다시 건다 — 창이 열려 있지 않을 때). `CARD_PLAYED` 에서 멈추고 창이 열린 동안은 숨긴다(다음 차례가 멈춰 있다 —
+  서버도 기다리는 좌석이 없으면 `turnRemainingMs` 를 null 로 준다). 0 이 되면 서버의 시간 초과(먹기)가 다음 이벤트를 낸다.
 - **D-130 — 경쟁 결과 로그.** 창이 닫힐 때마다 서버가 INFO 한 줄(`OneCard race resolved: … outcome via owner… by…
   latencyMs windowMs lateMs`)을 남긴다. 사용자별 값이라 메트릭이 아니라 로그로만 둔다. PRESS·TIMER 줄은 저장 전에 찍혀(DESERTION
   은 저장 뒤) 저장 실패 뒤 같은 창이 두 번 찍힐 수 있으므로 `room`+`raceId` 의 마지막 줄이 정본이다(`docs/deploy.md`).
