@@ -314,12 +314,12 @@
 ## 13. 테스트 현황
 
 - **서버**: **1324건** (D-131 공개 전환 시점 실측, 실패 0, 그중 Docker 불필요 1118건(84%), 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 게임별 내역(같은 실측): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 16건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+  단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
+  Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
   집계 방식: `./gradlew :server:test --rerun` 뒤 `server/build/test-results/test/TEST-*.xml` 을 합한다. 클래스는 **파일 이름의 바깥 클래스**로
   묶는다 — `@Nested` 는 `$` 앞, `@DisplayName` 을 단 `@Nested` 는 스위트 이름이 표시 이름이라 이름 속성으로는 패키지에 안 묶인다(스컬킹이
   그렇다). 게임 도메인 = `com.mirboard.domain.game.{게임}.` 아래, Docker 불필요 = 바깥 클래스 이름이 `IT`·`IntegrationTest` 로 끝나지 않는 것.
   재현 스크립트는 `docs/case-study-multi-game.md` 부록 (6).
-  단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
-  Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
 - **클라이언트**: **658건 / 61파일** (D-131 공개 전환 시점 실측 — 원카드 턴 카운트다운 15건·본인 큐 가드 1건 포함, 실패 0). Vitest + RTL — 스토어

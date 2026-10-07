@@ -91,7 +91,7 @@ Object>` 로 우회했고, 부수 효과로 액션 역직렬화와 Redis 직렬�
 적어 뒀습니다: 칩 정산은 "어느 팀이 이겼는가"에 묶여 있어, 방금 포트에서 뺀 팀 개념을
 도로 끌어올려야 합니다.
 
-`코드:` `domain/game/core/GameEngine.java`(149줄) · `infra/ws/GameEngineProvider.java` ·
+`코드:` `domain/game/core/GameEngine.java`(149줄 — 스컬킹을 붙인 시점(D-102), D-131 기준 184줄은 §8) · `infra/ws/GameEngineProvider.java` ·
 `테스트:` `TichuGameEngine*Test` · `결정:` D-98
 
 ---

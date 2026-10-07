@@ -263,6 +263,16 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 자동 재시도는 없다 — 로그의 room·players·결과로 영향 범위(누구의 전적이 빠졌는가)를 확인하고, 같은 시각의 DB 장애 원인부터
 본다. 수동 복구(빠진 행 다시 넣기)는 별건이다.
 
+**공개 직후 확인**(D-131 병합·배포 직후 한 번). 위 절들을 묶은 점검표다.
+
+1. `flyctl scale show -a mirboard` — app 머신이 **1대**다(위 "머신은 1대로 둔다". Fly 는 첫 배포 때 HA 기본으로 2대를 만들기도 한다 —
+   2대면 `flyctl scale count 1 -a mirboard`).
+2. `flyctl secrets list -a mirboard` — `MIRBOARD_ONECARD_STATUS` 가 **없다**(있으면 위 "지금 값 확인"대로 지운다).
+3. 허브의 원카드 카드에 'Coming Soon' 이 없고, 원카드 4인 봇 채우기 방 한 판이 끝까지 간다 — 내 차례 카운트다운이 줄고
+   0 에서 자동으로 먹으며, 1장 남으면 경쟁 버튼이 뜬다(`docs/qa-scenarios.md` "원카드 게임판 확인").
+4. `flyctl logs -a mirboard | grep "OneCard race resolved"` 가 그 판에서 1줄 이상 나온다(위 "경쟁 튜닝").
+5. Sentry·로그에 `match record failed` ERROR 가 0건이다(위 "매치 기록 실패" — 있으면 그 절대로 영향 범위부터 본다).
+
 ---
 
 ## CD (GitHub Actions)

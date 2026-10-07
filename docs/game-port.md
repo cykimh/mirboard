@@ -168,6 +168,11 @@ ELO·전적은 포트 밖이지만, 새 게임의 매치 기록기(`MatchResultR
    `TransactionTemplate` 으로 트랜잭션 경계를 직접 감싸 본문·커밋 예외를 삼킨다(티츄 — 발행 지점에서 잡으면
    멀티캐스터가 첫 예외에서 멈춰, 리스너 순서에 따라 칩 정산이 빠진다. `@Transactional` 본문 안의 try 로는 커밋
    실패를 못 잡는다). 고정: `infra.ws.*RecorderFailureTest`.
+   **이 격리는 진행 경로가 트랜잭션 밖에서 매치 종료 이벤트를 발행한다는 전제에 선다(세 게임 공통).** 기록기는 기본
+   전파(REQUIRED — 티츄 `TransactionTemplate`, 스컬킹·원카드 `@Transactional` 리스너)라 바깥 트랜잭션이 있으면 거기에
+   참여하고, 기록 실패는 바깥을 rollback-only 로 표시한 채 삼켜져 바깥 커밋에서 `UnexpectedRollbackException` 으로 샌다.
+   진행 경로(컨트롤러·봇·두 스케줄러·탈주·REST leave)에 `@Transactional` 을 얹지 말 것. `REQUIRES_NEW` 로 바꾸지 않은 것은
+   `MatchResultRecorderIT` 가 테스트 트랜잭션 안에서 만든 사용자를 기록기가 같은 트랜잭션에서 보는 것에 기대기 때문이다.
 
 `users` 를 FK 로 참조하는 테이블을 **매치와 무관한 용도**(신고·역할처럼)로 새로 만들면
 `UserRepository.findExpiredGuestIds` 에 `NOT EXISTS` 를 더할 것. 매치 참가자 테이블은 2번이
