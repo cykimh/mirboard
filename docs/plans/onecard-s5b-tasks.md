@@ -1,5 +1,29 @@
 # 원카드 S5b 구현 계획 — 공개 전환 (D-130 기록 + D-131)
 
+## 정오표 (최종 리뷰 반영, 2026-10-07)
+
+아래 본문은 실행 기록이라 그대로 둔다. 최종 리뷰(서버·클라·릴리스 3렌즈 + 반박 검증)의 fix-now 28건(렌즈 간 중복을 묶으면 id 23개)을 반영한 뒤
+바뀐 것과 새 수치만 여기 적는다. 근거·항목별 내역은 커밋 `8298708`·`77971e5`·`9bc2db9`·`5e76c6f` 와 이 정오표를 단 커밋.
+
+- **재무장 실패 처리**(F-server-1·S5bT4-M4): 본문은 "컨트롤러·탈주 계속은 잡고, 두 스케줄러는 자기 catch 가 잡는다, 봇은 원래 락
+  안"이라 했지만 봇 경로는 재무장 예외가 루프 catch 로 빠져 재귀가 끊겼다(D-131 이전부터). 이제 다섯 경로(액션·봇·턴 시간 초과·엔진
+  타이머·탈주 계속) 모두 재무장만 따로 잡아 `Turn rearm after … failed` ERROR, 봇 스케줄·재귀는 그대로. 테스트 +3
+  (`BotSchedulerTest`·`TurnRemainingTest$RearmInsideTheLock`·`EngineTimerSchedulerTest$Firing`).
+- **카운트다운**(F-client-1·F-client-4·S5bT5-M1): resync 값을 턴 제한으로 자른다(+1 테스트), 숫자 2ch 고정폭, 위험 배지 규칙을
+  `.oc-attack` 과 한 규칙으로. 스토어 RACE_OPENED 단독 테스트 +1(S5bT5-M2).
+- **테스트 판별력**(수 불변): 원카드 시뮬레이션의 클라 턴 시계 모델 단언(F-client-5), 티츄 기록 실패 테스트의 리스너 호출 순서
+  InOrder(S5bT2-M1), staleSocket 의 핸들러 동일성 사전조건·공용 코드 BUSY(S5bT7-M1·M2), resync IT 사용자 rs7_*(S5bT4-M3).
+- **이름·주석·문서**: `RoomCapacityIntegrationTest` 의 `…_defaults_to_max_players` → `…_defaults_to_declared_players`(본문 Task 4
+  코드 블록의 옛 이름은 실행 당시 그대로), 짧은 `createRoom` 오버로드 Javadoc, `GameEngine.onTimer` 계약 Javadoc(줄 수 184 유지),
+  `MatchResultRecorder` 전파 전제(+2줄 → 티츄 main 6,007 → **6,009줄**), `game-port.md` 기록기 계약 3·`api.md` 만기 순간 null·
+  `deploy.md` 공개 직후 확인·QA 시나리오 6·README/CLAUDE.md 포트 확장 범위·케이스 스터디 §2 앵커 시점·implementation-status 순서.
+- **후속으로 기록만**(`docs/plans/onecard.md` §9 남은 후속): F-server-2(기록 지연은 락 안 — 운영 타임아웃·락 소유 확인), S5bT2-M3(칩 정산
+  리스너 미격리), F-client-3("0초" 정지·자가 치유 없음), F-client-2(표시 마감 지연), F-client-6(이미 기록 — 근거 표시만).
+- **새 수치**(본문 Step 5 의 Expected 대신): 클라 `Test Files  61 passed (61)` · `Tests  660 passed (660)`(658 + 2). 서버
+  `tests=1327 skipped=5 failed=0 dockerfree=1121 (84%)`(1324 + 3, 모두 Docker 불필요). 게임 도메인 내역은 그대로(티츄 312/304 ·
+  스컬킹 375/371 · 원카드 191/187), 엔진 타이머 단위 16 → **17**, `*RecorderFailureTest` 8·원카드 서버 경로 IT 10 그대로. 인프라 게임
+  이름 grep 16·원카드 0 그대로. 코드 규모 core 515 · tichu **6009** · skullking 3766 · onecard 2612 · `GameEngine.java` 184.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 원카드를 공개(AVAILABLE)한다. 공개 전에 사용자가 고른 보강을 같이 넣는다 — resync 응답의 **남은 턴 시간**(게임 중립)과 원카드 게임판

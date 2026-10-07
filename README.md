@@ -8,7 +8,7 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 1324건 / 클라 658건
+서버 테스트 1327건 / 클라 660건
 
 **라이브**: https://mirboard.fly.dev — 로그인 화면 「게스트로 바로 체험하기」로 가입 없이 들어갈 수 있습니다.
 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
@@ -53,7 +53,7 @@ ELO·전적은 **게임별**로 쌓입니다(`user_game_stats`, [D-115](docs/dec
 
 ### 1. 두 번째 게임이 추상화의 결함을 정확히 한 곳 찾아냈다
 
-`GameEngine` 포트(지금 184줄) 뒤에 티츄 6,007줄·스컬킹 3,766줄·원카드 2,612줄이 꽂힙니다(재현 명령은 케이스 스터디
+`GameEngine` 포트(지금 184줄) 뒤에 티츄 6,009줄·스컬킹 3,766줄·원카드 2,612줄이 꽂힙니다(재현 명령은 케이스 스터디
 부록 (8)). 스컬킹을 붙일 때
 **REST/WS 컨트롤러·스케줄러·브로드캐스터·로비는 한 줄도 바뀌지 않았고**, 인프라에
 `skullking` 참조는 0건입니다.

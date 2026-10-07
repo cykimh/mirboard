@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1324건 중 1118건(84%)이 Docker 불필요**합니다(D-131 시점, 부록 (6)).
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1327건 중 1121건(84%)이 Docker 불필요**합니다(D-131 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -281,7 +281,7 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 순서 공용화뿐이고(원카드 전용 신규 파일 `types/onecard.ts`·`19-onecard-table.css` 와 테스트는 빼고) `useStompRoom` 은 0줄입니다.
 
 - `grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra` → **0건**.
-- 포트 `domain/game/core` 515줄(그중 `GameEngine.java` 184줄) 뒤에 티츄 6,007줄 · 스컬킹 3,766줄 · 원카드 2,612줄
+- 포트 `domain/game/core` 515줄(그중 `GameEngine.java` 184줄) 뒤에 티츄 6,009줄 · 스컬킹 3,766줄 · 원카드 2,612줄
   (`wc -l`, D-131 기준 — 부록 (8). §5 의 수치는 스컬킹을 붙인 시점).
 
 **대가 — 시간은 인프라의 가정을 건드렸습니다.** "포트 확장 1건"은 맞지만, 처음으로 *시간에 기대는* 게임이 붙자 기존 가정 셋이
@@ -338,7 +338,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1324 skipped=5 failed=0 dockerfree=1118 (84%)   (D-131 시점)
+# → tests=1327 skipped=5 failed=0 dockerfree=1121 (84%)   (D-131 시점)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -349,7 +349,7 @@ git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard 
 # (8) 포트 뒤 게임별 코드 규모(§8) — main 소스 줄 수
 for d in core tichu skullking onecard; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 515 · tichu 6007 · skullking 3766 · onecard 2612, GameEngine.java 184   (D-131 시점)
+# → core 515 · tichu 6009 · skullking 3766 · onecard 2612, GameEngine.java 184   (D-131 시점)
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·

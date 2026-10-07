@@ -313,7 +313,7 @@
 
 ## 13. 테스트 현황
 
-- **서버**: **1324건** (D-131 공개 전환 시점 실측, 실패 0, 그중 Docker 불필요 1118건(84%), 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 게임별 내역(같은 실측): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 16건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+- **서버**: **1327건** (D-131 공개 전환 시점 실측 — 최종 리뷰 반영 뒤, 실패 0, 그중 Docker 불필요 1121건(84%), 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip). 게임별 내역(같은 실측): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 17건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
   집계 방식: `./gradlew :server:test --rerun` 뒤 `server/build/test-results/test/TEST-*.xml` 을 합한다. 클래스는 **파일 이름의 바깥 클래스**로
@@ -322,7 +322,7 @@
   재현 스크립트는 `docs/case-study-multi-game.md` 부록 (6).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **658건 / 61파일** (D-131 공개 전환 시점 실측 — 원카드 턴 카운트다운 15건·본인 큐 가드 1건 포함, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **660건 / 61파일** (D-131 공개 전환 시점 실측 — 최종 리뷰 반영 뒤, 원카드 턴 카운트다운 17건·본인 큐 가드 1건 포함, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
@@ -416,7 +416,7 @@
   (resync `turnRemainingMs` + `TURN_CHANGED`·`PLAYER_ELIMINATED` 로 다시 세기, 경쟁 창 동안 숨김). 방 만들기에서 인원·턴 제한을
   생략하면 게임 선언(4명·30초).
 - **검증**: 도메인 191건(Docker 불필요 187) — 2~6인 무작위 시뮬레이션·매 전이 불변식, 서버 경로 IT 10건(경쟁 창 6건·봇 풀매치 4건),
-  엔진 타이머 단위 16건, 클라 게임판·스토어·튜토리얼(`npm --prefix client run test -- onecard`).
+  엔진 타이머 단위 17건, 클라 게임판·스토어·튜토리얼(`npm --prefix client run test -- onecard`).
 - **남은 것**: `docs/plans/onecard.md` §8·§9 남은 후속(메시지 순서, 강제 종료 기록 정책, 장기 정지 탈주화, 누름 하한 등).
 
 ---
