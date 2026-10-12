@@ -74,3 +74,21 @@ export function sortForDisplay(hand: OneCardCard[]): OneCardCard[] {
     c.joker ? 100 + (c.joker === 'BLACK' ? 0 : 1) : SUIT_ORDER[c.suit!] * 20 + c.rank;
   return [...hand].sort((a, b) => order(a) - order(b));
 }
+
+/**
+ * 일반 진행 기준 다음 차례 (D-132 — 게임판의 "다음" 표시). 진행 방향(`direction` ≥ 0 이면 +1, 아니면 −1)으로 탈락하지 않은 다음
+ * 좌석이고, 차례가 비어 있으면(`turnSeat` −1 — 카드를 낸 직후·경쟁 창) 또는 나머지가 모두 탈락했으면 −1 이다. J(건너뛰기)·
+ * K(한 번 더)·2인 특례는 카드를 내기 전엔 알 수 없으므로 반영하지 않는다. 표시 전용이고 차례의 권위는 서버다.
+ *
+ * @param eliminated 좌석 번호별 탈락 여부 — 길이가 곧 좌석 수다.
+ */
+export function nextTurnSeat(turnSeat: number, direction: number, eliminated: boolean[]): number {
+  const n = eliminated.length;
+  if (turnSeat < 0 || turnSeat >= n) return -1;
+  const step = direction < 0 ? -1 : 1;
+  for (let i = 1; i < n; i++) {
+    const seat = (((turnSeat + step * i) % n) + n) % n;
+    if (!eliminated[seat]) return seat;
+  }
+  return -1;
+}

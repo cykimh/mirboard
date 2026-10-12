@@ -1,5 +1,6 @@
 import { avatarSrc } from '@/api/avatar';
 import { animalFor } from '@/components/avatarGlyph';
+import type { TableSide } from '@/components/seatOrder';
 import type { EliminationReason, OneCardSeatView } from '@/types/onecard';
 
 const ACCENTS = [
@@ -27,12 +28,18 @@ interface Props {
   username?: string;
   isBot?: boolean;
   isTurn?: boolean;
+  /** D-132 — 일반 진행 기준 다음 차례. */
+  isNext?: boolean;
   isDisconnected?: boolean;
+  /** D-132 — 테이블 자리(관전자의 아래 좌석은 `bottom`). 자리는 게임판의 옆줄 래퍼가 잡고, 이 값은 표식이다. */
+  side?: TableSide | 'bottom';
+  /** 옆줄 안 순서(시계 방향, 0 부터). */
+  slot?: number;
 }
 
 /**
  * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
- * 스컬킹처럼 정상 흐름의 `auto-fit` 그리드에 놓여 2~6인이 폭 미디어 없이 줄바꿈된다.
+ * 테이블(D-132)의 옆줄·윗줄에 놓인다 — 옆줄 칸은 좁아질 수 있어 이름은 말줄임하고 `title` 로 전체 이름을 보인다.
  */
 export function OneCardSeat({
   seat,
@@ -40,7 +47,10 @@ export function OneCardSeat({
   username,
   isBot = false,
   isTurn = false,
+  isNext = false,
   isDisconnected = false,
+  side,
+  slot,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -62,7 +72,10 @@ export function OneCardSeat({
       className={className}
       style={{ ['--oc-accent' as string]: seatAccent(seat.seat) }}
       data-seat={seat.seat}
+      data-side={side}
+      data-slot={slot}
     >
+      {isNext && <span className="oc-badge oc-seat-next">다음</span>}
       <div className="oc-seat-top">
         <span className="oc-seat-avatar" aria-hidden>
           {!isBot && userId != null ? (

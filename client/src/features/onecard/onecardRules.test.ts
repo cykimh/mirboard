@@ -7,6 +7,7 @@ import {
   drawCount,
   isAttack,
   isSuitChange,
+  nextTurnSeat,
   sortForDisplay,
 } from './onecardRules';
 import type { OneCardCard, OneCardSuit } from '@/types/onecard';
@@ -121,5 +122,51 @@ describe('손패 표시 순서', () => {
 
     expect(sorted).toEqual([c('SPADE', 9), c('HEART', 1), c('HEART', 13), c('CLUB', 2), BLACK, COLOR]);
     expect(hand[0]).toBe(COLOR);
+  });
+});
+
+/**
+ * D-132 — 게임판의 "다음" 표시. 일반 진행 기준이다: J(건너뛰기)·K(한 번 더)·2인 특례는 카드를 내기 전엔 알 수 없으므로
+ * 반영하지 않는다. 탈락 좌석은 서버 진행(`OneCardEngine`)처럼 건너뛴다.
+ */
+describe('다음 차례 — nextTurnSeat (D-132)', () => {
+  const alive = (n: number) => Array.from({ length: n }, () => false);
+
+  it('정방향이면 +1, 마지막 좌석 다음은 0', () => {
+    expect(nextTurnSeat(0, 1, alive(4))).toBe(1);
+    expect(nextTurnSeat(3, 1, alive(4))).toBe(0);
+  });
+
+  it('역방향이면 −1, 0 다음은 마지막 좌석', () => {
+    expect(nextTurnSeat(2, -1, alive(4))).toBe(1);
+    expect(nextTurnSeat(0, -1, alive(4))).toBe(3);
+  });
+
+  it('탈락한 좌석은 건너뛴다 — 역방향에서도', () => {
+    const out = [false, true, true, false, false];
+    expect(nextTurnSeat(0, 1, out)).toBe(3);
+    expect(nextTurnSeat(4, 1, out)).toBe(0);
+    expect(nextTurnSeat(3, -1, out)).toBe(0);
+    expect(nextTurnSeat(0, -1, out)).toBe(4);
+  });
+
+  it('차례가 비어 있으면(−1 — 카드를 낸 직후·경쟁 창) 다음도 없다', () => {
+    expect(nextTurnSeat(-1, 1, alive(4))).toBe(-1);
+    expect(nextTurnSeat(-1, -1, alive(4))).toBe(-1);
+  });
+
+  it('나머지가 모두 탈락해 혼자 남으면 다음이 없다', () => {
+    const lone = [true, true, false, true];
+    expect(nextTurnSeat(2, 1, lone)).toBe(-1);
+    expect(nextTurnSeat(2, -1, lone)).toBe(-1);
+  });
+
+  it('2인은 방향과 무관하게 상대가 다음이다', () => {
+    expect(nextTurnSeat(0, 1, alive(2))).toBe(1);
+    expect(nextTurnSeat(0, -1, alive(2))).toBe(1);
+  });
+
+  it('좌석 수 밖의 차례는 다음이 없다 (방어)', () => {
+    expect(nextTurnSeat(4, 1, alive(4))).toBe(-1);
   });
 });

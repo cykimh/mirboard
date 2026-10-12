@@ -134,6 +134,20 @@ function declared(selector: string, prop: string): string | undefined {
 }
 
 /**
+ * 같은 특이도에선 뒤 규칙이 이긴다 — `selector` 를 포함한 규칙들 중 `prop` 의 **마지막** 값(D-132). `declared` 는 첫 값이라
+ * `.oc-felt-left, .oc-felt-right { flex-direction: column }` 그룹 규칙을 읽어 `.oc-felt-left` 의 `column-reverse` 를 놓친다.
+ */
+function lastDeclared(selector: string, prop: string): string | undefined {
+  const decl = new RegExp(`(^|[;\\s])${prop}\\s*:\\s*([^;]+);`);
+  let last: string | undefined;
+  for (const body of bodiesOf(selector)) {
+    const m = decl.exec(body);
+    if (m) last = m[2].replace(/\s+/g, ' ').trim();
+  }
+  return last;
+}
+
+/**
  * jsdom(css:false)은 캐스케이드를 계산하지 않는다 — 전역 규칙이 OC 규칙을 이기는지는 원문으로 고정한다.
  * `01-base.css` 의 `button:hover:not(:disabled)`(0,2,1)·`button:disabled { opacity: .5 }` 와 `08-hand.css` 의
  * `.card-chip:hover:not(:disabled)`(0,3,0)는 단일 클래스(0,1,0) 규칙을 이긴다. 그래서 hover·disabled 상태를 19 가 직접
@@ -193,6 +207,62 @@ describe('19-onecard-table.css — 버튼 반폭(--oc-race-half-w)', () => {
 
     expect(minWidth).toBeGreaterThan(0);
     expect(half).toBeGreaterThanOrEqual(minWidth / 2);
+  });
+});
+
+/** D-132 — 테이블 좌석 배치와 버튼 간격. jsdom(css:false)은 레이아웃을 재지 않으므로 원문으로 고정한다. */
+describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
+  it('내기와 먹기 사이를 손가락 너비(32px) 띄운다 — 붙어 있으면 먹기를 잘못 누른다', () => {
+    expect(declared('.oc-play + .oc-draw', 'margin-inline-start')).toBe('32px');
+  });
+
+  it('테이블 색은 토큰이고 라이트 테마 값을 따로 둔다', () => {
+    const dark = tokensOf('.oc-table').get('--oc-felt-bg');
+    const light = tokensOf('html:not(.dark) .oc-table').get('--oc-felt-bg');
+
+    expect(dark, '.oc-table --oc-felt-bg').toBeTruthy();
+    expect(light, 'html:not(.dark) .oc-table --oc-felt-bg').toBeTruthy();
+    expect(light).not.toBe(dark);
+    expect(declared('.oc-felt', 'background')).toBe('var(--oc-felt-bg)');
+  });
+
+  it('옆줄 좌석 폭은 화면 폭을 따른다 — 폭 미디어 없이 clamp 로', () => {
+    expect(declared('.oc-felt-left .oc-seat', 'width')).toBe('clamp(64px, 22vw, 150px)');
+    expect(declared('.oc-felt-right .oc-seat', 'width')).toBe('clamp(64px, 22vw, 150px)');
+  });
+
+  it('옆줄 사이 가운데 칸이 좁아지면 더미와 맨 위 카드가 줄을 바꾼다 — 넘쳐 옆 좌석을 덮지 않는다', () => {
+    expect(declared('.oc-felt .oc-piles', 'flex-wrap')).toBe('wrap');
+  });
+
+  // 좌석 DOM 의 data-side 는 표식일 뿐 — 자리를 잡는 것은 이 CSS 다. 여기를 반시계로 뒤집으면 컴포넌트 테스트는 모두 통과한다.
+  it('시계 방향 자리 — 왼쪽 옆줄은 왼쪽 칸에서 아래→위, 오른쪽 옆줄은 오른쪽 칸에서 위→아래', () => {
+    expect(lastDeclared('.oc-felt', 'grid-template-areas')).toBe(
+      "'top top top' 'left center right' 'bottom bottom bottom'",
+    );
+    expect(lastDeclared('.oc-felt-left', 'grid-area')).toBe('left');
+    expect(lastDeclared('.oc-felt-left', 'flex-direction')).toBe('column-reverse');
+    expect(lastDeclared('.oc-felt-right', 'grid-area')).toBe('right');
+    expect(lastDeclared('.oc-felt-right', 'flex-direction')).toBe('column');
+  });
+
+  // 390px 옆줄 좌석 내용 ≈65px 에 아바타 28px 면 한 줄 이름 칸은 ≈31px(두 글자)다. 모바일은 title 툴팁이 뜨지 않는다.
+  it('좁은 좌석에서는 이름이 아바타 아래 줄로 내려간다 — 한 줄에 아바타 + 이름 44px 가 안 들어가면', () => {
+    expect(lastDeclared('.oc-seat-top', 'flex-wrap')).toBe('wrap');
+    expect(lastDeclared('.oc-seat-name', 'flex')).toBe('1 1 44px');
+  });
+
+  // 390px 가운데 칸 ≈138px — 더미 뒷면 62px + 문구 + 맨 위 카드 48px 가 한 줄에 안 들어가 천이 ≈80px 높아졌다.
+  it('가운데 칸이 좁으면 더미 뒷면·문구·간격이 폭을 따라 줄어 더미와 맨 위 카드가 한 줄에 든다', () => {
+    expect(lastDeclared('.oc-felt .oc-pile-back', 'width')).toBe('clamp(40px, 11vw, 62px)');
+    expect(lastDeclared('.oc-felt .oc-pile-count', 'max-width')).toBe('clamp(50px, 14vw, 120px)');
+    expect(lastDeclared('.oc-felt .oc-piles', 'gap')).toBe('8px clamp(6px, 2vw, 24px)');
+  });
+
+  // .oc-badge 는 nowrap 이라 "guest-ab12cd34 차례" ≈137px 가 가운데 칸(≈126px)을 넘어 옆줄 좌석에 걸쳤다. 헤더 배지는 그대로.
+  it('가운데 칸 배지는 칸 안에서 줄을 바꾼다 — 긴 이름의 "차례" 배지가 옆줄 좌석으로 넘치지 않는다', () => {
+    expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'white-space')).toBe('normal');
+    expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'max-width')).toBe('100%');
   });
 });
 

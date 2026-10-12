@@ -1,7 +1,7 @@
 /* 원카드 게임판 (D-129) — 스컬킹 게임판(18)과 같은 규칙을 따른다.
  *
  * ⚠ 캐스케이드: index.css 에서 18 다음, **17-responsive 앞**에 import 된다. 그래서 이 파일에는 폭 미디어가
- *   **0개**다 — 좌석은 auto-fit 그리드라 브레이크포인트 없이 줄바꿈되고 손패는 여러 줄로 감긴다. 카드 축소는
+ *   **0개**다 — 좌석은 테이블 격자(D-132)라 옆줄 폭을 clamp() 로 줄여 브레이크포인트 없이 맞추고 손패는 여러 줄로 감긴다. 카드 축소는
  *   17 의 공용 규칙(.card-chip, .action-bar)을 상속한다. 폭·터치 규칙이 불가피하면 17-responsive.css **맨 끝**에
  *   .oc-* 블록만 추가한다(D-88).
  *
@@ -38,6 +38,9 @@
   --oc-accent-3: #e0b32a;
   --oc-accent-4: #7b5cd6;
   --oc-accent-5: #2fb5c0;
+  /* D-132 — 테이블 천. 라이트 테마 값은 아래 블록. */
+  --oc-felt-bg: #173a2a;
+  --oc-felt-edge: #2c6046;
 
   position: relative;
   display: flex;
@@ -45,6 +48,12 @@
   gap: 10px;
   padding: 10px;
   min-height: 100vh;
+}
+
+/* 좌석·가운데는 자기 배경(--color-bg-*)이 있어 천 위 글자색은 문제되지 않는다 — 천만 테마를 따라 밝힌다. */
+html:not(.dark) .oc-table {
+  --oc-felt-bg: #dbeee1;
+  --oc-felt-edge: #9fcbb0;
 }
 
 /* ── 헤더 ─────────────────────────────────────────────────────────── */
@@ -108,13 +117,103 @@ button.oc-badge {
   cursor: pointer;
 }
 
-/* ── 상대 좌석 그리드 — 폭 미디어 없이 2~6인 대응 ─────────────────── */
-/* max 는 1fr 이어야 auto-fit 이 min 기준으로 열을 센다(스컬킹 18 의 C5 실측과 같은 이유). */
-.oc-seats {
+/* ── 테이블 (D-132) — 내 기준 왼쪽 옆줄 → 윗줄 → 오른쪽 옆줄, 시계 방향. 폭 미디어 없이 2~6인 ─────── */
+/* 자리 계산은 `tableLayout`(components/seatOrder.ts), 배치는 여기. 옆줄 열은 좌석이 없으면 auto 로 접힌다(좌우는 늘 같은 수라
+   대칭). 내 자리(아래)는 천 밖의 "나" 줄이고, 관전자만 좌석 0 을 아래 칸에 둔다. */
+.oc-felt {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--oc-seat-min), 1fr));
-  justify-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'top top top'
+    'left center right'
+    'bottom bottom bottom';
   gap: 8px;
+  padding: 12px 8px;
+  border-radius: 24px;
+  border: 2px solid var(--oc-felt-edge);
+  background: var(--oc-felt-bg);
+}
+
+.oc-felt-top,
+.oc-felt-bottom {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oc-felt-top {
+  grid-area: top;
+}
+
+.oc-felt-bottom {
+  grid-area: bottom;
+}
+
+/* 옆줄은 세로로 고르게 — 1명이면 가운데, 2명이면 위·아래. 간격은 "다음" 꼬리표(좌석 위로 9px)가 위 좌석에 닿지 않게. */
+.oc-felt-left,
+.oc-felt-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* 왼쪽 옆줄은 아래→위다(index 0 = 내 바로 왼쪽 = 다음 차례). DOM 순서는 진행 순서 그대로 두고 보이는 순서만 뒤집는다. */
+.oc-felt-left {
+  grid-area: left;
+  flex-direction: column-reverse;
+}
+
+.oc-felt-right {
+  grid-area: right;
+}
+
+.oc-felt > .oc-center {
+  grid-area: center;
+  min-width: 0;
+  padding: 8px 6px;
+}
+
+/* 390px 3인 이상이면 가운데 칸이 ≈138px(내용 ≈126px)다. 더미 뒷면(62px)·"뽑을 더미 N장"(≈80px)·맨 위 카드(≤480px 48px)를
+   그대로 두면 한 줄에 안 들어가 두 줄(천 +80px)이 되므로, 뒷면·문구 폭·간격을 화면 폭에 맞춰 줄인다(390px ≈110px — 문구는
+   "뽑을 더미 / N장" 두 줄). 그래도 넘치면(7 의 지정 무늬 배지가 붙은 직후) 줄을 바꾼다 — 안 바꾸면 넘쳐 오른쪽 옆줄 좌석을
+   덮는다. 넓은 화면은 62px·120px·24px 라 지금처럼 한 줄이다. */
+.oc-felt .oc-piles {
+  flex-wrap: wrap;
+  gap: 8px clamp(6px, 2vw, 24px);
+}
+
+.oc-felt .oc-pile-back {
+  width: clamp(40px, 11vw, 62px);
+  height: auto;
+  aspect-ratio: 62 / 88;
+}
+
+.oc-felt .oc-pile-count {
+  max-width: clamp(50px, 14vw, 120px);
+  text-align: center;
+}
+
+/* 가운데 배지는 칸 안에서 줄을 바꾼다 — .oc-badge 는 nowrap 이라 "guest-ab12cd34 차례"(≈137px)가 가운데 칸을 넘어 옆줄 좌석에
+   걸쳤다. 헤더 배지는 그대로 한 줄. */
+.oc-felt .oc-center-info .oc-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 옆줄 좌석은 화면 폭을 따라 64~150px, 윗줄·아래 좌석은 기준 폭(--oc-seat-min)에서 최대 168px. 이름은 말줄임(.oc-seat-name). */
+.oc-felt-left .oc-seat,
+.oc-felt-right .oc-seat {
+  width: clamp(64px, 22vw, 150px);
+}
+
+.oc-felt-top .oc-seat,
+.oc-felt-bottom .oc-seat {
+  flex: 1 1 var(--oc-seat-min);
 }
 
 .oc-seat {
@@ -155,10 +254,15 @@ button.oc-badge {
     0 0 0 4px var(--oc-race-catch);
 }
 
+/* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 44 = 78px — 390px 옆줄 ≈65px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다
+   쓴다(≈8자). 한 줄이면 이름 칸이 ≈31px(두 글자 + 말줄임)라 봇이 모두 "bo…"로 보이고, 모바일은 title 툴팁이 뜨지 않는다.
+   윗줄 좌석·넓은 화면 옆줄은 한 줄 그대로다(폭 미디어 없음). */
 .oc-seat-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  row-gap: 2px;
   min-width: 0;
 }
 
@@ -185,6 +289,8 @@ button.oc-badge {
 }
 
 .oc-seat-name {
+  flex: 1 1 44px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -222,6 +328,22 @@ button.oc-badge {
 .oc-seat-tag {
   align-self: flex-start;
   font-size: 11px;
+}
+
+/* D-132 — 일반 진행 기준 다음 차례. 좌석 안에서는 위 테두리에 걸친 꼬리표라 좁은 옆줄 좌석의 이름 칸을 줄이지 않는다.
+   "나" 줄에서는 다른 배지처럼 줄 안에 놓인다. */
+.oc-seat-next {
+  border-color: var(--oc-accent);
+  background: var(--color-bg-surface);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.oc-seat > .oc-seat-next {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  padding: 0 6px;
 }
 
 /* ── 가운데 — 더미·맨 위 카드·상태 ─────────────────────────────────── */
@@ -286,6 +408,16 @@ button.oc-badge {
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
+}
+
+/* D-132 — 진행 방향 화살표(↻ 시계 / ↺ 반시계). 글리프는 aria-hidden, 방향은 뒤의 글자로 읽힌다. */
+.oc-direction {
+  font-weight: 600;
+}
+
+.oc-direction-arrow {
+  font-size: 15px;
+  line-height: 1;
 }
 
 /* D-131 — 차례 옆 남은 시간. 숫자 폭이 흔들리지 않게 고정폭 숫자, 5초 이하는 경고 테두리·배경(아래 .oc-attack 과 같은
@@ -457,6 +589,12 @@ button.oc-card {
 
 .oc-draw {
   background: #7a6bd0;
+}
+
+/* D-132 — "먹기"는 공격 누적이면 여러 장을 먹는 되돌릴 수 없는 동작이다. 엄지로 "내기"를 누르려다 "먹기"를 누르지 않게
+   손가락 너비만큼 띄운다(줄이 감겨 아래로 내려가면 버튼 높이 44px 가 이미 그만큼 떨어뜨린다). */
+.oc-play + .oc-draw {
+  margin-inline-start: 32px;
 }
 
 /* 반투명 흰색은 라이트 테마에서 흰 글자가 된다 — 불투명 회색으로 고정한다(스컬킹 C5 실측과 같은 이유). 전역
