@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -110,8 +111,8 @@ class RoomPreviewRendererTest {
     }
 
     @Test
-    @DisplayName("방 이름이 40자를 넘으면 40자에서 자르고 말줄임표 — 이모지(서로게이트 쌍)를 반으로 가르지 않는다")
-    void clips_long_room_name_by_code_points() {
+    @DisplayName("방 이름이 40글자를 넘으면 40글자에서 자르고 말줄임표 — 이모지(서로게이트 쌍)를 반으로 가르지 않는다")
+    void clips_long_room_name_keeping_surrogate_pairs() {
         String longName = "🎲".repeat(39) + "가나다라";
         String html = RoomPreviewRenderer.render(TEMPLATE, room(longName, "alice"));
 
@@ -123,12 +124,57 @@ class RoomPreviewRendererTest {
     }
 
     @Test
-    @DisplayName("딱 40자인 방 이름은 자르지 않는다")
+    @DisplayName("딱 40글자인 방 이름은 자르지 않는다")
     void keeps_room_name_of_exactly_forty() {
         String name = "가".repeat(40);
         String html = RoomPreviewRenderer.render(TEMPLATE, room(name, "alice"));
 
         assertThat(html).contains("원카드 · " + name + "\" />").doesNotContain("…");
+    }
+
+    /**
+     * FR-3 — 길이는 사람이 보는 글자(확장 그래핌 묶음) 수다. 코드 포인트로 세면 ZWJ 가족 이모지(코드 포인트 5개)가 경계에 걸릴 때
+     * 낱개 사람 이모지만 남고, 딱 40글자인 이름도 잘린다.
+     */
+    @Test
+    @DisplayName("ZWJ 가족 이모지가 경계에 걸려도 통째로 두고 그 뒤에서 자른다")
+    void clips_by_grapheme_keeping_zwj_sequence() {
+        String family = "👨‍👩‍👧";
+        String html = RoomPreviewRenderer.render(TEMPLATE, room("가".repeat(39) + family + "끝", "alice"));
+
+        assertThat(html).contains("<meta property=\"og:title\" content=\"원카드 · " + "가".repeat(39) + family + "…\" />");
+        assertThat(html).doesNotContain("끝");
+    }
+
+    @Test
+    @DisplayName("ZWJ 가족 이모지로 끝나는 딱 40글자 이름은 자르지 않는다(코드 포인트로는 44개)")
+    void keeps_forty_graphemes_with_zwj_sequence() {
+        String name = "가".repeat(39) + "👨‍👩‍👧";
+        String html = RoomPreviewRenderer.render(TEMPLATE, room(name, "alice"));
+
+        assertThat(html).contains("원카드 · " + name + "\" />").doesNotContain("…");
+    }
+
+    @Test
+    @DisplayName("NFD 한글(초성+중성 자모)은 한 글자로 센다 — 자모 가운데서 자르지 않는다")
+    void counts_nfd_hangul_as_one_grapheme() {
+        String ga = Normalizer.normalize("가", Normalizer.Form.NFD);
+        assertThat(ga.codePointCount(0, ga.length())).isEqualTo(2);
+
+        String thirty = RoomPreviewRenderer.render(TEMPLATE, room(ga.repeat(30), "alice"));
+        String fortyOne = RoomPreviewRenderer.render(TEMPLATE, room(ga.repeat(41), "alice"));
+
+        assertThat(thirty).contains("원카드 · " + ga.repeat(30) + "\" />").doesNotContain("…");
+        assertThat(fortyOne).contains("원카드 · " + ga.repeat(40) + "…\" />");
+    }
+
+    @Test
+    @DisplayName("방장 이름도 20글자(그래핌)에서 자른다 — 가족 이모지를 가르지 않는다")
+    void clips_host_name_by_grapheme() {
+        String family = "👨‍👩‍👧";
+        String html = RoomPreviewRenderer.render(TEMPLATE, room("방", "a".repeat(19) + family + "b"));
+
+        assertThat(html).contains("content=\"" + "a".repeat(19) + family + "…님이 초대했어요");
     }
 
     @Test
@@ -193,6 +239,8 @@ class RoomPreviewRendererTest {
         Path index = Path.of("../client/index.html");
         assumeTrue(Files.exists(index), "저장소 밖에서 돌면 건너뛴다(클라 원문 없음)");
         String template = Files.readString(index, StandardCharsets.UTF_8);
+        // 시작할 때 경고(FR-4)가 실제 틀에는 뜨지 않는다 — 표식이 순서대로 한 쌍.
+        assertThat(IndexHtmlTemplate.hasPreviewMarkers(template)).isTrue();
 
         String html = RoomPreviewRenderer.render(template, room("금요일 한 판", "alice"));
 

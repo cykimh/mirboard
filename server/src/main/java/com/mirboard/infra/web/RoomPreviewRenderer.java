@@ -1,5 +1,7 @@
 package com.mirboard.infra.web;
 
+import java.text.BreakIterator;
+import java.util.Locale;
 import org.springframework.web.util.HtmlUtils;
 
 /**
@@ -12,9 +14,9 @@ import org.springframework.web.util.HtmlUtils;
  *   <li>제목 "{게임 표시 이름} · {방 이름}"(방 이름이 비면 "{방장}님의 방"), {@code <title>} 은 제목 + " — 미르보드카페".</li>
  *   <li>설명 "{방장}님이 초대했어요 · {정원}인 방 · 누르면 바로 입장". <b>현재 인원은 넣지 않는다</b> — 카톡이 미리보기를 한동안
  *       저장해 낡은 숫자가 보인다(입력 {@link RoomPreview} 에 인원이 아예 없다).</li>
- *   <li>사용자 입력(방 이름·방장 이름)은 공백을 접고 길이를 자른 뒤(방 이름 {@value #MAX_ROOM_NAME}자·방장 {@value #MAX_HOST_NAME}자,
- *       코드 포인트 기준 — 이모지를 반으로 가르지 않는다) 모든 값을 {@link HtmlUtils#htmlEscape(String, String)} 으로 이스케이프한다
- *       (속성 안 따옴표 포함, UTF-8 이라 한글·이모지는 그대로).</li>
+ *   <li>사용자 입력(방 이름·방장 이름)은 공백을 접고 길이를 자른 뒤(방 이름 {@value #MAX_ROOM_NAME}글자·방장 {@value #MAX_HOST_NAME}글자,
+ *       사람이 보는 글자인 확장 그래핌 묶음 기준 — ZWJ 이모지·NFD 한글 자모를 가르지 않는다) 모든 값을
+ *       {@link HtmlUtils#htmlEscape(String, String)} 으로 이스케이프한다(속성 안 따옴표 포함, UTF-8 이라 한글·이모지는 그대로).</li>
  * </ul>
  */
 public final class RoomPreviewRenderer {
@@ -22,9 +24,9 @@ public final class RoomPreviewRenderer {
     static final String START = "<!--og:start-->";
     static final String END = "<!--og:end-->";
     static final String SITE_NAME = "미르보드카페";
-    /** 방 이름 길이 상한(코드 포인트). 카톡 말풍선 제목은 두 줄 남짓에서 어차피 잘린다 — 메타가 끝없이 길어지지 않게만. */
+    /** 방 이름 길이 상한(글자 — 확장 그래핌 묶음). 카톡 말풍선 제목은 두 줄 남짓에서 어차피 잘린다 — 메타가 끝없이 길어지지 않게만. */
     static final int MAX_ROOM_NAME = 40;
-    /** 방장 이름 상한. 가입 규칙(3~20자)·게스트 이름(`guest-` + 8자)이 이미 그 안이라 방어용. */
+    /** 방장 이름 상한(글자). 가입 규칙(3~20자)·게스트 이름(`guest-` + 8자)이 이미 그 안이라 방어용. */
     static final int MAX_HOST_NAME = 20;
 
     private static final String INDENT = "    ";
@@ -75,13 +77,27 @@ public final class RoomPreviewRenderer {
         return host == null ? "초대받은 방" : host + "님의 방";
     }
 
-    /** 공백(줄바꿈·탭 포함)을 하나로 접고 앞뒤를 다듬은 뒤 코드 포인트 {@code max} 개에서 자른다(넘치면 말줄임표). */
+    /**
+     * 공백(줄바꿈·탭 포함)을 하나로 접고 앞뒤를 다듬은 뒤 글자 {@code max} 개에서 자른다(넘치면 말줄임표). 글자는 확장 그래핌 묶음
+     * (JDK 20+ {@link BreakIterator#getCharacterInstance()}) — 코드 포인트로 세면 👨‍👩‍👧(코드 포인트 5개)이 경계에서 낱개
+     * 이모지로 갈리고 NFD 한글(자모 2~3개가 한 글자)이 자모 가운데서 잘린다(최종 리뷰 FR-3).
+     */
     static String clip(String value, int max) {
         String folded = value.strip().replaceAll("\\s+", " ");
-        if (folded.codePointCount(0, folded.length()) <= max) {
-            return folded;
+        BreakIterator graphemes = BreakIterator.getCharacterInstance(Locale.ROOT);
+        graphemes.setText(folded);
+        int cut = graphemes.first();
+        for (int i = 0; i < max; i++) {
+            int next = graphemes.next();
+            if (next == BreakIterator.DONE) {
+                return folded; // max 글자 이하.
+            }
+            cut = next;
         }
-        return folded.substring(0, folded.offsetByCodePoints(0, max)) + "…";
+        if (graphemes.next() == BreakIterator.DONE) {
+            return folded; // 딱 max 글자.
+        }
+        return folded.substring(0, cut) + "…";
     }
 
     private static String meta(String attr, String key, String content) {
