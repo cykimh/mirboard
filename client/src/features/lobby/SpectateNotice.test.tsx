@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SpectateNotice,
   markSpectateNoticeSeen,
+  spectateNoticeMessage,
   spectateNoticeOf,
   spectateNoticeSeen,
 } from './SpectateNotice';
@@ -94,7 +95,16 @@ describe('SpectateNotice (D-133 결정 A)', () => {
   ] as const)('%s 문구', (kind, text) => {
     render(<SpectateNotice kind={kind} onClose={() => {}} />);
 
-    expect(screen.getByRole('status')).toHaveTextContent(text);
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(spectateNoticeMessage(kind)).toBe(text);
+  });
+
+  // FR-5 — 카드는 안내와 함께 삽입되므로 라이브 영역이 될 수 없다(일부 스크린 리더가 읽지 않는다). 읽어 주는 것은 방 화면이 늘 두는
+  // 상태 영역이고(RoomPage), 카드는 보이는 안내 + [닫기]뿐이다 — 상태 영역이 둘이 되지 않게.
+  it('카드 자체는 상태 영역(role=status)이 아니다 — 방 화면의 상태 영역이 읽는다', () => {
+    render(<SpectateNotice kind="started" onClose={() => {}} />);
+
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('[닫기]를 누르면 onClose', () => {

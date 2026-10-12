@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
@@ -14,6 +14,7 @@ import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPa
 import {
   SpectateNotice,
   markSpectateNoticeSeen,
+  spectateNoticeMessage,
   spectateNoticeOf,
   spectateNoticeSeen,
   type SpectateNoticeKind,
@@ -344,13 +345,25 @@ export function RoomPage() {
     if (!waiting) hideTutorial();
   }, [waiting, hideTutorial]);
 
+  // FR-5 — 관전 안내를 읽어 주는 상태 영역. 영역과 문구를 함께 삽입하면 일부 스크린 리더가 읽지 않으므로 아래 모든 렌더 갈래의 맨
+  // 앞 같은 자리에 늘 둔다 — 첫 입장 응답 전 로딩 화면부터 같은 DOM 노드가 유지되고 문구만 들어간다. 보이는 안내 카드
+  // (SpectateNotice)는 상태 영역이 아니다(같은 문구가 두 번 읽히지 않게 카드 문구는 보조 기술에서 숨긴다).
+  const withLiveRegion = (body: ReactNode) => (
+    <>
+      <p role="status" className="sr-only" data-testid="room-live-status">
+        {spectateNotice ? spectateNoticeMessage(spectateNotice) : ''}
+      </p>
+      {body}
+    </>
+  );
+
   if (joinBlock) {
-    return (
-      <JoinBlockedPanel kind={joinBlock} onSpectate={handleSpectate} spectating={spectating} />
+    return withLiveRegion(
+      <JoinBlockedPanel kind={joinBlock} onSpectate={handleSpectate} spectating={spectating} />,
     );
   }
   if (error) {
-    return (
+    return withLiveRegion(
       <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
         <Card className="w-full max-w-sm">
           <CardContent className="flex flex-col gap-4 pt-6">
@@ -362,14 +375,14 @@ export function RoomPage() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </div>,
     );
   }
   if (!room || !user) {
-    return (
+    return withLiveRegion(
       <div className="app-shell flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         방 정보 불러오는 중...
-      </div>
+      </div>,
     );
   }
 
@@ -405,16 +418,16 @@ export function RoomPage() {
       onExit: handleLeave,
       roomFinished,
     };
-    return (
+    return withLiveRegion(
       <main className="room-page">
         {notice}
         {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
-      </main>
+      </main>,
     );
   }
 
   if (room.status === 'IN_GAME') {
-    return (
+    return withLiveRegion(
       <main className="room-page">
         {notice}
         <GameTable
@@ -431,11 +444,11 @@ export function RoomPage() {
           isHost={iAmHost}
           onExit={handleLeave}
         />
-      </main>
+      </main>,
     );
   }
 
-  return (
+  return withLiveRegion(
     <div className="app-shell min-h-screen bg-background text-foreground">
       {notice}
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
@@ -600,6 +613,6 @@ export function RoomPage() {
           onClose={tutorialGate.close}
         />
       )}
-    </div>
+    </div>,
   );
 }

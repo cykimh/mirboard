@@ -51,6 +51,30 @@ describe('InviteLinkButton — 결과별 표시 (D-133)', () => {
     expect(input.selectionEnd).toBe(LINK.length);
   });
 
+  // FR-6 — iOS WebKit(카톡 iOS 앱 내 브라우저 포함)은 읽기 전용 입력란에 select() 만으로는 선택이 잡히지 않는 경우가 있다.
+  // select() 뒤 setSelectionRange(0, 길이)도 부른다 — 열릴 때(effect)와 다시 포커스될 때(onFocus) 둘 다. 실기기는 QA 4번.
+  it('수동 입력란은 select() 뒤 setSelectionRange(0, 길이)로도 링크 전체를 고른다 — 열릴 때와 다시 포커스될 때', async () => {
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    const setSelectionRange = vi.spyOn(HTMLInputElement.prototype, 'setSelectionRange');
+    try {
+      fireEvent.click(renderButton({}));
+      const input = (await screen.findByLabelText('직접 복사해 주세요')) as HTMLInputElement;
+
+      expect(setSelectionRange).toHaveBeenCalledWith(0, LINK.length);
+      expect(Math.max(...setSelectionRange.mock.invocationCallOrder)).toBeGreaterThan(
+        Math.min(...select.mock.invocationCallOrder),
+      );
+
+      setSelectionRange.mockClear();
+      fireEvent.blur(input);
+      fireEvent.focus(input);
+      expect(setSelectionRange).toHaveBeenCalledWith(0, LINK.length);
+    } finally {
+      select.mockRestore();
+      setSelectionRange.mockRestore();
+    }
+  });
+
   it('복사가 거절돼도 수동 입력란으로 넘어간다', async () => {
     const writeText = vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError'));
     fireEvent.click(renderButton({ clipboard: { writeText } }));

@@ -659,11 +659,15 @@ describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', (
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'friend' } as never });
   });
 
+  // FR-5 — 안내 문구를 읽어 주는 것은 방 화면이 늘 두는 상태 영역(`room-live-status`)이다. 카드는 보이는 안내일 뿐이다.
+  const live = () => screen.getByTestId('room-live-status');
+
   it('진행 중인 원카드 방에 관전으로 받아지면 게임판 위에 안내한다', async () => {
     renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
 
     expect(await screen.findByTestId('onecard-table')).toBeInTheDocument();
     expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
+    expect(screen.getByRole('status')).toBe(live());
     expect(oneCardProps.at(-1)!.spectator).toBe(true);
   });
 
@@ -673,13 +677,58 @@ describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', (
 
     expect(await screen.findByTestId('tichu-table')).toBeInTheDocument();
     expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
+    expect(screen.getByRole('status')).toBe(live());
   });
 
   it('꽉 찬 대기실에 관전으로 받아지면 안내하고 "관전 중" 알림도 그대로 둔다', async () => {
     renderRoom({ ...watching, gameType: 'ONE_CARD', capacity: 2 }, 'SPECTATING');
 
-    expect(await screen.findByText(FULL)).toBeInTheDocument();
-    expect(screen.getByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+    expect(await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+    expect(live()).toHaveTextContent(FULL);
+    expect(live()).toHaveAttribute('role', 'status');
+  });
+
+  /**
+   * FR-5 — 라이브 영역은 내용이 바뀌기 전에 DOM 에 있어야 스크린 리더가 읽는다(IP-4 와 같은 결). 안내는 첫 입장 응답과 함께 정해져
+   * 로딩 화면 → 방 화면 전환과 같은 렌더에 들어오므로, 영역을 방 화면 갈래 안에만 두면 영역과 문구가 함께 삽입된다. 그래서 로딩
+   * 화면부터 모든 갈래의 맨 앞 같은 자리에 둔다 — 로딩 때의 그 노드에 문구가 들어간다.
+   */
+  it('로딩 화면에서도 상태 영역이 비어 있는 채로 있고, 안내 문구는 바로 그 노드에 들어간다', async () => {
+    let resolve!: (v: JoinOrReconnectResponse) => void;
+    joinOrReconnect.mockReturnValue(new Promise<JoinOrReconnectResponse>((r) => { resolve = r; }));
+    render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('방 정보 불러오는 중...')).toBeInTheDocument();
+    const before = live();
+    expect(before).toHaveAttribute('role', 'status');
+    expect(before.textContent).toBe('');
+
+    await act(async () => {
+      resolve({ mode: 'SPECTATING', room: { ...ROOM, ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' } as Room });
+    });
+
+    await screen.findByTestId('onecard-table');
+    expect(live()).toBe(before);
+    expect(before).toHaveTextContent(STARTED);
+  });
+
+  it.each([
+    ['스컬킹·원카드 게임판', { gameType: 'ONE_CARD', status: 'IN_GAME' }, 'onecard-table'],
+    ['티츄 게임판', { gameType: 'TICHU', status: 'IN_GAME' }, 'tichu-table'],
+    ['대기실 셸', { gameType: 'ONE_CARD', status: 'WAITING' }, null],
+  ] as const)('안내가 없어도 %s 에 상태 영역이 비어 있는 채로 있다', async (_label, over, boardId) => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'host' } as never });
+    renderRoom({ ...watching, ...over } as Partial<Room>, 'RECONNECTED');
+
+    if (boardId) await screen.findByTestId(boardId);
+    else await screen.findByText('테스트 방');
+    expect(live()).toHaveAttribute('role', 'status');
+    expect(live().textContent).toBe('');
   });
 
   it('빈자리가 있는 대기실 관전은 안내하지 않는다 — 본인이 고른 관전', async () => {
@@ -704,18 +753,19 @@ describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', (
     expect(screen.queryByText(/관전으로 들어왔어요/)).toBeNull();
   });
 
-  it('[닫기]를 누르면 내린다', async () => {
+  it('[닫기]를 누르면 내린다 — 상태 영역도 비운다', async () => {
     renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
 
     fireEvent.click(await screen.findByRole('button', { name: '닫기' }));
 
     expect(screen.queryByText(STARTED)).toBeNull();
+    expect(live().textContent).toBe('');
     expect(screen.getByTestId('onecard-table')).toBeInTheDocument();
   });
 
   it('새로고침하면(같은 탭에서 다시 관전으로 받아짐) 다시 띄우지 않는다', async () => {
     const first = renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
-    expect(await screen.findByText(STARTED)).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
     first.unmount();
 
     renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');

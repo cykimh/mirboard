@@ -17,6 +17,15 @@ interface InviteLinkButtonProps {
   origin?: string;
 }
 
+/**
+ * 입력란의 글 전체를 고른다. iOS WebKit(카톡 iOS 앱 내 브라우저 포함)은 읽기 전용 입력란에 `select()` 만으로는 선택이 잡히지 않는
+ * 경우가 있어 `setSelectionRange(0, 길이)` 도 부른다(최종 리뷰 FR-6 — 실기기 확인은 QA 4번).
+ */
+function selectAll(input: HTMLInputElement) {
+  input.select();
+  input.setSelectionRange(0, input.value.length);
+}
+
 /** 공유됨·복사됨 알림이 떠 있는 시간. */
 const NOTICE_MS = 3000;
 
@@ -62,8 +71,10 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
   // 수동 복사 — 입력란이 뜨면 링크 전체를 선택해 둔다.
   useEffect(() => {
     if (result !== 'manual') return;
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    selectAll(input);
   }, [result]);
 
   // 공유됨·복사됨은 짧은 알림 — 잠시 뒤 내린다.
@@ -95,7 +106,7 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
             ref={inputRef}
             readOnly
             value={url}
-            onFocus={(e) => e.currentTarget.select()}
+            onFocus={(e) => selectAll(e.currentTarget)}
           />
         </div>
       )}

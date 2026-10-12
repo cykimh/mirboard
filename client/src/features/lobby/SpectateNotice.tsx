@@ -51,6 +51,11 @@ const MESSAGES: Record<SpectateNoticeKind, string> = {
   full: '자리가 없어 관전으로 들어왔어요',
 };
 
+/** 안내 문구. 방 화면이 늘 두는 상태 영역(스크린 리더용)과 보이는 카드가 같은 문구를 쓴다(FR-5). */
+export function spectateNoticeMessage(kind: SpectateNoticeKind): string {
+  return MESSAGES[kind];
+}
+
 interface SpectateNoticeProps {
   kind: SpectateNoticeKind;
   onClose: () => void;
@@ -60,6 +65,10 @@ interface SpectateNoticeProps {
  * D-133 결정 A — "…관전으로 들어왔어요" 안내. 방 화면 맨 위에 떠 있다(게임판 채팅 100 위, 원카드 경쟁 레이어 150·패스 받은 카드 200
  * 아래). 게임판은 `.app-shell` 밖이라 카드 자체에 `app-shell` 을 붙여 색·테두리 토큰을 쓴다(바깥 줄에 붙이면 전체 폭이 칠해진다).
  * 바깥 줄은 클릭을 통과시킨다. 8초 뒤 저절로 내린다.
+ *
+ * <p>FR-5 — 카드는 상태 영역(`role="status"`)이 아니다. 안내와 함께 삽입되는 영역은 일부 스크린 리더가 읽지 않으므로, 읽어 주는 것은
+ * 방 화면(`RoomPage`)이 로딩 때부터 늘 두는 숨은 상태 영역이고 같은 문구가 그리로 들어간다. 그래서 카드의 문구는 보조 기술에서
+ * 숨긴다(두 번 읽히지 않게) — [닫기] 버튼은 그대로 닿는다.
  */
 export function SpectateNotice({ kind, onClose }: SpectateNoticeProps) {
   // 부모가 렌더마다 새 함수를 넘겨도 타이머를 다시 걸지 않는다(방 메타·이름 갱신으로 자주 다시 그린다).
@@ -72,11 +81,8 @@ export function SpectateNotice({ kind, onClose }: SpectateNoticeProps) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-[120] flex justify-center px-4">
-      <div
-        role="status"
-        className="app-shell pointer-events-auto flex max-w-md items-center gap-3 rounded-lg border bg-background px-4 py-2 text-sm shadow-lg"
-      >
-        <span>{MESSAGES[kind]}</span>
+      <div className="app-shell pointer-events-auto flex max-w-md items-center gap-3 rounded-lg border bg-background px-4 py-2 text-sm shadow-lg">
+        <span aria-hidden="true">{MESSAGES[kind]}</span>
         <Button type="button" size="sm" variant="ghost" onClick={onClose}>
           닫기
         </Button>
