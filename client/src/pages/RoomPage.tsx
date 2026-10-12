@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
-import { roomsApi } from '@/api/rooms';
+import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi } from '@/api/users';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -112,6 +112,20 @@ export function RoomPage() {
     };
   }, [token, room?.gameType]);
 
+  // `join-or-reconnect` 결과를 화면에 반영한다 — 첫 입장과 대기실 재동기화(D-134)가 같은 규칙을 쓴다.
+  const applyJoinResult = useCallback(
+    (r: JoinOrReconnectResponse) => {
+      setRoom(r.room);
+      // D-133 결정 A — 관전으로 받아졌으면 이유를 알린다. 이 탭에서 이 방 관전을 이미 알면(안내를 봤거나 허브·패널에서 관전을
+      // 골랐다) 띄우지 않는다 — 새로고침에도 서버는 SPECTATING 을 다시 준다.
+      if (r.mode === 'SPECTATING') {
+        if (!spectateNoticeSeen(roomId)) setSpectateNotice(spectateNoticeOf(r.mode, r.room));
+        markSpectateNoticeSeen(roomId);
+      }
+    },
+    [roomId],
+  );
+
   // Phase 8A — 진입 시 1회만 join-or-reconnect 호출. 폴링과 분리.
   useEffect(() => {
     if (!token || autoJoinAttempted) return;
@@ -119,15 +133,7 @@ export function RoomPage() {
     (async () => {
       try {
         const r = await roomsApi.joinOrReconnect(token, roomId);
-        if (!cancelled) {
-          setRoom(r.room);
-          // D-133 결정 A — 관전으로 받아졌으면 이유를 알린다. 이 탭에서 이 방 관전을 이미 알면(안내를 봤거나 허브·패널에서 관전을
-          // 골랐다) 띄우지 않는다 — 새로고침에도 서버는 SPECTATING 을 다시 준다.
-          if (r.mode === 'SPECTATING') {
-            if (!spectateNoticeSeen(roomId)) setSpectateNotice(spectateNoticeOf(r.mode, r.room));
-            markSpectateNoticeSeen(roomId);
-          }
-        }
+        if (!cancelled) applyJoinResult(r);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError) {
@@ -142,7 +148,7 @@ export function RoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, roomId, autoJoinAttempted]);
+  }, [token, roomId, autoJoinAttempted, applyJoinResult]);
 
   useEffect(() => {
     if (!token) {
@@ -174,6 +180,31 @@ export function RoomPage() {
   const roomRef = useRef<Room | null>(null);
   roomRef.current = room;
 
+  // D-134 — 대기실 화면 재동기화. 메타 소켓이 다시 연결되거나 화면이 다시 보이거나 온라인이 되면(useRoomMeta) 첫 입장과 같은
+  // `join-or-reconnect` 로 방을 다시 맞춘다. 휴대폰이 백그라운드에 있던 동안 서버가 준비를 풀었거나, 유예가 지나 자리를 잃었거나
+  // (꽉 찼으면 관전 + 안내), 방이 없어졌을 수 있다 — 소켓은 놓친 메타를 다시 주지 않는다. 대기실일 때만 — 게임판은 자기 resync 가
+  // 있다(D-79). 방 없음은 "방이 없어졌어요", 그 밖의 오류는 조용히 넘긴다(다음 알림에 다시 — 네트워크 실패로 화면을 오류로 바꾸지
+  // 않는다). 진행 중이면 겹쳐 부르지 않는다.
+  const resyncingRef = useRef(false);
+  const roomIdRef = useRef(roomId);
+  roomIdRef.current = roomId;
+  async function resyncWaitingRoom() {
+    if (!token || resyncingRef.current) return;
+    if (room?.status !== 'WAITING' || joinBlock || error) return;
+    const requested = roomId;
+    resyncingRef.current = true;
+    try {
+      const r = await roomsApi.joinOrReconnect(token, requested);
+      if (roomIdRef.current === requested) applyJoinResult(r);
+    } catch (err) {
+      if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
+        setJoinBlock('gone');
+      }
+    } finally {
+      resyncingRef.current = false;
+    }
+  }
+
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
   useRoomMeta(
@@ -189,6 +220,7 @@ export function RoomPage() {
       setRoom(r);
     },
     () => setError('방이 종료되었습니다.'),
+    resyncWaitingRoom,
   );
 
   // 좌석/참가자 표시용 username 일괄 조회. 참가자 집합이 바뀔 때만 재요청(최대 4명).

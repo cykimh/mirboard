@@ -752,3 +752,126 @@ describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', (
     expect(screen.queryByText(STARTED)).toBeNull();
   });
 });
+
+/**
+ * D-134 — 대기실 화면 재동기화. 휴대폰 방장이 초대 링크를 카톡으로 보내고 기다리는 동안 소켓이 죽으면(D-79) 그 사이 서버가 준비를
+ * 풀었거나, 유예가 지나 자리를 잃었거나, 방이 없어졌을 수 있다 — 메타 소켓은 다시 구독만 해서 놓친 것을 받을 길이 없다. 그래서
+ * `useRoomMeta` 가 다시 연결·다시 보이기·온라인 때 알리면(5번째 인자) 대기실은 첫 입장과 같은 `join-or-reconnect` 로 방을 다시
+ * 맞춘다. 게임판은 자기 resync 가 있어(D-79) 부르지 않는다. 네트워크 실패로 화면을 오류로 바꾸지 않는다.
+ */
+describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
+  const resync = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![4]!;
+  const apiError = (status: number, code: string, message: string) =>
+    new ApiError(status, { error: { code, message } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), displayName: '원카드' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('대기실에서 알림을 받으면 join-or-reconnect 를 다시 불러 방을 다시 그린다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockResolvedValue({
+      mode: 'RECONNECTED',
+      room: { ...ROOM, gameType: 'ONE_CARD', playerIds: [1, 2], playerCount: 2, readyUserIds: [2] },
+    });
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(joinOrReconnect).toHaveBeenCalledTimes(2);
+    expect(joinOrReconnect).toHaveBeenLastCalledWith('tok', 'r1');
+    expect(await screen.findByText(/원카드 · 대기 중 · 2\/4/)).toBeInTheDocument();
+  });
+
+  it('유예가 지나 자리를 잃었고 방이 꽉 찼으면 관전으로 받아지고 첫 입장처럼 안내한다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockResolvedValue({
+      mode: 'SPECTATING',
+      room: { ...ROOM, gameType: 'ONE_CARD', capacity: 2, playerIds: [2, 3], playerCount: 2, spectatorIds: [1] },
+    });
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+    expect(screen.getAllByText('자리가 없어 관전으로 들어왔어요').length).toBeGreaterThan(0);
+  });
+
+  it('방이 없어졌으면 "방이 없어졌어요" — 서버 문구를 보이지 않는다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockRejectedValue(apiError(404, 'ROOM_NOT_FOUND', 'Room not found'));
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+    expect(screen.queryByText('Room not found')).toBeNull();
+  });
+
+  it.each([
+    ['서버 오류', () => apiError(500, 'INTERNAL', 'boom')],
+    ['네트워크 실패', () => new TypeError('Failed to fetch')],
+  ])('그 밖의 오류(%s)는 조용히 넘기고 대기실을 그대로 둔다 — 다음 알림에 다시', async (_label, makeError) => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockRejectedValue(makeError());
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(screen.getByText('테스트 방')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초대 링크' })).toBeInTheDocument();
+    expect(screen.queryByText('boom')).toBeNull();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
+  });
+
+  it('게임 중(IN_GAME)에는 부르지 않는다 — 게임판이 자기 resync 를 한다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME' });
+    await screen.findByTestId('onecard-table');
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(joinOrReconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('진행 중이면 겹쳐 부르지 않는다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    let resolve!: (v: JoinOrReconnectResponse) => void;
+    joinOrReconnect.mockReturnValue(new Promise<JoinOrReconnectResponse>((r) => { resolve = r; }));
+
+    // 콜백 타입은 `() => void` 지만 방 화면의 구현은 끝을 기다릴 수 있는 Promise 를 돌려준다.
+    let first: unknown;
+    act(() => {
+      first = resync()();
+      void resync()();
+    });
+    expect(joinOrReconnect).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolve({ mode: 'RECONNECTED', room: { ...ROOM, gameType: 'ONE_CARD' } });
+      await first;
+    });
+
+    // 끝난 뒤에는 다시 부를 수 있다.
+    joinOrReconnect.mockResolvedValue({ mode: 'RECONNECTED', room: { ...ROOM, gameType: 'ONE_CARD' } });
+    await act(async () => {
+      await resync()();
+    });
+    expect(joinOrReconnect).toHaveBeenCalledTimes(3);
+  });
+});
