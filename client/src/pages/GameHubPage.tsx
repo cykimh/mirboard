@@ -13,6 +13,7 @@ import { TierBadge } from '@/components/TierBadge';
 import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
+import { markSpectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import { t } from '@/i18n/messages';
 import type { GameSummary, Room } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -121,6 +122,8 @@ export function GameHubPage() {
     const roomId = spectateInput.trim();
     try {
       await roomsApi.spectate(token, roomId);
+      // D-133 결정 A — 본인이 고른 관전이라 방 화면의 "…관전으로 들어왔어요" 안내를 띄우지 않는다(탭 기록).
+      markSpectateNoticeSeen(roomId);
       navigate(`/rooms/${roomId}`);
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameHubPage } from './GameHubPage';
 import { useAuthStore } from '@/features/auth/authStore';
+import { spectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import type { GameSummary, Room } from '@/types/api';
 
 /**
@@ -10,14 +11,15 @@ import type { GameSummary, Room } from '@/types/api';
  * 첫 방문 자동 노출을 하지 않는다(자동 노출은 그 게임 대기실 첫 입장, RoomPage).
  */
 
-const { catalog, list, stats } = vi.hoisted(() => ({
+const { catalog, list, stats, spectate } = vi.hoisted(() => ({
   catalog: vi.fn(),
   list: vi.fn(),
   stats: vi.fn(),
+  spectate: vi.fn(),
 }));
 
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
-vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate: vi.fn() } }));
+vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate } }));
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
 vi.mock('@/ws/useLobbyStomp', () => ({
   useLobbyStomp: () => ({ messages: [], connected: false, send: vi.fn() }),
@@ -146,5 +148,40 @@ describe('GameHubPage — 대기 중인 방 목록 (D-130)', () => {
     expect(screen.getByText(/MYSTERY · 1 \/ 4 · 대기 중/)).toBeInTheDocument();
     expect(screen.queryByText(/SKULL_KING ·/)).toBeNull();
     expect(screen.queryByText(/WAITING/)).toBeNull(); // enum 원문이 아니라 한글 상태 라벨
+  });
+});
+
+/**
+ * D-133 결정 A — 서버가 관전으로 받으면 방 화면 위에 "…관전으로 들어왔어요"를 띄운다. 허브 "구경하기"(방 ID 로 관전)는 본인이 고른
+ * 관전이라 탭에 관전 기록을 남기고 들어가 방 화면이 안내를 띄우지 않게 한다.
+ */
+describe('GameHubPage — 허브에서 고른 관전 (D-133)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('방 ID 로 구경하기를 고르면 탭에 관전 기록을 남기고 그 방으로 간다', async () => {
+    spectate.mockResolvedValue(room('r9', 'TICHU', 4));
+    render(
+      <MemoryRouter initialEntries={['/games']}>
+        <Routes>
+          <Route path="/games" element={<GameHubPage />} />
+          <Route path="/rooms/:roomId" element={<div>ROOM_PAGE</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByPlaceholderText('방 ID 로 관전 진입'), { target: { value: 'r9' } });
+    fireEvent.click(screen.getByRole('button', { name: '구경하기' }));
+
+    expect(await screen.findByText('ROOM_PAGE')).toBeInTheDocument();
+    expect(spectate).toHaveBeenCalledWith('tok', 'r9');
+    expect(spectateNoticeSeen('r9')).toBe(true);
   });
 });

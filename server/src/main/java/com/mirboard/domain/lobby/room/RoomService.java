@@ -349,8 +349,20 @@ public class RoomService {
             return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.SPECTATING, room);
         }
         if (room.status() == RoomStatus.WAITING && room.playerCount() < room.capacity()) {
-            Room joined = joinRoom(roomId, userId);
-            return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.JOINED, joined);
+            try {
+                Room joined = joinRoom(roomId, userId);
+                return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.JOINED, joined);
+            } catch (AlreadyInRoomException race) {
+                // D-133 — 같은 사람의 동시 이중 요청(두 탭·개발 StrictMode 의 이중 effect)이 둘 다 "플레이어 아님"을 읽고
+                // 입장으로 왔다. 먼저 간 요청이 앉혔으면 이 요청은 재접속이다(D-74 멱등). 경합 ROOM_FULL·
+                // GAME_ALREADY_STARTED 는 잡지 않는다 — 클라 방 화면이 그 코드로 "관전할까요?" 패널을 띄운다(결정 A).
+                Room seated = getRoom(roomId);
+                if (!seated.playerIds().contains(userId)) {
+                    throw race;
+                }
+                log.info("Room reconnect (concurrent join): roomId={} userId={}", roomId, userId);
+                return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.RECONNECTED, seated);
+            }
         }
         Room spectated = spectate(roomId, userId);
         return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.SPECTATING, spectated);
