@@ -250,11 +250,14 @@ html:not(.dark) .sk-table {
 }
 
 /* 105px 좌석(8인)에서 라벨이 2줄로 깨지지 않아야 한다 — C5 실측에서 '예측'이 '예/측'로
- * 쪼개졌다. 그래서 키는 한 글자로 줄이고(전체 뜻은 .sk-stat 의 title) nowrap 을 건다. */
+ * 쪼개졌다. 그래서 키는 한 글자로 줄이고(전체 뜻은 .sk-stat 의 title) nowrap 을 건다.
+ * D-132 — 테이블 윗줄(8인 ≈72~82px)에서 입찰 중 "예 제출 · 획 0 · 손 N"이 한 줄에 안 들어가면 글자가 겹쳤다 — 통계 단위로
+ * 다음 줄로 내려간다(각 통계는 nowrap 그대로, 최종 리뷰 m1). */
 .sk-seat-stats {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px;
+  gap: 0 4px;
   font-size: 11px;
   white-space: nowrap;
 }

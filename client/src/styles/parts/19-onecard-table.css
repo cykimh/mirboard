@@ -572,10 +572,11 @@ button.oc-card {
   margin-top: 8px;
 }
 
+/* D-132 — 좌우 안쪽 여백 12px: 내기·먹기 사이를 넓힌 만큼 줄여 360·384px 에서도 버튼 줄이 한 줄이다(최종 리뷰 I1). */
 .oc-play,
 .oc-draw {
   min-height: 44px;
-  padding: 10px 18px;
+  padding: 10px 12px;
   border: none;
   border-radius: 8px;
   color: #ffffff;
@@ -592,9 +593,9 @@ button.oc-card {
 }
 
 /* D-132 — "먹기"는 공격 누적이면 여러 장을 먹는 되돌릴 수 없는 동작이다. 엄지로 "내기"를 누르려다 "먹기"를 누르지 않게
-   손가락 너비만큼 띄운다(줄이 감겨 아래로 내려가면 버튼 높이 44px 가 이미 그만큼 떨어뜨린다). */
+   손가락 너비(32px = .oc-actions gap 8px + 이 여백 24px)만큼 띄운다(줄이 감겨 아래로 내려가면 버튼 높이 44px 가 이미 그만큼 떨어뜨린다). */
 .oc-play + .oc-draw {
-  margin-inline-start: 32px;
+  margin-inline-start: 24px;
 }
 
 /* 반투명 흰색은 라이트 테마에서 흰 글자가 된다 — 불투명 회색으로 고정한다(스컬킹 C5 실측과 같은 이유). 전역

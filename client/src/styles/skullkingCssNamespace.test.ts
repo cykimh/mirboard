@@ -195,6 +195,13 @@ describe('18-skullking-table.css — 테이블 배치 (D-132)', () => {
     expect(lastDeclaredIn('.sk-seat', 'min-width')).toBe('0');
   });
 
+  // 8인 윗줄 좌석 내용은 ≈72~82px(360~390px)인데 입찰 중 "예 제출 · 획 0 · 손 N"은 ≈78~91px 이라 nowrap 한 줄이면 글자가 겹친다 —
+  // 통계 묶음이 줄을 바꿔 자리가 모자란 통계는 다음 줄로 내려간다(각 통계는 nowrap 그대로라 '예/측'처럼 쪼개지지 않는다, 최종 리뷰 m1).
+  it('좌석 통계는 자리가 모자라면 통계 단위로 다음 줄로 내려간다 — 글자가 겹치지 않는다', () => {
+    expect(lastDeclaredIn('.sk-seat-stats', 'flex-wrap')).toBe('wrap');
+    expect(lastDeclaredIn('.sk-seat-stats', 'white-space')).toBe('nowrap');
+  });
+
   // 좌석 배경이 반투명이라 키 글자 뒤가 밝은 천(#dde7f1)이다 — opacity .6 이면 4.36:1 로 AA(4.5) 미달.
   it('라이트 테마 천 위 좌석 통계 키는 AA 대비가 나오게 덜 흐리게 한다', () => {
     expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-stat-key', 'opacity')).toBe('0.7');

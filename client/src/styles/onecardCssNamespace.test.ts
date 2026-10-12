@@ -212,8 +212,18 @@ describe('19-onecard-table.css — 버튼 반폭(--oc-race-half-w)', () => {
 
 /** D-132 — 테이블 좌석 배치와 버튼 간격. jsdom(css:false)은 레이아웃을 재지 않으므로 원문으로 고정한다. */
 describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
-  it('내기와 먹기 사이를 손가락 너비(32px) 띄운다 — 붙어 있으면 먹기를 잘못 누른다', () => {
-    expect(declared('.oc-play + .oc-draw', 'margin-inline-start')).toBe('32px');
+  // 보이는 간격 = 버튼 줄 gap 8px + 먹기의 시작 여백 24px = 32px(손가락 너비). 예전엔 여백이 32px 라 실제 간격이 40px 였다(최종 리뷰 I1).
+  it('내기와 먹기 사이가 손가락 너비(32px) 떨어진다 — 붙어 있으면 먹기를 잘못 누른다', () => {
+    expect(declared('.oc-actions', 'gap')).toBe('8px');
+    expect(declared('.oc-play + .oc-draw', 'margin-inline-start')).toBe('24px');
+  });
+
+  // 간격을 넓힌 만큼 버튼 좌우 안쪽 여백을 18 → 12px 로 줄여 버튼 줄 폭이 변경 전으로 돌아온다 — 360·384px 안드로이드에서
+  // "카드를 고르세요"·"내 차례 아님" 상태에도 한 줄이다(감기면 차례마다 sticky 버튼 줄 높이가 바뀌고 손패를 덮는다, 최종 리뷰 I1).
+  it('간격을 넓힌 만큼 버튼 좌우 안쪽 여백을 줄여 좁은 폰에서도 버튼 줄이 한 줄이다', () => {
+    expect(declared('.oc-play', 'padding')).toBe('10px 12px');
+    expect(declared('.oc-draw', 'padding')).toBe('10px 12px');
+    expect(declared('.oc-play', 'min-height')).toBe('44px');
   });
 
   it('테이블 색은 토큰이고 라이트 테마 값을 따로 둔다', () => {
