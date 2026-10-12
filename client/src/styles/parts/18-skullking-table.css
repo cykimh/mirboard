@@ -1,9 +1,11 @@
-/* 스컬킹 게임판 (D-103, S6) — Row-Flow 가변 좌석 기하.
+/* 스컬킹 게임판 (D-103, S6) — 가변 좌석 기하(테이블 배치 D-132).
  *
  * ⚠ 캐스케이드 제약: 이 파일은 index.css 에서 **17-responsive 앞**에 import 된다.
  *   따라서 여기에 폭 미디어(@media max-width)를 두면 17 에 덮인다. 이 파일에는 폭 미디어가
- *   **0개**이고 그게 설계 의도다 — 좌석은 auto-fit 그리드라 브레이크포인트 없이 줄바꿈되고,
- *   카드/버튼 축소는 17 의 공용 규칙(.card-chip, .action-bar)을 상속한다.
+ *   **0개**이고 그게 설계 의도다 — 좌석은 테이블 격자라 옆줄 폭을 clamp() 로 줄여 브레이크포인트
+ *   없이 맞추고, 카드/버튼 축소는 17 의 공용 규칙(.card-chip, .action-bar)을 상속한다.
+ *   (좁은 화면 ≤480px 의 옆줄 좌석 손패 장수 숨김과 가운데 칸(트릭 레일)을 옆줄 아래 전체 폭으로 내리는
+ *   배치만 17 맨 끝 .sk-* 블록 — D-132.)
  *   폭 규칙이 불가피해지면 17-responsive.css **맨 끝**에 .sk-* 블록만 추가할 것
  *   (기존 블록 사이 삽입 금지 — 480/440 순서 의존, D-88).
  *
@@ -39,12 +41,21 @@
   --sk-accent-5: #2fb5c0;
   --sk-accent-6: #f08a3c;
   --sk-accent-7: #a0a4b8;
+  /* D-132 — 테이블 천. 라이트 테마 값은 아래 블록. */
+  --sk-felt-bg: #13283b;
+  --sk-felt-edge: #2a4a66;
 
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px;
   min-height: 100vh;
+}
+
+/* 좌석 배경이 반투명이라 글자는 페이지 글자색을 따른다 — 천도 테마를 따라 밝혀야 라이트 테마에서 읽힌다. */
+html:not(.dark) .sk-table {
+  --sk-felt-bg: #dde7f1;
+  --sk-felt-edge: #a7bfd6;
 }
 
 /* ── 헤더 / 메타 줄 ───────────────────────────────────────────────── */
@@ -74,16 +85,92 @@
   font-weight: 700;
 }
 
-/* ── 상대 좌석 그리드 — 폭 미디어 없이 2~8인 대응 ─────────────────── */
-/* ⚠ max 는 반드시 `1fr` 이어야 한다. `minmax(100px, 168px)` 처럼 max 가 **고정값**이면
- * CSS 스펙상 auto-fit 반복 횟수를 max 기준으로 세므로(168+8 단위) 375px 화면에서 트랙이
- * 1개만 생겨 8인이 세로로 쌓인다 — C5 실측에서 실제로 그랬다. `1fr` 이면 min(100px)
- * 기준으로 세어 3열이 되고, 각 좌석은 아래 max-width 로 데스크톱에서만 168px 로 묶인다. */
-.sk-seats {
+/* ── 테이블 (D-132) — 내 기준 왼쪽 옆줄 → 윗줄 → 오른쪽 옆줄, 시계 방향. 폭 미디어 없이 2~8인 ─────── */
+/* 자리 계산은 `tableLayout`(components/seatOrder.ts), 배치는 여기. 옆줄은 최대 2명씩이라 5인 이상은 윗줄이 늘어 위쪽 반원이
+   된다. 옆줄 열은 좌석이 없으면 auto 로 접힌다. 가운데 칸은 재생순 트릭 레일(D-103 — 원형 배치는 8인에서 카드↔낸 사람이
+   모호해 기각)과 방향 화살표. 내 자리(아래)는 천 밖의 "나" 줄이고, 관전자만 좌석 0 을 아래 칸에 둔다.
+   ≤480px 는 가운데 칸이 ≈138px(390px)라 트릭 레일이 한 줄에 1장씩 쌓이므로 17 맨 끝 블록이 가운데를 옆줄 아래 전체 폭으로
+   내린다(좌·우·위 자리는 그대로). */
+.sk-felt {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--sk-seat-min), 1fr));
-  justify-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'top top top'
+    'left center right'
+    'bottom bottom bottom';
   gap: 8px;
+  padding: 12px 8px;
+  border-radius: 24px;
+  border: 2px solid var(--sk-felt-edge);
+  background: var(--sk-felt-bg);
+}
+
+/* 감기지 않는다 — 8인 윗줄 3명이 375·360px 에서 2 + 1 로 감기면 위쪽 반원 순서가 흐트러진다. 좌석(min-width 0)이 한 줄에서 줄어든다. */
+.sk-felt-top,
+.sk-felt-bottom {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sk-felt-top {
+  grid-area: top;
+}
+
+.sk-felt-bottom {
+  grid-area: bottom;
+}
+
+/* 옆줄은 세로로 고르게 — 1명이면 가운데, 2명이면 위·아래. 간격은 "다음" 꼬리표(좌석 위로 9px)가 위 좌석에 닿지 않게. */
+.sk-felt-left,
+.sk-felt-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* 왼쪽 옆줄은 아래→위다(index 0 = 내 바로 왼쪽 = 다음 차례). DOM 순서는 진행 순서 그대로 두고 보이는 순서만 뒤집는다. */
+.sk-felt-left {
+  grid-area: left;
+  flex-direction: column-reverse;
+}
+
+.sk-felt-right {
+  grid-area: right;
+}
+
+.sk-felt-center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 진행 방향(스컬킹은 늘 ↻ 시계 방향). 글리프는 aria-hidden, 방향은 뒤의 글자로 읽힌다. */
+.sk-felt-dir {
+  align-self: center;
+  font-weight: 600;
+}
+
+.sk-felt-dir-arrow {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* 옆줄 좌석은 화면 폭을 따라 64~150px, 윗줄·아래 좌석은 기준 폭(--sk-seat-min — 인원이 늘면 좁아진다)에서 최대 168px. */
+.sk-felt-left .sk-seat,
+.sk-felt-right .sk-seat {
+  width: clamp(64px, 22vw, 150px);
+}
+
+.sk-felt-top .sk-seat,
+.sk-felt-bottom .sk-seat {
+  flex: 1 1 var(--sk-seat-min);
 }
 
 .sk-seat {
@@ -114,10 +201,15 @@
   border-style: dashed;
 }
 
+/* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 44 = 78px — 390px 옆줄 ≈65px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다
+   쓴다(≈8자). 한 줄이면 이름 칸이 ≈31px(두 글자 + 말줄임)라 봇이 모두 "bo…"로 보이고, 모바일은 title 툴팁이 뜨지 않는다.
+   윗줄 좌석(8인도 ≈82px 이상)·넓은 화면 옆줄은 한 줄 그대로다(폭 미디어 없음). */
 .sk-seat-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  row-gap: 2px;
   min-width: 0;
 }
 
@@ -148,7 +240,7 @@
 }
 
 .sk-seat-name {
-  flex: 1 1 auto;
+  flex: 1 1 44px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -158,11 +250,14 @@
 }
 
 /* 105px 좌석(8인)에서 라벨이 2줄로 깨지지 않아야 한다 — C5 실측에서 '예측'이 '예/측'로
- * 쪼개졌다. 그래서 키는 한 글자로 줄이고(전체 뜻은 .sk-stat 의 title) nowrap 을 건다. */
+ * 쪼개졌다. 그래서 키는 한 글자로 줄이고(전체 뜻은 .sk-stat 의 title) nowrap 을 건다.
+ * D-132 — 테이블 윗줄(8인 ≈72~82px)에서 입찰 중 "예 제출 · 획 0 · 손 N"이 한 줄에 안 들어가면 글자가 겹쳤다 — 통계 단위로
+ * 다음 줄로 내려간다(각 통계는 nowrap 그대로, 최종 리뷰 m1). */
 .sk-seat-stats {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px;
+  gap: 0 4px;
   font-size: 11px;
   white-space: nowrap;
 }
@@ -178,6 +273,12 @@
   opacity: 0.6;
 }
 
+/* 좌석 배경이 반투명이라 라이트 테마에서는 키 글자 뒤가 밝은 천(#dde7f1)이다 — .6 이면 4.36:1 로 AA(4.5) 미달, .7 이면 ≈6:1.
+   "나" 줄(.sk-me)은 천 밖이라 그대로. */
+html:not(.dark) .sk-felt .sk-stat-key {
+  opacity: 0.7;
+}
+
 .sk-stat-val {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -185,6 +286,22 @@
 
 .sk-seat-tag {
   align-self: flex-start;
+}
+
+/* D-132 — 일반 진행 기준 다음 차례. 좌석 안에서는 위 테두리에 걸친 꼬리표라 좁은 옆줄 좌석의 이름 칸을 줄이지 않는다.
+   "나" 줄에서는 다른 배지처럼 줄 안에 놓인다. 천 위에서도 읽히게 배경을 불투명하게 둔다. */
+.sk-seat-next {
+  border-color: var(--sk-accent);
+  background: var(--color-bg-surface);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sk-seat > .sk-seat-next {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  padding: 0 6px;
 }
 
 /* ── 트릭 레일 (재생순) ───────────────────────────────────────────── */

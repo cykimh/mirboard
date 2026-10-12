@@ -6,7 +6,7 @@ import {
 } from '@/types/skullking';
 
 /**
- * 2~8인 가변 좌석의 순수 배치 계산 (D-103, Row-Flow). DOM 을 모른다 — 전수 테스트가
+ * 2~8인 가변 좌석의 순수 배치 계산 (D-103, 테이블 배치 D-132). DOM 을 모른다 — 전수 테스트가
  * jsdom 없이 돈다. 좌석 순서·최소 폭은 원카드도 쓰는 공용 모듈에서 다시 내보낸다(D-129).
  */
 
@@ -26,6 +26,22 @@ const ACCENTS = [
 
 export function seatAccent(seat: number): string {
   return ACCENTS[((seat % ACCENTS.length) + ACCENTS.length) % ACCENTS.length];
+}
+
+/**
+ * 일반 진행 기준 다음 차례 (D-132 — 게임판의 "다음" 표시). 서버 진행은 트릭 안에서 +1(`TrickState`)이다. 차례가 없거나
+ * (`currentTurnSeat` −1 — 입찰·라운드 정리) 지금 사람이 이번 트릭의 마지막이면(`trickLength + 1 >= seatCount` — 다음 리드는 트릭
+ * 승자라 아직 모른다) −1. 탈주 좌석은 유령이 대신 두므로 건너뛰지 않는다(룰 ⑱). 표시 전용이다.
+ *
+ * <p>트릭이 막 끝난 순간(`TRICK_TAKEN` 뒤 승자의 `TURN_CHANGED` 전)은 스토어가 차례를 −1 로 만들지 않는다(지난 사람이 남는다) —
+ * 그 구간은 게임판(`SkullKingTable`)이 −1 로 다룬다.
+ *
+ * @param trickLength 이번 트릭에 이미 나온 카드 수(지금 사람 것 제외).
+ */
+export function nextTurnSeat(currentTurnSeat: number, seatCount: number, trickLength: number): number {
+  if (currentTurnSeat < 0 || seatCount <= 0) return -1;
+  if (trickLength + 1 >= seatCount) return -1;
+  return (currentTurnSeat + 1) % seatCount;
 }
 
 /** 캐릭터 카드인가 — 인어·해적·스컬킹·해적 선언 티그리스 (§6.1). */

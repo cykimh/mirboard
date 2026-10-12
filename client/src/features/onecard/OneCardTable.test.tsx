@@ -880,3 +880,162 @@ describe('OneCardTable — 턴 카운트다운 (D-131)', () => {
     expect(countdown()).toBeNull();
   });
 });
+
+/** 좌석 배치 안 좌석들의 [좌석, 옆줄, 옆줄 안 순서] — DOM 순서 그대로. */
+function layoutOf(): [number, string | null, string | null][] {
+  const felt = screen.getByRole('group', { name: '좌석 배치' });
+  return [...felt.querySelectorAll('.oc-seat')].map((el) => [
+    Number(el.getAttribute('data-seat')),
+    el.getAttribute('data-side'),
+    el.getAttribute('data-slot'),
+  ]);
+}
+
+describe('OneCardTable — 테이블 좌석 배치 (D-132)', () => {
+  it.each([
+    [2, [[1, 'top', '0']]],
+    [
+      4,
+      [
+        [1, 'left', '0'],
+        [2, 'top', '0'],
+        [3, 'right', '0'],
+      ],
+    ],
+    [
+      6,
+      [
+        [1, 'left', '0'],
+        [2, 'left', '1'],
+        [3, 'top', '0'],
+        [4, 'right', '0'],
+        [5, 'right', '1'],
+      ],
+    ],
+  ])('%i인: 내 다음 좌석부터 왼쪽 옆줄 → 윗줄 → 오른쪽 옆줄에 시계 방향으로 앉는다', (n, expected) => {
+    seed({ seatCount: n, mySeat: 0 });
+    renderTable({ playerIds: playerIds(n) });
+
+    expect(layoutOf()).toEqual(expected);
+  });
+
+  it('내 좌석 기준으로 돈다 — 4인 내 좌석 2 면 3 이 왼쪽, 0 이 위, 1 이 오른쪽', () => {
+    seed({ seatCount: 4, mySeat: 2 });
+    renderTable();
+
+    expect(layoutOf()).toEqual([
+      [3, 'left', '0'],
+      [0, 'top', '0'],
+      [1, 'right', '0'],
+    ]);
+  });
+
+  it('가운데(region "테이블")가 좌석 배치 안에 있고, 내 정보줄은 그 밖 아래다', () => {
+    seed({ seatCount: 4, mySeat: 0 });
+    const { container } = renderTable();
+
+    const felt = screen.getByRole('group', { name: '좌석 배치' });
+    expect(within(felt).getByRole('region', { name: '테이블' })).toBeInTheDocument();
+    expect(felt.querySelector('.oc-me')).toBeNull();
+    expect(container.querySelector('.oc-me')).not.toBeNull();
+  });
+
+  it('관전자는 좌석 0 을 아래에 일반 좌석으로 두고 나머지를 0 기준으로 앉힌다 — "나" 줄은 없다', () => {
+    seed({ seatCount: 4, mySeat: -1 });
+    const { container } = renderTable({ spectator: true });
+
+    expect(layoutOf()).toEqual([
+      [1, 'left', '0'],
+      [2, 'top', '0'],
+      [3, 'right', '0'],
+      [0, 'bottom', '0'],
+    ]);
+    expect(container.querySelector('.oc-me')).toBeNull();
+    expect(screen.queryByText(/\(나\)/)).toBeNull();
+  });
+
+  it('좁은 옆줄 좌석의 긴 이름은 말줄임 대상이고 title 로 전체 이름을 보인다', () => {
+    const long = '아주아주긴이름을가진플레이어';
+    seed({ seatCount: 4, mySeat: 0 });
+    const { container } = renderTable({ usernames: { 101: long } });
+
+    const seat = container.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(seat).toHaveAttribute('data-side', 'left');
+    expect(seat.querySelector('.oc-seat-name')).toHaveAttribute('title', long);
+  });
+});
+
+describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
+  const seatEl = (seat: number) => document.querySelector(`[data-seat="${seat}"]`) as HTMLElement;
+
+  it('지금 차례 좌석은 테두리, 진행 방향의 다음 좌석에는 "다음"', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+
+    expect(seatEl(1)).toHaveClass('oc-seat-turn');
+    expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('다음이 나면 "나" 줄에 표시한다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 3 });
+    const { container } = renderTable();
+
+    expect(within(container.querySelector('.oc-me') as HTMLElement).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('다음 사람이 탈락했으면 건너뛴다', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      turnSeat: 1,
+      seats: [seatOf(0), seatOf(1), seatOf(2, { eliminated: 'BANKRUPT', handCount: 0 }), seatOf(3)],
+    });
+    renderTable();
+
+    expect(within(seatEl(3)).getByText('다음')).toBeInTheDocument();
+    expect(within(seatEl(2)).queryByText('다음')).toBeNull();
+  });
+
+  it('가운데에 진행 방향을 화살표와 글자로 보인다 — 화살표 글리프는 읽지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+
+    const dir = within(screen.getByRole('region', { name: '테이블' })).getByText('시계 방향', { exact: false });
+    expect(dir).toHaveTextContent('↻ 시계 방향');
+    expect(dir.querySelector('[aria-hidden="true"]')).toHaveTextContent('↻');
+  });
+
+  it('Q 로 방향이 뒤집히면 화살표와 "다음"이 함께 반대로 — 차례가 비는 동안은 "다음"이 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+    const center = () => screen.getByRole('region', { name: '테이블' });
+    expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARD_PLAYED',
+        seq: 2,
+        payload: { seat: 1, card: c('HEART', 12), declaredSuit: null, handCount: 4, attackStack: 0, direction: -1 },
+      } as never);
+    });
+    expect(center()).toHaveTextContent('↺ 반시계 방향');
+    expect(screen.queryByText('다음')).toBeNull();
+
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 3, payload: { seat: 0, direction: -1, attackStack: 0 } } as never);
+    });
+    expect(within(seatEl(3)).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('관전자에게는 "다음"이 아래 좌석(0)에 붙고 "나" 줄로 가지 않는다', () => {
+    seed({ seatCount: 4, mySeat: -1, turnSeat: 3 });
+    const { container } = renderTable({ spectator: true });
+
+    expect(seatEl(0)).toHaveAttribute('data-side', 'bottom');
+    expect(within(seatEl(0)).getByText('다음')).toBeInTheDocument();
+    expect(container.querySelector('.oc-me')).toBeNull();
+  });
+});

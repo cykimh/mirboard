@@ -3,6 +3,7 @@ import type { Card, Hand } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import type { EffectKind, EffectTone } from './effectStore';
 import type { TichuRoomState } from './tichuStore';
+import { viewPosOf } from './seatView';
 
 /** Phase B(D-78) — 비행 카드 오버레이 상태. left/top 은 arena 기준 도착 중심,
  *  dx/dy 는 출발 좌석 중심까지의 오프셋(여기서 0 으로 transition). */
@@ -109,9 +110,8 @@ export function useGameTableEffects({
     const arena = arenaRef.current;
     const center = centerTrickRef.current;
     if (!arena || !center) return;
-    const viewIdx = ((currentTopSeat - mySeat) + 4) % 4;
-    const viewPos = ['s', 'w', 'n', 'e'][viewIdx];
-    const seatEl = arena.querySelector(`.seat-${viewPos}`) as HTMLElement | null;
+    // 낸 사람의 좌석에서 출발한다 — 좌석 클래스와 같은 매핑(D-132 시계 방향, +1 은 왼쪽).
+    const seatEl = arena.querySelector(`.seat-${viewPosOf(currentTopSeat, mySeat)}`) as HTMLElement | null;
     if (!seatEl) return;
 
     const arenaRect = arena.getBoundingClientRect();

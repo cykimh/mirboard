@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
-import { seatMinWidth, viewOrder } from '@/components/seatOrder';
+import { seatMinWidth, tableLayout, type TableSide } from '@/components/seatOrder';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
@@ -10,7 +10,7 @@ import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { cardKey } from '@/types/onecard';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
-import { isSuitChange } from './onecardRules';
+import { isSuitChange, nextTurnSeat } from './onecardRules';
 import { ELIMINATED_LABEL, OneCardSeat, seatAccent } from './OneCardSeat';
 import { OneCardCenter, raceResultText } from './OneCardCenter';
 import { OneCardHand } from './OneCardHand';
@@ -47,6 +47,9 @@ interface Props {
  * 원카드 게임판 조립 루트 (D-129). 스컬킹처럼 자기 소켓을 소유하고 자기 sink 를 주입한다(D-103) — 다른 게임의 코드
  * 경로는 실행되지 않는다. 좌석 수의 권위값은 `tableView.seats.length` 이고 `playerIds` 는 이름·아바타 조회용이다.
  *
+ * <p>상대는 테이블처럼 내 기준 왼쪽 옆줄 → 윗줄 → 오른쪽 옆줄에 시계 방향으로 앉고(`tableLayout`, D-132), 가운데 칸에 더미·방향
+ * 화살표가 놓인다. 지금 차례는 테두리, 일반 진행 기준 다음 차례는 "다음" 표시다.
+ *
  * <p>경쟁 창은 화면 위 오버레이 버튼(`RaceButton`)과 aria-live 알림으로 보여 준다. 락 경합 `BUSY` 를 받은 누름은
  * 창이 열린 동안 최대 2번 다시 보낸다(스토어가 신호를 올리고 여기서 보낸다).
  */
@@ -76,8 +79,14 @@ export function OneCardTable({
   const s = useOneCardStore();
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
-  const opponents = viewOrder(seatCount, mySeat);
+  const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const me = s.seats.find((x) => x.seat === mySeat) ?? null;
+  // D-132 — 일반 진행 기준 다음 차례. 차례가 비면(카드 직후·경쟁 창·종료) 테두리와 함께 사라진다.
+  const eliminated = Array.from(
+    { length: seatCount },
+    (_, i) => s.seats.find((x) => x.seat === i)?.eliminated != null,
+  );
+  const nextSeat = nextTurnSeat(s.turnSeat, s.direction, eliminated);
   const iAmOut = me?.eliminated != null;
   const raceOpen = s.race !== null;
   const myTurn =
@@ -88,6 +97,31 @@ export function OneCardTable({
     const uid = playerIds[seat];
     if (botSeats.includes(seat)) return usernames[uid] ?? `봇 ${seat}`;
     return usernames[uid] ?? `#${uid ?? seat}`;
+  };
+
+  const seatAt = (seat: number, side: TableSide | 'bottom', slot: number) => {
+    const view = s.seats.find((x) => x.seat === seat);
+    if (!view) return null;
+    return (
+      <OneCardSeat
+        key={seat}
+        seat={view}
+        userId={playerIds[seat]}
+        username={usernames[playerIds[seat]]}
+        isBot={botSeats.includes(seat)}
+        isTurn={s.turnSeat === seat}
+        isNext={nextSeat === seat}
+        isDisconnected={s.disconnectedSeats.has(seat)}
+        side={side}
+        slot={slot}
+      />
+    );
+  };
+  // 옆줄마다 묶는다 — 좌석 DOM 순서가 slots 순서(= 진행 순서)라 스크린리더가 다음 사람부터 읽는다.
+  const sideRow = (side: TableSide) => {
+    const row = slots.filter((x) => x.side === side);
+    if (row.length === 0) return null;
+    return <div className={`oc-felt-${side}`}>{row.map((x) => seatAt(x.seat, side, x.index))}</div>;
   };
 
   // BUSY 재시도 — 스토어가 신호(retryNonce)를 올리면 기다리던 누름을 다시 보낸다. 지금도 이 창을 기다리는 누름만
@@ -221,38 +255,29 @@ export function OneCardTable({
         </p>
       )}
 
-      <div className="oc-seats">
-        {opponents.map((seat) => {
-          const view = s.seats.find((x) => x.seat === seat);
-          if (!view) return null;
-          return (
-            <OneCardSeat
-              key={seat}
-              seat={view}
-              userId={playerIds[seat]}
-              username={usernames[playerIds[seat]]}
-              isBot={botSeats.includes(seat)}
-              isTurn={s.turnSeat === seat}
-              isDisconnected={s.disconnectedSeats.has(seat)}
-            />
-          );
-        })}
-      </div>
+      {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
+      <div className="oc-felt" role="group" aria-label="좌석 배치">
+        {sideRow('left')}
+        {sideRow('top')}
+        {sideRow('right')}
 
-      <OneCardCenter
-        topCard={s.topCard}
-        declaredSuit={s.declaredSuit}
-        attackStack={s.attackStack}
-        direction={s.direction}
-        drawPileCount={s.drawPileCount}
-        turnName={s.turnSeat >= 0 ? nameOf(s.turnSeat) : null}
-        raceOpen={raceOpen}
-        lastRace={s.lastRace}
-        late={s.raceNotice === 'LATE'}
-        nameOf={nameOf}
-        // D-131 — 서버 남은 시간 기준 카운트다운. 방이 끝났으면(강제 종료 — 결과 없음) 세지 않는다.
-        countdown={roomFinished ? null : <OneCardTurnCountdown turnSeconds={turnSeconds} />}
-      />
+        <OneCardCenter
+          topCard={s.topCard}
+          declaredSuit={s.declaredSuit}
+          attackStack={s.attackStack}
+          direction={s.direction}
+          drawPileCount={s.drawPileCount}
+          turnName={s.turnSeat >= 0 ? nameOf(s.turnSeat) : null}
+          raceOpen={raceOpen}
+          lastRace={s.lastRace}
+          late={s.raceNotice === 'LATE'}
+          nameOf={nameOf}
+          // D-131 — 서버 남은 시간 기준 카운트다운. 방이 끝났으면(강제 종료 — 결과 없음) 세지 않는다.
+          countdown={roomFinished ? null : <OneCardTurnCountdown turnSeconds={turnSeconds} />}
+        />
+
+        {bottomSeat !== null && <div className="oc-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}
+      </div>
 
       {s.result && (
         <OneCardMatchEnd result={s.result} mySeat={mySeat} nameOf={nameOf} onExit={onExit} />
@@ -279,6 +304,7 @@ export function OneCardTable({
             <strong>{nameOf(mySeat)} (나)</strong>
             <span className="oc-me-count">손패 {s.hand.length}장</span>
             {myTurn && <span className="oc-badge oc-badge-turn">내 차례</span>}
+            {nextSeat === mySeat && <span className="oc-badge oc-seat-next">다음</span>}
             {myTurn && s.attackStack > 0 && (
               <span className="oc-badge oc-attack">공격받는 중 +{s.attackStack}</span>
             )}

@@ -380,3 +380,54 @@ describe('GameTable — 헤더', () => {
     expect(screen.queryByText(/관전/)).toBeNull();
   });
 });
+
+/** 좌석 배지 글자 → 그 좌석의 위치 클래스(seat-s/e/n/w). CSS 는 `.seat-e` 가 왼쪽, `.seat-w` 가 오른쪽이다. */
+function seatPositions(container: HTMLElement): Record<string, string> {
+  const out: Record<string, string> = {};
+  container.querySelectorAll('.seat').forEach((el) => {
+    const label = el.querySelector('.seat-team')?.textContent?.trim() ?? '';
+    const pos = [...el.classList].find((c) => /^seat-[snew]$/.test(c)) ?? '';
+    out[label] = pos;
+  });
+  return out;
+}
+
+describe('GameTable — 좌석 방향 (D-132 시계 방향)', () => {
+  it('내 다음 차례(+1)가 왼쪽(seat-e), 파트너가 위, 직전 차례(+3)가 오른쪽(seat-w)', () => {
+    seed({ tableView: tableView(), privateHand: privateHand([]) });
+
+    const { container } = renderTable();
+
+    expect(seatPositions(container)).toEqual({
+      나: 'seat-s',
+      '#20': 'seat-e',
+      '#30': 'seat-n',
+      '#40': 'seat-w',
+    });
+  });
+
+  it('내 좌석이 2 여도 다음 좌석(3)이 왼쪽이다', () => {
+    seed({ tableView: tableView(), privateHand: { seat: 2, cards: [] } });
+
+    const { container } = renderTable({ myUserId: 30 });
+
+    expect(seatPositions(container)).toEqual({
+      나: 'seat-s',
+      '#40': 'seat-e',
+      '#10': 'seat-n',
+      '#20': 'seat-w',
+    });
+  });
+
+  it('관전자는 기존 식 그대로 좌석 3 을 아래에 두고, 그 다음 좌석 0 이 왼쪽이다', () => {
+    seed({ tableView: tableView(), privateHand: null });
+
+    const { container } = renderTable({ spectator: true, myUserId: 99 });
+
+    const pos = seatPositions(container);
+    expect(pos['#10']).toBe('seat-e');
+    expect(pos['#20']).toBe('seat-n');
+    expect(pos['#30']).toBe('seat-w');
+    expect(container.querySelectorAll('.seat.seat-s')).toHaveLength(1);
+  });
+});

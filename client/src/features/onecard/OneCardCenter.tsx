@@ -72,7 +72,13 @@ export function OneCardCenter({
 
       <div className="oc-center-info">
         {attackStack > 0 && <span className="oc-badge oc-attack">공격 +{attackStack}</span>}
-        <span className="oc-badge">{direction >= 0 ? '진행 → 정방향' : '진행 ← 역방향'}</span>
+        {/* D-132 — 진행 방향. 글리프는 읽지 않고 글자로 읽는다. 좌석이 시계 방향으로 앉으므로 +1 이 시계 방향이다. */}
+        <span className="oc-badge oc-direction">
+          <span className="oc-direction-arrow" aria-hidden="true">
+            {direction >= 0 ? '↻' : '↺'}
+          </span>{' '}
+          {direction >= 0 ? '시계 방향' : '반시계 방향'}
+        </span>
         {raceOpen ? (
           <span className="oc-badge oc-race-status">원카드 경쟁 중</span>
         ) : (

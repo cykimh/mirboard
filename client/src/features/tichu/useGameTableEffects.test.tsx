@@ -135,3 +135,99 @@ describe('useGameTableEffects — 카드 비행(fly) 정리', () => {
     expect(hook.result.current.fly).toBeNull();
   });
 });
+
+/** 좌표를 고정한 DOMRect — jsdom 은 레이아웃을 하지 않아 getBoundingClientRect 가 늘 0 이다. */
+function rect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
+/**
+ * D-132 — 트릭 카드 비행은 낸 사람의 좌석에서 가운데로 날아온다. 경기장 CSS 대로 좌석을 놓는다: `.seat-e` 왼쪽,
+ * `.seat-w` 오른쪽, `.seat-n` 위, `.seat-s` 아래(가운데 트릭은 (500, 300)). `dx`·`dy` 는 가운데 → 좌석 벡터다.
+ */
+function renderPositioned(mySeat: number) {
+  const hook = renderHook((p: Props) =>
+    useGameTableEffects({
+      mySeat,
+      myTeam: 'A',
+      myTurn: false,
+      matchEnded: null,
+      triggerEffect: vi.fn(),
+      playChime: vi.fn(),
+      cardAnimEnabled: true,
+      spectator: mySeat < 0,
+      isInPassing: false,
+      iAmPassSubmitted: false,
+      passCardsBySlot: NO_PASS,
+      sendAction: vi.fn(),
+      ...p,
+    }),
+    { initialProps: BASE },
+  );
+  const arena = document.createElement('div');
+  arena.getBoundingClientRect = () => rect(0, 0, 1000, 600);
+  const at: Record<string, DOMRect> = {
+    s: rect(450, 500, 100, 80),
+    e: rect(20, 260, 100, 80),
+    n: rect(450, 20, 100, 80),
+    w: rect(880, 260, 100, 80),
+  };
+  Object.entries(at).forEach(([pos, r]) => {
+    const seat = document.createElement('div');
+    seat.className = `seat seat-${pos}`;
+    seat.getBoundingClientRect = () => r;
+    arena.appendChild(seat);
+  });
+  const center = document.createElement('div');
+  center.getBoundingClientRect = () => rect(450, 250, 100, 100);
+  hook.result.current.arenaRef.current = arena;
+  hook.result.current.centerTrickRef.current = center;
+  return hook;
+}
+
+describe('useGameTableEffects — 트릭 카드 비행 출발 좌석 (D-132 시계 방향)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('내 다음 차례(+1)가 내면 왼쪽 좌석에서 날아온다', () => {
+    const hook = renderPositioned(0);
+    hook.rerender({ ...BASE, currentTop: FULL_HOUSE, currentTopSeat: 1 });
+
+    expect(hook.result.current.fly?.dx).toBeLessThan(0);
+    expect(hook.result.current.fly?.dy).toBe(0);
+  });
+
+  it('직전 차례(+3)가 내면 오른쪽, 파트너(+2)가 내면 위에서 날아온다', () => {
+    const right = renderPositioned(0);
+    right.rerender({ ...BASE, currentTop: FULL_HOUSE, currentTopSeat: 3 });
+    expect(right.result.current.fly?.dx).toBeGreaterThan(0);
+
+    const partner = renderPositioned(0);
+    partner.rerender({ ...BASE, currentTop: FULL_HOUSE, currentTopSeat: 2 });
+    expect(partner.result.current.fly?.dx).toBe(0);
+    expect(partner.result.current.fly?.dy).toBeLessThan(0);
+  });
+
+  it('관전자에게는 아래 좌석(3) 다음인 좌석 0 이 왼쪽에서 날아온다', () => {
+    const hook = renderPositioned(-1);
+    hook.rerender({ ...BASE, currentTop: FULL_HOUSE, currentTopSeat: 0 });
+
+    expect(hook.result.current.fly?.dx).toBeLessThan(0);
+  });
+});

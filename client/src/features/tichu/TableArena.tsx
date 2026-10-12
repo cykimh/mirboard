@@ -9,6 +9,7 @@ import { comboLabel } from './handType';
 import { CardChip } from './CardChip';
 import { SeatAvatar } from './SeatAvatar';
 import { SeatCardStack } from './SeatCardStack';
+import { viewPosOf } from './seatView';
 import { ReactionFloats } from './ReactionFloats';
 import { TurnCountdown } from './TurnCountdown';
 import type { FlyState } from './useGameTableEffects';
@@ -91,10 +92,9 @@ export function TableArena({
         const decl = tableView.declarations[seat];
         const declared: 'tichu' | 'grand' | null =
           decl && decl !== 'NONE' ? (decl === 'GRAND_TICHU' ? 'grand' : 'tichu') : null;
-        // Phase 8E — 본인 시점 좌석 매핑. mySeat 기준 회전 후 (S/W/N/E) 배치.
-        // viewIdx 0=South(본인), 1=West(우적), 2=North(파트너), 3=East(좌적).
-        const viewIdx = ((seat - mySeat) + 4) % 4;
-        const viewPos = ['s', 'w', 'n', 'e'][viewIdx];
+        // 본인 시점 좌석 매핑(D-132 시계 방향): 나=South(아래), +1=East(왼쪽·다음 차례 상대),
+        // +2=North(파트너), +3=West(오른쪽·직전 차례 상대).
+        const viewPos = viewPosOf(seat, mySeat);
         return (
           <div
             key={uid}
@@ -128,7 +128,7 @@ export function TableArena({
             {viewPos !== 's' && (
               <SeatCardStack
                 count={tableView.handCounts[seat] ?? 0}
-                viewPos={viewPos as 's' | 'w' | 'n' | 'e'}
+                viewPos={viewPos}
               />
             )}
             {tableView.declarations[seat] && tableView.declarations[seat] !== 'NONE' && (
