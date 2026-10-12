@@ -306,11 +306,15 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 - `RECONNECTED` — 이미 본인이 `playerIds` 에 있음 (Redis 변경 없음, 좌석 보존).
 - `SPECTATING` — IN_GAME 방에 들어왔거나 capacity 가 찬 경우 자동 관전.
 
+D-133 — 방을 읽은 뒤(빈자리 있음) 실제로 앉기 전에 마지막 자리가 차거나 게임이 시작되면 `ROOM_FULL`·`GAME_ALREADY_STARTED`(409)가 관전으로
+바뀌지 않고 그대로 나간다 — 클라 방 화면은 "자리가 없어요 — 관전할까요?" 패널. 같은 사람의 동시 이중 요청(두 탭)은 늦은 쪽도 `ALREADY_IN_ROOM`
+대신 `RECONNECTED` 다.
+
 응답 `200`
 ```json
 { "mode": "JOINED" | "RECONNECTED" | "SPECTATING", "room": { ... } }
 ```
-에러: `ROOM_NOT_FOUND`. 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
+에러: `ROOM_NOT_FOUND`, `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
 
 ### GET `/api/users/{userId}/stats` *(Phase 8D)*
 ELO rating + 누적 전적 + 파생 tier 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
@@ -613,6 +617,26 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 `image/png` 바이너리 (`Cache-Control: max-age=60`), 없으면 `404`. `<img>` 직접
 요청은 Bearer 를 못 실으므로 의도적으로 `/api/**` 밖(D-61 default-permit) —
 `users` 화이트리스트 불변(D-02).
+
+---
+
+## 방 초대 미리보기 *(D-133 — 공개 HTML, REST 아님)*
+
+### GET `/rooms/{roomId}` *(공개, 비-`/api`)*
+초대 링크는 방 주소 그대로다. 브라우저에게는 SPA(`index.html`)이고, 카톡 같은 스크래퍼(자바스크립트를 실행하지 않는다)에게는 그 방의
+링크 미리보기다 — 서버가 빌드된 `classpath:static/index.html` 의 `<!--og:start-->`…`<!--og:end-->` 구간(사이트 공통 미리보기)을 그 방의
+Open Graph 로 바꿔 준다(`infra.web.RoomPagePreviewController`, 렌더러 `RoomPreviewRenderer`).
+
+- 응답 `200` `text/html;charset=UTF-8`, `Cache-Control: no-cache`(방마다 내용이 달라 공유 캐시 금지). 요청의 `Accept` 와 무관하다 — 협상하지 않는다
+  (`produces` 를 걸면 `Accept` 가 HTML 이 아닌 스크래퍼가 406 빈 본문을 받는다). 인증 없음(`/api` 밖 default-permit — 스크래퍼는 토큰이 없다),
+  레이트리밋 없음(`/api/**` 전용).
+- 넣는 값: `<title>{제목} — 미르보드카페</title>`, `description`·`og:description` = "{방장}님이 초대했어요 · {정원}인 방 · 누르면 바로 입장",
+  `og:title` = "{게임 표시 이름} · {방 이름}"(방 이름이 비면 "{방장}님의 방"), `og:url`(요청 절대 주소 — forwarded 헤더 반영, 쿼리 없음),
+  `og:type=website`, `og:site_name=미르보드카페`, `og:locale=ko_KR`, `twitter:card=summary`. **현재 인원은 넣지 않는다**(카톡이 미리보기를
+  저장해 낡은 숫자가 보인다 — 정원만). 방 이름 40자·방장 20자(코드 포인트)에서 자르고 공백을 접은 뒤 전부 HTML 이스케이프.
+- 방이 없거나(`ROOM_NOT_FOUND`) 조회가 실패하면 틀 그대로 `200`(공통 미리보기의 SPA — 클라가 "방이 없어졌어요"). 방 ID 모양
+  (`[A-Za-z0-9-]{1,64}`)이 아니면 저장소를 보지 않는다. 틀이 없으면(클라 번들을 동봉하지 않은 개발·테스트 빌드) `404`.
+- 새로 드러나는 정보 없음 — 방 이름·방장·게임·정원은 로비 목록(`GET /api/rooms`)에 이미 있다. 방 ID 는 UUID(추측 불가).
 
 ---
 
