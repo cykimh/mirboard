@@ -9,7 +9,6 @@
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 서버 테스트 1401건 / 클라 885건
-<!-- 잠정(D-133): 서버 1401 = Docker 불필요 1189 실측(D-134 반영 — 대기실 끊김 유예·최종 리뷰 +30) + Docker IT 212(직전 전체 실측 1362 의 IT 수 — D-133·D-134 에 IT 변경 없음). Docker 복구 뒤 ./gradlew :server:test --rerun 으로 확정 -->
 
 **라이브**: https://mirboard.fly.dev — 로그인 화면 「게스트로 바로 체험하기」로 가입 없이 들어갈 수 있습니다.
 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
