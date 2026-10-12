@@ -179,6 +179,11 @@ mirboard:
     # 처리될 위험이 크다. 모바일 운영을 감안해 120s 로 상향(D-79). ReconnectBanner 가
     # 3분에 장시간 경고하므로 그 안쪽. 명시적 '나가기' 는 유예 없이 즉시 탈주(불변).
     grace-seconds: ${MIRBOARD_DESERTION_GRACE_SECONDS:120}
+  waiting:
+    # D-134 — 대기실(WAITING) 플레이어가 끊긴 뒤 내보내기까지 유예(초). 초대 링크를 휴대폰 공유창으로 카톡에
+    # 보내고 기다리는 방장의 소켓이 백그라운드 10~15s 만에 죽어도(D-79) 방과 자리가 남게 한다. 끊기면 준비를
+    # 풀고(그 사람 없이 시작 안 됨) 유예 안에 돌아오면 자리 유지. 명시적 '나가기' 는 유예 없이 즉시(불변).
+    grace-seconds: ${MIRBOARD_WAITING_GRACE_SECONDS:120}
 
 logging:
   pattern:
