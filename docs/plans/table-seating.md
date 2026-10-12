@@ -196,3 +196,17 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
 - **경쟁 버튼 슬롯 재배치** — 사용자 결정으로 보류(튜토리얼 연습·테스트가 함께 바뀌는 비용).
 - **스컬킹 좁은 화면에서 트릭 레일을 가운데 칸에 두고 슬롯만 줄이기**(이름칩 상한 52px·여백 축소로 2장/줄) — 375px 에서 슬롯 합 120px 대 내용
   122px 로 빠듯하고 360px 에서 넘쳐 다시 1장/줄이 된다. 가운데를 옆줄 아래로 내리는 안(§4.3)을 택했다.
+
+## 9. 남은 후속 (최종 리뷰 Minor — 배포 뒤 운영 화면 확인과 함께 처리, 사용자 결정 2026-10-12)
+
+- **m2 강제 종료 뒤 "다음"** — 결과(`MATCH_ENDED`) 없이 방이 끝나면 차례 좌석에 "다음" 꼬리표가 남는다(`OneCardTable.tsx`·`SkullKingTable.tsx` 의 `nextSeat` —
+  `roomFinished` 면 −1. 카운트다운은 이미 `roomFinished` 로 숨긴다).
+- **m3 스컬킹 `awaitingLead`** — resync 가 `settledTrick` 을 남겨, 이벤트를 놓친 뒤 다음 트릭 리드 차례에 들어오면 리드 전까지 "다음"이 빈다(엉뚱한 좌석은
+  아님). 조건을 "지금 차례가 정리된 트릭의 마지막으로 낸 사람이고 승자가 아님"으로.
+- **m4 라이트 테마 대비** — 스컬킹 천 위 `.sk-trick-slot.waiting`·`.sk-trick-empty`(opacity .7) 대비 ≈3.9:1(AA 미달, 예전 ≈4.3). `html:not(.dark) .sk-felt` 범위에서
+  .8 로 + 원문 단언.
+- **m5 의존 방향** — 공용 `features/chat/ArenaChatBubbles` 가 `features/tichu/seatView` 를 import 한다(티츄 `TableArena` 만 씀) → `features/tichu` 로 옮기고,
+  `SeatViewPos` 타입을 `seatView.ts` 로.
+- **m6 설계 §4.2 본문** — 행 `auto 1fr 1fr`·"좌석의 `data-side` 로 배치"는 구현(옆줄 래퍼 + `column-reverse`, 행 `auto 1fr auto`)과 다르다(상단 구현 메모가 덮는다).
+- **m7 481~560px** — 스컬킹 ≤480 규칙 밖이라 8인 트릭 레일이 가운데 칸(≈190~240px)에서 4줄 이상(폴더블·분할 화면). 17 맨 끝 `max-width: 560px` 로 템플릿만 옮기거나 한계로 기록.
+- **m8 관전자 기준 좌석** — 티츄는 기존 식(좌석 3 아래), 원카드·스컬킹은 좌석 0 아래 — 의도. D-132 나 §5 에 한 줄.
