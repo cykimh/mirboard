@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-131),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-132),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`·
@@ -33,6 +33,7 @@
 | 12 | 멀티 인스턴스 (opt-in) | ✅(opt-in) | `infra.messaging.RedisMessageGateway` |
 | 13 | 관측성 (Prometheus 게임별 차원, Grafana, Sentry) | ✅ | `infra.metrics`, `infra.config.SentryConfig`, `ops/grafana` (D-107) |
 | 14 | **`GameEngine` 포트 (멀티게임 기반)** | ✅ | `domain.game.core.GameEngine`, `infra.ws.GameEngineProvider`, `TichuGameEngine` |
+| 15 | 테이블 좌석 배치 (원카드·스컬킹 시계 방향 테이블형 좌석 + "다음" 표시·방향 화살표, 티츄 +1 을 왼쪽에 — 클라만) | ✅ | `client/src/components/seatOrder.ts`(`tableLayout`), `features/tichu/seatView.ts`, `docs/plans/table-seating.md` (D-132) |
 
 설계 단계(Phase 1)부터 클라이언트 통합·UI 리디자인(Phase 20)까지 로드맵 항목이 완료
 표시되어 있다(`docs/plans/mvp-roadmap.md`).
@@ -322,7 +323,7 @@
   재현 스크립트는 `docs/case-study-multi-game.md` 부록 (6).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **660건 / 61파일** (D-131 공개 전환 시점 실측 — 최종 리뷰 반영 뒤, 원카드 턴 카운트다운 17건·본인 큐 가드 1건 포함, 실패 0). Vitest + RTL — 스토어
+- **클라이언트**: **746건 / 65파일** (D-132 테이블 좌석 배치 시점 실측 — 사전 리뷰 반영 뒤, 배치 함수·티츄 매핑·말풍선·원카드·스컬킹 게임판 86건 포함, 실패 0). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지
@@ -386,7 +387,7 @@
   완주 IT** (`SkullKingBotMatchSimulationIT`).
 - **클라(S6, D-103) 완료**: `useStompRoom` 을 `RoomEventSink` 주입으로 게임 중립화하고
   (`tichuStore` 0줄 수정) `features/skullking/` 에 게임판을 새로 만들었다. 2~8 가변 좌석은
-  **Row-Flow**(auto-fit 좌석 그리드 + 재생순 트릭 레일)로 폭 미디어 쿼리 0개. CSS 는
+  **Row-Flow**(auto-fit 좌석 그리드 + 재생순 트릭 레일 — 좌석은 D-132 에서 테이블 배치로)로 폭 미디어 쿼리 0개. CSS 는
   `styles/parts/18-skullking-table.css` 에 `.sk-` 접두로 격리하고 네임스페이스 규칙을
   테스트로 기계화했다. 375×667 8인 실측 완료.
 - **매치 영속·ELO(D-115)**: 게임별 전적 테이블로 해소 — §9.

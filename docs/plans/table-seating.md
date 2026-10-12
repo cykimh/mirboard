@@ -1,6 +1,14 @@
 # 테이블 좌석 배치 — 원카드·스컬킹 테이블형 좌석 + 티츄 시계 방향 (D-132) — 설계
 
-> 상태: **설계 승인** · 2026-10-12 · 결정 이력 `docs/decisions.md` D-132(계획 Task 1 에서 추가)
+> 상태: **구현** · 2026-10-12(설계 승인 → 구현 → 사전 리뷰 SP-1~SP-10 반영, 클라 65파일 746건) · 결정 이력 `docs/decisions.md` D-132 ·
+> 운영 실측(§1 기준 5·7)은 배포 뒤
+> 구현 메모: §6 의 `viewOrder`·`seatMinWidth` 테스트 이동은 하지 않았다 — `features/skullking/seatLayout.test.ts` 를 스컬킹 태스크가 함께 고쳐
+> 한 파일이 두 태스크에 걸리기 때문이다(새 배치 함수 테스트만 `components/seatOrder.test.ts`). 옆줄·윗줄 자리는 좌석 속성이 아니라 옆줄
+> 래퍼(`.oc-felt-left` 등, 왼쪽은 `column-reverse`)가 잡는다 — `data-side`·`data-slot` 은 표식이고, 자리를 잡는 CSS 는 네임스페이스 테스트가
+> 캐스케이드 승자로 단언한다. §4.5 와 달리 테이블 색 토큰(`--oc-felt-*`·`--sk-felt-*`)은 포털 토큰(`.oc-tokens`·`.sk-tokens`)에 넣지 않았다 —
+> 튜토리얼 다이얼로그는 천을 그리지 않는다(테스트는 다크·라이트 값이 따로 있는지 본다).
+> 390px 수치(계산): 천 내용 326px, 옆줄 좌석 ≈86px(내용 ≈65px), 3인 이상 가운데 칸 ≈138px(375px ≈130, 360px ≈122). 데스크톱(1200px)은
+> 옆줄 150px·가운데 676px.
 > 근거: 사용자 요청(원카드 게임판 스크린샷 — 상대가 단순 격자) · 티츄 테이블 배치 D-45 · 스컬킹 Row-Flow D-103 · 원카드 게임판 D-129
 > 범위: 클라이언트만. 서버·STOMP·REST 계약, 경쟁 버튼 슬롯 표는 바뀌지 않는다.
 
@@ -86,6 +94,12 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
   윗줄은 1행 전체 폭의 flex 줄, 왼쪽 옆줄은 1열(index 0 = 아래 3행, 1 = 위 2행, 1명이면 2~3행 가운데), 오른쪽 옆줄은 3열(index 0 = 위 2행,
   1 = 아래 3행), 가운데는 2열 2~3행. 좌석 요소에 `data-side`·`data-slot` 을 달아 CSS 가 자리를 잡는다(위치 계산은 함수, 배치는 CSS).
 - 옆줄 좌석 폭은 `clamp(64px, 22vw, 150px)`, 윗줄 좌석은 flex(최대 168px) — `@media` 없이 폭에 맞춘다. 이름은 말줄임.
+  390px 옆줄 좌석은 내용이 ≈65px 라 아바타(28px) 옆 한 줄 이름 칸이 ≈31px(두 글자)이고 모바일은 `title` 툴팁이 뜨지 않으므로, 좁은 좌석
+  (내용 < 아바타 28 + 간격 6 + 이름 44 = 78px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다 쓴다(≈8자 — `flex-wrap`, 이름
+  `flex: 1 1 44px`, 스컬킹 좌석도 같음). 윗줄 좌석·넓은 화면은 한 줄 그대로.
+- 가운데 칸은 390px 3인 이상에서 ≈138px(내용 ≈126px)다. 더미 뒷면·"뽑을 더미 N장" 문구 폭·간격을 `clamp()` 로 줄여 더미와 맨 위 카드가
+  한 줄에 든다(390px ≈110px — 7 의 지정 무늬 배지가 붙은 직후만 두 줄, 줄바꿈 허용). 가운데 배지(`○○ 차례` 등)는 칸 안에서 줄을 바꾼다 —
+  `.oc-badge` 의 `nowrap` 그대로면 긴 이름이 옆줄 좌석으로 넘친다. 넓은 화면은 지금 크기 그대로.
 - **"다음" 표시**: `onecardRules.ts` 에 순수 함수 `nextTurnSeat(turnSeat, direction, eliminated: boolean[]): number` — `turnSeat < 0` 이면 −1, 아니면
   진행 방향으로 탈락하지 않은 다음 좌석(자기 자신뿐이면 −1). J(건너뛰기)·K(한 번 더)·2인 특례는 카드를 내기 전엔 알 수 없으므로 반영하지 않는다
   ("일반 진행 기준 다음"). 차례가 비는 순간(카드를 낸 직후, 경쟁 창)에는 차례 테두리와 함께 사라진다. 다음 좌석이 나면 "나" 줄에 표시한다.
@@ -97,11 +111,19 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
 ### 4.3 스컬킹 게임판
 
 - `.sk-seats` 를 `.sk-felt` 로 바꾸고 같은 배치 함수·격자를 쓴다. 가운데 칸에는 기존 트릭 레일(`SkullTrickRow`, PLAYING 일 때)과 시계 방향
-  화살표(`↻`)를 둔다 — 낸 카드는 좌석 앞이 아니라 레일에 그대로 놓는다(D-103 의 결정 유지).
-- **"다음" 표시**: `seatLayout.ts` 에 `nextTurnSeat(currentTurnSeat, seatCount, trickLength): number` — `currentTurnSeat < 0`(입찰·트릭 정리 중)이거나
+  화살표(`↻`)를 둔다 — 낸 카드는 좌석 앞이 아니라 레일에 그대로 놓는다(D-103 의 결정 유지). 좁은 화면은 아래처럼 가운데를 내린다.
+- **"다음" 표시**: `seatLayout.ts` 에 `nextTurnSeat(currentTurnSeat, seatCount, trickLength): number` — `currentTurnSeat < 0`(입찰·라운드 정리 중)이거나
   지금 사람이 이번 트릭의 마지막(`trickLength + 1 >= seatCount`)이면 −1, 아니면 `(currentTurnSeat + 1) % seatCount`. 탈주 좌석은 유령이 대신 두므로
-  건너뛰지 않는다(룰 ⑱). `SkullSeatCard` 에 `isNext` → `sk-seat-next` 표시.
-- 좁은 화면(≤480px)의 옆줄 좌석은 손패 장수를 숨긴다 — 규칙은 `17-responsive.css` 끝에 `.sk-*` 로만(18 파일은 `@media` 0개 유지).
+  건너뛰지 않는다(룰 ⑱). `SkullSeatCard` 에 `isNext` → `sk-seat-next` 표시. 트릭이 막 끝난 순간(`TRICK_TAKEN` 뒤 승자의 `TURN_CHANGED` 전)은
+  스토어가 차례를 −1 로 만들지 않고 방금 낸 마지막 사람을 남기므로, 게임판이 그 구간(트릭이 비었고 정리된 트릭의 승자가 지금 차례가 아님 —
+  승자 리드 대기)을 −1 로 다룬다. 마지막 사람이 승자면 곧 리드하므로 그대로 계산한다.
+- 좁은 화면(≤480px)은 `17-responsive.css` 끝 `.sk-*` 블록 하나로(18 파일은 `@media` 0개 유지) ① 옆줄 좌석의 손패 장수를 숨기고 ② 가운데 칸
+  (트릭 레일·방향 화살표)을 옆줄 아래 전체 폭으로 내린다 — `.sk-felt` 템플릿 `'top top top' 'left . right' 'center center center'
+  'bottom bottom bottom'`(사용자 결정, 2026-10-12 사전 리뷰 SP-2). 390px 가운데 칸 ≈138px 에서는 트릭 슬롯(카드 48px + 이름칩, 슬롯 ≈63~96px)이
+  한 줄에 1장씩 쌓여 8인 천이 ≈800~1000px 가 되고 매 차례 트릭과 손패 사이를 스크롤해야 한다. 전체 폭(≈314px)이면 3~4장씩 2~3줄,
+  천 ≈570~670px. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이 칸은 빈다. 넓은 화면은 가운데 그대로.
+- 윗줄·아래 줄은 감기지 않는다(`flex-wrap` 없음) — 8인 윗줄 3명이 375·360px 에서 2 + 1 로 감기면 위쪽 반원 순서가 흐트러진다. 좌석
+  (`min-width: 0`)이 한 줄에서 줄어든다(375px ≈98px).
 - `--sk-seat-min` 은 윗줄 좌석 최소 폭으로 계속 쓴다(기존 테스트 유지).
 
 ### 4.4 티츄 — 시계 방향
@@ -125,6 +147,8 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
   네임스페이스 테스트가 대조)으로 라이트·다크 둘 다. 티츄 `.table-arena` 는 재사용하지 않는다(`.table-arena .seat{position:absolute}` 충돌).
 - 폭 조건이 필요한 규칙은 `17-responsive.css` **끝**에만(기존 블록 사이 삽입 금지).
 - 차례 테두리 `.oc-seat-turn`·`.oc-seat-turn.oc-seat-last`(경쟁 강조와 겹침) 스타일은 그대로 — 네임스페이스 테스트가 두 변수를 확인한다.
+- 스컬킹 좌석 배경은 반투명이라 라이트 테마에서 글자 뒤가 밝은 천이다 — 좌석 통계 키(예·획·손, `opacity`)는 천 위에서만 `.7` 로 덜 흐리게
+  해 AA(4.5:1)를 지킨다(`.6` 은 4.36:1).
 
 ### 4.6 접근성
 
@@ -138,8 +162,8 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
 | 관전자 | 좌석 0 을 아래에 두고 나머지를 시계 방향으로. 아래 좌석은 일반 좌석 카드("나" 아님) |
 | 원카드 탈락 좌석 | 자리에 그대로(흐리게). "다음" 계산에서 건너뜀 |
 | 스컬킹 탈주 좌석 | 자리에 그대로. 유령이 두므로 "다음" 에서 건너뛰지 않음 |
-| 차례 없음(−1) | 테두리·"다음" 표시 없음(원카드 카드 낸 직후·경쟁 창, 스컬킹 입찰·트릭 정리) |
-| 긴 이름 | 말줄임 + `title` 로 전체 이름 |
+| 차례 없음(−1) | 테두리·"다음" 표시 없음(원카드 카드 낸 직후·경쟁 창, 스컬킹 입찰·라운드 정리). 스컬킹 트릭이 막 끝나 승자 리드를 기다리는 동안은 "다음"만 없음 |
+| 긴 이름 | 좁은 좌석은 이름이 아바타 아래 줄로(≈8자), 그래도 길면 말줄임 + `title`(데스크톱 — 모바일은 툴팁이 뜨지 않는다) |
 | 경쟁 버튼 | 위치 표 그대로(뷰포트 %). 위쪽 좌석을 최대 3초 가릴 수 있음 — 기존과 같음 |
 
 ## 6. 테스트
@@ -147,9 +171,12 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
 - 단위: `tableLayout`·`sideCounts`(2~8인 전수 — 좌석 집합 보존, 시계 방향 순서, 내 좌석 회전, 관전자), `viewPosOf`(+1 → `'e'`, +2 → `'n'`, +3 → `'w'`,
   관전자), 원카드 `nextTurnSeat`(정·역방향, 탈락 건너뛰기, −1, 혼자 남음), 스컬킹 `nextTurnSeat`(마지막 사람, 입찰, 일반).
   `viewOrder`·`seatMinWidth` 테스트는 `components/seatOrder.test.ts` 로 옮기고 스컬킹 재내보내기는 유지(`docs/plans/onecard.md` 의 기존 후속).
-- CSS: 원카드 내기·먹기 간격 32px 단언(§4.4b).
+- CSS: 원카드 내기·먹기 간격 32px 단언(§4.4b). 시계 방향 자리(옆줄 `grid-area`·왼쪽 `column-reverse`·`grid-template-areas`)를 캐스케이드 승자
+  (같은 특이도면 뒤 규칙)로 단언 — `data-side` 단언은 DOM 표식만 본다. 좁은 좌석 이름 줄바꿈, 원카드 가운데 칸 축소·배지 줄바꿈, 스컬킹 ≤480px
+  맨 끝 블록(손패 숨김 + 가운데 내림)·윗줄 감기지 않음·라이트 테마 통계 키 대비도 원문 단언.
 - 컴포넌트: 원카드 2·4·6인의 `data-side`/`data-slot`, "다음" 표시 좌석, 방향 화살표 뒤집힘, 기존 단언(좌석 수·`data-seat`·`region "테이블"`) 유지.
-  스컬킹 2·5·8인 배치, 기존 DOM 순서 단언 유지, "다음" 표시. 티츄 좌석 클래스(+1 이 `seat-e`), 트릭 카드 비행이 그 좌석에서 출발.
+  스컬킹 2·5·8인 배치, 기존 DOM 순서 단언 유지, "다음" 표시(트릭이 막 끝난 순간 포함 — `CARD_PLAYED`→`TRICK_TAKEN`→`TURN_CHANGED`). 티츄 좌석 클래스
+  (+1 이 `seat-e`), 트릭 카드 비행이 그 좌석에서 출발, 채팅 말풍선·이모지가 같은 자리.
 - CSS 네임스페이스 테스트 유지(18·19 `@media` 0개, 17 마지막, 토큰 대조).
 - 배포 뒤 운영 사이트에서 390px·데스크톱으로 원카드 2·4·6인, 스컬킹 4·8인, 티츄 4인을 본다(봇 채우기 방). `docs/qa-scenarios.md` 에 항목 추가.
 
@@ -165,3 +192,5 @@ export function tableLayout(seatCount: number, mySeat: number): { bottomSeat: nu
 - **티츄 `.table-arena` 재사용** — 좌석 절대 위치 규칙과 충돌하고 티츄 회귀 위험.
 - **티츄 CSS 를 좌우로 맞바꾸기** — 03·06·14·17 파일과 css-baseline 이 모두 바뀐다. 매핑 배열만 바꾸면 같은 효과.
 - **경쟁 버튼 슬롯 재배치** — 사용자 결정으로 보류(튜토리얼 연습·테스트가 함께 바뀌는 비용).
+- **스컬킹 좁은 화면에서 트릭 레일을 가운데 칸에 두고 슬롯만 줄이기**(이름칩 상한 52px·여백 축소로 2장/줄) — 375px 에서 슬롯 합 120px 대 내용
+  122px 로 빠듯하고 360px 에서 넘쳐 다시 1장/줄이 된다. 가운데를 옆줄 아래로 내리는 안(§4.3)을 택했다.
