@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useReactionStore, REACTION_TTL_MS } from '@/features/chat/reactionStore';
-
-const VIEW_POS = ['s', 'w', 'n', 'e'] as const;
+import { viewPosOf } from './seatView';
 
 /**
  * P2(7) — 좌석에 떠오르는 이모지 반응. `.table-arena` 안에 마운트되어 발신 좌석
@@ -28,8 +27,7 @@ export function ReactionFloats({ mySeat }: { mySeat: number }) {
   return (
     <>
       {live.map((r) => {
-        const viewIdx = ((r.fromSeat - mySeat) + 4) % 4;
-        const viewPos = VIEW_POS[viewIdx];
+        const viewPos = viewPosOf(r.fromSeat, mySeat);
         // 같은 좌석에서 짧게 연속 도착한 반응이 정확히 겹치지 않도록 약간의 가로 분산.
         const dx = ((r.id % 5) - 2) * 16;
         return (

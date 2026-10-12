@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { viewPosOf } from '@/features/tichu/seatView';
 import { useRoomChatStore } from './roomChatStore';
 
 interface ArenaChatBubblesProps {
@@ -11,7 +12,6 @@ interface ArenaChatBubblesProps {
 /** 메시지 노출 수명(ms). 마지막 ~1s 는 fade. */
 const TTL_MS = 5000;
 const FADE_MS = 1200;
-const VIEW_POS = ['s', 'w', 'n', 'e'] as const;
 
 /**
  * Phase 15(#5) — 경기장 내 채팅 말풍선. `.table-arena` 안에 마운트되어 발신자
@@ -40,8 +40,7 @@ export function ArenaChatBubbles({ playerIds, mySeat }: ArenaChatBubblesProps) {
   return (
     <>
       {[...bySeat.entries()].map(([seat, m]) => {
-        const viewIdx = ((seat - mySeat) + 4) % 4;
-        const viewPos = VIEW_POS[viewIdx];
+        const viewPos = viewPosOf(seat, mySeat);
         const fading = now - m.ts > TTL_MS - FADE_MS;
         return (
           <div
