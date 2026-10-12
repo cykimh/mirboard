@@ -1,7 +1,7 @@
 # Mirboard 구현 현황
 
 > 지금까지 **실제로 구현된 기능**을 end-to-end로 정리한 현황 문서.
-> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-133),
+> 구조/흐름은 `docs/architecture.md`, 의사결정 이력은 `docs/decisions.md`(D-01~D-134),
 > 단계별 진행은 `docs/plans/mvp-roadmap.md` 참조.
 > 기능 설명의 세부 계약은 `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP),
 > `docs/game-port.md`(`GameEngine` 포트), `docs/rules-tichu.md`·`docs/rules-skullking.md`·
@@ -34,7 +34,7 @@
 | 13 | 관측성 (Prometheus 게임별 차원, Grafana, Sentry) | ✅ | `infra.metrics`, `infra.config.SentryConfig`, `ops/grafana` (D-107) |
 | 14 | **`GameEngine` 포트 (멀티게임 기반)** | ✅ | `domain.game.core.GameEngine`, `infra.ws.GameEngineProvider`, `TichuGameEngine` |
 | 15 | 테이블 좌석 배치 (원카드·스컬킹 시계 방향 테이블형 좌석 + "다음" 표시·방향 화살표, 티츄 +1 을 왼쪽에 — 클라만) | ✅ | `client/src/components/seatOrder.ts`(`tableLayout`), `features/tichu/seatView.ts`, `docs/plans/table-seating.md` (D-132) |
-| 16 | 방 초대 링크 (공유창·복사·수동, 방마다 다른 카톡 미리보기, 로그인·게스트·가입 뒤 그 방으로, 자리 없음 → 바로 관전 + 안내) | ✅ | `features/lobby/InviteLinkButton.tsx`·`shareRoomLink.ts`·`SpectateNotice.tsx`, `features/auth/returnPath.ts`, `infra.web.RoomPagePreviewController`, `docs/plans/room-invite.md` (D-133) |
+| 16 | 방 초대 링크 (공유창·복사·수동, 방마다 다른 카톡 미리보기, 로그인·게스트·가입 뒤 그 방으로, 자리 없음 → 바로 관전 + 안내, 대기실 끊김 120초 유예·화면 재동기화) | ✅ | `features/lobby/InviteLinkButton.tsx`·`shareRoomLink.ts`·`SpectateNotice.tsx`, `features/auth/returnPath.ts`, `infra.web.RoomPagePreviewController`, `infra.ws.WaitingLeaveGraceScheduler`, `ws/useRoomMeta.ts`, `docs/plans/room-invite.md` (D-133·D-134) |
 
 설계 단계(Phase 1)부터 클라이언트 통합·UI 리디자인(Phase 20)까지 로드맵 항목이 완료
 표시되어 있다(`docs/plans/mvp-roadmap.md`).
@@ -99,7 +99,7 @@
   건넨다. 서버 `GET /rooms/{id}`(공개 HTML, `/api` 밖)가 빌드된 `index.html` 의 표식 구간을 그 방의 Open Graph(게임·방 이름·방장·정원 —
   현재 인원 제외)로 바꿔 카톡 미리보기가 방마다 다르다(요청의 Accept 와 무관). 방이 없거나 틀이 없으면 기존 SPA 그대로(`docs/api.md`).
   공유창은 휴대폰·태블릿(굵은 포인터)만 — PC 는 복사. 꽉 찬 대기실(봇 자리 포함 — 봇은 자리를 비켜 주지 않는다)의 초대 설명은 "링크를 받은
-  친구는 관전으로 들어와요".
+  친구는 관전으로 들어와요". 방장이 공유창에서 카톡으로 나가 기다려도(휴대폰 소켓이 죽어도) 대기실 끊김 120초 유예로 방과 자리가 남는다(D-134).
 
 동시성 보장: capacity 위반 0건(`RoomServiceConcurrencyIT`, 멀티스레드 join).
 `join-or-reconnect` 의 입장 갈래(봇까지 꽉 찬 방 관전·경합 그대로·동시 이중 요청 재접속)는 `RoomServiceJoinOrReconnectTest`(Docker 불필요, D-133).
@@ -214,7 +214,9 @@
 - 서버가 STOMP Subscribe/Disconnect 를 후킹한다. 프레즌스는 **Redis `RoomPresence`**
   (세션 카운터 HASH) — D-75 의 in-memory `WsSessionRegistry` 는 D-96 에서 대체됐다.
   in-memory 로는 인스턴스 A 에 붙은 재접속을 B 가 못 봐서 "재접속했는데 탈주 처리"가 난다.
-- **WAITING 끊김** = 즉시 leave(빈 방·관전자 0 방 즉시 소멸).
+- **WAITING 끊김** = 플레이어는 준비 해제 + 유예(`mirboard.waiting.grace-seconds`, 기본 120s — D-134) 뒤 미복귀면 leave
+  (마지막이면 방 소멸), 같은 방 라이브 세션이 남아 있으면(두 탭 중 하나 닫기) 아무것도 안 함. 관전자는 즉시 관전 종료(관전자 0 방 소멸).
+  대기실 화면은 다시 연결·다시 보임·online 때 `join-or-reconnect` 로 방을 다시 맞춘다(방 없음 → "방이 없어졌어요"). D-75 는 즉시 leave 였다.
 - **IN_GAME 탈주** = 명시 '나가기' 또는 끊김 후 `mirboard.desertion.grace-seconds`
   (**기본 120s**, D-79 에서 모바일 백그라운드 전환을 감안해 30s→120s) 미복귀.
   처리는 게임이 정한다 — 포트가 3치 `DesertOutcome` 를 돌려준다(D-102/D-104):
@@ -328,7 +330,7 @@
 
 ## 13. 테스트 현황
 
-- **서버**: **1371건** (D-133 방 초대 링크 시점 — 사전 리뷰 반영·봇 자리 비켜주기 철회 뒤. **잠정(D-133)**: 그중 Docker 불필요 1159건(84%)은 실측(실패 0), Docker IT 212건은 직전 전체 실측(1362건, 실패 0) 그대로 — 이번 반영에 IT 변경 없음, OrbStack 이 멈춰 전체 `--rerun` 은 Docker 복구 뒤 확정. 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip. D-131 공개 전환 시점 1327건 + 방 미리보기 `infra.web.*` 39건(그중 Docker 불필요 33건) + 입장 갈래 `RoomServiceJoinOrReconnectTest` 5건(Docker 불필요)). 게임별 내역(같은 실측 — D-133 은 게임 도메인 무변경): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 17건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+- **서버**: **1401건** (D-134 대기실 끊김 유예·D-133 최종 리뷰 반영 시점. **잠정(D-133)**: 그중 Docker 불필요 1189건(85%)은 실측(실패 0), Docker IT 212건은 직전 전체 실측(1362건, 실패 0) 그대로 — D-133·D-134 반영에 IT 변경 없음, OrbStack 이 멈춰 전체 `--rerun` 은 Docker 복구 뒤 확정. 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip. D-131 공개 전환 시점 1327건 + 방 미리보기 `infra.web.*` 51건(그중 Docker 불필요 45건 — 그래핌 자르기·표식 경고 12건 포함) + 입장 갈래 `RoomServiceJoinOrReconnectTest` 5건 + 대기실 끊김 유예 18건(`WaitingLeaveGraceSchedulerTest` 14·`RoomDisconnectHandlerTest` +4, D-134 — 둘 다 Docker 불필요)). 게임별 내역(같은 실측 — D-133 은 게임 도메인 무변경): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 17건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
   집계 방식: `./gradlew :server:test --rerun` 뒤 `server/build/test-results/test/TEST-*.xml` 을 합한다. 클래스는 **파일 이름의 바깥 클래스**로
@@ -337,7 +339,7 @@
   재현 스크립트는 `docs/case-study-multi-game.md` 부록 (6).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **865건 / 72파일** (D-133 방 초대 링크 시점 실측 — 사전 리뷰·결정 A 반영, 봇 자리 비켜주기 철회 뒤, 돌아갈 주소·공유 함수·로그인/가입·라우팅·방 화면·초대 버튼·관전 안내·허브 관전 기록·`index.html` 117건 포함, 실패 0. D-132 시점 748건 / 65파일). Vitest + RTL — 스토어
+- **클라이언트**: **885건 / 73파일** (D-134 시점 실측, 실패 0 — D-133 방 초대 링크 시점 865건 / 72파일(돌아갈 주소·공유 함수·로그인/가입·라우팅·방 화면·초대 버튼·관전 안내·허브 관전 기록·`index.html` 117건 포함) + 최종 리뷰 반영 20건(대기실 화면 재동기화 `useRoomMeta`·방 화면 14건, 관전 안내 상태 영역 5건, 수동 복사 선택 1건). D-132 시점 748건 / 65파일). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지

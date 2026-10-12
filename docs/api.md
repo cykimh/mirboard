@@ -426,8 +426,10 @@ IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이
   목록을 당기면 STOMP 액션의 좌석 판정과 비공개 이벤트(`HAND_DEALT` 등) 라우팅이 남의 좌석을
   가리켰다.
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
-  은 즉시 leave, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`,
-  기본 **120s**, D-79) 후 미복귀 시 탈주.
+  플레이어는 준비 해제 + 유예(`mirboard.waiting.grace-seconds`, 기본 **120s**, D-134) 후
+  미복귀 시 leave(같은 방 라이브 세션이 남아 있으면 아무것도 안 함), WAITING 관전자는 즉시
+  관전 종료, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`, 기본 **120s**, D-79) 후
+  미복귀 시 탈주. 이 `/leave` 자체(명시적 '나가기')는 유예 없이 즉시다.
 
 ### GET `/api/rooms/{roomId}`
 응답 `200` — 단일 Room 상세.

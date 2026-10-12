@@ -317,8 +317,9 @@ JPA 엔티티는 `TichuMatchResult`, `TichuMatchParticipant`(복합키). `User` 
   `ApiErrorEnvelope` 로 변환. 401은 JSON.
 - **관측성**: Micrometer + Prometheus(`/actuator/prometheus`), `MirboardMetrics` 카운터.
   로그는 MDC(`userId`/`roomId`/`eventId`) 자동 부착(`MdcKeys`).
-- **재접속/탈주(D-74/D-75)**: WAITING 끊김=즉시 leave. IN_GAME 탈주(명시 '나가기' 또는
-  끊김 후 `mirboard.desertion.grace-seconds` 기본 30s 미복귀)=상대팀 승리로 매치 종료 +
+- **재접속/탈주(D-74/D-75)**: WAITING 끊김=플레이어는 준비 해제 + 유예(`mirboard.waiting.grace-seconds`
+  기본 120s, D-134 — 같은 방 라이브 세션이 남으면 그대로) 뒤 leave, 관전자는 즉시. IN_GAME 탈주(명시 '나가기' 또는
+  끊김 후 `mirboard.desertion.grace-seconds` 기본 120s(D-79) 미복귀)=상대팀 승리로 매치 종료 +
   탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 제외). 합성 `TichuMatchCompleted` 로
   `MatchResultRecorder` 재사용. resync 는 `GET /api/rooms/{id}/resync` 가 tableView +
   privateHand + seq 제공.
@@ -337,7 +338,8 @@ JPA 엔티티는 `TichuMatchResult`, `TichuMatchParticipant`(복합키). `User` 
 | Redis | `127.0.0.1:6379`, no pw, no TLS | `MIRBOARD_REDIS_HOST/PORT/PASSWORD/SSL` |
 | 메시징 모드 | `in-memory` | `MIRBOARD_MESSAGING_GATEWAY` (`redis`) |
 | 봇 딜레이 | 700ms | `MIRBOARD_BOT_DELAY_MILLIS` |
-| 탈주 유예 | 30s | `mirboard.desertion.grace-seconds` |
+| 탈주 유예 | 120s(D-79) | `mirboard.desertion.grace-seconds` (`MIRBOARD_DESERTION_GRACE_SECONDS`) |
+| 대기실 끊김 유예 | 120s(D-134) | `mirboard.waiting.grace-seconds` (`MIRBOARD_WAITING_GRACE_SECONDS`) |
 | 서버 포트 | 8080 | `MIRBOARD_PORT` |
 | Virtual Threads | enabled | `spring.threads.virtual.enabled` |
 
