@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
+import { safeReturnPath } from '@/features/auth/returnPath';
 import {
   Card,
   CardContent,
@@ -35,6 +36,12 @@ export function LoginPage() {
     (s) => !!s.token && !!s.user && (s.expiresAt == null || s.expiresAt > Date.now()),
   );
   const navigate = useNavigate();
+  // D-133 — 보호 경로가 실어 보낸 가려던 경로. 사이트 안 경로만 받고, 없으면 지금처럼 허브.
+  const location = useLocation();
+  const from = (location.state as { from?: unknown } | null)?.from;
+  const returnPath = safeReturnPath(from);
+  const destination = returnPath ?? '/games';
+  const invited = returnPath?.startsWith('/rooms/') ?? false;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +56,7 @@ export function LoginPage() {
     try {
       await login(username, password);
       // D-122 — replace: 뒤로가기로 로그인 화면에 돌아오지 않게.
-      navigate('/games', { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : '로그인 실패';
       setError(message);
@@ -64,7 +71,7 @@ export function LoginPage() {
     try {
       await loginAsGuest();
       // D-122 — replace: 뒤로가기로 로그인 화면에 돌아오지 않게.
-      navigate('/games', { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       setGuestError(guestErrorMessage(err));
     } finally {
@@ -77,7 +84,89 @@ export function LoginPage() {
   // 신원을 영영 잃었다 — 허브 로그아웃에만 건 확인(D-117)을 우회하는 경로였다. 만료된 토큰과
   // 사용자 정보 없는 토큰은 보내지 않는다: 다시 로그인할 길을 막거나, 허브의 /login 가드
   // (`!token || !user`)와 서로 튕기는 왕복이 된다.
-  if (signedIn) return <Navigate to="/games" replace />;
+  // D-133 — 보호 경로에서 왔으면(초대 링크 등) 허브 대신 그 경로로. 이미 로그인한 사람이 초대 링크를 열면 이 화면을 거치지 않는다.
+  if (signedIn) return <Navigate to={destination} replace />;
+
+  // D-133 — 회원가입으로 넘어가도 돌아갈 주소를 잃지 않게 그대로 넘긴다.
+  const registerState = returnPath ? { from: returnPath } : undefined;
+
+  const loginForm = (
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="login-username">아이디</Label>
+        <Input
+          id="login-username"
+          type="text"
+          value={username}
+          autoComplete="username"
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="login-password">비밀번호</Label>
+        <Input
+          id="login-password"
+          type="password"
+          value={password}
+          autoComplete="current-password"
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <Button type="submit" disabled={submitting || guestSubmitting}>
+        {submitting ? '로그인 중...' : '로그인'}
+      </Button>
+    </form>
+  );
+
+  const divider = (
+    <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+      <Separator className="flex-1" />
+      <span>{t('auth.guest.or')}</span>
+      <Separator className="flex-1" />
+    </div>
+  );
+
+  // D-117 — 가입 없는 체험. 처음 온 리뷰어가 가입 화면에서 이탈하지 않게.
+  // D-133 — 초대받은 사람에게는 같은 버튼을 "게스트로 바로 입장"으로 부른다(폼 앞에 둔다).
+  const guestEntry = (
+    <>
+      <Button
+        type="button"
+        variant={invited ? 'default' : 'outline'}
+        className="w-full"
+        onClick={handleGuest}
+        disabled={guestSubmitting || submitting}
+      >
+        {guestSubmitting
+          ? t('auth.guest.creating')
+          : invited
+            ? t('auth.invite.guestCta')
+            : t('auth.guest.cta')}
+      </Button>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        {t('auth.guest.caption')}
+      </p>
+      {guestError && (
+        <Alert className="mt-3">
+          <AlertDescription className="flex flex-col items-start gap-2">
+            <span>{guestError}</span>
+            <Button asChild size="sm">
+              <Link to="/register" state={registerState}>
+                {t('auth.guest.signupCta')}
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
 
   return (
     <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
@@ -87,72 +176,29 @@ export function LoginPage() {
           <CardDescription>미르보드카페에 오신 것을 환영합니다.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="login-username">아이디</Label>
-              <Input
-                id="login-username"
-                type="text"
-                value={username}
-                autoComplete="username"
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="login-password">비밀번호</Label>
-              <Input
-                id="login-password"
-                type="password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+          {invited ? (
+            <>
+              {/* D-133 — 초대 링크로 온 사람: 안내 → 게스트로 바로 입장 → (또는) 로그인 폼. */}
+              <Alert role="status" className="mb-4">
+                <AlertDescription>{t('auth.invite.notice')}</AlertDescription>
               </Alert>
-            )}
-            <Button type="submit" disabled={submitting || guestSubmitting}>
-              {submitting ? '로그인 중...' : '로그인'}
-            </Button>
-          </form>
-
-          {/* D-117 — 가입 없는 체험. 처음 온 리뷰어가 가입 화면에서 이탈하지 않게. */}
-          <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-            <Separator className="flex-1" />
-            <span>{t('auth.guest.or')}</span>
-            <Separator className="flex-1" />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleGuest}
-            disabled={guestSubmitting || submitting}
-          >
-            {guestSubmitting ? t('auth.guest.creating') : t('auth.guest.cta')}
-          </Button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            {t('auth.guest.caption')}
-          </p>
-          {guestError && (
-            <Alert className="mt-3">
-              <AlertDescription className="flex flex-col items-start gap-2">
-                <span>{guestError}</span>
-                <Button asChild size="sm">
-                  <Link to="/register">{t('auth.guest.signupCta')}</Link>
-                </Button>
-              </AlertDescription>
-            </Alert>
+              {guestEntry}
+              {divider}
+              {loginForm}
+            </>
+          ) : (
+            <>
+              {loginForm}
+              {divider}
+              {guestEntry}
+            </>
           )}
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             계정이 없나요?{' '}
             <Link
               to="/register"
+              state={registerState}
               className="text-primary underline-offset-4 hover:underline"
             >
               회원가입

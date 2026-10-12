@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
+import { safeReturnPath } from '@/features/auth/returnPath';
 import {
   Card,
   CardContent,
@@ -18,6 +19,9 @@ export function RegisterPage() {
   const register = useAuthStore((s) => s.register);
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  // D-133 — 로그인 화면이 넘긴 돌아갈 주소(초대받은 방 등). 규칙은 로그인 화면과 같다 — 사이트 안 경로만, 아니면 허브.
+  const location = useLocation();
+  const returnPath = safeReturnPath((location.state as { from?: unknown } | null)?.from);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +34,7 @@ export function RegisterPage() {
     try {
       await register(username, password);
       await login(username, password);
-      navigate('/games', { replace: true });
+      navigate(returnPath ?? '/games', { replace: true });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : '회원가입 실패';
       setError(message);
@@ -89,6 +93,7 @@ export function RegisterPage() {
             이미 계정이 있나요?{' '}
             <Link
               to="/login"
+              state={returnPath ? { from: returnPath } : undefined}
               className="text-primary underline-offset-4 hover:underline"
             >
               로그인

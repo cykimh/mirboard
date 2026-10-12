@@ -117,6 +117,10 @@ const KO = {
   'hub.guest.logoutConfirm':
     '게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 로그아웃할까요?',
   'profile.guest.noPassword': '게스트 계정은 비밀번호가 없어요 — 회원가입하면 전적이 남아요',
+
+  // --- 초대 링크 (D-133) ---
+  'auth.invite.notice': '방에 초대받았어요 — 가입하지 않아도 게스트로 바로 들어갈 수 있어요',
+  'auth.invite.guestCta': '게스트로 바로 입장',
 } as const;
 
 export type MessageKey = keyof typeof KO;

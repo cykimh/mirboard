@@ -3,6 +3,7 @@ import {
   MemoryRouter,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useNavigationType,
 } from 'react-router-dom';
@@ -213,5 +214,159 @@ describe('LoginPage — 로그인 상태 리다이렉트 (D-122)', () => {
     renderLogin();
 
     expect(guestButton()).toBeTruthy();
+  });
+});
+
+/**
+ * D-133 — 초대 링크로 온 사람. 보호 경로가 `state.from` 에 가려던 경로를 싣고 보낸다. 방 경로(`/rooms/…`)면
+ * "방에 초대받았어요" 안내와 "게스트로 바로 입장"을 로그인 폼 **앞**에 두고, 게스트·로그인 뒤(그리고 이미
+ * 로그인 상태로 왔을 때) 그 경로로 `replace` 한다. 돌아갈 주소는 사이트 안 경로만(`safeReturnPath`).
+ */
+describe('LoginPage — 초대 링크로 온 사람 (D-133)', () => {
+  /** 도착한 화면이 어떻게 왔는지(PUSH/REPLACE)와 넘겨받은 state.from 을 보인다. */
+  function Landing({ name }: { name: string }) {
+    const navigationType = useNavigationType();
+    const location = useLocation();
+    const from = (location.state as { from?: unknown } | null)?.from;
+    return (
+      <>
+        <div>{`${name} ${location.pathname}`}</div>
+        <div data-testid="nav-type">{navigationType}</div>
+        <div data-testid="state-from">{String(from)}</div>
+      </>
+    );
+  }
+
+  function renderWithFrom(from: unknown) {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/games" element={<Landing name="GAMES_PAGE" />} />
+          <Route path="/profile" element={<Landing name="PROFILE_PAGE" />} />
+          <Route path="/rooms/:roomId" element={<Landing name="ROOM_PAGE" />} />
+          <Route path="/register" element={<Landing name="REGISTER_PAGE" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  const GUEST_SESSION = {
+    accessToken: 'guest-tok',
+    tokenType: 'Bearer',
+    expiresAt: Date.now() + 3_600_000,
+    user: { userId: 99, username: 'guest-abcd2345', guest: true },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    useAuthStore.setState({ token: null, expiresAt: null, user: null });
+  });
+
+  it('방 경로에서 왔으면 초대 안내와 "게스트로 바로 입장"을 로그인 폼보다 앞에 둔다', () => {
+    renderWithFrom('/rooms/r1');
+
+    const notice = screen.getByText('방에 초대받았어요 — 가입하지 않아도 게스트로 바로 들어갈 수 있어요');
+    const guestCta = screen.getByRole('button', { name: '게스트로 바로 입장' });
+    const username = screen.getByLabelText('아이디');
+    const follows = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    expect(follows(notice, guestCta)).toBe(true);
+    expect(follows(guestCta, username)).toBe(true);
+    expect(screen.queryByRole('button', { name: '게스트로 바로 체험하기' })).toBeNull();
+  });
+
+  it('일반 진입이면 지금 배치 그대로 — 안내가 없고 게스트 버튼은 폼 뒤', () => {
+    renderLogin();
+
+    expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
+    const username = screen.getByLabelText('아이디');
+    expect(
+      username.compareDocumentPosition(guestButton()) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '게스트로 바로 입장' })).toBeNull();
+  });
+
+  it('방이 아닌 보호 경로(/profile)에서 왔으면 배치는 그대로, 로그인 뒤 그 경로로', async () => {
+    login.mockResolvedValue({ ...GUEST_SESSION, user: { userId: 3, username: 'alice' } });
+    renderWithFrom('/profile');
+
+    expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
+    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+
+    expect(await screen.findByText('PROFILE_PAGE /profile')).toBeInTheDocument();
+  });
+
+  it('게스트로 바로 입장하면 그 방으로 replace 한다', async () => {
+    guest.mockResolvedValue(GUEST_SESSION);
+    renderWithFrom('/rooms/r1');
+
+    fireEvent.click(screen.getByRole('button', { name: '게스트로 바로 입장' }));
+
+    expect(await screen.findByText('ROOM_PAGE /rooms/r1')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-type').textContent).toBe('REPLACE');
+  });
+
+  it('비밀번호로 로그인해도 그 방으로 replace 한다', async () => {
+    login.mockResolvedValue({ ...GUEST_SESSION, user: { userId: 3, username: 'alice' } });
+    renderWithFrom('/rooms/r1');
+
+    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+
+    expect(await screen.findByText('ROOM_PAGE /rooms/r1')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-type').textContent).toBe('REPLACE');
+  });
+
+  it('이미 로그인 상태로 /login(from 있음)에 오면 로그인 화면 없이 그 방으로', async () => {
+    useAuthStore.setState({
+      token: 'tok',
+      expiresAt: Date.now() + 3_600_000,
+      user: { userId: 7, username: 'alice' },
+    });
+    renderWithFrom('/rooms/r1');
+
+    expect(await screen.findByText('ROOM_PAGE /rooms/r1')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-type').textContent).toBe('REPLACE');
+  });
+
+  it.each(['//evil.com', '/\\evil.com', 'https://evil.com/rooms/r1', 'javascript:alert(1)', '/login'])(
+    'from 이 %j 이면 안내 없이 로그인 뒤 허브로 — 사이트 밖·로그인 화면으로 가지 않는다',
+    async (from) => {
+      guest.mockResolvedValue(GUEST_SESSION);
+      renderWithFrom(from);
+
+      expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
+      fireEvent.click(guestButton());
+
+      expect(await screen.findByText('GAMES_PAGE /games')).toBeInTheDocument();
+    },
+  );
+
+  it('"회원가입" 링크가 돌아갈 주소를 넘긴다', async () => {
+    renderWithFrom('/rooms/r1');
+
+    fireEvent.click(screen.getByRole('link', { name: '회원가입' }));
+
+    expect(await screen.findByText('REGISTER_PAGE /register')).toBeInTheDocument();
+    expect(screen.getByTestId('state-from').textContent).toBe('/rooms/r1');
+  });
+
+  it('게스트 생성 실패 안내의 회원가입 길도 돌아갈 주소를 넘긴다', async () => {
+    guest.mockRejectedValue(
+      new ApiError(429, { error: { code: 'TOO_MANY_REQUESTS', message: 'x' } }),
+    );
+    renderWithFrom('/rooms/r1');
+
+    fireEvent.click(screen.getByRole('button', { name: '게스트로 바로 입장' }));
+    fireEvent.click(await screen.findByRole('link', { name: '회원가입하고 시작하기' }));
+
+    expect(await screen.findByText('REGISTER_PAGE /register')).toBeInTheDocument();
+    expect(screen.getByTestId('state-from').textContent).toBe('/rooms/r1');
   });
 });
