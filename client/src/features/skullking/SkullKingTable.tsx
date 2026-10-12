@@ -6,7 +6,8 @@ import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { skullkingRoomSink } from './skullkingRoomSink';
 import { bidsRevealed, lastRoundResult, useSkullKingStore } from './skullkingStore';
-import { leadSuitOf, seatAccent, seatMinWidth, viewOrder } from './seatLayout';
+import { tableLayout, type TableSide } from '@/components/seatOrder';
+import { leadSuitOf, nextTurnSeat, seatAccent, seatMinWidth } from './seatLayout';
 import { SkullSeatCard } from './SkullSeatCard';
 import { SkullTrickRow } from './SkullTrickRow';
 import { SkullCardChip } from './SkullCardChip';
@@ -41,9 +42,10 @@ const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
  * 스컬킹 게임판 조립 루트 (D-103, S6). 티츄 `GameTable` 과 같은 구조로 자기 소켓을 소유하고
  * 자기 sink 를 주입한다 — 그래서 두 게임의 코드 경로가 겹치지 않는다.
  *
- * <p>기하는 **Row-Flow**다: 상대 좌석은 `auto-fit` 그리드에 정상 흐름으로 놓여 2~8인이
- * 폭 미디어 없이 줄바꿈되고, 트릭은 재생순 레일로 늘어놓는다. 좌석 수의 권위값은
- * `tableView.seats.length`(스토어의 `seats`)이며 `playerIds` 는 이름·아바타 조회용이다.
+ * <p>기하는 **테이블 격자**다(D-132): 상대 좌석은 내 기준 왼쪽 옆줄 → 윗줄(5인 이상은 위쪽 반원) → 오른쪽 옆줄에 시계
+ * 방향으로 앉고(`tableLayout`), 가운데 칸에 재생순 트릭 레일(D-103 — 카드는 좌석 앞이 아니라 레일에)과 진행 방향 화살표를
+ * 둔다. 폭 미디어 없이 옆줄 폭만 줄인다. 좌석 수의 권위값은 `tableView.seats.length`(스토어의 `seats`)이며 `playerIds` 는
+ * 이름·아바타 조회용이다.
  */
 export function SkullKingTable({
   roomId,
@@ -75,14 +77,47 @@ export function SkullKingTable({
   const revealed = bidsRevealed(s);
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
-  const opponents = viewOrder(seatCount, mySeat);
+  const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const leadSuit = leadSuitOf(s.trick);
   const myTurn = !spectator && mySeat >= 0 && s.currentTurnSeat === mySeat;
+  // D-132 — 일반 진행 기준 다음 차례(입찰·라운드 정리·트릭의 마지막 사람이면 없음). 트릭이 막 끝나(TRICK_TAKEN) 승자의
+  // 리드(TURN_CHANGED)를 기다리는 동안은 currentTurnSeat 가 방금 낸 마지막 사람이다 — 다음 리드는 승자라 아직 다음을 모른다.
+  // (마지막 사람이 승자면 그 사람이 곧 리드하므로 그대로 계산한다.)
+  const awaitingLead =
+    s.trick.length === 0 && s.settledTrick !== null && s.settledTrick.winnerSeat !== s.currentTurnSeat;
+  const nextSeat = awaitingLead ? -1 : nextTurnSeat(s.currentTurnSeat, seatCount, s.trick.length);
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
     if (botSeats.includes(seat)) return usernames[uid] ?? `봇 ${seat}`;
     return usernames[uid] ?? `#${uid ?? seat}`;
+  };
+
+  const seatAt = (seat: number, side: TableSide | 'bottom', slot: number) => {
+    const view = s.seats.find((x) => x.seat === seat);
+    if (!view) return null;
+    return (
+      <SkullSeatCard
+        key={seat}
+        seat={view}
+        userId={playerIds[seat]}
+        username={usernames[playerIds[seat]]}
+        isBot={botSeats.includes(seat)}
+        isTurn={s.currentTurnSeat === seat}
+        isNext={nextSeat === seat}
+        isDeserted={s.desertedSeats.includes(seat)}
+        isDisconnected={s.disconnectedSeats.has(seat)}
+        bidsRevealed={revealed}
+        side={side}
+        slot={slot}
+      />
+    );
+  };
+  // 옆줄마다 묶는다 — 좌석 DOM 순서가 slots 순서(= 진행 순서)다.
+  const sideRow = (side: TableSide) => {
+    const row = slots.filter((x) => x.side === side);
+    if (row.length === 0) return null;
+    return <div className={`sk-felt-${side}`}>{row.map((x) => seatAt(x.seat, side, x.index))}</div>;
   };
 
   const mySeatView = s.seats.find((x) => x.seat === mySeat) ?? null;
@@ -182,36 +217,34 @@ export function SkullKingTable({
       <ReconnectBanner connected={connected} />
       {s.errorMessage && <p className="sk-error">{s.errorMessage}</p>}
 
-      <div className="sk-seats">
-        {opponents.map((seat) => {
-          const view = s.seats.find((x) => x.seat === seat);
-          if (!view) return null;
-          return (
-            <SkullSeatCard
-              key={seat}
-              seat={view}
-              userId={playerIds[seat]}
-              username={usernames[playerIds[seat]]}
-              isBot={botSeats.includes(seat)}
-              isTurn={s.currentTurnSeat === seat}
-              isDeserted={s.desertedSeats.includes(seat)}
-              isDisconnected={s.disconnectedSeats.has(seat)}
-              bidsRevealed={revealed}
-            />
-          );
-        })}
-      </div>
+      {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
+      <div className="sk-felt" role="group" aria-label="좌석 배치">
+        {sideRow('left')}
+        {sideRow('top')}
+        {sideRow('right')}
 
-      {s.phase === 'PLAYING' && (
-        <SkullTrickRow
-          trick={s.trick}
-          settled={s.settledTrick}
-          currentTurnSeat={s.currentTurnSeat}
-          handSize={s.handSize}
-          completedTricks={completedTricks}
-          nameOf={nameOf}
-        />
-      )}
+        <div className="sk-felt-center">
+          {/* 스컬킹은 늘 시계 방향(+1)이다. 글리프는 읽지 않고 글자로 읽는다. */}
+          <span className="sk-badge sk-felt-dir">
+            <span className="sk-felt-dir-arrow" aria-hidden="true">
+              ↻
+            </span>{' '}
+            시계 방향
+          </span>
+          {s.phase === 'PLAYING' && (
+            <SkullTrickRow
+              trick={s.trick}
+              settled={s.settledTrick}
+              currentTurnSeat={s.currentTurnSeat}
+              handSize={s.handSize}
+              completedTricks={completedTricks}
+              nameOf={nameOf}
+            />
+          )}
+        </div>
+
+        {bottomSeat !== null && <div className="sk-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}
+      </div>
 
       {s.matchEnded && (
         <SkullMatchEndPanel
@@ -276,6 +309,7 @@ export function SkullKingTable({
               </span>
             )}
             {myTurn && <span className="sk-badge">내 차례</span>}
+            {nextSeat === mySeat && <span className="sk-badge sk-seat-next">다음</span>}
           </div>
 
           {s.phase === 'BIDDING' && !roomFinished && (

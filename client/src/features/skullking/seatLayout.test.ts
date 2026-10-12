@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isLegalPlayHint,
   leadSuitOf,
+  nextTurnSeat,
   seatAccent,
   seatMinWidth,
   viewOrder,
@@ -199,5 +200,38 @@ describe('isLegalPlayHint — follow 의무 (§6.2)', () => {
     const voidInGreen = [suit('YELLOW', 2), suit('BLACK', 5)];
     expect(isLegalPlayHint(suit('YELLOW', 2), voidInGreen, 'GREEN')).toBe(true);
     expect(isLegalPlayHint(suit('BLACK', 5), voidInGreen, 'GREEN')).toBe(true);
+  });
+});
+
+/**
+ * D-132 — 게임판의 "다음" 표시. 서버 진행은 트릭 안에서 +1(`TrickState`)이고, 트릭의 마지막 사람 다음은 트릭 승자가 리드하므로
+ * 아직 모른다. 탈주 좌석은 유령이 대신 두므로 건너뛰지 않는다(룰 ⑱ — 함수는 탈주를 모른다).
+ */
+describe('nextTurnSeat — 일반 진행 기준 다음 차례 (D-132)', () => {
+  it('트릭 중이면 +1, 마지막 좌석 다음은 0', () => {
+    expect(nextTurnSeat(1, 4, 0)).toBe(2);
+    expect(nextTurnSeat(3, 4, 1)).toBe(0);
+  });
+
+  it('입찰·라운드 정리 중(차례 −1)이면 없다 — 트릭이 막 끝난 순간은 게임판이 따로 다룬다', () => {
+    expect(nextTurnSeat(-1, 4, 0)).toBe(-1);
+    expect(nextTurnSeat(-1, 8, 3)).toBe(-1);
+  });
+
+  it('지금 사람이 이번 트릭의 마지막이면 없다 — 다음 리드는 트릭 승자라 아직 모른다', () => {
+    expect(nextTurnSeat(3, 4, 3)).toBe(-1);
+    expect(nextTurnSeat(0, 2, 1)).toBe(-1);
+  });
+
+  it('2~8인 × 리드 좌석 전수 — 트릭의 마지막 사람 전까지는 늘 다음 좌석(+1)', () => {
+    for (const n of SEAT_COUNTS) {
+      for (let lead = 0; lead < n; lead++) {
+        for (let played = 0; played < n; played++) {
+          const current = (lead + played) % n;
+          const expected = played + 1 < n ? (current + 1) % n : -1;
+          expect(nextTurnSeat(current, n, played), `n=${n} lead=${lead} played=${played}`).toBe(expected);
+        }
+      }
+    }
   });
 });

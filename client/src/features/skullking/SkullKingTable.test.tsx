@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SkullKingTable } from './SkullKingTable';
 import { useSkullKingStore } from './skullkingStore';
@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import type {
   CompletedRoundView,
   MatchEndedPayload,
+  PlayedCardView,
   SeatView,
   SkullCard,
   SkullKingPhase,
@@ -56,6 +57,8 @@ function seed(opts: {
   completedRounds?: CompletedRoundView[];
   cumulativeScores?: Record<number, number>;
   matchResult?: MatchEndedPayload | null;
+  trick?: PlayedCardView[];
+  desertedSeats?: number[];
 }) {
   const seats =
     opts.seats ??
@@ -74,9 +77,9 @@ function seed(opts: {
       startSeat: 0,
       currentTurnSeat: opts.currentTurnSeat ?? -1,
       seats,
-      trick: [],
+      trick: opts.trick ?? [],
       cumulativeScores: opts.cumulativeScores ?? {},
-      desertedSeats: [],
+      desertedSeats: opts.desertedSeats ?? [],
       roundScores: {},
       completedRounds: opts.completedRounds,
       matchResult: opts.matchResult,
@@ -205,7 +208,8 @@ describe('State Hiding — 입찰 (§5)', () => {
     });
     const { container } = renderTable();
 
-    const text = container.querySelector('.sk-seats')!.textContent ?? '';
+    // 좌석 카드들의 글자만 본다 — 테이블(D-132) 가운데 칸의 트릭 메타("트릭 1 / 3")가 섞이면 판별력이 없다.
+    const text = [...container.querySelectorAll('.sk-seat')].map((el) => el.textContent).join(' ');
     expect(text).toContain('2');
     expect(text).toContain('3');
   });
@@ -598,5 +602,195 @@ describe('규칙 버튼 (D-121)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '규칙' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+/** 좌석 배치 안 좌석들의 [좌석, 옆줄, 옆줄 안 순서] — DOM 순서 그대로. */
+function layoutOf(): [number, string | null, string | null][] {
+  const felt = screen.getByRole('group', { name: '좌석 배치' });
+  return [...felt.querySelectorAll('.sk-seat')].map((el) => [
+    Number(el.getAttribute('data-seat')),
+    el.getAttribute('data-side'),
+    el.getAttribute('data-slot'),
+  ]);
+}
+
+const seatEl = (seat: number) => document.querySelector(`.sk-seat[data-seat="${seat}"]`) as HTMLElement;
+
+describe('테이블 좌석 배치 (D-132)', () => {
+  it.each([
+    [2, [[1, 'top', '0']]],
+    [
+      5,
+      [
+        [1, 'left', '0'],
+        [2, 'left', '1'],
+        [3, 'right', '0'],
+        [4, 'right', '1'],
+      ],
+    ],
+    [
+      8,
+      [
+        [1, 'left', '0'],
+        [2, 'left', '1'],
+        [3, 'top', '0'],
+        [4, 'top', '1'],
+        [5, 'top', '2'],
+        [6, 'right', '0'],
+        [7, 'right', '1'],
+      ],
+    ],
+  ])('%i인: 내 다음 좌석부터 왼쪽 옆줄 → 윗줄(위쪽 반원) → 오른쪽 옆줄에 시계 방향으로 앉는다', (n, expected) => {
+    seed({ seatCount: n, mySeat: 0, phase: 'PLAYING' });
+    renderTable({ playerIds: playerIds(n) });
+
+    expect(layoutOf()).toEqual(expected);
+  });
+
+  it('가운데 칸에 트릭 레일과 시계 방향 화살표 — 화살표 글리프는 읽지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable();
+
+    const felt = screen.getByRole('group', { name: '좌석 배치' });
+    expect(within(felt).getByRole('region', { name: '이번 트릭' })).toBeInTheDocument();
+    const dir = within(felt).getByText('시계 방향');
+    expect(dir).toHaveTextContent('↻ 시계 방향');
+    expect(dir.querySelector('[aria-hidden="true"]')).toHaveTextContent('↻');
+  });
+
+  it('관전자는 좌석 0 을 아래에 일반 좌석으로 두고 나머지를 0 기준으로 앉힌다', () => {
+    seed({ seatCount: 4, mySeat: -1, phase: 'BIDDING' });
+    renderTable({ spectator: true });
+
+    expect(layoutOf()).toEqual([
+      [1, 'left', '0'],
+      [2, 'top', '0'],
+      [3, 'right', '0'],
+      [0, 'bottom', '0'],
+    ]);
+  });
+
+  it('옆줄 좌석만 좁은 화면에서 손패 장수를 숨길 수 있게 표시한다 — 윗줄은 그대로', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable();
+
+    expect(seatEl(1)).toHaveClass('sk-seat-side');
+    expect(seatEl(3)).toHaveClass('sk-seat-side');
+    expect(seatEl(2)).not.toHaveClass('sk-seat-side');
+    expect(seatEl(1).querySelector('.sk-stat-hand')).toHaveAttribute('title', '남은 손패');
+  });
+
+  it('좁은 옆줄 좌석의 긴 이름은 말줄임 대상이고 title 로 전체 이름을 보인다', () => {
+    const long = '아주아주긴이름을가진해적선장';
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
+    renderTable({ usernames: { 101: long } });
+
+    expect(seatEl(1)).toHaveAttribute('data-side', 'left');
+    expect(seatEl(1).querySelector('.sk-seat-name')).toHaveAttribute('title', long);
+  });
+});
+
+describe('다음 차례 표시 (D-132)', () => {
+  it('지금 차례 좌석은 테두리, 그 다음 좌석(+1)에는 "다음"', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
+    renderTable();
+
+    expect(seatEl(1)).toHaveClass('sk-seat-turn');
+    expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('다음이 나면 "나" 줄에 표시한다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 3 });
+    const { container } = renderTable();
+
+    expect(within(container.querySelector('.sk-me') as HTMLElement).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('지금 사람이 트릭의 마지막이면 "다음"이 없다 — 다음 리드는 승자다', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      phase: 'PLAYING',
+      currentTurnSeat: 0,
+      trick: [
+        { seat: 1, card: suit('GREEN', 3), declaredAs: null },
+        { seat: 2, card: suit('GREEN', 5), declaredAs: null },
+        { seat: 3, card: suit('GREEN', 7), declaredAs: null },
+      ],
+    });
+    renderTable();
+
+    expect(screen.queryByText('다음')).toBeNull();
+  });
+
+  it('입찰 중(차례 −1)에는 "다음"이 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING' });
+    renderTable();
+
+    expect(screen.queryByText('다음')).toBeNull();
+  });
+
+  it('탈주 좌석도 건너뛰지 않는다 — 유령이 대신 둔다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1, desertedSeats: [2] });
+    renderTable();
+
+    expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+  });
+
+  it('관전자에게는 "다음"이 아래 좌석(0)에 붙고 "나" 줄로 가지 않는다', () => {
+    seed({ seatCount: 4, mySeat: -1, phase: 'PLAYING', currentTurnSeat: 3 });
+    const { container } = renderTable({ spectator: true });
+
+    expect(seatEl(0)).toHaveAttribute('data-side', 'bottom');
+    expect(within(seatEl(0)).getByText('다음')).toBeInTheDocument();
+    expect(container.querySelector('.sk-me')).toBeNull();
+  });
+});
+
+/**
+ * 서버는 트릭이 완성되면 `CARD_PLAYED` → `TRICK_TAKEN` → `TURN_CHANGED(승자)` 순서로 낸다. `TRICK_TAKEN` 은 트릭만 비우고
+ * 차례(`currentTurnSeat` = 방금 낸 마지막 사람)는 그대로라, 그 사이 "다음"을 (마지막 사람 + 1)에 붙이면 틀린다 — 다음 리드는
+ * 승자다. 각 이벤트가 별도 프레임이라 실제로 보이는 순간이 있다.
+ */
+describe('다음 차례 표시 — 트릭이 막 끝난 순간 (D-132)', () => {
+  const ev = (type: string, payload: unknown) => ({ type, payload });
+  const trickOf3: PlayedCardView[] = [
+    { seat: 0, card: suit('GREEN', 3), declaredAs: null },
+    { seat: 1, card: suit('GREEN', 9), declaredAs: null },
+    { seat: 2, card: suit('GREEN', 5), declaredAs: null },
+  ];
+
+  function finishTrick(winnerSeat: number) {
+    act(() => {
+      const store = useSkullKingStore.getState();
+      store.applyEvent(ev('CARD_PLAYED', { seat: 3, card: suit('GREEN', 7), declaredAs: null }));
+      store.applyEvent(ev('TRICK_TAKEN', { winnerSeat, winningCard: suit('GREEN', 9), trickNumber: 1 }));
+    });
+  }
+
+  it('승자의 리드(TURN_CHANGED)를 기다리는 동안은 "다음"이 없고, 리드가 정해지면 승자 다음 좌석에 붙는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 3, trick: trickOf3 });
+    renderTable();
+
+    finishTrick(1);
+    expect(screen.queryByText('다음')).toBeNull();
+
+    act(() => {
+      useSkullKingStore.getState().applyEvent(ev('TURN_CHANGED', { currentTurnSeat: 1 }));
+    });
+    expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  it('마지막 사람이 트릭을 가져가면 그 사람이 리드하므로 곧바로 그 다음(나)에 "다음"', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 3, trick: trickOf3 });
+    const { container } = renderTable();
+
+    finishTrick(3);
+    expect(within(container.querySelector('.sk-me') as HTMLElement).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
   });
 });
