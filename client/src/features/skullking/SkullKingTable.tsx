@@ -79,13 +79,21 @@ export function SkullKingTable({
   const mySeat = spectator ? -1 : s.mySeat;
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const leadSuit = leadSuitOf(s.trick);
-  const myTurn = !spectator && mySeat >= 0 && s.currentTurnSeat === mySeat;
+  // D-132 후속 m2 — 강제 종료는 결과 없이 방만 끝나 스토어의 차례가 남는다. 끝난 판에는 차례(테두리·"다음"·"내 차례")가 없다.
+  const turnSeat = roomFinished ? -1 : s.currentTurnSeat;
+  const myTurn = !spectator && mySeat >= 0 && turnSeat === mySeat;
   // D-132 — 일반 진행 기준 다음 차례(입찰·라운드 정리·트릭의 마지막 사람이면 없음). 트릭이 막 끝나(TRICK_TAKEN) 승자의
   // 리드(TURN_CHANGED)를 기다리는 동안은 currentTurnSeat 가 방금 낸 마지막 사람이다 — 다음 리드는 승자라 아직 다음을 모른다.
-  // (마지막 사람이 승자면 그 사람이 곧 리드하므로 그대로 계산한다.)
+  // (마지막 사람이 승자면 그 사람이 곧 리드하므로 그대로 계산한다.) 후속 m3 — 지금 차례가 그 트릭의 마지막으로 낸 사람일
+  // 때만 기다리는 중이다. resync 는 settledTrick 을 남기므로, 놓친 이벤트 뒤 다음 트릭의 리드 차례로 들어오면 남은 것은 지난
+  // 트릭이다 — 승자만 비교하면 리드 전까지 "다음"이 빈다.
+  const settled = s.settledTrick;
   const awaitingLead =
-    s.trick.length === 0 && s.settledTrick !== null && s.settledTrick.winnerSeat !== s.currentTurnSeat;
-  const nextSeat = awaitingLead ? -1 : nextTurnSeat(s.currentTurnSeat, seatCount, s.trick.length);
+    s.trick.length === 0 &&
+    settled !== null &&
+    settled.cards.at(-1)?.seat === turnSeat &&
+    settled.winnerSeat !== turnSeat;
+  const nextSeat = awaitingLead ? -1 : nextTurnSeat(turnSeat, seatCount, s.trick.length);
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
@@ -103,7 +111,7 @@ export function SkullKingTable({
         userId={playerIds[seat]}
         username={usernames[playerIds[seat]]}
         isBot={botSeats.includes(seat)}
-        isTurn={s.currentTurnSeat === seat}
+        isTurn={turnSeat === seat}
         isNext={nextSeat === seat}
         isDeserted={s.desertedSeats.includes(seat)}
         isDisconnected={s.disconnectedSeats.has(seat)}
@@ -235,7 +243,7 @@ export function SkullKingTable({
             <SkullTrickRow
               trick={s.trick}
               settled={s.settledTrick}
-              currentTurnSeat={s.currentTurnSeat}
+              currentTurnSeat={turnSeat}
               handSize={s.handSize}
               completedTricks={completedTricks}
               nameOf={nameOf}

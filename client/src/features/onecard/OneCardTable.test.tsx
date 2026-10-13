@@ -1038,4 +1038,22 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
     expect(within(seatEl(0)).getByText('다음')).toBeInTheDocument();
     expect(container.querySelector('.oc-me')).toBeNull();
   });
+
+  // D-132 후속 m2 — 강제 종료는 결과(MATCH_ENDED) 없이 방만 끝나 스토어의 차례가 그대로 남는다. 끝난 판에 차례를 보이지 않는다.
+  it('방이 결과 없이 끝나면(강제 종료) 차례 테두리·"다음"·가운데 차례 이름이 사라진다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    const { container } = renderTable({ roomFinished: true });
+
+    expect(container.querySelector('.oc-seat-turn')).toBeNull();
+    expect(screen.queryByText('다음')).toBeNull();
+    expect(screen.getByRole('region', { name: '테이블' })).not.toHaveTextContent('차례');
+  });
+
+  it('방이 결과 없이 끝나면 내 차례였어도 "내 차례"를 보이지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 0 });
+    const { container } = renderTable({ roomFinished: true });
+
+    expect(screen.queryByText('내 차례')).toBeNull();
+    expect(container.querySelector('.oc-me')).not.toHaveClass('oc-me-turn');
+  });
 });
