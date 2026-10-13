@@ -91,7 +91,7 @@ export function SkullKingTable({
   const awaitingLead =
     s.trick.length === 0 &&
     settled !== null &&
-    settled.cards.at(-1)?.seat === turnSeat &&
+    settled.cards[settled.cards.length - 1]?.seat === turnSeat && // .at() 은 iOS 15.4 미만에 없다(빌드가 보완하지 않음)
     settled.winnerSeat !== turnSeat;
   const nextSeat = awaitingLead ? -1 : nextTurnSeat(turnSeat, seatCount, s.trick.length);
 
