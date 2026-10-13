@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ArenaChatBubbles } from './ArenaChatBubbles';
-import { useRoomChatStore } from './roomChatStore';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
 
 /**
  * D-132 — 말풍선도 좌석 클래스·카드 비행과 같은 자리(`viewPosOf`)에서 뜬다(설계 성공 기준 4). 매핑이 갈라지면 상대 좌석은

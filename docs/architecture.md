@@ -121,9 +121,9 @@ pages/        LoginPage, RegisterPage, GameHubPage(메인=미르보드카페), R
 features/
 ├── auth/     authStore (JWT 영속)
 ├── lobby/    CreateRoomModal, gameWiki(외부 위키 URL 하드코딩)
-├── chat/     RoomChat, ArenaChatBubbles, roomChatStore
+├── chat/     RoomChat, roomChatStore (게임 공용 — 게임 폴더를 import 하지 않는다, D-132 후속)
 ├── theme/    themeStore (라이트/다크 토글, <html>.dark, 기본 dark)
-└── tichu/    GameTable, SortableHand, CardChip, SeatAvatar, MakeWishModal,
+└── tichu/    GameTable, SortableHand, CardChip, SeatAvatar, ArenaChatBubbles(경기장 말풍선), MakeWishModal,
               GiveDragonTrickModal, EffectsOverlay, tichuStore, handType, useSfx
 ws/           STOMP 연결/구독 훅
 api/          REST 클라이언트

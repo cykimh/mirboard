@@ -1,13 +1,8 @@
 import type { CSSProperties } from 'react';
+import type { SeatViewPos } from './seatView';
 
 const BACK_SRC = '/cards/back.svg';
 const MAX_SHOWN = 6;
-
-/**
- * 본인 시점 좌석 위치(S=하단/W=우측/N=상단/E=좌측). 시계 방향이라 E 가 다음 차례(+1), W 가 직전 차례(+3) 상대다
- * (`seatView.viewPosOf`, D-132). 부채 방향을 중앙 지향으로 회전.
- */
-export type SeatViewPos = 's' | 'w' | 'n' | 'e';
 
 /**
  * 좌석 앞 손패 수를 실제 카드 뒷면(back.svg) 부채꼴 스택 + 숫자로 직관적으로 표시(#6).
