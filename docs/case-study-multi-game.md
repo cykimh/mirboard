@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1327건 중 1121건(84%)이 Docker 불필요**합니다(D-131 시점, 부록 (6)).
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1401건 중 1189건(85%)이 Docker 불필요**합니다(D-134 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -338,7 +338,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1327 skipped=5 failed=0 dockerfree=1121 (84%)   (D-131 시점)
+# → tests=1401 skipped=5 failed=0 dockerfree=1189 (85%)   (D-134 시점 — D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
-import { roomsApi } from '@/api/rooms';
+import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi } from '@/api/users';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -9,6 +9,16 @@ import { GameTable } from '@/features/tichu/GameTable';
 import { SkullKingTable } from '@/features/skullking/SkullKingTable';
 import { OneCardTable } from '@/features/onecard/OneCardTable';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
+import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
+import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPanel';
+import {
+  SpectateNotice,
+  markSpectateNoticeSeen,
+  spectateNoticeMessage,
+  spectateNoticeOf,
+  spectateNoticeSeen,
+  type SpectateNoticeKind,
+} from '@/features/lobby/SpectateNotice';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
@@ -38,6 +48,16 @@ import {
  */
 const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD']);
 
+/**
+ * D-133 — 첫 입장(`join-or-reconnect`)이 막힌 이유. 자리 없음은 관전을, 방 없음은 메인으로를 제안한다. 그 밖의 오류는
+ * 지금처럼 서버 문구를 보인다. 서버는 꽉 찬 대기실·진행 중 방이면 이미 관전으로 받으므로 `full` 은 그 사이 자리가 찬 경합이다.
+ */
+function joinBlockOf(code: string): JoinBlock | null {
+  if (code === 'ROOM_FULL' || code === 'GAME_ALREADY_STARTED') return 'full';
+  if (code === 'ROOM_NOT_FOUND') return 'gone';
+  return null;
+}
+
 /** D-122 — 유지된 게임판이 쓰는 좌석 목록 스냅샷 (FINISHED 전이 직전 IN_GAME 메타). */
 interface HeldSeats {
   playerIds: number[];
@@ -58,6 +78,11 @@ export function RoomPage() {
   const navigate = useNavigate();
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // D-133 — 초대 링크로 왔는데 입장이 막혔다(자리 없음·방 없음). 오류 문구 대신 패널.
+  const [joinBlock, setJoinBlock] = useState<JoinBlock | null>(null);
+  const [spectating, setSpectating] = useState(false);
+  // D-133 결정 A — 서버가 묻지 않고 관전으로 받았을 때(꽉 찬 대기실·진행 중 방) 방 화면 위 안내. 탭에서 처음 한 번만.
+  const [spectateNotice, setSpectateNotice] = useState<SpectateNoticeKind | null>(null);
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [usernames, setUsernames] = useState<Record<number, string>>({});
   // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 좌석 정책 **라벨**을 고르는 데만 쓴다.
@@ -88,6 +113,20 @@ export function RoomPage() {
     };
   }, [token, room?.gameType]);
 
+  // `join-or-reconnect` 결과를 화면에 반영한다 — 첫 입장과 대기실 재동기화(D-134)가 같은 규칙을 쓴다.
+  const applyJoinResult = useCallback(
+    (r: JoinOrReconnectResponse) => {
+      setRoom(r.room);
+      // D-133 결정 A — 관전으로 받아졌으면 이유를 알린다. 이 탭에서 이 방 관전을 이미 알면(안내를 봤거나 허브·패널에서 관전을
+      // 골랐다) 띄우지 않는다 — 새로고침에도 서버는 SPECTATING 을 다시 준다.
+      if (r.mode === 'SPECTATING') {
+        if (!spectateNoticeSeen(roomId)) setSpectateNotice(spectateNoticeOf(r.mode, r.room));
+        markSpectateNoticeSeen(roomId);
+      }
+    },
+    [roomId],
+  );
+
   // Phase 8A — 진입 시 1회만 join-or-reconnect 호출. 폴링과 분리.
   useEffect(() => {
     if (!token || autoJoinAttempted) return;
@@ -95,10 +134,14 @@ export function RoomPage() {
     (async () => {
       try {
         const r = await roomsApi.joinOrReconnect(token, roomId);
-        if (!cancelled) setRoom(r.room);
+        if (!cancelled) applyJoinResult(r);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError) setError(err.message);
+        if (err instanceof ApiError) {
+          const block = joinBlockOf(err.code);
+          if (block) setJoinBlock(block);
+          else setError(err.message);
+        }
       } finally {
         if (!cancelled) setAutoJoinAttempted(true);
       }
@@ -106,13 +149,22 @@ export function RoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, roomId, autoJoinAttempted]);
+  }, [token, roomId, autoJoinAttempted, applyJoinResult]);
 
   useEffect(() => {
     if (!token) {
       navigate('/login');
     }
   }, [token, navigate]);
+
+  // D-133 — 방 주소로 처음 연 탭은 서버가 넣은 방 제목으로 시작한다. SPA 는 제목을 관리하지 않으므로 방 화면을 떠날 때
+  // 기본 제목으로 되돌린다(허브로 나가거나 다른 방에 가도 처음 방 이름이 탭·방문 기록에 남지 않게).
+  useEffect(
+    () => () => {
+      document.title = 'Mirboard';
+    },
+    [],
+  );
 
   // D-120 — 이 세션에서 IN_GAME→FINISHED 전이를 봤는가. 봇 방은 매치가 끝나면 서버가
   // 방을 FINISHED 로 바꾸는데, 그 메타가 마지막 게임 이벤트보다 먼저 올 수 있다. 그때
@@ -129,6 +181,31 @@ export function RoomPage() {
   const roomRef = useRef<Room | null>(null);
   roomRef.current = room;
 
+  // D-134 — 대기실 화면 재동기화. 메타 소켓이 다시 연결되거나 화면이 다시 보이거나 온라인이 되면(useRoomMeta) 첫 입장과 같은
+  // `join-or-reconnect` 로 방을 다시 맞춘다. 휴대폰이 백그라운드에 있던 동안 서버가 준비를 풀었거나, 유예가 지나 자리를 잃었거나
+  // (꽉 찼으면 관전 + 안내), 방이 없어졌을 수 있다 — 소켓은 놓친 메타를 다시 주지 않는다. 대기실일 때만 — 게임판은 자기 resync 가
+  // 있다(D-79). 방 없음은 "방이 없어졌어요", 그 밖의 오류는 조용히 넘긴다(다음 알림에 다시 — 네트워크 실패로 화면을 오류로 바꾸지
+  // 않는다). 진행 중이면 겹쳐 부르지 않는다.
+  const resyncingRef = useRef(false);
+  const roomIdRef = useRef(roomId);
+  roomIdRef.current = roomId;
+  async function resyncWaitingRoom() {
+    if (!token || resyncingRef.current) return;
+    if (room?.status !== 'WAITING' || joinBlock || error) return;
+    const requested = roomId;
+    resyncingRef.current = true;
+    try {
+      const r = await roomsApi.joinOrReconnect(token, requested);
+      if (roomIdRef.current === requested) applyJoinResult(r);
+    } catch (err) {
+      if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
+        setJoinBlock('gone');
+      }
+    } finally {
+      resyncingRef.current = false;
+    }
+  }
+
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
   useRoomMeta(
@@ -144,6 +221,7 @@ export function RoomPage() {
       setRoom(r);
     },
     () => setError('방이 종료되었습니다.'),
+    resyncWaitingRoom,
   );
 
   // 좌석/참가자 표시용 username 일괄 조회. 참가자 집합이 바뀔 때만 재요청(최대 4명).
@@ -187,6 +265,30 @@ export function RoomPage() {
       navigate('/games');
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
+    }
+  }
+
+  // D-133 — 자리 없음 패널의 [관전하기]. 허브 관전과 같은 `spectate` 를 부르고 그 응답의 방으로 다시 그린다.
+  async function handleSpectate() {
+    if (!token) return;
+    setSpectating(true);
+    try {
+      const spectated = await roomsApi.spectate(token, roomId);
+      // 본인이 고른 관전 — 이 탭에서는 새로고침해도 "관전으로 들어왔어요"를 띄우지 않는다(결정 A).
+      markSpectateNoticeSeen(roomId);
+      setJoinBlock(null);
+      setRoom(spectated);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === 'ROOM_NOT_FOUND') {
+          setJoinBlock('gone');
+        } else {
+          setJoinBlock(null);
+          setError(err.message);
+        }
+      }
+    } finally {
+      setSpectating(false);
     }
   }
 
@@ -243,8 +345,25 @@ export function RoomPage() {
     if (!waiting) hideTutorial();
   }, [waiting, hideTutorial]);
 
+  // FR-5 — 관전 안내를 읽어 주는 상태 영역. 영역과 문구를 함께 삽입하면 일부 스크린 리더가 읽지 않으므로 아래 모든 렌더 갈래의 맨
+  // 앞 같은 자리에 늘 둔다 — 첫 입장 응답 전 로딩 화면부터 같은 DOM 노드가 유지되고 문구만 들어간다. 보이는 안내 카드
+  // (SpectateNotice)는 상태 영역이 아니다(같은 문구가 두 번 읽히지 않게 카드 문구는 보조 기술에서 숨긴다).
+  const withLiveRegion = (body: ReactNode) => (
+    <>
+      <p role="status" className="sr-only" data-testid="room-live-status">
+        {spectateNotice ? spectateNoticeMessage(spectateNotice) : ''}
+      </p>
+      {body}
+    </>
+  );
+
+  if (joinBlock) {
+    return withLiveRegion(
+      <JoinBlockedPanel kind={joinBlock} onSpectate={handleSpectate} spectating={spectating} />,
+    );
+  }
   if (error) {
-    return (
+    return withLiveRegion(
       <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
         <Card className="w-full max-w-sm">
           <CardContent className="flex flex-col gap-4 pt-6">
@@ -256,16 +375,21 @@ export function RoomPage() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </div>,
     );
   }
   if (!room || !user) {
-    return (
+    return withLiveRegion(
       <div className="app-shell flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         방 정보 불러오는 중...
-      </div>
+      </div>,
     );
   }
+
+  // D-133 결정 A — 아래 세 분기(스컬킹·원카드 게임판, 티츄 게임판, 대기실·종료 셸) 모두의 맨 위. 진행 중 방은 셸 없이 게임판을 바로 그린다.
+  const notice = spectateNotice && (
+    <SpectateNotice kind={spectateNotice} onClose={() => setSpectateNotice(null)} />
+  );
 
   // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
@@ -294,16 +418,18 @@ export function RoomPage() {
       onExit: handleLeave,
       roomFinished,
     };
-    return (
+    return withLiveRegion(
       <main className="room-page">
+        {notice}
         {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
-      </main>
+      </main>,
     );
   }
 
   if (room.status === 'IN_GAME') {
-    return (
+    return withLiveRegion(
       <main className="room-page">
+        {notice}
         <GameTable
           roomId={room.roomId}
           playerIds={room.playerIds}
@@ -318,12 +444,13 @@ export function RoomPage() {
           isHost={iAmHost}
           onExit={handleLeave}
         />
-      </main>
+      </main>,
     );
   }
 
-  return (
+  return withLiveRegion(
     <div className="app-shell min-h-screen bg-background text-foreground">
+      {notice}
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -356,6 +483,17 @@ export function RoomPage() {
             </Button>
           </div>
         </header>
+
+        {/* D-133 — 초대는 시작 전에만(시작하면 자리가 없다). 방 주소 그대로를 공유·복사한다. 정원이 다 찼으면(봇 자리
+            포함 — 봇은 자리를 비켜 주지 않는다) 받은 친구는 관전으로 들어오므로 설명을 그렇게 바꾼다. */}
+        {room.status === 'WAITING' && (
+          <InviteLinkButton
+            roomId={room.roomId}
+            roomName={room.name}
+            gameName={gameName ?? room.gameType}
+            full={room.playerCount >= room.capacity}
+          />
+        )}
 
         {iAmSpectator && (
           <Alert>
@@ -475,6 +613,6 @@ export function RoomPage() {
           onClose={tutorialGate.close}
         />
       )}
-    </div>
+    </div>,
   );
 }

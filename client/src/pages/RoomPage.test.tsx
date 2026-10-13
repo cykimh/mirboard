@@ -2,7 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
+import { ApiError } from '@/api/client';
+import type { JoinOrReconnectResponse } from '@/api/rooms';
 import { useAuthStore } from '@/features/auth/authStore';
+import { markSpectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import { GAME_TUTORIALS } from '@/features/tutorial/gameTutorials';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
@@ -22,8 +25,9 @@ import type { GameSummary, Room, RoomOption } from '@/types/api';
 
 vi.mock('@/ws/useRoomMeta', () => ({ useRoomMeta: vi.fn() }));
 
-const { joinOrReconnect, loadGame, names } = vi.hoisted(() => ({
+const { joinOrReconnect, spectate, loadGame, names } = vi.hoisted(() => ({
   joinOrReconnect: vi.fn(),
+  spectate: vi.fn(),
   loadGame: vi.fn(),
   names: vi.fn(),
 }));
@@ -31,6 +35,7 @@ const { joinOrReconnect, loadGame, names } = vi.hoisted(() => ({
 vi.mock('@/api/rooms', () => ({
   roomsApi: {
     joinOrReconnect,
+    spectate,
     leave: vi.fn(),
     setReady: vi.fn(),
     updateTeamPolicy: vi.fn(),
@@ -96,8 +101,8 @@ function game(id: string, options: RoomOption[]): GameSummary {
   };
 }
 
-function renderRoom(room: Partial<Room> = {}) {
-  joinOrReconnect.mockResolvedValue({ mode: 'JOINED', room: { ...ROOM, ...room } });
+function renderRoom(room: Partial<Room> = {}, mode: JoinOrReconnectResponse['mode'] = 'JOINED') {
+  joinOrReconnect.mockResolvedValue({ mode, room: { ...ROOM, ...room } });
   return render(
     <MemoryRouter initialEntries={['/rooms/r1']}>
       <Routes>
@@ -402,5 +407,521 @@ describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
     act(() => pushRoom({ ...ROOM, gameType: 'SKULL_KING', status: 'WAITING' }));
     expect(await screen.findByText('테스트 방')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+/**
+ * D-133 — 대기실 "초대 링크". 방 주소 그대로(`/rooms/<방ID>`)를 공유창·복사·수동 입력란으로 건넨다. 초대는 시작 전에만
+ * 의미가 있어(시작하면 자리가 없다) 대기실(WAITING)에만 둔다. 결과별 표시는 `InviteLinkButton.test` 가 자세히 본다.
+ */
+describe('RoomPage — 초대 링크 (D-133)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), displayName: '원카드' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('대기실에는 "초대 링크" 버튼이 있다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+
+    expect(await screen.findByRole('button', { name: '초대 링크' })).toBeInTheDocument();
+  });
+
+  it('게임 중(IN_GAME) 화면에는 없다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME' });
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByRole('button', { name: '초대 링크' })).toBeNull();
+  });
+
+  it('끝난 방(FINISHED) 화면에도 없다', async () => {
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom({ gameType: 'TICHU', status: 'FINISHED' });
+
+    await screen.findByText('게임이 종료되었습니다.');
+    expect(screen.queryByRole('button', { name: '초대 링크' })).toBeNull();
+  });
+
+  it('공유창·클립보드가 없으면(앱 내 브라우저) 이 방 주소가 선택된 입력란을 보인다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '초대 링크' }));
+
+    const input = (await screen.findByLabelText('직접 복사해 주세요')) as HTMLInputElement;
+    expect(input.value).toBe(`${window.location.origin}/rooms/r1`);
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionEnd).toBe(input.value.length);
+  });
+
+  it('클립보드가 있으면 이 방 주소를 복사하고 알린다', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    try {
+      renderRoom({ gameType: 'ONE_CARD' });
+
+      fireEvent.click(await screen.findByRole('button', { name: '초대 링크' }));
+
+      expect(await screen.findByText('링크를 복사했어요')).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/rooms/r1`);
+    } finally {
+      delete (navigator as { clipboard?: unknown }).clipboard;
+    }
+  });
+
+  // IP-3 — 사람으로 꽉 찬 대기실의 링크를 연 친구는 관전으로 들어온다. "바로 이 방에 들어와요"는 거짓이다.
+  it('사람으로 꽉 찬 대기실이면 "링크를 받은 친구는 관전으로 들어와요"', async () => {
+    renderRoom({ gameType: 'ONE_CARD', capacity: 2, playerCount: 2, playerIds: [1, 2], botSeats: [] });
+
+    expect(
+      await screen.findByText('자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeNull();
+  });
+
+  it('빈자리가 있으면 "친구가 바로 이 방에 들어와요"', async () => {
+    renderRoom({ gameType: 'ONE_CARD', capacity: 4, playerCount: 1, playerIds: [1] });
+
+    expect(await screen.findByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeInTheDocument();
+  });
+
+  // 게스트 방은 기본 봇 채우기라 만들자마자 꽉 찬다. 봇은 자리를 비켜 주지 않으므로(봇 자리 비켜주기는 기각 — 사람과 할 때는 봇을
+  // 없앤다) 링크를 받은 친구는 관전으로 들어온다 — 봇 자리도 찬 자리다.
+  it('봇까지 다 찬 대기실(게스트 봇 채우기 방)도 "링크를 받은 친구는 관전으로 들어와요"', async () => {
+    renderRoom({ gameType: 'ONE_CARD', capacity: 2, playerCount: 2, playerIds: [1, 900], botSeats: [1], fillWithBots: true });
+
+    expect(
+      await screen.findByText('자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeNull();
+  });
+});
+
+/**
+ * D-133 — 방 주소로 처음 연 탭은 서버가 넣은 방 제목("{게임} · {방 이름} — 미르보드카페")으로 시작한다. SPA 는 제목을 관리하지 않으므로
+ * 방 화면을 떠날 때 기본 제목으로 되돌린다 — 허브로 나가거나 다른 방에 가도 처음 방 이름이 탭·방문 기록에 남지 않게(IP-5).
+ */
+describe('RoomPage — 탭 제목 (D-133)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), displayName: '원카드' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('방 화면을 떠나면 서버가 넣은 방 제목을 기본 제목으로 되돌린다', async () => {
+    document.title = '원카드 · 금요일 한 판 — 미르보드카페';
+    const view = renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+
+    view.unmount();
+
+    expect(document.title).toBe('Mirboard');
+  });
+});
+
+/**
+ * D-133 — 초대 링크로 들어왔는데 자리가 없거나 방이 사라졌을 때. 서버 오류 문구("Room capacity exceeded" 등)를
+ * 그대로 보이지 않고 다음 행동을 제안한다 — 자리 없음은 관전, 방 없음은 메인으로. (서버 `join-or-reconnect` 는 꽉 찬
+ * 대기실·진행 중 방이면 이미 관전으로 받으므로 이 패널은 확인과 입장 사이에 자리가 찬 경합에서 뜬다.)
+ */
+describe('RoomPage — 자리 없음·방 없음 (D-133)', () => {
+  function renderRejected(err: ApiError) {
+    joinOrReconnect.mockRejectedValue(err);
+    return render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+          <Route path="/games" element={<div>GAMES_PAGE</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  const apiError = (status: number, code: string, message: string) =>
+    new ApiError(status, { error: { code, message } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    skullProps.length = 0;
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 2, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('SKULL_KING', []), displayName: '스컬킹' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'friend' } as never });
+  });
+
+  it.each([
+    ['ROOM_FULL', 'Room capacity exceeded'],
+    ['GAME_ALREADY_STARTED', 'Game already started'],
+  ])('%s 면 오류 문구 대신 "자리가 없어요 — 관전할까요?"와 관전하기·메인으로', async (code, message) => {
+    renderRejected(apiError(409, code, message));
+
+    expect(await screen.findByText('자리가 없어요 — 관전할까요?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '관전하기' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '메인으로' })).toHaveAttribute('href', '/games');
+    expect(screen.queryByText(message)).toBeNull();
+  });
+
+  it('관전하기를 누르면 관전으로 들어가 그 방을 다시 그린다 — 진행 중이면 관전자 게임판', async () => {
+    renderRejected(apiError(409, 'GAME_ALREADY_STARTED', 'Game already started'));
+    spectate.mockResolvedValue({
+      ...ROOM,
+      gameType: 'SKULL_KING',
+      status: 'IN_GAME',
+      hostId: 2,
+      playerIds: [2, 3],
+      playerCount: 2,
+      spectatorIds: [1],
+    } as Room);
+
+    fireEvent.click(await screen.findByRole('button', { name: '관전하기' }));
+
+    expect(await screen.findByTestId('skullking-table')).toBeInTheDocument();
+    expect(spectate).toHaveBeenCalledWith('tok', 'r1');
+    expect(skullProps.at(-1)!.spectator).toBe(true);
+    expect(screen.queryByText('자리가 없어요 — 관전할까요?')).toBeNull();
+    // D-133 결정 A — 패널에서 본인이 고른 관전이라 "…관전으로 들어왔어요" 안내는 없다.
+    expect(screen.queryByText(/관전으로 들어왔어요/)).toBeNull();
+  });
+
+  it('꽉 찬 대기실에서 관전하기를 누르면 관전 중 대기실을 본다', async () => {
+    renderRejected(apiError(409, 'ROOM_FULL', 'Room capacity exceeded'));
+    spectate.mockResolvedValue({
+      ...ROOM,
+      gameType: 'SKULL_KING',
+      hostId: 2,
+      capacity: 2,
+      playerIds: [2, 3],
+      playerCount: 2,
+      spectatorIds: [1],
+    } as Room);
+
+    fireEvent.click(await screen.findByRole('button', { name: '관전하기' }));
+
+    expect(await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+  });
+
+  it('메인으로를 누르면 허브로 간다', async () => {
+    renderRejected(apiError(409, 'ROOM_FULL', 'Room capacity exceeded'));
+
+    fireEvent.click(await screen.findByRole('link', { name: '메인으로' }));
+
+    expect(await screen.findByText('GAMES_PAGE')).toBeInTheDocument();
+  });
+
+  it('ROOM_NOT_FOUND 면 "방이 없어졌어요"와 메인으로 — 관전하기는 없고 서버 문구도 보이지 않는다', async () => {
+    renderRejected(apiError(404, 'ROOM_NOT_FOUND', 'Room not found'));
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '메인으로' })).toHaveAttribute('href', '/games');
+    expect(screen.queryByRole('button', { name: '관전하기' })).toBeNull();
+    expect(screen.queryByText('Room not found')).toBeNull();
+  });
+
+  it('관전하기 사이에 방이 사라지면 "방이 없어졌어요"로 바뀐다', async () => {
+    renderRejected(apiError(409, 'ROOM_FULL', 'Room capacity exceeded'));
+    spectate.mockRejectedValue(apiError(404, 'ROOM_NOT_FOUND', 'Room not found'));
+
+    fireEvent.click(await screen.findByRole('button', { name: '관전하기' }));
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+  });
+
+  it('그 밖의 오류는 지금처럼 서버 문구를 보인다', async () => {
+    renderRejected(apiError(409, 'ALREADY_IN_ROOM', 'User already in room'));
+
+    expect(await screen.findByText('User already in room')).toBeInTheDocument();
+    expect(screen.queryByText('자리가 없어요 — 관전할까요?')).toBeNull();
+  });
+});
+
+/**
+ * D-133 결정 A — 서버 `join-or-reconnect` 는 꽉 찬 대기실·진행 중 방이면 묻지 않고 관전으로 받는다(`mode=SPECTATING`, 서버 무변경).
+ * 그렇게 들어온 사람에게 방 화면 위에 이유를 알린다. 진행 중 방은 대기실 셸이 아니라 게임판을 바로 그리므로 세 렌더 분기(스컬킹·원카드
+ * 게임판, 티츄 게임판, 대기실·종료 셸) 모두에 있어야 한다. 허브에서 고른 관전·새로고침한 관전자에게는 띄우지 않는다(탭 안 기록).
+ */
+describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', () => {
+  const STARTED = '게임이 이미 시작돼 관전으로 들어왔어요';
+  const FULL = '자리가 없어 관전으로 들어왔어요';
+  const watching = { hostId: 2, playerIds: [2, 3], playerCount: 2, spectatorIds: [1] } as Partial<Room>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    skullProps.length = 0;
+    tichuProps.length = 0;
+    oneCardProps.length = 0;
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 2, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), displayName: '원카드' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'friend' } as never });
+  });
+
+  // FR-5 — 안내 문구를 읽어 주는 것은 방 화면이 늘 두는 상태 영역(`room-live-status`)이다. 카드는 보이는 안내일 뿐이다.
+  const live = () => screen.getByTestId('room-live-status');
+
+  it('진행 중인 원카드 방에 관전으로 받아지면 게임판 위에 안내한다', async () => {
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+
+    expect(await screen.findByTestId('onecard-table')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
+    expect(screen.getByRole('status')).toBe(live());
+    expect(oneCardProps.at(-1)!.spectator).toBe(true);
+  });
+
+  it('진행 중인 티츄 방도 게임판 위에 안내한다 — 티츄 분기', async () => {
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom({ ...watching, gameType: 'TICHU', status: 'IN_GAME', capacity: 2 }, 'SPECTATING');
+
+    expect(await screen.findByTestId('tichu-table')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
+    expect(screen.getByRole('status')).toBe(live());
+  });
+
+  it('꽉 찬 대기실에 관전으로 받아지면 안내하고 "관전 중" 알림도 그대로 둔다', async () => {
+    renderRoom({ ...watching, gameType: 'ONE_CARD', capacity: 2 }, 'SPECTATING');
+
+    expect(await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+    expect(live()).toHaveTextContent(FULL);
+    expect(live()).toHaveAttribute('role', 'status');
+  });
+
+  /**
+   * FR-5 — 라이브 영역은 내용이 바뀌기 전에 DOM 에 있어야 스크린 리더가 읽는다(IP-4 와 같은 결). 안내는 첫 입장 응답과 함께 정해져
+   * 로딩 화면 → 방 화면 전환과 같은 렌더에 들어오므로, 영역을 방 화면 갈래 안에만 두면 영역과 문구가 함께 삽입된다. 그래서 로딩
+   * 화면부터 모든 갈래의 맨 앞 같은 자리에 둔다 — 로딩 때의 그 노드에 문구가 들어간다.
+   */
+  it('로딩 화면에서도 상태 영역이 비어 있는 채로 있고, 안내 문구는 바로 그 노드에 들어간다', async () => {
+    let resolve!: (v: JoinOrReconnectResponse) => void;
+    joinOrReconnect.mockReturnValue(new Promise<JoinOrReconnectResponse>((r) => { resolve = r; }));
+    render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('방 정보 불러오는 중...')).toBeInTheDocument();
+    const before = live();
+    expect(before).toHaveAttribute('role', 'status');
+    expect(before.textContent).toBe('');
+
+    await act(async () => {
+      resolve({ mode: 'SPECTATING', room: { ...ROOM, ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' } as Room });
+    });
+
+    await screen.findByTestId('onecard-table');
+    expect(live()).toBe(before);
+    expect(before).toHaveTextContent(STARTED);
+  });
+
+  it.each([
+    ['스컬킹·원카드 게임판', { gameType: 'ONE_CARD', status: 'IN_GAME' }, 'onecard-table'],
+    ['티츄 게임판', { gameType: 'TICHU', status: 'IN_GAME' }, 'tichu-table'],
+    ['대기실 셸', { gameType: 'ONE_CARD', status: 'WAITING' }, null],
+  ] as const)('안내가 없어도 %s 에 상태 영역이 비어 있는 채로 있다', async (_label, over, boardId) => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'host' } as never });
+    renderRoom({ ...watching, ...over } as Partial<Room>, 'RECONNECTED');
+
+    if (boardId) await screen.findByTestId(boardId);
+    else await screen.findByText('테스트 방');
+    expect(live()).toHaveAttribute('role', 'status');
+    expect(live().textContent).toBe('');
+  });
+
+  it('빈자리가 있는 대기실 관전은 안내하지 않는다 — 본인이 고른 관전', async () => {
+    renderRoom({ ...watching, gameType: 'ONE_CARD', capacity: 4 }, 'SPECTATING');
+
+    await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.');
+    expect(screen.queryByText(/관전으로 들어왔어요/)).toBeNull();
+  });
+
+  it('끝난 방은 안내하지 않는다 — 종료 카드가 설명한다', async () => {
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'FINISHED' }, 'SPECTATING');
+
+    await screen.findByText('게임이 종료되었습니다.');
+    expect(screen.queryByText(/관전으로 들어왔어요/)).toBeNull();
+  });
+
+  it.each(['JOINED', 'RECONNECTED'] as const)('%s 면 안내하지 않는다', async (mode) => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'host' } as never });
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, mode);
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByText(/관전으로 들어왔어요/)).toBeNull();
+  });
+
+  it('[닫기]를 누르면 내린다 — 상태 영역도 비운다', async () => {
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+
+    fireEvent.click(await screen.findByRole('button', { name: '닫기' }));
+
+    expect(screen.queryByText(STARTED)).toBeNull();
+    expect(live().textContent).toBe('');
+    expect(screen.getByTestId('onecard-table')).toBeInTheDocument();
+  });
+
+  it('새로고침하면(같은 탭에서 다시 관전으로 받아짐) 다시 띄우지 않는다', async () => {
+    const first = renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+    expect(await screen.findByRole('status')).toHaveTextContent(STARTED);
+    first.unmount();
+
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByText(STARTED)).toBeNull();
+  });
+
+  it('허브에서 고른 관전(기록을 남기고 들어옴)이면 띄우지 않는다', async () => {
+    markSpectateNoticeSeen('r1');
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByText(STARTED)).toBeNull();
+  });
+
+  it('경합 패널에서 관전을 고르면 그 뒤 새로고침에도 띄우지 않는다', async () => {
+    joinOrReconnect.mockRejectedValue(new ApiError(409, { error: { code: 'GAME_ALREADY_STARTED', message: 'x' } }));
+    spectate.mockResolvedValue({ ...ROOM, ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' } as Room);
+    const first = render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '관전하기' }));
+    await screen.findByTestId('onecard-table');
+    first.unmount();
+
+    renderRoom({ ...watching, gameType: 'ONE_CARD', status: 'IN_GAME' }, 'SPECTATING');
+
+    await screen.findByTestId('onecard-table');
+    expect(screen.queryByText(STARTED)).toBeNull();
+  });
+});
+
+/**
+ * D-134 — 대기실 화면 재동기화. 휴대폰 방장이 초대 링크를 카톡으로 보내고 기다리는 동안 소켓이 죽으면(D-79) 그 사이 서버가 준비를
+ * 풀었거나, 유예가 지나 자리를 잃었거나, 방이 없어졌을 수 있다 — 메타 소켓은 다시 구독만 해서 놓친 것을 받을 길이 없다. 그래서
+ * `useRoomMeta` 가 다시 연결·다시 보이기·온라인 때 알리면(5번째 인자) 대기실은 첫 입장과 같은 `join-or-reconnect` 로 방을 다시
+ * 맞춘다. 게임판은 자기 resync 가 있어(D-79) 부르지 않는다. 네트워크 실패로 화면을 오류로 바꾸지 않는다.
+ */
+describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
+  const resync = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![4]!;
+  const apiError = (status: number, code: string, message: string) =>
+    new ApiError(status, { error: { code, message } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), displayName: '원카드' });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('대기실에서 알림을 받으면 join-or-reconnect 를 다시 불러 방을 다시 그린다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockResolvedValue({
+      mode: 'RECONNECTED',
+      room: { ...ROOM, gameType: 'ONE_CARD', playerIds: [1, 2], playerCount: 2, readyUserIds: [2] },
+    });
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(joinOrReconnect).toHaveBeenCalledTimes(2);
+    expect(joinOrReconnect).toHaveBeenLastCalledWith('tok', 'r1');
+    expect(await screen.findByText(/원카드 · 대기 중 · 2\/4/)).toBeInTheDocument();
+  });
+
+  it('유예가 지나 자리를 잃었고 방이 꽉 찼으면 관전으로 받아지고 첫 입장처럼 안내한다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockResolvedValue({
+      mode: 'SPECTATING',
+      room: { ...ROOM, gameType: 'ONE_CARD', capacity: 2, playerIds: [2, 3], playerCount: 2, spectatorIds: [1] },
+    });
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(await screen.findByText('관전 중 — 본인 손패는 표시되지 않습니다.')).toBeInTheDocument();
+    expect(screen.getAllByText('자리가 없어 관전으로 들어왔어요').length).toBeGreaterThan(0);
+  });
+
+  it('방이 없어졌으면 "방이 없어졌어요" — 서버 문구를 보이지 않는다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockRejectedValue(apiError(404, 'ROOM_NOT_FOUND', 'Room not found'));
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+    expect(screen.queryByText('Room not found')).toBeNull();
+  });
+
+  it.each([
+    ['서버 오류', () => apiError(500, 'INTERNAL', 'boom')],
+    ['네트워크 실패', () => new TypeError('Failed to fetch')],
+  ])('그 밖의 오류(%s)는 조용히 넘기고 대기실을 그대로 둔다 — 다음 알림에 다시', async (_label, makeError) => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockRejectedValue(makeError());
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(screen.getByText('테스트 방')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초대 링크' })).toBeInTheDocument();
+    expect(screen.queryByText('boom')).toBeNull();
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
+  });
+
+  it('게임 중(IN_GAME)에는 부르지 않는다 — 게임판이 자기 resync 를 한다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME' });
+    await screen.findByTestId('onecard-table');
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(joinOrReconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('진행 중이면 겹쳐 부르지 않는다', async () => {
+    renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    let resolve!: (v: JoinOrReconnectResponse) => void;
+    joinOrReconnect.mockReturnValue(new Promise<JoinOrReconnectResponse>((r) => { resolve = r; }));
+
+    // 콜백 타입은 `() => void` 지만 방 화면의 구현은 끝을 기다릴 수 있는 Promise 를 돌려준다.
+    let first: unknown;
+    act(() => {
+      first = resync()();
+      void resync()();
+    });
+    expect(joinOrReconnect).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolve({ mode: 'RECONNECTED', room: { ...ROOM, gameType: 'ONE_CARD' } });
+      await first;
+    });
+
+    // 끝난 뒤에는 다시 부를 수 있다.
+    joinOrReconnect.mockResolvedValue({ mode: 'RECONNECTED', room: { ...ROOM, gameType: 'ONE_CARD' } });
+    await act(async () => {
+      await resync()();
+    });
+    expect(joinOrReconnect).toHaveBeenCalledTimes(3);
   });
 });

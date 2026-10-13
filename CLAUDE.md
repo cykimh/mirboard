@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 3종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-132까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-134까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -145,7 +145,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   하드코딩, 카탈로그 API 무변경).
 - Phase 19(D-75): 서버 STOMP Subscribe/Disconnect 후킹(in-memory
   `WsSessionRegistry`, 단일 인스턴스 전제). WAITING 끊김=즉시 leave(빈 방·
-  관전자0 방 즉시 소멸). IN_GAME 탈주(명시 '나가기' / 끊김 후
+  관전자0 방 즉시 소멸 — **D-134 로 플레이어는 준비 해제 + 유예 뒤 leave**, 관전자는 그대로 즉시). IN_GAME 탈주(명시 '나가기' / 끊김 후
   `mirboard.desertion.grace-seconds` 기본 120s(D-79, 모바일 관용; 구 30s) 미복귀)=상대팀 승리로
   매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
   D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
@@ -158,6 +158,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   (Redis HASH) + `CHIPS_SETTLED` 공개 이벤트(테이블 공개 정보), 정산은 신규 `RoomChipService`.
   매치 정상 종료는 FINISHED 대신 WAITING 복귀(리매치), 탈주는 FINISHED 유지. 판돈은 Redis
   room 해시 고정 → `TichuMatchCompleted.stake` 로 정산 전달.
+- D-133: **초대 링크 = 방 주소 그대로**(`/rooms/{id}`). 대기실 "초대 링크"가 공유창 → 복사 → 선택된 입력란, 서버 `GET /rooms/{id}`(공개 HTML,
+  `infra.web.RoomPagePreviewController`)가 빌드된 `index.html` 의 `<!--og:start-->`…`<!--og:end-->` 를 그 방의 미리보기로 바꾼다(표식을 지우지 말 것).
+  로그인 안 된 친구는 보호 경로가 실은 `state.from` 으로 로그인·게스트·가입 뒤 그 방으로(`safeReturnPath` — 사이트 안 경로만).
+  꽉 찬 대기실(봇 자리 포함)·시작된 방은 `join-or-reconnect` 가 지금처럼 관전으로 받고 방 화면 위에 "…관전으로 들어왔어요"(`SpectateNotice`, 탭에서
+  한 번). **봇은 사람에게 자리를 비켜 주지 않는다**(기각 — 사람과 할 때는 봇을 없앤다).
+- D-134: **대기실 끊김 유예** — 휴대폰 방장이 초대 링크를 카톡으로 보내고 기다려도 방이 남게, WAITING 플레이어 끊김은 준비를 풀고
+  (`setReady false`) `WaitingLeaveGraceScheduler`(`deadlines:waiting-leave`, `mirboard.waiting.grace-seconds` 기본 120s) 유예를 건다.
+  방 토픽 재구독이면 취소(알림·준비 복원 없음), 만료 때 WAITING·플레이어·라이브 세션 없음일 때만 leave. 같은 방 라이브 세션이 남으면
+  아무것도 안 한다(두 탭 중 하나 닫기 — IN_GAME 과 같은 가드). 대기실 화면은 `useRoomMeta` 의 `onResync`(다시 연결·다시 보임·online)로
+  `join-or-reconnect` 를 다시 불러 맞춘다(방 없음 → "방이 없어졌어요"). 명시적 '나가기'·IN_GAME 갈래는 그대로.
 
 ## 자주 쓰는 명령
 
@@ -209,6 +219,8 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.infra.bot.TurnRemainingTest"   # resync 남은 턴 시간·재무장을 락 안에서 (D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.*RecorderFailureTest"   # 매치 기록 실패 격리 3게임 (D-130·D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.OneCardRaceIT"   # 원카드 경쟁 창 서버 경로 (D-128, Docker)
+./gradlew :server:test --tests "com.mirboard.infra.web.*"   # 방 초대 미리보기 렌더러·틀·컨트롤러 + IT 1개 (D-133, IT 만 Docker)
+./gradlew :server:test --tests "com.mirboard.infra.ws.WaitingLeaveGraceSchedulerTest" --tests "com.mirboard.infra.ws.RoomDisconnectHandlerTest"   # 대기실 끊김 유예·준비 해제·같은 방 세션 가드 (D-134, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.TichuEventStreamIT"   # 티츄 공개 순번 무구멍 + 플레이당 resync 측정 → server/build/d126-resync-stats.txt (D-126, Docker)
 MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.tichu.bot.HeuristicBotEvaluationTest"   # 티츄 봇 대형 평가 (~1m30s)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.DealingLifecycleTest"
