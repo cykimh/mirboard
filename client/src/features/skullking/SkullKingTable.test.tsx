@@ -748,6 +748,23 @@ describe('다음 차례 표시 (D-132)', () => {
     expect(within(seatEl(0)).getByText('다음')).toBeInTheDocument();
     expect(container.querySelector('.sk-me')).toBeNull();
   });
+
+  // D-132 후속 m2 — 강제 종료는 결과(MATCH_ENDED) 없이 방만 끝나 스토어의 차례가 그대로 남는다. 끝난 판에 차례를 보이지 않는다.
+  it('방이 결과 없이 끝나면(강제 종료) 차례 테두리와 "다음"이 사라진다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
+    renderTable({ roomFinished: true });
+
+    expect(seatEl(1)).not.toHaveClass('sk-seat-turn');
+    expect(screen.queryByText('다음')).toBeNull();
+  });
+
+  it('방이 결과 없이 끝나면 내 차례였어도 "내 차례"를 보이지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 0 });
+    const { container } = renderTable({ roomFinished: true });
+
+    expect(screen.queryByText('내 차례')).toBeNull();
+    expect(container.querySelector('.sk-me')).not.toHaveClass('sk-me-turn');
+  });
 });
 
 /**
@@ -782,6 +799,25 @@ describe('다음 차례 표시 — 트릭이 막 끝난 순간 (D-132)', () => {
       useSkullKingStore.getState().applyEvent(ev('TURN_CHANGED', { currentTurnSeat: 1 }));
     });
     expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
+    expect(screen.getAllByText('다음')).toHaveLength(1);
+  });
+
+  // D-132 후속 m3 — resync 는 settledTrick 을 남긴다(승자 왕관 보존). 이벤트를 놓친 뒤 들어온 resync 가 다음 트릭의 리드 차례를
+  // 주면 settledTrick 은 지난 트릭이라, "승자가 아니면 리드를 기다리는 중"으로 보면 리드 전까지 "다음"이 빈다.
+  it('남아 있는 정리된 트릭의 마지막 사람이 지금 차례가 아니면 리드를 기다리는 중이 아니다 — "다음"을 보인다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 2 });
+    act(() => {
+      useSkullKingStore.setState({
+        settledTrick: {
+          cards: [...trickOf3, { seat: 3, card: suit('GREEN', 7), declaredAs: null }],
+          winnerSeat: 1,
+          winningCard: suit('GREEN', 9),
+        },
+      });
+    });
+    renderTable();
+
+    expect(within(seatEl(3)).getByText('다음')).toBeInTheDocument();
     expect(screen.getAllByText('다음')).toHaveLength(1);
   });
 

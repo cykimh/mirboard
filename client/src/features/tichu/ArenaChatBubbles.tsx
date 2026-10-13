@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { viewPosOf } from '@/features/tichu/seatView';
-import { useRoomChatStore } from './roomChatStore';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
+import { viewPosOf } from './seatView';
 
 interface ArenaChatBubblesProps {
   /** 좌석 인덱스 → userId. RoomChat 과 동일 소스(useRoomChatStore) 구독. */

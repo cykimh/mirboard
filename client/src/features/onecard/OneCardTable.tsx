@@ -86,11 +86,13 @@ export function OneCardTable({
     { length: seatCount },
     (_, i) => s.seats.find((x) => x.seat === i)?.eliminated != null,
   );
-  const nextSeat = nextTurnSeat(s.turnSeat, s.direction, eliminated);
+  // D-132 후속 m2 — 강제 종료는 결과 없이 방만 끝나 스토어의 차례가 남는다. 끝난 판에는 차례(테두리·"다음"·"내 차례"·가운데 이름)가 없다.
+  const turnSeat = roomFinished ? -1 : s.turnSeat;
+  const nextSeat = nextTurnSeat(turnSeat, s.direction, eliminated);
   const iAmOut = me?.eliminated != null;
   const raceOpen = s.race !== null;
   const myTurn =
-    !spectator && mySeat >= 0 && !iAmOut && s.result === null && !raceOpen && s.turnSeat === mySeat;
+    !spectator && mySeat >= 0 && !iAmOut && s.result === null && !raceOpen && turnSeat === mySeat;
   const canPress = !spectator && mySeat >= 0 && !iAmOut && s.result === null && !roomFinished;
 
   const nameOf = (seat: number) => {
@@ -109,7 +111,7 @@ export function OneCardTable({
         userId={playerIds[seat]}
         username={usernames[playerIds[seat]]}
         isBot={botSeats.includes(seat)}
-        isTurn={s.turnSeat === seat}
+        isTurn={turnSeat === seat}
         isNext={nextSeat === seat}
         isDisconnected={s.disconnectedSeats.has(seat)}
         side={side}
@@ -267,7 +269,7 @@ export function OneCardTable({
           attackStack={s.attackStack}
           direction={s.direction}
           drawPileCount={s.drawPileCount}
-          turnName={s.turnSeat >= 0 ? nameOf(s.turnSeat) : null}
+          turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           raceOpen={raceOpen}
           lastRace={s.lastRace}
           late={s.raceNotice === 'LATE'}

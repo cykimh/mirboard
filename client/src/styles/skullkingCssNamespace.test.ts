@@ -160,14 +160,17 @@ describe('18-skullking-table.css — 테이블 배치 (D-132)', () => {
 
   // 390px 가운데 칸 ≈138px 에서는 트릭 레일이 한 줄에 1장씩 쌓여 8인 천이 ≈800~1000px 가 됐다 — 좁은 화면만 가운데를 옆줄
   // 아래 전체 폭으로 내린다. 좌·우·위 자리(시계 방향)는 그대로다.
-  it('17-responsive 맨 끝 블록이 ≤480px 에서 옆줄 손패 장수를 숨기고 가운데 칸을 옆줄 아래 전체 폭으로 내린다 — .sk- 선택자만', () => {
+  // D-132 후속 m7 — 481~560px(폴더블·분할 화면)도 가운데 칸이 ≈190~240px 라 8인 트릭 레일이 4줄 이상 쌓였다. 가운데를 내리는 것은
+  // ≤560px, 옆줄 손패 숨김은 그대로 ≤480px.
+  it('17-responsive 맨 끝 두 블록 — ≤560px 에서 가운데 칸을 옆줄 아래 전체 폭으로, ≤480px 에서 옆줄 손패 장수를 숨긴다 — .sk- 선택자만', () => {
     const code = responsiveCssSource.replace(/\/\*[\s\S]*?\*\//g, '');
-    const last = code.slice(code.lastIndexOf('@media')).replace(/\s+/g, ' ').trim();
+    const lastTwo = code.slice(code.lastIndexOf('@media', code.lastIndexOf('@media') - 1)).replace(/\s+/g, ' ').trim();
 
-    expect(last).toBe(
-      '@media (max-width: 480px) { .sk-seat-side .sk-stat-hand { display: none; } ' +
+    expect(lastTwo).toBe(
+      '@media (max-width: 560px) { ' +
         ".sk-felt { grid-template-areas: 'top top top' 'left . right' 'center center center' 'bottom bottom bottom'; " +
-        'grid-template-rows: auto auto auto auto; } }',
+        'grid-template-rows: auto auto auto auto; } } ' +
+        '@media (max-width: 480px) { .sk-seat-side .sk-stat-hand { display: none; } }',
     );
   });
 
@@ -183,9 +186,11 @@ describe('18-skullking-table.css — 테이블 배치 (D-132)', () => {
   });
 
   // 390px 옆줄 좌석 내용 ≈65px 에 아바타 28px 면 한 줄 이름 칸은 ≈31px(두 글자)다. 모바일은 title 툴팁이 뜨지 않는다.
-  it('좁은 좌석에서는 이름이 아바타 아래 줄로 내려간다 — 한 줄에 아바타 + 이름 44px 가 안 들어가면', () => {
+  // D-132 후속 — 운영 390px 8인 윗줄(내용 ≈82px)은 44px 기준이면 한 줄에 들어가 이름이 ≈48px("bot_…")로 잘렸다. 64px 기준이면
+  // 내용 98px 미만 좌석은 이름이 아래 줄로 내려가 좌석 폭을 다 쓴다(넓은 좌석은 한 줄에서도 이름 칸 64px 이상).
+  it('좁은 좌석에서는 이름이 아바타 아래 줄로 내려간다 — 한 줄에 아바타 + 이름 64px 가 안 들어가면', () => {
     expect(lastDeclaredIn('.sk-seat-top', 'flex-wrap')).toBe('wrap');
-    expect(lastDeclaredIn('.sk-seat-name', 'flex')).toBe('1 1 44px');
+    expect(lastDeclaredIn('.sk-seat-name', 'flex')).toBe('1 1 64px');
   });
 
   // 8인 윗줄 3명 × 100px + 간격이 375·360px 천 내용을 넘으면 2 + 1 로 감겨 위쪽 반원 순서가 흐트러진다 — 한 줄에서 줄인다.
@@ -205,6 +210,12 @@ describe('18-skullking-table.css — 테이블 배치 (D-132)', () => {
   // 좌석 배경이 반투명이라 키 글자 뒤가 밝은 천(#dde7f1)이다 — opacity .6 이면 4.36:1 로 AA(4.5) 미달.
   it('라이트 테마 천 위 좌석 통계 키는 AA 대비가 나오게 덜 흐리게 한다', () => {
     expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-stat-key', 'opacity')).toBe('0.7');
+  });
+
+  // D-132 후속 m4 — 트릭 레일이 천 위로 오며 라이트 테마의 대기 칸·"아직 낸 카드 없음"(opacity .7)이 ≈3.9:1 로 AA(4.5) 미달이 됐다.
+  it('라이트 테마 천 위 트릭 대기 칸·빈 트릭 안내도 덜 흐리게 한다', () => {
+    expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-trick-slot.waiting', 'opacity')).toBe('0.8');
+    expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-trick-empty', 'opacity')).toBe('0.8');
   });
 });
 

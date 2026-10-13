@@ -4,7 +4,7 @@ import type { Card, TableView } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArenaChatBubbles } from '@/features/chat/ArenaChatBubbles';
+import { ArenaChatBubbles } from './ArenaChatBubbles';
 import { comboLabel } from './handType';
 import { CardChip } from './CardChip';
 import { SeatAvatar } from './SeatAvatar';
