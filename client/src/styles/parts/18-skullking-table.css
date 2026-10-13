@@ -201,9 +201,10 @@ html:not(.dark) .sk-table {
   border-style: dashed;
 }
 
-/* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 44 = 78px — 390px 옆줄 ≈65px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다
-   쓴다(≈8자). 한 줄이면 이름 칸이 ≈31px(두 글자 + 말줄임)라 봇이 모두 "bo…"로 보이고, 모바일은 title 툴팁이 뜨지 않는다.
-   윗줄 좌석(8인도 ≈82px 이상)·넓은 화면 옆줄은 한 줄 그대로다(폭 미디어 없음). */
+/* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 64 = 98px — 390px 옆줄 ≈65px, 8인 윗줄 ≈82px)에서는 이름이 아바타 아래 줄로
+   내려가 좌석 폭을 다 쓴다(≈8~10자). 한 줄이면 이름 칸이 ≈31~48px(두~네 글자 + 말줄임)라 봇이 모두 "bo…"·"bot_…"로 보이고,
+   모바일은 title 툴팁이 뜨지 않는다(D-132 후속 — 44px 기준이던 때 운영 390px 8인 윗줄에서 실제로 그랬다). 넓은 좌석은 한 줄
+   그대로다(폭 미디어 없음). */
 .sk-seat-top {
   display: flex;
   flex-wrap: wrap;
@@ -240,7 +241,7 @@ html:not(.dark) .sk-table {
 }
 
 .sk-seat-name {
-  flex: 1 1 44px;
+  flex: 1 1 64px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -399,6 +400,12 @@ html:not(.dark) .sk-felt .sk-stat-key {
 .sk-trick-empty {
   font-size: 13px;
   opacity: 0.7;
+}
+
+/* D-132 후속 m4 — 트릭 레일이 천 위로 오며 라이트 테마(밝은 천 #dde7f1)에서 .7 이면 ≈3.9:1 로 AA(4.5) 미달 — .8 이면 넘는다. */
+html:not(.dark) .sk-felt .sk-trick-slot.waiting,
+html:not(.dark) .sk-felt .sk-trick-empty {
+  opacity: 0.8;
 }
 
 /* ── 카드 ─────────────────────────────────────────────────────────── */
