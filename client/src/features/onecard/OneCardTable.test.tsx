@@ -5,6 +5,7 @@ import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import type {
   OneCardCard,
   OneCardMatchResult,
@@ -1134,5 +1135,70 @@ describe('OneCardTable — 경기장 상태 줄 (D-139)', () => {
 
     const felt = screen.getByRole('group', { name: '좌석 배치' });
     expect(felt.firstElementChild).toBe(status());
+  });
+});
+
+/**
+ * D-139 — 카드를 내면 낸 사람의 좌석 패널(내가 냈으면 내 줄)에서 가운데 맨 위 카드 자리로 카드가 날아간다(티츄 D-78 FLIP 과 같은 방식).
+ * 날아오는 동안 맨 위 카드는 숨겨 두 장으로 보이지 않게 하고, 내려앉으면 걷는다. 카드 애니메이션 설정·resync 는 날리지 않는다.
+ */
+describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
+  const fly = () => document.querySelector('.oc-fly');
+  const top = () => document.querySelector('.oc-top');
+  const play = (seat: number, card: OneCardCard, seq: number) =>
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARD_PLAYED',
+        seq,
+        payload: { seat, card, declaredSuit: null, handCount: 4, attackStack: 0, direction: 1 },
+      } as never);
+    });
+
+  beforeEach(() => {
+    useCardAnimStore.setState({ enabled: true });
+  });
+
+  it('남이 내면 그 좌석 패널에서 날아오고, 내려앉으면 걷는다 — 그동안 맨 위 카드는 숨긴다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 9), 2);
+    expect(fly()).toHaveAttribute('data-from-seat', '2');
+    expect(fly()).toHaveAttribute('aria-hidden', 'true');
+    expect(top()).toHaveClass('oc-top-landing');
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(fly()).toBeNull();
+    expect(top()).not.toHaveClass('oc-top-landing');
+  });
+
+  it('내가 내면 내 줄에서 날아간다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 0 });
+    renderTable();
+
+    play(0, c('HEART', 9), 2);
+    expect(fly()).toHaveAttribute('data-from-seat', '0');
+  });
+
+  it('카드 애니메이션을 끄면 날리지 않는다', () => {
+    useCardAnimStore.setState({ enabled: false });
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 9), 2);
+    expect(fly()).toBeNull();
+    expect(top()).not.toHaveClass('oc-top-landing');
+  });
+
+  it('다시 받기(resync)로 맨 위 카드가 바뀌어도 날리지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    act(() => {
+      seed({ seatCount: 4, mySeat: 0, turnSeat: 3, topCard: c('CLUB', 5) });
+    });
+    expect(fly()).toBeNull();
   });
 });

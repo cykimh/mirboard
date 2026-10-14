@@ -872,3 +872,21 @@ button.oc-card {
   --oc-race-call: #23955a;
   --oc-race-catch: #d9483d;
 }
+
+/* D-139 — 카드 내기 비행 효과. 처음 프레임은 출발 좌석(transform 이 transition 없이 놓인다), settled 가 되면 맨 위 카드 자리로 날아간다.
+   .oc-table(position: relative) 기준 절대 위치. 맨 위 카드는 내려앉을 때까지 숨긴다(자리는 그대로 — 레이아웃이 흔들리지 않는다). */
+.oc-fly {
+  position: absolute;
+  z-index: 110;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
+}
+
+.oc-fly-settled {
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.oc-top-landing > .oc-card {
+  visibility: hidden;
+}
+

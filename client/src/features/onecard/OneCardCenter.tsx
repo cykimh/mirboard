@@ -29,6 +29,8 @@ interface Props {
   lastRace: LastRace | null;
   late: boolean;
   nameOf: (seat: number) => string;
+  /** D-139 — 방금 낸 카드가 날아오는 중 — 맨 위 카드를 숨겨(자리는 그대로) 두 장으로 보이지 않게 한다. */
+  landing?: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export function OneCardCenter({
   lastRace,
   late,
   nameOf,
+  landing = false,
 }: Props) {
   return (
     <section className="oc-center" aria-label="테이블">
@@ -53,7 +56,7 @@ export function OneCardCenter({
           <span className="oc-pile-back" aria-hidden />
           <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
         </div>
-        <div className="oc-top">
+        <div className={`oc-top${landing ? ' oc-top-landing' : ''}`}>
           {topCard ? (
             <OneCardCardChip card={topCard} />
           ) : (
