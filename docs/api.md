@@ -279,7 +279,8 @@
 둘뿐, `details` 에 `gameType`/`option`, D-106).
 
 ### POST `/api/rooms/{roomId}/join`
-응답 `200` — Room 갱신본.
+응답 `200` — Room 갱신본. D-137 — 관전자가 부르면(대기실의 [자리에 앉기]) 같은 원자 구간에서 관전자 목록에서도 빠진다(플레이어·관전자
+이중 소속 없음).
 에러: `ROOM_FULL`, `ROOM_NOT_FOUND`, `ALREADY_IN_ROOM`, `GAME_ALREADY_STARTED`.
 
 ### POST `/api/rooms/{roomId}/rematch` *(D-82)*

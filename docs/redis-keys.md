@@ -66,8 +66,8 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 성공 `1`.
 
 ### `room_join.lua`
-입력: `KEYS[1]=room:{id}`, `KEYS[2]=room:{id}:players`, `ARGV[1]=userId`,
-`ARGV[2]=now`.
+입력: `KEYS[1]=room:{id}`, `KEYS[2]=room:{id}:players`, `KEYS[3]=rooms:open`, `KEYS[4]=room:{id}:spectators`(D-137), `ARGV[1]=userId`,
+`ARGV[2]=now`. 앉으면 같은 원자 구간에서 `SREM spectators userId`(관전자가 자리에 앉기).
 
 처리:
 1. `HGET room status` 검사 → `WAITING` 아니면 `"NOT_WAITING"` 반환.
