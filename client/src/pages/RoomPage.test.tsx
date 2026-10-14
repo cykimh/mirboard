@@ -631,10 +631,12 @@ describe('RoomPage — 자리 없음·방 없음 (D-133)', () => {
     expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
   });
 
-  it('그 밖의 오류는 지금처럼 서버 문구를 보인다', async () => {
+  // D-138 — 그 밖의 오류도 서버 영어 원문 대신 한국어(api/errorText).
+  it('그 밖의 오류는 한국어 문구로 보인다', async () => {
     renderRejected(apiError(409, 'ALREADY_IN_ROOM', 'User already in room'));
 
-    expect(await screen.findByText('User already in room')).toBeInTheDocument();
+    expect(await screen.findByText('이미 이 방에 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('User already in room')).toBeNull();
     expect(screen.queryByText('자리가 없어요 — 관전할까요?')).toBeNull();
   });
 });

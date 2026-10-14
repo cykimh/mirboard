@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameHubPage } from './GameHubPage';
+import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
 import { spectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import type { GameSummary, Room } from '@/types/api';
@@ -192,5 +193,40 @@ describe('GameHubPage — 허브에서 고른 관전 (D-133)', () => {
     expect(await screen.findByText('ROOM_PAGE')).toBeInTheDocument();
     expect(spectate).toHaveBeenCalledWith('tok', 'r9');
     expect(spectateNoticeSeen('r9')).toBe(true);
+  });
+});
+
+/** D-138 — 허브 "입장"·"구경하기"가 실패하면 서버 영어 원문(`Room not found` 등) 대신 한국어(api/errorText). */
+describe('GameHubPage — 오류 문구 (D-138)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [room('a', 'SKULL_KING', 8)] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('입장하려던 방이 그사이 없어지면 "방이 없어졌어요"', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.joinOrReconnect).mockRejectedValue(
+      new ApiError(404, { error: { code: 'ROOM_NOT_FOUND', message: 'Room not found' } }),
+    );
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '입장' }));
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+    expect(screen.queryByText('Room not found')).toBeNull();
+  });
+
+  it('구경하려던 방 ID 가 없으면 "방이 없어졌어요"', async () => {
+    spectate.mockRejectedValue(new ApiError(404, { error: { code: 'ROOM_NOT_FOUND', message: 'Room not found' } }));
+    renderHub();
+
+    fireEvent.change(await screen.findByPlaceholderText('방 ID 로 관전 진입'), { target: { value: 'nope' } });
+    fireEvent.click(screen.getByRole('button', { name: '구경하기' }));
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
   });
 });

@@ -1,5 +1,7 @@
 package com.mirboard.infra.web;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.text.BreakIterator;
 import java.util.Locale;
 import org.springframework.web.util.HtmlUtils;
@@ -24,6 +26,8 @@ public final class RoomPreviewRenderer {
     static final String START = "<!--og:start-->";
     static final String END = "<!--og:end-->";
     static final String SITE_NAME = "미르보드카페";
+    /** D-138 — 빌드가 `client/public` 을 그대로 복사한 미리보기 이미지(1200×630). */
+    static final String IMAGE_PATH = "/og-image.jpg";
     /** 방 이름 길이 상한(글자 — 확장 그래핌 묶음). 카톡 말풍선 제목은 두 줄 남짓에서 어차피 잘린다 — 메타가 끝없이 길어지지 않게만. */
     static final int MAX_ROOM_NAME = 40;
     /** 방장 이름 상한(글자). 가입 규칙(3~20자)·게스트 이름(`guest-` + 8자)이 이미 그 안이라 방어용. */
@@ -66,7 +70,35 @@ public final class RoomPreviewRenderer {
                 + meta("property", "og:description", description)
                 + meta("property", "og:url", room.url())
                 + meta("property", "og:locale", "ko_KR")
-                + meta("name", "twitter:card", "summary");
+                + image(room.url());
+    }
+
+    /**
+     * D-138 — 큰 미리보기 이미지(`client/public/og-image.jpg`, 1200×630). 스크래퍼는 상대 주소를 풀지 못하므로 방 주소의 출처(프록시 뒤
+     * 실제 scheme://host — 컨트롤러가 forwarded 헤더를 반영해 만든 주소)를 붙인다. 주소를 못 읽으면 이미지 없이 작은 카드.
+     */
+    private static String image(String roomUrl) {
+        String origin = originOf(roomUrl);
+        if (origin == null) {
+            return meta("name", "twitter:card", "summary");
+        }
+        return meta("property", "og:image", origin + IMAGE_PATH)
+                + meta("property", "og:image:width", "1200")
+                + meta("property", "og:image:height", "630")
+                + meta("property", "og:image:alt", "카드 테이블 — " + SITE_NAME)
+                + meta("name", "twitter:card", "summary_large_image");
+    }
+
+    private static String originOf(String url) {
+        try {
+            URI uri = new URI(url);
+            if (uri.getScheme() == null || uri.getRawAuthority() == null) {
+                return null;
+            }
+            return uri.getScheme() + "://" + uri.getRawAuthority();
+        } catch (URISyntaxException | NullPointerException e) {
+            return null;
+        }
     }
 
     private static String roomLabel(String roomName, String host) {
