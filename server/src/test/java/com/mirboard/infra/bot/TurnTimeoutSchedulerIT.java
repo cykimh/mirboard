@@ -101,10 +101,7 @@ class TurnTimeoutSchedulerIT {
                 /*targetScore*/ 150, /*turnSeconds*/ 1);
         String roomId = room.roomId();
 
-        // Phase 16(#2) — 봇 3 은 자동 ready. 사람 호스트가 준비하면 전원 ready
-        // → 게임 시작 (이후 게임 중엔 의도적으로 행동 안 함 = idle).
-        room = roomService.setReady(roomId, humanHostId, true);
-
+        // D-136 — 봇과 연습 방은 만들자마자 시작한다(서버가 방장 준비까지 넣는다). 이후 사람은 의도적으로 행동 안 함 = idle.
         assertThat(room.status()).isEqualTo(RoomStatus.IN_GAME);
         assertThat(room.playerIds()).hasSize(4);
         assertThat(room.turnSeconds()).isEqualTo(1);

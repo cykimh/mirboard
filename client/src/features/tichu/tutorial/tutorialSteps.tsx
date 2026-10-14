@@ -123,7 +123,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: '준비 완료!',
     body: (
       <p>
-        기본은 다 익혔습니다. 처음에는 <strong>봇과 함께</strong> 한 판 연습해보는 걸 추천해요.
+        기본은 다 익혔습니다. 처음에는 방 만들기의 <strong>'봇과 연습'</strong>으로 한 판 해보는 걸 추천해요.
         자세한 규칙은 게임 카드의 "자세히" 링크에서 볼 수 있습니다. 즐겁게 플레이하세요!
       </p>
     ),

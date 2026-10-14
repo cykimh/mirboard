@@ -39,6 +39,8 @@ interface Props {
   turnSeconds?: number;
   spectatorCount?: number;
   onExit?: () => void;
+  /** D-136 — 봇과 연습 방(방의 fillWithBots). 머리 줄에 "🤖 혼자 연습". */
+  practice?: boolean;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
   /** D-120 — 방은 FINISHED 인데 이 세션이 종료 전이를 봐서 게임판을 유지하는 중. 입력을 숨긴다. */
@@ -66,6 +68,7 @@ export function OneCardTable({
   spectatorCount = 0,
   onExit,
   onAbort,
+  practice = false,
   roomFinished = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -225,6 +228,7 @@ export function OneCardTable({
         <div className="oc-header-badges">
           <span className="oc-badge oc-badge-title">원카드</span>
           <span className="oc-badge">{seatCount}인</span>
+          {practice && <span className="oc-badge">🤖 혼자 연습</span>}
           {turnSeconds > 0 && <span className="oc-badge">턴 {turnSeconds}초</span>}
           {spectatorCount > 0 && <span className="oc-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="oc-badge">관전 모드</span>}

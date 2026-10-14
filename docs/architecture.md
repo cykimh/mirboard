@@ -219,9 +219,10 @@ envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.m
 
 | 스크립트 | 역할 |
 |----------|------|
-| `room_create.lua` | 방 HASH + players LIST + open 인덱스 초기화 |
+| `room_create.lua` | 방 HASH + players LIST + open 인덱스 초기화(D-136 — 봇과 연습 방은 open 인덱스에 넣지 않음) |
 | `room_join.lua`   | status/capacity/멤버십 검증 후 player 추가 (capacity 자동시작 없음 — Phase 16) |
 | `room_ready.lua`  | ready SET 토글, **정원+전원 ready 시에만** WAITING→IN_GAME 원자 전이(중복 start 0건) |
+| `room_start_now.lua` | D-136 방장 "지금 N명으로 시작" — 최소 인원 이상·방장 말고 전원 ready·정원 미만이면 정원 := 현재 인원 + WAITING→IN_GAME |
 | `room_leave.lua`  | player 제거, 호스트 이양, 빈 방이면 `ready`·`spectators` 정리 후 소멸 |
 | `room_delete.lua` | 방 관련 키 일괄 삭제(플레이어·관전자 0일 때) |
 | `room_finish.lua` | IN_GAME→FINISHED 전이 (결과 화면 보존용 TTL) |

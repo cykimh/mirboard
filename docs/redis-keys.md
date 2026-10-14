@@ -11,9 +11,9 @@
 
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
-| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정·불변 |
+| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
 | `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
-| `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함) |
+| `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함). D-136 — 봇과 연습 방(`fillWithBots=true`)은 `room_create.lua` 가 넣지 않는다 |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함). 원카드는 `OneCardState`(손패·뽑을 더미 순서·경쟁 창·봇 누름 포함 — 서버 전용, 1판 = 1매치라 `match:` 키 없음, D-128) | 직렬화 책임은 GameEngine. 원카드는 모르는 필드를 무시한다(`@JsonIgnoreProperties(ignoreUnknown)`, 롤백 안전) |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120)·`roundsPlayed`(완주 라운드 수, 매치가 끝날 때 확정 — 진행 중·구 JSON 은 `null`, D-122) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
@@ -61,7 +61,7 @@
 `ARGV = [roomId, hostId, name, gameType, capacity, createdAt, teamPolicy,
 fillWithBots, targetScore, turnSeconds, stake]`.
 
-방 메타 HASH + 호스트 `RPUSH` + `rooms:open` ZADD 를 한 덩어리로 생성(양쪽 EXPIRE 6h).
+방 메타 HASH + 호스트 `RPUSH` + `rooms:open` ZADD 를 한 덩어리로 생성(양쪽 EXPIRE 6h). D-136 — `fillWithBots="true"`(연습 방)면 ZADD 하지 않는다.
 UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` 시 `-10`(ROOM_ID_COLLISION).
 성공 `1`.
 
@@ -77,7 +77,7 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 
 모든 단계가 단일 원자 트랜잭션. 4명이 동시 입장해도 capacity 위반 0건 보장.
 **Phase 16(#2)**: 정원 도달 시 IN_GAME 자동전이 블록을 제거했다. 시작은
-`room_ready.lua` 가 전담.
+WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비) 또는 `room_start_now.lua`(D-136 — 방장 "지금 N명으로 시작") 두 곳뿐이다.
 
 ### `room_ready.lua` *(Phase 16 #2)*
 입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`,
@@ -91,6 +91,13 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 
 단일 원자 트랜잭션 — 다수 플레이어가 동시에 마지막 ready 를 눌러도 `1`(start)
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
+
+### `room_start_now.lua` *(D-136)*
+입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`, `ARGV = [hostId, minPlayers, roomId]`.
+
+처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4`, `LLEN >= capacity` `-6`(정원이 다 참 — 준비로
+시작), 방장 말고 ready 아닌 사람 `-5` → 아니면 `SADD ready hostId` + `HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. `room_join.lua`
+와 같은 키를 원자적으로 다뤄 확인과 시작 사이에 입장·준비 해제가 끼지 않는다. 방장 확인은 자바가 먼저 한다.
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players, rooms:open, room:{id}:ready,

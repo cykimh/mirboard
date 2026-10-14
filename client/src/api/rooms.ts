@@ -58,6 +58,11 @@ export const roomsApi = {
     });
   },
 
+  /** D-136 — 친구와 하기 대기실에서 방장이 "지금 N명으로 시작"(정원을 현재 인원으로 줄이고 시작). 응답은 시작된 방. */
+  startNow(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/start`, { method: 'POST', token });
+  },
+
   join(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
       method: 'POST',

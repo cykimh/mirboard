@@ -248,13 +248,15 @@
 - `gameType` 은 `GameRegistry` 에 등록되고 `status==AVAILABLE` 인 ID여야 한다.
 - 선택: `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`(D-81),
   `capacity`(D-99).
+- **`fillWithBots`(D-136 — 봇과 연습)**: `true` 면 **연습 방**이다 — 방장 + 봇으로 정원을 채우고 방장 준비까지 서버가 넣어
+  **응답 방이 이미 `IN_GAME`**(대기실·초대 없음), `rooms:open`(대기 중인 방 목록)에 한 번도 오르지 않는다. 관전은 막지 않는다.
+  `false`(기본 — 친구와 하기)면 봇이 들어갈 길이 없다(사람끼리만).
 - `capacity`(D-99): 방 인원. **생략하면 게임 선언 `defaultPlayers`**(D-131 — 카탈로그와 같은 값, 티츄 4·스컬킹 8·원카드 4. 예전
   생략 기본 `maxPlayers` 와는 원카드만 다르다). 게임이 정한
   `minPlayers() <= capacity <= maxPlayers()` 를 벗어나면 `INVALID_CAPACITY`. 인원이
   고정된 게임(티츄는 `min=max=4`)은 그 값 하나만 통과하므로 사실상 생략과 동일하다 —
   클라는 `minPlayers === maxPlayers` 인 게임에서 이 필드를 아예 보내지 않는다.
-  `fillWithBots` 의 좌석 채우기도 확정된 `capacity` 를 따른다(시드 봇은 4명뿐이므로
-  `capacity - 1 > 4` 인 방은 봇으로 채울 수 없다 — 봇 풀 확장은 스컬킹 통합 시 별건).
+  `fillWithBots` 의 좌석 채우기도 확정된 `capacity` 를 따른다(봇 풀 8명 — 스컬킹 8인 연습은 방장 + 봇 7).
 - `turnSeconds`(Phase 13D): 개인 턴 제한(초, 0=끔). **생략하면 게임 선언 `defaultTurnSeconds`**(D-131 — 티츄·스컬킹 0,
   원카드 30). 턴 제한이 있는 방의 resync 는 지금 턴의 남은 시간을 싣는다(`turnRemainingMs`, 아래 resync).
 - `stake`(D-81): 판돈(가상 칩). 허용값 `{0,10,50,100,500}`(기본 0=내기 없음). 생성 시
@@ -299,6 +301,14 @@
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 `GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석).
+
+### POST `/api/rooms/{roomId}/start` *(D-136 — 지금 N명으로 시작, 방장 전용)*
+친구와 하기 대기실에서 정원이 다 차지 않았어도 지금 모인 인원으로 시작한다. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상,
+정원 미만, **방장 말고 모두 준비**(방장이 누르는 것을 방장의 준비로 친다). `room_start_now.lua` 가 정원을 현재 인원으로 줄이고
+WAITING→IN_GAME 을 한 번에 한다(`ZREM rooms:open`) — 이후는 전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 정원은 이때 한 번만
+줄고 되돌리지 않는다. 티츄(4인 고정)는 4명 미만이면 `NOT_ENOUGH_PLAYERS`, 4명이 다 모였으면 `ROOM_ALREADY_FULL`(준비로 시작). 응답 `200` — 시작된 Room(`capacity` = 인원).
+에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details `minPlayers`), `PLAYERS_NOT_READY`(409),
+`ROOM_ALREADY_FULL`(409 — 정원이 다 찼으면 준비로 시작), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`.
 
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:

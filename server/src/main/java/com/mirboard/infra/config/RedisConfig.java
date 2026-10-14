@@ -30,6 +30,12 @@ public class RedisConfig {
         return scriptOf("lua/room_ready.lua");
     }
 
+    /** D-136 — 친구와 하기 대기실의 "지금 N명으로 시작"(정원 축소 + 시작 전이). */
+    @Bean
+    public RedisScript<Long> roomStartNowScript() {
+        return scriptOf("lua/room_start_now.lua");
+    }
+
     @Bean
     public RedisScript<Long> roomFinishScript() {
         return scriptOf("lua/room_finish.lua");

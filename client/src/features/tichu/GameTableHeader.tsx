@@ -29,7 +29,7 @@ interface GameTableHeaderProps {
 }
 
 /**
- * 게임판 헤더 — 좌측은 방 상태 배지(솔로/턴제한/판돈/연결/라운드/단계/관전/소원),
+ * 게임판 헤더 — 좌측은 방 상태 배지(혼자 연습/턴제한/판돈/연결/라운드/단계/관전/소원),
  * 우측은 토글 컨트롤(사운드·카드애니·이모지·채팅).
  *
  * 이모지 팔레트 열림 상태는 헤더 밖에서 쓰이지 않아 여기서 소유한다. 반면
@@ -64,8 +64,8 @@ export function GameTableHeader({
     <header className="game-table-header">
       <div className="header-status">
         {fillWithBots && (
-          <span className="solo-banner" title="이 방은 솔로 모드 — 빈 좌석은 봇이 자동 진행합니다">
-            🤖 솔로 모드 (봇 {botSeats.length}명)
+          <span className="solo-banner" title="봇과 연습 — 다른 좌석은 봇이 둡니다">
+            🤖 혼자 연습 (봇 {botSeats.length}명)
           </span>
         )}
         {turnSeconds > 0 && (

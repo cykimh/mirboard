@@ -856,3 +856,20 @@ describe('강제 종료 (D-135)', () => {
     expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
   });
 });
+
+/** D-136 — 봇과 연습 방은 머리 줄에 "🤖 혼자 연습"(티츄 배너와 같은 문구). RoomPage 가 방의 fillWithBots 로 넘긴다. */
+describe('혼자 연습 표시 (D-136)', () => {
+  it('practice 면 머리 줄에 "🤖 혼자 연습"', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
+    renderTable({ practice: true });
+
+    expect(screen.getByText('🤖 혼자 연습')).toBeInTheDocument();
+  });
+
+  it('친구와 하기 방에는 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
+    renderTable();
+
+    expect(screen.queryByText(/혼자 연습/)).toBeNull();
+  });
+});

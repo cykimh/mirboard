@@ -12,7 +12,7 @@
 ## 0. 한눈에 보기
 
 플랫폼은 **동작하는 MVP** 상태다. 로비/방 → **게임 3종**(티츄 4인 2:2 팀전 / 스컬킹
-2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 →
+2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) →
 재접속/탈주 처리 → UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 | # | 기능 | 상태 | 핵심 위치 |
@@ -75,7 +75,10 @@
 - **생성** `POST /api/rooms` {name, gameType} — 생성자가 호스트. 정원은 선택 필드
   `capacity`(D-99), 생략하면 `GameDefinition.maxPlayers()`. 게임이 정한
   `minPlayers()..maxPlayers()` 밖이면 `INVALID_CAPACITY` — 티츄는 4~4 라 무변경.
-  Redis `room:{id}` + `room:{id}:players` 저장.
+  Redis `room:{id}` + `room:{id}:players` 저장. D-136 — `fillWithBots=true` 는 **봇과 연습**(방장 + 봇, 만들자마자 IN_GAME,
+  목록에 안 오름), 방 만들기 모달은 "친구와 하기 / 봇과 연습"(기본 친구와 하기 — 게스트 포함, 봇 체크박스 없음).
+- **지금 시작** `POST /api/rooms/{id}/start`(D-136, 방장) — `room_start_now.lua` 가 최소 인원 이상·방장 말고 모두 준비·정원 미만이면
+  정원을 현재 인원으로 줄이고 WAITING→IN_GAME. 대기실의 "지금 N명으로 시작"(티츄 없음).
 - **목록** `GET /api/rooms?gameType=&status=` — status로 필터.
 - **입장** `POST /api/rooms/{id}/join` — `room_join.lua` 원자 검증(정원/멤버십).
   **capacity 자동시작 폐기**(Phase 16): 입장만으로는 시작하지 않는다.
@@ -173,7 +176,7 @@
 ## 6. 봇 플레이어 (Phase 9A, D-49)
 
 - 시드 봇 4명(`bot_north/east/south/west`, `is_bot=TRUE`, 로그인 불가) — V3 마이그레이션.
-- 사람 < 4명으로 시작 시 빈 좌석을 봇으로 채움(join 시 서버가 자동 ready).
+- D-136 — 봇은 **봇과 연습** 방에만 들어간다(방 만들기에서 고름 — 방장 + 봇으로 만들자마자 시작, 봇은 join 시 서버가 자동 ready). 친구와 하기 방에는 봇이 없다(사람이 모자라면 방장이 "지금 N명으로 시작").
 - `infra.bot.BotScheduler` 가 봇 차례에 포트 `botAction` 을 부르고, 각 게임 어댑터가 자기 정책에
   위임한다. 딜레이 `mirboard.bot.delay-millis`(기본 700ms, D-76 후속 상향).
 - **티츄 봇 = `HeuristicBotPolicy`(D-118)** — 공개 정보(`BotView`)만 보는 결정적 휴리스틱. 선언·패스·
@@ -330,7 +333,7 @@
 
 ## 13. 테스트 현황
 
-- **서버**: **1408건** (D-135 방장 강제 종료 봇 판만 시점 — `RoomServiceHostAbortTest` 6건 + 봇 판 강제 종료 IT 1건. D-134 시점 1401건. 전체 `--rerun` 실측 실패 0, 그중 Docker 불필요 1195건(85%) · Docker IT 213건. 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip. D-131 공개 전환 시점 1327건 + 방 미리보기 `infra.web.*` 51건(그중 Docker 불필요 45건 — 그래핌 자르기·표식 경고 12건 포함) + 입장 갈래 `RoomServiceJoinOrReconnectTest` 5건 + 대기실 끊김 유예 18건(`WaitingLeaveGraceSchedulerTest` 14·`RoomDisconnectHandlerTest` +4, D-134 — 둘 다 Docker 불필요)). 게임별 내역(같은 실측 — D-133 은 게임 도메인 무변경): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 17건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
+- **서버**: **1426건** (D-136 방 만들기 두 갈래 시점 — `RoomServiceStartNowTest` 6건 + `RoomModesIntegrationTest` 12건. D-135 시점 1408건 — `RoomServiceHostAbortTest` 6건 + 봇 판 강제 종료 IT 1건. D-134 시점 1401건. 전체 `--rerun` 실측 실패 0, 그중 Docker 불필요 1201건(84%) · Docker IT 225건. 대형 봇 평가 5건은 `MIRBOARD_BOT_EVAL=1` 전용이라 skip. D-131 공개 전환 시점 1327건 + 방 미리보기 `infra.web.*` 51건(그중 Docker 불필요 45건 — 그래핌 자르기·표식 경고 12건 포함) + 입장 갈래 `RoomServiceJoinOrReconnectTest` 5건 + 대기실 끊김 유예 18건(`WaitingLeaveGraceSchedulerTest` 14·`RoomDisconnectHandlerTest` +4, D-134 — 둘 다 Docker 불필요)). 게임별 내역(같은 실측 — D-133 은 게임 도메인 무변경): 티츄 도메인 312건(그중 Docker 불필요 304건), 스컬킹 도메인 375건(371건), 원카드 도메인 191건(187건) + 원카드 서버 경로 IT 10건(`OneCardRaceIT`·`OneCardBotMatchSimulationIT`)·엔진 타이머 단위 17건. 매치 기록 실패 격리는 세 게임 모두 `infra.ws.*RecorderFailureTest`(8건, D-130·D-131). 테스트 JVM 힙 1g · 컨텍스트 캐시 상한 4(IT 가 늘어 기본 512m 에서 OOM — D-122 검증 중 발견).
   단위(룰 엔진·족보·ELO·JWT·카탈로그·포트 어댑터) + 통합(Testcontainers PostgreSQL 16/
   Redis — auth/rooms/STOMP/봇/동시성/매치 영속/2-인스턴스 인계).
   집계 방식: `./gradlew :server:test --rerun` 뒤 `server/build/test-results/test/TEST-*.xml` 을 합한다. 클래스는 **파일 이름의 바깥 클래스**로
@@ -339,7 +342,7 @@
   재현 스크립트는 `docs/case-study-multi-game.md` 부록 (6).
 - 룰·봇 단위는 **Docker 불필요** — `./scripts/check.sh rules` 에 묶여 있다(티츄·스컬킹·원카드 룰 + 세 봇
   평가, ~20s). 스컬킹·원카드 매치 기록 IT(D-115·D-128)는 Docker 가 필요해 `rules` 에서 뺐다.
-- **클라이언트**: **910건 / 75파일** (D-135 시점 실측, 실패 0 — 게임판 "게임 종료" 버튼 3게임·RoomPage 조건·재접속 배너 +18건/+1파일. D-132 후속 시점 892건 / 74파일 — 끝난 판 차례 숨김·스컬킹 리드 대기·라이트 대비·좁은 좌석 이름·481~560px·채팅 폴더 경계 +7건/+1파일. D-134 시점 885건 / 73파일. D-133 방 초대 링크 시점 865건 / 72파일(돌아갈 주소·공유 함수·로그인/가입·라우팅·방 화면·초대 버튼·관전 안내·허브 관전 기록·`index.html` 117건 포함) + 최종 리뷰 반영 20건(대기실 화면 재동기화 `useRoomMeta`·방 화면 14건, 관전 안내 상태 영역 5건, 수동 복사 선택 1건). D-132 시점 748건 / 65파일). Vitest + RTL — 스토어
+- **클라이언트**: **933건 / 75파일** (D-136 시점 실측, 실패 0 — 방 만들기 두 갈래·지금 시작 버튼·안내·연습 표시·허브 +23건. D-135 시점 910건 / 75파일 — 게임판 "게임 종료" 버튼 3게임·RoomPage 조건·재접속 배너 +18건/+1파일. D-132 후속 시점 892건 / 74파일 — 끝난 판 차례 숨김·스컬킹 리드 대기·라이트 대비·좁은 좌석 이름·481~560px·채팅 폴더 경계 +7건/+1파일. D-134 시점 885건 / 73파일. D-133 방 초대 링크 시점 865건 / 72파일(돌아갈 주소·공유 함수·로그인/가입·라우팅·방 화면·초대 버튼·관전 안내·허브 관전 기록·`index.html` 117건 포함) + 최종 리뷰 반영 20건(대기실 화면 재동기화 `useRoomMeta`·방 화면 14건, 관전 안내 상태 영역 5건, 수동 복사 선택 1건). D-132 시점 748건 / 65파일). Vitest + RTL — 스토어
   리듀서, 족보 타입, 카드 에셋 매핑 등.
 - 통합 테스트는 Docker 필요. 실행 명령은 `CLAUDE.md` "자주 쓰는 명령" 참조.
 - **밀폐성(D-113)**: IT 는 Testcontainers 로 자기 Postgres/Redis 를 띄우고 compose 에 기대지

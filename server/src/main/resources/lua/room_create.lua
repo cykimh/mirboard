@@ -1,5 +1,6 @@
 -- room_create.lua
 -- Atomically materialize a new room: meta hash + players list + rooms:open ZSET.
+-- D-136 — 봇과 연습 방(fillWithBots="true")은 rooms:open 에 넣지 않는다(곧바로 시작하고 목록에 한 순간도 오르지 않는다).
 --
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
@@ -44,6 +45,8 @@ redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('RPUSH', KEYS[2], hostId)
 redis.call('EXPIRE', KEYS[2], ttl)
 
-redis.call('ZADD', KEYS[3], createdAt, roomId)
+if fillWithBots ~= 'true' then
+    redis.call('ZADD', KEYS[3], createdAt, roomId)
+end
 
 return 1

@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -37,16 +36,17 @@ interface CreateRoomModalProps {
   availableGames: GameSummary[];
   onClose: () => void;
   onError: (message: string) => void;
-  /**
-   * D-117 — '빈 좌석 봇으로 채우기'의 초기값. 게스트는 혼자 온 리뷰어라 켠 채로 열어 사람을
-   * 기다리지 않고 바로 한 판 하게 한다. 판돈 방 봇 금지(D-81)는 그대로 우선한다.
-   */
-  defaultFillWithBots?: boolean;
 }
 
 /**
+ * D-136 — 방 종류. 친구와 하기(처음 선택 — 게스트 포함)는 사람만, 봇과 연습은 방장 + 봇으로 곧바로 시작한다(서버가 방장 준비까지
+ * 넣고 방 목록에 올리지 않는다 — 요청의 `fillWithBots` 가 곧 연습 방).
+ */
+type RoomMode = 'friends' | 'practice';
+
+/**
  * Phase 18(#2, D-74) 방 만들기 모달 — Phase 20b(D-76) shadcn Dialog 재디자인.
- * 상태/제출 로직 불변.
+ * D-136 — 맨 위 "친구와 하기 / 봇과 연습". 봇 채우기 체크박스와 게스트 봇 기본값(D-117)은 없앴다.
  */
 export function CreateRoomModal({
   open,
@@ -54,13 +54,13 @@ export function CreateRoomModal({
   availableGames,
   onClose,
   onError,
-  defaultFillWithBots,
 }: CreateRoomModalProps) {
   const navigate = useNavigate();
   const [selectedGame, setSelectedGame] = useState('');
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [fillWithBots, setFillWithBots] = useState(defaultFillWithBots ?? false);
+  const [mode, setMode] = useState<RoomMode>('friends');
+  const practice = mode === 'practice';
   const [targetScore, setTargetScore] = useState(1000);
   // D-130 — null = 아직 안 고름(게임이 선언한 처음 선택을 쓴다). 인원과 같은 방식.
   const [turnSeconds, setTurnSeconds] = useState<number | null>(null);
@@ -94,38 +94,47 @@ export function CreateRoomModal({
   // D-106 — 게임이 선언한 옵션만 노출한다. 스컬킹은 10라운드 고정(목표 점수 무의미)·
   // 개인전(팀 없음)·칩 정산 미지원(내기 불가)이라 셋 다 안 뜬다. 서버도 같은 집합으로
   // 검증하므로 여기서 숨기는 것은 UX 이고 강제는 서버가 한다.
+  // D-136 — 연습 방은 목표 점수·판돈이 없다(목표 점수는 서버 기본, 판돈 방은 봇 금지 — D-81).
   const options = game?.supportedRoomOptions ?? [];
-  const usesTargetScore = options.includes('TARGET_SCORE');
-  const usesBetting = options.includes('BETTING');
-  // 리셋 effect 는 페인트 **뒤에** 돌기 때문에, 티츄에서 판돈을 켜고 스컬킹으로 바꾸면
-  // stake 가 100 으로 남은 프레임이 생긴다. 그 사이 판돈 블록은 usesBetting 으로 이미
-  // 사라졌는데 봇 체크박스만 stake>0 을 보고 잠긴 채 "(판돈 방 불가)" 를 띄운다 —
-  // 화면 어디에도 이유가 없는 잠금이다(실측 54ms, 60fps 기준 3프레임).
-  // usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰면 state 와 무관하게 꺼짐.
+  const gameUsesTargetScore = options.includes('TARGET_SCORE');
+  const gameUsesBetting = options.includes('BETTING');
+  const usesTargetScore = gameUsesTargetScore && !practice;
+  const usesBetting = gameUsesBetting && !practice;
+  // 리셋 effect 는 페인트 **뒤에** 돌기 때문에, 티츄에서 판돈을 켜고 스컬킹(또는 연습)으로 바꾸면 stake 가 100 으로 남은
+  // 프레임이 생긴다. usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰거나 연습이면 state 와 무관하게 꺼짐 —
+  // 제출도 usesBetting 일 때만 stake 를 싣는다(D-136 — 연습 방은 판돈 없음).
   const stakeOn = usesBetting && stake > 0;
 
   // 게임을 바꾸면 이전 게임의 좌석 수·턴 제한은 무효 — 새 게임의 처음 선택으로 되돌린다.
   // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
   // 입력은 사라지지만 state 는 남아, 그대로 보내면 서버가 거절한다.
+  // D-136 최종 리뷰 FR-1 — 게임 기준으로만 되돌린다. 방 종류 토글은 상태를 건드리지 않는다(연습이면 제출에서 목표 점수·판돈을 빼고 —
+  // usesTargetScore·usesBetting — 친구와 하기로 돌아오면 고른 값이 그대로다). 예전엔 연습 게이팅이 deps 를 흔들어 티츄에서만 턴 제한까지
+  // 처음 값으로 돌아갔다.
   useEffect(() => {
     setCapacity(null);
     setTurnSeconds(null);
-    if (!usesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
-    if (!usesBetting) setStake(0);
-  }, [selectedGame, usesTargetScore, usesBetting]);
+    if (!gameUsesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
+    if (!gameUsesBetting) setStake(0);
+  }, [selectedGame, gameUsesTargetScore, gameUsesBetting]);
+
+  // D-136 — 모달은 허브에 늘 붙어 있다. 열 때마다 처음 선택(친구와 하기)으로.
+  useEffect(() => {
+    if (open) setMode('friends');
+  }, [open]);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
-    if (!roomName.trim() || !selectedGame) return;
+    if ((!practice && !roomName.trim()) || !selectedGame) return;
     setCreating(true);
     try {
       const room = await roomsApi.create(
         token,
-        roomName.trim(),
+        // D-136 — 연습 방은 이름을 묻지 않는다(목록에 오르지 않는다).
+        practice ? `${game?.displayName ?? selectedGame} 연습` : roomName.trim(),
         selectedGame.toUpperCase(),
         {
-          // 판돈 방은 봇 금지(서버도 거절) — 클라에서도 강제.
-          fillWithBots: stakeOn ? false : fillWithBots,
+          fillWithBots: practice,
           // D-106 — 게임이 안 쓰는 옵션은 아예 보내지 않는다(D-99 의 capacity 와 같은 방식).
           // 서버는 기본값 아닌 값이 오면 UNSUPPORTED_ROOM_OPTION 으로 거절한다.
           targetScore: usesTargetScore ? targetScore : undefined,
@@ -150,6 +159,25 @@ export function CreateRoomModal({
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleCreate}>
           <div className="flex flex-col gap-1.5">
+            <Label>방 종류</Label>
+            <ToggleGroup
+              type="single"
+              aria-label="방 종류"
+              value={mode}
+              onValueChange={(v) => v && setMode(v as RoomMode)}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="friends">친구와 하기</ToggleGroupItem>
+              <ToggleGroupItem value="practice">봇과 연습</ToggleGroupItem>
+            </ToggleGroup>
+            <p className="text-xs text-muted-foreground">
+              {practice
+                ? '봇과 바로 시작해요 — 방 목록에 오르지 않고 친구를 부를 수 없어요.'
+                : '사람끼리만 해요 — 초대 링크로 친구를 불러요.'}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label>게임</Label>
             <Select value={selectedGame} onValueChange={setSelectedGame}>
               <SelectTrigger aria-label="게임 선택">
@@ -165,17 +193,19 @@ export function CreateRoomModal({
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="room-name">방 이름</Label>
-            <Input
-              id="room-name"
-              type="text"
-              value={roomName}
-              placeholder="새 방 이름"
-              onChange={(e) => setRoomName(e.target.value)}
-              required
-            />
-          </div>
+          {!practice && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="room-name">방 이름</Label>
+              <Input
+                id="room-name"
+                type="text"
+                value={roomName}
+                placeholder="새 방 이름"
+                onChange={(e) => setRoomName(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
           {seatChoices.length > 0 && (
             <div className="flex flex-col gap-1.5">
@@ -193,6 +223,7 @@ export function CreateRoomModal({
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
+              {practice && <p className="text-xs text-muted-foreground">봇 {selectedSeats - 1}명과 함께</p>}
             </div>
           )}
 
@@ -242,32 +273,18 @@ export function CreateRoomModal({
             <label className="flex items-center gap-2 text-sm">
               <Switch
                 checked={stakeOn}
-                onCheckedChange={(on) => {
-                  setStake(on ? DEFAULT_STAKE : 0);
-                  if (on) setFillWithBots(false); // 판돈 방은 봇 금지
-                }}
+                onCheckedChange={(on) => setStake(on ? DEFAULT_STAKE : 0)}
                 aria-label="판돈(내기) 켜기/끄기"
               />
               <span>{stakeOn ? `내기 켜짐 — 판돈 ${stake}칩` : '내기 끔'}</span>
             </label>
             {stakeOn && (
               <p className="text-xs text-muted-foreground">
-                승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님). 봇 참여 불가.
+                승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님).
               </p>
             )}
           </div>
           )}
-
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={fillWithBots}
-              disabled={stakeOn}
-              onCheckedChange={(c) => setFillWithBots(c === true)}
-            />
-            <span>
-              🤖 빈 좌석 봇으로 채우기{stakeOn ? ' (판돈 방 불가)' : ''}
-            </span>
-          </label>
 
           <DialogFooter className="gap-2">
             <Button
@@ -280,9 +297,9 @@ export function CreateRoomModal({
             </Button>
             <Button
               type="submit"
-              disabled={creating || !selectedGame || !roomName.trim()}
+              disabled={creating || !selectedGame || (!practice && !roomName.trim())}
             >
-              {creating ? '생성 중...' : '방 만들기'}
+              {creating ? '생성 중...' : practice ? '연습 시작' : '방 만들기'}
             </Button>
           </DialogFooter>
         </form>

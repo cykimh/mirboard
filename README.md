@@ -8,7 +8,7 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 1408건 / 클라 910건
+서버 테스트 1426건 / 클라 933건
 
 **라이브**: https://mirboard.fly.dev — 로그인 화면 「게스트로 바로 체험하기」로 가입 없이 들어갈 수 있습니다.
 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
@@ -38,7 +38,7 @@ Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 - **로비/방** — 방 생성(인원 선택)·입장·관전·랭킹·채팅. 게임 시작은 정원 충족 + **전원 준비**
 - **초대 링크** — 대기실에서 방 주소를 카톡 등으로 공유(방마다 다른 미리보기), 받은 친구는 가입 없이 게스트로 바로 그 방에 앉는다(자리가 다
   찼으면 관전, D-133). 방장이 카톡으로 나가 기다려도 대기실은 120초 동안 자리를 지킨다(D-134)
-- **봇** — 빈 좌석을 자동 충족. 세 게임 모두 공개 정보만 보는 결정적 휴리스틱이다(티츄 D-118 —
+- **봇** — 방 만들기의 "봇과 연습"(방장 + 봇, 바로 시작 — 사람과 하는 판에는 봇이 없다, D-136). 세 게임 모두 공개 정보만 보는 결정적 휴리스틱이다(티츄 D-118 —
   랜덤 봇 상대 100전 100승, 스컬킹 D-119 — 1:무작위 2~8인 승률 0.92~1.00, 원카드 D-128 — 무작위 봇 대비 4인 승률 0.92).
   원카드 봇은 경쟁 창마다 추첨한 반응 시간(기본 1.0~2.5초)에 누른다. 재현:
   `./gradlew :server:test --tests "com.mirboard.domain.game.*.bot.*"` (Docker 불필요)

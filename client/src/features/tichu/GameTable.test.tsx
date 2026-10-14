@@ -352,7 +352,7 @@ describe('GameTable — 매치 종료', () => {
 });
 
 describe('GameTable — 헤더', () => {
-  it('솔로/턴제한/판돈/관전자 배지를 조건부로 렌더한다', () => {
+  it('연습/턴제한/판돈/관전자 배지를 조건부로 렌더한다', () => {
     seed({ tableView: tableView(), privateHand: privateHand([]) });
 
     renderTable({
@@ -363,7 +363,8 @@ describe('GameTable — 헤더', () => {
       spectatorCount: 2,
     });
 
-    expect(screen.getByText('🤖 솔로 모드 (봇 3명)')).toBeInTheDocument();
+    // D-136 — 봇 방은 "봇과 연습"이다(솔로 모드 → 혼자 연습).
+    expect(screen.getByText('🤖 혼자 연습 (봇 3명)')).toBeInTheDocument();
     expect(screen.getByText('⏱ 턴 제한 30초')).toBeInTheDocument();
     expect(screen.getByText('💰 판돈 100칩')).toBeInTheDocument();
     expect(screen.getByText('👁 관전 2')).toBeInTheDocument();
@@ -374,7 +375,7 @@ describe('GameTable — 헤더', () => {
 
     renderTable();
 
-    expect(screen.queryByText(/솔로 모드/)).toBeNull();
+    expect(screen.queryByText(/혼자 연습/)).toBeNull();
     expect(screen.queryByText(/턴 제한/)).toBeNull();
     expect(screen.queryByText(/판돈/)).toBeNull();
     expect(screen.queryByText(/관전/)).toBeNull();

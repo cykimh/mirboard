@@ -45,7 +45,7 @@ const DECLARED: GameSummary = {
 };
 
 /** availableGames 를 한 개만 넘기면 모달이 그 게임을 자동 선택한다(Radix Select 조작 회피). */
-function openModal(games: GameSummary[], extra: { defaultFillWithBots?: boolean } = {}) {
+function openModal(games: GameSummary[]) {
   render(
     <MemoryRouter>
       <CreateRoomModal
@@ -54,7 +54,6 @@ function openModal(games: GameSummary[], extra: { defaultFillWithBots?: boolean 
         availableGames={games}
         onClose={() => {}}
         onError={() => {}}
-        {...extra}
       />
     </MemoryRouter>,
   );
@@ -128,10 +127,9 @@ describe('CreateRoomModal — 방 옵션 게이팅 (D-106)', () => {
     expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
   });
 
-  it('게임과 무관한 옵션(턴 제한·봇 채우기)은 계속 노출한다', () => {
+  it('게임과 무관한 옵션(턴 제한)은 계속 노출한다', () => {
     openModal([VARIABLE]);
     expect(screen.getByText('턴 제한')).toBeTruthy();
-    expect(screen.getByText(/빈 좌석 봇으로 채우기/)).toBeTruthy();
   });
 
   it('미지원 게임은 targetScore·stake 를 아예 보내지 않는다', async () => {
@@ -155,39 +153,99 @@ describe('CreateRoomModal — 방 옵션 게이팅 (D-106)', () => {
   });
 });
 
-describe('CreateRoomModal — 봇 채우기 기본값 (D-117)', () => {
+/**
+ * D-136 — 방 만들기 두 갈래. "친구와 하기"(처음 선택 — 게스트 포함, 봇 없음)와 "봇과 연습"(방장 + 봇으로 곧바로 시작 — 이름·목표 점수·
+ * 판돈 없음). 요청의 `fillWithBots` 가 곧 연습 방이다(서버가 방장 준비까지 넣어 바로 시작하고 목록에 올리지 않는다).
+ */
+describe('CreateRoomModal — 친구와 하기 / 봇과 연습 (D-136)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockResolvedValue({ roomId: 'room-1' });
   });
 
-  function botCheckbox() {
-    return screen.getByRole('checkbox');
-  }
+  const practice = () => fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
 
-  it('기본은 꺼진 채 열리고 fillWithBots=false 로 보낸다', async () => {
+  it('처음 선택은 친구와 하기 — 봇 옵션이 없고 fillWithBots=false 로 보낸다', async () => {
     openModal([FIXED]);
-    expect(botCheckbox().getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('radio', { name: '친구와 하기' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText(/봇으로 채우기/)).toBeNull();
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().fillWithBots).toBe(false);
   });
 
-  it('defaultFillWithBots 면 켜진 채 열리고 fillWithBots=true 로 보낸다', async () => {
-    // 게스트는 혼자 온 리뷰어라 사람을 기다리지 않고 바로 한 판 하게.
-    openModal([FIXED], { defaultFillWithBots: true });
-    expect(botCheckbox().getAttribute('aria-checked')).toBe('true');
-    submit();
+  it('봇과 연습은 이름·목표 점수·판돈 없이 "연습 시작" — fillWithBots=true, 이름은 "{게임} 연습"', async () => {
+    openModal([FIXED]);
+    practice();
+    expect(screen.queryByLabelText('방 이름')).toBeNull();
+    expect(screen.queryByText('목표 점수')).toBeNull();
+    expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
     await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().fillWithBots).toBe(true);
+    const [, name, gameType, opts] = createMock.mock.calls[0];
+    expect(name).toBe('티츄 연습');
+    expect(gameType).toBe('TICHU');
+    expect(opts.fillWithBots).toBe(true);
+    expect(opts.stake).toBeUndefined();
+    expect(opts.targetScore).toBeUndefined();
   });
 
-  it('기본값이 켜져 있어도 내기를 켜면 봇은 꺼진다 (D-81 판돈 방 봇 금지)', async () => {
-    openModal([FIXED], { defaultFillWithBots: true });
+  it('봇과 연습도 인원 가변 게임은 인원을 고르고(봇 수 안내) 그대로 보낸다', async () => {
+    openModal([DECLARED]);
+    practice();
+    expect(screen.getByText('봇 3명과 함께')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: '2' }));
+    expect(screen.getByText('봇 1명과 함께')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().capacity).toBe(2);
+    expect(lastCreateOpts().turnSeconds).toBe(30);
+  });
+
+  // 최종 리뷰 FR-1 — 티츄는 연습이면 목표 점수·판돈을 숨기는데, 그 게이팅이 바뀔 때 턴 제한까지 처음 값으로 돌아갔다(원카드는 그대로).
+  it('방 종류를 바꿔도 고른 턴 제한은 그대로다 (티츄)', async () => {
+    openModal([FIXED]);
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+    practice();
+    expect(screen.getByRole('radio', { name: '60초' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().turnSeconds).toBe(60);
+  });
+
+  it('다시 열면 처음 선택(친구와 하기)으로 돌아간다', () => {
+    const view = render(
+      <MemoryRouter>
+        <CreateRoomModal open token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+    practice();
+    view.rerender(
+      <MemoryRouter>
+        <CreateRoomModal open={false} token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+    view.rerender(
+      <MemoryRouter>
+        <CreateRoomModal open token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('radio', { name: '친구와 하기' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('판돈을 켠 뒤 봇과 연습으로 바꾸면 판돈을 보내지 않는다 (판돈 방 봇 금지)', async () => {
+    openModal([FIXED]);
     fireEvent.click(screen.getByLabelText('판돈(내기) 켜기/끄기'));
-    submit();
+    practice();
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
     await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().fillWithBots).toBe(false);
+    expect(lastCreateOpts().stake).toBeUndefined();
+    expect(lastCreateOpts().fillWithBots).toBe(true);
   });
 });
 

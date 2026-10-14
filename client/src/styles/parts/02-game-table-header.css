@@ -66,7 +66,7 @@
   opacity: 1;
 }
 
-/* Phase 20(D-76) — 헤더 솔로 모드 라벨. 헤더는 앱 배경 위(라이트/다크
+/* Phase 20(D-76) — 헤더 혼자 연습 라벨(D-136 — 예전 "솔로 모드"). 헤더는 앱 배경 위(라이트/다크
    전환)라 legacy 의미 토큰으로 muted pill. */
 .solo-banner {
   padding: 1px 8px;

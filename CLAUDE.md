@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 3종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-135까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-136까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -136,6 +136,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   통합. 방 생성/입장/관전/랭킹/로비채팅이 모두 `/games` 한 화면.
 - Phase 16(#2): 게임 시작 = 정원 4 + **전원 준비**(`POST /api/rooms/{id}/ready`,
   봇은 join 시 서버가 자동 ready). capacity 자동시작 폐기.
+- D-136: 방 만들기 = **친구와 하기**(기본, 게스트 포함 — 사람만, 봇 없음) / **봇과 연습**(`fillWithBots=true` — 방장 + 봇, 만들자마자
+  IN_GAME, `rooms:open` 에 안 오름, 초대 없음). 친구와 하기 대기실은 방장이 **"지금 N명으로 시작"**(`POST /api/rooms/{id}/start`,
+  `room_start_now.lua` — 최소 인원 이상·방장 말고 모두 준비면 정원을 현재 인원으로 줄이고 시작, 티츄 해당 없음).
 - 통합 대기실 채팅 (`/topic/lobby/chat`) 은 메인페이지 전역 채팅.
 - 게임별 격리 채팅은 MVP 범위 밖.
 - Phase 18(D-74): 메인 입장은 `join-or-reconnect`(멱등) — 나갔다 재입장
@@ -287,7 +290,7 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
 
 - `room:{id}` (HASH), `room:{id}:players` (LIST), `room:{id}:ready` (SET, Phase 16#2), `room:{id}:state` (JSON), `room:{id}:hand:{userId}` (JSON, 서버만), `room:{id}:seq` (INCR), `room:{id}:lock` (SET NX EX 2s).
 - 방 입장/퇴장은 **Lua 스크립트로 원자화** — capacity 위반 0건 보장이 Phase 2 검증 기준.
-- Phase 16(#2): 게임 시작은 `room_ready.lua` 가 전담 — 정원+전원 ready 시에만 WAITING→IN_GAME 원자 전이(중복 start 0건). `room_join.lua` 의 capacity 자동시작 제거.
+- Phase 16(#2): 게임 시작은 `room_ready.lua`(정원+전원 ready 시에만 WAITING→IN_GAME 원자 전이, 중복 start 0건) 또는 D-136 `room_start_now.lua`(방장 "지금 N명으로 시작" — 최소 인원 이상·방장 말고 모두 ready 면 정원을 현재 인원으로 줄이고 전이) 둘뿐. `room_join.lua` 의 capacity 자동시작 제거.
 - 액션 처리는 `room:{id}:lock` 으로 직렬화.
 
 전체 표: `docs/redis-keys.md`.
