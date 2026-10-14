@@ -3,6 +3,7 @@ package com.mirboard.infra.bot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -108,16 +109,21 @@ class FinishedRoomStopsProgressIT {
         assertStopped(t);
     }
 
+    /**
+     * D-135 — 사람끼리 하는 판은 방장 강제 종료를 거절한다. 거절은 락을 잡기 전 검사라 진행에 손대지 않는다 — 방은 진행 중이고
+     * 턴 데드라인도 그대로다.
+     */
     @Test
-    void an_abort_stops_the_turn_timer() throws Exception {
+    void a_host_abort_of_a_game_with_humans_is_refused_and_the_game_goes_on() throws Exception {
         Table t = startTwoPlayerSkullKing("fp2");
 
         mockMvc.perform(post("/api/rooms/" + t.roomId + "/abort")
                         .header("Authorization", bearer(t.tokens.get(0))))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("HUMAN_PLAYERS_PRESENT"));
 
-        assertThat(roomStatus(t)).isEqualTo("FINISHED");
-        assertStopped(t);
+        assertThat(roomStatus(t)).isEqualTo("IN_GAME");
+        assertThat(pendingTurnDeadlines(t.roomId)).hasSize(1);
     }
 
     @Test
@@ -143,13 +149,16 @@ class FinishedRoomStopsProgressIT {
     @Test
     void an_abort_waits_for_the_in_flight_action_to_release_the_room_lock() throws Exception {
         Table t = startTwoPlayerSkullKing("fp4");
+        // D-135 — 사람 판이라 방장 강제 종료는 거절된다. 같은 락 절차(GameAbortService)를 타는 운영자 강제 종료로 본다.
+        String adminToken = registerAndLogin("fp4_admin");
+        adminRoles.save(new AdminRole(userIdOf(adminToken), clock.instant()));
         String lockKey = "room:" + t.roomId + ":lock";
         redis.opsForValue().set(lockKey, "in-flight-action", Duration.ofSeconds(30));
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
             Future<Integer> abort = pool.submit(() -> mockMvc.perform(
-                            post("/api/rooms/" + t.roomId + "/abort")
-                                    .header("Authorization", bearer(t.tokens.get(0))))
+                            post("/api/admin/rooms/" + t.roomId + "/abort")
+                                    .header("Authorization", bearer(adminToken)))
                     .andReturn().getResponse().getStatus());
 
             Awaitility.await()

@@ -39,6 +39,8 @@ interface Props {
   turnSeconds?: number;
   spectatorCount?: number;
   onExit?: () => void;
+  /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
+  onAbort?: () => void;
   /** D-120 — 방은 FINISHED 인데 이 세션이 종료 전이를 봐서 게임판을 유지하는 중. 입력을 숨긴다. */
   roomFinished?: boolean;
 }
@@ -63,6 +65,7 @@ export function OneCardTable({
   turnSeconds = 0,
   spectatorCount = 0,
   onExit,
+  onAbort,
   roomFinished = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -239,6 +242,11 @@ export function OneCardTable({
           >
             규칙
           </button>
+          {onAbort && !roomFinished && (
+            <button type="button" className="oc-badge" onClick={onAbort}>
+              게임 종료
+            </button>
+          )}
           {onExit && (
             <button type="button" className="oc-badge" onClick={exit}>
               나가기

@@ -925,3 +925,94 @@ describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
     expect(joinOrReconnect).toHaveBeenCalledTimes(3);
   });
 });
+
+/**
+ * D-135 — 방장 강제 종료 버튼은 게임판 머리 줄에 있다(예전 대기실 셸의 버튼은 게임 중에 그려지지 않는 죽은 코드였다). 방장이고 방장 말고
+ * 모두 봇인 판에서만 게임판에 `onAbort` 를 넘긴다 — 서버도 같은 조건으로 거절한다(HUMAN_PLAYERS_PRESENT).
+ */
+describe('RoomPage — 게임판 강제 종료 (D-135)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    skullProps.length = 0;
+    tichuProps.length = 0;
+    oneCardProps.length = 0;
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  const botGame = (gameType: string, extra: Partial<Room> = {}) =>
+    ({
+      gameType,
+      status: 'IN_GAME',
+      playerIds: [1, 900, 901, 902],
+      playerCount: 4,
+      botSeats: [1, 2, 3],
+      fillWithBots: true,
+      ...extra,
+    }) as Partial<Room>;
+
+  it.each([
+    ['ONE_CARD', 'onecard-table', oneCardProps],
+    ['SKULL_KING', 'skullking-table', skullProps],
+    ['TICHU', 'tichu-table', tichuProps],
+  ] as const)('%s — 방장이고 나머지가 모두 봇이면 게임판에 강제 종료를 넘긴다', async (gameType, testId, props) => {
+    loadGame.mockResolvedValue(game(gameType, []));
+    renderRoom(botGame(gameType));
+    await screen.findByTestId(testId);
+
+    expect(typeof props.at(-1)!.onAbort).toBe('function');
+  });
+
+  it('사람이 한 명이라도 더 있으면 넘기지 않는다', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(botGame('ONE_CARD', { playerIds: [1, 2, 900, 901], botSeats: [2, 3] }));
+    await screen.findByTestId('onecard-table');
+
+    expect(oneCardProps.at(-1)!.onAbort).toBeUndefined();
+  });
+
+  it('방장이 아니면 넘기지 않는다', async () => {
+    loadGame.mockResolvedValue(game('SKULL_KING', []));
+    renderRoom(botGame('SKULL_KING', { hostId: 900 } as Partial<Room>));
+    await screen.findByTestId('skullking-table');
+
+    expect(skullProps.at(-1)!.onAbort).toBeUndefined();
+  });
+
+  it('관전 중이면 넘기지 않는다', async () => {
+    loadGame.mockResolvedValue(game('TICHU', []));
+    renderRoom(botGame('TICHU', { hostId: 1, playerIds: [5, 900, 901, 902], spectatorIds: [1] } as Partial<Room>), 'SPECTATING');
+    await screen.findByTestId('tichu-table');
+
+    expect(tichuProps.at(-1)!.onAbort).toBeUndefined();
+  });
+
+  it('누르면 확인을 받은 뒤 강제 종료를 부르고, 취소하면 부르지 않는다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(botGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+    const onAbort = oneCardProps.at(-1)!.onAbort as () => Promise<void>;
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    await act(async () => {
+      await onAbort();
+    });
+    expect(roomsApi.abort).not.toHaveBeenCalled();
+
+    confirm.mockReturnValueOnce(true);
+    await act(async () => {
+      await onAbort();
+    });
+    expect(roomsApi.abort).toHaveBeenCalledWith('tok', 'r1');
+    confirm.mockRestore();
+  });
+
+  it('대기실 셸에는 강제 종료 버튼이 없다 — 게임 중에는 셸이 그려지지 않는다', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom({ gameType: 'ONE_CARD', status: 'WAITING' });
+    await screen.findByText('테스트 방');
+
+    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+  });
+});

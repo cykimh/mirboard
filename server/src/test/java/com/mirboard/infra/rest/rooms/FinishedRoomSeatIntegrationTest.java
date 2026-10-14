@@ -8,7 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mirboard.domain.admin.AdminRole;
+import com.mirboard.domain.admin.AdminRoleRepository;
 import com.mirboard.domain.lobby.room.RoomRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -78,6 +81,7 @@ class FinishedRoomSeatIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired StringRedisTemplate redis;
     @Autowired RoomRepository roomRepository;
+    @Autowired AdminRoleRepository adminRoles;
 
     // ---------- FINISHED 방 나가기 ----------
 
@@ -288,8 +292,10 @@ class FinishedRoomSeatIntegrationTest {
         return new Table(roomId, players.stream().map(Player::token).toList(), ids);
     }
 
+    /** D-135 — 사람 판은 방장 강제 종료가 거절되므로 운영자 강제 종료로 FINISHED 를 만든다(같은 종료 절차). 좌석 0 을 운영자로 둔다. */
     private void abort(Table t) throws Exception {
-        mockMvc.perform(post("/api/rooms/" + t.roomId + "/abort")
+        adminRoles.save(new AdminRole(t.userIds().get(0), Instant.now()));
+        mockMvc.perform(post("/api/admin/rooms/" + t.roomId + "/abort")
                         .header("Authorization", bearer(t.token(0))))
                 .andExpect(status().isNoContent());
     }

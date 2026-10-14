@@ -24,6 +24,8 @@ interface GameTableHeaderProps {
   chatOpen: boolean;
   onToggleChat: () => void;
   unreadCount: number;
+  /** D-135 — 방장 강제 종료(확인은 호출 측). 방장이고 나머지가 모두 봇일 때만 온다. */
+  onAbort?: () => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export function GameTableHeader({
   chatOpen,
   onToggleChat,
   unreadCount,
+  onAbort,
 }: GameTableHeaderProps) {
   const [reactionOpen, setReactionOpen] = useState(false);
 
@@ -161,6 +164,11 @@ export function GameTableHeader({
             </span>
           )}
         </Button>
+        {onAbort && (
+          <Button type="button" variant="outline" size="sm" onClick={onAbort}>
+            게임 종료
+          </Button>
+        )}
       </div>
     </header>
   );

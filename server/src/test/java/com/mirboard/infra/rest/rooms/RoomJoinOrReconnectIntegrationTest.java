@@ -195,12 +195,16 @@ class RoomJoinOrReconnectIntegrationTest {
                 .andExpect(jsonPath("$.privateHand").exists());
     }
 
+    /** D-135 — 방장 말고 모두 봇인 판은 강제 종료한다. */
     @Test
-    void host_can_abort_in_game_room() throws Exception {
-        Map<String, String> tokens = registerAndLoginAll(
-                List.of("jor_h_host", "jor_h2", "jor_h3", "jor_h4"));
-        String roomId = createRoomAndJoinAll(tokens);
-        String hostToken = tokens.get("jor_h_host");
+    void host_can_abort_a_game_against_bots() throws Exception {
+        String hostToken = registerAndLogin("jor_h_host", "validpass1");
+        String roomId = createRoom(hostToken, true);
+        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ready\":true}"))
+                .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
                         .header("Authorization", "Bearer " + hostToken))
@@ -210,6 +214,25 @@ class RoomJoinOrReconnectIntegrationTest {
                         .header("Authorization", "Bearer " + hostToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FINISHED"));
+    }
+
+    /** D-135 — 사람이 더 있는 판은 거절한다(강제 종료는 기록을 남기지 않아 판 깨기가 된다). 방은 그대로 진행 중. */
+    @Test
+    void host_cannot_abort_a_game_with_other_humans() throws Exception {
+        Map<String, String> tokens = registerAndLoginAll(
+                List.of("jor_hh_host", "jor_hh2", "jor_hh3", "jor_hh4"));
+        String roomId = createRoomAndJoinAll(tokens);
+        String hostToken = tokens.get("jor_hh_host");
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("HUMAN_PLAYERS_PRESENT"));
+
+        mockMvc.perform(get("/api/rooms/" + roomId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"));
     }
 
     @Test
@@ -260,8 +283,12 @@ class RoomJoinOrReconnectIntegrationTest {
     }
 
     private String createRoom(String token) throws Exception {
+        return createRoom(token, false);
+    }
+
+    private String createRoom(String token, boolean fillWithBots) throws Exception {
         var body = objectMapper.writeValueAsString(
-                Map.of("name", "jor-room", "gameType", "TICHU"));
+                Map.of("name", "jor-room", "gameType", "TICHU", "fillWithBots", fillWithBots));
         MvcResult created = mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
