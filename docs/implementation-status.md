@@ -12,7 +12,7 @@
 ## 0. 한눈에 보기
 
 플랫폼은 **동작하는 MVP** 상태다. 로비/방 → **게임 3종**(티츄 4인 2:2 팀전 / 스컬킹
-2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇 자동 채움 →
+2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) →
 재접속/탈주 처리 → UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 | # | 기능 | 상태 | 핵심 위치 |
@@ -75,7 +75,10 @@
 - **생성** `POST /api/rooms` {name, gameType} — 생성자가 호스트. 정원은 선택 필드
   `capacity`(D-99), 생략하면 `GameDefinition.maxPlayers()`. 게임이 정한
   `minPlayers()..maxPlayers()` 밖이면 `INVALID_CAPACITY` — 티츄는 4~4 라 무변경.
-  Redis `room:{id}` + `room:{id}:players` 저장.
+  Redis `room:{id}` + `room:{id}:players` 저장. D-136 — `fillWithBots=true` 는 **봇과 연습**(방장 + 봇, 만들자마자 IN_GAME,
+  목록에 안 오름), 방 만들기 모달은 "친구와 하기 / 봇과 연습"(기본 친구와 하기 — 게스트 포함, 봇 체크박스 없음).
+- **지금 시작** `POST /api/rooms/{id}/start`(D-136, 방장) — `room_start_now.lua` 가 최소 인원 이상·방장 말고 모두 준비·정원 미만이면
+  정원을 현재 인원으로 줄이고 WAITING→IN_GAME. 대기실의 "지금 N명으로 시작"(티츄 없음).
 - **목록** `GET /api/rooms?gameType=&status=` — status로 필터.
 - **입장** `POST /api/rooms/{id}/join` — `room_join.lua` 원자 검증(정원/멤버십).
   **capacity 자동시작 폐기**(Phase 16): 입장만으로는 시작하지 않는다.
