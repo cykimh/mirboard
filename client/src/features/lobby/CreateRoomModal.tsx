@@ -96,8 +96,10 @@ export function CreateRoomModal({
   // 검증하므로 여기서 숨기는 것은 UX 이고 강제는 서버가 한다.
   // D-136 — 연습 방은 목표 점수·판돈이 없다(목표 점수는 서버 기본, 판돈 방은 봇 금지 — D-81).
   const options = game?.supportedRoomOptions ?? [];
-  const usesTargetScore = options.includes('TARGET_SCORE') && !practice;
-  const usesBetting = options.includes('BETTING') && !practice;
+  const gameUsesTargetScore = options.includes('TARGET_SCORE');
+  const gameUsesBetting = options.includes('BETTING');
+  const usesTargetScore = gameUsesTargetScore && !practice;
+  const usesBetting = gameUsesBetting && !practice;
   // 리셋 effect 는 페인트 **뒤에** 돌기 때문에, 티츄에서 판돈을 켜고 스컬킹(또는 연습)으로 바꾸면 stake 가 100 으로 남은
   // 프레임이 생긴다. usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰거나 연습이면 state 와 무관하게 꺼짐 —
   // 제출도 usesBetting 일 때만 stake 를 싣는다(D-136 — 연습 방은 판돈 없음).
@@ -106,12 +108,20 @@ export function CreateRoomModal({
   // 게임을 바꾸면 이전 게임의 좌석 수·턴 제한은 무효 — 새 게임의 처음 선택으로 되돌린다.
   // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
   // 입력은 사라지지만 state 는 남아, 그대로 보내면 서버가 거절한다.
+  // D-136 최종 리뷰 FR-1 — 게임 기준으로만 되돌린다. 방 종류 토글은 상태를 건드리지 않는다(연습이면 제출에서 목표 점수·판돈을 빼고 —
+  // usesTargetScore·usesBetting — 친구와 하기로 돌아오면 고른 값이 그대로다). 예전엔 연습 게이팅이 deps 를 흔들어 티츄에서만 턴 제한까지
+  // 처음 값으로 돌아갔다.
   useEffect(() => {
     setCapacity(null);
     setTurnSeconds(null);
-    if (!usesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
-    if (!usesBetting) setStake(0);
-  }, [selectedGame, usesTargetScore, usesBetting]);
+    if (!gameUsesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
+    if (!gameUsesBetting) setStake(0);
+  }, [selectedGame, gameUsesTargetScore, gameUsesBetting]);
+
+  // D-136 — 모달은 허브에 늘 붙어 있다. 열 때마다 처음 선택(친구와 하기)으로.
+  useEffect(() => {
+    if (open) setMode('friends');
+  }, [open]);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();

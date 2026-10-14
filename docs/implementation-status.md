@@ -176,7 +176,7 @@
 ## 6. 봇 플레이어 (Phase 9A, D-49)
 
 - 시드 봇 4명(`bot_north/east/south/west`, `is_bot=TRUE`, 로그인 불가) — V3 마이그레이션.
-- 사람 < 4명으로 시작 시 빈 좌석을 봇으로 채움(join 시 서버가 자동 ready).
+- D-136 — 봇은 **봇과 연습** 방에만 들어간다(방 만들기에서 고름 — 방장 + 봇으로 만들자마자 시작, 봇은 join 시 서버가 자동 ready). 친구와 하기 방에는 봇이 없다(사람이 모자라면 방장이 "지금 N명으로 시작").
 - `infra.bot.BotScheduler` 가 봇 차례에 포트 `botAction` 을 부르고, 각 게임 어댑터가 자기 정책에
   위임한다. 딜레이 `mirboard.bot.delay-millis`(기본 700ms, D-76 후속 상향).
 - **티츄 봇 = `HeuristicBotPolicy`(D-118)** — 공개 정보(`BotView`)만 보는 결정적 휴리스틱. 선언·패스·

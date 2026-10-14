@@ -77,7 +77,7 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 
 모든 단계가 단일 원자 트랜잭션. 4명이 동시 입장해도 capacity 위반 0건 보장.
 **Phase 16(#2)**: 정원 도달 시 IN_GAME 자동전이 블록을 제거했다. 시작은
-`room_ready.lua` 가 전담.
+WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비) 또는 `room_start_now.lua`(D-136 — 방장 "지금 N명으로 시작") 두 곳뿐이다.
 
 ### `room_ready.lua` *(Phase 16 #2)*
 입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`,

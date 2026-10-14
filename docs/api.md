@@ -306,7 +306,7 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 친구와 하기 대기실에서 정원이 다 차지 않았어도 지금 모인 인원으로 시작한다. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상,
 정원 미만, **방장 말고 모두 준비**(방장이 누르는 것을 방장의 준비로 친다). `room_start_now.lua` 가 정원을 현재 인원으로 줄이고
 WAITING→IN_GAME 을 한 번에 한다(`ZREM rooms:open`) — 이후는 전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 정원은 이때 한 번만
-줄고 되돌리지 않는다. 티츄(4인 고정)는 늘 `NOT_ENOUGH_PLAYERS`. 응답 `200` — 시작된 Room(`capacity` = 인원).
+줄고 되돌리지 않는다. 티츄(4인 고정)는 4명 미만이면 `NOT_ENOUGH_PLAYERS`, 4명이 다 모였으면 `ROOM_ALREADY_FULL`(준비로 시작). 응답 `200` — 시작된 Room(`capacity` = 인원).
 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details `minPlayers`), `PLAYERS_NOT_READY`(409),
 `ROOM_ALREADY_FULL`(409 — 정원이 다 찼으면 준비로 시작), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`.
 

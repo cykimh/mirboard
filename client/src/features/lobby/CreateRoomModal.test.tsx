@@ -205,6 +205,39 @@ describe('CreateRoomModal — 친구와 하기 / 봇과 연습 (D-136)', () => {
     expect(lastCreateOpts().turnSeconds).toBe(30);
   });
 
+  // 최종 리뷰 FR-1 — 티츄는 연습이면 목표 점수·판돈을 숨기는데, 그 게이팅이 바뀔 때 턴 제한까지 처음 값으로 돌아갔다(원카드는 그대로).
+  it('방 종류를 바꿔도 고른 턴 제한은 그대로다 (티츄)', async () => {
+    openModal([FIXED]);
+    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
+    practice();
+    expect(screen.getByRole('radio', { name: '60초' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().turnSeconds).toBe(60);
+  });
+
+  it('다시 열면 처음 선택(친구와 하기)으로 돌아간다', () => {
+    const view = render(
+      <MemoryRouter>
+        <CreateRoomModal open token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+    practice();
+    view.rerender(
+      <MemoryRouter>
+        <CreateRoomModal open={false} token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+    view.rerender(
+      <MemoryRouter>
+        <CreateRoomModal open token="tok" availableGames={[FIXED]} onClose={() => {}} onError={() => {}} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('radio', { name: '친구와 하기' })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('판돈을 켠 뒤 봇과 연습으로 바꾸면 판돈을 보내지 않는다 (판돈 방 봇 금지)', async () => {
     openModal([FIXED]);
     fireEvent.click(screen.getByLabelText('판돈(내기) 켜기/끄기'));

@@ -1062,7 +1062,7 @@ describe('RoomPage — 지금 인원으로 시작 (D-136)', () => {
     await screen.findByText('테스트 방');
 
     expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
-    expect(screen.queryByText(/지금 인원으로 시작할 수 있어요/)).toBeNull();
+    expect(screen.queryByText(/명 이상 모이고 모두 준비하면/)).toBeNull(); // 방장용 안내(방장 아닌 사람에게는 FR-5 의 준비 권유)
   });
 
   it('정원이 다 찼으면 없다 — 모두 준비하면 저절로 시작한다', async () => {
@@ -1128,5 +1128,86 @@ describe('RoomPage — 게임판에 연습 표시 넘기기 (D-136)', () => {
     await screen.findByTestId('skullking-table');
 
     expect(skullProps.at(-1)!.practice).toBe(false);
+  });
+});
+
+/** D-136 최종 리뷰 FR-4·FR-5 — 지금 시작 오류 줄의 수명·네트워크 오류·요청 중 잠금, 방장 아닌 사람의 준비 권유와 방장에게 준비 안 한 사람 이름. */
+describe('RoomPage — 지금 시작 안내·오류 (D-136 후속)', () => {
+  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }, { userId: 2, username: '철수' }, { userId: 3, username: '영희' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  const oneCard = { ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 };
+  const waiting = (extra: Partial<Room>) =>
+    ({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', capacity: 4, playerIds: [1, 2, 3], playerCount: 3, readyUserIds: [2, 3], ...extra }) as Room;
+
+  it('거절 안내는 준비 상태가 바뀌면 사라진다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.startNow).mockRejectedValue(new ApiError(409, { error: { code: 'PLAYERS_NOT_READY', message: 'x' } }));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(screen.getByText('아직 준비하지 않은 사람이 있어요')).toBeInTheDocument();
+
+    act(() => {
+      metaCallback()(waiting({ readyUserIds: [2] }));
+    });
+    expect(screen.queryByText('아직 준비하지 않은 사람이 있어요')).toBeNull();
+  });
+
+  it('네트워크 오류도 알린다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.startNow).mockRejectedValue(new TypeError('Failed to fetch'));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(screen.getByText('시작하지 못했어요 — 다시 눌러 주세요')).toBeInTheDocument();
+  });
+
+  it('요청 중에는 버튼이 잠긴다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.startNow).mockReturnValue(new Promise(() => {}));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(button).toBeDisabled();
+  });
+
+  it('방장에게는 준비 안 한 사람 이름을 알려 준다', async () => {
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ readyUserIds: [2] }));
+
+    expect(await screen.findByText('준비 안 한 사람: 영희')).toBeInTheDocument();
+  });
+
+  it('방장이 아닌 사람에게는 준비해 두라고 권한다 — 방장이 지금 인원으로 시작할 수 있다', async () => {
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ hostId: 2, readyUserIds: [] } as Partial<Room>));
+
+    expect(await screen.findByText('방장이 지금 인원으로 시작할 수 있어요 — 준비해 두세요')).toBeInTheDocument();
+  });
+
+  it('이미 준비했으면 권하지 않는다', async () => {
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ hostId: 2, readyUserIds: [1] } as Partial<Room>));
+    await screen.findByText('테스트 방');
+
+    expect(screen.queryByText(/준비해 두세요/)).toBeNull();
   });
 });

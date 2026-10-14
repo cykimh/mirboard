@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mirboard.domain.lobby.room.RoomRepository;
 import com.mirboard.domain.lobby.room.TeamPolicy;
+import com.mirboard.infra.ws.RoomDisconnectHandler;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +66,9 @@ class RoomModesIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired StringRedisTemplate redis;
     @Autowired RoomRepository repository;
+    @Autowired RoomDisconnectHandler disconnects;
+
+    private final Map<String, Long> userIds = new HashMap<>();
 
     // ---------- 봇과 연습 ----------
 
@@ -184,6 +188,40 @@ class RoomModesIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("NOT_ENOUGH_PLAYERS"));
     }
 
+    /** 최종 리뷰 FR-2 — 티츄는 4명 미만이면 NOT_ENOUGH_PLAYERS, 4명이 다 모였으면 ROOM_ALREADY_FULL(준비로 시작)이다. */
+    @Test
+    void tichu_with_all_four_is_already_full() throws Exception {
+        List<String> players = List.of(registerAndLogin("rm_t4_host"), registerAndLogin("rm_t4_a"),
+                registerAndLogin("rm_t4_b"), registerAndLogin("rm_t4_c"));
+        String roomId = friendsRoom(players, "TICHU", null);
+        for (int i = 1; i < players.size(); i++) {
+            ready(roomId, players.get(i));
+        }
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ROOM_ALREADY_FULL"));
+    }
+
+    /**
+     * 최종 리뷰 FR-6 — D-134: 대기실에서 끊긴 사람은 준비가 풀린다. 그 사람이 돌아오기 전(유예 120초)에는 방장이 지금 시작할 수 없다 —
+     * 그 사람 없이 시작되지 않게 한 D-134 의 뜻이 지금 시작에도 지켜진다.
+     */
+    @Test
+    void a_disconnected_player_blocks_start_now_until_back() throws Exception {
+        List<String> players = List.of(registerAndLogin("rm_dc_host"), registerAndLogin("rm_dc_a"), registerAndLogin("rm_dc_b"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        ready(roomId, players.get(1));
+        ready(roomId, players.get(2));
+
+        disconnects.onDisconnect(roomId, userIds.get(players.get(2)));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PLAYERS_NOT_READY"));
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
+    }
+
     @Test
     void a_full_room_starts_by_ready_not_by_start() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_full_host"), registerAndLogin("rm_full_a"));
@@ -258,7 +296,10 @@ class RoomModesIntegrationTest {
         MvcResult login = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
+        JsonNode json = objectMapper.readTree(login.getResponse().getContentAsString());
+        String token = json.get("accessToken").asText();
+        userIds.put(token, json.get("user").get("userId").asLong());
+        return token;
     }
 
     private static String bearer(String token) {

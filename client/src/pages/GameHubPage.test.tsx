@@ -149,6 +149,15 @@ describe('GameHubPage — 대기 중인 방 목록 (D-130)', () => {
     expect(screen.queryByText(/SKULL_KING ·/)).toBeNull();
     expect(screen.queryByText(/WAITING/)).toBeNull(); // enum 원문이 아니라 한글 상태 라벨
   });
+
+  // D-136 — 봇과 연습 방은 목록에 오르지 않는다(서버). 예전 "🤖 솔로" 배지도 지웠다 — 혹시 와도 그리지 않는다.
+  it('봇 채우기 방이 와도 "🤖 솔로" 배지를 그리지 않는다 (D-136)', async () => {
+    list.mockResolvedValue({ rooms: [{ ...room('p', 'SKULL_KING', 8), fillWithBots: true, botSeats: [1, 2, 3, 4, 5, 6, 7] }] });
+    renderHub();
+
+    expect(await screen.findByText(/스컬킹 · 1 \/ 8 · 대기 중/)).toBeInTheDocument();
+    expect(screen.queryByText(/솔로/)).toBeNull();
+  });
 });
 
 /**
