@@ -57,10 +57,33 @@ class RoomPreviewRendererTest {
                 .contains("<meta property=\"og:type\" content=\"website\" />")
                 .contains("<meta property=\"og:site_name\" content=\"미르보드카페\" />")
                 .contains("<meta property=\"og:locale\" content=\"ko_KR\" />")
-                .contains("<meta name=\"twitter:card\" content=\"summary\" />")
+                .contains("<meta name=\"twitter:card\" content=\"summary_large_image\" />")
                 .doesNotContain("미르보드카페 — 공통")
                 .doesNotContain("<title>Mirboard</title>");
         assertThat(count(html, "<title>")).isEqualTo(1);
+    }
+
+    /** D-138 — 카톡 큰 미리보기 이미지. 스크래퍼는 상대 주소를 풀지 못하므로 방 주소의 출처(scheme://host)를 붙인 절대 주소다. */
+    @Test
+    @DisplayName("미리보기 이미지 — 방 주소의 출처 + /og-image.jpg, 크기 1200×630, 큰 카드")
+    void adds_preview_image_on_the_same_origin() {
+        String html = RoomPreviewRenderer.render(TEMPLATE, room("금요일 한 판", "alice"));
+
+        assertThat(html)
+                .contains("<meta property=\"og:image\" content=\"https://mirboard.test/og-image.jpg\" />")
+                .contains("<meta property=\"og:image:width\" content=\"1200\" />")
+                .contains("<meta property=\"og:image:height\" content=\"630\" />")
+                .contains("<meta property=\"og:image:alt\" content=\"카드 테이블 — 미르보드카페\" />");
+    }
+
+    @Test
+    @DisplayName("방 주소가 이상하면 이미지 없이 — 작은 카드")
+    void no_image_without_a_usable_url() {
+        String html = RoomPreviewRenderer.render(TEMPLATE, new RoomPreview("원카드", "방", "alice", 4, "not a url"));
+
+        assertThat(html)
+                .doesNotContain("og:image")
+                .contains("<meta name=\"twitter:card\" content=\"summary\" />");
     }
 
     @Test

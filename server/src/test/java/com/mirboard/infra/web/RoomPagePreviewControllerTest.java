@@ -158,6 +158,8 @@ class RoomPagePreviewControllerTest {
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(body).contains("<meta property=\"og:url\" content=\"https://mirboard.fly.dev/rooms/" + ROOM_ID + "\" />");
+        // D-138 — 이미지도 프록시 뒤 실제 출처.
+        assertThat(body).contains("<meta property=\"og:image\" content=\"https://mirboard.fly.dev/og-image.jpg\" />");
     }
 
     @Test
