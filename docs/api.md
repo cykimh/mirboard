@@ -393,11 +393,13 @@ WAITING 방의 **좌석 순서 정책**을 변경. IN_GAME / FINISHED 방은 거
 `MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트
 좌석 드래그 UI 도입 시 분기 추가.
 
-### POST `/api/rooms/{roomId}/abort` *(Phase 8A — 호스트 전용)*
-IN_GAME 방을 강제 종료. 무한 재접속 정책 하에서 끊긴 플레이어가 돌아오지 않을 때
-유일한 탈출구.
+### POST `/api/rooms/{roomId}/abort` *(Phase 8A — 호스트 전용, D-135 — 봇과 하는 판만)*
+IN_GAME 방을 강제 종료. **방장 말고 모두 봇인 판에서만** 허용한다(D-135) — 강제 종료는 매치 기록·레이팅을 남기지 않아
+사람 판에서는 판 깨기가 된다. 사람 판에서 끊긴 사람은 탈주 유예(D-75·D-79)가 정리하고, 멈춘 판은 운영자 강제 종료
+(`POST /api/admin/rooms/{id}/abort`)가 맡는다. 클라는 게임판 머리 줄의 "게임 종료"(같은 조건에서만 보인다).
 
-응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).
+응답 `204`. 에러: `NOT_HOST` (403), `GAME_NOT_IN_PROGRESS` (409), `HUMAN_PLAYERS_PRESENT` (409 — 방장 말고 사람이 있음, D-135),
+`ROOM_NOT_FOUND` (404).
 방 status → `FINISHED`, `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트. D-122: 턴
 데드라인을 취소하고, 이후 액션·봇·턴 타임아웃은 방 상태 가드로 적용되지 않는다(버려진
 라운드가 더 진행되지 않음). 전이와 취소는 **방 액션 락 안에서** 한다 — 진행 중인 액션이
