@@ -199,12 +199,7 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void host_can_abort_a_game_against_bots() throws Exception {
         String hostToken = registerAndLogin("jor_h_host", "validpass1");
-        String roomId = createRoom(hostToken, true);
-        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                        .header("Authorization", "Bearer " + hostToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ready\":true}"))
-                .andExpect(status().isOk());
+        String roomId = createRoom(hostToken, true); // D-136 — 봇과 연습 방은 만들자마자 시작한다.
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
                         .header("Authorization", "Bearer " + hostToken))

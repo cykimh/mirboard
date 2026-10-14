@@ -109,11 +109,10 @@ class OneCardRaceIT {
         return room;
     }
 
-    /** 사람 호스트(좌석 0) + 봇(좌석 1). 봇은 입장 때 자동 준비라 호스트가 준비하면 시작한다. */
+    /** 사람 호스트(좌석 0) + 봇(좌석 1). D-136 — 봇과 연습 방이라 만들자마자 시작한다. */
     private Room humanAndBotRoom(long host) {
         Room room = roomService.createRoom(host, "oc-race-bot", "ONE_CARD", TeamPolicy.SEQUENTIAL, true,
                 RoomService.DEFAULT_TARGET_SCORE, 0, RoomService.DEFAULT_STAKE, 2);
-        room = roomService.setReady(room.roomId(), host, true);
         assertThat(room.status()).isEqualTo(RoomStatus.IN_GAME);
         assertThat(room.botSeats()).containsExactly(1);
         return room;

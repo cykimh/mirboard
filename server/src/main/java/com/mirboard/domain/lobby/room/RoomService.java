@@ -175,13 +175,15 @@ public class RoomService {
             for (long botId : botIds) {
                 room = joinRoom(roomId, botId);
             }
-            // Phase 16(#2) — 봇은 자동 ready. 솔로(사람 호스트)면 호스트가
-            // RoomPage 에서 준비 눌러야 시작. all-bot 시나리오(호스트도 봇)면
-            // 마지막 봇 ready 에서 전원 ready → 자동 시작(기존 동작 보존).
+            // Phase 16(#2) — 봇은 자동 ready. all-bot 시나리오(호스트도 봇)면 마지막 봇 ready 에서 전원 ready → 자동 시작.
             for (long pid : getRoom(roomId).playerIds()) {
                 if (bots.isBot(pid)) {
                     room = setReady(roomId, pid, true);
                 }
+            }
+            // D-136 — 봇과 연습 방은 대기실이 없다. 사람 방장의 준비까지 넣어 기존 시작 길(room_ready.lua → onGameStart)로 곧바로 시작.
+            if (room.status() == RoomStatus.WAITING) {
+                room = setReady(roomId, hostUserId, true);
             }
         }
         return room;
@@ -267,6 +269,33 @@ public class RoomService {
             room = onGameStart(room);
         }
         return room;
+    }
+
+    /**
+     * D-136 — 친구와 하기 대기실의 "지금 N명으로 시작". 방장만, 게임 최소 인원 이상, 방장 말고 모두 준비, 정원 미만일 때 정원을 현재 인원으로
+     * 줄이고 시작한다(room_start_now.lua 한 번). 시작 뒤는 전원 준비로 시작할 때와 같은 절차({@link #onGameStart}).
+     */
+    public Room startNow(String roomId, long hostUserId) {
+        Room room = getRoom(roomId);
+        if (room.hostId() != hostUserId) {
+            throw new NotHostException(roomId);
+        }
+        int minPlayers = games.require(room.gameType()).minPlayers();
+        int code = repository.startNow(roomId, hostUserId, minPlayers);
+        switch (code) {
+            case 1 -> { }
+            case -1 -> throw new RoomNotFoundException(roomId);
+            case -2 -> throw new GameAlreadyStartedException(roomId);
+            case -3 -> throw new NotInRoomException(roomId);
+            case -4 -> throw new NotEnoughPlayersException(roomId, minPlayers);
+            case -5 -> throw new PlayersNotReadyException(roomId);
+            case -6 -> throw new RoomAlreadyFullException(roomId);
+            default -> throw new IllegalStateException("room_start_now.lua returned unexpected: " + code);
+        }
+        Room started = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(started));
+        log.info("Room started now: roomId={} host={} players={}", roomId, hostUserId, started.playerIds());
+        return onGameStart(started);
     }
 
     /**

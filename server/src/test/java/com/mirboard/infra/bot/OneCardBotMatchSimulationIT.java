@@ -102,7 +102,7 @@ class OneCardBotMatchSimulationIT {
                 Clock.systemUTC())).getId();
         Room room = roomService.createRoom(human, "oc-idle", "ONE_CARD", TeamPolicy.SEQUENTIAL, true,
                 RoomService.DEFAULT_TARGET_SCORE, /*turnSeconds*/ 1, RoomService.DEFAULT_STAKE, 4);
-        room = roomService.setReady(room.roomId(), human, true);
+        // D-136 — 봇과 연습 방은 만들자마자 시작한다(방장 준비까지 서버가 넣는다).
         assertThat(room.status()).isEqualTo(RoomStatus.IN_GAME);
         String roomId = room.roomId();
 

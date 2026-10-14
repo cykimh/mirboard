@@ -24,6 +24,7 @@ public class RoomRepository {
     private final RedisScript<Long> finishScript;
     private final RedisScript<Long> readyScript;
     private final RedisScript<Long> deleteScript;
+    private final RedisScript<Long> startNowScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -34,6 +35,7 @@ public class RoomRepository {
             @Qualifier("roomFinishScript") RedisScript<Long> finishScript,
             @Qualifier("roomReadyScript") RedisScript<Long> readyScript,
             @Qualifier("roomDeleteScript") RedisScript<Long> deleteScript,
+            @Qualifier("roomStartNowScript") RedisScript<Long> startNowScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
@@ -42,6 +44,7 @@ public class RoomRepository {
         this.finishScript = finishScript;
         this.readyScript = readyScript;
         this.deleteScript = deleteScript;
+        this.startNowScript = startNowScript;
         this.bots = bots;
     }
 
@@ -140,6 +143,26 @@ public class RoomRepository {
         if (v == -2L) throw new GameAlreadyStartedException(roomId);
         if (v == -3L) throw new NotInRoomException(roomId);
         return (int) v;
+    }
+
+    /**
+     * D-136 — "지금 N명으로 시작"(room_start_now.lua). 반환: 1 시작(정원 := 현재 인원), -1 방 없음, -2 대기 중 아님, -3 멤버 아님,
+     * -4 최소 인원 미만, -5 방장 말고 준비 안 된 사람 있음, -6 정원이 이미 다 참. 해석은 호출측({@link RoomService#startNow}).
+     */
+    public int startNow(String roomId, long hostUserId, int minPlayers) {
+        Long result = redis.execute(
+                startNowScript,
+                List.of("room:" + roomId,
+                        "room:" + roomId + ":players",
+                        readyKey(roomId),
+                        ROOMS_OPEN_KEY),
+                Long.toString(hostUserId),
+                Integer.toString(minPlayers),
+                roomId);
+        if (result == null) {
+            throw new IllegalStateException("room_start_now.lua returned null");
+        }
+        return result.intValue();
     }
 
     /** 대기실 떠난 플레이어의 ready 플래그 정리 (방 파괴 시엔 TTL 로 자연 소멸). */
