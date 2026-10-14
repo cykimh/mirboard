@@ -34,6 +34,8 @@ interface Props {
    * 유지하는 중. 입력을 숨기고, 나가기에 탈주 확인을 묻지 않는다.
    */
   roomFinished?: boolean;
+  /** D-136 — 봇과 연습 방(방의 fillWithBots). 머리 줄에 "🤖 혼자 연습". */
+  practice?: boolean;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
 }
@@ -61,6 +63,7 @@ export function SkullKingTable({
   onExit,
   roomFinished = false,
   onAbort,
+  practice = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(
@@ -184,6 +187,7 @@ export function SkullKingTable({
           <span className="sk-badge sk-badge-round">
             라운드 {s.roundNumber} / 10
           </span>
+          {practice && <span className="sk-badge">🤖 혼자 연습</span>}
           <span className="sk-badge">{seatCount}인</span>
           <span className="sk-badge">손패 {s.handSize}장</span>
           {turnSeconds > 0 && <span className="sk-badge">턴 {turnSeconds}초</span>}

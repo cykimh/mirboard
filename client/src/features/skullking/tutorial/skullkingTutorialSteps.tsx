@@ -333,7 +333,7 @@ export const SKULL_KING_TUTORIAL_STEPS: TutorialStep[] = [
       <>
         <ul style={LIST}>
           <li>
-            방을 만들 때 <strong>'🤖 빈 좌석 봇으로 채우기'</strong>를 켜면 봇과 함께 연습할 수
+            방 만들기에서 <strong>'봇과 연습'</strong>을 고르면 봇과 바로 한 판 연습할 수
             있습니다.
           </li>
           <li>

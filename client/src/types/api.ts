@@ -44,7 +44,7 @@ export interface Room {
   spectatorIds: number[];
   teamPolicy: TeamPolicy;
   createdAt: number;
-  /** Phase 9B — 솔로 모드 (방 생성 시 빈 좌석을 봇으로 자동 채움). */
+  /** Phase 9B — 봇 채우기. D-136 — true 면 "봇과 연습" 방(방장 + 봇, 만들자마자 시작, 방 목록에 없음). */
   fillWithBots: boolean;
   /** Phase 9B — playerIds 중 봇 user 좌석 인덱스 (서버 derived). */
   botSeats: number[];

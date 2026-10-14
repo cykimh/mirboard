@@ -337,14 +337,6 @@ export function GameHubPage() {
                   >
                     <span className="flex flex-1 items-center gap-2 font-medium">
                       {room.name}
-                      {room.fillWithBots && (
-                        <Badge
-                          variant="secondary"
-                          title="솔로 모드 — 빈 좌석은 봇이 자동 채움"
-                        >
-                          🤖 솔로
-                        </Badge>
-                      )}
                       {room.stake > 0 && (
                         <Badge
                           variant="outline"
@@ -444,7 +436,6 @@ export function GameHubPage() {
           open={showCreateModal}
           token={token}
           availableGames={availableGames}
-          defaultFillWithBots={!!user?.guest}
           onClose={() => setShowCreateModal(false)}
           onError={(msg) => {
             setError(msg);

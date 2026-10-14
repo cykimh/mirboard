@@ -91,6 +91,9 @@ export function RoomPage() {
   const [roomOptions, setRoomOptions] = useState<RoomOption[] | null>(null);
   // D-110 — 헤더용 게임 표시명. 메타를 못 받으면 null 로 두고 gameType 으로 폴백한다.
   const [gameName, setGameName] = useState<string | null>(null);
+  // D-136 — "지금 N명으로 시작"의 최소 인원(게임 선언). null = 모름 → 버튼·안내를 그리지 않는다.
+  const [minPlayers, setMinPlayers] = useState<number | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
   // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
   // 같은 게임의 방을 여러 번 드나들어도 요청은 한 번이다.
@@ -103,6 +106,7 @@ export function RoomPage() {
         if (cancelled) return;
         setRoomOptions(g.supportedRoomOptions ?? []);
         setGameName(g.displayName);
+        setMinPlayers(g.minPlayers);
       })
       .catch(() => {
         // 게임 메타를 못 받아도 대기실은 동작해야 한다 — 옵션만 숨긴 채 둔다.
@@ -302,6 +306,28 @@ export function RoomPage() {
     }
   }
 
+  // D-136 — 서버 거절은 원문 대신 할 일을 알린다(확인과 누름 사이의 경합 — 누가 준비를 풀었거나 들어왔거나 나갔다).
+  async function handleStartNow() {
+    if (!token) return;
+    setStartError(null);
+    try {
+      const started = await roomsApi.startNow(token, roomId);
+      setRoom(started);
+    } catch (err) {
+      if (!(err instanceof ApiError)) return;
+      if (err.code === 'GAME_ALREADY_STARTED') return; // 이미 시작 — 메타가 게임판으로 옮긴다.
+      setStartError(
+        err.code === 'PLAYERS_NOT_READY'
+          ? '아직 준비하지 않은 사람이 있어요'
+          : err.code === 'NOT_ENOUGH_PLAYERS'
+            ? `${minPlayers ?? 2}명 이상 모여야 해요`
+            : err.code === 'ROOM_ALREADY_FULL'
+              ? '정원이 다 찼어요 — 모두 준비하면 시작해요'
+              : '시작하지 못했어요 — 다시 눌러 주세요',
+      );
+    }
+  }
+
   async function handleTeamPolicyChange(next: TeamPolicy) {
     if (!token) return;
     try {
@@ -342,6 +368,16 @@ export function RoomPage() {
     room.playerIds.includes(user.userId) &&
     room.playerIds.every((uid, seat) => uid === user.userId || (room.botSeats ?? []).includes(seat));
   const onAbort = canAbortGame ? handleAbort : undefined;
+
+  // D-136 — 친구와 하기 대기실의 "지금 N명으로 시작". 방장이고, 사람이 게임 최소 인원 이상이며 정원 미만이고, 방장 말고 모두 준비했을
+  // 때만(서버도 같은 조건 — room_start_now.lua). 정원을 못 줄이는 게임(티츄 4~4)은 안내도 없다.
+  const canShrink =
+    !!room && !!user && iAmHost && room.status === 'WAITING' && minPlayers !== null && minPlayers < room.capacity;
+  const othersReady =
+    !!room && !!user && room.playerIds.every((uid) => uid === user.userId || (room.readyUserIds ?? []).includes(uid));
+  const canStartNow =
+    canShrink && !!room && room.playerCount >= (minPlayers ?? Infinity) && room.playerCount < room.capacity && othersReady;
+  const startNowHint = canShrink && !canStartNow && !!room && room.playerCount < room.capacity;
 
   // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
   // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
@@ -426,6 +462,7 @@ export function RoomPage() {
       spectatorCount: (room.spectatorIds ?? []).length,
       onExit: handleLeave,
       onAbort,
+      practice: room.fillWithBots ?? false,
       roomFinished,
     };
     return withLiveRegion(
@@ -571,7 +608,7 @@ export function RoomPage() {
               )}
 
               {iAmPlayer && (
-                <div>
+                <div className="flex flex-wrap items-center gap-2">
                   {(room.readyUserIds ?? []).includes(user.userId) ? (
                     <Button
                       type="button"
@@ -588,13 +625,27 @@ export function RoomPage() {
                       준비
                     </Button>
                   )}
+                  {canStartNow && (
+                    <Button type="button" variant="secondary" onClick={handleStartNow}>
+                      지금 {room.playerCount}명으로 시작
+                    </Button>
+                  )}
                 </div>
+              )}
+              {startError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {startError}
+                </p>
               )}
 
               <p className="text-sm text-muted-foreground">
-                정원이 모두 모이고 전원이 준비하면 자동으로 게임이
-                시작됩니다. (봇은 자동 준비)
+                정원이 모두 모이고 전원이 준비하면 자동으로 게임이 시작됩니다.
               </p>
+              {startNowHint && (
+                <p className="text-sm text-muted-foreground">
+                  {minPlayers}명 이상 모이고 모두 준비하면 지금 인원으로 시작할 수 있어요
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
