@@ -74,6 +74,8 @@ export interface LastPlay {
   seq: number;
   seat: number;
   card: OneCardCard;
+  /** D-139 후속 — 내기 전 맨 위 카드와 지정 무늬. 날아오는 카드가 다 덮을 때까지 가운데에 그대로 보인다. */
+  under: { card: OneCardCard | null; declaredSuit: OneCardSuit | null };
 }
 
 export interface OneCardRoomState {
@@ -327,7 +329,16 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           turnClock: null,
           lastRace: null,
           // D-139 — 비행 효과: 순번·좌석·카드(같은 이벤트면 같은 값 — 순번 없는 이벤트는 날리지 않는다).
-          lastPlay: envelope.seq === undefined ? state.lastPlay : { seq: envelope.seq, seat: p.seat, card: p.card },
+          // 같은 이벤트가 다시 오면 그대로 둔다 — 두 번째에는 맨 위 카드가 이미 새 카드라 '내기 전'을 잃는다.
+          lastPlay:
+            envelope.seq === undefined || state.lastPlay?.seq === envelope.seq
+              ? state.lastPlay
+              : {
+                  seq: envelope.seq,
+                  seat: p.seat,
+                  card: p.card,
+                  under: { card: state.topCard, declaredSuit: state.declaredSuit },
+                },
           // 경쟁 중에는 내기가 막혀 있어(requireTurn) 카드는 항상 창이 닫힌 뒤에 놓인다 — 거절이 끝내 안 온 진 누름이
           // 남아 있다면 여기서 정리한다(안 하면 내 카드 내기의 BUSY 가 "늦었어요"로 잘못 읽힌다).
           press: null,

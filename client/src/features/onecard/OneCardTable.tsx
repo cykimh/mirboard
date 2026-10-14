@@ -307,7 +307,7 @@ export function OneCardTable({
           lastRace={s.lastRace}
           late={s.raceNotice === 'LATE'}
           nameOf={nameOf}
-          landing={flight !== null}
+          landingUnder={flight ? flight.under : null}
         />
 
         {bottomSeat !== null && <div className="oc-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}

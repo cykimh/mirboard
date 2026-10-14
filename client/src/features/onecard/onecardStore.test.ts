@@ -749,6 +749,8 @@ describe('방금 낸 카드 — 비행 효과 (D-139)', () => {
   beforeEach(() => store().applySnapshot(snapshot()));
 
   it('CARD_PLAYED 가 순번·좌석·카드를 남긴다 — 같은 이벤트를 두 번 적용해도 같다', () => {
+    const before = store().topCard;
+    const beforeSuit = store().declaredSuit;
     const played = ev(
       'CARD_PLAYED',
       { seat: 1, card: card('SPADE', 9), declaredSuit: null, handCount: 4, attackStack: 0, direction: 1 },
@@ -758,7 +760,8 @@ describe('방금 낸 카드 — 비행 효과 (D-139)', () => {
     const first = store().lastPlay;
     store().applyEvent(played);
 
-    expect(first).toEqual({ seq: 21, seat: 1, card: card('SPADE', 9) });
+    // D-139 후속 — 내기 전 맨 위 카드(와 지정 무늬)도 남긴다: 날아오는 카드가 다 덮을 때까지 가운데에 그대로 보인다.
+    expect(first).toEqual({ seq: 21, seat: 1, card: card('SPADE', 9), under: { card: before, declaredSuit: beforeSuit } });
     expect(store().lastPlay).toEqual(first);
   });
 
@@ -768,7 +771,7 @@ describe('방금 낸 카드 — 비행 효과 (D-139)', () => {
     );
     store().applySnapshot(snapshot());
 
-    expect(store().lastPlay).toEqual({ seq: 21, seat: 1, card: card('SPADE', 9) });
+    expect(store().lastPlay).toMatchObject({ seq: 21, seat: 1, card: card('SPADE', 9) });
   });
 
   it('처음과 reset 뒤에는 없다', () => {
