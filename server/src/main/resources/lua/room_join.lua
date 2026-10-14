@@ -4,6 +4,7 @@
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = rooms:open
+-- KEYS[4] = room:{roomId}:spectators  (D-137 — 앉으면 관전자 목록에서 뺀다)
 -- ARGV    = userId, now, roomId
 --
 -- Return codes:
@@ -41,6 +42,8 @@ if current >= capacity then
 end
 
 redis.call('RPUSH', KEYS[2], userId)
+-- D-137 — 관전자가 자리에 앉으면(같은 원자 구간) 관전자 목록에서 빠진다. 예전엔 플레이어·관전자 양쪽에 남았다(BY-5).
+redis.call('SREM', KEYS[4], userId)
 redis.call('HSET', KEYS[1], 'updatedAt', now)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)

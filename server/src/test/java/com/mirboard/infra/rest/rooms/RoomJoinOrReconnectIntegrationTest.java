@@ -195,6 +195,27 @@ class RoomJoinOrReconnectIntegrationTest {
                 .andExpect(jsonPath("$.privateHand").exists());
     }
 
+    /**
+     * D-137 — 관전자가 [자리에 앉기](`/join`)를 누르면 플레이어가 되고 관전자 목록에서는 빠진다(같은 원자 구간). 예전엔 양쪽에 남아
+     * 관전 인원·관전자 표시가 틀렸다(봇 교체 리뷰 BY-5).
+     */
+    @Test
+    void a_spectator_who_takes_a_seat_leaves_the_spectator_list() throws Exception {
+        String hostToken = registerAndLogin("jor_sit_host", "validpass1");
+        String friendToken = registerAndLogin("jor_sit_friend", "validpass1");
+        String roomId = createRoom(hostToken);
+        mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
+                        .header("Authorization", "Bearer " + friendToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.spectatorIds.length()").value(1));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/join")
+                        .header("Authorization", "Bearer " + friendToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerCount").value(2))
+                .andExpect(jsonPath("$.spectatorIds.length()").value(0));
+    }
+
     /** D-135 — 방장 말고 모두 봇인 판은 강제 종료한다. */
     @Test
     void host_can_abort_a_game_against_bots() throws Exception {
