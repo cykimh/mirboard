@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { seatMinWidth, tableLayout, type TableSide } from '@/components/seatOrder';
@@ -12,12 +13,14 @@ import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
 import { isSuitChange, nextTurnSeat } from './onecardRules';
 import { ELIMINATED_LABEL, OneCardSeat, seatAccent } from './OneCardSeat';
+import { OneCardCardChip } from './OneCardCardChip';
 import { OneCardCenter, raceResultText } from './OneCardCenter';
 import { OneCardHand } from './OneCardHand';
 import { OneCardMatchEnd } from './OneCardMatchEnd';
 import { OneCardTurnCountdown } from './OneCardTurnCountdown';
 import { RaceButton } from './RaceButton';
 import { ONE_CARD_TUTORIAL } from './tutorial/onecardTutorial';
+import { useCardPlayFlight } from './useCardPlayFlight';
 
 /** `BUSY` 로 거절된 누름을 다시 보내기까지의 간격. 창(기본 3초) 안에 두 번 재시도할 여유가 있다. */
 export const PRESS_RETRY_DELAY_MS = 120;
@@ -83,8 +86,12 @@ export function OneCardTable({
   const rules = useTutorialGate(ONE_CARD_TUTORIAL.seenKey, false);
 
   const s = useOneCardStore();
+  // D-139 — 카드 내기 비행 효과(낸 좌석 → 맨 위 카드). 카드 애니메이션 설정을 따른다.
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  const cardAnimEnabled = useCardAnimStore((st) => st.enabled);
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
+  const flight = useCardPlayFlight(tableRef, s.lastPlay, mySeat, cardAnimEnabled);
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const me = s.seats.find((x) => x.seat === mySeat) ?? null;
   // D-132 — 일반 진행 기준 다음 차례. 차례가 비면(카드 직후·경쟁 창·종료) 테두리와 함께 사라진다.
@@ -223,7 +230,7 @@ export function OneCardTable({
         : resultText;
 
   return (
-    <div className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
+    <div ref={tableRef} className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
       <header className="oc-header">
         <div className="oc-header-badges">
           <span className="oc-badge oc-badge-title">원카드</span>
@@ -271,6 +278,21 @@ export function OneCardTable({
 
       {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
       <div className="oc-felt" role="group" aria-label="좌석 배치">
+        {/* D-139 — 경기장 맨 위 상태 줄: 왼쪽 위 남은 턴 시간(경쟁 중·끝난 판·차례 없음이면 비움), 오른쪽 위 진행 방향(D-132 — 글리프는
+            읽지 않고 글자로 읽는다, 좌석이 시계 방향으로 앉으므로 +1 이 시계 방향). */}
+        <div className="oc-felt-status" role="group" aria-label="판 상태">
+          <div className="oc-felt-status-left">
+            {!roomFinished && !raceOpen && turnSeat >= 0 && <OneCardTurnCountdown turnSeconds={turnSeconds} />}
+          </div>
+          <div className="oc-felt-status-right">
+            <span className="oc-badge oc-direction">
+              <span className="oc-direction-arrow" aria-hidden="true">
+                {s.direction >= 0 ? '↻' : '↺'}
+              </span>{' '}
+              {s.direction >= 0 ? '시계 방향' : '반시계 방향'}
+            </span>
+          </div>
+        </div>
         {sideRow('left')}
         {sideRow('top')}
         {sideRow('right')}
@@ -279,15 +301,13 @@ export function OneCardTable({
           topCard={s.topCard}
           declaredSuit={s.declaredSuit}
           attackStack={s.attackStack}
-          direction={s.direction}
           drawPileCount={s.drawPileCount}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           raceOpen={raceOpen}
           lastRace={s.lastRace}
           late={s.raceNotice === 'LATE'}
           nameOf={nameOf}
-          // D-131 — 서버 남은 시간 기준 카운트다운. 방이 끝났으면(강제 종료 — 결과 없음) 세지 않는다.
-          countdown={roomFinished ? null : <OneCardTurnCountdown turnSeconds={turnSeconds} />}
+          landing={flight !== null}
         />
 
         {bottomSeat !== null && <div className="oc-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}
@@ -371,6 +391,23 @@ export function OneCardTable({
       )}
 
       <TutorialDialog tutorial={ONE_CARD_TUTORIAL} open={rules.open} onClose={rules.close} />
+      {/* D-139 — 날아가는 카드(장식 — 맨 위 카드와 알림이 이미 같은 정보를 준다). 처음 프레임은 출발 좌석에, settled 가 되면 맨 위 카드 자리로. */}
+      {flight && (
+        <div
+          className={`oc-fly${flight.settled ? ' oc-fly-settled' : ''}`}
+          data-from-seat={flight.fromSeat}
+          aria-hidden="true"
+          style={{
+            left: flight.left,
+            top: flight.top,
+            transform: flight.settled
+              ? 'translate(-50%, -50%)'
+              : `translate(calc(-50% + ${flight.dx}px), calc(-50% + ${flight.dy}px)) scale(0.8)`,
+          }}
+        >
+          <OneCardCardChip card={flight.card} />
+        </div>
+      )}
     </div>
   );
 }

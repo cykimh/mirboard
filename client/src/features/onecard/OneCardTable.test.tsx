@@ -5,6 +5,7 @@ import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import type {
   OneCardCard,
   OneCardMatchResult,
@@ -998,11 +999,12 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
     expect(within(seatEl(2)).queryByText('다음')).toBeNull();
   });
 
-  it('가운데에 진행 방향을 화살표와 글자로 보인다 — 화살표 글리프는 읽지 않는다', () => {
+  it('경기장 오른쪽 위에 진행 방향을 화살표와 글자로 보인다 — 화살표 글리프는 읽지 않는다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
 
-    const dir = within(screen.getByRole('region', { name: '테이블' })).getByText('시계 방향', { exact: false });
+    // D-139 — 방향 배지는 가운데 칸이 아니라 경기장 상태 줄 오른쪽.
+    const dir = within(screen.getByRole('group', { name: '판 상태' })).getByText('시계 방향', { exact: false });
     expect(dir).toHaveTextContent('↻ 시계 방향');
     expect(dir.querySelector('[aria-hidden="true"]')).toHaveTextContent('↻');
   });
@@ -1010,7 +1012,7 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
   it('Q 로 방향이 뒤집히면 화살표와 "다음"이 함께 반대로 — 차례가 비는 동안은 "다음"이 없다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
-    const center = () => screen.getByRole('region', { name: '테이블' });
+    const status = () => screen.getByRole('group', { name: '판 상태' });
     expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
 
     act(() => {
@@ -1020,7 +1022,7 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
         payload: { seat: 1, card: c('HEART', 12), declaredSuit: null, handCount: 4, attackStack: 0, direction: -1 },
       } as never);
     });
-    expect(center()).toHaveTextContent('↺ 반시계 방향');
+    expect(status()).toHaveTextContent('↺ 반시계 방향');
     expect(screen.queryByText('다음')).toBeNull();
 
     act(() => {
@@ -1098,5 +1100,105 @@ describe('OneCardTable — 혼자 연습 표시 (D-136)', () => {
     renderTable();
 
     expect(screen.queryByText(/혼자 연습/)).toBeNull();
+  });
+});
+
+/** D-139 — 경기장 맨 위 상태 줄: 왼쪽 위 남은 턴 시간, 오른쪽 위 진행 방향. 가운데 칸에는 더미·맨 위 카드·공격·차례만. */
+describe('OneCardTable — 경기장 상태 줄 (D-139)', () => {
+  const status = () => screen.getByRole('group', { name: '판 상태' });
+  const center = () => screen.getByRole('region', { name: '테이블' });
+
+  it('왼쪽 위에 남은 시간, 오른쪽 위에 방향 — 가운데 칸에는 둘 다 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1, turnRemainingMs: 12_000 });
+    renderTable({ turnSeconds: 30 });
+
+    const [left, right] = Array.from(status().children);
+    expect(within(left as HTMLElement).getByRole('timer')).toHaveTextContent('12초');
+    expect(right).toHaveTextContent('↻ 시계 방향');
+    expect(within(center()).queryByRole('timer')).toBeNull();
+    expect(center()).not.toHaveTextContent('시계 방향');
+    expect(center()).toHaveTextContent('차례');
+  });
+
+  it('턴 제한이 꺼져 있으면 왼쪽은 비고 방향은 그대로 오른쪽', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable({ turnSeconds: 0 });
+
+    const [left, right] = Array.from(status().children);
+    expect(left).toBeEmptyDOMElement();
+    expect(right).toHaveTextContent('↻ 시계 방향');
+  });
+
+  it('상태 줄은 경기장(좌석 배치) 안 맨 앞이다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+
+    const felt = screen.getByRole('group', { name: '좌석 배치' });
+    expect(felt.firstElementChild).toBe(status());
+  });
+});
+
+/**
+ * D-139 — 카드를 내면 낸 사람의 좌석 패널(내가 냈으면 내 줄)에서 가운데 맨 위 카드 자리로 카드가 날아간다(티츄 D-78 FLIP 과 같은 방식).
+ * 날아오는 동안 맨 위 카드는 숨겨 두 장으로 보이지 않게 하고, 내려앉으면 걷는다. 카드 애니메이션 설정·resync 는 날리지 않는다.
+ */
+describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
+  const fly = () => document.querySelector('.oc-fly');
+  const top = () => document.querySelector('.oc-top');
+  const play = (seat: number, card: OneCardCard, seq: number) =>
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARD_PLAYED',
+        seq,
+        payload: { seat, card, declaredSuit: null, handCount: 4, attackStack: 0, direction: 1 },
+      } as never);
+    });
+
+  beforeEach(() => {
+    useCardAnimStore.setState({ enabled: true });
+  });
+
+  it('남이 내면 그 좌석 패널에서 날아오고, 내려앉으면 걷는다 — 그동안 맨 위 카드는 숨긴다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 9), 2);
+    expect(fly()).toHaveAttribute('data-from-seat', '2');
+    expect(fly()).toHaveAttribute('aria-hidden', 'true');
+    expect(top()).toHaveClass('oc-top-landing');
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(fly()).toBeNull();
+    expect(top()).not.toHaveClass('oc-top-landing');
+  });
+
+  it('내가 내면 내 줄에서 날아간다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 0 });
+    renderTable();
+
+    play(0, c('HEART', 9), 2);
+    expect(fly()).toHaveAttribute('data-from-seat', '0');
+  });
+
+  it('카드 애니메이션을 끄면 날리지 않는다', () => {
+    useCardAnimStore.setState({ enabled: false });
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 9), 2);
+    expect(fly()).toBeNull();
+    expect(top()).not.toHaveClass('oc-top-landing');
+  });
+
+  it('다시 받기(resync)로 맨 위 카드가 바뀌어도 날리지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    act(() => {
+      seed({ seatCount: 4, mySeat: 0, turnSeat: 3, topCard: c('CLUB', 5) });
+    });
+    expect(fly()).toBeNull();
   });
 });

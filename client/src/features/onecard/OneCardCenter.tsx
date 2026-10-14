@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { SUIT_LABEL, SUIT_SYMBOL, type OneCardCard, type OneCardSuit } from '@/types/onecard';
 import type { LastRace } from './onecardStore';
 import { OneCardCardChip } from './OneCardCardChip';
@@ -23,7 +22,6 @@ interface Props {
   topCard: OneCardCard | null;
   declaredSuit: OneCardSuit | null;
   attackStack: number;
-  direction: number;
   drawPileCount: number;
   /** 지금 차례인 사람 이름, 없으면 null. */
   turnName: string | null;
@@ -31,23 +29,25 @@ interface Props {
   lastRace: LastRace | null;
   late: boolean;
   nameOf: (seat: number) => string;
-  /** D-131 — 차례 옆에 붙는 남은 시간(경쟁 중에는 그리지 않는다). */
-  countdown?: ReactNode;
+  /** D-139 — 방금 낸 카드가 날아오는 중 — 맨 위 카드를 숨겨(자리는 그대로) 두 장으로 보이지 않게 한다. */
+  landing?: boolean;
 }
 
-/** 가운데 — 뽑을 더미, 맨 위 카드와 지정 무늬, 공격 누적, 진행 방향, 차례, 경쟁 결과. 모두 공개 정보다. */
+/**
+ * 가운데 — 뽑을 더미, 맨 위 카드와 지정 무늬, 공격 누적, 차례, 경쟁 결과. 모두 공개 정보다. D-139 — 진행 방향과 남은 턴 시간은 경기장
+ * 맨 위 상태 줄(`OneCardTable`)로 옮겼다.
+ */
 export function OneCardCenter({
   topCard,
   declaredSuit,
   attackStack,
-  direction,
   drawPileCount,
   turnName,
   raceOpen,
   lastRace,
   late,
   nameOf,
-  countdown,
+  landing = false,
 }: Props) {
   return (
     <section className="oc-center" aria-label="테이블">
@@ -56,7 +56,7 @@ export function OneCardCenter({
           <span className="oc-pile-back" aria-hidden />
           <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
         </div>
-        <div className="oc-top">
+        <div className={`oc-top${landing ? ' oc-top-landing' : ''}`}>
           {topCard ? (
             <OneCardCardChip card={topCard} />
           ) : (
@@ -72,22 +72,10 @@ export function OneCardCenter({
 
       <div className="oc-center-info">
         {attackStack > 0 && <span className="oc-badge oc-attack">공격 +{attackStack}</span>}
-        {/* D-132 — 진행 방향. 글리프는 읽지 않고 글자로 읽는다. 좌석이 시계 방향으로 앉으므로 +1 이 시계 방향이다. */}
-        <span className="oc-badge oc-direction">
-          <span className="oc-direction-arrow" aria-hidden="true">
-            {direction >= 0 ? '↻' : '↺'}
-          </span>{' '}
-          {direction >= 0 ? '시계 방향' : '반시계 방향'}
-        </span>
         {raceOpen ? (
           <span className="oc-badge oc-race-status">원카드 경쟁 중</span>
         ) : (
-          turnName && (
-            <>
-              <span className="oc-badge">{turnName} 차례</span>
-              {countdown}
-            </>
-          )
+          turnName && <span className="oc-badge">{turnName} 차례</span>
         )}
       </div>
 

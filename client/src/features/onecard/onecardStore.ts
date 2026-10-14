@@ -69,6 +69,13 @@ export interface PendingPress {
 /** 첫 누름 + 재시도 2회 (설계서 §4.4 — 락 경합 `BUSY` 는 창이 열린 동안 최대 2회 재시도). */
 export const MAX_PRESS_ATTEMPTS = 3;
 
+/** D-139 — 방금 낸 카드. 비행 효과의 근거 — 공개 이벤트의 순번이 바뀔 때만 날린다(resync 는 바꾸지 않는다). */
+export interface LastPlay {
+  seq: number;
+  seat: number;
+  card: OneCardCard;
+}
+
 export interface OneCardRoomState {
   roomId: string | null;
 
@@ -85,6 +92,8 @@ export interface OneCardRoomState {
   race: OneCardClientRace | null;
   lastRace: LastRace | null;
   result: OneCardMatchResult | null;
+  /** D-139 — 방금 낸 카드(카드 내기 비행 효과). 같은 이벤트를 두 번 적용해도 같다(순번이 같다). */
+  lastPlay: LastPlay | null;
 
   // ── 본인 전용 ──
   mySeat: number;
@@ -161,6 +170,7 @@ const INITIAL: OneCardRoomState = {
   race: null,
   lastRace: null,
   result: null,
+  lastPlay: null,
   mySeat: -1,
   hand: [],
   handVersion: 0,
@@ -316,6 +326,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           turnSeat: -1,
           turnClock: null,
           lastRace: null,
+          // D-139 — 비행 효과: 순번·좌석·카드(같은 이벤트면 같은 값 — 순번 없는 이벤트는 날리지 않는다).
+          lastPlay: envelope.seq === undefined ? state.lastPlay : { seq: envelope.seq, seat: p.seat, card: p.card },
           // 경쟁 중에는 내기가 막혀 있어(requireTurn) 카드는 항상 창이 닫힌 뒤에 놓인다 — 거절이 끝내 안 온 진 누름이
           // 남아 있다면 여기서 정리한다(안 하면 내 카드 내기의 BUSY 가 "늦었어요"로 잘못 읽힌다).
           press: null,

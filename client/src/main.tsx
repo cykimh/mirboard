@@ -6,7 +6,7 @@ import { App } from './App';
 // 순서가 곧 캐스케이드이고, 그 근거를 CSS 파일 한 곳에 모아두기 위해서다.
 import './styles/index.css';
 import { useThemeStore } from './features/theme/themeStore';
-import { useCardAnimStore } from './features/tichu/cardAnimStore';
+import { useCardAnimStore } from './features/theme/cardAnimStore';
 import { useColorblindStore } from './features/theme/colorblindStore';
 import { useAuthStore } from './features/auth/authStore';
 
