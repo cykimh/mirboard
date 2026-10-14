@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
+import { errorText } from '@/api/errorText';
 import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
 import { usersApi, type UserStats } from '@/api/users';
@@ -79,7 +80,7 @@ export function GameHubPage() {
       const res = await roomsApi.list(token);
       setRooms(res.rooms);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '방 목록을 불러오지 못했어요'));
     }
   }, [token]);
 
@@ -93,7 +94,7 @@ export function GameHubPage() {
       .then((res) => {
         setGames(res.games);
       })
-      .catch((err: Error) => setError(err.message));
+      .catch((err: unknown) => setError(errorText(err, '게임 목록을 불러오지 못했어요')));
     usersApi.stats(token, user.userId).then(setStats).catch(() => {});
   }, [token, user, navigate]);
 
@@ -112,7 +113,7 @@ export function GameHubPage() {
       await roomsApi.joinOrReconnect(token, roomId);
       navigate(`/rooms/${roomId}`);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '방에 들어가지 못했어요'));
     }
   }
 
@@ -126,7 +127,7 @@ export function GameHubPage() {
       markSpectateNoticeSeen(roomId);
       navigate(`/rooms/${roomId}`);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '관전하지 못했어요'));
     }
   }
 

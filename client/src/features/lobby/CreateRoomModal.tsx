@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import { errorText } from '@/api/errorText';
 import { roomsApi } from '@/api/rooms';
 import type { GameSummary } from '@/types/api';
 import {
@@ -145,7 +146,7 @@ export function CreateRoomModal({
       );
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
-      if (err instanceof ApiError) onError(err.message);
+      if (err instanceof ApiError) onError(errorText(err, '방을 만들지 못했어요'));
     } finally {
       setCreating(false);
     }

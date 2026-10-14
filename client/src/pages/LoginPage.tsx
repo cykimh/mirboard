@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import { errorText } from '@/api/errorText';
 import { useAuthStore } from '@/features/auth/authStore';
 import { safeReturnPath } from '@/features/auth/returnPath';
 import {
@@ -58,7 +59,7 @@ export function LoginPage() {
       // D-122 — replace: 뒤로가기로 로그인 화면에 돌아오지 않게.
       navigate(destination, { replace: true });
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : '로그인 실패';
+      const message = errorText(err, '로그인 실패');
       setError(message);
     } finally {
       setSubmitting(false);

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import { errorText } from '@/api/errorText';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi } from '@/api/users';
 import { loadGame } from '@/api/games';
@@ -148,7 +149,7 @@ export function RoomPage() {
         if (err instanceof ApiError) {
           const block = joinBlockOf(err.code);
           if (block) setJoinBlock(block);
-          else setError(err.message);
+          else setError(errorText(err, '방에 들어가지 못했어요'));
         }
       } finally {
         if (!cancelled) setAutoJoinAttempted(true);
@@ -280,7 +281,7 @@ export function RoomPage() {
       }
       navigate('/games');
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '방을 나가지 못했어요'));
     }
   }
 
@@ -300,7 +301,7 @@ export function RoomPage() {
           setJoinBlock('gone');
         } else {
           setJoinBlock(null);
-          setError(err.message);
+          setError(errorText(err, '관전하지 못했어요'));
         }
       }
     } finally {
@@ -314,7 +315,7 @@ export function RoomPage() {
       const updated = await roomsApi.setReady(token, roomId, next);
       setRoom(updated);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '준비를 바꾸지 못했어요'));
     }
   }
 
@@ -379,7 +380,7 @@ export function RoomPage() {
       const updated = await roomsApi.updateTeamPolicy(token, roomId, next);
       setRoom(updated);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '좌석 순서를 바꾸지 못했어요'));
     }
   }
 
@@ -395,7 +396,7 @@ export function RoomPage() {
     try {
       await roomsApi.abort(token, roomId);
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
+      if (err instanceof ApiError) setError(errorText(err, '게임을 끝내지 못했어요'));
     }
   }
 
