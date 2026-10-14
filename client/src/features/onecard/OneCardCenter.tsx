@@ -29,8 +29,11 @@ interface Props {
   lastRace: LastRace | null;
   late: boolean;
   nameOf: (seat: number) => string;
-  /** D-139 — 방금 낸 카드가 날아오는 중 — 맨 위 카드를 숨겨(자리는 그대로) 두 장으로 보이지 않게 한다. */
-  landing?: boolean;
+  /**
+   * D-139 후속 — 방금 낸 카드가 날아오는 중이면 내기 전 맨 위 카드(와 지정 무늬). 날아온 카드가 다 덮을 때까지 가운데는 이전 카드를
+   * 그대로 보이고, 내려앉으면(null) 새 맨 위 카드로 바뀐다.
+   */
+  landingUnder?: { card: OneCardCard | null; declaredSuit: OneCardSuit | null } | null;
 }
 
 /**
@@ -47,8 +50,10 @@ export function OneCardCenter({
   lastRace,
   late,
   nameOf,
-  landing = false,
+  landingUnder = null,
 }: Props) {
+  const shownTop = landingUnder ? landingUnder.card : topCard;
+  const shownSuit = landingUnder ? landingUnder.declaredSuit : declaredSuit;
   return (
     <section className="oc-center" aria-label="테이블">
       <div className="oc-piles">
@@ -56,15 +61,15 @@ export function OneCardCenter({
           <span className="oc-pile-back" aria-hidden />
           <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
         </div>
-        <div className={`oc-top${landing ? ' oc-top-landing' : ''}`}>
-          {topCard ? (
-            <OneCardCardChip card={topCard} />
+        <div className="oc-top">
+          {shownTop ? (
+            <OneCardCardChip card={shownTop} />
           ) : (
             <span className="oc-top-empty">—</span>
           )}
-          {declaredSuit && (
+          {shownSuit && (
             <span className="oc-badge oc-declared">
-              지정 {SUIT_SYMBOL[declaredSuit]} {SUIT_LABEL[declaredSuit]}
+              지정 {SUIT_SYMBOL[shownSuit]} {SUIT_LABEL[shownSuit]}
             </span>
           )}
         </div>

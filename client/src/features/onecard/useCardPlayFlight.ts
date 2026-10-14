@@ -9,6 +9,8 @@ export interface CardFlight {
   /** 낸 이벤트의 순번 — 한 비행의 식별자. */
   id: number;
   card: OneCardCard;
+  /** D-139 후속 — 날아오는 동안 가운데에 그대로 둘 내기 전 맨 위 카드. */
+  under: LastPlay['under'];
   fromSeat: number;
   /** 도착점(맨 위 카드 가운데) — 게임판 루트 기준. */
   left: number;
@@ -78,6 +80,7 @@ export function useCardPlayFlight(
     setFlight({
       id: lastPlay.seq,
       card: lastPlay.card,
+      under: lastPlay.under,
       fromSeat: lastPlay.seat,
       left: tx - rootRect.left,
       top: ty - rootRect.top,

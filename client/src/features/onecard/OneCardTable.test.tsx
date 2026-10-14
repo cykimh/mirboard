@@ -1158,20 +1158,23 @@ describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
     useCardAnimStore.setState({ enabled: true });
   });
 
-  it('남이 내면 그 좌석 패널에서 날아오고, 내려앉으면 걷는다 — 그동안 맨 위 카드는 숨긴다', () => {
+  // D-139 후속(사용자) — 날아온 카드가 다 덮을 때까지 가운데는 이전 맨 위 카드를 그대로 보이고, 내려앉은 뒤에 새 카드로 바꾼다.
+  it('남이 내면 그 좌석 패널에서 날아오고, 다 덮을 때까지 가운데는 이전 카드 — 내려앉으면 새 카드', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
     renderTable();
+    const before = top()!.textContent;
 
     play(2, c('SPADE', 9), 2);
     expect(fly()).toHaveAttribute('data-from-seat', '2');
     expect(fly()).toHaveAttribute('aria-hidden', 'true');
-    expect(top()).toHaveClass('oc-top-landing');
+    expect(top()!.textContent).toBe(before);
+    expect(top()!.querySelector('.oc-card')).toBeVisible();
 
     act(() => {
       vi.advanceTimersByTime(600);
     });
     expect(fly()).toBeNull();
-    expect(top()).not.toHaveClass('oc-top-landing');
+    expect(top()!.textContent).not.toBe(before);
   });
 
   it('내가 내면 내 줄에서 날아간다', () => {
@@ -1187,9 +1190,10 @@ describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
     renderTable();
 
+    const before = top()!.textContent;
     play(2, c('SPADE', 9), 2);
     expect(fly()).toBeNull();
-    expect(top()).not.toHaveClass('oc-top-landing');
+    expect(top()!.textContent).not.toBe(before); // 날지 않으면 곧바로 새 카드.
   });
 
   it('다시 받기(resync)로 맨 위 카드가 바뀌어도 날리지 않는다', () => {

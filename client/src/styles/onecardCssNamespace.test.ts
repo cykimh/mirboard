@@ -253,6 +253,10 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
     );
     expect(lastDeclared('.oc-felt-status', 'grid-area')).toBe('status');
     expect(lastDeclared('.oc-felt-status', 'justify-content')).toBe('space-between');
+    // D-139 후속 — 상태 줄의 남은 시간·방향은 다른 배지보다 크게(사용자 요청).
+    expect(lastDeclared('.oc-felt-status .oc-badge', 'font-size')).toBe('16px');
+    expect(lastDeclared('.oc-felt-status .oc-badge', 'padding')).toBe('4px 12px');
+    expect(lastDeclared('.oc-felt-status .oc-direction-arrow', 'font-size')).toBe('20px');
     expect(lastDeclared('.oc-felt-left', 'grid-area')).toBe('left');
     expect(lastDeclared('.oc-felt-left', 'flex-direction')).toBe('column-reverse');
     expect(lastDeclared('.oc-felt-right', 'grid-area')).toBe('right');
