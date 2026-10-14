@@ -9,7 +9,7 @@ import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
 import { useEffectStore } from './effectStore';
 import { useSfx } from './useSfx';
-import { useCardAnimStore } from './cardAnimStore';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { RoomChat } from '@/features/chat/RoomChat';
