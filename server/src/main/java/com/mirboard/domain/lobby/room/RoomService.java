@@ -381,6 +381,14 @@ public class RoomService {
         if (room.status() != RoomStatus.IN_GAME) {
             throw new GameNotInProgressException(roomId);
         }
+        // D-135 — 방장 말고 모두 봇인 판만. 강제 종료는 매치 기록·레이팅을 남기지 않아 사람 판에서는 판 깨기가 된다
+        // (사람 판의 끊김은 탈주 유예, 멈춘 판은 운영자 강제 종료 — adminAbortGame 은 이 검사를 거치지 않는다).
+        List<Long> players = room.playerIds();
+        for (int seat = 0; seat < players.size(); seat++) {
+            if (players.get(seat) != userId && !room.botSeats().contains(seat)) {
+                throw new HumanPlayersPresentException(roomId);
+            }
+        }
     }
 
     /**

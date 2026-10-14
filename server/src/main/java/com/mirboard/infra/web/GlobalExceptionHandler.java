@@ -17,6 +17,7 @@ import com.mirboard.domain.lobby.auth.UsernameTakenException;
 import com.mirboard.domain.lobby.room.AlreadyInRoomException;
 import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.GameNotInProgressException;
+import com.mirboard.domain.lobby.room.HumanPlayersPresentException;
 import com.mirboard.domain.lobby.room.InvalidCapacityException;
 import com.mirboard.domain.lobby.room.InvalidStakeException;
 import com.mirboard.domain.lobby.room.UnsupportedRoomOptionException;
@@ -186,6 +187,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorEnvelope> handleNotHost(NotHostException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiErrorEnvelope.of("NOT_HOST", "Only the host can perform this action",
+                        Map.of("roomId", e.roomId())));
+    }
+
+    // D-135 — 방장 강제 종료는 방장 말고 모두 봇인 판만.
+    @ExceptionHandler(HumanPlayersPresentException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleHumanPlayersPresent(HumanPlayersPresentException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("HUMAN_PLAYERS_PRESENT",
+                        "Host abort is only allowed in a game against bots",
                         Map.of("roomId", e.roomId())));
     }
 
