@@ -316,7 +316,7 @@ export function RoomPage() {
     if (!token) return;
     if (
       !window.confirm(
-        '게임을 강제로 종료하시겠습니까? 모든 참가자가 로비로 돌아갑니다.',
+        '게임을 강제로 종료할까요? 봇과 하던 이 판은 기록 없이 끝납니다.',
       )
     ) {
       return;
@@ -332,7 +332,16 @@ export function RoomPage() {
   // D-106 정정 — 좌석 정책은 게임 중립(RANDOM 은 좌석 순서를 섞을 뿐)이라 숨기지 않는다.
   // 팀이 있는 게임에서만 "팀 배정"으로 부른다.
   const seatPolicyLabel = roomOptions?.includes('TEAMS') ? '팀 배정' : '좌석 순서';
-  const canAbort = iAmHost && room?.status === 'IN_GAME';
+  // D-135 — 방장 강제 종료는 게임판 머리 줄에서, 방장 말고 모두 봇인 판만(서버도 같은 조건 — HUMAN_PLAYERS_PRESENT). 강제 종료는
+  // 기록을 남기지 않아 사람 판에서는 판 깨기가 된다. 예전 대기실 셸의 버튼은 게임 중에 셸이 그려지지 않아 보인 적이 없었다.
+  const canAbortGame =
+    !!room &&
+    !!user &&
+    iAmHost &&
+    room.status === 'IN_GAME' &&
+    room.playerIds.includes(user.userId) &&
+    room.playerIds.every((uid, seat) => uid === user.userId || (room.botSeats ?? []).includes(seat));
+  const onAbort = canAbortGame ? handleAbort : undefined;
 
   // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
   // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
@@ -416,6 +425,7 @@ export function RoomPage() {
       turnSeconds: room.turnSeconds ?? 0,
       spectatorCount: (room.spectatorIds ?? []).length,
       onExit: handleLeave,
+      onAbort,
       roomFinished,
     };
     return withLiveRegion(
@@ -443,6 +453,7 @@ export function RoomPage() {
           usernames={usernames}
           isHost={iAmHost}
           onExit={handleLeave}
+          onAbort={onAbort}
         />
       </main>,
     );
@@ -464,15 +475,6 @@ export function RoomPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {canAbort && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleAbort}
-              >
-                게임 종료
-              </Button>
-            )}
             {tutorial && (
               <Button type="button" variant="outline" onClick={tutorialGate.show}>
                 게임 방법

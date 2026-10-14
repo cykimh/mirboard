@@ -34,6 +34,8 @@ interface Props {
    * 유지하는 중. 입력을 숨기고, 나가기에 탈주 확인을 묻지 않는다.
    */
   roomFinished?: boolean;
+  /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
+  onAbort?: () => void;
 }
 
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
@@ -58,6 +60,7 @@ export function SkullKingTable({
   spectatorCount = 0,
   onExit,
   roomFinished = false,
+  onAbort,
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(
@@ -214,6 +217,11 @@ export function SkullKingTable({
           >
             규칙
           </button>
+          {onAbort && !roomFinished && (
+            <button type="button" className="sk-badge" onClick={onAbort}>
+              게임 종료
+            </button>
+          )}
           {onExit && (
             <button type="button" className="sk-badge" onClick={exit}>
               나가기

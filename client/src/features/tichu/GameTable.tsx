@@ -45,6 +45,8 @@ interface GameTableProps {
   isHost?: boolean;
   /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
   onExit?: () => void;
+  /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
+  onAbort?: () => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export function GameTable({
   usernames = {},
   isHost = false,
   onExit,
+  onAbort,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
@@ -150,6 +153,7 @@ export function GameTable({
         chatOpen={chatOpen}
         onToggleChat={() => setChatOpen((v) => !v)}
         unreadCount={unreadCount}
+        onAbort={onAbort}
       />
 
       <TableArena

@@ -1057,3 +1057,29 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
     expect(container.querySelector('.oc-me')).not.toHaveClass('oc-me-turn');
   });
 });
+
+/** D-135 — 방장 강제 종료는 게임판 머리 줄에. RoomPage 가 방장이고 나머지가 모두 봇일 때만 onAbort 를 넘긴다. */
+describe('OneCardTable — 강제 종료 (D-135)', () => {
+  it('onAbort 가 있으면 머리 줄에 "게임 종료" — 누르면 부른다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    const onAbort = vi.fn();
+    renderTable({ onAbort });
+
+    fireEvent.click(screen.getByRole('button', { name: '게임 종료' }));
+    expect(onAbort).toHaveBeenCalledTimes(1);
+  });
+
+  it('onAbort 가 없으면(방장 아님·사람 판) 버튼이 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+
+    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+  });
+
+  it('방이 이미 끝났으면 버튼이 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable({ onAbort: vi.fn(), roomFinished: true });
+
+    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+  });
+});
