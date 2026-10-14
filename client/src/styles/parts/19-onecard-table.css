@@ -123,8 +123,10 @@ button.oc-badge {
 .oc-felt {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
+  /* D-139 — 맨 위 상태 줄(왼쪽 위 남은 시간·오른쪽 위 방향). 위쪽 좌석과 겹치지 않게 자기 행을 갖는다. */
   grid-template-areas:
+    'status status status'
     'top top top'
     'left center right'
     'bottom bottom bottom';
@@ -169,6 +171,22 @@ button.oc-badge {
 
 .oc-felt-right {
   grid-area: right;
+}
+
+.oc-felt-status {
+  grid-area: status;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.oc-felt-status-left,
+.oc-felt-status-right {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .oc-felt > .oc-center {
@@ -427,7 +445,7 @@ button.oc-badge {
   font-weight: 600;
 }
 
-/* 10초 → 9초처럼 자릿수가 줄어도 배지 폭이 그대로다 — 가운데 정렬된 줄(.oc-center-info)의 다른 배지가 밀리지 않는다.
+/* 10초 → 9초처럼 자릿수가 줄어도 배지 폭이 그대로다 — 상태 줄(D-139 — 왼쪽 위)에서 배지가 흔들리지 않는다.
    턴 제한 선택지가 최대 두 자리(90초)라 2ch. */
 .oc-countdown-num {
   display: inline-block;

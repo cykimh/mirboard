@@ -247,9 +247,12 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
 
   // 좌석 DOM 의 data-side 는 표식일 뿐 — 자리를 잡는 것은 이 CSS 다. 여기를 반시계로 뒤집으면 컴포넌트 테스트는 모두 통과한다.
   it('시계 방향 자리 — 왼쪽 옆줄은 왼쪽 칸에서 아래→위, 오른쪽 옆줄은 오른쪽 칸에서 위→아래', () => {
+    // D-139 — 맨 위 상태 줄(왼쪽 남은 시간·오른쪽 방향)을 위해 status 행이 하나 더 있다.
     expect(lastDeclared('.oc-felt', 'grid-template-areas')).toBe(
-      "'top top top' 'left center right' 'bottom bottom bottom'",
+      "'status status status' 'top top top' 'left center right' 'bottom bottom bottom'",
     );
+    expect(lastDeclared('.oc-felt-status', 'grid-area')).toBe('status');
+    expect(lastDeclared('.oc-felt-status', 'justify-content')).toBe('space-between');
     expect(lastDeclared('.oc-felt-left', 'grid-area')).toBe('left');
     expect(lastDeclared('.oc-felt-left', 'flex-direction')).toBe('column-reverse');
     expect(lastDeclared('.oc-felt-right', 'grid-area')).toBe('right');

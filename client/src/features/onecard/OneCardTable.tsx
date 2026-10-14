@@ -271,6 +271,21 @@ export function OneCardTable({
 
       {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
       <div className="oc-felt" role="group" aria-label="좌석 배치">
+        {/* D-139 — 경기장 맨 위 상태 줄: 왼쪽 위 남은 턴 시간(경쟁 중·끝난 판·차례 없음이면 비움), 오른쪽 위 진행 방향(D-132 — 글리프는
+            읽지 않고 글자로 읽는다, 좌석이 시계 방향으로 앉으므로 +1 이 시계 방향). */}
+        <div className="oc-felt-status" role="group" aria-label="판 상태">
+          <div className="oc-felt-status-left">
+            {!roomFinished && !raceOpen && turnSeat >= 0 && <OneCardTurnCountdown turnSeconds={turnSeconds} />}
+          </div>
+          <div className="oc-felt-status-right">
+            <span className="oc-badge oc-direction">
+              <span className="oc-direction-arrow" aria-hidden="true">
+                {s.direction >= 0 ? '↻' : '↺'}
+              </span>{' '}
+              {s.direction >= 0 ? '시계 방향' : '반시계 방향'}
+            </span>
+          </div>
+        </div>
         {sideRow('left')}
         {sideRow('top')}
         {sideRow('right')}
@@ -279,15 +294,12 @@ export function OneCardTable({
           topCard={s.topCard}
           declaredSuit={s.declaredSuit}
           attackStack={s.attackStack}
-          direction={s.direction}
           drawPileCount={s.drawPileCount}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           raceOpen={raceOpen}
           lastRace={s.lastRace}
           late={s.raceNotice === 'LATE'}
           nameOf={nameOf}
-          // D-131 — 서버 남은 시간 기준 카운트다운. 방이 끝났으면(강제 종료 — 결과 없음) 세지 않는다.
-          countdown={roomFinished ? null : <OneCardTurnCountdown turnSeconds={turnSeconds} />}
         />
 
         {bottomSeat !== null && <div className="oc-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}

@@ -998,11 +998,12 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
     expect(within(seatEl(2)).queryByText('다음')).toBeNull();
   });
 
-  it('가운데에 진행 방향을 화살표와 글자로 보인다 — 화살표 글리프는 읽지 않는다', () => {
+  it('경기장 오른쪽 위에 진행 방향을 화살표와 글자로 보인다 — 화살표 글리프는 읽지 않는다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
 
-    const dir = within(screen.getByRole('region', { name: '테이블' })).getByText('시계 방향', { exact: false });
+    // D-139 — 방향 배지는 가운데 칸이 아니라 경기장 상태 줄 오른쪽.
+    const dir = within(screen.getByRole('group', { name: '판 상태' })).getByText('시계 방향', { exact: false });
     expect(dir).toHaveTextContent('↻ 시계 방향');
     expect(dir.querySelector('[aria-hidden="true"]')).toHaveTextContent('↻');
   });
@@ -1010,7 +1011,7 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
   it('Q 로 방향이 뒤집히면 화살표와 "다음"이 함께 반대로 — 차례가 비는 동안은 "다음"이 없다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
-    const center = () => screen.getByRole('region', { name: '테이블' });
+    const status = () => screen.getByRole('group', { name: '판 상태' });
     expect(within(seatEl(2)).getByText('다음')).toBeInTheDocument();
 
     act(() => {
@@ -1020,7 +1021,7 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
         payload: { seat: 1, card: c('HEART', 12), declaredSuit: null, handCount: 4, attackStack: 0, direction: -1 },
       } as never);
     });
-    expect(center()).toHaveTextContent('↺ 반시계 방향');
+    expect(status()).toHaveTextContent('↺ 반시계 방향');
     expect(screen.queryByText('다음')).toBeNull();
 
     act(() => {
@@ -1098,5 +1099,40 @@ describe('OneCardTable — 혼자 연습 표시 (D-136)', () => {
     renderTable();
 
     expect(screen.queryByText(/혼자 연습/)).toBeNull();
+  });
+});
+
+/** D-139 — 경기장 맨 위 상태 줄: 왼쪽 위 남은 턴 시간, 오른쪽 위 진행 방향. 가운데 칸에는 더미·맨 위 카드·공격·차례만. */
+describe('OneCardTable — 경기장 상태 줄 (D-139)', () => {
+  const status = () => screen.getByRole('group', { name: '판 상태' });
+  const center = () => screen.getByRole('region', { name: '테이블' });
+
+  it('왼쪽 위에 남은 시간, 오른쪽 위에 방향 — 가운데 칸에는 둘 다 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1, turnRemainingMs: 12_000 });
+    renderTable({ turnSeconds: 30 });
+
+    const [left, right] = Array.from(status().children);
+    expect(within(left as HTMLElement).getByRole('timer')).toHaveTextContent('12초');
+    expect(right).toHaveTextContent('↻ 시계 방향');
+    expect(within(center()).queryByRole('timer')).toBeNull();
+    expect(center()).not.toHaveTextContent('시계 방향');
+    expect(center()).toHaveTextContent('차례');
+  });
+
+  it('턴 제한이 꺼져 있으면 왼쪽은 비고 방향은 그대로 오른쪽', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable({ turnSeconds: 0 });
+
+    const [left, right] = Array.from(status().children);
+    expect(left).toBeEmptyDOMElement();
+    expect(right).toHaveTextContent('↻ 시계 방향');
+  });
+
+  it('상태 줄은 경기장(좌석 배치) 안 맨 앞이다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    renderTable();
+
+    const felt = screen.getByRole('group', { name: '좌석 배치' });
+    expect(felt.firstElementChild).toBe(status());
   });
 });
