@@ -42,6 +42,7 @@ vi.mock('@/api/rooms', () => ({
     abort: vi.fn(),
     stopSpectating: vi.fn(),
     startNow: vi.fn(),
+    join: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1209,5 +1210,83 @@ describe('RoomPage — 지금 시작 안내·오류 (D-136 후속)', () => {
     await screen.findByText('테스트 방');
 
     expect(screen.queryByText(/준비해 두세요/)).toBeNull();
+  });
+});
+
+/**
+ * D-137 — 대기실을 관전 중이고 빈자리가 있으면 [자리에 앉기](`/join` — 서버가 같은 원자 구간에서 관전자 목록에서 뺀다). 진행 중이거나 꽉 찼으면
+ * 없다. 대기실 화면 재동기화(D-134)는 관전자를 빈자리에 저절로 앉히지 않고 관전으로 돌려놓는다.
+ */
+describe('RoomPage — 관전자 자리에 앉기 (D-137)', () => {
+  const resync = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![4]!;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 2, username: '방장' }] });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  const watching = (extra: Partial<Room> = {}) =>
+    ({ gameType: 'ONE_CARD', status: 'WAITING', hostId: 2, capacity: 4, playerIds: [2, 3], playerCount: 2, spectatorIds: [1], ...extra }) as Partial<Room>;
+
+  it('빈자리가 있는 대기실을 관전 중이면 [자리에 앉기] — 누르면 입장하고 내 자리가 된다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.join).mockResolvedValue({ ...ROOM, ...watching({ playerIds: [2, 3, 1], playerCount: 3, spectatorIds: [] }) } as Room);
+    renderRoom(watching(), 'SPECTATING');
+
+    const sit = await screen.findByRole('button', { name: '자리에 앉기' });
+    await act(async () => {
+      fireEvent.click(sit);
+    });
+
+    expect(roomsApi.join).toHaveBeenCalledWith('tok', 'r1');
+    expect(screen.queryByRole('button', { name: '자리에 앉기' })).toBeNull();
+    expect(screen.getByRole('button', { name: '준비' })).toBeInTheDocument();
+  });
+
+  it('꽉 찬 대기실이면 없다', async () => {
+    renderRoom(watching({ playerIds: [2, 3, 4, 5], playerCount: 4 }), 'SPECTATING');
+    await screen.findByText('테스트 방');
+
+    expect(screen.queryByRole('button', { name: '자리에 앉기' })).toBeNull();
+  });
+
+  it('플레이어에게는 없다', async () => {
+    renderRoom(watching({ playerIds: [2, 1], spectatorIds: [] }));
+    await screen.findByText('테스트 방');
+
+    expect(screen.queryByRole('button', { name: '자리에 앉기' })).toBeNull();
+  });
+
+  it('그사이 자리가 차면 서버 문구가 아니라 한국어로 알리고 관전을 이어 간다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.join).mockRejectedValue(new ApiError(409, { error: { code: 'ROOM_FULL', message: 'Room is full' } }));
+    renderRoom(watching(), 'SPECTATING');
+
+    const sit = await screen.findByRole('button', { name: '자리에 앉기' });
+    await act(async () => {
+      fireEvent.click(sit);
+    });
+
+    expect(screen.getByText('자리가 방금 찼어요 — 관전을 이어 가요')).toBeInTheDocument();
+    expect(screen.queryByText('Room is full')).toBeNull();
+    expect(screen.getByText(/관전 중/)).toBeInTheDocument();
+  });
+
+  it('재동기화는 관전자를 관전으로 돌려놓는다 — 빈자리에 저절로 앉히지 않는다', async () => {
+    renderRoom(watching(), 'SPECTATING');
+    await screen.findByText('테스트 방');
+    joinOrReconnect.mockClear();
+    spectate.mockResolvedValue({ ...ROOM, ...watching() });
+
+    await act(async () => {
+      resync()();
+    });
+
+    expect(spectate).toHaveBeenCalledWith('tok', 'r1');
+    expect(joinOrReconnect).not.toHaveBeenCalled();
   });
 });

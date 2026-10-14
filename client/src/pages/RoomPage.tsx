@@ -95,6 +95,9 @@ export function RoomPage() {
   const [minPlayers, setMinPlayers] = useState<number | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(false);
+  // D-137 — 관전자 [자리에 앉기].
+  const [sitPending, setSitPending] = useState(false);
+  const [sitError, setSitError] = useState<string | null>(null);
 
   // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
   // 같은 게임의 방을 여러 번 드나들어도 요청은 한 번이다.
@@ -199,9 +202,17 @@ export function RoomPage() {
     if (room?.status !== 'WAITING' || joinBlock || error) return;
     const requested = roomId;
     resyncingRef.current = true;
+    // D-137 — 관전자는 관전으로 돌려놓는다(D-134 끊김에 관전 목록에서 빠졌어도). join-or-reconnect 는 빈자리면 앉혀 버린다 — 앉는 것은
+    // [자리에 앉기]로만.
+    const wasSpectator = !!user && (room.spectatorIds ?? []).includes(user.userId);
     try {
-      const r = await roomsApi.joinOrReconnect(token, requested);
-      if (roomIdRef.current === requested) applyJoinResult(r);
+      if (wasSpectator) {
+        const watched = await roomsApi.spectate(token, requested);
+        if (roomIdRef.current === requested) setRoom(watched);
+      } else {
+        const r = await roomsApi.joinOrReconnect(token, requested);
+        if (roomIdRef.current === requested) applyJoinResult(r);
+      }
     } catch (err) {
       if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
         setJoinBlock('gone');
@@ -335,10 +346,31 @@ export function RoomPage() {
     }
   }
 
+  // D-137 — 대기실 관전자가 빈자리에 앉는다. 서버가 같은 원자 구간에서 관전자 목록에서 뺀다(room_join.lua).
+  async function handleSit() {
+    if (!token || sitPending) return;
+    setSitError(null);
+    setSitPending(true);
+    try {
+      const seated = await roomsApi.join(token, roomId);
+      setRoom(seated);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
+      setSitError(
+        err instanceof ApiError && err.code === 'ROOM_FULL'
+          ? '자리가 방금 찼어요 — 관전을 이어 가요'
+          : '앉지 못했어요 — 다시 눌러 주세요',
+      );
+    } finally {
+      setSitPending(false);
+    }
+  }
+
   // D-136 최종 리뷰 FR-4 — 거절 안내는 그때의 사정이다. 사람·준비가 바뀌면 지운다(다시 누를지 버튼 조건이 알려 준다).
   const startSituation = room ? `${room.playerIds.join(',')}|${(room.readyUserIds ?? []).join(',')}` : '';
   useEffect(() => {
     setStartError(null);
+    setSitError(null);
   }, [startSituation]);
 
   async function handleTeamPolicyChange(next: TeamPolicy) {
@@ -566,10 +598,21 @@ export function RoomPage() {
 
         {iAmSpectator && (
           <Alert>
-            <AlertDescription>
-              관전 중 — 본인 손패는 표시되지 않습니다.
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              <span>관전 중 — 본인 손패는 표시되지 않습니다.</span>
+              {/* D-137 — 대기실에 빈자리가 있으면 관전자가 앉는다(꽉 찬 방 링크로 관전하게 된 친구). */}
+              {room.status === 'WAITING' && room.playerCount < room.capacity && (
+                <Button type="button" size="sm" onClick={handleSit} disabled={sitPending}>
+                  자리에 앉기
+                </Button>
+              )}
             </AlertDescription>
           </Alert>
+        )}
+        {sitError && (
+          <p role="alert" className="text-sm text-destructive">
+            {sitError}
+          </p>
         )}
 
         {room.status === 'WAITING' && (
