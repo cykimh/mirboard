@@ -112,7 +112,8 @@ public class RoomRepository {
     public int join(String roomId, long userId, long now) {
         Long result = redis.execute(
                 joinScript,
-                keysFor(roomId),
+                // D-137 — KEYS[4] 관전자 SET: 앉으면 같은 원자 구간에서 관전자 목록에서 뺀다.
+                List.of("room:" + roomId, "room:" + roomId + ":players", ROOMS_OPEN_KEY, spectatorsKey(roomId)),
                 Long.toString(userId),
                 Long.toString(now),
                 roomId);
