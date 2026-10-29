@@ -819,3 +819,44 @@ describe('방금 낸 카드 — 비행 효과 (D-139)', () => {
     expect(store().lastPlay).toBeNull();
   });
 });
+
+describe('맨 위 아래 이전 카드 — 화면 기억 (D-144)', () => {
+  const play = (c: OneCardCard, seq: number) =>
+    store().applyEvent(
+      ev('CARD_PLAYED', { seat: 0, card: c, declaredSuit: null, handCount: 5, attackStack: 0, direction: 1 }, seq),
+    );
+
+  beforeEach(() => store().applySnapshot(snapshot()));
+
+  it('스냅샷만 받으면 아래 카드가 없다', () => {
+    expect(store().discardTrail).toEqual([]);
+  });
+
+  it('카드를 내면 직전 맨 위가 아래로 깔린다 — 최근 것이 앞, 2장까지', () => {
+    play(card('HEART', 4), 11);
+    expect(store().discardTrail).toEqual([card('HEART', 9)]);
+    play(card('SPADE', 4), 12);
+    play(card('SPADE', 6), 13);
+    expect(store().discardTrail).toEqual([card('SPADE', 4), card('HEART', 4)]);
+  });
+
+  it('같은 이벤트를 두 번 적용해도 같다 — 새 카드가 자기 아래에 깔리지 않는다', () => {
+    play(card('HEART', 4), 11);
+    play(card('HEART', 4), 11);
+    expect(store().discardTrail).toEqual([card('HEART', 9)]);
+  });
+
+  it('버린 더미를 다시 섞으면 아래 카드를 비운다', () => {
+    play(card('HEART', 4), 11);
+    store().applyEvent(ev('PILE_RESHUFFLED', { drawPileCount: 40 }, 12));
+    expect(store().discardTrail).toEqual([]);
+  });
+
+  it('resync — 맨 위가 같으면 아래 카드를 지키고, 다르면 비운다', () => {
+    play(card('HEART', 4), 11);
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, topCard: card('HEART', 4) } }));
+    expect(store().discardTrail).toEqual([card('HEART', 9)]);
+    store().applySnapshot(snapshot({ tableView: { ...TABLE, topCard: card('CLUB', 4) } }));
+    expect(store().discardTrail).toEqual([]);
+  });
+});

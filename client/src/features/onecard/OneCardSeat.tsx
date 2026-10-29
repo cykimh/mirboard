@@ -38,7 +38,7 @@ interface Props {
 }
 
 /**
- * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
+ * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding, D-144 — 장수만큼 작은 뒷면). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
  * 테이블(D-132)의 옆줄·윗줄에 놓인다 — 옆줄 칸은 좁아질 수 있어 이름은 말줄임하고 `title` 로 전체 이름을 보인다.
  */
 export function OneCardSeat({
@@ -95,9 +95,19 @@ export function OneCardSeat({
         </span>
       </div>
 
-      <div className="oc-seat-count" title="남은 손패">
-        <span className="oc-seat-count-num">{seat.handCount}</span>
-        <span className="oc-seat-count-unit">장</span>
+      {/* D-144 — 숫자 대신 장수만큼 작은 뒷면. 정확한 장수는 보조기기·마우스 오버로. */}
+      <div className="oc-seat-count">
+        <span
+          className="oc-seat-hand"
+          role="img"
+          aria-label={`남은 손패 ${seat.handCount}장`}
+          title={`남은 손패 ${seat.handCount}장`}
+          style={{ ['--oc-hand-count' as string]: seat.handCount }}
+        >
+          {Array.from({ length: seat.handCount }, (_, i) => (
+            <span key={i} className="oc-seat-hand-card" />
+          ))}
+        </span>
         {last && <span className="oc-seat-one">1장!</span>}
       </div>
 

@@ -145,6 +145,17 @@ describe('OneCardTable — 좌석', () => {
     expect(container.querySelector('[data-seat="2"]')!.textContent).not.toContain('1장!');
   });
 
+  it('상대 손패는 숫자 대신 장수만큼 작은 카드 뒷면으로 보이고, 장수는 보조기기로 읽힌다 (D-144)', () => {
+    seed({ seatCount: 3, mySeat: 0, seats: [seatOf(0), seatOf(1, { handCount: 7 }), seatOf(2, { handCount: 19 })] });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    const seven = container.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(seven.querySelectorAll('.oc-seat-hand-card')).toHaveLength(7);
+    expect(within(seven).getByRole('img', { name: '남은 손패 7장' })).toBeInTheDocument();
+    expect(seven.textContent).not.toMatch(/7\s*장/);
+    expect(container.querySelector('[data-seat="2"]')!.querySelectorAll('.oc-seat-hand-card')).toHaveLength(19);
+  });
+
   it('탈락한 좌석에는 사유를 단다', () => {
     seed({
       seatCount: 3,
@@ -236,6 +247,39 @@ describe('OneCardTable — 내기·먹기', () => {
     expect(within(center).getByText('지정 ♣ 클로버')).toBeInTheDocument();
     expect(within(center).getByText('뽑을 더미 30장')).toBeInTheDocument();
     expect(within(center).getByText('#101 차례')).toBeInTheDocument();
+  });
+
+  it('맨 위 카드 아래에 직전 카드 2장을 겹쳐 깐다 — 보조기기에는 맨 위만 읽힌다 (D-144)', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, topCard: c('HEART', 9) });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+    const play = (card: ReturnType<typeof c>, seq: number, inFlight?: () => void) => {
+      act(() => {
+        useOneCardStore.getState().applyEvent({
+          type: 'CARD_PLAYED',
+          seq,
+          payload: { seat: 1, card, declaredSuit: null, handCount: 6, attackStack: 0, direction: 1 },
+        });
+      });
+      inFlight?.();
+      // 비행이 끝나 내려앉을 때까지.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+    };
+    play(c('HEART', 4), 2);
+    play(c('SPADE', 4), 3);
+    // 날아오는 동안 맨 위 자리는 이전 카드다 — 그 카드를 아래에 또 깔지 않는다.
+    play(c('SPADE', 6), 4, () => {
+      expect(container.querySelector('.oc-top-trail')!.querySelectorAll('.oc-card')).toHaveLength(1);
+      expect(within(container.querySelector('.oc-top-stack') as HTMLElement).getByRole('img', { name: '스페이드 4' })).toBeInTheDocument();
+    });
+
+    const trail = container.querySelector('.oc-top-trail') as HTMLElement;
+    expect(trail).toHaveAttribute('aria-hidden', 'true');
+    expect(trail.querySelectorAll('.oc-card')).toHaveLength(2);
+    const center = screen.getByRole('region', { name: '테이블' });
+    expect(within(center).getAllByRole('img', { name: /^(하트|스페이드)/ })).toHaveLength(1);
+    expect(within(center).getByRole('img', { name: '스페이드 6' })).toBeInTheDocument();
   });
 
   it('거절 문구를 보여 주고 닫을 수 있다', () => {
@@ -519,7 +563,7 @@ describe('OneCardTable — 원카드 경쟁', () => {
       });
     });
 
-    expect(screen.getAllByText('잡기 성공: #102 → #101 벌칙 1장')).toHaveLength(2);
+    expect(screen.getAllByText('잡기 성공: #102')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: '잡기!' })).toBeNull();
   });
 });
