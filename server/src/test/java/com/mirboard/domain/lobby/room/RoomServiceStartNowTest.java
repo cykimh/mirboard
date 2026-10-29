@@ -27,7 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
- * D-136 — 친구와 하기 대기실의 "지금 N명으로 시작"(저장소는 모의 — Docker 불필요). 정원을 현재 인원으로 줄이고 시작하는 것은
+ * D-136·D-143 — 친구와 하기 대기실의 방장 시작(준비·정원 미만 조건 없음)(저장소는 모의 — Docker 불필요). 정원을 현재 인원으로 줄이고 시작하는 것은
  * {@code room_start_now.lua} 한 번이고(통합 테스트가 본다), 서비스는 방장 확인·게임 최소 인원 전달·결과 코드 해석·기존 시작 절차
  * ({@code onGameStart} — 좌석 섞기·{@link GameStartingEvent})를 맡는다.
  */
@@ -94,24 +94,6 @@ class RoomServiceStartNowTest {
         assertThatThrownBy(() -> service.startNow(ROOM_ID, HOST))
                 .isInstanceOfSatisfying(NotEnoughPlayersException.class, e -> assertThat(e.minPlayers()).isEqualTo(2));
         verify(events, never()).publishEvent(any(GameStartingEvent.class));
-    }
-
-    @Test
-    @DisplayName("준비 안 한 사람이 있으면(-5) PLAYERS_NOT_READY")
-    void someone_not_ready() {
-        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, 4, HOST, 10L)));
-        when(repository.startNow(ROOM_ID, HOST, 2)).thenReturn(-5);
-
-        assertThatThrownBy(() -> service.startNow(ROOM_ID, HOST)).isInstanceOf(PlayersNotReadyException.class);
-    }
-
-    @Test
-    @DisplayName("정원이 이미 다 찼으면(-6) ROOM_ALREADY_FULL — 준비로 시작한다")
-    void already_full() {
-        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, 2, HOST, 10L)));
-        when(repository.startNow(ROOM_ID, HOST, 2)).thenReturn(-6);
-
-        assertThatThrownBy(() -> service.startNow(ROOM_ID, HOST)).isInstanceOf(RoomAlreadyFullException.class);
     }
 
     @Test

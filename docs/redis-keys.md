@@ -77,7 +77,7 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 
 모든 단계가 단일 원자 트랜잭션. 4명이 동시 입장해도 capacity 위반 0건 보장.
 **Phase 16(#2)**: 정원 도달 시 IN_GAME 자동전이 블록을 제거했다. 시작은
-WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비) 또는 `room_start_now.lua`(D-136 — 방장 "지금 N명으로 시작") 두 곳뿐이다.
+WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 뒤로는 봇과 연습 방의 내부 시작만) 또는 `room_start_now.lua`(D-136·D-143 — 친구와 하기의 방장 시작) 두 곳뿐이다.
 
 ### `room_ready.lua` *(Phase 16 #2)*
 입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`,
@@ -93,12 +93,12 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비) 또는 `roo
 단일 원자 트랜잭션 — 다수 플레이어가 동시에 마지막 ready 를 눌러도 `1`(start)
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
 
-### `room_start_now.lua` *(D-136)*
+### `room_start_now.lua` *(D-136, D-143)*
 입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`, `ARGV = [hostId, minPlayers, roomId]`.
 
-처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4`, `LLEN >= capacity` `-6`(정원이 다 참 — 준비로
-시작), 방장 말고 ready 아닌 사람 `-5` → 아니면 `SADD ready hostId` + `HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. `room_join.lua`
-와 같은 키를 원자적으로 다뤄 확인과 시작 사이에 입장·준비 해제가 끼지 않는다. 방장 확인은 자바가 먼저 한다.
+처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4` → 아니면 앉은 사람 모두 `SADD ready`(상태 맞춤) +
+`HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. D-143 — 준비는 조건이 아니고 정원이 다 찼어도 이 길로 시작한다(예전 `-5`
+준비 안 됨·`-6` 정원 다 참은 없앴다). `room_join.lua` 와 같은 키를 원자적으로 다뤄 확인과 시작 사이에 입장이 끼지 않는다. 방장 확인은 자바가 먼저 한다.
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players, rooms:open, room:{id}:ready,

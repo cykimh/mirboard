@@ -272,8 +272,8 @@ public class RoomService {
     }
 
     /**
-     * D-136 — 친구와 하기 대기실의 "지금 N명으로 시작". 방장만, 게임 최소 인원 이상, 방장 말고 모두 준비, 정원 미만일 때 정원을 현재 인원으로
-     * 줄이고 시작한다(room_start_now.lua 한 번). 시작 뒤는 전원 준비로 시작할 때와 같은 절차({@link #onGameStart}).
+     * D-136·D-143 — 친구와 하기 대기실의 방장 시작. 방장만, 게임 최소 인원 이상이면 정원을 현재 인원으로 줄이고 시작한다(room_start_now.lua
+     * 한 번 — 준비는 조건이 아니고 정원이 다 차도 이 길로 시작한다). 시작 뒤는 전원 준비로 시작할 때와 같은 절차({@link #onGameStart}).
      */
     public Room startNow(String roomId, long hostUserId) {
         Room room = getRoom(roomId);
@@ -288,8 +288,6 @@ public class RoomService {
             case -2 -> throw new GameAlreadyStartedException(roomId);
             case -3 -> throw new NotInRoomException(roomId);
             case -4 -> throw new NotEnoughPlayersException(roomId, minPlayers);
-            case -5 -> throw new PlayersNotReadyException(roomId);
-            case -6 -> throw new RoomAlreadyFullException(roomId);
             default -> throw new IllegalStateException("room_start_now.lua returned unexpected: " + code);
         }
         Room started = getRoom(roomId);

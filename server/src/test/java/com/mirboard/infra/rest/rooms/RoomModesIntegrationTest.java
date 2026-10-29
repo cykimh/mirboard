@@ -121,15 +121,14 @@ class RoomModesIntegrationTest {
         assertThat(waitingRoomIds(host)).contains(room.get("roomId").asText());
     }
 
-    // ---------- 지금 N명으로 시작 ----------
+    // ---------- 방장 시작 (D-143 — 준비 없음, 정원이 차도 자동 시작 없음) ----------
 
     @Test
     void the_host_starts_with_three_of_four_and_every_seat_gets_a_hand() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_s_host"), registerAndLogin("rm_s_a"), registerAndLogin("rm_s_b"));
-        String roomId = friendsRoom(players, "ONE_CARD", 4);
-        ready(roomId, players.get(1));
-        ready(roomId, players.get(2));
+        String roomId = friendsRoom(players, "ONE_CARD", 6);
 
+        // 아무도 준비하지 않았다 — 준비는 시작 조건이 아니다.
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_GAME"))
@@ -145,20 +144,9 @@ class RoomModesIntegrationTest {
     }
 
     @Test
-    void someone_not_ready_refuses_and_the_room_waits() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_nr_host"), registerAndLogin("rm_nr_a"));
-        String roomId = friendsRoom(players, "ONE_CARD", 4);
-
-        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("PLAYERS_NOT_READY"));
-        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
-    }
-
-    @Test
     void the_host_alone_cannot_start() throws Exception {
         String host = registerAndLogin("rm_alone");
-        String roomId = friendsRoom(List.of(host), "ONE_CARD", 4);
+        String roomId = friendsRoom(List.of(host), "ONE_CARD", 6);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(host)))
                 .andExpect(status().isConflict())
@@ -168,8 +156,7 @@ class RoomModesIntegrationTest {
     @Test
     void only_the_host_starts() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_nh_host"), registerAndLogin("rm_nh_a"));
-        String roomId = friendsRoom(players, "ONE_CARD", 4);
-        ready(roomId, players.get(1));
+        String roomId = friendsRoom(players, "ONE_CARD", 6);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(1))))
                 .andExpect(status().isForbidden())
@@ -180,57 +167,51 @@ class RoomModesIntegrationTest {
     void tichu_needs_all_four() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_t_host"), registerAndLogin("rm_t_a"), registerAndLogin("rm_t_b"));
         String roomId = friendsRoom(players, "TICHU", null);
-        ready(roomId, players.get(1));
-        ready(roomId, players.get(2));
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("NOT_ENOUGH_PLAYERS"));
     }
 
-    /** 최종 리뷰 FR-2 — 티츄는 4명 미만이면 NOT_ENOUGH_PLAYERS, 4명이 다 모였으면 ROOM_ALREADY_FULL(준비로 시작)이다. */
+    /** 티츄도 방장이 시작한다 — 4명이 다 모여도 저절로 시작하지 않는다. */
     @Test
-    void tichu_with_all_four_is_already_full() throws Exception {
+    void tichu_with_all_four_starts_by_the_host() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_t4_host"), registerAndLogin("rm_t4_a"),
                 registerAndLogin("rm_t4_b"), registerAndLogin("rm_t4_c"));
         String roomId = friendsRoom(players, "TICHU", null);
-        for (int i = 1; i < players.size(); i++) {
-            ready(roomId, players.get(i));
-        }
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("ROOM_ALREADY_FULL"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"))
+                .andExpect(jsonPath("$.capacity").value(4));
     }
 
     /**
-     * 최종 리뷰 FR-6 — D-134: 대기실에서 끊긴 사람은 준비가 풀린다. 그 사람이 돌아오기 전(유예 120초)에는 방장이 지금 시작할 수 없다 —
-     * 그 사람 없이 시작되지 않게 한 D-134 의 뜻이 지금 시작에도 지켜진다.
+     * D-143 의 대가 — 대기실에서 끊긴 사람(D-134 준비 해제·유예 중)이 있어도 방장은 시작할 수 있다. 그 사람은 게임 중 끊김 유예를 탄다.
      */
     @Test
-    void a_disconnected_player_blocks_start_now_until_back() throws Exception {
+    void a_disconnected_player_does_not_block_the_host_start() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_dc_host"), registerAndLogin("rm_dc_a"), registerAndLogin("rm_dc_b"));
-        String roomId = friendsRoom(players, "ONE_CARD", 4);
-        ready(roomId, players.get(1));
-        ready(roomId, players.get(2));
+        String roomId = friendsRoom(players, "ONE_CARD", 6);
 
         disconnects.onDisconnect(roomId, userIds.get(players.get(2)));
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("PLAYERS_NOT_READY"));
-        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerCount").value(3));
     }
 
     @Test
-    void a_full_room_starts_by_ready_not_by_start() throws Exception {
+    void a_full_room_waits_for_the_host() throws Exception {
         List<String> players = List.of(registerAndLogin("rm_full_host"), registerAndLogin("rm_full_a"));
         String roomId = friendsRoom(players, "ONE_CARD", 2);
-        ready(roomId, players.get(1));
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("ROOM_ALREADY_FULL"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"))
+                .andExpect(jsonPath("$.capacity").value(2));
     }
 
     // ---------- helpers ----------
@@ -257,14 +238,6 @@ class RoomModesIntegrationTest {
                     .andExpect(status().isOk());
         }
         return roomId;
-    }
-
-    private void ready(String roomId, String token) throws Exception {
-        mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                        .header("Authorization", bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ready\":true}"))
-                .andExpect(status().isOk());
     }
 
     private String roomStatus(String roomId, String token) throws Exception {
