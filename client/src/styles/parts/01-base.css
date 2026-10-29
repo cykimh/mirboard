@@ -60,3 +60,10 @@ a {
   flex-direction: column;
   gap: 18px;
 }
+
+/* 게임판 조각을 받는 동안의 안내(pages/gameTables — 대개 대기실에서 미리 받아 보이지 않는다). */
+.room-table-loading {
+  margin: 48px auto;
+  color: var(--color-text-muted);
+  text-align: center;
+}
