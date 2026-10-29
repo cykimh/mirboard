@@ -211,6 +211,53 @@ class GameProgressKickTest {
         }
     }
 
+    /**
+     * D-140 — (c) 사라진 턴 데드라인. 세대를 올린 뒤 무장이 실패했거나 Redis 항목이 없어지면 사람이 자리를 비운 판이 "0초"에서
+     * 영영 멈췄다(진행 킥은 일부러 턴 진행을 부르지 않는다). 지금 세대의 턴 데드라인이 없을 때만 방의 턴 제한 전체로 다시 건다.
+     */
+    @Nested
+    class TurnDeadline {
+
+        @Test
+        void a_lost_turn_deadline_is_armed_only_if_absent_with_the_full_turn() {
+            inGame(List.of(), 30, List.of(0));
+            when(engine.timer(state)).thenReturn(Optional.empty());
+            when(generations.current(ROOM)).thenReturn(7L);
+            when(deadlines.scheduleIfAbsent(TurnTimeoutScheduler.KIND, "r1#7", Duration.ofSeconds(30)))
+                    .thenReturn(true);
+
+            try (LogCapture logs = LogCapture.of(GameProgressKick.class)) {
+                kick.kickNow(ROOM, PLAYER);
+
+                // 언제 시작된 턴인지 모르니 0(바로 자동 처리)이 아니라 한 턴 전체 — 막 차례를 받은 사람을 벌하지 않는다.
+                verify(deadlines).scheduleIfAbsent(TurnTimeoutScheduler.KIND, "r1#7", Duration.ofSeconds(30));
+                verify(deadlines, never()).schedule(anyString(), anyString(), any());
+                verify(generations, never()).bump(anyString());
+                assertThat(logs.messages(Level.INFO)).anyMatch(m -> m.contains("armed an absent turn deadline"));
+            }
+        }
+
+        @Test
+        void a_room_without_a_turn_limit_arms_no_turn_deadline() {
+            inGame(List.of(), 0, List.of(0));
+            when(engine.timer(state)).thenReturn(Optional.empty());
+
+            kick.kickNow(ROOM, PLAYER);
+
+            verify(deadlines, never()).scheduleIfAbsent(eq(TurnTimeoutScheduler.KIND), anyString(), any());
+        }
+
+        @Test
+        void no_one_waiting_arms_no_turn_deadline() {
+            inGame(List.of(), 30, List.of());
+            when(engine.timer(state)).thenReturn(Optional.empty());
+
+            kick.kickNow(ROOM, PLAYER);
+
+            verify(deadlines, never()).scheduleIfAbsent(eq(TurnTimeoutScheduler.KIND), anyString(), any());
+        }
+    }
+
     @Nested
     class Guards {
 
@@ -229,8 +276,8 @@ class GameProgressKickTest {
 
             verify(generations, never()).bump(anyString());
             verify(deadlines, never()).schedule(eq(TurnTimeoutScheduler.KIND), anyString(), any());
-            verify(deadlines, never()).scheduleIfAbsent(eq(TurnTimeoutScheduler.KIND), anyString(), any());
             verify(deadlines, never()).cancel(anyString(), anyString());
+            // (c) 의 다시 걸기는 없을 때만 더하는 쪽(ZADD NX)뿐이다 — 걸린 데드라인을 덮어 늘리지 못한다.
         }
 
         /**

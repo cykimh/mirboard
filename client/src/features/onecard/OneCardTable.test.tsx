@@ -1,6 +1,13 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LATE_NOTICE_MS, OneCardTable, PRESS_RETRY_DELAY_MS, STALE_RACE_GRACE_MS } from './OneCardTable';
+import {
+  LATE_NOTICE_MS,
+  OneCardTable,
+  PRESS_RETRY_DELAY_MS,
+  STALE_RACE_GRACE_MS,
+  STALE_TURN_GRACE_MS,
+  STALE_TURN_JITTER_MS,
+} from './OneCardTable';
 import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore } from './onecardStore';
@@ -879,6 +886,72 @@ describe('OneCardTable — 턴 카운트다운 (D-131)', () => {
     renderTable({ playerIds: [100, 101, 102], turnSeconds: 30, roomFinished: true });
 
     expect(countdown()).toBeNull();
+  });
+});
+
+describe('OneCardTable — 멈춘 차례 복구 (D-140)', () => {
+  it('0초가 되고 유예가 지나도 같은 차례면 그 차례에 한 번 다시 받는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 4_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    act(() => {
+      vi.advanceTimersByTime(4_000 + STALE_TURN_GRACE_MS - 1);
+    });
+    expect(requestResync).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(STALE_TURN_JITTER_MS + 1);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+
+    // 응답이 또 0 을 줘도(폴러가 밀렸다) 같은 차례로는 다시 청하지 않는다 — 모든 클라가 몇 초마다 resync 하지 않게.
+    act(() => {
+      useOneCardStore.getState().applySnapshot(snapshotOf({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 0 }));
+    });
+    act(() => {
+      vi.advanceTimersByTime((STALE_TURN_GRACE_MS + STALE_TURN_JITTER_MS) * 3);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+  });
+
+  it('제때 다음 차례가 오면 다시 받지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 4_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+
+    act(() => {
+      vi.advanceTimersByTime(4_100);
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 2, payload: { seat: 2, direction: 1, attackStack: 0 } } as never);
+    });
+    act(() => {
+      vi.advanceTimersByTime(STALE_TURN_GRACE_MS + STALE_TURN_JITTER_MS + 1);
+    });
+
+    expect(requestResync).not.toHaveBeenCalled();
+  });
+
+  it('새 차례가 또 멈추면 그 차례에도 한 번 다시 받는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 1_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 30 });
+    act(() => {
+      vi.advanceTimersByTime(1_000 + STALE_TURN_GRACE_MS + STALE_TURN_JITTER_MS);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'TURN_CHANGED', seq: 2, payload: { seat: 2, direction: 1, attackStack: 0 } } as never);
+    });
+    act(() => {
+      vi.advanceTimersByTime(30_000 + STALE_TURN_GRACE_MS + STALE_TURN_JITTER_MS);
+    });
+    expect(requestResync).toHaveBeenCalledTimes(2);
+  });
+
+  it('카운트다운이 없으면(턴 제한 끔·경쟁 창·끝난 방) 다시 받지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, turnRemainingMs: 1_000 });
+    renderTable({ playerIds: [100, 101, 102], turnSeconds: 0 });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(requestResync).not.toHaveBeenCalled();
   });
 });
 

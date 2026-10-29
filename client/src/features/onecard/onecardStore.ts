@@ -122,6 +122,13 @@ export interface OneCardRoomState {
    * D-130 — 다시 받기 신호. 게임판이 이 값의 변화를 보고 훅의 `requestResync` 를 부른다 — sink·스토어는 훅을 모른다(D-103).
    */
   resyncNonce: number;
+  /**
+   * D-140 — 턴 번호. 차례를 처음부터 다시 세는 공개 이벤트(`TURN_CHANGED`·`PLAYER_ELIMINATED`)마다 오른다 — resync 는 올리지
+   * 않는다. 멈춘 차례 복구가 "같은 차례"를 가르는 키다.
+   */
+  turnEpoch: number;
+  /** D-140 — 멈췄다고 의심돼 권위 스냅샷을 청한 턴 번호(차례마다 한 번). */
+  staleTurnResyncFor: number | null;
 
   // ── 메타 ──
   disconnectedSeats: Set<number>;
@@ -157,6 +164,8 @@ export interface OneCardActions {
   clearRaceNotice: () => void;
   /** D-130 — 이 창이 낡았다고 의심되면 권위 스냅샷을 청한다. 같은 창으로는 한 번만(신호를 올리지 않는다). */
   requestRaceResync: (raceId: number) => void;
+  /** D-140 — 이 차례가 0초를 지나 멈췄다고 의심되면 권위 스냅샷을 청한다. 같은 턴 번호로는 한 번만. */
+  requestTurnResync: (turnEpoch: number) => void;
 }
 
 const INITIAL: OneCardRoomState = {
@@ -183,6 +192,8 @@ const INITIAL: OneCardRoomState = {
   raceNotice: null,
   staleRaceResyncFor: null,
   resyncNonce: 0,
+  turnEpoch: 0,
+  staleTurnResyncFor: null,
   disconnectedSeats: new Set(),
   errorMessage: null,
   turnClock: null,
@@ -371,6 +382,7 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           attackStack: p.attackStack,
           // D-131 — 서버는 이 이벤트를 낸 진행 직후(같은 락 안) 턴 데드라인을 처음부터 다시 건다.
           turnClock: { since: Date.now(), remainingMs: null },
+          turnEpoch: state.turnEpoch + 1,
           // 매 플레이 resync 가 지워 주던 거절 문구를 차례가 바뀔 때 지운다(D-126 의 티츄와 같은 처리).
           errorMessage: null,
         });
@@ -425,7 +437,7 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
           // 사람이 나갔다). 차례가 정해지지 않았으면(−1 — 카드 직후·경쟁 창) 세지 않는다. 창이 열리면 서버가 turnSeat 를 −1 로
           // 두고, 창이 열린 채 나가면 해소(취소)를 탈락보다 먼저 보내므로 창 여부는 따로 볼 필요가 없다(다음 TURN_CHANGED 가 센다).
           ...(state.turnSeat >= 0
-            ? { turnClock: { since: Date.now(), remainingMs: null } }
+            ? { turnClock: { since: Date.now(), remainingMs: null }, turnEpoch: state.turnEpoch + 1 }
             : {}),
         });
         return 'applied';
@@ -495,5 +507,11 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
     const { staleRaceResyncFor, resyncNonce } = get();
     if (staleRaceResyncFor === raceId) return;
     set({ staleRaceResyncFor: raceId, resyncNonce: resyncNonce + 1 });
+  },
+
+  requestTurnResync(turnEpoch) {
+    const { staleTurnResyncFor, resyncNonce } = get();
+    if (staleTurnResyncFor === turnEpoch) return;
+    set({ staleTurnResyncFor: turnEpoch, resyncNonce: resyncNonce + 1 });
   },
 }));
