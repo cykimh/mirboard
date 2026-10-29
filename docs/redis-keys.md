@@ -86,8 +86,9 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비) 또는 `roo
 처리:
 1. 방 없음 → `-1`. status≠WAITING → `-2`. players 에 userId 없음 → `-3`.
 2. ready='1' 이면 `SADD ready userId`, '0' 이면 `SREM ready userId` (+EXPIRE).
-3. `LLEN players >= capacity` **and** `SCARD ready >= capacity` 이면
+3. `LLEN players >= capacity` **and** 앉은 사람 **모두** `SISMEMBER ready` 이면
    `HSET room status IN_GAME` + `ZREM rooms:open` → `1`(started), 아니면 `0`.
+   BY-3 — 예전엔 `SCARD ready >= capacity` 로 세어 좌석에 없는 준비(떠난 사람의 남은 준비)로도 조기 시작될 수 있었다.
 
 단일 원자 트랜잭션 — 다수 플레이어가 동시에 마지막 ready 를 눌러도 `1`(start)
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
@@ -111,7 +112,8 @@ room:{id}:spectators]`, `ARGV = [userId, roomId]`.
    다른 좌석으로 당겼다(종료 패널 이름 밀림, resync 가 남의 비공개 뷰를 반환). 나간 사람은
    목록에 남지만 `ALREADY_IN_ROOM` 은 방 단위 검사라 다른 방 입장에는 영향이 없다.
    아래 1~4 는 WAITING·IN_GAME 만 탄다(동작 불변).
-1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM).
+1. `LREM players 0 userId` (없으면 `-2` NOT_IN_ROOM) + 같은 원자 구간에서 `SREM ready userId`
+   (BY-3 — 예전엔 자바가 스크립트 뒤에 따로 지워, 그 사이 준비 토글이 떠난 사람의 준비까지 셌다).
 2. `players` 빈 리스트면 `DEL room players ready spectators` 및
    `ZREM rooms:open` → `0`(방 파괴). D-74: ready, D-75: spectators 도
    함께 삭제(고아 키 방지).

@@ -44,6 +44,8 @@ local removed = redis.call('LREM', KEYS[2], 0, userId)
 if removed == 0 then
     return -2
 end
+-- BY-3 — 좌석과 준비를 같은 원자 구간에서 뺀다. 예전엔 준비를 자바가 따로 지워, 그 사이의 준비 토글이 떠난 사람의 준비까지 세어 시작될 수 있었다.
+redis.call('SREM', KEYS[4], userId)
 
 local remaining = redis.call('LLEN', KEYS[2])
 if remaining == 0 then
