@@ -48,10 +48,15 @@ end
 redis.call('EXPIRE', KEYS[3], ttl)
 
 local capacity = tonumber(redis.call('HGET', KEYS[1], 'capacity'))
-if #players >= capacity and redis.call('SCARD', KEYS[3]) >= capacity then
-    redis.call('HSET', KEYS[1], 'status', 'IN_GAME')
-    redis.call('ZREM', KEYS[4], roomId)
-    return 1
+if #players < capacity then
+    return 0
 end
-
-return 0
+-- BY-3 — 준비 집합 크기(SCARD)가 아니라 앉은 사람마다 준비를 확인한다. 좌석에 없는 준비가 남아도 조기 시작하지 않는다.
+for i = 1, #players do
+    if redis.call('SISMEMBER', KEYS[3], players[i]) == 0 then
+        return 0
+    end
+end
+redis.call('HSET', KEYS[1], 'status', 'IN_GAME')
+redis.call('ZREM', KEYS[4], roomId)
+return 1

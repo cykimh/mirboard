@@ -745,6 +745,46 @@ describe('턴 카운트다운 기준 (D-131)', () => {
 });
 
 /** D-139 — 카드 내기 비행 효과의 근거: 방금 낸 카드(공개 이벤트의 순번·좌석·카드). resync 는 바꾸지 않는다(다시 받기로 날리지 않는다). */
+describe('멈춘 차례 복구 — 턴 번호 (D-140)', () => {
+  it('차례를 다시 세는 공개 이벤트마다 턴 번호가 오르고, resync 는 올리지 않는다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 5_000 }));
+    const start = store().turnEpoch;
+
+    store().applyEvent(ev('TURN_CHANGED', { seat: 2, direction: 1, attackStack: 0 }, 11));
+    expect(store().turnEpoch).toBe(start + 1);
+
+    store().applyEvent(ev('PLAYER_ELIMINATED', { seat: 0, reason: 'DESERTED', drawPileCount: 40 }, 12));
+    expect(store().turnEpoch).toBe(start + 2);
+
+    store().applySnapshot(snapshot({ turnRemainingMs: 3_000 }));
+    expect(store().turnEpoch).toBe(start + 2);
+  });
+
+  it('같은 차례로는 한 번만 다시 받기를 청한다', () => {
+    store().applySnapshot(snapshot({ turnRemainingMs: 5_000 }));
+    const nonce = store().resyncNonce;
+    const epoch = store().turnEpoch;
+
+    store().requestTurnResync(epoch);
+    store().requestTurnResync(epoch);
+    expect(store().resyncNonce).toBe(nonce + 1);
+
+    store().applyEvent(ev('TURN_CHANGED', { seat: 2, direction: 1, attackStack: 0 }, 11));
+    store().requestTurnResync(store().turnEpoch);
+    expect(store().resyncNonce).toBe(nonce + 2);
+  });
+
+  it('방을 바꾸면 비운다', () => {
+    store().applyEvent(ev('TURN_CHANGED', { seat: 2, direction: 1, attackStack: 0 }, 11));
+    store().requestTurnResync(store().turnEpoch);
+
+    store().reset('r-2');
+
+    expect(store().turnEpoch).toBe(0);
+    expect(store().staleTurnResyncFor).toBeNull();
+  });
+});
+
 describe('방금 낸 카드 — 비행 효과 (D-139)', () => {
   beforeEach(() => store().applySnapshot(snapshot()));
 

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -44,6 +45,12 @@ class RoomServiceConcurrencyIT {
 
     @Autowired
     RoomService roomService;
+
+    @Autowired
+    RoomRepository repository;
+
+    @Autowired
+    StringRedisTemplate redis;
 
     @Test
     void nine_concurrent_joins_do_not_exceed_capacity() throws InterruptedException {
@@ -125,5 +132,42 @@ class RoomServiceConcurrencyIT {
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> roomService.getRoom(roomId))
                 .isInstanceOf(RoomNotFoundException.class);
+    }
+
+    /**
+     * BY-3 — 좌석 빼기와 준비 지우기가 한 원자 구간이어야 한다. 예전엔 room_leave.lua 가 좌석만 빼고 준비는 자바가 따로 지워,
+     * 그 사이 다른 사람의 준비가 떠난 사람의 준비까지 세어 시작될 수 있었다.
+     */
+    @Test
+    void leave_script_clears_the_leavers_ready_flag_atomically() {
+        String roomId = roomService.createRoom(300L, "by3-leave", "TICHU").roomId();
+        roomService.joinRoom(roomId, 301L);
+        roomService.setReady(roomId, 301L, true);
+
+        repository.leave(roomId, 301L);
+
+        assertThat(redis.opsForSet().isMember("room:" + roomId + ":ready", "301"))
+                .as("leave 스크립트만으로 준비가 지워진다")
+                .isFalse();
+    }
+
+    /** BY-3 — 시작 판정은 앉아 있는 사람의 준비만 센다. 좌석에 없는 준비가 남아 있어도 조기 시작하지 않는다. */
+    @Test
+    void stale_ready_of_a_non_seated_user_does_not_start_the_game() {
+        String roomId = roomService.createRoom(400L, "by3-stale", "TICHU").roomId();
+        roomService.joinRoom(roomId, 401L);
+        roomService.joinRoom(roomId, 402L);
+        roomService.joinRoom(roomId, 403L);
+        redis.opsForSet().add("room:" + roomId + ":ready", "499"); // 떠난 사람의 남은 준비(경합 창)
+        roomService.setReady(roomId, 400L, true);
+        roomService.setReady(roomId, 401L, true);
+
+        roomService.setReady(roomId, 402L, true); // 앉은 4명 중 3명 + 남은 준비 1 = 4
+
+        assertThat(roomService.getRoom(roomId).status())
+                .as("403 이 준비하지 않았으니 대기 그대로")
+                .isEqualTo(RoomStatus.WAITING);
+        roomService.setReady(roomId, 403L, true);
+        assertThat(roomService.getRoom(roomId).status()).isEqualTo(RoomStatus.IN_GAME);
     }
 }

@@ -166,11 +166,6 @@ public class RoomRepository {
         return result.intValue();
     }
 
-    /** 대기실 떠난 플레이어의 ready 플래그 정리 (방 파괴 시엔 TTL 로 자연 소멸). */
-    public void clearReady(String roomId, long userId) {
-        redis.opsForSet().remove(readyKey(roomId), Long.toString(userId));
-    }
-
     private static String readyKey(String roomId) {
         return "room:" + roomId + ":ready";
     }

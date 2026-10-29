@@ -10,6 +10,7 @@ import com.mirboard.infra.scheduling.DeadlineQueue;
 import com.mirboard.infra.scheduling.RoomGeneration;
 import com.mirboard.infra.ws.GameEngineProvider;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -33,6 +34,10 @@ import org.springframework.stereotype.Component;
  *       무장(재시도·미만기 재무장 포함)을 락 없이 읽은 낡은 남은 시간으로 덮지 않는다. 남은 시간은 상태가 정하므로 창을
  *       늘리지도 앞당기지도 않는다(이미 지났으면 0 — 바로 발화). 낡은 킥이 틈에서 걸어도 발화 쪽의 세대·락·{@code timer}
  *       재확인이 그대로 지킨다.</li>
+ *   <li><b>(c) 턴 데드라인</b>(D-140) — 턴 제한이 있는 방에서 누군가 기다리는데 지금 세대의 턴 데드라인이 큐에 없으면, 없을
+ *       때만(ZADD NX) <b>방의 턴 제한 전체로</b> 건다. 세대를 올린 뒤 무장이 실패했거나 항목이 없어지면 사람이 자리를 비운 판이
+ *       "0초"에서 영영 멈췄다(F-client-3 (b)). 언제 시작된 턴인지 모르므로 0(바로 자동 처리)이 아니라 한 턴이다 — 막 차례를
+ *       받은 사람을 벌하지 않는다. NX 라 걸린 데드라인을 늘리지 못한다(아래 "턴 진행은 부르지 않는다"가 그대로 선다).</li>
  * </ul>
  *
  * <p><b>참가자·관전자의 킥만 받는다.</b> 공개 토픽 구독은 로그인한 누구나 할 수 있고 SUBSCRIBE 는 레이트리밋 밖이라,
@@ -148,12 +153,27 @@ public class GameProgressKick {
             return;
         }
 
-        boolean botPending = engine.pendingSeats(state).stream().anyMatch(room.botSeats()::contains);
+        List<Integer> pending = engine.pendingSeats(state);
+        boolean botPending = pending.stream().anyMatch(room.botSeats()::contains);
         if (botPending && bots.scheduleBotsIfIdle(roomId)) {
             log.info("Progress kick resumed the bot loop: roomId={} phase={}", roomId, engine.phaseName(state));
         }
 
         engine.timer(state).ifPresent(left -> rearmIfLost(roomId, left));
+
+        if (room.turnSeconds() > 0 && !pending.isEmpty()) {
+            rearmTurnIfLost(roomId, Duration.ofSeconds(room.turnSeconds()));
+        }
+    }
+
+    /** (c) — 이 세대의 턴 데드라인이 큐에 없을 때만 한 턴 전체로 건다. pop 뒤 처리 중이라 없던 경우는 세대 불일치로 버려져 무해하다. */
+    private void rearmTurnIfLost(String roomId, Duration fullTurn) {
+        long gen = generations.current(roomId);
+        String member = TurnTimeoutScheduler.member(roomId, gen);
+        if (deadlines.scheduleIfAbsent(TurnTimeoutScheduler.KIND, member, fullTurn)) {
+            log.info("Progress kick armed an absent turn deadline (lost, or popped and still in flight): "
+                    + "roomId={} gen={} turnMs={}", roomId, gen, fullTurn.toMillis());
+        }
     }
 
     /**

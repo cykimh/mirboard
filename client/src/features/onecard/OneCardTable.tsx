@@ -31,6 +31,13 @@ export const LATE_NOTICE_MS = 1500;
  * 다시 받는다(서버 resync 는 진행 킥으로 사라진 타이머를 다시 건다). 폴링 주기·왕복 시간보다 넉넉히.
  */
 export const STALE_RACE_GRACE_MS = 1500;
+/**
+ * D-140 — 턴 카운트다운이 0 이 된 뒤 이만큼(+ 무작위 0~{@link STALE_TURN_JITTER_MS}) 지나도 같은 차례면 시간 초과 처리를 못 받은
+ * 것으로 보고 그 차례에 한 번 권위 스냅샷을 다시 받는다(서버 resync 는 진행 킥으로 사라진 턴 데드라인을 다시 건다). 지터는 폴러가
+ * 밀린 순간 그 방의 모든 클라가 한꺼번에 resync 하지 않게.
+ */
+export const STALE_TURN_GRACE_MS = 2000;
+export const STALE_TURN_JITTER_MS = 1000;
 
 interface Props {
   roomId: string;
@@ -164,6 +171,22 @@ export function OneCardTable({
     }, Math.max(0, staleRaceClosesAt + STALE_RACE_GRACE_MS - Date.now()));
     return () => window.clearTimeout(timer);
   }, [staleRaceId, staleRaceClosesAt]);
+
+  // D-140 — 멈춘 차례 복구. 카운트다운(아래 상태 줄)이 보이는 동안에만 — 0 + 유예 + 지터 뒤에도 같은 차례면 그 차례에 한 번.
+  const turnClock = s.turnClock;
+  const turnEpoch = s.turnEpoch;
+  const countingTurn = !roomFinished && !raceOpen && turnSeat >= 0 && turnSeconds > 0 && turnClock !== null;
+  useEffect(() => {
+    if (!countingTurn || turnClock === null) return;
+    const fullTurnMs = turnSeconds * 1000;
+    const deadline = turnClock.since + Math.min(turnClock.remainingMs ?? fullTurnMs, fullTurnMs);
+    const jitter = Math.random() * STALE_TURN_JITTER_MS;
+    const timer = window.setTimeout(() => {
+      const current = useOneCardStore.getState();
+      if (current.turnEpoch === turnEpoch) current.requestTurnResync(turnEpoch);
+    }, Math.max(0, deadline + STALE_TURN_GRACE_MS + jitter - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [countingTurn, turnClock, turnEpoch, turnSeconds]);
 
   // 스토어가 다시 받기를 청하면(낡은 창 — 마감 초과·창이 열린 채 NO_RACE) 훅으로 권위 스냅샷을 받는다. 처리한 값을 ref 로
   // 기억한다 — 스토어는 모듈 전역이라 이전 방 세션이 남긴 값을 첫 렌더가 읽을 수 있는데, 값이 아니라 변화에만 반응해야

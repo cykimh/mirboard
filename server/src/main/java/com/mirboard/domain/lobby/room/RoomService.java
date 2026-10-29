@@ -345,8 +345,7 @@ public class RoomService {
     }
 
     public void leaveRoom(String roomId, long userId) {
-        repository.leave(roomId, userId);
-        repository.clearReady(roomId, userId); // Phase 16(#2) — ready 플래그 정리.
+        repository.leave(roomId, userId); // BY-3 — 준비 플래그도 스크립트가 같은 원자 구간에서 지운다.
         Optional<Room> remaining = repository.findById(roomId);
         events.publishEvent(remaining
                 .map(RoomChangedEvent::updated)
