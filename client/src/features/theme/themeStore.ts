@@ -8,7 +8,7 @@ interface ThemeState {
   theme: Theme;
   setTheme: (t: Theme) => void;
   toggle: () => void;
-  /** localStorage 복원 후 `<html>` 클래스 적용. 미저장 시 기본 dark. */
+  /** localStorage 복원 후 `<html>` 클래스 적용. 미저장 시 기본 light(D-146). */
   init: () => void;
 }
 
@@ -26,8 +26,8 @@ function persist(theme: Theme) {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  // 앱 기본은 다크(현행 UI 와 동일). init() 가 저장값으로 덮어쓴다.
-  theme: 'dark',
+  // D-146 — 앱 기본은 라이트. init() 가 저장값(직접 고른 테마)으로 덮어쓴다.
+  theme: 'light',
 
   setTheme(t) {
     applyHtmlClass(t);
@@ -40,7 +40,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
 
   init() {
-    let theme: Theme = 'dark';
+    let theme: Theme = 'light';
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved === 'light' || saved === 'dark') theme = saved;

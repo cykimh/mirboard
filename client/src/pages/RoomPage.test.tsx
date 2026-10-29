@@ -25,11 +25,13 @@ import type { GameSummary, Room, RoomOption } from '@/types/api';
 
 vi.mock('@/ws/useRoomMeta', () => ({ useRoomMeta: vi.fn() }));
 
-const { joinOrReconnect, spectate, loadGame, names } = vi.hoisted(() => ({
+const { joinOrReconnect, spectate, loadGame, names, stats } = vi.hoisted(() => ({
   joinOrReconnect: vi.fn(),
   spectate: vi.fn(),
   loadGame: vi.fn(),
   names: vi.fn(),
+  // D-146 — 참가자 카드의 계급·전적. 기본은 기록 없음.
+  stats: vi.fn((_token: string, _id: number) => Promise.resolve({ games: [] as unknown[] })),
 }));
 
 vi.mock('@/api/rooms', () => ({
@@ -46,7 +48,7 @@ vi.mock('@/api/rooms', () => ({
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
-vi.mock('@/api/users', () => ({ usersApi: { names } }));
+vi.mock('@/api/users', () => ({ usersApi: { names, stats } }));
 
 // 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120). 텍스트는
 // 대기실 튜토리얼 테스트(D-121)가 IN_GAME 분기 진입을 확인하는 데 쓴다.
@@ -476,16 +478,20 @@ describe('RoomPage — 초대 링크 (D-133)', () => {
   it('사람으로 꽉 찬 대기실이면 "링크를 받은 친구는 관전으로 들어와요"', async () => {
     renderRoom({ gameType: 'ONE_CARD', capacity: 2, playerCount: 2, playerIds: [1, 2], botSeats: [] });
 
-    expect(
-      await screen.findByText('자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeNull();
+    // D-146 — 설명은 버튼 title.
+    expect(await screen.findByRole('button', { name: '초대 링크' })).toHaveAttribute(
+      'title',
+      '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요',
+    );
   });
 
   it('빈자리가 있으면 "친구가 바로 이 방에 들어와요"', async () => {
     renderRoom({ gameType: 'ONE_CARD', capacity: 4, playerCount: 1, playerIds: [1] });
 
-    expect(await screen.findByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '초대 링크' })).toHaveAttribute(
+      'title',
+      '링크를 보내면 친구가 바로 이 방에 들어와요',
+    );
   });
 
   // 게스트 방은 기본 봇 채우기라 만들자마자 꽉 찬다. 봇은 자리를 비켜 주지 않으므로(봇 자리 비켜주기는 기각 — 사람과 할 때는 봇을
@@ -493,10 +499,11 @@ describe('RoomPage — 초대 링크 (D-133)', () => {
   it('봇까지 다 찬 대기실(게스트 봇 채우기 방)도 "링크를 받은 친구는 관전으로 들어와요"', async () => {
     renderRoom({ gameType: 'ONE_CARD', capacity: 2, playerCount: 2, playerIds: [1, 900], botSeats: [1], fillWithBots: true });
 
-    expect(
-      await screen.findByText('자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeNull();
+    // D-146 — 설명은 버튼 title.
+    expect(await screen.findByRole('button', { name: '초대 링크' })).toHaveAttribute(
+      'title',
+      '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요',
+    );
   });
 });
 
@@ -1240,5 +1247,55 @@ describe('RoomPage — 관전자 자리에 앉기 (D-137)', () => {
 
     expect(spectate).toHaveBeenCalledWith('tok', 'r1');
     expect(joinOrReconnect).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * D-146 — 대기실 참가자는 목록 줄이 아니라 카드로, 이 방 게임 기준 계급·전적을 함께 보인다. 봇은 전적을 묻지 않는다.
+ */
+describe('RoomPage — 참가자 카드 (D-146)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    names.mockResolvedValue({
+      names: [
+        { userId: 1, username: 'host' },
+        { userId: 2, username: 'friend' },
+        { userId: 900, username: 'bot_east' },
+      ],
+    });
+    stats.mockImplementation((_token, id) =>
+      Promise.resolve(
+        id === 1
+          ? {
+              games: [
+                { gameType: 'TICHU', rating: 1400, tier: 'PLATINUM', winCount: 9, loseCount: 9, desertCount: 0 },
+                { gameType: 'ONE_CARD', rating: 1250, tier: 'GOLD', winCount: 4, loseCount: 1, desertCount: 2 },
+              ],
+            }
+          : { games: [] },
+      ),
+    );
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('참가자마다 카드 — 이 방 게임의 계급·전적, 안 해 본 게임이면 "첫 판", 봇은 봇 표시만', async () => {
+    renderRoom({ gameType: 'ONE_CARD', capacity: 6, playerCount: 3, playerIds: [1, 2, 900], botSeats: [2] });
+
+    const list = await screen.findByRole('list', { name: '참가자' });
+    const host = await within(list).findByRole('listitem', { name: 'host' });
+    expect(await within(host).findByText('골드')).toBeInTheDocument();
+    expect(within(host).getByText('4승 1패 · 탈주 2')).toBeInTheDocument();
+    expect(within(host).getByText('방장')).toBeInTheDocument();
+    expect(within(host).queryByText('플래티넘')).toBeNull();
+
+    const friend = within(list).getByRole('listitem', { name: 'friend' });
+    expect(await within(friend).findByText('첫 판')).toBeInTheDocument();
+
+    const bot = within(list).getByRole('listitem', { name: 'bot_east' });
+    expect(within(bot).getByText('봇')).toBeInTheDocument();
+    expect(within(bot).queryByText('첫 판')).toBeNull();
+    expect(stats).not.toHaveBeenCalledWith('tok', 900);
   });
 });

@@ -22,9 +22,6 @@ const { catalog, list, stats, spectate } = vi.hoisted(() => ({
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
 vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate } }));
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
-vi.mock('@/ws/useLobbyStomp', () => ({
-  useLobbyStomp: () => ({ messages: [], connected: false, send: vi.fn() }),
-}));
 vi.mock('@/features/stats/RankingCard', () => ({ RankingCard: () => null }));
 
 function game(id: string, displayName: string, status: GameSummary['status'] = 'AVAILABLE'): GameSummary {
@@ -247,5 +244,30 @@ describe('GameHubPage — 사이트 이름 없음 (D-145)', () => {
 
     expect(container.textContent).not.toMatch(/미르보드|Mirboard/);
     expect(screen.getByRole('heading', { level: 1 })).toHaveClass('sr-only');
+  });
+});
+
+describe('GameHubPage — 로비 정리 (D-146)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({
+      userId: 1,
+      username: 'me',
+      games: [{ gameType: 'TICHU', rating: 1200, tier: 'SILVER', winCount: 3, loseCount: 2, desertCount: 1 }],
+    });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('색약 모드 버튼·전적 합계·로비 채팅이 없다 — 계급 배지는 남는다', async () => {
+    const { container } = renderHub();
+    await screen.findByRole('button', { name: '티츄 게임 방법' });
+
+    expect(screen.queryByRole('button', { name: '색약 모드' })).toBeNull();
+    expect(container.textContent).not.toMatch(/3승|2패|탈주 1/);
+    expect(screen.queryByText('로비 채팅')).toBeNull();
+    expect(screen.queryByPlaceholderText(/메시지|연결 중/)).toBeNull();
   });
 });

@@ -42,7 +42,6 @@ public class StompRateLimitInterceptor implements ChannelInterceptor {
     private static final Pattern ROOM_ACTION = Pattern.compile("^/app/room/([^/]+)/action$");
     private static final Pattern ROOM_CHAT = Pattern.compile("^/app/room/([^/]+)/chat$");
     private static final Pattern ROOM_REACTION = Pattern.compile("^/app/room/([^/]+)/reaction$");
-    private static final String LOBBY_CHAT = "/app/lobby/chat";
 
     private final RateLimiter rateLimiter;
     private final StompPublisher publisher;
@@ -86,7 +85,7 @@ public class StompRateLimitInterceptor implements ChannelInterceptor {
         if (ROOM_ACTION.matcher(destination).matches()) {
             return RateLimitProperties.GAME_ACTION;
         }
-        if (ROOM_CHAT.matcher(destination).matches() || LOBBY_CHAT.equals(destination)) {
+        if (ROOM_CHAT.matcher(destination).matches()) {
             return RateLimitProperties.CHAT;
         }
         if (ROOM_REACTION.matcher(destination).matches()) {

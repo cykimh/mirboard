@@ -8,7 +8,7 @@
 [![Deploy](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml/badge.svg)](https://github.com/cykimh/mirboard/actions/workflows/deploy.yml)
 
 Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
-서버 테스트 1435건 / 클라 978건
+서버 테스트 1435건 / 클라 977건
 
 **라이브**: https://mirboard.fly.dev — 로그인 화면 「게스트로 바로 체험하기」로 가입 없이 들어갈 수 있습니다.
 유휴 시 머신이 멈춰 첫 접속에 약 30초 걸립니다(콜드 스타트).
@@ -16,7 +16,7 @@ Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 ---
 
 ![메인 화면](docs/assets/screenshots/01-hub.png)
-*메인 — 게임 카탈로그·방 목록/생성·관전·랭킹·로비 채팅이 한 화면*
+*메인 — 게임 카탈로그·방 목록/생성·관전·랭킹이 한 화면*
 
 ![스컬킹](docs/assets/screenshots/02-skullking.png)
 *스컬킹 — 6인 트릭테이킹. 예측은 전원 제출 후 동시 공개, 트릭은 재생순으로 늘어놓는다*
@@ -43,7 +43,7 @@ Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
   원카드 봇은 경쟁 창마다 추첨한 반응 시간(기본 1.0~2.5초)에 누른다. 재현:
   `./gradlew :server:test --tests "com.mirboard.domain.game.*.bot.*"` (Docker 불필요)
 - **재접속·탈주** — 끊김 유예 후 미복귀 시 게임별 규칙으로 처리
-- **UI** — 라이트/다크 토글, 모바일 반응형, 색약 모드
+- **UI** — 라이트(기본)/다크 토글, 모바일 반응형
 
 ELO·전적은 **게임별**로 쌓입니다(`user_game_stats`, [D-115](docs/decisions.md)) — 봇·게스트가 낀 매치는 승패만, ELO 는 제외.
 

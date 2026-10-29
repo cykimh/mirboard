@@ -3,12 +3,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
-import { usersApi } from '@/api/users';
+import { usersApi, type GameRecord } from '@/api/users';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
+import { ParticipantCard } from '@/features/lobby/ParticipantCard';
 import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPanel';
 import {
   SpectateNotice,
@@ -93,6 +94,7 @@ export function RoomPage() {
   const [spectateNotice, setSpectateNotice] = useState<SpectateNoticeKind | null>(null);
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [usernames, setUsernames] = useState<Record<number, string>>({});
+  const [records, setRecords] = useState<Record<number, GameRecord | null>>({});
   // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 좌석 정책 **라벨**을 고르는 데만 쓴다.
   // null = 아직 모름(요청 중) → 행을 그리지 않는다. 티츄에서 "좌석 순서"가 잠깐 떴다
   // "팀 배정"으로 바뀌는 깜빡임을 막으려는 것이다.
@@ -247,6 +249,31 @@ export function RoomPage() {
     () => setError('방이 종료되었습니다.'),
     resyncWaitingRoom,
   );
+
+  // D-146 — 대기실 참가자 카드의 계급·전적(이 방 게임 기준). 사람만 묻고, 참가자 집합·게임이 바뀔 때만 다시 묻는다.
+  const recordsWanted = room?.status === 'WAITING';
+  const humansKey = room
+    ? room.playerIds.filter((_, seat) => !(room.botSeats ?? []).includes(seat)).join(',')
+    : '';
+  useEffect(() => {
+    if (!token || !room || !recordsWanted || humansKey === '') return;
+    let cancelled = false;
+    const gameType = room.gameType;
+    for (const id of humansKey.split(',').map(Number)) {
+      Promise.resolve()
+        .then(() => usersApi.stats(token, id))
+        .then((st) => {
+          if (cancelled) return;
+          const rec = st.games.find((g) => g.gameType === gameType) ?? null;
+          setRecords((prev) => ({ ...prev, [id]: rec }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, humansKey, recordsWanted, room?.gameType]);
 
   // 좌석/참가자 표시용 username 일괄 조회. 참가자 집합이 바뀔 때만 재요청(최대 4명).
   const playersKey = room?.playerIds.join(',') ?? '';
@@ -553,28 +580,27 @@ export function RoomPage() {
                 ` · 👁 관전 ${(room.spectatorIds ?? []).length}`}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {tutorial && (
               <Button type="button" variant="outline" onClick={tutorialGate.show}>
                 게임 방법
               </Button>
+            )}
+            {/* D-133 — 초대는 시작 전에만(시작하면 자리가 없다). 방 주소 그대로를 공유·복사한다. 정원이 다 찼으면(봇 자리
+                포함 — 봇은 자리를 비켜 주지 않는다) 받은 친구는 관전으로 들어오므로 설명을 그렇게 바꾼다. D-146 — 버튼 줄로. */}
+            {room.status === 'WAITING' && (
+              <InviteLinkButton
+                roomId={room.roomId}
+                roomName={room.name}
+                gameName={gameName ?? room.gameType}
+                full={room.playerCount >= room.capacity}
+              />
             )}
             <Button type="button" variant="outline" onClick={handleLeave}>
               나가기
             </Button>
           </div>
         </header>
-
-        {/* D-133 — 초대는 시작 전에만(시작하면 자리가 없다). 방 주소 그대로를 공유·복사한다. 정원이 다 찼으면(봇 자리
-            포함 — 봇은 자리를 비켜 주지 않는다) 받은 친구는 관전으로 들어오므로 설명을 그렇게 바꾼다. */}
-        {room.status === 'WAITING' && (
-          <InviteLinkButton
-            roomId={room.roomId}
-            roomName={room.name}
-            gameName={gameName ?? room.gameType}
-            full={room.playerCount >= room.capacity}
-          />
-        )}
 
         {iAmSpectator && (
           <Alert>
@@ -601,20 +627,19 @@ export function RoomPage() {
               <CardTitle>참가자</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <ul className="flex flex-col gap-2">
+              {/* D-146 — 목록 줄 대신 카드(아바타·이름·방장/봇·이 방 게임의 계급·전적). */}
+              <ul aria-label="참가자" className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3">
                 {room.playerIds.map((id, seat) => {
                   const isBot = (room.botSeats ?? []).includes(seat);
                   return (
-                    <li
+                    <ParticipantCard
                       key={id}
-                      className="flex items-center gap-2 rounded-md border p-2"
-                    >
-                      <code className="text-sm text-muted-foreground">
-                        {usernames[id] ?? `#${id}`}
-                      </code>
-                      {id === room.hostId && <Badge>호스트</Badge>}
-                      {isBot && <Badge variant="secondary">봇</Badge>}
-                    </li>
+                      userId={id}
+                      username={usernames[id] ?? `#${id}`}
+                      host={id === room.hostId}
+                      bot={isBot}
+                      record={records[id]}
+                    />
                   );
                 })}
               </ul>

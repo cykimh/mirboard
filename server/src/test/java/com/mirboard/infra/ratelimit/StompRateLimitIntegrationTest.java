@@ -77,21 +77,24 @@ class StompRateLimitIntegrationTest {
 
     private final RestTemplate http = new RestTemplate();
 
+    // D-146 — 로비 채팅을 없애 방 채팅(같은 chat 버킷)으로 시험한다. 보내는 사람·지켜보는 사람 모두 그 방에 앉아 있다.
     @Test
-    void lobby_chat_beyond_the_bucket_is_dropped_while_the_allowance_still_flows()
+    void room_chat_beyond_the_bucket_is_dropped_while_the_allowance_still_flows()
             throws Exception {
         String senderToken = registerAndLogin("rlchatsend", "validpass1");
         String watcherToken = registerAndLogin("rlchatwatch", "validpass1");
+        String roomId = createRoom(senderToken);
+        joinRoom(watcherToken, roomId);
 
         BlockingQueue<JsonNode> inbox = new ArrayBlockingQueue<>(32);
         StompSession sender = connect(senderToken);
         StompSession watcher = connect(watcherToken);
-        watcher.subscribe("/topic/lobby/chat", collector(inbox));
+        watcher.subscribe(chatTopic(roomId), collector(inbox));
         Thread.sleep(200);
 
         // 한도(3) 를 넘겨 6회 발행.
         for (int i = 0; i < 6; i++) {
-            sender.send("/app/lobby/chat", Map.of("message", "spam-" + i));
+            sender.send(chatSend(roomId), Map.of("message", "spam-" + i));
         }
 
         // 앞의 3개는 반드시 도착해야 한다 — 정상 사용자를 막지 않는다는 쪽 검증.
@@ -112,15 +115,19 @@ class StompRateLimitIntegrationTest {
     void a_second_user_is_not_affected_by_the_first_users_spam() throws Exception {
         String spammer = registerAndLogin("rlspammer1", "validpass1");
         String innocent = registerAndLogin("rlinnocent", "validpass1");
+        String watcherToken = registerAndLogin("rlwatcher1", "validpass1");
+        String roomId = createRoom(spammer);
+        joinRoom(innocent, roomId);
+        joinRoom(watcherToken, roomId);
 
         BlockingQueue<JsonNode> inbox = new ArrayBlockingQueue<>(32);
-        StompSession watcher = connect(registerAndLogin("rlwatcher1", "validpass1"));
-        watcher.subscribe("/topic/lobby/chat", collector(inbox));
+        StompSession watcher = connect(watcherToken);
+        watcher.subscribe(chatTopic(roomId), collector(inbox));
         Thread.sleep(200);
 
         StompSession spamSession = connect(spammer);
         for (int i = 0; i < 6; i++) {
-            spamSession.send("/app/lobby/chat", Map.of("message", "flood-" + i));
+            spamSession.send(chatSend(roomId), Map.of("message", "flood-" + i));
         }
         // 스패머의 허용분 3개를 비운다.
         for (int i = 0; i < 3; i++) {
@@ -129,13 +136,40 @@ class StompRateLimitIntegrationTest {
         assertThat(inbox.poll(1, TimeUnit.SECONDS)).as("스패머 초과분은 드롭").isNull();
 
         // 다른 사용자는 같은 IP·같은 서버지만 자기 버킷이라 그대로 통과해야 한다.
-        connect(innocent).send("/app/lobby/chat", Map.of("message", "hello"));
+        connect(innocent).send(chatSend(roomId), Map.of("message", "hello"));
         JsonNode env = inbox.poll(5, TimeUnit.SECONDS);
         assertThat(env).as("다른 사용자는 영향받지 않아야 한다").isNotNull();
         assertThat(env.get("payload").get("message").asText()).isEqualTo("hello");
     }
 
     // ---------- helpers (StompLobbyIntegrationTest 와 동일 패턴) ----------
+
+    private static String chatTopic(String roomId) {
+        return "/topic/room/" + roomId + "/chat";
+    }
+
+    private static String chatSend(String roomId) {
+        return "/app/room/" + roomId + "/chat";
+    }
+
+    private HttpHeaders authJson(String token) {
+        var headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    private String createRoom(String token) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> room = http.postForObject("http://localhost:" + port + "/api/rooms",
+                new HttpEntity<>(Map.of("name", "rl-room", "gameType", "TICHU"), authJson(token)), Map.class);
+        return (String) room.get("roomId");
+    }
+
+    private void joinRoom(String token, String roomId) {
+        http.postForObject("http://localhost:" + port + "/api/rooms/" + roomId + "/join",
+                new HttpEntity<>(Map.of(), authJson(token)), String.class);
+    }
 
     private StompSession connect(String token) throws Exception {
         WebSocketStompClient client = new WebSocketStompClient(new StandardWebSocketClient());

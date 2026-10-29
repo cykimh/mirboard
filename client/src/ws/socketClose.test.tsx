@@ -46,7 +46,6 @@ vi.mock('@/api/rooms', () => ({
 }));
 
 import { useStompRoom } from './useStompRoom';
-import { useLobbyStomp } from './useLobbyStomp';
 
 const sink: RoomEventSink = {
   reset() {},
@@ -82,17 +81,6 @@ afterEach(() => {
 describe('갑작스러운 끊김 (D-130)', () => {
   it('방 소켓 — 끊기면 connected 가 false 로 내려간다', async () => {
     const { result } = renderHook(() => useStompRoom('r-1', 'tok', sink));
-    await waitFor(() => expect(sockets).toHaveLength(1));
-    accept(sockets[0]);
-    await waitFor(() => expect(result.current.connected).toBe(true));
-
-    dropAbruptly(sockets[0]);
-
-    expect(result.current.connected).toBe(false);
-  });
-
-  it('로비 소켓 — 끊기면 connected 가 false 로 내려간다', async () => {
-    const { result } = renderHook(() => useLobbyStomp('tok'));
     await waitFor(() => expect(sockets).toHaveLength(1));
     accept(sockets[0]);
     await waitFor(() => expect(result.current.connected).toBe(true));
