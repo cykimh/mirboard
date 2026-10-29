@@ -316,17 +316,7 @@ export function RoomPage() {
     }
   }
 
-  async function handleToggleReady(next: boolean) {
-    if (!token) return;
-    try {
-      const updated = await roomsApi.setReady(token, roomId, next);
-      setRoom(updated);
-    } catch (err) {
-      if (err instanceof ApiError) setError(errorText(err, '준비를 바꾸지 못했어요'));
-    }
-  }
-
-  // D-136 — 서버 거절은 원문 대신 할 일을 알린다(확인과 누름 사이의 경합 — 누가 준비를 풀었거나 들어왔거나 나갔다).
+  // D-136·D-143 — 서버 거절은 원문 대신 할 일을 알린다(확인과 누름 사이의 경합 — 누가 나갔다).
   async function handleStartNow() {
     if (!token || startPending) return;
     setStartError(null);
@@ -341,13 +331,7 @@ export function RoomPage() {
       }
       if (err.code === 'GAME_ALREADY_STARTED') return; // 이미 시작 — 메타가 게임판으로 옮긴다.
       setStartError(
-        err.code === 'PLAYERS_NOT_READY'
-          ? '아직 준비하지 않은 사람이 있어요'
-          : err.code === 'NOT_ENOUGH_PLAYERS'
-            ? `${minPlayers ?? 2}명 이상 모여야 해요`
-            : err.code === 'ROOM_ALREADY_FULL'
-              ? '정원이 다 찼어요 — 모두 준비하면 시작해요'
-              : '시작하지 못했어요 — 다시 눌러 주세요',
+        err.code === 'NOT_ENOUGH_PLAYERS' ? `${minPlayers ?? 2}명 이상 모여야 해요` : '시작하지 못했어요 — 다시 눌러 주세요',
       );
     } finally {
       setStartPending(false);
@@ -374,8 +358,8 @@ export function RoomPage() {
     }
   }
 
-  // D-136 최종 리뷰 FR-4 — 거절 안내는 그때의 사정이다. 사람·준비가 바뀌면 지운다(다시 누를지 버튼 조건이 알려 준다).
-  const startSituation = room ? `${room.playerIds.join(',')}|${(room.readyUserIds ?? []).join(',')}` : '';
+  // D-136 최종 리뷰 FR-4 — 거절 안내는 그때의 사정이다. 사람이 바뀌면 지운다(다시 누를지 버튼 조건이 알려 준다).
+  const startSituation = room ? room.playerIds.join(',') : '';
   useEffect(() => {
     setStartError(null);
     setSitError(null);
@@ -422,32 +406,10 @@ export function RoomPage() {
     room.playerIds.every((uid, seat) => uid === user.userId || (room.botSeats ?? []).includes(seat));
   const onAbort = canAbortGame ? handleAbort : undefined;
 
-  // D-136 — 친구와 하기 대기실의 "지금 N명으로 시작". 방장이고, 사람이 게임 최소 인원 이상이며 정원 미만이고, 방장 말고 모두 준비했을
-  // 때만(서버도 같은 조건 — room_start_now.lua). 정원을 못 줄이는 게임(티츄 4~4)은 안내도 없다.
-  const canShrink =
-    !!room && !!user && iAmHost && room.status === 'WAITING' && minPlayers !== null && minPlayers < room.capacity;
-  const othersReady =
-    !!room && !!user && room.playerIds.every((uid) => uid === user.userId || (room.readyUserIds ?? []).includes(uid));
-  const canStartNow =
-    canShrink && !!room && room.playerCount >= (minPlayers ?? Infinity) && room.playerCount < room.capacity && othersReady;
-  const startNowHint = canShrink && !canStartNow && !!room && room.playerCount < room.capacity;
-  // FR-5 — 방장에게는 누가 막고 있는지(끊겨 준비가 풀린 사람 포함 — D-134), 방장이 아닌 사람에게는 준비해 두라고.
-  const notReadyNames =
-    startNowHint && room && user
-      ? room.playerIds
-          .filter((uid) => uid !== user.userId && !(room.readyUserIds ?? []).includes(uid))
-          .map((uid) => usernames[uid] ?? `#${uid}`)
-      : [];
-  const askReadyForStartNow =
-    !!room &&
-    !!user &&
-    !iAmHost &&
-    room.status === 'WAITING' &&
-    room.playerIds.includes(user.userId) &&
-    !(room.readyUserIds ?? []).includes(user.userId) &&
-    minPlayers !== null &&
-    minPlayers < room.capacity &&
-    room.playerCount < room.capacity;
+  // D-143 — 친구와 하기 대기실은 [준비] 없이 방장이 시작한다. 사람이 게임 최소 인원 이상이면 켜진다(정원이 다 차도 저절로 시작하지 않는다 —
+  // 서버도 같은 조건, room_start_now.lua). 최소 인원을 모르면(카탈로그 실패) 켜 두고 서버가 판단한다.
+  const startMin = minPlayers ?? 1;
+  const canStart = !!room && room.status === 'WAITING' && room.playerCount >= startMin;
 
   // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
   // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
@@ -641,7 +603,6 @@ export function RoomPage() {
             <CardContent className="flex flex-col gap-4">
               <ul className="flex flex-col gap-2">
                 {room.playerIds.map((id, seat) => {
-                  const isReady = (room.readyUserIds ?? []).includes(id);
                   const isBot = (room.botSeats ?? []).includes(seat);
                   return (
                     <li
@@ -653,12 +614,6 @@ export function RoomPage() {
                       </code>
                       {id === room.hostId && <Badge>호스트</Badge>}
                       {isBot && <Badge variant="secondary">봇</Badge>}
-                      <span className="flex-1" />
-                      {isReady ? (
-                        <Badge>✓ 준비됨</Badge>
-                      ) : (
-                        <Badge variant="outline">대기</Badge>
-                      )}
                     </li>
                   );
                 })}
@@ -698,29 +653,11 @@ export function RoomPage() {
               </>
               )}
 
-              {iAmPlayer && (
+              {iAmPlayer && iAmHost && (
                 <div className="flex flex-wrap items-center gap-2">
-                  {(room.readyUserIds ?? []).includes(user.userId) ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleToggleReady(false)}
-                    >
-                      준비 취소
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      onClick={() => handleToggleReady(true)}
-                    >
-                      준비
-                    </Button>
-                  )}
-                  {canStartNow && (
-                    <Button type="button" variant="secondary" onClick={handleStartNow} disabled={startPending}>
-                      지금 {room.playerCount}명으로 시작
-                    </Button>
-                  )}
+                  <Button type="button" onClick={handleStartNow} disabled={!canStart || startPending}>
+                    {room.playerCount}명으로 시작
+                  </Button>
                 </div>
               )}
               {startError && (
@@ -729,19 +666,15 @@ export function RoomPage() {
                 </p>
               )}
 
-              <p className="text-sm text-muted-foreground">
-                정원이 모두 모이고 전원이 준비하면 자동으로 게임이 시작됩니다.
-              </p>
-              {startNowHint && (
+              {iAmPlayer && iAmHost && !canStart && minPlayers !== null && (
                 <p className="text-sm text-muted-foreground">
-                  {minPlayers}명 이상 모이고 모두 준비하면 지금 인원으로 시작할 수 있어요
+                  {minPlayers}명 이상 모이면 시작할 수 있어요 (지금 {room.playerCount}명 · 최대 {room.capacity}명)
                 </p>
               )}
-              {notReadyNames.length > 0 && (
-                <p className="text-sm text-muted-foreground">준비 안 한 사람: {notReadyNames.join(', ')}</p>
-              )}
-              {askReadyForStartNow && (
-                <p className="text-sm text-muted-foreground">방장이 지금 인원으로 시작할 수 있어요 — 준비해 두세요</p>
+              {iAmPlayer && !iAmHost && (
+                <p className="text-sm text-muted-foreground">
+                  방장이 시작하면 게임이 시작돼요 (지금 {room.playerCount}명 · 최대 {room.capacity}명)
+                </p>
               )}
             </CardContent>
           </Card>

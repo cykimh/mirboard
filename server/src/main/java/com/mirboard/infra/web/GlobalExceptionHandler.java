@@ -19,8 +19,6 @@ import com.mirboard.domain.lobby.room.GameAlreadyStartedException;
 import com.mirboard.domain.lobby.room.GameNotInProgressException;
 import com.mirboard.domain.lobby.room.HumanPlayersPresentException;
 import com.mirboard.domain.lobby.room.NotEnoughPlayersException;
-import com.mirboard.domain.lobby.room.PlayersNotReadyException;
-import com.mirboard.domain.lobby.room.RoomAlreadyFullException;
 import com.mirboard.domain.lobby.room.InvalidCapacityException;
 import com.mirboard.domain.lobby.room.InvalidStakeException;
 import com.mirboard.domain.lobby.room.UnsupportedRoomOptionException;
@@ -199,20 +197,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiErrorEnvelope.of("NOT_ENOUGH_PLAYERS", "Not enough players to start",
                         Map.of("roomId", e.roomId(), "minPlayers", e.minPlayers())));
-    }
-
-    @ExceptionHandler(PlayersNotReadyException.class)
-    public ResponseEntity<ApiErrorEnvelope> handlePlayersNotReady(PlayersNotReadyException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorEnvelope.of("PLAYERS_NOT_READY", "Every player must be ready",
-                        Map.of("roomId", e.roomId())));
-    }
-
-    @ExceptionHandler(RoomAlreadyFullException.class)
-    public ResponseEntity<ApiErrorEnvelope> handleRoomAlreadyFull(RoomAlreadyFullException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiErrorEnvelope.of("ROOM_ALREADY_FULL", "Room is already full",
-                        Map.of("roomId", e.roomId())));
     }
 
     // D-135 — 방장 강제 종료는 방장 말고 모두 봇인 판만.

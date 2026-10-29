@@ -147,8 +147,8 @@ public class RoomRepository {
     }
 
     /**
-     * D-136 — "지금 N명으로 시작"(room_start_now.lua). 반환: 1 시작(정원 := 현재 인원), -1 방 없음, -2 대기 중 아님, -3 멤버 아님,
-     * -4 최소 인원 미만, -5 방장 말고 준비 안 된 사람 있음, -6 정원이 이미 다 참. 해석은 호출측({@link RoomService#startNow}).
+     * D-136·D-143 — 방장 시작(room_start_now.lua). 반환: 1 시작(정원 := 현재 인원), -1 방 없음, -2 대기 중 아님, -3 멤버 아님,
+     * -4 최소 인원 미만. 해석은 호출측({@link RoomService#startNow}).
      */
     public int startNow(String roomId, long hostUserId, int minPlayers) {
         Long result = redis.execute(

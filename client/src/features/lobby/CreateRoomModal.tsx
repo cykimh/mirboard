@@ -78,7 +78,8 @@ export function CreateRoomModal({
 
   const game = availableGames.find((g) => g.id === selectedGame);
   // D-99 — min<max 인 게임만 인원을 고를 수 있다. 티츄(4~4)는 선택지가 없으므로
-  // UI 를 아예 노출하지 않고 capacity 도 보내지 않는다(요청 본문 무변경).
+  // UI 를 아예 노출하지 않고 capacity 도 보내지 않는다(요청 본문 무변경). D-143 — 고르는 것은 봇과 연습뿐(봇 수),
+  // 친구와 하기는 최소·최대 인원만 알리고 정원은 게임 최대 인원이다.
   const seatChoices =
     game && game.minPlayers < game.maxPlayers
       ? Array.from(
@@ -141,7 +142,8 @@ export function CreateRoomModal({
           targetScore: usesTargetScore ? targetScore : undefined,
           turnSeconds: selectedTurnSeconds,
           stake: usesBetting ? stake : undefined,
-          capacity: seatChoices.length > 0 ? selectedSeats : undefined,
+          // D-143 — 친구와 하기의 정원은 게임 최대 인원(대기실에서 방장이 시작한다). 봇과 연습만 고른 인원(봇 수).
+          capacity: seatChoices.length > 0 ? (practice ? selectedSeats : game?.maxPlayers) : undefined,
         },
       );
       navigate(`/rooms/${room.roomId}`);
@@ -208,7 +210,18 @@ export function CreateRoomModal({
             </div>
           )}
 
-          {seatChoices.length > 0 && (
+          {!practice && game && (
+            <div className="flex flex-col gap-1.5">
+              <Label>인원</Label>
+              <p className="text-sm text-muted-foreground">
+                {game.minPlayers === game.maxPlayers
+                  ? `${game.minPlayers}명 — 모이면 대기실에서 방장이 시작해요`
+                  : `최소 ${game.minPlayers}명 · 최대 ${game.maxPlayers}명 — 대기실에서 방장이 시작해요`}
+              </p>
+            </div>
+          )}
+
+          {practice && seatChoices.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <Label>인원</Label>
               <ToggleGroup
@@ -224,7 +237,7 @@ export function CreateRoomModal({
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-              {practice && <p className="text-xs text-muted-foreground">봇 {selectedSeats - 1}명과 함께</p>}
+              <p className="text-xs text-muted-foreground">봇 {selectedSeats - 1}명과 함께</p>
             </div>
           )}
 

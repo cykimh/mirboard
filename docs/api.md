@@ -293,23 +293,23 @@
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
-> **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. 시작은
-> 전원이 `/ready` 로 준비 완료한 시점(아래).
+> **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. **D-143**: 친구와 하기 방의 시작은 방장의
+> `/start` 뿐이다(준비 없음 — 화면에 [준비]가 없다). `/ready` 의 전원 준비 시작은 봇과 연습 방의 내부 시작 길로만 남았다.
 
 ### POST `/api/rooms/{roomId}/ready` *(Phase 16 #2)*
 대기실 준비 토글. body `{ "ready": true|false }`. 응답 `200` — Room 갱신본
 (`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
-`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석).
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석). **D-143**: 화면은 이 호출을 쓰지 않는다 — 봇과 연습 방을 만들 때 서버가
+봇과 방장의 준비를 넣어 시작하는 내부 길이다(API 는 하위 호환으로 남긴다).
 
-### POST `/api/rooms/{roomId}/start` *(D-136 — 지금 N명으로 시작, 방장 전용)*
-친구와 하기 대기실에서 정원이 다 차지 않았어도 지금 모인 인원으로 시작한다. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상,
-정원 미만, **방장 말고 모두 준비**(방장이 누르는 것을 방장의 준비로 친다). `room_start_now.lua` 가 정원을 현재 인원으로 줄이고
-WAITING→IN_GAME 을 한 번에 한다(`ZREM rooms:open`) — 이후는 전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 정원은 이때 한 번만
-줄고 되돌리지 않는다. 티츄(4인 고정)는 4명 미만이면 `NOT_ENOUGH_PLAYERS`, 4명이 다 모였으면 `ROOM_ALREADY_FULL`(준비로 시작). 응답 `200` — 시작된 Room(`capacity` = 인원).
-에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details `minPlayers`), `PLAYERS_NOT_READY`(409),
-`ROOM_ALREADY_FULL`(409 — 정원이 다 찼으면 준비로 시작), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`.
+### POST `/api/rooms/{roomId}/start` *(D-136·D-143 — 방장 시작, 방장 전용)*
+친구와 하기 대기실의 유일한 시작. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상 — **준비는 조건이 아니고 정원이 다 찼어도 이 길로
+시작한다**(D-143, 티츄 포함). `room_start_now.lua` 가 정원을 현재 인원으로 줄이고 WAITING→IN_GAME 을 한 번에 한다(`ZREM rooms:open`) — 이후는
+전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 친구와 하기의 정원은 처음에 게임 최대 인원이다(클라가 `capacity=maxPlayers`).
+응답 `200` — 시작된 Room(`capacity` = 인원). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details
+`minPlayers`), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`. (`PLAYERS_NOT_READY`·`ROOM_ALREADY_FULL` 은 D-143 에서 없앴다.)
 
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:

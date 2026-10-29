@@ -68,44 +68,45 @@ function lastCreateOpts() {
   return createMock.mock.calls[0][3] as Record<string, unknown>;
 }
 
-describe('CreateRoomModal — 인원 선택 (D-99)', () => {
+/**
+ * D-143 — 친구와 하기는 인원을 고르지 않는다. 최소·최대 인원만 알리고 정원은 게임 최대 인원(대기실에서 방장이 시작한다). 봇과 연습만 봇 수를
+ * 정하려고 인원을 고른다(아래 D-136 묶음).
+ */
+describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockResolvedValue({ roomId: 'room-1' });
   });
 
-  it('인원 고정 게임에는 인원 선택을 노출하지 않는다', () => {
-    openModal([FIXED]);
+  it('친구와 하기에는 인원 선택이 없고 최소·최대 인원과 방장 시작을 알린다', () => {
+    openModal([VARIABLE]);
     expect(screen.queryByRole('group', { name: '인원 선택' })).toBeNull();
+    expect(screen.getByText('최소 2명 · 최대 8명 — 대기실에서 방장이 시작해요')).toBeInTheDocument();
   });
 
-  it('인원 고정 게임은 capacity 를 보내지 않는다 (요청 본문 무변경)', async () => {
+  it('친구와 하기의 정원은 게임 최대 인원이다 — 게임이 선언한 처음 인원이 아니다', async () => {
+    openModal([DECLARED]);
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().capacity).toBe(6);
+  });
+
+  it('인원 고정 게임은 인원만 알리고 capacity 를 보내지 않는다 (요청 본문 무변경)', async () => {
     openModal([FIXED]);
+    expect(screen.queryByRole('group', { name: '인원 선택' })).toBeNull();
+    expect(screen.getByText('4명 — 모이면 대기실에서 방장이 시작해요')).toBeInTheDocument();
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().capacity).toBeUndefined();
   });
 
-  it('인원 가변 게임에는 min~max 범위의 인원 선택을 노출한다', () => {
+  it('봇과 연습에는 min~max 범위의 인원 선택이 있다', () => {
     openModal([VARIABLE]);
+    fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
     const picker = screen.getByRole('group', { name: '인원 선택' });
     const seats = Array.from(picker.querySelectorAll('button')).map((b) => b.textContent);
     expect(seats).toEqual(['2', '3', '4', '5', '6', '7', '8']);
-  });
-
-  it('선언이 없으면 인원 가변 게임의 처음 인원은 maxPlayers', async () => {
-    openModal([VARIABLE]);
-    submit();
-    await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().capacity).toBe(8);
-  });
-
-  it('호스트가 고른 인원을 그대로 보낸다', async () => {
-    openModal([VARIABLE]);
-    fireEvent.click(screen.getByRole('radio', { name: '4' }));
-    submit();
-    await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().capacity).toBe(4);
+    expect(screen.queryByText(/대기실에서 방장이 시작해요/)).toBeNull();
   });
 });
 
@@ -255,37 +256,37 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
     createMock.mockResolvedValue({ roomId: 'room-1' });
   });
 
-  it('게임이 선언한 인원·턴 제한을 처음부터 골라 둔다', () => {
-    openModal([DECLARED]);
+  const practice = () => fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
 
-    expect(screen.getByRole('radio', { name: '4' })).toHaveAttribute('aria-checked', 'true');
+  it('게임이 선언한 턴 제한을 처음부터 골라 두고, 봇과 연습의 인원도 선언값이다', () => {
+    openModal([DECLARED]);
     expect(screen.getByRole('radio', { name: '30초' })).toHaveAttribute('aria-checked', 'true');
+
+    practice();
+    expect(screen.getByRole('radio', { name: '4' })).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('바꾸지 않으면 선언한 값으로 보낸다', async () => {
+  it('바꾸지 않으면 선언한 턴 제한으로 보낸다', async () => {
     openModal([DECLARED]);
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
 
-    expect(lastCreateOpts().capacity).toBe(4);
     expect(lastCreateOpts().turnSeconds).toBe(30);
   });
 
-  it('사용자가 바꾼 값을 그대로 보낸다', async () => {
+  it('사용자가 바꾼 턴 제한을 그대로 보낸다', async () => {
     openModal([DECLARED]);
-    fireEvent.click(screen.getByRole('radio', { name: '6' }));
     fireEvent.click(screen.getByRole('radio', { name: '끔' }));
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
 
-    expect(lastCreateOpts().capacity).toBe(6);
     expect(lastCreateOpts().turnSeconds).toBe(0);
   });
 
   /**
    * 게임을 바꾸면 이전 게임에서 고른 인원·턴 제한을 새 게임의 처음 선택으로 되돌린다 — 티츄·스컬킹 사용자에게 걸리는 유일한
    * 동작 변화(예전엔 티츄에서 고른 60초가 스컬킹으로 바꿔도 남았다). 폼 안의 Radix Select 는 숨은 네이티브 select 를 함께
-   * 렌더하므로 그걸로 게임을 바꾼다.
+   * 렌더하므로 그걸로 게임을 바꾼다. 인원은 봇과 연습에만 있다(D-143).
    */
   function switchGame(id: string) {
     const native = document.querySelector('select[aria-hidden="true"]') as HTMLSelectElement;
@@ -295,6 +296,7 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
 
   it('게임을 바꾸면 고른 인원·턴 제한이 새 게임의 처음 선택으로 되돌아간다', async () => {
     openModal([DECLARED, VARIABLE]);
+    practice();
     fireEvent.click(screen.getByRole('radio', { name: '6' }));
     fireEvent.click(screen.getByRole('radio', { name: '60초' }));
 
@@ -306,6 +308,7 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
 
   it('선언 없는 게임에서 고른 턴 제한은 선언한 게임으로 바꾸면 선언값으로 바뀐다', async () => {
     openModal([VARIABLE, DECLARED]);
+    practice();
     fireEvent.click(screen.getByRole('radio', { name: '60초' }));
 
     switchGame('ONE_CARD');

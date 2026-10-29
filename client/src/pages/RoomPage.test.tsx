@@ -1022,10 +1022,12 @@ describe('RoomPage — 게임판 강제 종료 (D-135)', () => {
 });
 
 /**
- * D-136 — 친구와 하기 대기실의 "지금 N명으로 시작". 방장이고, 사람이 게임 최소 인원 이상이며 정원 미만이고, 방장 말고 모두 준비했을 때만
- * 보인다(서버도 같은 조건 — room_start_now.lua). 티츄는 4인 고정이라 없다. 봇 자동 준비 안내는 친구와 하기에 봇이 없어 지웠다.
+ * D-143 — 친구와 하기 대기실은 [준비] 없이 방장이 시작한다. 사람이 게임 최소 인원 이상이면 방장의 [N명으로 시작]이 켜지고(정원이 다 차도 저절로
+ * 시작하지 않는다 — 티츄도 같다), 방장이 아닌 사람에게는 방장이 시작한다고 알린다. 서버도 같은 조건 — room_start_now.lua.
  */
-describe('RoomPage — 지금 인원으로 시작 (D-136)', () => {
+describe('RoomPage — 방장 시작 (D-143)', () => {
+  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
+
   beforeEach(() => {
     vi.clearAllMocks();
     Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
@@ -1036,75 +1038,104 @@ describe('RoomPage — 지금 인원으로 시작 (D-136)', () => {
   const oneCard = { ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 };
   const tichu = { ...game('TICHU', ['TEAMS']), minPlayers: 4, maxPlayers: 4 };
   const waiting = (extra: Partial<Room>) =>
-    ({ gameType: 'ONE_CARD', status: 'WAITING', capacity: 4, playerIds: [1, 2, 3], playerCount: 3, readyUserIds: [2, 3], ...extra }) as Partial<Room>;
+    ({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', capacity: 6, playerIds: [1, 2, 3], playerCount: 3, readyUserIds: [], ...extra }) as Room;
 
-  it('방장이고 방장 말고 모두 준비했으며 최소 인원 이상·정원 미만이면 "지금 3명으로 시작" — 누르면 시작을 부른다', async () => {
+  it('최소 인원 이상이면 아무도 준비하지 않았어도 "3명으로 시작" — 누르면 시작을 부른다', async () => {
     const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.startNow).mockResolvedValue({ ...ROOM, ...waiting({ status: 'IN_GAME', capacity: 3 }) } as Room);
+    vi.mocked(roomsApi.startNow).mockResolvedValue({ ...waiting({ status: 'IN_GAME', capacity: 3 }) });
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({}));
 
-    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
+    const button = await screen.findByRole('button', { name: '3명으로 시작' });
+    expect(button).toBeEnabled();
     await act(async () => {
       fireEvent.click(button);
     });
     expect(roomsApi.startNow).toHaveBeenCalledWith('tok', 'r1');
   });
 
-  it('준비 안 한 사람이 있으면 버튼 대신 안내만', async () => {
+  it('대기실에 [준비]·준비 표시가 없다', async () => {
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({ readyUserIds: [2] }));
+    await screen.findByRole('button', { name: '3명으로 시작' });
 
-    expect(await screen.findByText('2명 이상 모이고 모두 준비하면 지금 인원으로 시작할 수 있어요')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^준비/ })).toBeNull();
+    expect(screen.queryByText(/준비됨/)).toBeNull();
+    expect(screen.queryByText(/자동으로 게임이 시작/)).toBeNull();
   });
 
-  it('방장이 아니면 버튼도 안내도 없다', async () => {
+  it('최소 인원 미만이면 버튼이 잠기고 몇 명이 더 필요한지 알린다', async () => {
     loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({ hostId: 2 } as Partial<Room>));
-    await screen.findByText('테스트 방');
+    renderRoom(waiting({ playerIds: [1], playerCount: 1 }));
 
-    expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
-    expect(screen.queryByText(/명 이상 모이고 모두 준비하면/)).toBeNull(); // 방장용 안내(방장 아닌 사람에게는 FR-5 의 준비 권유)
+    expect(await screen.findByRole('button', { name: '1명으로 시작' })).toBeDisabled();
+    expect(screen.getByText('2명 이상 모이면 시작할 수 있어요 (지금 1명 · 최대 6명)')).toBeInTheDocument();
   });
 
-  it('정원이 다 찼으면 없다 — 모두 준비하면 저절로 시작한다', async () => {
+  it('정원이 다 차도 저절로 시작하지 않고 방장 버튼으로 시작한다', async () => {
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({ capacity: 3 }));
-    await screen.findByText('테스트 방');
 
-    expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
+    expect(await screen.findByRole('button', { name: '3명으로 시작' })).toBeEnabled();
   });
 
-  it('티츄(4인 고정)는 없다', async () => {
+  it('티츄도 4명이 모이면 방장이 시작한다', async () => {
     loadGame.mockResolvedValue(tichu);
-    renderRoom(waiting({ gameType: 'TICHU' }));
-    await screen.findByText('팀 배정');
+    renderRoom(waiting({ gameType: 'TICHU', capacity: 4, playerIds: [1, 2, 3, 4], playerCount: 4 }));
 
-    expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
-    expect(screen.queryByText(/지금 인원으로 시작할 수 있어요/)).toBeNull();
+    expect(await screen.findByRole('button', { name: '4명으로 시작' })).toBeEnabled();
   });
 
-  it('경합으로 거절되면 서버 문구가 아니라 한국어로 알린다', async () => {
+  it('방장이 아니면 버튼 대신 "방장이 시작하면 게임이 시작돼요"', async () => {
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ hostId: 2 }));
+
+    expect(await screen.findByText('방장이 시작하면 게임이 시작돼요 (지금 3명 · 최대 6명)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
+  });
+
+  it('인원이 모자라 거절되면 서버 문구가 아니라 한국어로 알리고, 사람이 바뀌면 지운다', async () => {
     const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.startNow).mockRejectedValue(new ApiError(409, { error: { code: 'PLAYERS_NOT_READY', message: 'Every player must be ready' } }));
+    vi.mocked(roomsApi.startNow).mockRejectedValue(new ApiError(409, { error: { code: 'NOT_ENOUGH_PLAYERS', message: 'Not enough players to start' } }));
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({}));
-
-    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
+    const button = await screen.findByRole('button', { name: '3명으로 시작' });
     await act(async () => {
       fireEvent.click(button);
     });
-    expect(screen.getByText('아직 준비하지 않은 사람이 있어요')).toBeInTheDocument();
-    expect(screen.queryByText('Every player must be ready')).toBeNull();
+    expect(screen.getByText('2명 이상 모여야 해요')).toBeInTheDocument();
+    expect(screen.queryByText('Not enough players to start')).toBeNull();
+
+    act(() => {
+      metaCallback()(waiting({ playerIds: [1, 2], playerCount: 2 }));
+    });
+    expect(screen.queryByText('2명 이상 모여야 해요')).toBeNull();
   });
 
-  it('대기실 안내에 "봇은 자동 준비"가 없다 — 친구와 하기에는 봇이 없다', async () => {
+  it('네트워크 오류도 알린다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.startNow).mockRejectedValue(new TypeError('Failed to fetch'));
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({}));
-    await screen.findByText('테스트 방');
+    const button = await screen.findByRole('button', { name: '3명으로 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
 
-    expect(screen.queryByText(/봇은 자동 준비/)).toBeNull();
+    expect(screen.getByText('시작하지 못했어요 — 다시 눌러 주세요')).toBeInTheDocument();
+  });
+
+  it('요청 중에는 버튼이 잠긴다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.startNow).mockReturnValue(new Promise(() => {}));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+    const button = await screen.findByRole('button', { name: '3명으로 시작' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(button).toBeDisabled();
   });
 });
 
@@ -1131,87 +1162,6 @@ describe('RoomPage — 게임판에 연습 표시 넘기기 (D-136)', () => {
     await screen.findByTestId('skullking-table');
 
     expect(skullProps.at(-1)!.practice).toBe(false);
-  });
-});
-
-/** D-136 최종 리뷰 FR-4·FR-5 — 지금 시작 오류 줄의 수명·네트워크 오류·요청 중 잠금, 방장 아닌 사람의 준비 권유와 방장에게 준비 안 한 사람 이름. */
-describe('RoomPage — 지금 시작 안내·오류 (D-136 후속)', () => {
-  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
-    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }, { userId: 2, username: '철수' }, { userId: 3, username: '영희' }] });
-    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
-  });
-
-  const oneCard = { ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 };
-  const waiting = (extra: Partial<Room>) =>
-    ({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', capacity: 4, playerIds: [1, 2, 3], playerCount: 3, readyUserIds: [2, 3], ...extra }) as Room;
-
-  it('거절 안내는 준비 상태가 바뀌면 사라진다', async () => {
-    const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.startNow).mockRejectedValue(new ApiError(409, { error: { code: 'PLAYERS_NOT_READY', message: 'x' } }));
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({}));
-    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-    expect(screen.getByText('아직 준비하지 않은 사람이 있어요')).toBeInTheDocument();
-
-    act(() => {
-      metaCallback()(waiting({ readyUserIds: [2] }));
-    });
-    expect(screen.queryByText('아직 준비하지 않은 사람이 있어요')).toBeNull();
-  });
-
-  it('네트워크 오류도 알린다', async () => {
-    const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.startNow).mockRejectedValue(new TypeError('Failed to fetch'));
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({}));
-    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(screen.getByText('시작하지 못했어요 — 다시 눌러 주세요')).toBeInTheDocument();
-  });
-
-  it('요청 중에는 버튼이 잠긴다', async () => {
-    const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.startNow).mockReturnValue(new Promise(() => {}));
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({}));
-    const button = await screen.findByRole('button', { name: '지금 3명으로 시작' });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(button).toBeDisabled();
-  });
-
-  it('방장에게는 준비 안 한 사람 이름을 알려 준다', async () => {
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({ readyUserIds: [2] }));
-
-    expect(await screen.findByText('준비 안 한 사람: 영희')).toBeInTheDocument();
-  });
-
-  it('방장이 아닌 사람에게는 준비해 두라고 권한다 — 방장이 지금 인원으로 시작할 수 있다', async () => {
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({ hostId: 2, readyUserIds: [] } as Partial<Room>));
-
-    expect(await screen.findByText('방장이 지금 인원으로 시작할 수 있어요 — 준비해 두세요')).toBeInTheDocument();
-  });
-
-  it('이미 준비했으면 권하지 않는다', async () => {
-    loadGame.mockResolvedValue(oneCard);
-    renderRoom(waiting({ hostId: 2, readyUserIds: [1] } as Partial<Room>));
-    await screen.findByText('테스트 방');
-
-    expect(screen.queryByText(/준비해 두세요/)).toBeNull();
   });
 });
 
@@ -1246,7 +1196,7 @@ describe('RoomPage — 관전자 자리에 앉기 (D-137)', () => {
 
     expect(roomsApi.join).toHaveBeenCalledWith('tok', 'r1');
     expect(screen.queryByRole('button', { name: '자리에 앉기' })).toBeNull();
-    expect(screen.getByRole('button', { name: '준비' })).toBeInTheDocument();
+    expect(screen.getByText(/방장이 시작하면 게임이 시작돼요/)).toBeInTheDocument();
   });
 
   it('꽉 찬 대기실이면 없다', async () => {
