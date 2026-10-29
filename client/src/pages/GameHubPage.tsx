@@ -156,10 +156,9 @@ export function GameHubPage() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
         {/* 헤더 */}
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {t('hub.title')}
-          </h1>
-          <div className="flex items-center gap-3">
+          {/* D-145 — 화면에 사이트 이름을 쓰지 않는다. 제목은 보조기기에만 남긴다(오른쪽 줄은 ml-auto 로 그대로 오른쪽). */}
+          <h1 className="sr-only">{t('hub.title')}</h1>
+          <div className="ml-auto flex items-center gap-3">
             {user && (
               <div className="flex items-center gap-2">
                 {/* D-117 — 게스트는 아바타 업로드 불가(서버도 403). 버튼만 잠그고 이유는 title 로. */}

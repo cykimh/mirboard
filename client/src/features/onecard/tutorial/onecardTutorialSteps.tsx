@@ -38,7 +38,7 @@ function CardRow({ cards }: { cards: OneCardCard[] }) {
 
 export const ONE_CARD_TUTORIAL_STEPS: TutorialStep[] = [
   {
-    title: '미르보드 원카드에 오신 걸 환영합니다',
+    title: '원카드에 오신 걸 환영합니다',
     source: '§2·§11',
     body: (
       <>

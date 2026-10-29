@@ -645,9 +645,9 @@ Open Graph 로 바꿔 준다(`infra.web.RoomPagePreviewController`, 렌더러 `R
 - 응답 `200` `text/html;charset=UTF-8`, `Cache-Control: no-cache`(방마다 내용이 달라 공유 캐시 금지). 요청의 `Accept` 와 무관하다 — 협상하지 않는다
   (`produces` 를 걸면 `Accept` 가 HTML 이 아닌 스크래퍼가 406 빈 본문을 받는다). 인증 없음(`/api` 밖 default-permit — 스크래퍼는 토큰이 없다),
   레이트리밋 없음(`/api/**` 전용).
-- 넣는 값: `<title>{제목} — 미르보드카페</title>`, `description`·`og:description` = "{방장}님이 초대했어요 · {정원}인 방 · 누르면 바로 입장",
+- 넣는 값: `<title>{제목}</title>`(D-145 — 사이트 이름 꼬리 없음), `description`·`og:description` = "{방장}님이 초대했어요 · {정원}인 방 · 누르면 바로 입장",
   `og:title` = "{게임 표시 이름} · {방 이름}"(방 이름이 비면 "{방장}님의 방"), `og:url`(요청 절대 주소 — forwarded 헤더 반영, 쿼리 없음),
-  `og:type=website`, `og:site_name=미르보드카페`, `og:locale=ko_KR`, D-138 — `og:image`(= 방 주소의 출처 + `/og-image.jpg`, 1200×630 카드 테이블 그림,
+  `og:type=website`, `og:site_name=티츄·스컬킹·원카드`, `og:locale=ko_KR`, D-138 — `og:image`(= 방 주소의 출처 + `/og-image.jpg`, 1200×630 카드 테이블 그림,
   `og:image:width`·`height`·`alt`) + `twitter:card=summary_large_image`(방 주소를 못 읽으면 이미지 없이 `summary`). **현재 인원은 넣지 않는다**(카톡이 미리보기를
   저장해 낡은 숫자가 보인다 — 정원만). 방 이름 40글자·방장 20글자(그래핌 — 사람이 보는 글자, ZWJ 이모지·NFD 한글을 가르지 않는다)에서 자르고 공백을 접은 뒤 전부 HTML 이스케이프.
 - 방이 없거나(`ROOM_NOT_FOUND`) 조회가 실패하면 틀 그대로 `200`(공통 미리보기의 SPA — 클라가 "방이 없어졌어요"). 방 ID 모양

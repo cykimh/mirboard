@@ -117,7 +117,7 @@ infra/
 ### 3.3 클라이언트 (`client/src`)
 
 ```
-pages/        LoginPage, RegisterPage, GameHubPage(메인=미르보드카페), RoomPage(대기실+게임판)
+pages/        LoginPage, RegisterPage, GameHubPage(메인=메인), RoomPage(대기실+게임판)
 features/
 ├── auth/     authStore (JWT 영속)
 ├── lobby/    CreateRoomModal, gameWiki(외부 위키 URL 하드코딩)

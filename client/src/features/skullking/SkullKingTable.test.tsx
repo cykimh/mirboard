@@ -581,7 +581,7 @@ describe('규칙 버튼 (D-121)', () => {
     fireEvent.click(screen.getByRole('button', { name: '규칙' }));
 
     expect(
-      screen.getByRole('heading', { name: '미르보드 스컬킹에 오신 걸 환영합니다' }),
+      screen.getByRole('heading', { name: '스컬킹에 오신 걸 환영합니다' }),
     ).toBeInTheDocument();
     // 다이얼로그는 body 포털(.sk-table 밖)이라 본문이 칩 토큰 클래스를 직접 가져야 한다.
     expect(document.querySelector('.tutorial-body')).toHaveClass('sk-tokens');

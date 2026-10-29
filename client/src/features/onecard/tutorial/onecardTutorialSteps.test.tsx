@@ -26,7 +26,7 @@ describe('원카드 튜토리얼 — 구조', () => {
   });
 
   it('첫 단계는 환영, 끝의 두 단계는 퀴즈와 반응 연습이다', () => {
-    expect(steps[0].title).toBe('미르보드 원카드에 오신 걸 환영합니다');
+    expect(steps[0].title).toBe('원카드에 오신 걸 환영합니다');
     expect(steps[10].title).toBe('연습 — 낼 수 있을까?');
     expect(steps[11].title).toBe('연습 — 원카드! 반응');
   });
@@ -47,7 +47,7 @@ describe('원카드 튜토리얼 — 구조', () => {
 
 describe('원카드 튜토리얼 — 룰 문서와 맞물린 문구 (§ 인용)', () => {
   it('인원 2~6명 (§2)', () => {
-    expect(bodyText('미르보드 원카드에 오신 걸 환영합니다')).toContain('2~6명');
+    expect(bodyText('원카드에 오신 걸 환영합니다')).toContain('2~6명');
   });
 
   it('카드 54장과 공격 값 +2·+3·+5·+7 (§1)', () => {

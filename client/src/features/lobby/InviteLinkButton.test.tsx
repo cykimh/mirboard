@@ -26,7 +26,7 @@ describe('InviteLinkButton — 결과별 표시 (D-133)', () => {
     expect(await screen.findByText('초대 링크를 보냈어요')).toHaveAttribute('role', 'status');
     expect(share).toHaveBeenCalledWith({
       title: '원카드 같이 해요',
-      text: '금요일 한 판 — 미르보드카페',
+      text: '금요일 한 판',
       url: LINK,
     });
   });
@@ -174,7 +174,7 @@ describe('InviteLinkButton — 기본 경로는 휴대폰만 공유창 (D-133)',
     fireEvent.click(screen.getByRole('button', { name: '초대 링크' }));
 
     expect(await screen.findByText('초대 링크를 보냈어요')).toBeInTheDocument();
-    expect(share).toHaveBeenCalledWith({ title: '원카드 같이 해요', text: '금요일 한 판 — 미르보드카페', url: LINK });
+    expect(share).toHaveBeenCalledWith({ title: '원카드 같이 해요', text: '금요일 한 판', url: LINK });
     expect(writeText).not.toHaveBeenCalled();
   });
 });

@@ -49,7 +49,7 @@ export function RegisterPage() {
         <CardHeader>
           <CardTitle className="text-xl">회원가입</CardTitle>
           <CardDescription>
-            Mirboard 는 아이디와 비밀번호만 저장합니다. 이메일/전화번호는
+            이 사이트는 아이디와 비밀번호만 저장합니다. 이메일/전화번호는
             받지 않습니다.
           </CardDescription>
         </CardHeader>

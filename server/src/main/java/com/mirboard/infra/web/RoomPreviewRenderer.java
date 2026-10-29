@@ -13,7 +13,7 @@ import org.springframework.web.util.HtmlUtils;
  * 바꾸고 구간 밖은 한 글자도 건드리지 않는다. 표식이 없거나 순서가 어긋나면 틀을 그대로 돌려준다.
  *
  * <ul>
- *   <li>제목 "{게임 표시 이름} · {방 이름}"(방 이름이 비면 "{방장}님의 방"), {@code <title>} 은 제목 + " — 미르보드카페".</li>
+ *   <li>제목 "{게임 표시 이름} · {방 이름}"(방 이름이 비면 "{방장}님의 방"), {@code <title>} 도 같은 제목(D-145 — 사이트 이름 꼬리 없음).</li>
  *   <li>설명 "{방장}님이 초대했어요 · {정원}인 방 · 누르면 바로 입장". <b>현재 인원은 넣지 않는다</b> — 카톡이 미리보기를 한동안
  *       저장해 낡은 숫자가 보인다(입력 {@link RoomPreview} 에 인원이 아예 없다).</li>
  *   <li>사용자 입력(방 이름·방장 이름)은 공백을 접고 길이를 자른 뒤(방 이름 {@value #MAX_ROOM_NAME}글자·방장 {@value #MAX_HOST_NAME}글자,
@@ -25,7 +25,7 @@ public final class RoomPreviewRenderer {
 
     static final String START = "<!--og:start-->";
     static final String END = "<!--og:end-->";
-    static final String SITE_NAME = "미르보드카페";
+    static final String SITE_NAME = "티츄·스컬킹·원카드";
     /** D-138 — 빌드가 `client/public` 을 그대로 복사한 미리보기 이미지(1200×630). */
     static final String IMAGE_PATH = "/og-image.jpg";
     /** 방 이름 길이 상한(글자 — 확장 그래핌 묶음). 카톡 말풍선 제목은 두 줄 남짓에서 어차피 잘린다 — 메타가 끝없이 길어지지 않게만. */
@@ -62,7 +62,7 @@ public final class RoomPreviewRenderer {
         String title = room.gameName() + " · " + roomLabel(room.roomName(), host);
         String description = (host == null ? "" : host + "님이 초대했어요 · ")
                 + room.capacity() + "인 방 · 누르면 바로 입장";
-        return line("<title>" + esc(title + " — " + SITE_NAME) + "</title>")
+        return line("<title>" + esc(title) + "</title>")
                 + meta("name", "description", description)
                 + meta("property", "og:type", "website")
                 + meta("property", "og:site_name", SITE_NAME)
@@ -85,7 +85,7 @@ public final class RoomPreviewRenderer {
         return meta("property", "og:image", origin + IMAGE_PATH)
                 + meta("property", "og:image:width", "1200")
                 + meta("property", "og:image:height", "630")
-                + meta("property", "og:image:alt", "카드 테이블 — " + SITE_NAME)
+                + meta("property", "og:image:alt", "카드 테이블")
                 + meta("name", "twitter:card", "summary_large_image");
     }
 
