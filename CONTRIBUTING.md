@@ -178,6 +178,19 @@ export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
 npm --prefix client run test
 ```
 
+#### 화면 자동 점검 (E2E, D-142)
+
+`client/e2e/*.e2e.ts`(Playwright) — 게스트로 들어가 허브를 보고, 세 게임을 "봇과 연습"으로 열어 게임판이 뜨는지·게임 종료 뒤 허브로
+나오는지 데스크톱·휴대폰(Pixel 7) 두 화면으로 돈다. 서버·클라를 띄워 둔 채 돌린다(기본 `http://localhost:5173` — `scripts/dev.sh up`).
+로컬은 깔린 Chrome 을 쓰므로 브라우저를 따로 받지 않는다. CI 는 `bundle-jar` 잡이 묶은 jar 를 띄워 같은 테스트를 돈다(배포와는 별개 —
+실패해도 배포를 막지 않는다).
+
+```bash
+npm --prefix client run e2e
+# 다른 곳(스테이징·운영)에 돌릴 때 — 게스트 계정이 하나 생긴다(12시간 뒤 정리). 운영은 사람이 직접 고른다.
+E2E_BASE_URL=https://<호스트> npm --prefix client run e2e
+```
+
 ### 코드 수정 검증 흐름
 
 **`scripts/check.sh` wrapper** (Phase 11 — D-60) — 자주 쓰는 검증 명령 단축 +
