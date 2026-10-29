@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
@@ -6,9 +6,7 @@ import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi } from '@/api/users';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
-import { GameTable } from '@/features/tichu/GameTable';
-import { SkullKingTable } from '@/features/skullking/SkullKingTable';
-import { OneCardTable } from '@/features/onecard/OneCardTable';
+import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
 import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPanel';
@@ -72,6 +70,15 @@ interface HeldSeats {
  * 스코프에서 명시). 종료 화면을 가진 게임(`BOARD_HELD_GAMES`)은 이 세션이 IN_GAME→FINISHED 를 보면 게임판을 내리지
  * 않고 `roomFinished` 를 넘긴다(D-120·D-129).
  */
+/** 게임판 조각을 받는 동안(대개 대기실에서 미리 받아 두어 보이지 않는다). */
+function TableLoading() {
+  return (
+    <p role="status" className="room-table-loading">
+      게임판을 불러오는 중…
+    </p>
+  );
+}
+
 export function RoomPage() {
   const { roomId = '' } = useParams<{ roomId: string }>();
   const token = useAuthStore((s) => s.token);
@@ -453,6 +460,12 @@ export function RoomPage() {
     if (!waiting) hideTutorial();
   }, [waiting, hideTutorial]);
 
+  // 게임판은 따로 받는 조각이다(gameTables) — 방에 들어오면 그 게임의 게임판을 미리 받아, 시작할 때 기다리지 않게 한다.
+  const gameType = room?.gameType;
+  useEffect(() => {
+    if (gameType) preloadGameTable(gameType);
+  }, [gameType]);
+
   // FR-5 — 관전 안내를 읽어 주는 상태 영역. 영역과 문구를 함께 삽입하면 일부 스크린 리더가 읽지 않으므로 아래 모든 렌더 갈래의 맨
   // 앞 같은 자리에 늘 둔다 — 첫 입장 응답 전 로딩 화면부터 같은 DOM 노드가 유지되고 문구만 들어간다. 보이는 안내 카드
   // (SpectateNotice)는 상태 영역이 아니다(같은 문구가 두 번 읽히지 않게 카드 문구는 보조 기술에서 숨긴다).
@@ -531,7 +544,9 @@ export function RoomPage() {
     return withLiveRegion(
       <main className="room-page">
         {notice}
-        {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
+        <Suspense fallback={<TableLoading />}>
+          {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
+        </Suspense>
       </main>,
     );
   }
@@ -540,21 +555,23 @@ export function RoomPage() {
     return withLiveRegion(
       <main className="room-page">
         {notice}
-        <GameTable
-          roomId={room.roomId}
-          playerIds={room.playerIds}
-          myUserId={user.userId}
-          spectator={iAmSpectator}
-          botSeats={room.botSeats ?? []}
-          fillWithBots={room.fillWithBots ?? false}
-          turnSeconds={room.turnSeconds ?? 0}
-          stake={room.stake ?? 0}
-          spectatorCount={(room.spectatorIds ?? []).length}
-          usernames={usernames}
-          isHost={iAmHost}
-          onExit={handleLeave}
-          onAbort={onAbort}
-        />
+        <Suspense fallback={<TableLoading />}>
+          <GameTable
+            roomId={room.roomId}
+            playerIds={room.playerIds}
+            myUserId={user.userId}
+            spectator={iAmSpectator}
+            botSeats={room.botSeats ?? []}
+            fillWithBots={room.fillWithBots ?? false}
+            turnSeconds={room.turnSeconds ?? 0}
+            stake={room.stake ?? 0}
+            spectatorCount={(room.spectatorIds ?? []).length}
+            usernames={usernames}
+            isHost={iAmHost}
+            onExit={handleLeave}
+            onAbort={onAbort}
+          />
+        </Suspense>
       </main>,
     );
   }
