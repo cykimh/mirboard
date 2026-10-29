@@ -100,13 +100,13 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '스컬킹 게임 방법' }));
     expect(
-      await screen.findByRole('heading', { name: '미르보드 스컬킹에 오신 걸 환영합니다' }),
+      await screen.findByRole('heading', { name: '스컬킹에 오신 걸 환영합니다' }),
     ).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
 
     fireEvent.click(screen.getByRole('button', { name: '티츄 게임 방법' }));
     expect(
-      await screen.findByRole('heading', { name: '미르보드 티츄에 오신 걸 환영합니다' }),
+      await screen.findByRole('heading', { name: '티츄에 오신 걸 환영합니다' }),
     ).toBeInTheDocument();
   });
 
@@ -228,5 +228,24 @@ describe('GameHubPage — 오류 문구 (D-138)', () => {
     fireEvent.click(screen.getByRole('button', { name: '구경하기' }));
 
     expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
+  });
+});
+
+describe('GameHubPage — 사이트 이름 없음 (D-145)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('화면에 사이트 이름을 쓰지 않는다 — 큰 제목은 보조기기에만 남는다', async () => {
+    const { container } = renderHub();
+    await screen.findByRole('button', { name: '티츄 게임 방법' });
+
+    expect(container.textContent).not.toMatch(/미르보드|Mirboard/);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveClass('sr-only');
   });
 });

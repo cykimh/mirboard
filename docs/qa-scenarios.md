@@ -173,7 +173,7 @@ npm --prefix client run dev
 
 브라우저 4개(또는 incognito 창 4개) 로:
 1. `/register` 에서 4명의 사용자 가입 (예: `p1` ~ `p4`).
-2. 각자 로그인 → **미르보드카페(`/games`)** 진입. 게임 카탈로그·방 목록·랭킹·로비 채팅이
+2. 각자 로그인 → **메인(`/games`)** 진입. 게임 카탈로그·방 목록·랭킹·로비 채팅이
    한 화면에 있다 (게임별 로비 페이지 `/games/:id/lobby` 는 Phase 16(#1)에서 폐지).
 3. p1 이 "방 만들기" → 모달에서 티츄 선택 → 생성. p2, p3, p4 가 목록에서 입장.
 4. 4명이 모이면 **방장이 "4명으로 시작"**(D-143 — [준비] 없음)을 누르면 `room_start_now.lua` 가 WAITING→IN_GAME 을 원자 전이시키고
@@ -245,7 +245,7 @@ MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MAX_MILLIS=19000 \
 각각 `mirboard.onecard.race-window-millis`, `bot-reaction-{owner,catcher}-{min,max}-millis` 설정에 대응한다 — `@Value` 도 스프링의
 환경 변수 매핑(점·하이픈 → 밑줄, 대문자)으로 받고 `application.yml` 값보다 우선한다.
 
-1. 미르보드카페 → 원카드 카드의 「게임 방법」으로 튜토리얼(12단계)을 연다(D-136 — 봇과 연습은 대기실이 없어 자동으로 뜨지 않는다 —
+1. 메인 → 원카드 카드의 「게임 방법」으로 튜토리얼(12단계)을 연다(D-136 — 봇과 연습은 대기실이 없어 자동으로 뜨지 않는다 —
    친구와 하기 방 대기실에 처음 들어가면 한 번 자동으로 뜬다). 2단계 카드 그림(♥ 빨강, ♠ 검정, 두 조커), 11단계 퀴즈, 12단계 반응 연습 버튼이 칸 안에 뜨는지 본다.
 2. 게임판: 상대 좌석은 이름과 장수만큼의 작은 카드 뒷면만(숫자 없음 — 마우스를 올리면 "남은 손패 N장", D-144), 가운데에 뽑을 더미 장수·
    맨 위 카드(7 이면 지정 무늬, 아래에 직전 카드 2장이 살짝 비틀려 깔림)·진행 방향·차례가 보인다. 내 차례에
@@ -321,11 +321,11 @@ MIRBOARD_ONECARD_BOT_REACTION_CATCHER_MAX_MILLIS=19000 \
 ```bash
 # 미리보기 HTML — 토큰 없이 200, 그 방의 og 메타 (방 ID 는 대기실 주소창에서)
 curl -s https://mirboard.fly.dev/rooms/<방ID> | grep -E '<title>|og:|twitter:'
-# → <title>원카드 · 금요일 한 판 — 미르보드카페</title>
+# → <title>원카드 · 금요일 한 판</title>
 #   <meta property="og:description" content="alice님이 초대했어요 · 4인 방 · 누르면 바로 입장" /> …
 #   og:url 은 https://mirboard.fly.dev/rooms/<방ID> 여야 한다 — http·내부 주소(:8080)면 forwarded 헤더 반영 실패
 curl -sI https://mirboard.fly.dev/rooms/<방ID> | grep -i cache-control   # → no-cache
-# 없는 방 → 사이트 공통 미리보기("미르보드카페 — 티츄·스컬킹·원카드") 그대로
+# 없는 방 → 사이트 공통 미리보기("티츄·스컬킹·원카드") 그대로
 curl -s https://mirboard.fly.dev/rooms/00000000-0000-0000-0000-000000000000 | grep og:title
 # Accept 가 HTML 이 아니어도 406 이 아니라 같은 미리보기(스크래퍼마다 Accept 가 다르다)
 curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -H 'Accept: application/json' https://mirboard.fly.dev/rooms/<방ID>
@@ -448,11 +448,11 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 ### 시나리오 4 — 관전 모드 (6A-5/6A-6)
 
-1. 5번째 사용자 (예: `spec_user`) 가 미르보드카페(`/games`) 진입 → "방 ID 로 관전 진입" 입력 박스에
+1. 5번째 사용자 (예: `spec_user`) 가 메인(`/games`) 진입 → "방 ID 로 관전 진입" 입력 박스에
    IN_GAME 방 ID 붙여넣기 → "구경하기".
 2. **기대**: GameTable 표시되되 손패 영역 / 액션 버튼 / 모달 모두 숨김.
    "관전 중 — 본인 손패는 표시되지 않습니다." 배너 노출.
-3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 미르보드카페로 복귀.
+3. "나가기" 버튼 → `DELETE /api/rooms/{id}/spectate` 호출 → 메인로 복귀.
 4. **추가 보안 검증** (옵션): 관전자가 `curl -X POST /app/room/{id}/action` 직접
    호출 시 `NOT_IN_ROOM` 에러 (실제 UI 에선 액션 버튼 자체가 안 보임).
 
@@ -466,7 +466,7 @@ Phase 6 (E/A/C/D) 의 주요 UX/운영 기능을 사용자 직접 클릭으로 �
 
 ### 시나리오 6 — 게임별 튜토리얼 (D-121)
 
-1. 새 시크릿 창(빈 localStorage)으로 로그인 → 미르보드카페.
+1. 새 시크릿 창(빈 localStorage)으로 로그인 → 메인.
 2. **기대**: 허브에서는 튜토리얼이 **자동으로 뜨지 않는다**. 헤더에 '게임 방법' 버튼이 없고,
    티츄·스컬킹·원카드 게임 카드 3장 모두에 '게임 방법' 버튼이 있다(튜토리얼이 없는 게임 카드에는 없음).
 3. 스컬킹 카드 '게임 방법' → 스컬킹 13단계, 티츄 카드 → 티츄 9단계, 원카드 카드 → 원카드 12단계(퀴즈·반응 연습 포함)가

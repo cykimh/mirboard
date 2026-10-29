@@ -28,7 +28,7 @@ const SPECIALS: Card[] = [
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
-    title: '미르보드 티츄에 오신 걸 환영합니다',
+    title: '티츄에 오신 걸 환영합니다',
     body: (
       <p>
         티츄는 4명이 <strong>2:2 팀</strong>으로 즐기는 카드 게임입니다. 마주 보는 두 사람이

@@ -173,8 +173,8 @@ export function LoginPage() {
     <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Mirboard 로그인</CardTitle>
-          <CardDescription>미르보드카페에 오신 것을 환영합니다.</CardDescription>
+          <CardTitle className="text-xl">로그인</CardTitle>
+          <CardDescription>티츄·스컬킹·원카드를 친구와 바로 즐겨요.</CardDescription>
         </CardHeader>
         <CardContent>
           {invited ? (

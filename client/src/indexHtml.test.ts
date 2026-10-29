@@ -41,10 +41,12 @@ describe('index.html — 사이트 공통 미리보기와 표식 (D-133)', () =>
     expect(html.indexOf(END)).toBeLessThan(html.indexOf('</head>'));
   });
 
-  it('구간 안에 사이트 공통 Open Graph 가 있다 — 제목은 "미르보드카페 — 티츄·스컬킹·원카드"', () => {
+  it('구간 안에 사이트 공통 Open Graph 가 있다 — 제목은 "티츄·스컬킹·원카드" — 사이트 이름 없음', () => {
     const og = block();
-    expect(og).toContain('<meta property="og:title" content="미르보드카페 — 티츄·스컬킹·원카드" />');
-    expect(og).toContain('<meta property="og:site_name" content="미르보드카페" />');
+    expect(og).toContain('<meta property="og:title" content="티츄·스컬킹·원카드" />');
+    expect(og).toContain('<meta property="og:site_name" content="티츄·스컬킹·원카드" />');
+    expect(og).toContain('<title>티츄·스컬킹·원카드</title>');
+    expect(html).not.toMatch(/미르보드|Mirboard/);
     expect(og).toContain('<meta property="og:type" content="website" />');
     expect(og).toContain('<meta property="og:locale" content="ko_KR" />');
     expect(og).toContain('<meta name="twitter:card" content="summary" />');

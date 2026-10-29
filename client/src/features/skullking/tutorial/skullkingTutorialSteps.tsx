@@ -57,7 +57,7 @@ const CYCLE: SkullCard[] = [
 
 export const SKULL_KING_TUTORIAL_STEPS: TutorialStep[] = [
   {
-    title: '미르보드 스컬킹에 오신 걸 환영합니다',
+    title: '스컬킹에 오신 걸 환영합니다',
     source: '§2·§3·§12·§13-⑰',
     body: (
       <>

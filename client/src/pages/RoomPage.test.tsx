@@ -329,7 +329,7 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
 
 describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
   const SK_KEY = 'mirboard.tutorial.skull_king.seen.v1';
-  const SK_TITLE = '미르보드 스컬킹에 오신 걸 환영합니다';
+  const SK_TITLE = '스컬킹에 오신 걸 환영합니다';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -501,7 +501,7 @@ describe('RoomPage — 초대 링크 (D-133)', () => {
 });
 
 /**
- * D-133 — 방 주소로 처음 연 탭은 서버가 넣은 방 제목("{게임} · {방 이름} — 미르보드카페")으로 시작한다. SPA 는 제목을 관리하지 않으므로
+ * D-133 — 방 주소로 처음 연 탭은 서버가 넣은 방 제목("{게임} · {방 이름}")으로 시작한다. SPA 는 제목을 관리하지 않으므로
  * 방 화면을 떠날 때 기본 제목으로 되돌린다 — 허브로 나가거나 다른 방에 가도 처음 방 이름이 탭·방문 기록에 남지 않게(IP-5).
  */
 describe('RoomPage — 탭 제목 (D-133)', () => {
@@ -514,13 +514,13 @@ describe('RoomPage — 탭 제목 (D-133)', () => {
   });
 
   it('방 화면을 떠나면 서버가 넣은 방 제목을 기본 제목으로 되돌린다', async () => {
-    document.title = '원카드 · 금요일 한 판 — 미르보드카페';
+    document.title = '원카드 · 금요일 한 판';
     const view = renderRoom({ gameType: 'ONE_CARD' });
     await screen.findByText('테스트 방');
 
     view.unmount();
 
-    expect(document.title).toBe('Mirboard');
+    expect(document.title).toBe('티츄·스컬킹·원카드');
   });
 });
 

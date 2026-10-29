@@ -8,7 +8,7 @@ import { shareRoomLink, type ShareEnv } from './shareRoomLink';
  */
 
 const URL_ = 'https://mirboard.test/rooms/abc';
-const META = { title: '원카드 같이 해요', text: '금요일 한 판 — 미르보드카페' };
+const META = { title: '원카드 같이 해요', text: '금요일 한 판' };
 
 function abortError(): Error {
   return new DOMException('Share canceled', 'AbortError');

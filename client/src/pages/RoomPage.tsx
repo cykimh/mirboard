@@ -177,7 +177,7 @@ export function RoomPage() {
   // 기본 제목으로 되돌린다(허브로 나가거나 다른 방에 가도 처음 방 이름이 탭·방문 기록에 남지 않게).
   useEffect(
     () => () => {
-      document.title = 'Mirboard';
+      document.title = '티츄·스컬킹·원카드';
     },
     [],
   );
@@ -454,7 +454,7 @@ export function RoomPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
             <Button asChild variant="outline">
-              <Link to="/games">← 미르보드카페로</Link>
+              <Link to="/games">← 메인으로</Link>
             </Button>
           </CardContent>
         </Card>

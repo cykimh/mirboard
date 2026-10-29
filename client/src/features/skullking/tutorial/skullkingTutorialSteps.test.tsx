@@ -30,7 +30,7 @@ describe('스컬킹 튜토리얼 — 구조', () => {
   });
 
   it('첫 단계는 환영, 마지막은 준비 완료', () => {
-    expect(steps[0].title).toBe('미르보드 스컬킹에 오신 걸 환영합니다');
+    expect(steps[0].title).toBe('스컬킹에 오신 걸 환영합니다');
     expect(steps[steps.length - 1].title).toBe('준비 완료!');
   });
 

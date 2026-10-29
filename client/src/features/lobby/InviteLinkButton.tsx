@@ -59,7 +59,7 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
     try {
       const outcome = await shareRoomLink(
         url,
-        { title: `${gameName} 같이 해요`, text: `${roomName} — 미르보드카페` },
+        { title: `${gameName} 같이 해요`, text: roomName },
         env ?? browserShareEnv(),
       );
       setResult(outcome);

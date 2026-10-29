@@ -790,7 +790,7 @@ describe('OneCardTable — 종료·나가기', () => {
     renderTable({ playerIds: [100, 101, 102] });
 
     fireEvent.click(screen.getByRole('button', { name: '규칙' }));
-    expect(screen.getByText('미르보드 원카드에 오신 걸 환영합니다')).toBeInTheDocument();
+    expect(screen.getByText('원카드에 오신 걸 환영합니다')).toBeInTheDocument();
   });
 });
 

@@ -106,7 +106,7 @@ class RoomPagePreviewControllerTest {
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(body)
-                .contains("<title>원카드 · 금요일 한 판 — 미르보드카페</title>")
+                .contains("<title>원카드 · 금요일 한 판</title>")
                 .contains("<meta property=\"og:description\" content=\"alice님이 초대했어요 · 4인 방 · 누르면 바로 입장\" />")
                 .contains("<meta property=\"og:url\" content=\"http://localhost/rooms/" + ROOM_ID + "\" />")
                 .contains("<div id=\"root\"></div>")

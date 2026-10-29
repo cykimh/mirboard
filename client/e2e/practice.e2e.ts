@@ -21,7 +21,7 @@ test('게스트로 바로 들어가면 허브가 보인다', async () => {
   await page.getByRole('button', { name: '게스트로 바로 체험하기' }).click();
 
   await expect(page).toHaveURL(/\/games$/);
-  await expect(page.getByRole('heading', { name: '미르보드카페' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '새 방 만들기' })).toBeVisible();
 });
 
 const GAMES = [
