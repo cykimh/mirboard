@@ -326,21 +326,36 @@ button.oc-badge {
   font-weight: 600;
 }
 
+/* D-144 — 남은 손패는 숫자 대신 장수만큼 작은 뒷면을 겹쳐 놓는다(최대 19장 — 20장이면 파산). 칸이 좁으면 더 촘촘히 겹친다:
+   뒷면 사이 간격 = min(7px, (칸 폭 − 뒷면 폭) / (장수 − 1)). 칸 폭은 컨테이너 단위(cqw)로 읽는다. */
 .oc-seat-count {
   display: flex;
-  align-items: baseline;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  container-type: inline-size;
 }
 
-.oc-seat-count-num {
-  font-size: 22px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+.oc-seat-hand {
+  display: flex;
+  min-width: 0;
 }
 
-.oc-seat-count-unit {
-  font-size: 12px;
-  opacity: 0.75;
+.oc-seat-hand-card {
+  box-sizing: border-box;
+  flex: none;
+  width: 12px;
+  height: 17px;
+  border-radius: 2px;
+  /* 흰 테두리 — 겹친 뒷면이 한 덩어리로 뭉치지 않고 한 장씩 갈린다(실제 카드 가장자리처럼). */
+  border: 1px solid #f2f2f2;
+  background: repeating-linear-gradient(45deg, #3b5ba9, #3b5ba9 2px, #2f4c92 2px, #2f4c92 4px);
+  box-shadow: -1px 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.oc-seat-hand-card + .oc-seat-hand-card {
+  margin-left: -6px;
+  margin-left: calc(min(7px, (100cqw - 12px) / max(var(--oc-hand-count) - 1, 1)) - 12px);
 }
 
 .oc-seat-one {
@@ -419,6 +434,40 @@ button.oc-badge {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+/* D-144 — 맨 위 카드 아래에 직전 카드를 살짝 비틀어 깐다(장식, aria-hidden). 겹친 카드는 자리를 차지하지 않아 가운데 칸 폭이
+   그대로다 — 좁은 화면(가운데 ≈126px)에서도 줄이 바뀌지 않는다. */
+.oc-top-stack {
+  position: relative;
+  display: inline-flex;
+}
+
+.oc-top-stack > .oc-card,
+.oc-top-stack > .oc-top-empty {
+  z-index: 1;
+}
+
+.oc-top-trail {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.oc-top-trail-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  filter: brightness(0.82);
+}
+
+.oc-top-trail-card[data-depth='1'] {
+  transform: translate(-9px, 2px) rotate(-10deg);
+}
+
+.oc-top-trail-card[data-depth='2'] {
+  transform: translate(9px, 3px) rotate(9deg);
 }
 
 .oc-top-empty {

@@ -96,6 +96,11 @@ export interface OneCardRoomState {
   result: OneCardMatchResult | null;
   /** D-139 — 방금 낸 카드(카드 내기 비행 효과). 같은 이벤트를 두 번 적용해도 같다(순번이 같다). */
   lastPlay: LastPlay | null;
+  /**
+   * D-144 — 맨 위 카드 아래에 깔린 이전 카드(최근 것이 앞, 최대 `DISCARD_TRAIL_MAX` 장). 서버 뷰에 없는 화면 기억이라
+   * 이 세션에서 본 내기만 쌓는다 — 다시 섞으면 비우고, resync 는 맨 위가 같을 때만 지킨다.
+   */
+  discardTrail: OneCardCard[];
 
   // ── 본인 전용 ──
   mySeat: number;
@@ -168,6 +173,13 @@ export interface OneCardActions {
   requestTurnResync: (turnEpoch: number) => void;
 }
 
+/** D-144 — 맨 위 아래에 겹쳐 보이는 이전 카드 수. */
+export const DISCARD_TRAIL_MAX = 2;
+
+function sameCard(a: OneCardCard | null, b: OneCardCard | null): boolean {
+  return a !== null && b !== null && cardKey(a) === cardKey(b);
+}
+
 const INITIAL: OneCardRoomState = {
   roomId: null,
   phase: null,
@@ -182,6 +194,7 @@ const INITIAL: OneCardRoomState = {
   lastRace: null,
   result: null,
   lastPlay: null,
+  discardTrail: [],
   mySeat: -1,
   hand: [],
   handVersion: 0,
@@ -281,6 +294,7 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
       // 방금 닫힌 경쟁 안내는 서버 뷰에 없는 값이다 — 오래 떠났다 돌아와도 몇 분 전 줄이 남지 않게 비운다.
       lastRace: null,
       result: t.result,
+      discardTrail: sameCard(t.topCard, state.topCard) ? state.discardTrail : [],
       ...mine,
       // D-130 — 기다리던 누름은 같은 창이라도 비운다. 끊긴 사이에 보낸 누름은 버려졌을 수 있다(소켓이 이미 죽어 있었다) —
       // 남겨 두면 그 창 동안 다시 누를 수 없었다. 다시 누른 것이 늦으면 서버가 NO_RACE 로 거절할 뿐이다.
@@ -332,6 +346,11 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
         set({
           topCard: p.card,
           declaredSuit: p.declaredSuit ?? null,
+          // 같은 이벤트를 다시 받으면 맨 위가 이미 이 카드다 — 자기 아래에 깔지 않는다(54장이 모두 달라 값으로 비교한다).
+          discardTrail:
+            state.topCard === null || sameCard(state.topCard, p.card)
+              ? state.discardTrail
+              : [state.topCard, ...state.discardTrail].slice(0, DISCARD_TRAIL_MAX),
           attackStack: p.attackStack,
           direction: p.direction,
           seats: patchSeat(state.seats, p.seat, { handCount: p.handCount }),
@@ -369,7 +388,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
 
       case 'PILE_RESHUFFLED': {
         const p = payload as PileReshuffledPayload;
-        set({ drawPileCount: p.drawPileCount });
+        // 맨 위 아래 카드가 뽑을 더미로 들어갔다.
+        set({ drawPileCount: p.drawPileCount, discardTrail: [] });
         return 'applied';
       }
 

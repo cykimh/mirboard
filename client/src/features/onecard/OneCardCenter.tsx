@@ -1,4 +1,4 @@
-import { SUIT_LABEL, SUIT_SYMBOL, type OneCardCard, type OneCardSuit } from '@/types/onecard';
+import { SUIT_LABEL, SUIT_SYMBOL, cardKey, type OneCardCard, type OneCardSuit } from '@/types/onecard';
 import type { LastRace } from './onecardStore';
 import { OneCardCardChip } from './OneCardCardChip';
 
@@ -8,11 +8,10 @@ export function raceResultText(race: LastRace, nameOf: (seat: number) => string)
     case 'CALLED':
       return `원카드! ${nameOf(race.bySeat)} 안전`;
     case 'CAUGHT':
-      return race.ownerSeat >= 0
-        ? `잡기 성공: ${nameOf(race.bySeat)} → ${nameOf(race.ownerSeat)} 벌칙 1장`
-        : `잡기 성공: ${nameOf(race.bySeat)}`;
+      // D-144 — 잡은 사람만. 벌칙은 상대 손패 장수로 보인다.
+      return `잡기 성공: ${nameOf(race.bySeat)}`;
     case 'EXPIRED':
-      return '시간 초과 — 벌칙 없음';
+      return '시간 초과';
     case 'CANCELLED':
       return '탈주로 경쟁이 취소됐습니다';
   }
@@ -34,6 +33,8 @@ interface Props {
    * 그대로 보이고, 내려앉으면(null) 새 맨 위 카드로 바뀐다.
    */
   landingUnder?: { card: OneCardCard | null; declaredSuit: OneCardSuit | null } | null;
+  /** D-144 — 맨 위 아래에 깔린 이전 카드(최근 것이 앞). */
+  discardTrail?: OneCardCard[];
 }
 
 /**
@@ -51,9 +52,12 @@ export function OneCardCenter({
   late,
   nameOf,
   landingUnder = null,
+  discardTrail = [],
 }: Props) {
   const shownTop = landingUnder ? landingUnder.card : topCard;
   const shownSuit = landingUnder ? landingUnder.declaredSuit : declaredSuit;
+  // 날아오는 동안 맨 위 자리는 이전 카드(= 아래 카드의 첫 장)다 — 같은 카드를 두 번 깔지 않는다.
+  const beneath = landingUnder ? discardTrail.slice(1) : discardTrail;
   return (
     <section className="oc-center" aria-label="테이블">
       <div className="oc-piles">
@@ -62,11 +66,25 @@ export function OneCardCenter({
           <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
         </div>
         <div className="oc-top">
-          {shownTop ? (
-            <OneCardCardChip card={shownTop} />
-          ) : (
-            <span className="oc-top-empty">—</span>
-          )}
+          <div className="oc-top-stack">
+            {beneath.length > 0 && (
+              // 장식 — 보조기기에는 맨 위 카드만 읽힌다. 뒤에 깔리도록 먼 카드부터 그린다.
+              <span className="oc-top-trail" aria-hidden="true">
+                {beneath
+                  .map((card, i) => (
+                    <span key={cardKey(card)} className="oc-top-trail-card" data-depth={i + 1}>
+                      <OneCardCardChip card={card} />
+                    </span>
+                  ))
+                  .reverse()}
+              </span>
+            )}
+            {shownTop ? (
+              <OneCardCardChip card={shownTop} />
+            ) : (
+              <span className="oc-top-empty">—</span>
+            )}
+          </div>
           {shownSuit && (
             <span className="oc-badge oc-declared">
               지정 {SUIT_SYMBOL[shownSuit]} {SUIT_LABEL[shownSuit]}
