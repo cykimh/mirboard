@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
+import { ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { gamesApi } from '@/api/games';
@@ -9,7 +9,6 @@ import { usersApi, type UserStats } from '@/api/users';
 import { RankingCard } from '@/features/stats/RankingCard';
 import { primaryGame } from '@/features/stats/primaryGame';
 import { useAuthStore } from '@/features/auth/authStore';
-import { useLobbyStomp } from '@/ws/useLobbyStomp';
 import { TierBadge } from '@/components/TierBadge';
 import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
@@ -30,7 +29,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
   Avatar,
@@ -42,7 +40,6 @@ import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
-import { useColorblindStore } from '@/features/theme/colorblindStore';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
 
@@ -67,12 +64,7 @@ export function GameHubPage() {
   // (자동 노출은 그 게임 대기실 첫 입장 — RoomPage).
   const [tutorialGameId, setTutorialGameId] = useState<string | null>(null);
   const hubTutorial = tutorialFor(tutorialGameId);
-  const colorblind = useColorblindStore((s) => s.enabled);
-  const toggleColorblind = useColorblindStore((s) => s.toggle);
   const [avatarVersion, setAvatarVersion] = useState(0);
-
-  const { messages, connected, send } = useLobbyStomp(token);
-  const [draft, setDraft] = useState('');
 
   const refreshRooms = useCallback(async () => {
     if (!token) return;
@@ -131,24 +123,9 @@ export function GameHubPage() {
     }
   }
 
-  function handleSendChat(event: React.FormEvent) {
-    event.preventDefault();
-    if (!draft.trim()) return;
-    send(draft.trim());
-    setDraft('');
-  }
-
   const availableGames = (games ?? []).filter((g) => g.status === 'AVAILABLE');
   const played = stats?.games ?? [];
   const primary = primaryGame(played);
-  const totals = played.reduce(
-    (acc, g) => ({
-      win: acc.win + g.winCount,
-      lose: acc.lose + g.loseCount,
-      desert: acc.desert + g.desertCount,
-    }),
-    { win: 0, lose: 0, desert: 0 },
-  );
   const gameName = (id: string) => games?.find((g) => g.id === id)?.displayName ?? id;
 
   return (
@@ -192,30 +169,12 @@ export function GameHubPage() {
                 )}
               </div>
             )}
-            {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로, 전적은 전 게임 합. */}
+            {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로. D-146 — 전적 합계는 뺐다(프로필에 있다). */}
             {primary && (
               <span title={`${gameName(primary.gameType)} 기준`}>
                 <TierBadge tier={primary.tier} rating={primary.rating} />
               </span>
             )}
-            {stats && (
-              <span className="text-xs text-muted-foreground">
-                {totals.win}승 {totals.lose}패
-                {totals.desert > 0 && ` · 탈주 ${totals.desert}`}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant={colorblind ? 'default' : 'outline'}
-              size="sm"
-              onClick={toggleColorblind}
-              aria-pressed={colorblind}
-              aria-label="색약 모드"
-              title="색약 모드 — 카드 슈트를 글리프로도 표시"
-            >
-              <Eye className="h-4 w-4" />
-              <span className="hidden sm:inline">색약</span>
-            </Button>
             <ThemeToggle />
             <Button
               type="button"
@@ -309,9 +268,10 @@ export function GameHubPage() {
               })}
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* D-146 — 로비 채팅을 없애 대기 중인 방이 한 줄을 다 쓴다. */}
+        <div className="grid grid-cols-1 gap-6">
           {/* 대기 중인 방 */}
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle>대기 중인 방</CardTitle>
               <Button
@@ -382,43 +342,6 @@ export function GameHubPage() {
                   disabled={!spectateInput.trim()}
                 >
                   구경하기
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* 로비 채팅 */}
-          <Card className="flex flex-col">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>로비 채팅</CardTitle>
-              <Badge variant={connected ? 'default' : 'secondary'}>
-                {connected ? '연결됨' : '연결 중'}
-              </Badge>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <ScrollArea className="h-56 rounded-md border p-2">
-                <ul className="flex flex-col gap-1.5 text-sm">
-                  {messages.map((m) => (
-                    <li key={m.eventId} className="flex gap-2">
-                      <strong className="text-primary">{m.username}</strong>
-                      <span className="text-foreground/90">{m.message}</span>
-                    </li>
-                  ))}
-                </ul>
-              </ScrollArea>
-              <form className="flex gap-2" onSubmit={handleSendChat}>
-                <Input
-                  type="text"
-                  value={draft}
-                  placeholder={connected ? '메시지' : '연결 중...'}
-                  disabled={!connected}
-                  onChange={(e) => setDraft(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  disabled={!connected || !draft.trim()}
-                >
-                  전송
                 </Button>
               </form>
             </CardContent>

@@ -84,22 +84,30 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
     return () => clearTimeout(timer);
   }, [result]);
 
+  // D-146 — 대기실 위쪽 버튼 줄에 버튼 하나만 둔다. 설명은 title 로, 알림은 버튼 아래에 떠서 줄 높이를 바꾸지 않는다. 수동 입력란은
+  // 버튼 줄 아래에 한 줄을 다 쓰고 끼어든다(줄 안 flex-wrap 의 basis-full) — 버튼에 붙여 띄우면 휴대폰에서 화면 왼쪽 밖으로 나갔다.
   return (
-    <section aria-label="친구 초대" className="flex flex-col gap-2 rounded-lg border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {full ? '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요' : '링크를 보내면 친구가 바로 이 방에 들어와요.'}
-        </p>
-        <Button type="button" onClick={handleClick} disabled={busy}>
+    <>
+      <div className="relative">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleClick}
+          disabled={busy}
+          title={full ? '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요' : '링크를 보내면 친구가 바로 이 방에 들어와요'}
+        >
           초대 링크
         </Button>
+        {/* 라이브 영역은 늘 두고 내용만 바꾼다 — 영역과 내용을 함께 삽입하면 일부 스크린 리더가 읽지 않는다. */}
+        <p
+          role="status"
+          className="absolute right-0 top-full z-10 mt-1 whitespace-nowrap text-xs text-muted-foreground"
+        >
+          {result === 'shared' ? '초대 링크를 보냈어요' : result === 'copied' ? '링크를 복사했어요' : ''}
+        </p>
       </div>
-      {/* 라이브 영역은 늘 두고 내용만 바꾼다 — 영역과 내용을 함께 삽입하면 일부 스크린 리더가 읽지 않는다. */}
-      <p role="status" className="min-h-5 text-sm">
-        {result === 'shared' ? '초대 링크를 보냈어요' : result === 'copied' ? '링크를 복사했어요' : ''}
-      </p>
       {result === 'manual' && (
-        <div className="flex flex-col gap-1.5">
+        <div className="order-last flex min-w-64 basis-full flex-col gap-1.5">
           <Label htmlFor="invite-link-manual">직접 복사해 주세요</Label>
           <Input
             id="invite-link-manual"
@@ -110,6 +118,6 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
           />
         </div>
       )}
-    </section>
+    </>
   );
 }

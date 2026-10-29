@@ -109,7 +109,7 @@
 }
 
 /* #1' — 직관적 숫자+슈트 카드(트럼프 핍 SVG 대체). 좌측 정렬 + 세로 중앙이라 손패가
-   겹쳐도 왼쪽 슬라이버에서 랭크/슈트가 읽힌다. A5 색약(.cb)은 슈트 글리프 윤곽 강조. */
+   겹쳐도 왼쪽 슬라이버에서 랭크/슈트가 읽힌다. */
 .card-chip .card-simple {
   position: absolute;
   inset: 0;
@@ -129,9 +129,6 @@
   font-size: 1.4rem;
   font-weight: 700;
   margin-top: 2px;
-}
-.card-chip .card-simple.cb .cs-suit {
-  -webkit-text-stroke: 0.5px currentColor;
 }
 
 .card-chip .rank {

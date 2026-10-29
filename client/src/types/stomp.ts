@@ -8,12 +8,6 @@ export interface StompEnvelope<TPayload = unknown> {
   payload: TPayload;
 }
 
-export interface LobbyChatPayload {
-  userId: number;
-  username: string;
-  message: string;
-}
-
 /**
  * 게임 sink(스토어)의 반영 결과 (D-103 → D-124). 순번 판정(중복·구멍)은 훅이 sink 앞에서
  * 끝낸다 — `ws/seqGate.ts` 의 `judgeSeq`. 그래서 여기에는 순번 관련 값이 없다.

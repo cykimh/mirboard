@@ -116,18 +116,24 @@ describe('InviteLinkButton — 결과별 표시 (D-133)', () => {
  * D-133 — 자리가 다 찬 대기실(봇 자리 포함)의 초대는 관전 초대다. 버튼은 그대로 두고 설명만 사실대로 바꾼다(IP-3).
  */
 describe('InviteLinkButton — 자리가 다 찬 방 (D-133)', () => {
-  it('full 이면 "링크를 받은 친구는 관전으로 들어와요"', () => {
+  // D-146 — 설명 문단을 없애고 버튼 하나만 둔다. 설명은 버튼 title(마우스 오버)로.
+  it('full 이면 버튼 설명이 "링크를 받은 친구는 관전으로 들어와요"', () => {
     render(<InviteLinkButton roomId="r1" roomName="방" gameName="원카드" full env={{}} origin={ORIGIN} />);
 
-    expect(screen.getByText('자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요')).toBeInTheDocument();
-    expect(screen.queryByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeNull();
-    expect(screen.getByRole('button', { name: '초대 링크' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초대 링크' })).toHaveAttribute(
+      'title',
+      '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요',
+    );
   });
 
-  it('자리가 있으면 "친구가 바로 이 방에 들어와요"', () => {
+  it('자리가 있으면 버튼 설명이 "친구가 바로 이 방에 들어와요" — 화면에 설명 문단은 없다', () => {
     render(<InviteLinkButton roomId="r1" roomName="방" gameName="원카드" env={{}} origin={ORIGIN} />);
 
-    expect(screen.getByText('링크를 보내면 친구가 바로 이 방에 들어와요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '초대 링크' })).toHaveAttribute(
+      'title',
+      '링크를 보내면 친구가 바로 이 방에 들어와요',
+    );
+    expect(screen.queryByText(/링크를 보내면/)).toBeNull();
   });
 });
 

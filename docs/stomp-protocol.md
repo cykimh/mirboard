@@ -28,16 +28,16 @@
 
 ## 토픽 / 큐 카탈로그
 
+> D-146 — 로비 채팅(`/topic/lobby/chat`·`/app/lobby/chat`)은 없앴다. 방 채팅만 남는다.
+
 | 종류 | 목적지 | 흐름 | 내용 |
 | --- | --- | --- | --- |
-| TOPIC | `/topic/lobby/chat` | 서버→전체 | 로비 채팅 (`CHAT`) |
 | TOPIC | `/topic/lobby/rooms` | 서버→전체 | 방 목록 변경 (`ROOM_UPDATED`, `ROOM_DESTROYED`) |
 | TOPIC | `/topic/room/{roomId}` | 서버→방 | 게임 공개 이벤트 + `PLAYER_DIS/RECONNECTED` + `CHIPS_SETTLED` |
 | TOPIC | `/topic/room/{roomId}/meta` | 서버→방 | 대기실 메타 (`ROOM_META_UPDATED`, `ROOM_DESTROYED`) — Phase 13C, RoomPage 폴링 대체 |
 | TOPIC | `/topic/room/{roomId}/chat` | 서버→방 | 인-게임 채팅 (`CHAT`) — 참가자+관전자 |
 | TOPIC | `/topic/room/{roomId}/reaction` | 서버→방 | 이모지 반응 (`REACTION`) |
 | QUEUE | `/user/queue/room/{roomId}` | 서버→본인 | `HAND_DEALT`, `CARDS_RECEIVED`(티츄), `HAND_UPDATED`(원카드), `ERROR` |
-| APP   | `/app/lobby/chat` | 클라→서버 | `{ message }` (≤500자) |
 | APP   | `/app/room/{roomId}/chat` | 클라→서버 | `{ message }` (≤500자, 참가자·관전자만) |
 | APP   | `/app/room/{roomId}/reaction` | 클라→서버 | `{ emoji }` (서버 화이트리스트 8종) |
 | APP   | `/app/room/{roomId}/action` | 클라→서버 | 게임 액션 (아래 `@action` 판별) |

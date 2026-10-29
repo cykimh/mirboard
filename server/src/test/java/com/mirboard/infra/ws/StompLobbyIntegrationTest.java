@@ -80,8 +80,9 @@ class StompLobbyIntegrationTest {
                 .satisfies(t -> assertThat(t.getCause()).isNotNull());
     }
 
+    // D-146 — 로비 채팅을 없앴다. 예전 주소로 보내도 아무도 받지 않는다(받는 컨트롤러가 없다).
     @Test
-    void chat_message_is_broadcast_to_subscribers() throws Exception {
+    void lobby_chat_is_gone() throws Exception {
         String aliceToken = registerAndLogin("stomp_alice", "validpass1");
         String bobToken = registerAndLogin("stomp_bob", "validpass1");
 
@@ -91,16 +92,11 @@ class StompLobbyIntegrationTest {
         StompSession bobSession = connect(bobToken);
 
         bobSession.subscribe("/topic/lobby/chat", collector(bobInbox));
-        // Give the subscription a moment to propagate before sending.
         Thread.sleep(150);
 
         aliceSession.send("/app/lobby/chat", Map.of("message", "안녕"));
 
-        JsonNode env = bobInbox.poll(5, TimeUnit.SECONDS);
-        assertThat(env).as("Bob must receive Alice's chat").isNotNull();
-        assertThat(env.get("type").asText()).isEqualTo("CHAT");
-        assertThat(env.get("payload").get("username").asText()).isEqualTo("stomp_alice");
-        assertThat(env.get("payload").get("message").asText()).isEqualTo("안녕");
+        assertThat(bobInbox.poll(2, TimeUnit.SECONDS)).as("로비 채팅은 배달되지 않는다").isNull();
     }
 
     @Test

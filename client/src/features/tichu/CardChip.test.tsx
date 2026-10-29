@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { CardChip } from './CardChip';
-import { useColorblindStore } from '@/features/theme/colorblindStore';
 import type { Card } from '@/types/tichu';
 
 const JADE_2: Card = { suit: 'JADE', rank: 2, special: null };
@@ -9,7 +8,6 @@ const DRAGON: Card = { suit: null, rank: 0, special: 'DRAGON' };
 
 describe('CardChip', () => {
   // 이전 테스트 언마운트(RTL cleanup) 후 리셋 → 마운트된 컴포넌트 재렌더 act 경고 방지.
-  beforeEach(() => useColorblindStore.setState({ enabled: false }));
 
   it('renders a suited card as intuitive rank + suit glyph (no pip image)', () => {
     render(<CardChip card={JADE_2} />);
@@ -26,13 +24,6 @@ describe('CardChip', () => {
     fireEvent.error(img);
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.getByText('🐉')).toBeInTheDocument();
-  });
-
-  it('keeps a single suit glyph in colorblind mode (no duplicate, still no image)', () => {
-    useColorblindStore.setState({ enabled: true });
-    render(<CardChip card={JADE_2} />);
-    expect(screen.queryByRole('img')).toBeNull();
-    expect(screen.getAllByText('◆')).toHaveLength(1);
   });
 
   it('preserves selected + aria semantics', () => {

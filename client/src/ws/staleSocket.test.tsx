@@ -55,7 +55,6 @@ vi.mock('@/api/rooms', () => ({
 }));
 
 import { useStompRoom } from './useStompRoom';
-import { useLobbyStomp } from './useLobbyStomp';
 
 function makeSink() {
   return {
@@ -224,23 +223,5 @@ describe('정리된 이전 소켓의 콜백 (D-130)', () => {
 
     queueFrame(sockets[1], 'B', 'ERROR');
     expect(sink.applyPrivateEvent).toHaveBeenCalledTimes(1);
-  });
-
-  it('로비 소켓 — 토큰이 바뀐 뒤 늦게 닿은 이전 소켓의 DISCONNECT 영수증이 새 소켓의 connected 를 내리지 않는다', async () => {
-    const { result, rerender } = renderHook(({ token }) => useLobbyStomp(token), {
-      initialProps: { token: 'tok-a' },
-    });
-    await waitFor(() => expect(sockets).toHaveLength(1));
-    accept(sockets[0]);
-    await waitFor(() => expect(result.current.connected).toBe(true));
-
-    rerender({ token: 'tok-b' });
-    await waitFor(() => expect(sockets).toHaveLength(2));
-    accept(sockets[1]);
-    await waitFor(() => expect(result.current.connected).toBe(true));
-
-    lateDisconnectReceipt(sockets[0]);
-
-    expect(result.current.connected).toBe(true);
   });
 });

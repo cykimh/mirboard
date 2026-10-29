@@ -19,7 +19,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
  * <p>방 화면(대기실 `/topic/room/{id}/meta`, 게임 `/topic/room/{id}` 및
  * `/chat`)을 구독할 때 세션→방을 {@link RoomPresence}(Redis) 에 기록하고,
  * 끊김 시 제거 후 {@link RoomDisconnectHandler} 로 정리/유예를 위임한다.
- * 로비 채팅(`/topic/lobby/chat`) 등 방과 무관한 구독은 무시한다.
+ * 로비 방 목록(`/topic/lobby/rooms`) 등 방과 무관한 구독은 무시한다.
  *
  * <p>D-130 — 게임 토픽 그 자체(`/topic/room/{id}`) 구독은 클라가 (재)접속해 판을 다시 보기 시작한 순간이다(배포
  * 뒤에는 모든 클라가 다시 붙는다). 그때 {@link GameProgressKick} 을 건다(킥은 그 방의 참가자·관전자 구독만 받는다).

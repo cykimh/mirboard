@@ -122,7 +122,7 @@ features/
 ├── auth/     authStore (JWT 영속)
 ├── lobby/    CreateRoomModal, gameWiki(외부 위키 URL 하드코딩)
 ├── chat/     RoomChat, roomChatStore (게임 공용 — 게임 폴더를 import 하지 않는다, D-132 후속)
-├── theme/    themeStore (라이트/다크 토글, <html>.dark, 기본 dark)
+├── theme/    themeStore (라이트/다크 토글, <html>.dark, 기본 light — D-146)
 └── tichu/    GameTable, SortableHand, CardChip, SeatAvatar, ArenaChatBubbles(경기장 말풍선), MakeWishModal,
               GiveDragonTrickModal, EffectsOverlay, tichuStore, handType, useSfx
 ws/           STOMP 연결/구독 훅
@@ -178,9 +178,9 @@ HTTP 요청 (예: POST /api/rooms)
 
 envelope 규약과 토픽·큐·이벤트 카탈로그는 `docs/stomp-protocol.md` 가 단일 진실 공급원.
 
-- 서버→클라 공개: `/topic/room/{id}`, `/topic/lobby/chat`, `/topic/lobby/rooms`, `/topic/room/{id}/chat`
+- 서버→클라 공개: `/topic/room/{id}`, `/topic/lobby/rooms`, `/topic/room/{id}/chat`
 - 서버→클라 비공개: `/user/queue/room/{id}` (HAND_DEALT, RESYNC, ERROR 등)
-- 클라→서버: `/app/room/{id}/action`, `/app/lobby/chat`, `/app/room/{id}/chat`
+- 클라→서버: `/app/room/{id}/action`, `/app/room/{id}/chat`
 
 ### 4.3 게임 디스패치 (GameRegistry)
 

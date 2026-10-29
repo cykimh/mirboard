@@ -65,7 +65,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/auth/
    랭킹에 오르지 않아요" → 누르면 메인으로 간다.
 2. 메인 헤더: username 옆 '게스트' 배지, 아바타 버튼은 눌리지 않고 마우스를 올리면 이유가 뜬다.
 3. 「새 방 만들기」 → 처음 선택이 **'친구와 하기'**다(D-136 — 게스트도) → '봇과 연습'을 골라 「연습 시작」 → 대기실 없이 게임판이 뜬다 → 한 판을 끝낸다.
-4. 로비 채팅을 다른 창(정회원)과 주고받는다 — 게스트도 정회원과 같다.
+4. 방 안 채팅을 다른 창(정회원)과 주고받는다 — 게스트도 정회원과 같다(D-146 — 로비 채팅은 없다).
 5. 랭킹 카드에 게스트가 없다. 프로필의 비밀번호 칸은 안내 문구로 바뀌어 있다.
 6. 「로그아웃」 → "다시 들어올 수 없어요" 확인창. 취소하면 그대로, 확인하면 로그인 화면.
 7. 한도: 같은 IP 에서 하루 11번째 생성은 429 → 로그인 화면이 "이 네트워크에서 오늘 만들 수
@@ -135,9 +135,7 @@ curl -s -X POST http://localhost:8080/api/rooms/$ROOM/leave -H "Authorization: B
 - 엔드포인트: `ws://<host>/ws` (raw) + SockJS fallback.
 - CONNECT 시 `Authorization: Bearer <JWT>` 헤더 필수 — 없거나 위조면 거절.
 - 채널:
-  - `/topic/lobby/chat` — 로비 채팅 (서버 발행)
   - `/topic/lobby/rooms` — 방 변경 알림 (`ROOM_UPDATED` / `ROOM_DESTROYED`)
-  - 클라 발행: `/app/lobby/chat` `{ "message": "..." }`
 - 메시지 envelope: `{ "eventId", "type", "ts", "payload" }`. 상세는
   [`docs/stomp-protocol.md`](stomp-protocol.md).
 
@@ -148,8 +146,8 @@ const client = new Client({
   brokerURL: 'ws://localhost:8080/ws',
   connectHeaders: { Authorization: `Bearer ${token}` },
   onConnect: () => {
-    client.subscribe('/topic/lobby/chat', (m) => console.log(JSON.parse(m.body)));
-    client.publish({ destination: '/app/lobby/chat', body: JSON.stringify({ message: 'hi' }) });
+    // 방을 만들거나 닫으면 ROOM_UPDATED / ROOM_DESTROYED 가 찍힌다.
+    client.subscribe('/topic/lobby/rooms', (m) => console.log(JSON.parse(m.body)));
   },
 });
 client.activate();
@@ -173,7 +171,7 @@ npm --prefix client run dev
 
 브라우저 4개(또는 incognito 창 4개) 로:
 1. `/register` 에서 4명의 사용자 가입 (예: `p1` ~ `p4`).
-2. 각자 로그인 → **메인(`/games`)** 진입. 게임 카탈로그·방 목록·랭킹·로비 채팅이
+2. 각자 로그인 → **메인(`/games`)** 진입. 게임 카탈로그·방 목록·랭킹이
    한 화면에 있다 (게임별 로비 페이지 `/games/:id/lobby` 는 Phase 16(#1)에서 폐지).
 3. p1 이 "방 만들기" → 모달에서 티츄 선택 → 생성. p2, p3, p4 가 목록에서 입장.
 4. 4명이 모이면 **방장이 "4명으로 시작"**(D-143 — [준비] 없음)을 누르면 `room_start_now.lua` 가 WAITING→IN_GAME 을 원자 전이시키고

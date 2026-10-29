@@ -134,8 +134,9 @@ class RateLimitRoutingTest {
                 .isEqualTo(RateLimitProperties.GAME_ACTION);
         assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/chat"))
                 .isEqualTo(RateLimitProperties.CHAT);
+        // D-146 — 로비 채팅은 없앴다. 남은 주소는 기본 버킷이다(컨트롤러도 없다).
         assertThat(StompRateLimitInterceptor.bucketFor("/app/lobby/chat"))
-                .isEqualTo(RateLimitProperties.CHAT);
+                .isEqualTo(RateLimitProperties.STOMP_DEFAULT);
         assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/reaction"))
                 .isEqualTo(RateLimitProperties.REACTION);
     }
