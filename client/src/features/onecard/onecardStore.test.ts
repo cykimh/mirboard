@@ -832,12 +832,13 @@ describe('맨 위 아래 이전 카드 — 화면 기억 (D-144)', () => {
     expect(store().discardTrail).toEqual([]);
   });
 
-  it('카드를 내면 직전 맨 위가 아래로 깔린다 — 최근 것이 앞, 2장까지', () => {
+  it('카드를 내면 직전 맨 위가 아래로 깔린다 — 최근 것이 앞, 3장까지 (D-150)', () => {
     play(card('HEART', 4), 11);
     expect(store().discardTrail).toEqual([card('HEART', 9)]);
     play(card('SPADE', 4), 12);
     play(card('SPADE', 6), 13);
-    expect(store().discardTrail).toEqual([card('SPADE', 4), card('HEART', 4)]);
+    play(card('CLUB', 6), 14);
+    expect(store().discardTrail).toEqual([card('SPADE', 6), card('SPADE', 4), card('HEART', 4)]);
   });
 
   it('같은 이벤트를 두 번 적용해도 같다 — 새 카드가 자기 아래에 깔리지 않는다', () => {

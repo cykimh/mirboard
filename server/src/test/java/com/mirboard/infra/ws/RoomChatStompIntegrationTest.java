@@ -73,8 +73,8 @@ class RoomChatStompIntegrationTest {
 
     @Test
     void member_chat_is_broadcast_to_room_topic() throws Exception {
-        String hostToken = registerAndLogin("rc_host1", "validpass1");
-        String guestToken = registerAndLogin("rc_guest1", "validpass1");
+        String hostToken = registerAndLogin("rchost1", "validpass1");
+        String guestToken = registerAndLogin("rcguest1", "validpass1");
         String roomId = createRoomAndJoin(hostToken, guestToken);
 
         BlockingQueue<JsonNode> hostInbox = new ArrayBlockingQueue<>(8);
@@ -89,14 +89,14 @@ class RoomChatStompIntegrationTest {
         JsonNode env = hostInbox.poll(5, TimeUnit.SECONDS);
         assertThat(env).as("Host must receive guest's room chat").isNotNull();
         assertThat(env.get("type").asText()).isEqualTo("CHAT");
-        assertThat(env.get("payload").get("username").asText()).isEqualTo("rc_guest1");
+        assertThat(env.get("payload").get("username").asText()).isEqualTo("rcguest1");
         assertThat(env.get("payload").get("message").asText()).isEqualTo("굿럭");
     }
 
     @Test
     void non_member_chat_is_dropped() throws Exception {
-        String hostToken = registerAndLogin("rc_host2", "validpass1");
-        String intruderToken = registerAndLogin("rc_intruder", "validpass1");
+        String hostToken = registerAndLogin("rchost2", "validpass1");
+        String intruderToken = registerAndLogin("rcintruder", "validpass1");
         String roomId = createRoomOnly(hostToken);
 
         BlockingQueue<JsonNode> hostInbox = new ArrayBlockingQueue<>(8);

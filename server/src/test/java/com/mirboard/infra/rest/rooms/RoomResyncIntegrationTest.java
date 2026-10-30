@@ -61,11 +61,11 @@ class RoomResyncIntegrationTest {
     @Test
     void resync_returns_tableView_and_privateHand_for_participant() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs_alice", "rs_bob", "rs_charlie", "rs_dave"));
+                List.of("rsalice", "rsbob", "rscharlie", "rsdave"));
         String roomId = createRoomAndJoinAll(tokens);
 
         // Phase 5b: 라운드 시작 시점에는 Dealing(phase=8) — 가시 손패 8장.
-        String token = tokens.get("rs_alice");
+        String token = tokens.get("rsalice");
         mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -93,12 +93,12 @@ class RoomResyncIntegrationTest {
     @Test
     void resync_carries_the_turn_time_left_when_the_room_has_a_turn_limit() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs7_alice", "rs7_bob", "rs7_charlie", "rs7_dave"));
+                List.of("rs7alice", "rs7bob", "rs7charlie", "rs7dave"));
         String roomId = createRoomAndJoinAll(tokens,
                 Map.of("name", "timed-room", "gameType", "TICHU", "turnSeconds", 30));
 
         MvcResult res = mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
-                        .header("Authorization", "Bearer " + tokens.get("rs7_alice")))
+                        .header("Authorization", "Bearer " + tokens.get("rs7alice")))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -109,11 +109,11 @@ class RoomResyncIntegrationTest {
     @Test
     void resync_non_participant_is_409_not_in_room() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs2_alice", "rs2_bob", "rs2_charlie", "rs2_dave"));
+                List.of("rs2alice", "rs2bob", "rs2charlie", "rs2dave"));
         String roomId = createRoomAndJoinAll(tokens);
 
         // intruder is registered but not in the room
-        String intruderToken = registerAndLogin("rs2_eve", "validpass1");
+        String intruderToken = registerAndLogin("rs2eve", "validpass1");
 
         mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
                         .header("Authorization", "Bearer " + intruderToken))
@@ -123,7 +123,7 @@ class RoomResyncIntegrationTest {
 
     @Test
     void resync_for_waiting_room_returns_404_not_available() throws Exception {
-        String token = registerAndLogin("rs3_alice", "validpass1");
+        String token = registerAndLogin("rs3alice", "validpass1");
         String roomId = createRoomOnly(token);
 
         mockMvc.perform(get("/api/rooms/" + roomId + "/resync")
@@ -135,10 +135,10 @@ class RoomResyncIntegrationTest {
     @Test
     void spectator_can_resync_but_gets_no_private_hand() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs4_alice", "rs4_bob", "rs4_charlie", "rs4_dave"));
+                List.of("rs4alice", "rs4bob", "rs4charlie", "rs4dave"));
         String roomId = createRoomAndJoinAll(tokens);
 
-        String specToken = registerAndLogin("rs4_spec", "validpass1");
+        String specToken = registerAndLogin("rs4spec", "validpass1");
         mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
                         .header("Authorization", "Bearer " + specToken))
                 .andExpect(status().isOk())
@@ -154,12 +154,12 @@ class RoomResyncIntegrationTest {
     @Test
     void player_cannot_spectate_own_room() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs5_alice", "rs5_bob", "rs5_charlie", "rs5_dave"));
+                List.of("rs5alice", "rs5bob", "rs5charlie", "rs5dave"));
         String roomId = createRoomAndJoinAll(tokens);
 
         // 자기 자신은 이미 플레이어 — 관전 거절.
         mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
-                        .header("Authorization", "Bearer " + tokens.get("rs5_alice")))
+                        .header("Authorization", "Bearer " + tokens.get("rs5alice")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("ALREADY_IN_ROOM"));
     }
@@ -167,10 +167,10 @@ class RoomResyncIntegrationTest {
     @Test
     void spectator_can_stop_spectating() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("rs6_alice", "rs6_bob", "rs6_charlie", "rs6_dave"));
+                List.of("rs6alice", "rs6bob", "rs6charlie", "rs6dave"));
         String roomId = createRoomAndJoinAll(tokens);
 
-        String specToken = registerAndLogin("rs6_spec", "validpass1");
+        String specToken = registerAndLogin("rs6spec", "validpass1");
         mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
                         .header("Authorization", "Bearer " + specToken))
                 .andExpect(status().isOk());

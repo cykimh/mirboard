@@ -249,7 +249,7 @@ describe('OneCardTable — 내기·먹기', () => {
     expect(within(center).getByText('#101 차례')).toBeInTheDocument();
   });
 
-  it('맨 위 카드 아래에 직전 카드 2장을 겹쳐 깐다 — 보조기기에는 맨 위만 읽힌다 (D-144)', () => {
+  it('맨 위 카드 옆에 직전 카드 3장을 작게 겹쳐 숫자·무늬를 보인다 — 보조기기에는 한 줄로 읽힌다 (D-150)', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1, topCard: c('HEART', 9) });
     const { container } = renderTable({ playerIds: [100, 101, 102] });
     const play = (card: ReturnType<typeof c>, seq: number, inFlight?: () => void) => {
@@ -266,20 +266,21 @@ describe('OneCardTable — 내기·먹기', () => {
         vi.advanceTimersByTime(2000);
       });
     };
+    const minis = () => [...container.querySelectorAll('.oc-trail-card')].map((e) => e.textContent);
     play(c('HEART', 4), 2);
     play(c('SPADE', 4), 3);
-    // 날아오는 동안 맨 위 자리는 이전 카드다 — 그 카드를 아래에 또 깔지 않는다.
-    play(c('SPADE', 6), 4, () => {
-      expect(container.querySelector('.oc-top-trail')!.querySelectorAll('.oc-card')).toHaveLength(1);
-      expect(within(container.querySelector('.oc-top-stack') as HTMLElement).getByRole('img', { name: '스페이드 4' })).toBeInTheDocument();
+    play(c('CLUB', 13), 4);
+    // 날아오는 동안 맨 위 자리는 이전 카드다 — 그 카드를 옆 줄에 또 두지 않는다.
+    play(c('SPADE', 6), 5, () => {
+      expect(minis()).toEqual(['♥4', '♠4']);
     });
 
-    const trail = container.querySelector('.oc-top-trail') as HTMLElement;
-    expect(trail).toHaveAttribute('aria-hidden', 'true');
-    expect(trail.querySelectorAll('.oc-card')).toHaveLength(2);
+    // 위에서부터 오래된 순, 맨 아래(맨 앞)가 바로 전 카드.
+    expect(minis()).toEqual(['♥4', '♠4', '♣K']);
     const center = screen.getByRole('region', { name: '테이블' });
-    expect(within(center).getAllByRole('img', { name: /^(하트|스페이드)/ })).toHaveLength(1);
+    expect(within(center).getByRole('img', { name: '이전에 낸 카드: 클로버 K, 스페이드 4, 하트 4' })).toBeInTheDocument();
     expect(within(center).getByRole('img', { name: '스페이드 6' })).toBeInTheDocument();
+    expect(container.querySelector('.oc-top-trail')).toBeNull();
   });
 
   it('거절 문구를 보여 주고 닫을 수 있다', () => {

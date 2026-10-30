@@ -183,7 +183,7 @@ describe('LoginPage — 로그인 상태 리다이렉트 (D-122)', () => {
     });
     renderLogin();
 
-    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('별명'), { target: { value: 'alice' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
 
@@ -269,7 +269,7 @@ describe('LoginPage — 초대 링크로 온 사람 (D-133)', () => {
 
     const notice = screen.getByText('방에 초대받았어요 — 가입하지 않아도 게스트로 바로 들어갈 수 있어요');
     const guestCta = screen.getByRole('button', { name: '게스트로 바로 입장' });
-    const username = screen.getByLabelText('아이디');
+    const username = screen.getByLabelText('별명');
     const follows = (a: Node, b: Node) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
@@ -282,7 +282,7 @@ describe('LoginPage — 초대 링크로 온 사람 (D-133)', () => {
     renderLogin();
 
     expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
-    const username = screen.getByLabelText('아이디');
+    const username = screen.getByLabelText('별명');
     expect(
       username.compareDocumentPosition(guestButton()) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -294,7 +294,7 @@ describe('LoginPage — 초대 링크로 온 사람 (D-133)', () => {
     renderWithFrom('/profile');
 
     expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
-    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('별명'), { target: { value: 'alice' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
 
@@ -315,7 +315,7 @@ describe('LoginPage — 초대 링크로 온 사람 (D-133)', () => {
     login.mockResolvedValue({ ...GUEST_SESSION, user: { userId: 3, username: 'alice' } });
     renderWithFrom('/rooms/r1');
 
-    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('별명'), { target: { value: 'alice' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
 

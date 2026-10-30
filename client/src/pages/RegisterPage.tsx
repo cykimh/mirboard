@@ -49,7 +49,7 @@ export function RegisterPage() {
         <CardHeader>
           <CardTitle className="text-xl">회원가입</CardTitle>
           <CardDescription>
-            이 사이트는 아이디와 비밀번호만 저장합니다. 이메일/전화번호는
+            이 사이트는 별명과 비밀번호만 저장합니다. 이메일/전화번호는
             받지 않습니다.
           </CardDescription>
         </CardHeader>
@@ -57,13 +57,14 @@ export function RegisterPage() {
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="reg-username">
-                아이디 (영문/숫자/언더스코어 3~20자)
+                별명 (한글·영문·숫자 2~10자)
               </Label>
               <Input
                 id="reg-username"
                 type="text"
                 value={username}
-                pattern="^[A-Za-z0-9_]{3,20}$"
+                // D-149 — 아이디 대신 별명. 서버 UsernamePolicy 와 같은 규칙.
+                pattern="^[가-힣A-Za-z0-9]{2,10}$"
                 onChange={(e) => setUsername(e.target.value)}
                 required
               />

@@ -70,7 +70,7 @@ class ChangePasswordIntegrationTest {
 
     @Test
     void change_password_then_login_with_new_password() throws Exception {
-        String token = registerAndLogin("pw_changer", "oldpass12");
+        String token = registerAndLogin("pwchanger", "oldpass12");
 
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -79,17 +79,17 @@ class ChangePasswordIntegrationTest {
 
         // 새 비번 로그인 성공.
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("username", "pw_changer", "password", "newpass34"))))
+                .content(body(Map.of("username", "pwchanger", "password", "newpass34"))))
                 .andExpect(status().isOk());
         // 옛 비번 로그인 실패.
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("username", "pw_changer", "password", "oldpass12"))))
+                .content(body(Map.of("username", "pwchanger", "password", "oldpass12"))))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void wrong_current_password_is_rejected() throws Exception {
-        String token = registerAndLogin("pw_wrongcur", "oldpass12");
+        String token = registerAndLogin("pwwrongcur", "oldpass12");
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body(Map.of("currentPassword", "WRONGcur99", "newPassword", "newpass34"))))
@@ -99,7 +99,7 @@ class ChangePasswordIntegrationTest {
 
     @Test
     void weak_new_password_is_rejected() throws Exception {
-        String token = registerAndLogin("pw_weaknew", "oldpass12");
+        String token = registerAndLogin("pwweaknew", "oldpass12");
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body(Map.of("currentPassword", "oldpass12", "newPassword", "short"))))

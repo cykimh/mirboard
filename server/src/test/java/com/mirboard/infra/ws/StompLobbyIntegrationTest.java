@@ -83,8 +83,8 @@ class StompLobbyIntegrationTest {
     // D-146 — 로비 채팅을 없앴다. 예전 주소로 보내도 아무도 받지 않는다(받는 컨트롤러가 없다).
     @Test
     void lobby_chat_is_gone() throws Exception {
-        String aliceToken = registerAndLogin("stomp_alice", "validpass1");
-        String bobToken = registerAndLogin("stomp_bob", "validpass1");
+        String aliceToken = registerAndLogin("stompalice", "validpass1");
+        String bobToken = registerAndLogin("stompbob", "validpass1");
 
         BlockingQueue<JsonNode> bobInbox = new ArrayBlockingQueue<>(8);
 
@@ -101,7 +101,7 @@ class StompLobbyIntegrationTest {
 
     @Test
     void room_change_pushes_to_lobby_rooms_topic() throws Exception {
-        String token = registerAndLogin("stomp_room", "validpass1");
+        String token = registerAndLogin("stomproom", "validpass1");
 
         BlockingQueue<JsonNode> inbox = new ArrayBlockingQueue<>(8);
         StompSession session = connect(token);

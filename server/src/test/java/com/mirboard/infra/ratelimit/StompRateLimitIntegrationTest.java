@@ -82,7 +82,7 @@ class StompRateLimitIntegrationTest {
     void room_chat_beyond_the_bucket_is_dropped_while_the_allowance_still_flows()
             throws Exception {
         String senderToken = registerAndLogin("rlchatsend", "validpass1");
-        String watcherToken = registerAndLogin("rlchatwatch", "validpass1");
+        String watcherToken = registerAndLogin("rlchatw4bb", "validpass1");
         String roomId = createRoom(senderToken);
         joinRoom(watcherToken, roomId);
 

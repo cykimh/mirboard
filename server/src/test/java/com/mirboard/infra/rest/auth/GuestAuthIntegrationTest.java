@@ -132,7 +132,7 @@ class GuestAuthIntegrationTest {
     @Test
     void member_login_response_says_guest_false() throws Exception {
         String body = objectMapper.writeValueAsString(
-                Map.of("username", "member_g1", "password", "validpass1"));
+                Map.of("username", "memberg1", "password", "validpass1"));
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());

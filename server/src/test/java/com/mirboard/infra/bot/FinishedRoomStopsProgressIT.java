@@ -129,7 +129,7 @@ class FinishedRoomStopsProgressIT {
     @Test
     void an_admin_abort_stops_the_turn_timer() throws Exception {
         Table t = startTwoPlayerSkullKing("fp3");
-        String adminToken = registerAndLogin("fp3_admin");
+        String adminToken = registerAndLogin("fp3admin");
         adminRoles.save(new AdminRole(userIdOf(adminToken), clock.instant()));
 
         mockMvc.perform(post("/api/admin/rooms/" + t.roomId + "/abort")
@@ -150,7 +150,7 @@ class FinishedRoomStopsProgressIT {
     void an_abort_waits_for_the_in_flight_action_to_release_the_room_lock() throws Exception {
         Table t = startTwoPlayerSkullKing("fp4");
         // D-135 — 사람 판이라 방장 강제 종료는 거절된다. 같은 락 절차(GameAbortService)를 타는 운영자 강제 종료로 본다.
-        String adminToken = registerAndLogin("fp4_admin");
+        String adminToken = registerAndLogin("fp4admin");
         adminRoles.save(new AdminRole(userIdOf(adminToken), clock.instant()));
         String lockKey = "room:" + t.roomId + ":lock";
         redis.opsForValue().set(lockKey, "in-flight-action", Duration.ofSeconds(30));
@@ -222,8 +222,8 @@ class FinishedRoomStopsProgressIT {
 
     /** 사람 2명, 턴 제한 1초 스컬킹 방 — 1라운드 Bidding 에서 첫 턴 데드라인이 걸린다. */
     private Table startTwoPlayerSkullKing(String prefix) throws Exception {
-        List<String> tokens = List.of(registerAndLogin(prefix + "_a"),
-                registerAndLogin(prefix + "_b"));
+        List<String> tokens = List.of(registerAndLogin(prefix + "a"),
+                registerAndLogin(prefix + "b"));
         MvcResult created = mockMvc.perform(post("/api/rooms")
                         .header("Authorization", bearer(tokens.get(0)))
                         .contentType(MediaType.APPLICATION_JSON)

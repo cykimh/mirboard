@@ -81,19 +81,19 @@ class GameStompControllerIntegrationTest {
     @Test
     void mahjong_leader_plays_with_bundled_wish_and_events_broadcast() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("ws_alice", "ws_bob", "ws_charlie", "ws_dave"));
+                List.of("wsalice", "wsbob", "wscharlie", "wsdave"));
         Map<String, Long> userIds = userIdsFromMe(tokens);
 
         // Alice creates and others join → game starts.
-        String roomId = createRoom(tokens.get("ws_alice"), "ws-room");
-        joinRoom(tokens.get("ws_bob"), roomId);
-        joinRoom(tokens.get("ws_charlie"), roomId);
-        joinRoom(tokens.get("ws_dave"), roomId);
+        String roomId = createRoom(tokens.get("wsalice"), "ws-room");
+        joinRoom(tokens.get("wsbob"), roomId);
+        joinRoom(tokens.get("wscharlie"), roomId);
+        joinRoom(tokens.get("wsdave"), roomId);
         // Phase 16(#2) — 전원 준비해야 게임 시작.
-        ready(tokens.get("ws_alice"), roomId);
-        ready(tokens.get("ws_bob"), roomId);
-        ready(tokens.get("ws_charlie"), roomId);
-        ready(tokens.get("ws_dave"), roomId);
+        ready(tokens.get("wsalice"), roomId);
+        ready(tokens.get("wsbob"), roomId);
+        ready(tokens.get("wscharlie"), roomId);
+        ready(tokens.get("wsdave"), roomId);
 
         // Phase 5b: 라운드 시작 시 Dealing(8) 로 진입 — STOMP 라우팅 테스트만 검증하므로
         // 곧바로 Playing 상태로 덮어쓴다 (덱은 Dealing 의 hand+reserved 를 합쳐 Mahjong
@@ -105,8 +105,8 @@ class GameStompControllerIntegrationTest {
 
         // Map seat → userId via Room.playerIds (alice/bob/charlie/dave joined in order).
         List<Long> playerIds = List.of(
-                userIds.get("ws_alice"), userIds.get("ws_bob"),
-                userIds.get("ws_charlie"), userIds.get("ws_dave"));
+                userIds.get("wsalice"), userIds.get("wsbob"),
+                userIds.get("wscharlie"), userIds.get("wsdave"));
         long leaderUserId = playerIds.get(leadSeat);
         String leaderToken = tokenForUserId(tokens, userIds, leaderUserId);
 
@@ -159,13 +159,13 @@ class GameStompControllerIntegrationTest {
     @Test
     void own_queue_receives_hand_after_play_without_seq_and_errors() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("pq_alice", "pq_bob", "pq_charlie", "pq_dave"));
+                List.of("pqalice", "pqbob", "pqcharlie", "pqdave"));
         Map<String, Long> userIds = userIdsFromMe(tokens);
-        String roomId = createRoom(tokens.get("pq_alice"), "pq-room");
-        joinRoom(tokens.get("pq_bob"), roomId);
-        joinRoom(tokens.get("pq_charlie"), roomId);
-        joinRoom(tokens.get("pq_dave"), roomId);
-        for (String u : List.of("pq_alice", "pq_bob", "pq_charlie", "pq_dave")) {
+        String roomId = createRoom(tokens.get("pqalice"), "pq-room");
+        joinRoom(tokens.get("pqbob"), roomId);
+        joinRoom(tokens.get("pqcharlie"), roomId);
+        joinRoom(tokens.get("pqdave"), roomId);
+        for (String u : List.of("pqalice", "pqbob", "pqcharlie", "pqdave")) {
             ready(tokens.get(u), roomId);
         }
         TichuState.Playing playing = forcePlayingFromDealing(
@@ -173,8 +173,8 @@ class GameStompControllerIntegrationTest {
         stateStore.save(roomId, playing);
         int leadSeat = playing.trick().leadSeat();
         List<Long> playerIds = List.of(
-                userIds.get("pq_alice"), userIds.get("pq_bob"),
-                userIds.get("pq_charlie"), userIds.get("pq_dave"));
+                userIds.get("pqalice"), userIds.get("pqbob"),
+                userIds.get("pqcharlie"), userIds.get("pqdave"));
         String leaderToken = tokenForUserId(tokens, userIds, playerIds.get(leadSeat));
 
         BlockingQueue<JsonNode> mine = new ArrayBlockingQueue<>(16);

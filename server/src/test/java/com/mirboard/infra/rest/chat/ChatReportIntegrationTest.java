@@ -133,7 +133,7 @@ class ChatReportIntegrationTest {
     @Test
     void reporting_the_same_message_twice_is_rejected() throws Exception {
         User author = register("crauthor2");
-        User reporter = register("crreporter2");
+        User reporter = register("crrepor939");
         String roomId = UUID.randomUUID().toString();
         String eventId = seedMessage(roomId, author.id(), "crauthor2", "도배 메시지");
 

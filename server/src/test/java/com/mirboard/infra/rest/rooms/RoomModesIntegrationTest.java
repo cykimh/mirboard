@@ -74,7 +74,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void a_practice_room_starts_right_away_and_is_not_listed() throws Exception {
-        String host = registerAndLogin("rm_p_host");
+        String host = registerAndLogin("rmphost");
 
         JsonNode room = create(host, Map.of("name", "연습", "gameType", "ONE_CARD", "fillWithBots", true, "capacity", 4));
 
@@ -90,7 +90,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void practice_starts_right_away_for_every_game() throws Exception {
-        String host = registerAndLogin("rm_p_all");
+        String host = registerAndLogin("rmpall");
         for (String game : List.of("TICHU", "SKULL_KING")) {
             JsonNode room = create(host, Map.of("name", "연습 " + game, "gameType", game, "fillWithBots", true));
             assertThat(room.get("status").asText()).as(game).isEqualTo("IN_GAME");
@@ -112,7 +112,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void a_friends_room_has_no_bots_and_waits() throws Exception {
-        String host = registerAndLogin("rm_f_host");
+        String host = registerAndLogin("rmfhost");
 
         JsonNode room = create(host, Map.of("name", "친구", "gameType", "ONE_CARD", "capacity", 4));
 
@@ -125,7 +125,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void the_host_starts_with_three_of_four_and_every_seat_gets_a_hand() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_s_host"), registerAndLogin("rm_s_a"), registerAndLogin("rm_s_b"));
+        List<String> players = List.of(registerAndLogin("rmshost"), registerAndLogin("rmsa"), registerAndLogin("rmsb"));
         String roomId = friendsRoom(players, "ONE_CARD", 6);
 
         // 아무도 준비하지 않았다 — 준비는 시작 조건이 아니다.
@@ -145,7 +145,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void the_host_alone_cannot_start() throws Exception {
-        String host = registerAndLogin("rm_alone");
+        String host = registerAndLogin("rmalone");
         String roomId = friendsRoom(List.of(host), "ONE_CARD", 6);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(host)))
@@ -155,7 +155,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void only_the_host_starts() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_nh_host"), registerAndLogin("rm_nh_a"));
+        List<String> players = List.of(registerAndLogin("rmnhhost"), registerAndLogin("rmnha"));
         String roomId = friendsRoom(players, "ONE_CARD", 6);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(1))))
@@ -165,7 +165,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void tichu_needs_all_four() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_t_host"), registerAndLogin("rm_t_a"), registerAndLogin("rm_t_b"));
+        List<String> players = List.of(registerAndLogin("rmthost"), registerAndLogin("rmta"), registerAndLogin("rmtb"));
         String roomId = friendsRoom(players, "TICHU", null);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
@@ -176,8 +176,8 @@ class RoomModesIntegrationTest {
     /** 티츄도 방장이 시작한다 — 4명이 다 모여도 저절로 시작하지 않는다. */
     @Test
     void tichu_with_all_four_starts_by_the_host() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_t4_host"), registerAndLogin("rm_t4_a"),
-                registerAndLogin("rm_t4_b"), registerAndLogin("rm_t4_c"));
+        List<String> players = List.of(registerAndLogin("rmt4host"), registerAndLogin("rmt4a"),
+                registerAndLogin("rmt4b"), registerAndLogin("rmt4c"));
         String roomId = friendsRoom(players, "TICHU", null);
         assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
 
@@ -192,7 +192,7 @@ class RoomModesIntegrationTest {
      */
     @Test
     void a_disconnected_player_does_not_block_the_host_start() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_dc_host"), registerAndLogin("rm_dc_a"), registerAndLogin("rm_dc_b"));
+        List<String> players = List.of(registerAndLogin("rmdchost"), registerAndLogin("rmdca"), registerAndLogin("rmdcb"));
         String roomId = friendsRoom(players, "ONE_CARD", 6);
 
         disconnects.onDisconnect(roomId, userIds.get(players.get(2)));
@@ -204,7 +204,7 @@ class RoomModesIntegrationTest {
 
     @Test
     void a_full_room_waits_for_the_host() throws Exception {
-        List<String> players = List.of(registerAndLogin("rm_full_host"), registerAndLogin("rm_full_a"));
+        List<String> players = List.of(registerAndLogin("rmfullhost"), registerAndLogin("rmfulla"));
         String roomId = friendsRoom(players, "ONE_CARD", 2);
         assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
 

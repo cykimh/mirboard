@@ -14,7 +14,7 @@ const apiError = (code: string, message: string) => new ApiError(409, { error: {
 describe('errorText (D-138)', () => {
   it('영어 원문의 코드는 한국어로 옮긴다', () => {
     expect(errorText(apiError('ROOM_NOT_FOUND', 'Room not found'), '실패')).toBe('방이 없어졌어요');
-    expect(errorText(apiError('BAD_CREDENTIALS', 'Invalid username or password'), '실패')).toBe('아이디 또는 비밀번호가 맞지 않아요');
+    expect(errorText(apiError('BAD_CREDENTIALS', 'Invalid username or password'), '실패')).toBe('별명 또는 비밀번호가 맞지 않아요');
   });
 
   it('서버 원문이 한국어면 그대로 쓴다', () => {

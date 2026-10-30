@@ -47,22 +47,22 @@ class AuthServiceTest {
 
     @Test
     void register_rejects_short_password() {
-        assertThatThrownBy(() -> service.register("alice_01", "short"))
+        assertThatThrownBy(() -> service.register("alice01", "short"))
                 .isInstanceOf(InvalidPasswordException.class);
     }
 
     @Test
     void register_rejects_taken_username() {
-        given(userRepository.existsByUsername("alice_01")).willReturn(true);
+        given(userRepository.existsByUsername("alice01")).willReturn(true);
 
-        assertThatThrownBy(() -> service.register("alice_01", "validpass1"))
+        assertThatThrownBy(() -> service.register("alice01", "validpass1"))
                 .isInstanceOf(UsernameTakenException.class);
         verify(userRepository, never()).save(any());
     }
 
     @Test
     void register_persists_user_with_hashed_password() {
-        given(userRepository.existsByUsername("alice_01")).willReturn(false);
+        given(userRepository.existsByUsername("alice01")).willReturn(false);
         given(passwordEncoder.encode("validpass1")).willReturn("hashed");
         given(userRepository.save(any(User.class))).willAnswer(inv -> {
             // DB 가 부여하는 PK 를 시뮬레이션 — 실제 환경에서는 @GeneratedValue.
@@ -71,11 +71,11 @@ class AuthServiceTest {
             return u;
         });
 
-        var result = service.register("alice_01", "validpass1");
+        var result = service.register("alice01", "validpass1");
 
-        assertThat(result.username()).isEqualTo("alice_01");
+        assertThat(result.username()).isEqualTo("alice01");
         verify(userRepository).save(Mockito.argThat(u ->
-                "alice_01".equals(u.getUsername())
+                "alice01".equals(u.getUsername())
                         && "hashed".equals(u.getPasswordHash())
                         && u.getWinCount() == 0
                         && u.getLoseCount() == 0));

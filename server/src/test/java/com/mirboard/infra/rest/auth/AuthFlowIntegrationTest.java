@@ -60,7 +60,7 @@ class AuthFlowIntegrationTest {
     @Test
     void register_then_login_then_me_returns_user_profile() throws Exception {
         var body = objectMapper.writeValueAsString(
-                Map.of("username", "alice_01", "password", "validpass1"));
+                Map.of("username", "alice01", "password", "validpass1"));
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -80,7 +80,7 @@ class AuthFlowIntegrationTest {
         mockMvc.perform(get("/api/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.username").value("alice_01"))
+                .andExpect(jsonPath("$.username").value("alice01"))
                 .andExpect(jsonPath("$.winCount").value(0))
                 .andExpect(jsonPath("$.loseCount").value(0));
     }
@@ -121,7 +121,7 @@ class AuthFlowIntegrationTest {
     @Test
     void register_with_duplicate_username_is_conflict() throws Exception {
         var body = objectMapper.writeValueAsString(
-                Map.of("username", "dup_user", "password", "validpass1"));
+                Map.of("username", "dupuser", "password", "validpass1"));
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -138,14 +138,14 @@ class AuthFlowIntegrationTest {
     @Test
     void login_with_wrong_password_returns_bad_credentials() throws Exception {
         var register = objectMapper.writeValueAsString(
-                Map.of("username", "carol_99", "password", "rightpass1"));
+                Map.of("username", "carol99", "password", "rightpass1"));
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(register))
                 .andExpect(status().isCreated());
 
         var badLogin = objectMapper.writeValueAsString(
-                Map.of("username", "carol_99", "password", "wrongpass!"));
+                Map.of("username", "carol99", "password", "wrongpass!"));
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(badLogin))

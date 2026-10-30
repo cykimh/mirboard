@@ -1,6 +1,14 @@
-import { SUIT_LABEL, SUIT_SYMBOL, cardKey, type OneCardCard, type OneCardSuit } from '@/types/onecard';
+import {
+  SUIT_LABEL,
+  SUIT_SYMBOL,
+  cardKey,
+  cardLabel,
+  rankLabel,
+  type OneCardCard,
+  type OneCardSuit,
+} from '@/types/onecard';
 import type { LastRace } from './onecardStore';
-import { OneCardCardChip } from './OneCardCardChip';
+import { OneCardCardChip, toneOf } from './OneCardCardChip';
 
 /** 방금 닫힌 경쟁의 한 줄 안내 — 화면과 스크린리더 알림이 같은 문장을 쓴다. */
 export function raceResultText(race: LastRace, nameOf: (seat: number) => string): string {
@@ -33,7 +41,7 @@ interface Props {
    * 그대로 보이고, 내려앉으면(null) 새 맨 위 카드로 바뀐다.
    */
   landingUnder?: { card: OneCardCard | null; declaredSuit: OneCardSuit | null } | null;
-  /** D-144 — 맨 위 아래에 깔린 이전 카드(최근 것이 앞). */
+  /** D-144 — 맨 위 바로 전에 낸 카드들(최근 것이 앞). D-150 — 맨 위 옆에 작게 겹친다. */
   discardTrail?: OneCardCard[];
 }
 
@@ -56,7 +64,7 @@ export function OneCardCenter({
 }: Props) {
   const shownTop = landingUnder ? landingUnder.card : topCard;
   const shownSuit = landingUnder ? landingUnder.declaredSuit : declaredSuit;
-  // 날아오는 동안 맨 위 자리는 이전 카드(= 아래 카드의 첫 장)다 — 같은 카드를 두 번 깔지 않는다.
+  // 날아오는 동안 맨 위 자리는 이전 카드(= 이전 카드 줄의 첫 장)다 — 같은 카드를 두 번 두지 않는다.
   const beneath = landingUnder ? discardTrail.slice(1) : discardTrail;
   return (
     <section className="oc-center" aria-label="테이블">
@@ -66,31 +74,32 @@ export function OneCardCenter({
           <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
         </div>
         <div className="oc-top">
-          <div className="oc-top-stack">
-            {beneath.length > 0 && (
-              // 장식 — 보조기기에는 맨 위 카드만 읽힌다. 뒤에 깔리도록 먼 카드부터 그린다.
-              <span className="oc-top-trail" aria-hidden="true">
-                {beneath
-                  .map((card, i) => (
-                    <span key={cardKey(card)} className="oc-top-trail-card" data-depth={i + 1}>
-                      <OneCardCardChip card={card} />
-                    </span>
-                  ))
-                  .reverse()}
-              </span>
-            )}
-            {shownTop ? (
-              <OneCardCardChip card={shownTop} />
-            ) : (
-              <span className="oc-top-empty">—</span>
-            )}
-          </div>
+          {shownTop ? (
+            <OneCardCardChip card={shownTop} />
+          ) : (
+            <span className="oc-top-empty">—</span>
+          )}
           {shownSuit && (
             <span className="oc-badge oc-declared">
               지정 {SUIT_SYMBOL[shownSuit]} {SUIT_LABEL[shownSuit]}
             </span>
           )}
         </div>
+        {beneath.length > 0 && (
+          // D-150 — 맨 위 옆에 바로 전 카드들을 작게 겹친다. 위에서부터 오래된 순이라 맨 아래(맨 앞)가 바로 전 카드고, 위 카드들은
+          // 귀퉁이의 숫자·무늬만 보인다. 보조기기에는 한 줄로(최근 것부터).
+          <div
+            className="oc-trail"
+            role="img"
+            aria-label={`이전에 낸 카드: ${beneath.map(cardLabel).join(', ')}`}
+          >
+            {[...beneath].reverse().map((card) => (
+              <span key={cardKey(card)} className={`oc-trail-card ${toneOf(card)}`} aria-hidden="true">
+                {card.joker ? '★' : `${SUIT_SYMBOL[card.suit!]}${rankLabel(card.rank)}`}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="oc-center-info">

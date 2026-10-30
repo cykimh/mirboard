@@ -62,14 +62,14 @@ class UserStatsIntegrationTest {
 
     @Test
     void new_user_starts_at_bronze_with_rating_1000() throws Exception {
-        long userId = registerAndGetId("us_alice", "validpass1");
-        String token = login("us_alice", "validpass1");
+        long userId = registerAndGetId("usalice", "validpass1");
+        String token = login("usalice", "validpass1");
 
         mockMvc.perform(get("/api/users/" + userId + "/stats")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.username").value("us_alice"))
+                .andExpect(jsonPath("$.username").value("usalice"))
                 .andExpect(jsonPath("$.winCount").value(0))
                 .andExpect(jsonPath("$.loseCount").value(0))
                 .andExpect(jsonPath("$.rating").value(1000))
@@ -78,8 +78,8 @@ class UserStatsIntegrationTest {
 
     @Test
     void unknown_user_returns_404() throws Exception {
-        registerAndGetId("us_lookup", "validpass1");
-        String token = login("us_lookup", "validpass1");
+        registerAndGetId("uslookup", "validpass1");
+        String token = login("uslookup", "validpass1");
 
         mockMvc.perform(get("/api/users/999999/stats")
                         .header("Authorization", "Bearer " + token))
@@ -88,8 +88,8 @@ class UserStatsIntegrationTest {
 
     @Test
     void ranking_excludes_bots_and_orders_by_rating_desc() throws Exception {
-        long me = registerAndGetId("rk_user", "validpass1");
-        String token = login("rk_user", "validpass1");
+        long me = registerAndGetId("rkuser", "validpass1");
+        String token = login("rkuser", "validpass1");
         // D-115 — 랭킹은 그 게임을 한 판이라도 한 사람만 싣는다.
         gameStats.record(me, "TICHU", true, 1020, false);
 
@@ -106,8 +106,8 @@ class UserStatsIntegrationTest {
 
     @Test
     void stats_lists_per_game_records_and_keeps_tichu_at_top_level() throws Exception {
-        long userId = registerAndGetId("gs_multi", "validpass1");
-        String token = login("gs_multi", "validpass1");
+        long userId = registerAndGetId("gsmulti", "validpass1");
+        String token = login("gsmulti", "validpass1");
         gameStats.record(userId, "TICHU", true, 1020, false);
         gameStats.record(userId, "SKULL_KING", false, 985, true);
 
@@ -125,9 +125,9 @@ class UserStatsIntegrationTest {
 
     @Test
     void ranking_is_per_game() throws Exception {
-        long sk = registerAndGetId("gs_skonly", "validpass1");
-        long tc = registerAndGetId("gs_tconly", "validpass1");
-        String token = login("gs_skonly", "validpass1");
+        long sk = registerAndGetId("gsskonly", "validpass1");
+        long tc = registerAndGetId("gstconly", "validpass1");
+        String token = login("gsskonly", "validpass1");
         gameStats.record(sk, "SKULL_KING", true, 1300, false);
         gameStats.record(tc, "TICHU", true, 1400, false);
 
@@ -135,14 +135,14 @@ class UserStatsIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gameType").value("SKULL_KING"))
-                .andExpect(jsonPath("$.entries[?(@.username == 'gs_skonly')].rating").value(1300))
-                .andExpect(jsonPath("$.entries[?(@.username == 'gs_tconly')]").isEmpty());
+                .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].rating").value(1300))
+                .andExpect(jsonPath("$.entries[?(@.username == 'gstconly')]").isEmpty());
     }
 
     @Test
     void ranking_for_unknown_game_is_404() throws Exception {
-        registerAndGetId("gs_unknown", "validpass1");
-        String token = login("gs_unknown", "validpass1");
+        registerAndGetId("gsunknown", "validpass1");
+        String token = login("gsunknown", "validpass1");
 
         mockMvc.perform(get("/api/users/ranking?gameType=NOPE")
                         .header("Authorization", "Bearer " + token))
@@ -151,8 +151,8 @@ class UserStatsIntegrationTest {
 
     @Test
     void me_win_lose_is_the_sum_over_games() throws Exception {
-        long userId = registerAndGetId("gs_me", "validpass1");
-        String token = login("gs_me", "validpass1");
+        long userId = registerAndGetId("gsme", "validpass1");
+        String token = login("gsme", "validpass1");
         gameStats.record(userId, "TICHU", true, null, false);
         gameStats.record(userId, "SKULL_KING", false, null, false);
         gameStats.record(userId, "SKULL_KING", true, null, false);

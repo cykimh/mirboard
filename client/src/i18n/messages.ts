@@ -15,7 +15,7 @@ const KO = {
   // --- 인증 ---
   'auth.login.title': '로그인',
   'auth.register.title': '회원가입',
-  'auth.username': '아이디',
+  'auth.username': '별명',
   'auth.password': '비밀번호',
 
   // --- 허브 / 로비 / 방 ---

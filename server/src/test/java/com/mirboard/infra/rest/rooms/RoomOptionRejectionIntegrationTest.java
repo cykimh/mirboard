@@ -69,7 +69,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("스컬킹 방에 판돈을 걸면 거절한다 (칩 없이 봇만 금지되던 경로)")
     void rejectsBettingOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_bet_user", "validpass1");
+        String token = registerAndLogin("optbetuser", "validpass1");
 
         createRoom(token, Map.of(
                 "name", "판돈 스컬킹", "gameType", "SKULL_KING", "stake", 100))
@@ -82,7 +82,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("스컬킹 방에 목표 점수를 지정하면 거절한다 (10라운드 고정)")
     void rejectsTargetScoreOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_score_user", "validpass1");
+        String token = registerAndLogin("optscor3ee", "validpass1");
 
         createRoom(token, Map.of(
                 "name", "300점 스컬킹", "gameType", "SKULL_KING", "targetScore", 300))
@@ -98,7 +98,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("기본값은 통과한다 — 예전 클라가 보내던 targetScore:1000·stake:0")
     void acceptsDefaultsOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_default_user", "validpass1");
+        String token = registerAndLogin("optdefacc3", "validpass1");
 
         createRoom(token, Map.of(
                 "name", "기본 스컬킹", "gameType", "SKULL_KING",
@@ -109,7 +109,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("옵션을 아예 안 보내도 통과한다 (D-106 이후 클라)")
     void acceptsOmittedOptionsOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_omit_user", "validpass1");
+        String token = registerAndLogin("optomit241", "validpass1");
 
         createRoom(token, Map.of("name", "옵션 없는 스컬킹", "gameType", "SKULL_KING"))
                 .andExpect(status().isCreated());
@@ -118,7 +118,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("티츄는 세 옵션을 모두 받는다 — 게이팅이 과하게 먹지 않았는지")
     void acceptsAllOptionsOnTichu() throws Exception {
-        String token = registerAndLogin("opt_tichu_user", "validpass1");
+        String token = registerAndLogin("opttichbbf", "validpass1");
 
         createRoom(token, Map.of(
                 "name", "티츄 내기방", "gameType", "TICHU",
@@ -129,7 +129,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("개인전에도 RANDOM 좌석 정책을 받는다 — 좌석 순서 = 턴 순서 (D-106 정정)")
     void acceptsRandomSeatPolicyOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_seat_user", "validpass1");
+        String token = registerAndLogin("optseat175", "validpass1");
 
         // 한때 이걸 UNSUPPORTED_ROOM_OPTION 으로 막았다. `domain.game` 에 TeamPolicy 참조가
         // 0건이고 RANDOM 은 onGameStart 에서 좌석 순서를 섞을 뿐이라, 동작하는 기능을
@@ -143,7 +143,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("만들어진 개인전 방의 좌석 정책도 바꿀 수 있다")
     void acceptsSeatPolicyUpdateOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_seat_up_user", "validpass1");
+        String token = registerAndLogin("optseatd19", "validpass1");
         String roomId = createdRoomId(token, Map.of(
                 "name", "스컬킹 방", "gameType", "SKULL_KING"));
 
@@ -158,7 +158,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("게임 중립 옵션(턴 제한)은 스컬킹에서도 그대로 받는다")
     void acceptsNeutralOptionsOnSkullKing() throws Exception {
-        String token = registerAndLogin("opt_neutral_user", "validpass1");
+        String token = registerAndLogin("optneut2e4", "validpass1");
 
         createRoom(token, Map.of(
                 "name", "턴제한 스컬킹", "gameType", "SKULL_KING", "turnSeconds", 60))
@@ -170,7 +170,7 @@ class RoomOptionRejectionIntegrationTest {
     @Test
     @DisplayName("카탈로그가 게임별 supportedRoomOptions 를 노출한다 (클라 게이팅 근거)")
     void catalogExposesSupportedRoomOptions() throws Exception {
-        String token = registerAndLogin("opt_catalog_user", "validpass1");
+        String token = registerAndLogin("optcatade6", "validpass1");
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .get("/api/games/TICHU").header("Authorization", "Bearer " + token))

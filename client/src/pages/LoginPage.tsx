@@ -94,7 +94,7 @@ export function LoginPage() {
   const loginForm = (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="login-username">아이디</Label>
+        <Label htmlFor="login-username">별명</Label>
         <Input
           id="login-username"
           type="text"

@@ -68,8 +68,8 @@ class RoomJoinOrReconnectIntegrationTest {
 
     @Test
     void newcomer_to_waiting_room_is_joined() throws Exception {
-        String hostToken = registerAndLogin("jor_host1", "validpass1");
-        String guestToken = registerAndLogin("jor_guest1", "validpass1");
+        String hostToken = registerAndLogin("jorhost1", "validpass1");
+        String guestToken = registerAndLogin("jorguest1", "validpass1");
         String roomId = createRoom(hostToken);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
@@ -83,7 +83,7 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void existing_player_revisiting_waiting_room_is_reconnected_without_capacity_change()
             throws Exception {
-        String hostToken = registerAndLogin("jor_host2", "validpass1");
+        String hostToken = registerAndLogin("jorhost2", "validpass1");
         String roomId = createRoom(hostToken);
 
         // 호스트는 createRoom 으로 이미 playerIds[0] 위치. 다시 호출하면 RECONNECTED.
@@ -101,8 +101,8 @@ class RoomJoinOrReconnectIntegrationTest {
      */
     @Test
     void guest_can_leave_waiting_room_and_rejoin() throws Exception {
-        String hostToken = registerAndLogin("jor_lr_host", "validpass1");
-        String guestToken = registerAndLogin("jor_lr_guest", "validpass1");
+        String hostToken = registerAndLogin("jorlrhost", "validpass1");
+        String guestToken = registerAndLogin("jorlrguest", "validpass1");
         String roomId = createRoom(hostToken);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
@@ -129,7 +129,7 @@ class RoomJoinOrReconnectIntegrationTest {
      */
     @Test
     void leaving_last_player_clears_ready_set() throws Exception {
-        String hostToken = registerAndLogin("jor_ready_host", "validpass1");
+        String hostToken = registerAndLogin("jorreadd6b", "validpass1");
         String roomId = createRoom(hostToken);
         String readyKey = "room:" + roomId + ":ready";
 
@@ -154,10 +154,10 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void newcomer_to_in_game_room_is_forced_to_spectate() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("jor_a", "jor_b", "jor_c", "jor_d"));
+                List.of("jora", "jorb", "jorc", "jord"));
         String roomId = createRoomAndJoinAll(tokens);  // 4명 다 join → IN_GAME
 
-        String outsiderToken = registerAndLogin("jor_outsider", "validpass1");
+        String outsiderToken = registerAndLogin("jorouts044", "validpass1");
         mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isOk())
@@ -178,10 +178,10 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void original_player_revisiting_in_game_room_is_reconnected() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("jor_p1", "jor_p2", "jor_p3", "jor_p4"));
+                List.of("jorp1", "jorp2", "jorp3", "jorp4"));
         String roomId = createRoomAndJoinAll(tokens);
 
-        String aliceToken = tokens.get("jor_p1");
+        String aliceToken = tokens.get("jorp1");
         mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect")
                         .header("Authorization", "Bearer " + aliceToken))
                 .andExpect(status().isOk())
@@ -201,8 +201,8 @@ class RoomJoinOrReconnectIntegrationTest {
      */
     @Test
     void a_spectator_who_takes_a_seat_leaves_the_spectator_list() throws Exception {
-        String hostToken = registerAndLogin("jor_sit_host", "validpass1");
-        String friendToken = registerAndLogin("jor_sit_friend", "validpass1");
+        String hostToken = registerAndLogin("jorsithost", "validpass1");
+        String friendToken = registerAndLogin("jorsitfaa5", "validpass1");
         String roomId = createRoom(hostToken);
         mockMvc.perform(post("/api/rooms/" + roomId + "/spectate")
                         .header("Authorization", "Bearer " + friendToken))
@@ -219,7 +219,7 @@ class RoomJoinOrReconnectIntegrationTest {
     /** D-135 — 방장 말고 모두 봇인 판은 강제 종료한다. */
     @Test
     void host_can_abort_a_game_against_bots() throws Exception {
-        String hostToken = registerAndLogin("jor_h_host", "validpass1");
+        String hostToken = registerAndLogin("jorhhost", "validpass1");
         String roomId = createRoom(hostToken, true); // D-136 — 봇과 연습 방은 만들자마자 시작한다.
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
@@ -236,9 +236,9 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void host_cannot_abort_a_game_with_other_humans() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("jor_hh_host", "jor_hh2", "jor_hh3", "jor_hh4"));
+                List.of("jorhhhost", "jorhh2", "jorhh3", "jorhh4"));
         String roomId = createRoomAndJoinAll(tokens);
-        String hostToken = tokens.get("jor_hh_host");
+        String hostToken = tokens.get("jorhhhost");
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
                         .header("Authorization", "Bearer " + hostToken))
@@ -254,9 +254,9 @@ class RoomJoinOrReconnectIntegrationTest {
     @Test
     void non_host_cannot_abort() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("jor_nh_host", "jor_nh2", "jor_nh3", "jor_nh4"));
+                List.of("jornhhost", "jornh2", "jornh3", "jornh4"));
         String roomId = createRoomAndJoinAll(tokens);
-        String otherToken = tokens.get("jor_nh2");
+        String otherToken = tokens.get("jornh2");
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")
                         .header("Authorization", "Bearer " + otherToken))
@@ -266,7 +266,7 @@ class RoomJoinOrReconnectIntegrationTest {
 
     @Test
     void cannot_abort_waiting_room() throws Exception {
-        String hostToken = registerAndLogin("jor_w_host", "validpass1");
+        String hostToken = registerAndLogin("jorwhost", "validpass1");
         String roomId = createRoom(hostToken);
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/abort")

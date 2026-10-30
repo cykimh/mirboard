@@ -42,7 +42,7 @@ function renderRegister(from?: unknown) {
 }
 
 function submitSignup() {
-  fireEvent.change(screen.getByLabelText(/아이디 \(영문/), { target: { value: 'newbie' } });
+  fireEvent.change(screen.getByLabelText(/별명 \(한글/), { target: { value: '새내기' } });
   fireEvent.change(screen.getByLabelText(/비밀번호 \(8~64자\)/), { target: { value: 'password1' } });
   fireEvent.click(screen.getByRole('button', { name: '회원가입 후 로그인' }));
 }
@@ -68,8 +68,8 @@ describe('RegisterPage — 가입 뒤 목적지 (D-133)', () => {
 
     expect(await screen.findByText('ROOM_PAGE /rooms/r1')).toBeInTheDocument();
     expect(screen.getByTestId('nav-type').textContent).toBe('REPLACE');
-    expect(register).toHaveBeenCalledWith('newbie', 'password1');
-    expect(login).toHaveBeenCalledWith('newbie', 'password1');
+    expect(register).toHaveBeenCalledWith('새내기', 'password1');
+    expect(login).toHaveBeenCalledWith('새내기', 'password1');
   });
 
   it('돌아갈 주소가 없으면 지금처럼 허브로', async () => {
@@ -98,5 +98,23 @@ describe('RegisterPage — 가입 뒤 목적지 (D-133)', () => {
 
     expect(await screen.findByText('LOGIN_PAGE /login')).toBeInTheDocument();
     expect(screen.getByTestId('state-from').textContent).toBe('/rooms/r1');
+  });
+});
+
+describe('RegisterPage — 별명 (D-149)', () => {
+  it('별명 칸은 한글·영문·숫자 2~10자를 받는다', () => {
+    render(
+      <MemoryRouter initialEntries={['/register']}>
+        <RegisterPage />
+      </MemoryRouter>,
+    );
+    const input = screen.getByLabelText(/별명 \(한글·영문·숫자 2~10자\)/) as HTMLInputElement;
+    const re = new RegExp(input.pattern);
+    expect(re.test('철수')).toBe(true);
+    expect(re.test('영희Kim1')).toBe(true);
+    expect(re.test('가')).toBe(false);
+    expect(re.test('alice_01')).toBe(false);
+    expect(re.test('가나다라마바사아자차카')).toBe(false);
+    expect(screen.queryByText(/아이디/)).toBeNull();
   });
 });
