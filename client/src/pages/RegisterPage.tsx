@@ -70,12 +70,12 @@ export function RegisterPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="reg-password">비밀번호 (8~64자)</Label>
+              <Label htmlFor="reg-password">비밀번호 (4자 이상)</Label>
               <Input
                 id="reg-password"
                 type="password"
                 value={password}
-                minLength={8}
+                minLength={4}
                 maxLength={64}
                 onChange={(e) => setPassword(e.target.value)}
                 required

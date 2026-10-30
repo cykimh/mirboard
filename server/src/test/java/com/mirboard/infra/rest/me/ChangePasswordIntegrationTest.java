@@ -102,7 +102,7 @@ class ChangePasswordIntegrationTest {
         String token = registerAndLogin("pwweaknew", "oldpass12");
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("currentPassword", "oldpass12", "newPassword", "short"))))
+                .content(body(Map.of("currentPassword", "oldpass12", "newPassword", "abc"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
     }

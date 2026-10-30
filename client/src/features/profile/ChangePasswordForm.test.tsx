@@ -22,11 +22,12 @@ describe('ChangePasswordForm', () => {
     expect(meApi.changePassword).not.toHaveBeenCalled();
   });
 
+  // D-156 — 4자 이상이면 된다. 3자는 막는다.
   it('rejects a too-short new password', () => {
     render(<ChangePasswordForm token="tok" />);
     fill('현재 비밀번호', 'oldpass12');
-    fill('새 비밀번호', 'short');
-    fill('새 비밀번호 확인', 'short');
+    fill('새 비밀번호', 'abc');
+    fill('새 비밀번호 확인', 'abc');
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(meApi.changePassword).not.toHaveBeenCalled();
   });

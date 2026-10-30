@@ -43,7 +43,7 @@ function renderRegister(from?: unknown) {
 
 function submitSignup() {
   fireEvent.change(screen.getByLabelText(/별명 \(한글/), { target: { value: '새내기' } });
-  fireEvent.change(screen.getByLabelText(/비밀번호 \(8~64자\)/), { target: { value: 'password1' } });
+  fireEvent.change(screen.getByLabelText(/비밀번호 \(4자 이상\)/), { target: { value: 'password1' } });
   fireEvent.click(screen.getByRole('button', { name: '회원가입 후 로그인' }));
 }
 
@@ -116,5 +116,18 @@ describe('RegisterPage — 별명 (D-149)', () => {
     expect(re.test('alice_01')).toBe(false);
     expect(re.test('가나다라마바사아자차카')).toBe(false);
     expect(screen.queryByText(/아이디/)).toBeNull();
+  });
+});
+
+describe('RegisterPage — 비밀번호 (D-156)', () => {
+  it('비밀번호는 4자 이상이면 무엇이든 — 칸의 최소 길이가 4다', () => {
+    render(
+      <MemoryRouter initialEntries={['/register']}>
+        <RegisterPage />
+      </MemoryRouter>,
+    );
+    const pw = screen.getByLabelText('비밀번호 (4자 이상)') as HTMLInputElement;
+    expect(pw.minLength).toBe(4);
+    expect(pw.pattern).toBe('');
   });
 });

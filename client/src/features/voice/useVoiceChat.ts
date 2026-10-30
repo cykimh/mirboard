@@ -242,3 +242,12 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
 
   return { joined, micOn, micError, members, peerState, join, leave, toggleMic };
 }
+
+/** 좌석 표시용 — 그 사람이 음성 대화에 있으면 on, 나와의 연결이 실패했으면 failed, 아니면 없음. */
+export function voiceStatusOf(
+  voice: Pick<ReturnType<typeof useVoiceChat>, 'members' | 'peerState'>,
+  userId: number | undefined,
+): 'on' | 'failed' | undefined {
+  if (userId == null || !voice.members.includes(userId)) return undefined;
+  return voice.peerState[userId] === 'failed' ? 'failed' : 'on';
+}

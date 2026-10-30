@@ -30,6 +30,10 @@
 
 .header-controls {
   display: flex;
+  /* D-156 — 음성 버튼 2개가 붙어 휴대폰 폭을 넘으면 화면 밖으로 밀리지 않고 줄을 바꾼다. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
@@ -80,3 +84,8 @@
 
 /* Phase 8E — 보드 풍 원형 좌석 배치. 본인 시점 기준 S(하단)/W(우)/N(상단)/E(좌).
    absolute positioning 으로 4개 좌석 + 중앙 currentTop. */
+/* D-156 — 음성 대화: 마이크를 못 쓰면 머리 줄에 이유 한 줄. */
+.voice-error {
+  font-size: 12px;
+  color: var(--color-danger, #d9483d);
+}

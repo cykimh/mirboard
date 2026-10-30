@@ -21,6 +21,9 @@ import { MatchEndedPanel } from './MatchEndedPanel';
 import { MyHandPanel } from './MyHandPanel';
 import { GameTableHeader } from './GameTableHeader';
 import { TableArena } from './TableArena';
+import { buttonVariants } from '@/components/ui/button';
+import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
+import { VoiceControls } from '@/features/voice/VoiceControls';
 import { RoundHistoryModal } from './RoundHistoryModal';
 
 interface GameTableProps {
@@ -75,8 +78,10 @@ export function GameTable({
   onBackToRoom,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
+  const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef } =
     useStompRoom(roomId, token, tichuRoomSink);
+  // D-156 — 음성 대화(무료 P2P, D-155 와 같은 훅).
+  const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
   const [chatOpen, setChatOpen] = useState(false);
   // D-108 — 순수 UI 상태(서버 상태 아님)라 useGameTableModel 이 아니라 여기 둔다.
   const [roundHistoryOpen, setRoundHistoryOpen] = useState(false);
@@ -154,11 +159,19 @@ export function GameTable({
         onToggleChat={() => setChatOpen((v) => !v)}
         unreadCount={unreadCount}
         onAbort={onAbort}
+        voiceControls={
+          <VoiceControls
+            voice={voice}
+            buttonClassName={buttonVariants({ variant: 'outline', size: 'sm' })}
+            errorClassName="voice-error"
+          />
+        }
       />
 
       <TableArena
         tableView={tableView}
         playerIds={playerIds}
+        voiceOf={(uid) => voiceStatusOf(voice, uid)}
         mySeat={m.mySeat}
         myTeam={m.myTeam}
         myTurn={m.myTurn}

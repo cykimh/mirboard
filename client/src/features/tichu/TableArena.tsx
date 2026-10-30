@@ -21,6 +21,8 @@ interface TableArenaProps {
   myTeam: 'A' | 'B';
   myTurn: boolean;
   usernames: Record<number, string>;
+  /** D-156 — 좌석 사람의 음성 대화 상태(참여 중 on / 나와 연결 실패 failed). */
+  voiceOf?: (userId: number) => 'on' | 'failed' | undefined;
   botSeats: number[];
   stake: number;
   chips: Record<number, number>;
@@ -59,6 +61,7 @@ export function TableArena({
   myTeam,
   myTurn,
   usernames,
+  voiceOf,
   botSeats,
   stake,
   chips,
@@ -118,6 +121,15 @@ export function TableArena({
               title={viewPos === 's' ? undefined : usernames[uid] ?? `#${uid}`}
             >
               {viewPos === 's' ? '나' : usernames[uid] ?? `#${uid}`}
+              {voiceOf?.(uid) && (
+                <span
+                  className={`seat-voice${voiceOf(uid) === 'failed' ? ' seat-voice-failed' : ''}`}
+                  aria-label={voiceOf(uid) === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+                  title={voiceOf(uid) === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+                >
+                  {voiceOf(uid) === 'failed' ? ' 🎧✕' : ' 🎧'}
+                </span>
+              )}
             </div>
             {stake > 0 && (
               <div className="seat-chips" title="테이블 칩">

@@ -891,3 +891,19 @@ html:not(.dark) .sk-table {
   gap: 8px;
   margin-top: 8px;
 }
+
+/* D-156 — 음성 대화: 좌석 이름 옆 🎧(참여 중), 연결 실패면 흐리게 ✕. 마이크 오류 문구. */
+.sk-seat-voice {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.sk-seat-voice-failed {
+  opacity: 0.55;
+}
+
+.sk-voice-error {
+  white-space: normal;
+}
+

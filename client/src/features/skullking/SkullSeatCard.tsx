@@ -23,6 +23,8 @@ interface Props {
   side?: TableSide | 'bottom';
   /** 옆줄 안 순서(시계 방향, 0 부터). */
   slot?: number;
+  /** D-156 — 음성 대화 참여 중(on) / 나와의 연결 실패(failed). */
+  voice?: 'on' | 'failed';
 }
 
 /**
@@ -42,6 +44,7 @@ export function SkullSeatCard({
   bidsRevealed,
   side,
   slot,
+  voice,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -82,6 +85,15 @@ export function SkullSeatCard({
         <span className="sk-seat-name" title={name}>
           {name}
         </span>
+        {voice && (
+          <span
+            className={`sk-seat-voice${voice === 'failed' ? ' sk-seat-voice-failed' : ''}`}
+            title={voice === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+            aria-label={voice === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+          >
+            {voice === 'failed' ? '🎧✕' : '🎧'}
+          </span>
+        )}
       </div>
 
       <div className="sk-seat-stats">
