@@ -393,7 +393,7 @@ describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
     expect(localStorage.getItem(SK_KEY)).toBeNull();
   });
 
-  it('연 채로 게임이 시작되면 닫고, 리매치로 대기실에 돌아와도 다시 열리지 않는다', async () => {
+  it('연 채로 게임이 시작되면 닫고, 판이 끝나 대기실에 돌아와도 다시 열리지 않는다', async () => {
     let pushRoom!: (r: Room) => void;
     vi.mocked(useRoomMeta).mockImplementation((_id, _token, onRoom) => {
       pushRoom = onRoom;
@@ -409,6 +409,8 @@ describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
 
     act(() => pushRoom({ ...ROOM, gameType: 'SKULL_KING', status: 'WAITING' }));
+    // D-153 — 결과 화면을 유지하다가 [대기실로]로 넘어간다.
+    act(() => (skullProps.at(-1)!.onBackToRoom as () => void)());
     expect(await screen.findByText('테스트 방')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -654,7 +656,8 @@ describe('RoomPage — 자리 없음·방 없음 (D-133)', () => {
  * 게임판, 티츄 게임판, 대기실·종료 셸) 모두에 있어야 한다. 허브에서 고른 관전·새로고침한 관전자에게는 띄우지 않는다(탭 안 기록).
  */
 describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', () => {
-  const STARTED = '게임이 이미 시작돼 관전으로 들어왔어요';
+  // D-153 — 친구 방이라 다음 판 안내.
+  const STARTED = '게임이 이미 시작돼 관전 중이에요 — 이 판이 끝나면 다음 판에 함께해요';
   const FULL = '자리가 없어 관전으로 들어왔어요';
   const watching = { hostId: 2, playerIds: [2, 3], playerCount: 2, spectatorIds: [1] } as Partial<Room>;
 
@@ -1297,5 +1300,79 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
     expect(within(bot).getByText('봇')).toBeInTheDocument();
     expect(within(bot).queryByText('첫 판')).toBeNull();
     expect(stats).not.toHaveBeenCalledWith('tok', 900);
+  });
+});
+
+/**
+ * D-153 — 사람만의 방은 판이 끝나면 서버가 대기실(WAITING)로 돌린다. 이 세션이 IN_GAME→WAITING 을 보면 세 게임 모두 결과 화면(게임판)을
+ * 유지하고 `onBackToRoom`([대기실로])을 넘긴다. 누르면 대기실로. 관전하다 자동으로 앉은 사람은 유지된 게임판에서는 여전히 관전자다.
+ */
+describe('RoomPage — 다음 판: 대기실 복귀 뒤 결과 화면 유지 (D-153)', () => {
+  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    skullProps.length = 0;
+    tichuProps.length = 0;
+    oneCardProps.length = 0;
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it.each([
+    ['ONE_CARD', 'onecard-table', () => oneCardProps],
+    ['SKULL_KING', 'skullking-table', () => skullProps],
+    ['TICHU', 'tichu-table', () => tichuProps],
+  ] as const)('%s — 게임 중 WAITING 을 받으면 게임판을 유지하고, [대기실로]를 누르면 대기실', async (gameType, testId, props) => {
+    loadGame.mockResolvedValue(game(gameType, []));
+    const inGame = { ...ROOM, gameType, status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 } as Room;
+    renderRoom(inGame);
+    await screen.findByTestId(testId);
+    expect(props().at(-1)!.onBackToRoom).toBeUndefined();
+
+    act(() => {
+      metaCallback()({ ...inGame, status: 'WAITING', capacity: 6 } as Room);
+    });
+
+    expect(screen.getByTestId(testId)).toBeInTheDocument();
+    const back = props().at(-1)!.onBackToRoom as () => void;
+    expect(back).toBeTypeOf('function');
+    if (gameType !== 'TICHU') expect(props().at(-1)!.roomFinished).toBe(true);
+
+    act(() => back());
+
+    expect(screen.queryByTestId(testId)).toBeNull();
+    expect(await screen.findByRole('list', { name: '참가자' })).toBeInTheDocument();
+  });
+
+  it('관전하다 자동으로 앉은 사람 — 유지된 게임판에서는 관전자 그대로', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    const watching = {
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'IN_GAME',
+      playerIds: [2, 3],
+      playerCount: 2,
+      spectatorIds: [1],
+    } as unknown as Room;
+    renderRoom(watching, 'SPECTATING');
+    await screen.findByTestId('onecard-table');
+
+    act(() => {
+      metaCallback()({ ...watching, status: 'WAITING', playerIds: [2, 3, 1], playerCount: 3, spectatorIds: [] } as unknown as Room);
+    });
+
+    const last = oneCardProps.at(-1)!;
+    expect(last.spectator).toBe(true);
+    expect(last.playerIds).toEqual([2, 3]);
+  });
+
+  it('처음부터 WAITING 으로 들어오면(새로고침) 대기실', async () => {
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom({ gameType: 'ONE_CARD', status: 'WAITING' });
+
+    expect(await screen.findByRole('list', { name: '참가자' })).toBeInTheDocument();
+    expect(screen.queryByTestId('onecard-table')).toBeNull();
   });
 });

@@ -18,8 +18,9 @@
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120)·`roundsPlayed`(완주 라운드 수, 매치가 끝날 때 확정 — 진행 중·구 JSON 은 `null`, D-122) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
 | `room:{roomId}:ready` | SET | 6h (FINISHED 후 600s) | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
-| `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(리매치 시 유지), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
+| `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(다음 판 — D-153 대기실 복귀 뒤 — 에도 유지, 새로 앉은 사람은 재바이인), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h (FINISHED 후 600s) | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
+| `room:{roomId}:spectators_since` | ZSET | 6h | member=관전자 `userId`, score=관전 시작 `epochMillis` | D-153. 다음 판 자동 착석 순서. `addSpectator` 가 `ZADD`(다시 관전하면 시각 갱신). 나간 관전자는 지우지 않고 `room_return_waiting.lua` 가 SET 과 맞춰 거른다(순서 기록 없는 관전자는 뒤에 userId 순). 앉으면 `ZREM` |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 — 값은 획득 때의 무작위 토큰 | `SET key token NX EX 2`. D-140: 해제는 `room_lock_release.lua`(`GET == token` 일 때만 `DEL`) — TTL 이 지나 남이 잡은 락을 늦게 돌아온 스레드가 지우지 않는다 |
 | `presence:room:{roomId}` | HASH | 6h | `userId` → 해당 방을 보고 있는 **세션 수** | D-96(D-111 보정). `RoomPresence`. 방 토픽 SUBSCRIBE 시 `presence_join.lua` 로 **세션당 1회만** `HINCRBY +1`, DISCONNECT 시 `presence_leave.lua` 로 −1(0 이면 `HDEL`, 빈 HASH 면 키 자체 `DEL`). **boolean 이 아니라 카운터** — 탭 두 개 중 하나만 닫아도 접속 중이어야 탈주 오판이 없다. 탈주 유예 만료 시 "재접속했는가"(`hasLiveSession`) 판정의 근거 |
@@ -241,3 +242,26 @@ TTL 도 있다" 가 항상 참이다.
   broadcast(`stomp:routes` 채널, `StompMessageRelay`)가 Redis Pub/Sub 위로 흐르므로
   **sticky session 없이** 작동한다. 기본값은 `in-memory`. 도메인 이벤트는 이 채널을 타지
   않는다 — 발행한 인스턴스에서만 처리한다(D-116, 구 `domain:event` 채널 폐기).
+
+## `room_return_waiting.lua` (D-153)
+
+정상 종료한 사람만의 방을 대기실로 돌린다. 매치 진행(`MatchProgressService.advance`)이 방 액션 락 안에서 부른다.
+
+- 입력:
+  - `KEYS[1]=room:{id}`
+  - `KEYS[2]=room:{id}:players`
+  - `KEYS[3]=room:{id}:ready`
+  - `KEYS[4]=room:{id}:spectators`
+  - `KEYS[5]=room:{id}:spectators_since`
+  - `KEYS[6]=rooms:open`
+  - `ARGV=[maxPlayers, roomId, now]`
+- IN_GAME 일 때만 한 번에 처리한다.
+  - 준비를 지운다(`DEL ready`).
+  - 관전자를 들어온 순서대로 `maxPlayers` 까지 `RPUSH players`·`SREM`·`ZREM` 한다.
+  - `status=WAITING`, `capacity=maxPlayers` 로 둔다.
+  - `ZADD rooms:open now roomId` 로 방 목록에 다시 올리고, 메타·좌석 TTL 을 6h 로 되돌린다.
+- 반환:
+  - `n` = 돌아간 뒤 좌석 수
+  - `-1` = 방 없음
+  - `-2` = IN_GAME 아님(그대로 둔다)
+

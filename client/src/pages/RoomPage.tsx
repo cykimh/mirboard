@@ -240,7 +240,8 @@ export function RoomPage() {
     (r) => {
       // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
       const prev = roomRef.current;
-      if (prev?.status === 'IN_GAME' && r.status === 'FINISHED') {
+      // D-153 — 판이 끝나 대기실(WAITING)로 돌아온 것도 같은 유지 — 결과를 보고 [대기실로]로 넘어간다.
+      if (prev?.status === 'IN_GAME' && (r.status === 'FINISHED' || r.status === 'WAITING')) {
         setHeldSeats({ playerIds: prev.playerIds, botSeats: prev.botSeats ?? [] });
       }
       roomRef.current = r;
@@ -505,22 +506,27 @@ export function RoomPage() {
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
   // 다른 게임의 코드 경로는 실행조차 되지 않는다.
   // D-120: 종료 화면을 가진 게임(스컬킹·원카드)은 이 세션에서 본 IN_GAME→FINISHED 직후에도
-  // 게임판을 유지한다(위 boardHeld). 티츄는 아직 기존 동작 그대로다 — 매치 결과·'한 판 더' 게이팅이 먼저다.
-  const roomFinished = room.status === 'FINISHED';
+  // 게임판을 유지한다(위 boardHeld). 티츄는 FINISHED(탈주·강제 종료)면 종료 카드, D-153 대기실 복귀면 유지한다.
+  // D-153 — 판이 끝나 대기실로 돌아온 방도 이 세션이 전이를 봤으면 결과 화면을 유지한다(세 게임 모두). [대기실로]가 유지를 푼다.
+  const backInWaiting = boardHeld && room.status === 'WAITING';
+  const roomFinished = room.status === 'FINISHED' || backInWaiting;
+  const onBackToRoom = backInWaiting ? () => setHeldSeats(null) : undefined;
+  // D-122 — 유지된 게임판은 얼린 좌석 목록으로 그린다. 게임 중에는 라이브 메타 그대로. D-153 — 관전하다 자동으로 앉은 사람은 유지된
+  // 게임판에서는 관전자 그대로다(얼린 좌석에 없다).
+  const seats: HeldSeats =
+    boardHeld && roomFinished && heldSeats
+      ? heldSeats
+      : { playerIds: room.playerIds, botSeats: room.botSeats ?? [] };
+  const boardSpectator = boardHeld && heldSeats ? !heldSeats.playerIds.includes(user.userId) : iAmSpectator;
   if (
     BOARD_HELD_GAMES.has(room.gameType) &&
     (room.status === 'IN_GAME' || (boardHeld && roomFinished))
   ) {
-    // D-122 — 유지된 게임판은 얼린 좌석 목록으로 그린다. 게임 중에는 라이브 메타 그대로.
-    const seats: HeldSeats =
-      roomFinished && heldSeats
-        ? heldSeats
-        : { playerIds: room.playerIds, botSeats: room.botSeats ?? [] };
     const board = {
       roomId: room.roomId,
       playerIds: seats.playerIds,
       myUserId: user.userId,
-      spectator: iAmSpectator,
+      spectator: boardSpectator,
       botSeats: seats.botSeats,
       usernames,
       turnSeconds: room.turnSeconds ?? 0,
@@ -529,6 +535,7 @@ export function RoomPage() {
       onAbort,
       practice: room.fillWithBots ?? false,
       roomFinished,
+      onBackToRoom,
     };
     return withLiveRegion(
       <main className="room-page">
@@ -540,17 +547,17 @@ export function RoomPage() {
     );
   }
 
-  if (room.status === 'IN_GAME') {
+  if (room.status === 'IN_GAME' || (room.gameType === 'TICHU' && backInWaiting)) {
     return withLiveRegion(
       <main className="room-page">
         {notice}
         <Suspense fallback={<TableLoading />}>
           <GameTable
             roomId={room.roomId}
-            playerIds={room.playerIds}
+            playerIds={seats.playerIds}
             myUserId={user.userId}
-            spectator={iAmSpectator}
-            botSeats={room.botSeats ?? []}
+            spectator={boardSpectator}
+            botSeats={seats.botSeats}
             fillWithBots={room.fillWithBots ?? false}
             turnSeconds={room.turnSeconds ?? 0}
             stake={room.stake ?? 0}
@@ -559,6 +566,7 @@ export function RoomPage() {
             isHost={iAmHost}
             onExit={handleLeave}
             onAbort={onAbort}
+            onBackToRoom={onBackToRoom}
           />
         </Suspense>
       </main>,

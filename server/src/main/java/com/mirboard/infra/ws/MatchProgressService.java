@@ -2,7 +2,6 @@ package com.mirboard.infra.ws;
 
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
-import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
@@ -30,13 +29,15 @@ public class MatchProgressService {
 
     private final RoomService roomService;
     private final MirboardMetrics metrics;
-    private final GameRegistry games;
+    private final RoomPresence sessions;
+    private final WaitingLeaveGraceScheduler waitingGrace;
 
     public MatchProgressService(RoomService roomService, MirboardMetrics metrics,
-                                GameRegistry games) {
+                                RoomPresence sessions, WaitingLeaveGraceScheduler waitingGrace) {
         this.roomService = roomService;
         this.metrics = metrics;
-        this.games = games;
+        this.sessions = sessions;
+        this.waitingGrace = waitingGrace;
     }
 
     /**
@@ -54,26 +55,27 @@ public class MatchProgressService {
             return;
         }
         metrics.matchCompleted(room.gameType());
-        if (awaitsRematch(room)) {
+        // D-153 — 봇이 낀 방(봇과 연습)은 한 판으로 끝난다. 사람만의 방은 대기실로 돌아가 다음 판을 기다린다.
+        if (!room.botSeats().isEmpty()) {
+            try {
+                roomService.markFinished(room.roomId());
+            } catch (RuntimeException e) {
+                log.warn("Failed to mark room {} finished: {}", room.roomId(), e.getMessage());
+            }
             return;
         }
+        // 진행 경로(마지막 방송)로 새지 않게 실패는 잡는다 — 기록기 실패 격리와 같은 원칙.
         try {
-            roomService.markFinished(room.roomId());
+            Room back = roomService.returnToWaiting(room.roomId());
+            // 판 도중 끊긴 채 남은 플레이어 — 탈주 유예는 IN_GAME 에서만 돌므로 대기실 끊김 유예(D-134)로 넘긴다. 돌아오면 재구독이 취소한다.
+            for (Long userId : back.playerIds()) {
+                if (!sessions.hasLiveSession(userId, room.roomId())) {
+                    waitingGrace.scheduleGrace(room.roomId(), userId);
+                }
+            }
         } catch (RuntimeException e) {
-            log.warn("Failed to mark room {} finished: {}", room.roomId(), e.getMessage());
+            log.warn("Failed to return room {} to waiting: {}", room.roomId(), e.getMessage());
         }
     }
-
-    /**
-     * D-82 — 사람만의 매치는 방을 IN_GAME 으로 유지해 호스트가 '한 판 더'(리매치)로 같은
-     * 테이블에서 칩 누적 플레이할 수 있게 한다. 봇 포함 매치는 리매치 대상이 아니다.
-     *
-     * <p>D-122 — 리매치는 <b>게임이 선언</b>한다({@code GameDefinition.supportsRematch()},
-     * 기본 false). 리매치가 없는 게임의 사람끼리 방이 IN_GAME 으로 남으면, 끝난 뒤 '나가기'가
-     * 탈주 판정(해당 없음) → 일반 leave 로 흘러 좌석 목록을 당겼다.
-     */
-    private boolean awaitsRematch(Room room) {
-        return room.botSeats().isEmpty()
-                && games.require(room.gameType()).supportsRematch();
-    }
 }
+

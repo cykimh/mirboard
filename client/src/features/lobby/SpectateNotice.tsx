@@ -3,8 +3,11 @@ import type { JoinOrReconnectResponse } from '@/api/rooms';
 import type { Room } from '@/types/api';
 import { Button } from '@/components/ui/button';
 
-/** 관전으로 받아진 이유 — `started` 는 게임이 이미 시작됨, `full` 은 시작 전인데 정원이 다 참(봇 자리 포함). */
-export type SpectateNoticeKind = 'started' | 'full';
+/**
+ * 관전으로 받아진 이유 — `started` 는 게임이 이미 시작됨(봇과 연습), `nextRound` 는 친구 방이 진행 중이라 이 판이 끝나면 자동으로 앉음
+ * (D-153), `full` 은 시작 전인데 정원이 다 참(봇 자리 포함).
+ */
+export type SpectateNoticeKind = 'started' | 'nextRound' | 'full';
 
 /**
  * D-133 결정 A — 서버 `join-or-reconnect` 가 관전으로 받았을 때(`mode=SPECTATING`) 방 상태로 이유를 고른다. 이미 관전자여도
@@ -13,10 +16,10 @@ export type SpectateNoticeKind = 'started' | 'full';
  */
 export function spectateNoticeOf(
   mode: JoinOrReconnectResponse['mode'],
-  room: Pick<Room, 'status' | 'playerCount' | 'capacity'>,
+  room: Pick<Room, 'status' | 'playerCount' | 'capacity'> & Partial<Pick<Room, 'fillWithBots'>>,
 ): SpectateNoticeKind | null {
   if (mode !== 'SPECTATING') return null;
-  if (room.status === 'IN_GAME') return 'started';
+  if (room.status === 'IN_GAME') return room.fillWithBots ? 'started' : 'nextRound';
   if (room.status === 'WAITING' && room.playerCount >= room.capacity) return 'full';
   return null;
 }
@@ -48,6 +51,7 @@ const NOTICE_MS = 8000;
 
 const MESSAGES: Record<SpectateNoticeKind, string> = {
   started: '게임이 이미 시작돼 관전으로 들어왔어요',
+  nextRound: '게임이 이미 시작돼 관전 중이에요 — 이 판이 끝나면 다음 판에 함께해요',
   full: '자리가 없어 관전으로 들어왔어요',
 };
 

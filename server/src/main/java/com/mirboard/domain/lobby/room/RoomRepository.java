@@ -25,6 +25,7 @@ public class RoomRepository {
     private final RedisScript<Long> readyScript;
     private final RedisScript<Long> deleteScript;
     private final RedisScript<Long> startNowScript;
+    private final RedisScript<Long> returnWaitingScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -36,6 +37,7 @@ public class RoomRepository {
             @Qualifier("roomReadyScript") RedisScript<Long> readyScript,
             @Qualifier("roomDeleteScript") RedisScript<Long> deleteScript,
             @Qualifier("roomStartNowScript") RedisScript<Long> startNowScript,
+            @Qualifier("roomReturnWaitingScript") RedisScript<Long> returnWaitingScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
@@ -45,6 +47,7 @@ public class RoomRepository {
         this.readyScript = readyScript;
         this.deleteScript = deleteScript;
         this.startNowScript = startNowScript;
+        this.returnWaitingScript = returnWaitingScript;
         this.bots = bots;
     }
 
@@ -166,6 +169,27 @@ public class RoomRepository {
         return result.intValue();
     }
 
+    /**
+     * D-153 — 정상 종료한 친구 방을 대기실로(room_return_waiting.lua). 반환: 돌아간 뒤 좌석 수, -1 방 없음, -2 진행 중 아님(그대로).
+     */
+    public int returnToWaiting(String roomId, int maxPlayers, long now) {
+        Long result = redis.execute(
+                returnWaitingScript,
+                List.of("room:" + roomId,
+                        "room:" + roomId + ":players",
+                        readyKey(roomId),
+                        spectatorsKey(roomId),
+                        spectatorsSinceKey(roomId),
+                        ROOMS_OPEN_KEY),
+                Integer.toString(maxPlayers),
+                roomId,
+                Long.toString(now));
+        if (result == null) {
+            throw new IllegalStateException("room_return_waiting.lua returned null");
+        }
+        return result.intValue();
+    }
+
     private static String readyKey(String roomId) {
         return "room:" + roomId + ":ready";
     }
@@ -278,6 +302,9 @@ public class RoomRepository {
         }
         Long added = redis.opsForSet().add(spectatorsKey(roomId), Long.toString(userId));
         redis.expire(spectatorsKey(roomId), java.time.Duration.ofHours(6));
+        // D-153 — 들어온 순서(다음 판 자동 착석 순서). 다시 관전하면 시각이 새로 찍힌다. 나간 관전자는 SET 과 맞춰 걸러진다.
+        redis.opsForZSet().add(spectatorsSinceKey(roomId), Long.toString(userId), System.currentTimeMillis());
+        redis.expire(spectatorsSinceKey(roomId), java.time.Duration.ofHours(6));
         return added != null && added > 0;
     }
 
@@ -290,6 +317,10 @@ public class RoomRepository {
     public boolean isSpectator(String roomId, long userId) {
         Boolean member = redis.opsForSet().isMember(spectatorsKey(roomId), Long.toString(userId));
         return Boolean.TRUE.equals(member);
+    }
+
+    private static String spectatorsSinceKey(String roomId) {
+        return "room:" + roomId + ":spectators_since";
     }
 
     private static String spectatorsKey(String roomId) {

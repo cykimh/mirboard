@@ -142,20 +142,6 @@ public class RoomController {
     }
 
     /**
-     * D-82 — 호스트가 매치 종료 후 같은 테이블에서 '한 판 더'(리매치). 칩은 누적되고
-     * 판돈 미만 보유자는 새 매치 시작 시 무료 재바이인된다. 매치가 끝난 상태에서만 허용.
-     */
-    @PostMapping("/{roomId}/rematch")
-    public Room rematch(@PathVariable String roomId,
-                        @AuthenticationPrincipal AuthPrincipal me) {
-        // 매치가 실제로 끝났는지는 게임이 판정한다 (티츄=목표점수 도달, D-98).
-        if (!engines.forRoom(rooms.getRoom(roomId)).isMatchOver()) {
-            throw new com.mirboard.domain.lobby.room.GameNotInProgressException(roomId);
-        }
-        return rooms.rematch(roomId, me.userId());
-    }
-
-    /**
      * Phase 8A — 직접 링크로 들어오는 사용자를 자동으로 분기. 본인이 원래 플레이어면
      * RECONNECTED, 빈 자리면 JOINED, IN_GAME 방에 처음 들어왔으면 SPECTATING.
      */
@@ -206,8 +192,8 @@ public class RoomController {
      * <p>처리되지 않는 경우는 셋이다: 이미 탈주한 좌석의 재요청(더블클릭, 유예 탈주 뒤 재접속해
      * '나가기' — 스컬킹처럼 남은 사람끼리 계속하는 게임), 락 획득 실패, 매치가 이미 끝남. 앞의
      * 둘은 <b>매치가 진행 중</b>이라 좌석을 그대로 둔다(아무것도 안 함 — 끊김은 유예 탈주가
-     * 처리한다). 넘기는 것은 매치가 끝나 리매치를 기다리는 방(티츄 사람만, D-82 — 좌석이 당겨지는
-     * 그 경로는 별건)과, 그 사이 방이 IN_GAME 을 벗어난 경우(FINISHED 는 lua 가 좌석을 고정)뿐이다.
+     * 처리한다). 넘기는 것은 매치가 끝났는데 아직 IN_GAME 인 방(D-153 대기실 복귀 직전·복귀 실패)과,
+     * 그 사이 방이 IN_GAME 을 벗어난 경우(WAITING 은 일반 나가기, FINISHED 는 lua 가 좌석을 고정)뿐이다.
      * 판정은 게임 중립 — 매치 종료 여부는 엔진 포트가 답한다.
      */
     private boolean seatMayBeReleased(String roomId) {

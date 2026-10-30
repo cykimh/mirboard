@@ -44,7 +44,6 @@ class OneCardGameDefinitionTest {
         assertThat(def.maxPlayers()).isEqualTo(6);
         assertThat(def.status()).isEqualTo(GameStatus.AVAILABLE);
         assertThat(def.supportedRoomOptions()).isEmpty();
-        assertThat(def.supportsRematch()).isFalse();
     }
 
     /**

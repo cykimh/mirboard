@@ -56,6 +56,8 @@ interface Props {
   onAbort?: () => void;
   /** D-120 — 방은 FINISHED 인데 이 세션이 종료 전이를 봐서 게임판을 유지하는 중. 입력을 숨긴다. */
   roomFinished?: boolean;
+  /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(이 세션이 전이를 봐 결과 화면을 유지하는 중). [대기실로]가 부른다. */
+  onBackToRoom?: () => void;
 }
 
 /**
@@ -81,6 +83,7 @@ export function OneCardTable({
   onAbort,
   practice = false,
   roomFinished = false,
+  onBackToRoom,
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, chatPanelOpenRef, requestResync } = useStompRoom(
@@ -341,7 +344,13 @@ export function OneCardTable({
       </div>
 
       {s.result && (
-        <OneCardMatchEnd result={s.result} mySeat={mySeat} nameOf={nameOf} onExit={onExit} />
+        <OneCardMatchEnd
+          result={s.result}
+          mySeat={mySeat}
+          nameOf={nameOf}
+          onExit={onExit}
+          onBackToRoom={onBackToRoom}
+        />
       )}
 
       {/* D-120 — 방은 끝났는데 결과가 없다: 강제 종료이거나 MATCH_ENDED 직전의 찰나다. */}

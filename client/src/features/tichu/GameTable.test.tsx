@@ -320,7 +320,8 @@ describe('GameTable — 매치 종료', () => {
     expect(panel).toHaveTextContent('더블 승');
   });
 
-  it('호스트에게만 "한 판 더" 를 노출하고, 비호스트에는 안내 문구를 렌더한다', () => {
+  // D-153 — '한 판 더'는 없다. 방이 대기실로 돌아오면 [대기실로](누구나), 아니면 지금처럼 나가기만.
+  it('대기실로 돌아온 방이면 누구에게나 [대기실로]가 있고 누르면 부른다 — "한 판 더"는 없다', () => {
     seed({
       tableView: tableView({ phase: 'ROUND_END' }),
       privateHand: privateHand([]),
@@ -332,22 +333,18 @@ describe('GameTable — 매치 종료', () => {
         mvpStat: null,
       },
     });
+    const onBackToRoom = vi.fn();
 
     const { rerender } = renderTable({ isHost: true });
-    expect(screen.getByRole('button', { name: '🔄 한 판 더' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /한 판 더/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '대기실로' })).toBeNull();
 
     rerender(
-      <GameTable
-        roomId="room-1"
-        playerIds={PLAYER_IDS}
-        myUserId={MY_USER_ID}
-        isHost={false}
-      />,
+      <GameTable roomId="room-1" playerIds={PLAYER_IDS} myUserId={MY_USER_ID} onBackToRoom={onBackToRoom} />,
     );
-    expect(screen.queryByRole('button', { name: '🔄 한 판 더' })).toBeNull();
-    expect(
-      screen.getByText("호스트가 '한 판 더' 를 누르면 같은 테이블에서 다시 시작합니다."),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '대기실로' }));
+    expect(onBackToRoom).toHaveBeenCalled();
+    expect(screen.getByText('대기실에서 방장이 시작하면 다음 판이에요.')).toBeInTheDocument();
   });
 });
 

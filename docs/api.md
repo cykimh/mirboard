@@ -283,13 +283,10 @@
 이중 소속 없음).
 에러: `ROOM_FULL`, `ROOM_NOT_FOUND`, `ALREADY_IN_ROOM`, `GAME_ALREADY_STARTED`.
 
-### POST `/api/rooms/{roomId}/rematch` *(D-82)*
-호스트가 매치 종료 후 같은 4명·같은 테이블에서 '한 판 더'(리매치). 방은 IN_GAME 을 유지한
-채 새 매치를 시작하고, 방 단위 테이블 칩(`room:{id}:chips`)은 누적되며 판돈 미만 보유자는
-무료 재바이인된다. 사람 4인 매치만(봇 매치는 종료 후 FINISHED). **리매치를 지원하는 게임만**
-(`GameDefinition.supportsRematch()`, 현재 티츄만 — D-122): 지원하지 않는 게임은 사람만의
-매치도 정상 종료 때 FINISHED 가 되므로 이 호출은 `GAME_NOT_IN_PROGRESS`. 응답 `200` — Room.
-에러: `NOT_HOST`, `GAME_NOT_IN_PROGRESS`(매치가 아직 안 끝났거나 진행 중 아님), `ROOM_NOT_FOUND`.
+### ~~POST `/api/rooms/{roomId}/rematch`~~ *(D-82 → D-153 폐기)*
+'한 판 더'(리매치)는 없앴다. 사람만의 방은 매치가 정상으로 끝나면 서버가 방을 **WAITING** 으로 돌린다(정원 = 게임 최대 인원, 준비
+비움, 관전자를 들어온 순서대로 빈자리에 자동 착석, 방 목록 재등록 — `room_return_waiting.lua`). 다음 판은 방장의
+`POST /api/rooms/{roomId}/start`(D-143). 봇과 연습 방·탈주 종료·강제 종료는 그대로 FINISHED. 방 칩은 이어진다.
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 

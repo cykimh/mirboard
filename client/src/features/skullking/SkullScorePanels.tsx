@@ -106,6 +106,8 @@ interface MatchEndProps {
   mySeat: number;
   nameOf: (seat: number) => string;
   onExit?: () => void;
+  /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(이 세션이 전이를 봐 결과 화면을 유지하는 중). [대기실로]가 부른다. */
+  onBackToRoom?: () => void;
   /** 라운드 표용 (D-120). 합계는 `match.finalScores` 를 쓴다. */
   completedRounds?: CompletedRoundView[];
   seats?: number[];
@@ -118,6 +120,7 @@ export function SkullMatchEndPanel({
   mySeat,
   nameOf,
   onExit,
+  onBackToRoom,
   completedRounds = [],
   seats = [],
   desertedSeats = [],
@@ -174,11 +177,19 @@ export function SkullMatchEndPanel({
         </details>
       )}
 
-      {onExit && (
-        <button type="button" className="sk-play" onClick={onExit}>
-          메인으로
-        </button>
-      )}
+      {onBackToRoom && <p className="sk-match-next">대기실에서 방장이 시작하면 다음 판이에요.</p>}
+      <div className="sk-match-actions">
+        {onBackToRoom && (
+          <button type="button" className="sk-play" onClick={onBackToRoom}>
+            대기실로
+          </button>
+        )}
+        {onExit && (
+          <button type="button" className="sk-play" onClick={onExit}>
+            {onBackToRoom ? '나가기' : '메인으로'}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
