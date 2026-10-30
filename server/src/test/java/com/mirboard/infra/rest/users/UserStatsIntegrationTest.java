@@ -26,7 +26,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * Phase 8D — GET /api/users/{id}/stats 검증. 신규 가입 사용자는 rating 1000 +
- * tier BRONZE.
+ * tier MISSILE_1(D-164 — 시작 1000점).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -73,7 +73,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.winCount").value(0))
                 .andExpect(jsonPath("$.loseCount").value(0))
                 .andExpect(jsonPath("$.rating").value(1000))
-                .andExpect(jsonPath("$.tier").value("BRONZE"));
+                .andExpect(jsonPath("$.tier").value("MISSILE_1"));
     }
 
     @Test
@@ -120,7 +120,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.games.length()").value(2))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].rating").value(985))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].desertCount").value(1))
-                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].tier").value("BRONZE"));
+                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].tier").value("BULLET_3"));
     }
 
     @Test
@@ -149,6 +149,22 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** D-160 — 랭킹 탭 순서: 전체에서 많이 한 게임부터(승+패 합). */
+    @Test
+    void game_plays_are_ordered_by_total_plays() throws Exception {
+        long oc = registerAndGetId("gsocmany", "validpass1");
+        String token = login("gsocmany", "validpass1");
+        for (int i = 0; i < 6; i++) {
+            gameStats.record(oc, "ONE_CARD", i % 2 == 0, null, false);
+        }
+
+        mockMvc.perform(get("/api/users/ranking/games")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.games[0].gameType").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[0].plays").value(org.hamcrest.Matchers.greaterThanOrEqualTo(6)));
+    }
+
     @Test
     void me_win_lose_is_the_sum_over_games() throws Exception {
         long userId = registerAndGetId("gsme", "validpass1");
@@ -161,6 +177,21 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.winCount").value(2))
                 .andExpect(jsonPath("$.loseCount").value(1));
+    }
+
+    /** D-164 — 금훈장(1430+) 이상은 게임별 순위로 왕관. 이 게임 최고점이면 별왕관이다. */
+    @Test
+    void the_top_gold_badge_wears_the_star_crown() throws Exception {
+        long top = registerAndGetId("gscrown", "validpass1");
+        String token = login("gscrown", "validpass1");
+        gameStats.record(top, "ONE_CARD", true, 9000, false);
+
+        mockMvc.perform(get("/api/users/" + top + "/stats").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.games[?(@.gameType == 'ONE_CARD')].tier").value("STAR_CROWN"));
+        mockMvc.perform(get("/api/users/ranking?gameType=ONE_CARD&limit=1").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.entries[0].username").value("gscrown"))
+                .andExpect(jsonPath("$.entries[0].tier").value("STAR_CROWN"));
     }
 
     // ---------- helpers ----------

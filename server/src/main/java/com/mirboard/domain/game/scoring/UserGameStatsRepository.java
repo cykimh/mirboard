@@ -24,6 +24,29 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
                                     Pageable pageable);
 
     /**
+     * D-164 — 나보다 점수가 높은 사람 수(봇·게스트 제외). 순위 = 이 값 + 1 — 금훈장 이상의 왕관 판정에만 쓴다.
+     */
+    @Query("SELECT COUNT(s) FROM UserGameStats s, User u"
+            + " WHERE u.id = s.userId AND u.isBot = false AND s.gameType = :gameType"
+            + " AND u.username NOT LIKE :guestPattern AND s.rating > :rating")
+    long countRankedAbove(@Param("gameType") String gameType,
+                          @Param("guestPattern") String guestPattern,
+                          @Param("rating") int rating);
+
+    /**
+     * D-160 — 게임별 판수(승+패 합, 봇 제외). 많이 한 게임부터. 한 매치를 여러 사람이 하므로 "사람-판" 수다 — 순서를 정하는
+     * 데에는 충분하다.
+     */
+    @Query("SELECT new com.mirboard.domain.game.scoring.UserGameStatsRepository$GamePlays(s.gameType,"
+            + " SUM(s.winCount + s.loseCount))"
+            + " FROM UserGameStats s, User u WHERE u.id = s.userId AND u.isBot = false"
+            + " GROUP BY s.gameType ORDER BY SUM(s.winCount + s.loseCount) DESC, s.gameType ASC")
+    List<GamePlays> countPlaysByGame();
+
+    record GamePlays(String gameType, long plays) {
+    }
+
+    /**
      * 한 매치 결과를 누적한다. 행이 없으면 기본값(1000)에서 시작하고, {@code rating} 이
      * null 이면(봇 매치 등 ELO 미적용) 현재 rating 을 유지한다. 판정과 증분이 한 문장이라
      * 같은 유저의 동시 기록에도 갱신이 사라지지 않는다.

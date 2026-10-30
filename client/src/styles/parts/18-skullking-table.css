@@ -289,6 +289,15 @@ html:not(.dark) .sk-felt .sk-stat-key {
   align-self: flex-start;
 }
 
+/* D-162 — 방장만 보는 [내보내기](끊긴 좌석). */
+.sk-seat-kick {
+  align-self: flex-start;
+  border-color: #c62f3a;
+  color: #c62f3a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* D-132 — 일반 진행 기준 다음 차례. 좌석 안에서는 위 테두리에 걸친 꼬리표라 좁은 옆줄 좌석의 이름 칸을 줄이지 않는다.
    "나" 줄에서는 다른 배지처럼 줄 안에 놓인다. 천 위에서도 읽히게 배경을 불투명하게 둔다. */
 .sk-seat-next {
@@ -464,6 +473,8 @@ button.sk-card {
 
 /* ── 내 요약 줄 / 손패 / 액션 ─────────────────────────────────────── */
 .sk-me {
+  /* D-163 — 채팅 한 줄(.sk-seat-chat)이 이 줄 위에 걸친다. */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -903,3 +914,22 @@ html:not(.dark) .sk-table {
   opacity: 0.55;
 }
 
+/* D-163 — 좌석·"(나)" 줄 위 최근 채팅 한 줄(5초). 위 테두리에 걸친 말풍선이라 좌석 높이를 바꾸지 않는다. 길면 말줄임. */
+.sk-seat-chat {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 6px;
+  right: 6px;
+  z-index: 6;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--sk-accent);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}

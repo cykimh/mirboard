@@ -27,6 +27,8 @@ interface TableArenaProps {
   stake: number;
   chips: Record<number, number>;
   disconnectedSeats: Set<number>;
+  /** D-162 — 방장만: 끊긴 좌석의 사람을 내보낸다(확인은 부르는 쪽이). */
+  onKickSeat?: (seat: number) => void;
   spectator: boolean;
   turnSeconds: number;
   isInDealing: boolean;
@@ -66,6 +68,7 @@ export function TableArena({
   stake,
   chips,
   disconnectedSeats,
+  onKickSeat,
   spectator,
   turnSeconds,
   isInDealing,
@@ -159,6 +162,11 @@ export function TableArena({
             {submitted && <div className="status-tag">{t('seat.submitted')}</div>}
             {disconnected && (
               <div className="status-tag disconnected-tag">🔌 연결 끊김</div>
+            )}
+            {disconnected && onKickSeat && seat !== mySeat && (
+              <button type="button" className="status-tag kick-btn" onClick={() => onKickSeat(seat)}>
+                내보내기
+              </button>
             )}
           </div>
         );

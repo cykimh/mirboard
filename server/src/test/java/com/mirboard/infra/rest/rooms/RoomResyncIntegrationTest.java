@@ -240,14 +240,10 @@ class RoomResyncIntegrationTest {
                             .header("Authorization", "Bearer " + tokens.get(ordered.get(i))))
                     .andExpect(status().isOk());
         }
-        // Phase 16(#2) — 전원 준비해야 IN_GAME (resync 는 시작된 방 대상).
-        for (String u : ordered) {
-            mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                            .header("Authorization", "Bearer " + tokens.get(u))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"ready\":true}"))
-                    .andExpect(status().isOk());
-        }
+        // D-161 — 친구 방은 준비로 시작하지 않는다. 방장이 시작해야 IN_GAME (resync 는 시작된 방 대상).
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start")
+                .header("Authorization", "Bearer " + tokens.get(host)))
+                .andExpect(status().isOk());
         return roomId;
     }
 }

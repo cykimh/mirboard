@@ -12,6 +12,7 @@ import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import { useOneCardStore } from './onecardStore';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import type {
@@ -74,6 +75,7 @@ interface SeedOptions {
   result?: OneCardMatchResult | null;
   /** D-131 — resync 의 남은 턴 시간(ms). */
   turnRemainingMs?: number | null;
+  disconnectedSeats?: number[];
 }
 
 function seed(opts: SeedOptions) {
@@ -102,7 +104,7 @@ function snapshotOf(opts: SeedOptions) {
     tableView: table,
     privateHand:
       opts.mySeat >= 0 ? { seat: opts.mySeat, hand: opts.hand ?? [], handVersion: 1 } : null,
-    disconnectedSeats: [],
+    disconnectedSeats: opts.disconnectedSeats ?? [],
     chips: null,
     turnRemainingMs: opts.turnRemainingMs ?? null,
   };
@@ -192,6 +194,37 @@ describe('OneCardTable — 좌석', () => {
     expect(container.querySelectorAll('.oc-seat')).toHaveLength(4);
     expect(screen.queryByRole('region', { name: '내 손패' })).toBeNull();
     expect(screen.getByText('관전 모드')).toBeInTheDocument();
+  });
+});
+
+/** D-160 — 손패는 최대 2줄. 8장까지 한 줄, 9장부터 반씩 두 줄(윗줄이 한 장 더). 넘치면 겹친다(CSS). */
+describe('OneCardTable — 손패 최대 2줄 (D-160)', () => {
+  const handOf = (n: number) =>
+    Array.from({ length: n }, (_, i) => c((['SPADE', 'HEART', 'DIAMOND', 'CLUB'] as const)[i % 4], (i % 13) + 1));
+  const rowSizes = () =>
+    Array.from(screen.getByRole('region', { name: '내 손패' }).querySelectorAll('.oc-hand-row')).map(
+      (row) => row.querySelectorAll('button.oc-card').length,
+    );
+
+  it('8장까지는 한 줄이다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(8) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([8]);
+  });
+
+  it('9장부터는 두 줄로 나눈다 — 윗줄이 한 장 더', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(9) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([5, 4]);
+  });
+
+  it('20장이어도 두 줄이다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(20) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([10, 10]);
   });
 });
 
@@ -357,10 +390,34 @@ describe('OneCardTable — 원카드 경쟁', () => {
     renderTable({ playerIds: [100, 101, 102] });
 
     const button = screen.getByRole('button', { name: '잡기!' });
-    // 슬롯 2(78%, 18%) + 지터(+30% × 10, −40% × 6) = (81%, 15.6%)
-    expect(button.style.left).toContain('81%');
-    expect(button.style.top).toContain('15.6%'); // D-154 — 세로도 가장자리 보정(clamp).
+    // 슬롯 2(78%, 14%) + 지터(+30% × 14, −40% × 9) = (82.2%, 10.4%) — D-161 슬롯 표, D-165 지터 반경
+    expect(button.style.left).toContain('82.2%');
+    expect(button.style.top).toContain('10.4%'); // D-154 — 세로도 가장자리 보정(clamp).
     expect(document.activeElement).not.toBe(button);
+  });
+
+  // D-161 — 방장이 대기실에서 고른 크기(방 설정). 없으면 보통.
+  it('버튼 크기는 방 설정을 따른다 — 없으면 보통', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102] });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-size-medium');
+    unmount();
+
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102], raceButtonSize: 'LARGE' });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-size-large');
+  });
+
+  // D-165 — 찾기 난이도(투명도)도 방 설정. 없으면 보통.
+  it('찾기 난이도는 방 설정을 따른다 — 없으면 보통', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102] });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-vis-normal');
+    unmount();
+
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102], raceButtonVisibility: 'VERY_HARD' });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-vis-very-hard');
   });
 
   it('창이 열린 동안 내기·먹기 버튼을 막고 "경쟁 중"으로 알린다', () => {
@@ -1102,6 +1159,95 @@ describe('OneCardTable — 테이블 좌석 배치 (D-132)', () => {
     const seat = container.querySelector('[data-seat="1"]') as HTMLElement;
     expect(seat).toHaveAttribute('data-side', 'left');
     expect(seat.querySelector('.oc-seat-name')).toHaveAttribute('title', long);
+  });
+});
+
+/** D-160 — 차례가 확실히 보이게: 차례 좌석에 "차례" 표시, 내 차례면 손패 칸이 빛나고 휴대폰이 한 번 진동한다. */
+describe('OneCardTable — 차례 강조 (D-160)', () => {
+  const seatEl = (seat: number) => document.querySelector(`[data-seat="${seat}"]`) as HTMLElement;
+  const vibrate = vi.fn();
+
+  beforeEach(() => {
+    vibrate.mockReset();
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    window.localStorage.removeItem('mirboard.sfxMuted');
+  });
+  afterEach(() => {
+    delete (navigator as { vibrate?: unknown }).vibrate;
+    window.localStorage.removeItem('mirboard.sfxMuted');
+  });
+
+  it('차례 좌석에 "차례" 표시가 붙고 다른 좌석에는 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    expect(within(seatEl(2)).getByText('차례')).toBeInTheDocument();
+    expect(within(seatEl(1)).queryByText('차례')).toBeNull();
+  });
+
+  it('내 차례면 손패 칸이 강조되고, 아니면 강조가 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)] });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(screen.getByRole('region', { name: '내 손패' })).toHaveClass('oc-hand-myturn');
+
+    act(() => useOneCardStore.setState({ turnSeat: 1 }));
+    expect(screen.getByRole('region', { name: '내 손패' })).not.toHaveClass('oc-hand-myturn');
+  });
+
+  it('내 차례가 되는 순간 한 번 진동한다 — 효과음을 끄면 진동도 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(vibrate).not.toHaveBeenCalled();
+
+    act(() => useOneCardStore.setState({ turnSeat: 0 }));
+    expect(vibrate).toHaveBeenCalledTimes(1);
+
+    act(() => useOneCardStore.setState({ turnSeat: 1 }));
+    fireEvent.click(screen.getByRole('button', { name: '효과음' }));
+    act(() => useOneCardStore.setState({ turnSeat: 0 }));
+    expect(vibrate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** D-162 — 방장은 끊긴 좌석에서 [내보내기]를 누른다. 방장이 아니면(onKick 없음) 버튼이 없다. */
+describe('OneCardTable — 끊긴 사람 내보내기 (D-162)', () => {
+  it('방장에게는 끊긴 좌석에만 [내보내기]가 있고 누르면 그 사람을 넘긴다', () => {
+    const onKick = vi.fn();
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, disconnectedSeats: [2] });
+    renderTable({ playerIds: [100, 101, 102], onKick });
+
+    const buttons = screen.getAllByRole('button', { name: '내보내기' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onKick).toHaveBeenCalledWith(102);
+  });
+
+  it('방장이 아니면 끊긴 좌석에도 버튼이 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, disconnectedSeats: [2] });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.queryByRole('button', { name: '내보내기' })).toBeNull();
+    expect(screen.getByText('연결 끊김')).toBeInTheDocument();
+  });
+});
+
+/** D-163 — 채팅을 보낸 사람 좌석(나는 "(나)" 줄) 위에 한 줄로 잠깐 보인다. */
+describe('OneCardTable — 좌석 채팅 한 줄 (D-163)', () => {
+  afterEach(() => useRoomChatStore.getState().reset('r-1'));
+
+  it('상대 채팅은 그 좌석 위에, 내 채팅은 "(나)" 줄 위에', () => {
+    useRoomChatStore.getState().reset('r-1');
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+    act(() => {
+      const add = useRoomChatStore.getState().appendIncoming;
+      add({ eventId: 'e1', ts: 0, userId: 101, username: 'b', message: '빨리 내요' }, true);
+      add({ eventId: 'e2', ts: 0, userId: 100, username: 'a', message: '잠깐만' }, true);
+    });
+
+    const seat1 = document.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(within(seat1).getByText('빨리 내요')).toHaveClass('oc-seat-chat');
+    expect(within(container.querySelector('.oc-me') as HTMLElement).getByText('잠깐만')).toBeInTheDocument();
   });
 });
 

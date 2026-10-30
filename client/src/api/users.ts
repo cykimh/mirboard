@@ -1,12 +1,28 @@
 import { apiRequest } from './client';
 
+/** D-164 — 포트리스2식 21단계(낮은 것부터). 서버 `Tier` 미러 — 점수 구간 + 금훈장 이상은 순위로 왕관. */
 export type Tier =
-  | 'BRONZE'
-  | 'SILVER'
-  | 'GOLD'
-  | 'PLATINUM'
-  | 'DIAMOND'
-  | 'MASTER';
+  | 'SKULL'
+  | 'BULLET_1'
+  | 'BULLET_2'
+  | 'BULLET_3'
+  | 'MISSILE_1'
+  | 'MISSILE_2'
+  | 'MISSILE_3'
+  | 'BRONZE_STAR'
+  | 'SILVER_STAR'
+  | 'GOLD_STAR'
+  | 'DOUBLE_GOLD_STAR'
+  | 'BRONZE_MEDAL'
+  | 'SILVER_MEDAL'
+  | 'GOLD_MEDAL'
+  | 'BRONZE_BADGE'
+  | 'SILVER_BADGE'
+  | 'GOLD_BADGE'
+  | 'BRONZE_CROWN'
+  | 'SILVER_CROWN'
+  | 'GOLD_CROWN'
+  | 'STAR_CROWN';
 
 /** D-115 — 한 게임의 전적. */
 export interface GameRecord {
@@ -49,6 +65,11 @@ export interface RankingResponse {
   entries: RankEntry[];
 }
 
+/** D-160 — 게임별 판수(승+패 합, 봇 제외). 많이 한 게임부터, 한 판도 없는 게임은 없다. */
+export interface GamePlaysResponse {
+  games: { gameType: string; plays: number }[];
+}
+
 export interface UserName {
   userId: number;
   username: string;
@@ -82,6 +103,10 @@ export const usersApi = {
       `/api/users/ranking?limit=${limit}&gameType=${encodeURIComponent(gameType)}`,
       { token },
     );
+  },
+  /** D-160 — 랭킹 탭 순서용 게임별 판수. */
+  rankingGames(token: string): Promise<GamePlaysResponse> {
+    return apiRequest('/api/users/ranking/games', { token });
   },
   /** D-154 — 상대 전적. gameType 을 주면 그 게임만. */
   headToHead(token: string, userId: number, gameType?: string): Promise<HeadToHeadResponse> {

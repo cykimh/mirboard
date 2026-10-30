@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Room, RoomListResponse, TeamPolicy } from '@/types/api';
+import type { Room, RoomListResponse, RoomSettingsUpdate, TeamPolicy } from '@/types/api';
 
 export interface JoinOrReconnectResponse {
   mode: 'JOINED' | 'RECONNECTED' | 'SPECTATING';
@@ -45,11 +45,29 @@ export const roomsApi = {
     });
   },
 
+  /** D-161 — 대기실에서 방장이 게임 설정을 바꾼다(부분 갱신). 응답은 갱신된 방 — 다른 사람은 방 메타 갱신으로 받는다. */
+  updateSettings(token: string, roomId: string, settings: RoomSettingsUpdate): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/settings`, {
+      method: 'PUT',
+      token,
+      body: settings,
+    });
+  },
+
+  /** D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리). 응답 본문 없음. */
+  kick(token: string, roomId: string, userId: number): Promise<void> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/kick`, {
+      method: 'POST',
+      token,
+      body: { userId },
+    });
+  },
+
   get(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}`, { token });
   },
 
-  /** Phase 16(#2) — 대기실 준비 토글. 전원 준비되면 서버가 게임 시작. */
+  /** Phase 16(#2) — 대기실 준비 토글. D-161 — 친구 방은 표시만(시작은 방장), 봇과 연습 방만 전원 준비로 시작. */
   setReady(token: string, roomId: string, ready: boolean): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/ready`, {
       method: 'POST',

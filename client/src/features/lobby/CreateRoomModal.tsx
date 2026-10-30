@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Select,
@@ -23,12 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-/** 내기(판돈) 토글 ON 시 기본 판돈(칩). 서버 허용 집합 {0,10,50,100,500} 중 하나. */
-const DEFAULT_STAKE = 100;
-
-/** 서버 `RoomService.DEFAULT_TARGET_SCORE` 와 같은 값 — 갈리면 안 된다. */
-const DEFAULT_TARGET_SCORE = 1000;
 
 interface CreateRoomModalProps {
   open: boolean;
@@ -51,6 +44,8 @@ const DEFAULT_TURN_CHOICES = [0, 30, 60, 90];
 /**
  * Phase 18(#2, D-74) 방 만들기 모달 — Phase 20b(D-76) shadcn Dialog 재디자인.
  * D-136 — 맨 위 "친구와 하기 / 봇과 연습". 봇 채우기 체크박스와 게스트 봇 기본값(D-117)은 없앴다.
+ * D-161 — 친구와 하기는 방 종류·게임·방 이름만 고른다. 턴 제한·목표 점수·판돈·원카드! 버튼 크기는 대기실에서 방장이 바꾼다
+ * (`RoomSettingsPanel`). 봇과 연습은 만들자마자 시작하므로 인원·턴 제한을 여기서 고른다(목표 점수·판돈은 연습에 없다).
  */
 export function CreateRoomModal({
   open,
@@ -65,10 +60,8 @@ export function CreateRoomModal({
   const [creating, setCreating] = useState(false);
   const [mode, setMode] = useState<RoomMode>('friends');
   const practice = mode === 'practice';
-  const [targetScore, setTargetScore] = useState(1000);
   // D-130 — null = 아직 안 고름(게임이 선언한 처음 선택을 쓴다). 인원과 같은 방식.
   const [turnSeconds, setTurnSeconds] = useState<number | null>(null);
-  const [stake, setStake] = useState(0);
   // D-99 — 인원 가변 게임에서만 쓰는 좌석 수. null = 아직 안 고름(게임이 선언한 처음 선택).
   const [capacity, setCapacity] = useState<number | null>(null);
 
@@ -96,32 +89,11 @@ export function CreateRoomModal({
   // D-130 — 턴 제한도 게임이 선언한 값이 처음 선택이다(원카드 30초 — 자리 비운 사람이 판을 멈추지 않게, 나머지는 끔).
   const selectedTurnSeconds = turnSeconds ?? game?.defaultTurnSeconds ?? 0;
 
-  // D-106 — 게임이 선언한 옵션만 노출한다. 스컬킹은 10라운드 고정(목표 점수 무의미)·
-  // 개인전(팀 없음)·칩 정산 미지원(내기 불가)이라 셋 다 안 뜬다. 서버도 같은 집합으로
-  // 검증하므로 여기서 숨기는 것은 UX 이고 강제는 서버가 한다.
-  // D-136 — 연습 방은 목표 점수·판돈이 없다(목표 점수는 서버 기본, 판돈 방은 봇 금지 — D-81).
-  const options = game?.supportedRoomOptions ?? [];
-  const gameUsesTargetScore = options.includes('TARGET_SCORE');
-  const gameUsesBetting = options.includes('BETTING');
-  const usesTargetScore = gameUsesTargetScore && !practice;
-  const usesBetting = gameUsesBetting && !practice;
-  // 리셋 effect 는 페인트 **뒤에** 돌기 때문에, 티츄에서 판돈을 켜고 스컬킹(또는 연습)으로 바꾸면 stake 가 100 으로 남은
-  // 프레임이 생긴다. usesBetting 을 곱해 그 프레임을 없앤다: 게임이 BETTING 을 안 쓰거나 연습이면 state 와 무관하게 꺼짐 —
-  // 제출도 usesBetting 일 때만 stake 를 싣는다(D-136 — 연습 방은 판돈 없음).
-  const stakeOn = usesBetting && stake > 0;
-
   // 게임을 바꾸면 이전 게임의 좌석 수·턴 제한은 무효 — 새 게임의 처음 선택으로 되돌린다.
-  // D-106 — 미지원 옵션 값도 같이 되돌린다. 티츄에서 판돈을 켠 뒤 스컬킹으로 바꾸면
-  // 입력은 사라지지만 state 는 남아, 그대로 보내면 서버가 거절한다.
-  // D-136 최종 리뷰 FR-1 — 게임 기준으로만 되돌린다. 방 종류 토글은 상태를 건드리지 않는다(연습이면 제출에서 목표 점수·판돈을 빼고 —
-  // usesTargetScore·usesBetting — 친구와 하기로 돌아오면 고른 값이 그대로다). 예전엔 연습 게이팅이 deps 를 흔들어 티츄에서만 턴 제한까지
-  // 처음 값으로 돌아갔다.
   useEffect(() => {
     setCapacity(null);
     setTurnSeconds(null);
-    if (!gameUsesTargetScore) setTargetScore(DEFAULT_TARGET_SCORE);
-    if (!gameUsesBetting) setStake(0);
-  }, [selectedGame, gameUsesTargetScore, gameUsesBetting]);
+  }, [selectedGame]);
 
   // D-136 — 모달은 허브에 늘 붙어 있다. 열 때마다 처음 선택(친구와 하기)으로.
   useEffect(() => {
@@ -140,11 +112,9 @@ export function CreateRoomModal({
         selectedGame.toUpperCase(),
         {
           fillWithBots: practice,
-          // D-106 — 게임이 안 쓰는 옵션은 아예 보내지 않는다(D-99 의 capacity 와 같은 방식).
-          // 서버는 기본값 아닌 값이 오면 UNSUPPORTED_ROOM_OPTION 으로 거절한다.
-          targetScore: usesTargetScore ? targetScore : undefined,
-          turnSeconds: selectedTurnSeconds,
-          stake: usesBetting ? stake : undefined,
+          // D-161 — 친구 방은 턴 제한도 보내지 않는다(서버가 게임 선언 기본으로 열고, 대기실에서 방장이 바꾼다).
+          // 목표 점수·판돈은 어느 방에서도 여기서 보내지 않는다(연습엔 없고, 친구 방은 대기실에서).
+          turnSeconds: practice ? selectedTurnSeconds : undefined,
           // D-143 — 친구와 하기의 정원은 게임 최대 인원(대기실에서 방장이 시작한다). 봇과 연습만 고른 인원(봇 수).
           capacity: seatChoices.length > 0 ? (practice ? selectedSeats : game?.maxPlayers) : undefined,
         },
@@ -244,58 +214,27 @@ export function CreateRoomModal({
             </div>
           )}
 
-          {usesTargetScore && (
-          <div className="flex flex-col gap-1.5">
-            <Label>목표 점수</Label>
-            <ToggleGroup
-              type="single"
-              value={String(targetScore)}
-              onValueChange={(v) => v && setTargetScore(Number(v))}
-              className="justify-start"
-            >
-              {[300, 500, 700, 1000].map((v) => (
-                <ToggleGroupItem key={v} value={String(v)}>
-                  {v}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
+          {practice && (
+            <div className="flex flex-col gap-1.5">
+              <Label>턴 제한</Label>
+              <ToggleGroup
+                type="single"
+                value={String(selectedTurnSeconds)}
+                onValueChange={(v) => v !== '' && setTurnSeconds(Number(v))}
+                className="justify-start"
+              >
+                {/* D-154 — 선택지도 게임이 선언한다(카탈로그 turnSecondsChoices, 없으면 끔·30·60·90). */}
+                {(game?.turnSecondsChoices ?? DEFAULT_TURN_CHOICES).map((v) => (
+                  <ToggleGroupItem key={v} value={String(v)}>
+                    {v === 0 ? '끔' : `${v}초`}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
-            <Label>턴 제한</Label>
-            <ToggleGroup
-              type="single"
-              value={String(selectedTurnSeconds)}
-              onValueChange={(v) => v !== '' && setTurnSeconds(Number(v))}
-              className="justify-start"
-            >
-              {/* D-154 — 선택지도 게임이 선언한다(카탈로그 turnSecondsChoices, 없으면 끔·30·60·90). */}
-              {(game?.turnSecondsChoices ?? DEFAULT_TURN_CHOICES).map((v) => (
-                <ToggleGroupItem key={v} value={String(v)}>
-                  {v === 0 ? '끔' : `${v}초`}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
-
-          {usesBetting && (
-          <div className="flex flex-col gap-1.5">
-            <Label>💰 판돈 (내기)</Label>
-            <label className="flex items-center gap-2 text-sm">
-              <Switch
-                checked={stakeOn}
-                onCheckedChange={(on) => setStake(on ? DEFAULT_STAKE : 0)}
-                aria-label="판돈(내기) 켜기/끄기"
-              />
-              <span>{stakeOn ? `내기 켜짐 — 판돈 ${stake}칩` : '내기 끔'}</span>
-            </label>
-            {stakeOn && (
-              <p className="text-xs text-muted-foreground">
-                승팀 +{stake}칩 / 패팀 −{stake}칩 (가상 칩, 현금 아님).
-              </p>
-            )}
-          </div>
+          {!practice && (
+            <p className="text-xs text-muted-foreground">턴 제한 같은 게임 설정은 대기실에서 방장이 바꿔요.</p>
           )}
 
           <DialogFooter className="gap-2">

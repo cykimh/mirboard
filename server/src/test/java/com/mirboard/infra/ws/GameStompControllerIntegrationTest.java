@@ -89,11 +89,8 @@ class GameStompControllerIntegrationTest {
         joinRoom(tokens.get("wsbob"), roomId);
         joinRoom(tokens.get("wscharlie"), roomId);
         joinRoom(tokens.get("wsdave"), roomId);
-        // Phase 16(#2) — 전원 준비해야 게임 시작.
-        ready(tokens.get("wsalice"), roomId);
-        ready(tokens.get("wsbob"), roomId);
-        ready(tokens.get("wscharlie"), roomId);
-        ready(tokens.get("wsdave"), roomId);
+        // D-161 — 친구 방은 준비로 시작하지 않는다. 방장이 시작한다.
+        start(tokens.get("wsalice"), roomId);
 
         // Phase 5b: 라운드 시작 시 Dealing(8) 로 진입 — STOMP 라우팅 테스트만 검증하므로
         // 곧바로 Playing 상태로 덮어쓴다 (덱은 Dealing 의 hand+reserved 를 합쳐 Mahjong
@@ -165,9 +162,7 @@ class GameStompControllerIntegrationTest {
         joinRoom(tokens.get("pqbob"), roomId);
         joinRoom(tokens.get("pqcharlie"), roomId);
         joinRoom(tokens.get("pqdave"), roomId);
-        for (String u : List.of("pqalice", "pqbob", "pqcharlie", "pqdave")) {
-            ready(tokens.get(u), roomId);
-        }
+        start(tokens.get("pqalice"), roomId); // D-161 — 방장 시작
         TichuState.Playing playing = forcePlayingFromDealing(
                 (TichuState.Dealing) stateStore.load(roomId).orElseThrow());
         stateStore.save(roomId, playing);
@@ -286,14 +281,13 @@ class GameStompControllerIntegrationTest {
                 new HttpEntity<>(headers), String.class);
     }
 
-    /** Phase 16(#2) — 대기실 준비. 전원 준비 시 서버가 게임 시작. */
-    private void ready(String token, String roomId) {
+    /** D-161 — 방장이 지금 인원으로 시작(친구 방은 준비로 시작하지 않는다). */
+    private void start(String token, String roomId) {
         var headers = new HttpHeaders();
         headers.setBearerAuth(token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
         http.postForObject(
-                "http://localhost:" + port + "/api/rooms/" + roomId + "/ready",
-                new HttpEntity<>("{\"ready\":true}", headers), String.class);
+                "http://localhost:" + port + "/api/rooms/" + roomId + "/start",
+                new HttpEntity<>(headers), String.class);
     }
 
     private static String tokenForUserId(Map<String, String> tokens, Map<String, Long> userIds, long userId) {

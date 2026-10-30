@@ -87,8 +87,10 @@ class GameSummaryOrderTest {
     /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
     @Test
     void declaration_order_is_the_contract() {
+        // D-161 — 원카드 경쟁 버튼 크기가 맨 뒤에 붙었다.
         assertThat(RoomOption.values())
-                .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING);
+                .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING,
+                        RoomOption.RACE_BUTTON_SIZE, RoomOption.RACE_BUTTON_VISIBILITY);
     }
 
     /** D-130 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */

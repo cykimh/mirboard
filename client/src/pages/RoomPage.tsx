@@ -11,6 +11,8 @@ import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pag
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
 import { ParticipantCard } from '@/features/lobby/ParticipantCard';
+import { RoomSettingsPanel } from '@/features/lobby/RoomSettingsPanel';
+import { showToast } from '@/components/toast/toastStore';
 import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPanel';
 import {
   SpectateNotice,
@@ -24,7 +26,7 @@ import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
-import type { Room, RoomOption, TeamPolicy } from '@/types/api';
+import type { GameSummary, Room, RoomOption, RoomSettingsUpdate, TeamPolicy } from '@/types/api';
 import {
   Card,
   CardContent,
@@ -106,6 +108,10 @@ export function RoomPage() {
   const [gameName, setGameName] = useState<string | null>(null);
   // D-136 — "지금 N명으로 시작"의 최소 인원(게임 선언). null = 모름 → 버튼·안내를 그리지 않는다.
   const [minPlayers, setMinPlayers] = useState<number | null>(null);
+  // D-161 — 대기실 게임 설정이 쓰는 이 방 게임의 카탈로그(선택지·방 설정 집합). null = 모름.
+  const [gameMeta, setGameMeta] = useState<GameSummary | null>(null);
+  const [settingsPending, setSettingsPending] = useState(false);
+  const [readyPending, setReadyPending] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(false);
   // D-137 — 관전자 [자리에 앉기].
@@ -124,6 +130,7 @@ export function RoomPage() {
         setRoomOptions(g.supportedRoomOptions ?? []);
         setGameName(g.displayName);
         setMinPlayers(g.minPlayers);
+        setGameMeta(g);
       })
       .catch(() => {
         // 게임 메타를 못 받아도 대기실은 동작해야 한다 — 옵션만 숨긴 채 둔다.
@@ -386,6 +393,34 @@ export function RoomPage() {
     }
   }
 
+  // D-161 — 대기실 게임 설정(방장). 응답으로 바로 맞추고, 다른 사람은 방 메타 갱신으로 받는다.
+  async function handleSettingsChange(settings: RoomSettingsUpdate) {
+    if (!token || settingsPending) return;
+    setSettingsPending(true);
+    try {
+      setRoom(await roomsApi.updateSettings(token, roomId, settings));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
+      if (err instanceof ApiError) setError(errorText(err, '설정을 바꾸지 못했어요'));
+    } finally {
+      setSettingsPending(false);
+    }
+  }
+
+  // D-161 — 준비 토글(표시만 — 친구 방은 다 준비해도 시작하지 않는다. 시작은 방장).
+  async function handleReady(next: boolean) {
+    if (!token || readyPending) return;
+    setReadyPending(true);
+    try {
+      setRoom(await roomsApi.setReady(token, roomId, next));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return;
+      if (err instanceof ApiError) setError(errorText(err, '준비를 바꾸지 못했어요'));
+    } finally {
+      setReadyPending(false);
+    }
+  }
+
   // D-137 — 대기실 관전자가 빈자리에 앉는다. 서버가 같은 원자 구간에서 관전자 목록에서 뺀다(room_join.lua).
   async function handleSit() {
     if (!token || sitPending) return;
@@ -454,8 +489,37 @@ export function RoomPage() {
     room.playerIds.every((uid, seat) => uid === user.userId || (room.botSeats ?? []).includes(seat));
   const onAbort = canAbortGame ? handleAbort : undefined;
 
+  // D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리 — 기록은 3분 유예가 끝났을 때와 같다). 티츄는 탈주가 곧 판 끝이라 알린다.
+  async function handleKick(userId: number) {
+    if (!token || !room) return;
+    const name = usernames[userId] ?? `#${userId}`;
+    const tichu = room.gameType === 'TICHU';
+    const message = tichu
+      ? `${name}님을 내보낼까요? 티츄는 팀전이라 이 판이 끝나요(상대 팀 승리). ${name}님은 탈주로 기록돼요.`
+      : `${name}님을 내보낼까요? 탈주로 기록되고 남은 사람끼리 계속해요.`;
+    if (!window.confirm(message)) return;
+    try {
+      await roomsApi.kick(token, roomId, userId);
+    } catch (err) {
+      if (!(err instanceof ApiError)) {
+        showToast('내보내지 못했어요 — 다시 눌러 주세요', 'error');
+        return;
+      }
+      showToast(
+        err.code === 'PLAYER_CONNECTED' ? `${name}님이 다시 연결됐어요 — 내보내지 않았어요` : errorText(err, '내보내지 못했어요'),
+        'error',
+      );
+    }
+  }
+  const onKick = iAmHost && !iAmSpectator ? handleKick : undefined;
+
   // D-143 — 친구와 하기 대기실은 [준비] 없이 방장이 시작한다. 사람이 게임 최소 인원 이상이면 켜진다(정원이 다 차도 저절로 시작하지 않는다 —
   // 서버도 같은 조건, room_start_now.lua). 최소 인원을 모르면(카탈로그 실패) 켜 두고 서버가 판단한다.
+  // D-161 — 준비는 방장 아닌 사람(봇 제외)만 센다. 방장은 시작 버튼이 곧 준비다.
+  const guests = room ? room.playerIds.filter((id, seat) => id !== room.hostId && !(room.botSeats ?? []).includes(seat)) : [];
+  const readyGuests = room ? guests.filter((id) => (room.readyUserIds ?? []).includes(id)).length : 0;
+  const allGuestsReady = guests.length > 0 && readyGuests === guests.length;
+  const iAmReady = !!(room && user && (room.readyUserIds ?? []).includes(user.userId));
   const startMin = minPlayers ?? 1;
   const canStart = !!room && room.status === 'WAITING' && room.playerCount >= startMin;
 
@@ -553,6 +617,7 @@ export function RoomPage() {
       spectatorCount: (room.spectatorIds ?? []).length,
       onExit: handleLeave,
       onAbort,
+      onKick,
       practice: room.fillWithBots ?? false,
       roomFinished,
       onBackToRoom,
@@ -561,7 +626,15 @@ export function RoomPage() {
       <main className="room-page">
         {notice}
         <Suspense fallback={<TableLoading />}>
-          {room.gameType === 'ONE_CARD' ? <OneCardTable {...board} /> : <SkullKingTable {...board} />}
+          {room.gameType === 'ONE_CARD' ? (
+            <OneCardTable
+              {...board}
+              raceButtonSize={room.raceButtonSize}
+              raceButtonVisibility={room.raceButtonVisibility}
+            />
+          ) : (
+            <SkullKingTable {...board} />
+          )}
         </Suspense>
       </main>,
     );
@@ -586,6 +659,7 @@ export function RoomPage() {
             isHost={iAmHost}
             onExit={handleLeave}
             onAbort={onAbort}
+            onKick={onKick}
             onBackToRoom={onBackToRoom}
           />
         </Suspense>
@@ -668,6 +742,7 @@ export function RoomPage() {
                       bot={isBot}
                       record={records[id]}
                       versusMe={id === user.userId || isBot ? undefined : versus[id]}
+                      ready={(room.readyUserIds ?? []).includes(id)}
                     />
                   );
                 })}
@@ -707,9 +782,43 @@ export function RoomPage() {
               </>
               )}
 
+              <Separator />
+              <RoomSettingsPanel
+                room={room}
+                game={gameMeta}
+                canEdit={iAmHost}
+                onChange={handleSettingsChange}
+                pending={settingsPending}
+              />
+              <Separator />
+
+              {/* D-161 — 준비는 표시만 한다. 방장은 준비와 상관없이 시작하고, 다 준비되면 시작 버튼을 알린다. */}
+              {guests.length > 0 && (
+                <p className="text-sm text-muted-foreground" data-testid="ready-count">
+                  준비 {readyGuests}/{guests.length}
+                  {allGuestsReady && ' — 모두 준비됐어요'}
+                </p>
+              )}
+              {iAmPlayer && !iAmHost && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={iAmReady ? 'outline' : 'default'}
+                    onClick={() => handleReady(!iAmReady)}
+                    disabled={readyPending}
+                  >
+                    {iAmReady ? '준비 취소' : '준비'}
+                  </Button>
+                </div>
+              )}
               {iAmPlayer && iAmHost && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" onClick={handleStartNow} disabled={!canStart || startPending}>
+                  <Button
+                    type="button"
+                    onClick={handleStartNow}
+                    disabled={!canStart || startPending}
+                    className={allGuestsReady && canStart ? 'ring-2 ring-emerald-500 ring-offset-2' : undefined}
+                  >
                     {room.playerCount}명으로 시작
                   </Button>
                 </div>

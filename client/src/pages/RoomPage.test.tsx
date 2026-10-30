@@ -48,6 +48,8 @@ vi.mock('@/api/rooms', () => ({
     stopSpectating: vi.fn(),
     startNow: vi.fn(),
     join: vi.fn(),
+    updateSettings: vi.fn(),
+    kick: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1070,13 +1072,15 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
     expect(roomsApi.startNow).toHaveBeenCalledWith('tok', 'r1');
   });
 
-  it('대기실에 [준비]·준비 표시가 없다', async () => {
+  // D-161 — 준비는 표시만 한다. 방장은 준비 버튼이 없고(시작 버튼이 곧 준비), 준비와 상관없이 시작한다.
+  it('방장에게는 [준비]가 없고, 손님 준비 수와 카드의 "준비" 표시를 본다', async () => {
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({ readyUserIds: [2] }));
     await screen.findByRole('button', { name: '3명으로 시작' });
 
     expect(screen.queryByRole('button', { name: /^준비/ })).toBeNull();
-    expect(screen.queryByText(/준비됨/)).toBeNull();
+    expect(screen.getByTestId('ready-count')).toHaveTextContent('준비 1/2');
+    expect(within(screen.getByRole('listitem', { name: '#2' })).getByText('준비')).toBeInTheDocument();
     expect(screen.queryByText(/자동으로 게임이 시작/)).toBeNull();
   });
 
@@ -1279,8 +1283,8 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
         id === 1
           ? {
               games: [
-                { gameType: 'TICHU', rating: 1400, tier: 'PLATINUM', winCount: 9, loseCount: 9, desertCount: 0 },
-                { gameType: 'ONE_CARD', rating: 1250, tier: 'GOLD', winCount: 4, loseCount: 1, desertCount: 2 },
+                { gameType: 'TICHU', rating: 1400, tier: 'SILVER_BADGE', winCount: 9, loseCount: 9, desertCount: 0 },
+                { gameType: 'ONE_CARD', rating: 1250, tier: 'SILVER_MEDAL', winCount: 4, loseCount: 1, desertCount: 2 },
               ],
             }
           : { games: [] },
@@ -1294,10 +1298,10 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
 
     const list = await screen.findByRole('list', { name: '참가자' });
     const host = await within(list).findByRole('listitem', { name: 'host' });
-    expect(await within(host).findByText('골드')).toBeInTheDocument();
+    expect(await within(host).findByText('은메달')).toBeInTheDocument();
     expect(within(host).getByText('4승 1패 · 탈주 2')).toBeInTheDocument();
     expect(within(host).getByText('방장')).toBeInTheDocument();
-    expect(within(host).queryByText('플래티넘')).toBeNull();
+    expect(within(host).queryByText('은훈장')).toBeNull();
 
     const friend = within(list).getByRole('listitem', { name: 'friend' });
     expect(await within(friend).findByText('첫 판')).toBeInTheDocument();
@@ -1405,5 +1409,145 @@ describe('RoomPage — 참가자 카드의 상대 전적 (D-154)', () => {
     expect(within(within(list).getByRole('listitem', { name: 'newbie' })).queryByText(/나와/)).toBeNull();
     expect(within(within(list).getByRole('listitem', { name: 'host' })).queryByText(/나와/)).toBeNull();
     expect(headToHead).toHaveBeenCalledWith('tok', 1, 'ONE_CARD');
+  });
+});
+
+/** D-161 — 대기실 게임 설정(방장만 바꾼다)과 손님의 준비 토글(표시만). */
+describe('RoomPage — 대기실 설정·준비 (D-161)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+  });
+
+  const oneCard = {
+    ...game('ONE_CARD', ['RACE_BUTTON_SIZE']),
+    minPlayers: 2,
+    maxPlayers: 6,
+    turnSecondsChoices: [0, 5, 10, 20, 30],
+  };
+  const waiting = (extra: Partial<Room>) =>
+    ({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'WAITING',
+      capacity: 6,
+      playerIds: [1, 2, 3],
+      playerCount: 3,
+      readyUserIds: [],
+      turnSeconds: 30,
+      ...extra,
+    }) as Room;
+
+  it('방장은 턴 제한·버튼 크기를 바꾸고, 응답으로 바로 맞춘다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+    const { roomsApi } = await import('@/api/rooms');
+    const updateSettings = vi.mocked(roomsApi.updateSettings).mockResolvedValue(waiting({ turnSeconds: 10 }));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+
+    const turn = await screen.findByRole('group', { name: '턴 제한' });
+    await act(async () => {
+      fireEvent.click(within(turn).getByRole('radio', { name: '10초' }));
+    });
+    expect(updateSettings).toHaveBeenCalledWith('tok', 'r1', { turnSeconds: 10 });
+    expect(within(turn).getByRole('radio', { name: '10초' })).toHaveAttribute('aria-checked', 'true');
+
+    const size = screen.getByRole('group', { name: '원카드! 버튼 크기' });
+    await act(async () => {
+      fireEvent.click(within(size).getByRole('radio', { name: '크게' }));
+    });
+    expect(updateSettings).toHaveBeenLastCalledWith('tok', 'r1', { raceButtonSize: 'LARGE' });
+  });
+
+  it('손님은 설정을 보기만 하고 [준비]를 누른다 — 다시 누르면 준비 취소', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'guest' } as never });
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.setReady).mockResolvedValue(waiting({ readyUserIds: [2] }));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ raceButtonSize: 'SMALL' }));
+
+    const panel = await screen.findByRole('region', { name: '게임 설정' });
+    expect(within(panel).queryByRole('radio')).toBeNull();
+    expect(within(panel).getByText('30초')).toBeInTheDocument();
+    expect(within(panel).getByText('작게')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '준비' }));
+    });
+    expect(roomsApi.setReady).toHaveBeenCalledWith('tok', 'r1', true);
+    expect(screen.getByRole('button', { name: '준비 취소' })).toBeInTheDocument();
+  });
+});
+
+/** D-162 — 방장은 게임 중 끊긴 사람을 내보낸다. 확인 창을 거치고, 티츄는 판이 끝난다고 알린다. */
+describe('RoomPage — 끊긴 사람 내보내기 (D-162)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    oneCardProps.length = 0;
+    tichuProps.length = 0;
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }, { userId: 2, username: '철수' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+    useToastStore.getState().clear();
+  });
+
+  const inGame = (gameType: string) =>
+    ({ ...ROOM, gameType, status: 'IN_GAME', playerIds: [1, 2, 3, 4], playerCount: 4 }) as Room;
+
+  it('방장 게임판에 onKick 을 넘기고, 확인하면 내보낸다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.kick).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+    await waitFor(() => expect(oneCardProps.at(-1)?.onKick).toBeTypeOf('function'));
+
+    await act(async () => {
+      await (oneCardProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(confirm.mock.calls[0][0]).toContain('남은 사람끼리 계속해요');
+    expect(roomsApi.kick).toHaveBeenCalledWith('tok', 'r1', 2);
+    confirm.mockRestore();
+  });
+
+  it('티츄는 판이 끝난다고 알리고, 취소하면 부르지 않는다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom(inGame('TICHU'));
+    await screen.findByTestId('tichu-table');
+
+    await act(async () => {
+      await (tichuProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(confirm.mock.calls[0][0]).toContain('이 판이 끝나요');
+    expect(roomsApi.kick).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('그새 다시 연결됐으면(PLAYER_CONNECTED) 토스트로 알린다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.kick).mockRejectedValue(new ApiError(409, { error: { code: 'PLAYER_CONNECTED', message: 'connected' } }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+
+    await act(async () => {
+      await (oneCardProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['철수님이 다시 연결됐어요 — 내보내지 않았어요']);
+    confirm.mockRestore();
+  });
+
+  it('방장이 아니면 onKick 이 없다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: '철수' } as never });
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+
+    expect(oneCardProps.at(-1)?.onKick).toBeUndefined();
   });
 });

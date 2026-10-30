@@ -9,12 +9,12 @@ import {
 } from './raceSlots';
 
 /**
- * 경쟁 버튼 위치는 프로토콜 상수다 — 슬롯 수가 서버(`RaceSettings` 슬롯 8)와 같아야 하고, 어떤 지터에서도 버튼 중심이
- * 손패 영역(아래 약 40%)과 화면 가장자리를 피해야 한다.
+ * 경쟁 버튼 위치는 프로토콜 상수다 — 슬롯 수가 서버(`RaceSettings` 슬롯 14, D-161)와 같아야 하고, 어떤 지터에서도 버튼 중심이
+ * 화면 가장자리를 피해야 한다. D-161 — 아래쪽(손패 위)까지 쓴다(경쟁 중엔 손패를 누를 수 없다).
  */
 describe('경쟁 버튼 슬롯', () => {
-  it('슬롯은 8개이고 서로 다른 자리다', () => {
-    expect(RACE_SLOT_COUNT).toBe(8);
+  it('슬롯은 14개이고 서로 다른 자리다', () => {
+    expect(RACE_SLOT_COUNT).toBe(14);
     expect(RACE_SLOTS).toHaveLength(RACE_SLOT_COUNT);
     expect(new Set(RACE_SLOTS.map((s) => `${s.x},${s.y}`)).size).toBe(RACE_SLOT_COUNT);
   });
@@ -33,23 +33,24 @@ describe('경쟁 버튼 슬롯', () => {
     });
   });
 
-  it('어떤 슬롯·지터에서도 화면 가장자리와 손패 영역을 피한다', () => {
+  // D-165 — 지터를 넓혀 중심은 가장자리 2% 까지 갈 수 있다. 버튼이 잘리지 않는 것은 CSS clamp(아래 두 테스트)가 맡는다.
+  it('어떤 슬롯·지터에서도 중심이 화면 안(2~98% · 3~89%)에 있다', () => {
     for (let slot = 0; slot < RACE_SLOT_COUNT; slot++) {
       for (const jx of [-100, 0, 100]) {
         for (const jy of [-100, 0, 100]) {
           const { left, top } = racePosition(slot, jx, jy);
-          expect(left, `slot ${slot} x`).toBeGreaterThanOrEqual(5);
-          expect(left, `slot ${slot} x`).toBeLessThanOrEqual(95);
-          expect(top, `slot ${slot} y`).toBeGreaterThanOrEqual(5);
-          expect(top, `slot ${slot} y`).toBeLessThanOrEqual(60);
+          expect(left, `slot ${slot} x`).toBeGreaterThanOrEqual(2);
+          expect(left, `slot ${slot} x`).toBeLessThanOrEqual(98);
+          expect(top, `slot ${slot} y`).toBeGreaterThanOrEqual(3);
+          expect(top, `slot ${slot} y`).toBeLessThanOrEqual(89);
         }
       }
     }
   });
 
   it('범위 밖 슬롯·지터는 잘라 쓴다', () => {
-    expect(racePosition(8, 0, 0)).toEqual(racePosition(0, 0, 0));
-    expect(racePosition(-1, 0, 0)).toEqual(racePosition(7, 0, 0));
+    expect(racePosition(RACE_SLOT_COUNT, 0, 0)).toEqual(racePosition(0, 0, 0));
+    expect(racePosition(-1, 0, 0)).toEqual(racePosition(RACE_SLOT_COUNT - 1, 0, 0));
     expect(racePosition(0, 500, -500)).toEqual(racePosition(0, 100, -100));
   });
 });

@@ -3,6 +3,7 @@ package com.mirboard.infra.rest.rooms;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -212,6 +213,85 @@ class RoomModesIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_GAME"))
                 .andExpect(jsonPath("$.capacity").value(2));
+    }
+
+    /** D-161 — 친구 방의 준비는 표시만 한다. 정원이 다 차고 모두 준비해도 시작하지 않고, 방장이 시작한다. */
+    @Test
+    void a_full_friends_room_with_everyone_ready_still_waits_for_the_host() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmrdyhost"), registerAndLogin("rmrdya"));
+        String roomId = friendsRoom(players, "ONE_CARD", 2);
+        for (String token : players) {
+            mockMvc.perform(post("/api/rooms/" + roomId + "/ready").header("Authorization", bearer(token))
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"ready\":true}"))
+                    .andExpect(status().isOk());
+        }
+
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("WAITING");
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(players.get(0))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"));
+    }
+
+    /** D-161 — 대기실에서 방장이 게임 설정을 바꾼다. 게임이 안 쓰는 설정·방장 아닌 사람·시작된 방은 거절한다. */
+    @Test
+    void the_host_changes_settings_in_the_waiting_room() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmsethost"), registerAndLogin("rmseta"));
+        String roomId = friendsRoom(players, "ONE_CARD", null);
+        String host = bearer(players.get(0));
+
+        mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"turnSeconds\":10,\"raceButtonSize\":\"LARGE\",\"raceButtonVisibility\":\"HARD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.turnSeconds").value(10))
+                .andExpect(jsonPath("$.raceButtonSize").value("LARGE"))
+                .andExpect(jsonPath("$.raceButtonVisibility").value("HARD"));
+        mockMvc.perform(get("/api/rooms/" + roomId).header("Authorization", host))
+                .andExpect(jsonPath("$.raceButtonSize").value("LARGE"));
+
+        mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", bearer(players.get(1)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"turnSeconds\":5}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"stake\":100}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_ROOM_OPTION"));
+        mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"raceButtonSize\":\"HUGE\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_ROOM_SETTING"));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", host))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"turnSeconds\":5}"))
+                .andExpect(status().isConflict());
+    }
+
+    /** D-162 — 게임 중 끊긴 사람(이 테스트의 손님은 소켓을 연 적이 없다)은 방장이 바로 탈주 처리한다. 원카드는 남은 사람끼리 계속한다. */
+    @Test
+    void the_host_kicks_a_disconnected_player_and_the_match_goes_on() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmkickhost"), registerAndLogin("rmkicka"), registerAndLogin("rmkickb"));
+        String roomId = friendsRoom(players, "ONE_CARD", null);
+        String host = bearer(players.get(0));
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", host)).andExpect(status().isOk());
+        long target = userIds.get(players.get(1));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", bearer(players.get(2)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + target + "}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + userIds.get(players.get(0)) + "}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("NOT_IN_ROOM"));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + target + "}"))
+                .andExpect(status().isNoContent());
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("IN_GAME");
+        mockMvc.perform(get("/api/rooms/" + roomId + "/resync").header("Authorization", host))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tableView.seats[1].eliminated").value("DESERTED"));
     }
 
     // ---------- helpers ----------

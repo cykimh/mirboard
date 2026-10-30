@@ -170,6 +170,15 @@ public class GlobalExceptionHandler {
                         Map.of("roomId", e.roomId())));
     }
 
+    /** D-162 — 아직 연결된 사람은 내보내지 않는다. */
+    @ExceptionHandler(com.mirboard.infra.ws.PlayerStillConnectedException.class)
+    public ResponseEntity<ApiErrorEnvelope> handlePlayerStillConnected(
+            com.mirboard.infra.ws.PlayerStillConnectedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("PLAYER_CONNECTED", "아직 연결돼 있는 사람은 내보낼 수 없어요",
+                        Map.of("userId", e.userId())));
+    }
+
     @ExceptionHandler(NotInRoomException.class)
     public ResponseEntity<ApiErrorEnvelope> handleNotInRoom(NotInRoomException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -242,6 +251,15 @@ public class GlobalExceptionHandler {
      * 서버는 검증한다 — 예전엔 통과시킨 뒤 `RoomChipService` 가 조용히 return 해서
      * 칩 없이 봇만 금지된 스컬킹 방이 만들어졌다.
      */
+    /** D-161 — 대기실 설정 값이 범위 밖. */
+    @ExceptionHandler(com.mirboard.domain.lobby.room.InvalidRoomSettingException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInvalidRoomSetting(
+            com.mirboard.domain.lobby.room.InvalidRoomSettingException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of("INVALID_ROOM_SETTING", "쓸 수 없는 방 설정 값입니다",
+                        Map.of("setting", e.setting())));
+    }
+
     @ExceptionHandler(UnsupportedRoomOptionException.class)
     public ResponseEntity<ApiErrorEnvelope> handleUnsupportedRoomOption(
             UnsupportedRoomOptionException e) {

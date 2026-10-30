@@ -102,9 +102,8 @@ class OneCardRaceIT {
         for (int i = 1; i < players.length; i++) {
             roomService.joinRoom(room.roomId(), players[i]);
         }
-        for (long player : players) {
-            room = roomService.setReady(room.roomId(), player, true);
-        }
+        // D-161 — 친구 방은 준비로 시작하지 않는다. 호스트(players[0])가 시작한다.
+        room = roomService.startNow(room.roomId(), players[0]);
         assertThat(room.status()).isEqualTo(RoomStatus.IN_GAME);
         return room;
     }

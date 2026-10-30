@@ -98,12 +98,30 @@ public class UserController {
                         r.userId(),
                         r.username(),
                         r.stats().rating(),
-                        r.stats().tier(),
+                        // D-164 — 목록 순위로 왕관(금훈장 이상).
+                        com.mirboard.domain.game.scoring.Tier.withRank(r.stats().rating(), r.rank()).name(),
                         r.stats().winCount(),
                         r.stats().loseCount(),
                         r.stats().desertCount()))
                 .toList();
         return new RankingResponse(game, entries);
+    }
+
+    /**
+     * D-160 — 랭킹 탭 순서: 전체에서 많이 한 게임부터(게임별 승+패 합, 봇 제외). 한 판도 없는 게임은 싣지 않는다 — 클라가
+     * 카탈로그 순서로 뒤에 붙인다.
+     */
+    @GetMapping("/ranking/games")
+    public GamePlaysResponse rankingGames() {
+        return new GamePlaysResponse(gameStats.playsByGame().stream()
+                .map(p -> new GamePlays(p.gameType(), p.plays()))
+                .toList());
+    }
+
+    public record GamePlays(String gameType, long plays) {
+    }
+
+    public record GamePlaysResponse(List<GamePlays> games) {
     }
 
     public record RankEntry(
@@ -123,7 +141,7 @@ public class UserController {
     private UserStatsResponse toResponse(User u) {
         GameStats legacy = gameStats.get(u.getId(), LEGACY_GAME);
         List<GameRecord> played = gameStats.playedGames(u.getId()).stream()
-                .map(g -> new GameRecord(g.gameType(), g.rating(), g.tier(),
+                .map(g -> new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(g),
                         g.winCount(), g.loseCount(), g.desertCount()))
                 .toList();
         return new UserStatsResponse(
@@ -132,7 +150,7 @@ public class UserController {
                 legacy.winCount(),
                 legacy.loseCount(),
                 legacy.rating(),
-                legacy.tier(),
+                gameStats.tierOf(legacy),
                 legacy.desertCount(),
                 played);
     }

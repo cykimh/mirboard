@@ -6,7 +6,7 @@ export type GameStatus = 'AVAILABLE' | 'COMING_SOON' | 'DISABLED';
  * D-106 — 게임에 따라 뜻이 있기도 없기도 한 방 설정. 서버 `RoomOption` 미러.
  * 방 만들기·대기실은 이 목록에 있는 것만 노출한다.
  */
-export type RoomOption = 'TARGET_SCORE' | 'TEAMS' | 'BETTING';
+export type RoomOption = 'TARGET_SCORE' | 'TEAMS' | 'BETTING' | 'RACE_BUTTON_SIZE' | 'RACE_BUTTON_VISIBILITY';
 
 export interface GameSummary {
   id: string;
@@ -56,8 +56,26 @@ export interface Room {
   turnSeconds: number;
   /** D-81 — 판돈(가상 칩). 0=내기 없음. 생성 시 고정. */
   stake: number;
-  /** Phase 16(#2) — 대기실에서 준비 완료한 플레이어 id (봇은 자동 포함). */
+  /** Phase 16(#2) — 대기실에서 준비 완료한 플레이어 id (봇은 자동 포함). D-161 — 친구 방은 표시만(시작은 방장). */
   readyUserIds: number[];
+  /** D-161 — 원카드 경쟁 버튼 크기(방 설정). 옛 서버면 없다 — MEDIUM 으로 본다. */
+  raceButtonSize?: RaceButtonSize;
+  /** D-165 — 원카드 경쟁 버튼 찾기 난이도(투명도, 방 설정). 옛 서버면 없다 — NORMAL 로 본다. */
+  raceButtonVisibility?: RaceButtonVisibility;
+}
+
+/** D-161 — 원카드 "원카드!/잡기!" 버튼 크기. */
+export type RaceButtonSize = 'SMALL' | 'MEDIUM' | 'LARGE';
+/** D-165 — 원카드 "원카드!/잡기!" 버튼 찾기 난이도 — 보통(불투명)·어려움(60%)·매우 어려움(35%). */
+export type RaceButtonVisibility = 'NORMAL' | 'HARD' | 'VERY_HARD';
+
+/** D-161 — 대기실에서 방장이 바꾸는 게임 설정(부분 갱신). */
+export interface RoomSettingsUpdate {
+  turnSeconds?: number;
+  targetScore?: number;
+  stake?: number;
+  raceButtonSize?: RaceButtonSize;
+  raceButtonVisibility?: RaceButtonVisibility;
 }
 
 export interface RoomListResponse {

@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  * ({@code docs/deploy.md}). 기본값은 {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다.
  *
  * <p>경쟁 창 길이와 봇 반응 구간도 설정에서 읽는다(룰 §9). 슬롯 수는 클라와 맞춘 프로토콜 상수라 열지 않는다.
- * {@code supportedRoomOptions()} 는 재정의하지 않는다 — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
+ * {@code supportedRoomOptions()} 는 경쟁 버튼 크기만 쓴다(D-161) — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
  */
 @Component
 public final class OneCardGameDefinition implements GameDefinition {
@@ -103,6 +103,13 @@ public final class OneCardGameDefinition implements GameDefinition {
     @Override
     public int defaultTurnSeconds() {
         return 30;
+    }
+
+    /** D-161 — 방장이 대기실에서 "원카드!/잡기!" 버튼 크기를, D-165 — 찾기 난이도(투명도)를 고른다(모두 같은 값). */
+    @Override
+    public java.util.Set<com.mirboard.domain.game.core.RoomOption> supportedRoomOptions() {
+        return java.util.EnumSet.of(com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE,
+                com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_VISIBILITY);
     }
 
     /** D-154 — 빠르게 하고 싶은 판을 위해 짧게(사용자 결정): 끔·5·10·20·30초. 60·90초는 없다. */

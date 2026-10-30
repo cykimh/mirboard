@@ -18,6 +18,7 @@ import { SkullRoundHistoryModal } from './SkullRoundHistoryModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
+import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { VoiceControls } from '@/features/voice/VoiceControls';
 import { SKULL_KING_TUTORIAL } from './tutorial/skullkingTutorial';
 
@@ -42,6 +43,8 @@ interface Props {
   onBackToRoom?: () => void;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이). */
+  onKick?: (userId: number) => void;
 }
 
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
@@ -68,6 +71,7 @@ export function SkullKingTable({
   roomFinished = false,
   onBackToRoom,
   onAbort,
+  onKick,
   practice = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -91,6 +95,8 @@ export function SkullKingTable({
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
+  // D-163 — 보낸 사람 좌석(나는 "(나)" 줄) 위에 최근 채팅 한 줄.
+  const chatLines = useSeatChatLines(playerIds);
   const leadSuit = leadSuitOf(s.trick);
   // D-132 후속 m2 — 강제 종료는 결과 없이 방만 끝나 스토어의 차례가 남는다. 끝난 판에는 차례(테두리·"다음"·"내 차례")가 없다.
   const turnSeat = roomFinished ? -1 : s.currentTurnSeat;
@@ -128,10 +134,12 @@ export function SkullKingTable({
         isNext={nextSeat === seat}
         isDeserted={s.desertedSeats.includes(seat)}
         isDisconnected={s.disconnectedSeats.has(seat)}
+        onKick={onKick && !roomFinished && seat !== mySeat ? () => onKick(playerIds[seat]) : undefined}
         bidsRevealed={revealed}
         side={side}
         slot={slot}
         voice={voiceStatusOf(voice, playerIds[seat])}
+        chat={chatLines[seat]}
       />
     );
   };
@@ -314,6 +322,11 @@ export function SkullKingTable({
             style={{ ['--sk-accent' as string]: seatAccent(mySeat) }}
           >
             <strong>{nameOf(mySeat)} (나)</strong>
+            {chatLines[mySeat] && (
+              <span key={chatLines[mySeat].id} className="sk-seat-chat" title={chatLines[mySeat].text}>
+                {chatLines[mySeat].text}
+              </span>
+            )}
             <span className="sk-stat">
               <span className="sk-stat-key">예측</span>
               <span className="sk-stat-val">

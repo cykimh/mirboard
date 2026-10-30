@@ -258,8 +258,28 @@ button.oc-badge {
 }
 
 .oc-seat-turn {
-  box-shadow: 0 0 0 2px var(--oc-accent);
+  /* D-160 — 차례가 확실히 보이게: 두꺼운 테두리 + 빛이 천천히 맥박친다(움직임 줄이기면 멈춘 빛 — 미디어는 17 끝, 이 파일은
+     미디어 0개). */
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
 }
+
+@keyframes oc-turn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 6px 0 var(--oc-accent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 18px 4px var(--oc-accent);
+  }
+}
+
 
 .oc-seat-out {
   opacity: 0.5;
@@ -276,8 +296,26 @@ button.oc-badge {
 /* 1장 남은 사람의 차례 — 둘 다 box-shadow 라 뒤의 규칙이 이기면 차례 링이 사라진다. 두 링을 겹쳐 그린다. */
 .oc-seat-turn.oc-seat-last {
   box-shadow:
-    0 0 0 2px var(--oc-accent),
-    0 0 0 4px var(--oc-race-catch);
+    0 0 0 3px var(--oc-accent),
+    0 0 0 5px var(--oc-race-catch);
+  animation-name: oc-turn-pulse-last;
+}
+
+/* D-160 — 맥박이 "1장!" 빨간 바깥 고리를 지우지 않게 따로 둔다. */
+@keyframes oc-turn-pulse-last {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 0 5px var(--oc-race-catch),
+      0 0 6px 0 var(--oc-race-catch);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 0 5px var(--oc-race-catch),
+      0 0 18px 4px var(--oc-race-catch);
+  }
 }
 
 /* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 44 = 78px — 390px 옆줄 ≈65px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다
@@ -371,6 +409,16 @@ button.oc-badge {
   font-size: 11px;
 }
 
+/* D-162 — 방장만 보는 [내보내기](끊긴 좌석). */
+.oc-seat-kick {
+  align-self: flex-start;
+  border-color: var(--oc-race-catch);
+  color: var(--oc-race-catch);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* D-132 — 일반 진행 기준 다음 차례. 좌석 안에서는 위 테두리에 걸친 꼬리표라 좁은 옆줄 좌석의 이름 칸을 줄이지 않는다.
    "나" 줄에서는 다른 배지처럼 줄 안에 놓인다. */
 .oc-seat-next {
@@ -385,6 +433,19 @@ button.oc-badge {
   top: -9px;
   right: 6px;
   padding: 0 6px;
+}
+
+/* D-160 — 차례 표시: 좌석 왼쪽 위, 좌석 색으로 채운다("다음"은 오른쪽 위 테두리만). */
+.oc-seat > .oc-seat-now {
+  position: absolute;
+  top: -9px;
+  left: 6px;
+  padding: 0 6px;
+  border-color: var(--oc-accent);
+  background: var(--oc-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ── 가운데 — 더미·맨 위 카드·상태 ─────────────────────────────────── */
@@ -683,7 +744,19 @@ button.oc-card {
 }
 
 .oc-me-turn {
-  box-shadow: 0 0 0 2px var(--oc-accent);
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
+}
+
+/* D-160 — 내 차례면 손패 칸도 빛난다. */
+.oc-hand-myturn {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
 }
 
 .oc-me-count {
@@ -691,11 +764,39 @@ button.oc-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* 손패는 감긴다 — 원카드 손패는 20장 가까이 늘 수 있어 한 줄 겹치기(.overlap)를 쓰지 않는다. */
-.oc-hand-cards {
-  justify-content: center;
+/* D-160 — 손패는 최대 2줄(8장까지 한 줄, 넘으면 반씩 — OneCardHand.handRows). 줄이 폭을 넘으면 카드를 감싼 칸
+   (.oc-hand-slot)이 줄어들고 카드는 그대로라 다음 카드 밑으로 겹친다. 마지막 칸은 줄지 않아 끝 카드는 다 보인다. */
+/* 공용 `.my-hand .hand-cards:not(.overlap)`(flex-wrap: wrap — 특이도 0,3,0)를 이겨야 한다. wrap 이면 세로 줄이 내용 폭으로 늘어
+   줄이 화면 밖으로 밀렸다(실측 390px). 그래서 같은 특이도에 뒤에 둔다. */
+.oc-hand .hand-cards.oc-hand-cards {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
   min-height: 96px;
   padding-top: 8px;
+}
+
+.oc-hand-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oc-hand-slot {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.oc-hand-slot:last-child {
+  flex-shrink: 0;
+}
+
+/* 고른 카드는 겹친 이웃 위로 올라온다. */
+.oc-hand-slot .oc-card-selected {
+  z-index: 3;
 }
 
 .oc-hand-empty {
@@ -837,6 +938,45 @@ button.oc-card {
 
 .oc-race-label {
   line-height: 1;
+}
+
+/* D-161 — 방장이 대기실에서 고른 버튼 크기(모두 같다). 보통이 위 기본값이다. 레이어의 반폭·반높이(가장자리 clamp)도 크기를 따른다.
+   작게는 맞히기 어렵게 하려는 선택이라 터치 하한(44px)보다 작다. */
+.oc-race-layer.oc-race-size-small {
+  --oc-race-half-w: 48px;
+  --oc-race-half-h: 22px;
+}
+
+.oc-race-size-small .oc-race-btn {
+  min-width: 64px;
+  max-width: 90px;
+  min-height: 34px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.oc-race-layer.oc-race-size-large {
+  --oc-race-half-w: 76px;
+  --oc-race-half-h: 36px;
+}
+
+/* D-165 — 찾기 난이도(방 설정): 반투명 + 그림자 없음. 테두리·막대는 그대로라 눈에 띄면 바로 누를 수 있다. */
+.oc-race-vis-hard .oc-race-btn {
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.oc-race-vis-very-hard .oc-race-btn {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.oc-race-size-large .oc-race-btn {
+  min-width: 108px;
+  max-width: 144px;
+  min-height: 60px;
+  padding: 8px 16px;
+  font-size: 21px;
 }
 
 /* 창 끝까지 남은 시간 — 시작 비율(--oc-race-start)에서 0 으로 줄어든다. */
@@ -1142,3 +1282,34 @@ button.oc-pile-draw {
   color: var(--oc-race-catch);
 }
 
+/* D-163 — 좌석·"(나)" 줄 위 최근 채팅 한 줄(5초). 위 테두리에 걸친 말풍선이라 좌석 높이를 바꾸지 않는다. 길면 말줄임. */
+.oc-seat-chat {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 6px;
+  right: 6px;
+  z-index: 6;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--oc-accent);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: oc-chat-in 160ms ease-out;
+}
+
+@keyframes oc-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

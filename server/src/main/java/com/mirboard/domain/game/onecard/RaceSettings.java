@@ -18,8 +18,8 @@ public record RaceSettings(long windowMillis,
                            long catcherMaxMillis,
                            int slotCount) {
 
-    /** 설계서 기본값 — 창 3초, 봇 반응 1.0~2.5초, 슬롯 8개. */
-    public static final RaceSettings DEFAULT = new RaceSettings(3_000, 1_000, 2_500, 1_000, 2_500, 8);
+    /** 설계서 기본값 — 창 3초, 봇 반응 1.0~2.5초, 슬롯 14개(D-161 — 8곳에서 늘려 화면 전체로. 클라 RACE_SLOTS 와 같아야 한다). */
+    public static final RaceSettings DEFAULT = new RaceSettings(3_000, 1_000, 2_500, 1_000, 2_500, 14);
 
     public RaceSettings {
         require(windowMillis > 0, "windowMillis must be positive: " + windowMillis);

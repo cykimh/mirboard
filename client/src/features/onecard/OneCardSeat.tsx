@@ -1,3 +1,4 @@
+import type { SeatChatLine } from '@/features/chat/useSeatChatLines';
 import { avatarSrc } from '@/api/avatar';
 import { animalFor } from '@/components/avatarGlyph';
 import type { TableSide } from '@/components/seatOrder';
@@ -42,6 +43,10 @@ interface Props {
   reaction?: string;
   /** D-155 — 음성 대화 참여 중(on) / 나와의 연결 실패(failed). */
   voice?: 'on' | 'failed';
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(바로 탈주 처리). */
+  onKick?: () => void;
+  /** D-163 — 이 사람의 최근 채팅 한 줄(5초). */
+  chat?: SeatChatLine;
 }
 
 /**
@@ -60,6 +65,8 @@ export function OneCardSeat({
   slot,
   reaction,
   voice,
+  onKick,
+  chat,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -84,7 +91,14 @@ export function OneCardSeat({
       data-side={side}
       data-slot={slot}
     >
+      {/* D-160 — 지금 차례가 확실히 보이게. 테두리 맥박과 함께. */}
+      {isTurn && <span className="oc-badge oc-seat-now">차례</span>}
       {isNext && <span className="oc-badge oc-seat-next">다음</span>}
+      {chat && (
+        <span key={chat.id} className="oc-seat-chat" title={chat.text}>
+          {chat.text}
+        </span>
+      )}
       {reaction && (
         <span className="oc-seat-reaction" aria-hidden="true">
           {reaction}
@@ -139,6 +153,11 @@ export function OneCardSeat({
         <span className="status-tag oc-seat-tag">
           {out ? ELIMINATED_LABEL[seat.eliminated!] : '연결 끊김'}
         </span>
+      )}
+      {!out && isDisconnected && onKick && (
+        <button type="button" className="oc-badge oc-seat-kick" onClick={onKick}>
+          내보내기
+        </button>
       )}
     </div>
   );

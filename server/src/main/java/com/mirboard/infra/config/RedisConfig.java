@@ -36,6 +36,12 @@ public class RedisConfig {
         return scriptOf("lua/room_start_now.lua");
     }
 
+    /** D-161 — 대기실에서 방장이 게임 설정 바꾸기(WAITING 확인 + 쓰기 한 번에). */
+    @Bean
+    public RedisScript<Long> roomUpdateSettingsScript() {
+        return scriptOf("lua/room_update_settings.lua");
+    }
+
     /** D-153 — 정상 종료한 친구 방을 대기실로(관전자 자동 착석). */
     @Bean
     public RedisScript<Long> roomReturnWaitingScript() {

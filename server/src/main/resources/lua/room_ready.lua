@@ -1,6 +1,7 @@
 -- room_ready.lua  (Phase 16 #2)
 -- Atomically toggle a player's ready flag. When every seat is filled AND
 -- every player is ready, transition WAITING -> IN_GAME (start the game).
+-- D-161 — 그 자동 시작은 봇과 연습 방(fillWithBots)만이다. 친구 방의 준비는 표시만 하고 시작은 늘 방장(room_start_now.lua).
 --
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
@@ -46,6 +47,10 @@ else
     redis.call('SREM', KEYS[3], userId)
 end
 redis.call('EXPIRE', KEYS[3], ttl)
+
+if redis.call('HGET', KEYS[1], 'fillWithBots') ~= 'true' then
+    return 0
+end
 
 local capacity = tonumber(redis.call('HGET', KEYS[1], 'capacity'))
 if #players < capacity then

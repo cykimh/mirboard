@@ -50,6 +50,8 @@ interface GameTableProps {
   onExit?: () => void;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이 — 티츄는 판이 끝난다고 알린다). */
+  onKick?: (userId: number) => void;
   /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(RoomPage 가 결과 화면을 유지하는 중). 매치 종료 화면의 [대기실로]가 부른다. */
   onBackToRoom?: () => void;
 }
@@ -75,6 +77,7 @@ export function GameTable({
   usernames = {},
   onExit,
   onAbort,
+  onKick,
   onBackToRoom,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
@@ -176,6 +179,7 @@ export function GameTable({
         stake={stake}
         chips={m.chips}
         disconnectedSeats={m.disconnectedSeats}
+        onKickSeat={onKick ? (seat) => onKick(playerIds[seat]) : undefined}
         spectator={spectator}
         turnSeconds={turnSeconds}
         isInDealing={m.isInDealing}

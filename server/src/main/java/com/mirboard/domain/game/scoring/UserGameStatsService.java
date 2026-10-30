@@ -44,12 +44,26 @@ public class UserGameStatsService {
             return winCount + loseCount;
         }
 
+        /** 점수 구간 계급(D-164). 왕관은 순위가 있어야 정해진다 — {@link UserGameStatsService#tierOf}. */
         public String tier() {
             return Tier.fromRating(rating).name();
         }
     }
 
     public record RankRow(int rank, long userId, String username, GameStats stats) {
+    }
+
+    /**
+     * D-164 — 순위까지 본 계급. 점수로 금훈장(1430+)이면 나보다 높은 사람 수로 순위를 구해 왕관을 정한다. 그 아래는 점수 구간 그대로라
+     * 조회가 없다.
+     */
+    @Transactional(readOnly = true)
+    public String tierOf(GameStats stats) {
+        if (Tier.fromRating(stats.rating()) != Tier.GOLD_BADGE) {
+            return stats.tier();
+        }
+        long above = repo.countRankedAbove(stats.gameType(), GuestPolicy.LIKE_PATTERN, stats.rating());
+        return Tier.withRank(stats.rating(), (int) Math.min(above + 1, Integer.MAX_VALUE)).name();
     }
 
     /** 안 해 본 게임이면 기본값. */
@@ -75,6 +89,12 @@ public class UserGameStatsService {
     @Transactional
     public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted) {
         repo.record(userId, gameType, newRating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
+    }
+
+    /** D-160 — 랭킹 탭 순서용 게임별 판수(많이 한 게임부터). */
+    @Transactional(readOnly = true)
+    public List<UserGameStatsRepository.GamePlays> playsByGame() {
+        return repo.countPlaysByGame();
     }
 
     @Transactional(readOnly = true)

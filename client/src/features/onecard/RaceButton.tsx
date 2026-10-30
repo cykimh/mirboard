@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { RaceButtonSize, RaceButtonVisibility } from '@/types/api';
 import type { OneCardClientRace, PressAction } from './onecardStore';
 import { raceLeftCss, racePosition, raceTopCss } from './raceSlots';
 
@@ -8,6 +9,10 @@ interface Props {
   /** 누를 수 없는 동안 — 내 누름이 응답을 기다리는 중(중복 누름 방지)이거나 연결이 끊겼다. */
   pending: boolean;
   onPress: (action: PressAction) => void;
+  /** D-161 — 방장이 대기실에서 고른 버튼 크기(모두 같다). 없으면 보통. */
+  size?: RaceButtonSize;
+  /** D-165 — 방장이 고른 찾기 난이도(투명도). 없으면 보통(불투명). */
+  visibility?: RaceButtonVisibility;
 }
 
 /**
@@ -40,12 +45,14 @@ function RaceTimer({ closesAt, windowMillis }: { closesAt: number; windowMillis:
  * 레이팅 공정성을 깬다. 진짜 `<button>` 이라 탭·클릭·보조기기로 누를 수 있고, 창이 열린 사실은 게임판의 aria-live
  * 영역이 알린다. 막대는 창 끝까지 남은 시간이다(이 클라 시계 — 판정은 서버).
  */
-export function RaceButton({ race, mySeat, pending, onPress }: Props) {
+export function RaceButton({ race, mySeat, pending, onPress, size = 'MEDIUM', visibility = 'NORMAL' }: Props) {
   const owner = mySeat === race.ownerSeat;
   const { left, top } = racePosition(race.slot, race.jitterX, race.jitterY);
 
   return (
-    <div className="oc-race-layer">
+    <div
+      className={`oc-race-layer oc-race-size-${size.toLowerCase()} oc-race-vis-${visibility.toLowerCase().replace('_', '-')}`}
+    >
       <button
         type="button"
         className={`oc-race-btn ${owner ? 'oc-race-call' : 'oc-race-catch'}`}

@@ -238,9 +238,13 @@
   "targetScore": 1000,
   "turnSeconds": 0,
   "stake": 0,
-  "readyUserIds": []
+  "readyUserIds": [],
+  "raceButtonSize": "MEDIUM",
+  "raceButtonVisibility": "NORMAL"
 }
 ```
+- `raceButtonSize`(D-161) 는 원카드 "원카드!/잡기!" 버튼 크기다. 방 설정이고 원카드 외 게임에서는 늘 `MEDIUM` 이다.
+- `raceButtonVisibility`(D-165) 는 같은 버튼의 찾기 난이도다. `NORMAL`·`HARD`(60%)·`VERY_HARD`(35%) 중 하나이고, 원카드 외 게임에서는 늘 `NORMAL` 이다.
 - 좌석(seat)은 `playerIds` 의 인덱스다 — STOMP 이벤트의 `seat` 와 같은 축.
 - `botSeats` 는 `playerIds` 인덱스 기준 봇 좌석(D-50).
 
@@ -295,15 +299,34 @@
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
 > **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. **D-143**: 친구와 하기 방의 시작은 방장의
-> `/start` 뿐이다(준비 없음 — 화면에 [준비]가 없다). `/ready` 의 전원 준비 시작은 봇과 연습 방의 내부 시작 길로만 남았다.
+> `/start` 뿐이다. **D-161**: 대기실에 [준비]가 돌아왔지만 표시만 한다 — `/ready` 의 전원 준비 시작은 봇과 연습 방(`fillWithBots`)에서만 일어난다.
 
 ### POST `/api/rooms/{roomId}/ready` *(Phase 16 #2)*
 대기실 준비 토글. body `{ "ready": true|false }`. 응답 `200` — Room 갱신본
 (`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
-`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석). **D-143**: 화면은 이 호출을 쓰지 않는다 — 봇과 연습 방을 만들 때 서버가
-봇과 방장의 준비를 넣어 시작하는 내부 길이다(API 는 하위 호환으로 남긴다).
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석). **D-161**: 정원+전원 준비로 시작하는 것은 봇과 연습 방(`fillWithBots`)뿐이다
+(`room_ready.lua` 가 방 해시를 본다). 친구 방의 준비는 대기실 표시만 하고(손님의 [준비]/[준비 취소]) 시작은 늘 방장의 `/start` 다.
+
+### PUT `/api/rooms/{roomId}/settings` *(D-161 — 대기실 게임 설정, 방장 전용)*
+친구 방 대기실에서 방장이 게임 설정을 바꾼다. **부분 갱신** — 보낸 항목만 바꾼다.
+```json
+{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE", "raceButtonVisibility": "HARD" }
+```
+- `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
+- `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
+- `stake` 는 허용값 `{0,10,50,100,500}` 이고 `BETTING` 게임만 쓴다. 봇 방이면 0 만 된다.
+- `raceButtonSize` 는 `SMALL`·`MEDIUM`·`LARGE` 이고 `RACE_BUTTON_SIZE` 게임(원카드)만 쓴다.
+- `raceButtonVisibility`(D-165) 는 `NORMAL`·`HARD`·`VERY_HARD` 이고 `RACE_BUTTON_VISIBILITY` 게임(원카드)만 쓴다.
+- 게임이 안 쓰는 항목을 보내면 값과 상관없이 `UNSUPPORTED_ROOM_OPTION` 이다. 만들 때와 달리 기본값도 통과하지 않는다.
+- `room_update_settings.lua` 가 WAITING 확인과 쓰기를 한 번에 한다. 성공하면 방 메타 갱신(`ROOM_UPDATED`)으로 다른 사람 화면도 바뀐다.
+
+응답 `200` — 갱신된 Room. 에러는 아래와 같다.
+- `NOT_HOST`(403)
+- `GAME_ALREADY_STARTED`(409)
+- `UNSUPPORTED_ROOM_OPTION`·`INVALID_STAKE`·`INVALID_ROOM_SETTING`(400 — details `setting`)
+- `ROOM_NOT_FOUND`
 
 ### POST `/api/rooms/{roomId}/start` *(D-136·D-143 — 방장 시작, 방장 전용)*
 친구와 하기 대기실의 유일한 시작. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상 — **준비는 조건이 아니고 정원이 다 찼어도 이 길로
@@ -358,8 +381,19 @@ schema constraint 유지.
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
 
-tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
-1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
+tier 는 derived 값이다(D-164 — 포트리스2식 21단계, 서버 `Tier`). 점수 구간은 아래와 같다.
+
+| 계급 | 점수 |
+|---|---|
+| `SKULL` | <910 |
+| `BULLET_1`·`_2`·`_3` | 910·940·970 |
+| `MISSILE_1`·`_2`·`_3` | 1000(시작)·1030·1060 |
+| `BRONZE_STAR`·`SILVER_STAR`·`GOLD_STAR`·`DOUBLE_GOLD_STAR` | 1090·1120·1150·1180 |
+| `BRONZE_MEDAL`·`SILVER_MEDAL`·`GOLD_MEDAL` | 1210·1250·1290 |
+| `BRONZE_BADGE`·`SILVER_BADGE`·`GOLD_BADGE` | 1330·1380·1430 |
+
+금훈장(1430+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
+11~30위 `BRONZE_CROWN`. 랭킹은 목록 순위를 쓰고, 전적 조회는 나보다 점수가 높은 사람 수 +1 을 쓴다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
@@ -376,6 +410,15 @@ rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라�
       "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
   ]
 }
+```
+
+### GET `/api/users/ranking/games` *(D-160 — 랭킹 탭 순서)*
+게임별 판수(`user_game_stats` 의 승+패 합, 봇 제외)를 많이 한 게임부터 준다. 한 판도 없는 게임은 싣지 않는다(클라가 카탈로그 순서로 뒤에
+붙인다). 한 매치를 여러 사람이 하므로 "사람-판" 수다 — 순서를 정하는 데 쓴다.
+
+응답 `200`
+```json
+{ "games": [ { "gameType": "ONE_CARD", "plays": 120 }, { "gameType": "TICHU", "plays": 48 } ] }
 ```
 
 ### GET `/api/users/{userId}/head-to-head` *(D-154 — 상대 전적)*
@@ -415,6 +458,21 @@ WAITING 방의 **좌석 순서 정책**을 변경. IN_GAME / FINISHED 방은 거
 본 청크 (Phase 8C) 에서는 `RANDOM` 만 서버 동작 분기 (4번째 join 직후 좌석 셔플).
 `MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트
 좌석 드래그 UI 도입 시 분기 추가.
+
+### POST `/api/rooms/{roomId}/kick` *(D-162 — 끊긴 사람 내보내기, 방장 전용)*
+body는 `{ "userId": 18 }` 이다. 게임 중(IN_GAME) 연결이 끊긴 사람을 방장이 바로 탈주 처리한다. 3분 유예(D-158)를 기다리지 않는다.
+- 대상은 방장 자신이 아닌, 이 판의 사람 플레이어여야 한다.
+- 그 방에 라이브 세션이 남아 있으면 거절한다(`RoomPresence` — 유예 만료와 같은 판정).
+- 통과하면 걸린 유예를 지우고 `DesertionService.processDesertion` 을 부른다.
+- 기록과 게임별 결과는 유예 만료와 같다. 원카드·스컬킹은 남은 사람끼리 계속하고, 티츄는 상대 팀 승리로 끝난다.
+- 이미 탈주한 좌석이면 아무것도 하지 않는다(그래도 204).
+
+응답은 `204` 다. 에러는 아래와 같다.
+- `NOT_HOST`(403)
+- `GAME_NOT_IN_PROGRESS`
+- `NOT_IN_ROOM`(409 — 자기 자신·봇·이 판 사람 아님)
+- `PLAYER_CONNECTED`(409 — 아직 연결돼 있음, details `userId`)
+- `ROOM_NOT_FOUND`
 
 ### POST `/api/rooms/{roomId}/abort` *(Phase 8A — 호스트 전용, D-135 — 봇과 하는 판만)*
 IN_GAME 방을 강제 종료. **방장 말고 모두 봇인 판에서만** 허용한다(D-135) — 강제 종료는 매치 기록·레이팅을 남기지 않아
