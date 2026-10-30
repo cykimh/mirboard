@@ -5,6 +5,7 @@ import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import type { RoomEventSink } from './roomEventSink';
 import { judgeSeq } from './seqGate';
+import type { VoiceMessage, VoiceSignal } from '@/features/voice/useVoiceChat';
 import type { ResyncEnvelope, StompEnvelope } from '@/types/stomp';
 
 interface ChatPayload {
@@ -68,6 +69,8 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
   const resetReactions = useReactionStore((s) => s.reset);
   /** GameTable 에서 채팅 패널 열림 여부를 ref 로 넘겨주면 appendChat 가 unreadCount 분기. */
   const chatPanelOpenRef = useRef(false);
+  /** D-155 — 음성 신호 받는 쪽(`useVoiceChat`). 방 공지·본인 큐 둘 다 여기로. */
+  const voiceHandlers = useRef(new Set<(m: VoiceMessage) => void>());
 
   const resync = useCallback(async () => {
     if (!token) return;
@@ -174,6 +177,15 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
           if (env.type !== 'REACTION') return;
           appendReaction(env.payload.fromSeat, env.payload.emoji);
         });
+        // D-155 — 음성 대화 신호(방 공지 JOIN·LEAVE + 본인 큐 OFFER·ANSWER·ICE). 소리는 P2P 라 여기로 오지 않는다.
+        const onVoice = (frame: { body: string }) => {
+          if (disposed) return;
+          const env = JSON.parse(frame.body) as StompEnvelope<VoiceMessage>;
+          if (env.type !== 'VOICE') return;
+          voiceHandlers.current.forEach((h) => h(env.payload));
+        };
+        client.subscribe(`/topic/room/${roomId}/voice`, onVoice);
+        client.subscribe(`/user/queue/room/${roomId}/voice`, onVoice);
         // 연결/재연결 직후 권위 있는 스냅샷으로 순번 기준점 동기화 — 구독을 모두 보낸 뒤에.
         resync();
       },
@@ -254,5 +266,30 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     [roomId],
   );
 
-  return { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef, requestResync: resync };
+  const sendVoice = useCallback(
+    (signal: VoiceSignal) => {
+      const client = clientRef.current;
+      if (!client?.connected) return;
+      client.publish({ destination: `/app/room/${roomId}/voice`, body: JSON.stringify(signal) });
+    },
+    [roomId],
+  );
+
+  const subscribeVoice = useCallback((handler: (m: VoiceMessage) => void) => {
+    voiceHandlers.current.add(handler);
+    return () => {
+      voiceHandlers.current.delete(handler);
+    };
+  }, []);
+
+  return {
+    connected,
+    sendAction,
+    sendChat,
+    sendReaction,
+    sendVoice,
+    subscribeVoice,
+    chatPanelOpenRef,
+    requestResync: resync,
+  };
 }

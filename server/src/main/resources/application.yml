@@ -147,6 +147,10 @@ mirboard:
       reaction:
         limit: ${MIRBOARD_RATELIMIT_REACTION_LIMIT:20}
         window: 10s
+      # D-155 — 음성 신호(ICE 후보 몰림).
+      voice:
+        limit: ${MIRBOARD_RATELIMIT_VOICE_LIMIT:300}
+        window: 10s
       # 표에 없는 /app/** fallback.
       stomp-default:
         limit: ${MIRBOARD_RATELIMIT_STOMP_LIMIT:60}

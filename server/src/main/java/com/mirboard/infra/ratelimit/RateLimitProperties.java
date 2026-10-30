@@ -31,6 +31,8 @@ public class RateLimitProperties {
     public static final String GAME_ACTION = "game-action";
     public static final String CHAT = "chat";
     public static final String REACTION = "reaction";
+    /** D-155 — 음성 신호. 연결을 맺을 때 ICE 후보가 한꺼번에 몰린다(상대당 수십 개). */
+    public static final String VOICE = "voice";
     public static final String STOMP_DEFAULT = "stomp-default";
 
     private static final Map<String, RateLimitPolicy> DEFAULTS = Map.of(
@@ -48,6 +50,7 @@ public class RateLimitProperties {
             GAME_ACTION, new RateLimitPolicy(GAME_ACTION, 30, Duration.ofSeconds(10)),
             CHAT, new RateLimitPolicy(CHAT, 10, Duration.ofSeconds(10)),
             REACTION, new RateLimitPolicy(REACTION, 20, Duration.ofSeconds(10)),
+            VOICE, new RateLimitPolicy(VOICE, 300, Duration.ofSeconds(10)),
             STOMP_DEFAULT, new RateLimitPolicy(STOMP_DEFAULT, 60, Duration.ofSeconds(10)));
 
     private boolean enabled = true;

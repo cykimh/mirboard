@@ -29,6 +29,12 @@
 ## 토픽 / 큐 카탈로그
 
 > D-146 — 로비 채팅(`/topic/lobby/chat`·`/app/lobby/chat`)은 없앴다. 방 채팅만 남는다.
+> D-155 — 음성 대화 신호는 다음과 같다.
+> - 클라 → 서버: `/app/room/{id}/voice` 로 `{ type: JOIN|LEAVE|OFFER|ANSWER|ICE, to?, data? }` 를 보낸다.
+> - JOIN·LEAVE: `/topic/room/{id}/voice` 로 `VOICE{ type, from }` 를 공지한다.
+> - OFFER·ANSWER·ICE: `/user/queue/room/{id}/voice` 로 `VOICE{ type, from, data }` 를 받는 사람에게만 보낸다.
+> - `data` 는 SDP·ICE JSON 문자열이고 서버는 해석하지 않는다(≤16KB).
+> - 소리는 P2P 라 서버를 거치지 않는다.
 > D-153 — 사람만의 방은 매치 정상 종료 뒤 `/topic/room/{id}/meta` 의 `ROOM_META_UPDATED` 가 `status: WAITING`(IN_GAME→WAITING)을 싣는다(관전자가 자동으로 앉은 `playerIds`). 다음 `IN_GAME` 은 방장 시작.
 
 | 종류 | 목적지 | 흐름 | 내용 |

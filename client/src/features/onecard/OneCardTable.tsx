@@ -10,6 +10,7 @@ import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { REACTIONS, useLiveReactions } from '@/features/chat/reactionStore';
 import { useSfx } from '@/features/sound/useSfx';
+import { useVoiceChat } from '@/features/voice/useVoiceChat';
 import { cardKey, type OneCardCard } from '@/types/onecard';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
@@ -88,7 +89,16 @@ export function OneCardTable({
   onBackToRoom,
 }: Props) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef, requestResync } = useStompRoom(
+  const {
+    connected,
+    sendAction,
+    sendChat,
+    sendReaction,
+    sendVoice,
+    subscribeVoice,
+    chatPanelOpenRef,
+    requestResync,
+  } = useStompRoom(
     roomId,
     token,
     onecardRoomSink,
@@ -98,6 +108,8 @@ export function OneCardTable({
   const { muted, toggleMute, playChime } = useSfx();
   const [reactionOpen, setReactionOpen] = useState(false);
   const liveReactions = useLiveReactions();
+  // D-155 — 음성 대화(무료 P2P). 🎧 참여(듣기)·🎙 마이크. 좌석에는 참여 중 🎧 / 연결 실패 표시.
+  const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
   const chatUnread = useRoomChatStore((s) => s.unreadCount);
   // 게임판에서는 수동으로만 연다 — 턴 타이머가 계속 흐른다(D-121).
   const rules = useTutorialGate(ONE_CARD_TUTORIAL.seenKey, false);
@@ -133,6 +145,11 @@ export function OneCardTable({
     wasMyTurn.current = myTurn;
   }, [myTurn, playChime]);
 
+  const voiceOf = (userId: number | undefined): 'on' | 'failed' | undefined => {
+    if (userId == null || !voice.members.includes(userId)) return undefined;
+    return voice.peerState[userId] === 'failed' ? 'failed' : 'on';
+  };
+
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
     if (botSeats.includes(seat)) return usernames[uid] ?? `봇 ${seat}`;
@@ -155,6 +172,7 @@ export function OneCardTable({
         side={side}
         slot={slot}
         reaction={liveReactions[seat]?.emoji}
+        voice={voiceOf(playerIds[seat])}
       />
     );
   };
@@ -296,6 +314,32 @@ export function OneCardTable({
           >
             {muted ? '🔇' : '🔊'}
           </button>
+          <button
+            type="button"
+            className="oc-badge"
+            onClick={voice.joined ? voice.leave : voice.join}
+            aria-label="음성 대화"
+            aria-pressed={voice.joined}
+            title={voice.joined ? '음성 대화 나가기' : '음성 대화 참여(듣기) — 마이크는 🎙 로 따로 켭니다'}
+          >
+            🎧
+          </button>
+          <button
+            type="button"
+            className="oc-badge"
+            onClick={() => void voice.toggleMic()}
+            disabled={!voice.joined}
+            aria-label="마이크"
+            aria-pressed={voice.micOn}
+            title={voice.micOn ? '마이크 끄기' : '마이크 켜기'}
+          >
+            {voice.micOn ? '🎙' : '🎙✕'}
+          </button>
+          {voice.micError && (
+            <span className="oc-badge oc-voice-error" role="alert">
+              {voice.micError}
+            </span>
+          )}
           {!spectator && (
             <span className="oc-reaction-bar">
               <button
