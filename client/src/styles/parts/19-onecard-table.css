@@ -961,4 +961,35 @@ button.oc-card {
   transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* D-152 — 먹은 카드: 더미와 같은 작은 뒷면이 먹은 사람 자리로 날아가며 작아진다. 여러 장이면 장수 배지. */
+.oc-fly-draw {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 56px;
+  border-radius: 6px;
+  border: 2px solid #f2f2f2;
+  background: repeating-linear-gradient(45deg, #3b5ba9, #3b5ba9 4px, #2f4c92 4px, #2f4c92 8px);
+}
+
+.oc-fly-draw-count {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--oc-race-catch);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* D-152 — 내 차례에 누를 수 있는 더미: 손가락 모양 + 은은한 테두리 빛(움직이지 않는다 — 이 파일은 미디어 쿼리를 두지 않아
+   동작 줄이기 분기를 못 단다). button 기본 글꼴·여백을 지운다. */
+button.oc-pile-draw {
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  outline-offset: 3px;
+  filter: drop-shadow(0 0 5px rgba(91, 141, 239, 0.95));
+}
 

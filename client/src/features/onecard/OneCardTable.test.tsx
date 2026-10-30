@@ -1332,3 +1332,80 @@ describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
     expect(fly()).toBeNull();
   });
 });
+
+/** D-152 — 내 차례에는 가운데 더미를 눌러도 먹는다(아래 "먹기" 버튼과 같은 일). */
+describe('OneCardTable — 더미 눌러 먹기 (D-152)', () => {
+  it('내 차례면 더미가 먹기 버튼이 되고, 누르면 DRAW 를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)], topCard: c('HEART', 2), attackStack: 4 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const pile = screen.getByRole('button', { name: '먹기 (4장) — 뽑을 더미 30장' });
+    fireEvent.click(pile);
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'DRAW' });
+  });
+
+  it('내 차례가 아니면 더미는 누를 수 없는 그림이다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.queryByRole('button', { name: /뽑을 더미/ })).toBeNull();
+    expect(screen.getByRole('img', { name: '뽑을 더미 30장' })).toBeInTheDocument();
+  });
+
+  it('관전자에게는 버튼이 아니다', () => {
+    seed({ seatCount: 3, mySeat: -1, turnSeat: 0 });
+    renderTable({ playerIds: [100, 101, 102], myUserId: 999 });
+
+    expect(screen.queryByRole('button', { name: /뽑을 더미/ })).toBeNull();
+  });
+});
+
+/** D-152 — 누가 카드를 먹으면 가운데 더미에서 그 사람 자리로 뒷면이 날아간다(카드 내기 비행의 반대 방향). */
+describe('OneCardTable — 먹기 비행 효과 (D-152)', () => {
+  const fly = () => document.querySelector('.oc-fly-draw');
+  const drawn = (seat: number, count: number, seq: number) =>
+    act(() => {
+      onecardRoomSink.applyEvent({
+        type: 'CARDS_DRAWN',
+        seq,
+        payload: { seat, count, reason: 'TURN', handCount: 8, drawPileCount: 29 },
+      } as never);
+    });
+
+  beforeEach(() => {
+    useCardAnimStore.setState({ enabled: true });
+  });
+
+  it('남이 먹으면 더미에서 그 좌석으로 날아가고, 내려앉으면 걷는다 — 여러 장이면 장수를 단다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    drawn(2, 3, 2);
+    expect(fly()).toHaveAttribute('data-to-seat', '2');
+    expect(fly()).toHaveAttribute('aria-hidden', 'true');
+    expect(fly()).toHaveTextContent('+3');
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(fly()).toBeNull();
+  });
+
+  it('한 장이면 장수를 달지 않는다 — 내가 먹으면 내 줄로', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 0 });
+    renderTable();
+
+    drawn(0, 1, 2);
+    expect(fly()).toHaveAttribute('data-to-seat', '0');
+    expect(fly()!.textContent).toBe('');
+  });
+
+  it('카드 애니메이션을 끄면 날리지 않는다', () => {
+    useCardAnimStore.setState({ enabled: false });
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    drawn(2, 1, 2);
+    expect(fly()).toBeNull();
+  });
+});
