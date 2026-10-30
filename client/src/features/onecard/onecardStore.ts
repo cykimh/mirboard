@@ -78,6 +78,13 @@ export interface LastPlay {
   under: { card: OneCardCard | null; declaredSuit: OneCardSuit | null };
 }
 
+/** D-152 — 방금 먹은 카드(먹기 비행 효과): 순번·좌석·장수. 카드 내용은 비공개라 장수만. */
+export interface LastDraw {
+  seq: number;
+  seat: number;
+  count: number;
+}
+
 export interface OneCardRoomState {
   roomId: string | null;
 
@@ -96,6 +103,8 @@ export interface OneCardRoomState {
   result: OneCardMatchResult | null;
   /** D-139 — 방금 낸 카드(카드 내기 비행 효과). 같은 이벤트를 두 번 적용해도 같다(순번이 같다). */
   lastPlay: LastPlay | null;
+  /** D-152 — 방금 먹은 카드. 같은 이벤트를 두 번 적용해도 같다(순번이 같다). */
+  lastDraw: LastDraw | null;
   /**
    * D-144 — 맨 위 카드 바로 전에 낸 카드들(최근 것이 앞, 최대 `DISCARD_TRAIL_MAX` 장, D-150 — 맨 위 옆에 작게). 서버 뷰에 없는 화면 기억이라
    * 이 세션에서 본 내기만 쌓는다 — 다시 섞으면 비우고, resync 는 맨 위가 같을 때만 지킨다.
@@ -194,6 +203,7 @@ const INITIAL: OneCardRoomState = {
   lastRace: null,
   result: null,
   lastPlay: null,
+  lastDraw: null,
   discardTrail: [],
   mySeat: -1,
   hand: [],
@@ -382,6 +392,11 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
         set({
           seats: patchSeat(state.seats, p.seat, { handCount: p.handCount }),
           drawPileCount: p.drawPileCount,
+          // D-152 — 비행 효과(순번 없는 이벤트는 날리지 않는다, 같은 이벤트면 그대로).
+          lastDraw:
+            envelope.seq === undefined || state.lastDraw?.seq === envelope.seq
+              ? state.lastDraw
+              : { seq: envelope.seq, seat: p.seat, count: p.count },
         });
         return 'applied';
       }

@@ -21,7 +21,7 @@ export interface CardFlight {
   settled: boolean;
 }
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return (
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -29,7 +29,7 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-function nextFrame(run: () => void): () => void {
+export function nextFrame(run: () => void): () => void {
   if (typeof window.requestAnimationFrame === 'function') {
     let inner = 0;
     const outer = window.requestAnimationFrame(() => {

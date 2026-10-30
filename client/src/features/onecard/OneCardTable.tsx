@@ -21,6 +21,7 @@ import { OneCardTurnCountdown } from './OneCardTurnCountdown';
 import { RaceButton } from './RaceButton';
 import { ONE_CARD_TUTORIAL } from './tutorial/onecardTutorial';
 import { useCardPlayFlight } from './useCardPlayFlight';
+import { useCardDrawFlight } from './useCardDrawFlight';
 
 /** `BUSY` 로 거절된 누름을 다시 보내기까지의 간격. 창(기본 3초) 안에 두 번 재시도할 여유가 있다. */
 export const PRESS_RETRY_DELAY_MS = 120;
@@ -99,6 +100,7 @@ export function OneCardTable({
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
   const flight = useCardPlayFlight(tableRef, s.lastPlay, mySeat, cardAnimEnabled);
+  const drawFlight = useCardDrawFlight(tableRef, s.lastDraw, mySeat, cardAnimEnabled);
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const me = s.seats.find((x) => x.seat === mySeat) ?? null;
   // D-132 — 일반 진행 기준 다음 차례. 차례가 비면(카드 직후·경쟁 창·종료) 테두리와 함께 사라진다.
@@ -331,6 +333,7 @@ export function OneCardTable({
           late={s.raceNotice === 'LATE'}
           nameOf={nameOf}
           landingUnder={flight ? flight.under : null}
+          onDraw={myTurn && connected ? draw : undefined}
           discardTrail={s.discardTrail}
         />
 
@@ -430,6 +433,23 @@ export function OneCardTable({
           }}
         >
           <OneCardCardChip card={flight.card} />
+        </div>
+      )}
+      {/* D-152 — 먹은 카드(장식 — 좌석 뒷면·손패가 이미 같은 정보를 준다). 더미에서 출발해 먹은 사람 자리로. 여러 장이면 장수. */}
+      {drawFlight && (
+        <div
+          className={`oc-fly oc-fly-draw${drawFlight.settled ? ' oc-fly-settled' : ''}`}
+          data-to-seat={drawFlight.toSeat}
+          aria-hidden="true"
+          style={{
+            left: drawFlight.left,
+            top: drawFlight.top,
+            transform: drawFlight.settled
+              ? 'translate(-50%, -50%) scale(0.6)'
+              : `translate(calc(-50% + ${drawFlight.dx}px), calc(-50% + ${drawFlight.dy}px))`,
+          }}
+        >
+          {drawFlight.count > 1 && <span className="oc-fly-draw-count">+{drawFlight.count}</span>}
         </div>
       )}
     </div>

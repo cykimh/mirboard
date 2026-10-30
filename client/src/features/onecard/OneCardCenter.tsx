@@ -9,6 +9,7 @@ import {
 } from '@/types/onecard';
 import type { LastRace } from './onecardStore';
 import { OneCardCardChip, toneOf } from './OneCardCardChip';
+import { drawCount } from './onecardRules';
 
 /** 방금 닫힌 경쟁의 한 줄 안내 — 화면과 스크린리더 알림이 같은 문장을 쓴다. */
 export function raceResultText(race: LastRace, nameOf: (seat: number) => string): string {
@@ -41,6 +42,8 @@ interface Props {
    * 그대로 보이고, 내려앉으면(null) 새 맨 위 카드로 바뀐다.
    */
   landingUnder?: { card: OneCardCard | null; declaredSuit: OneCardSuit | null } | null;
+  /** D-152 — 내 차례면 더미를 눌러 먹는다(아래 "먹기" 버튼과 같은 일). 없으면 더미는 그림이다. */
+  onDraw?: () => void;
   /** D-144 — 맨 위 바로 전에 낸 카드들(최근 것이 앞). D-150 — 맨 위 옆에 작게 겹친다. */
   discardTrail?: OneCardCard[];
 }
@@ -61,6 +64,7 @@ export function OneCardCenter({
   nameOf,
   landingUnder = null,
   discardTrail = [],
+  onDraw,
 }: Props) {
   const shownTop = landingUnder ? landingUnder.card : topCard;
   const shownSuit = landingUnder ? landingUnder.declaredSuit : declaredSuit;
@@ -69,18 +73,33 @@ export function OneCardCenter({
   return (
     <section className="oc-center" aria-label="테이블">
       <div className="oc-piles">
-        {/* D-151 — 작은 뒷면 몇 겹 위에 장수만. 전체 문장은 보조기기·마우스 오버로. */}
-        <div
-          className="oc-pile"
-          role="img"
-          aria-label={`뽑을 더미 ${drawPileCount}장`}
-          title={`뽑을 더미 ${drawPileCount}장`}
-          data-empty={drawPileCount === 0 ? '' : undefined}
-        >
-          <span className="oc-pile-count" aria-hidden="true">
-            {drawPileCount}
-          </span>
-        </div>
+        {/* D-151 — 작은 뒷면 몇 겹 위에 장수만. 전체 문장은 보조기기·마우스 오버로. D-152 — 내 차례면 눌러서 먹는 버튼. */}
+        {onDraw ? (
+          <button
+            type="button"
+            className="oc-pile oc-pile-draw"
+            aria-label={`먹기 (${drawCount(attackStack)}장) — 뽑을 더미 ${drawPileCount}장`}
+            title={`눌러서 먹기 (${drawCount(attackStack)}장)`}
+            data-empty={drawPileCount === 0 ? '' : undefined}
+            onClick={onDraw}
+          >
+            <span className="oc-pile-count" aria-hidden="true">
+              {drawPileCount}
+            </span>
+          </button>
+        ) : (
+          <div
+            className="oc-pile"
+            role="img"
+            aria-label={`뽑을 더미 ${drawPileCount}장`}
+            title={`뽑을 더미 ${drawPileCount}장`}
+            data-empty={drawPileCount === 0 ? '' : undefined}
+          >
+            <span className="oc-pile-count" aria-hidden="true">
+              {drawPileCount}
+            </span>
+          </div>
+        )}
         <div className="oc-top">
           {shownTop ? (
             <OneCardCardChip card={shownTop} />

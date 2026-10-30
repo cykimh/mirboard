@@ -861,3 +861,26 @@ describe('맨 위 아래 이전 카드 — 화면 기억 (D-144)', () => {
     expect(store().discardTrail).toEqual([]);
   });
 });
+
+describe('방금 먹은 카드 — 비행 효과 (D-152)', () => {
+  beforeEach(() => store().applySnapshot(snapshot()));
+
+  it('CARDS_DRAWN 이 순번·좌석·장수를 남긴다 — 같은 이벤트를 두 번 적용해도 같다', () => {
+    const drawn = ev('CARDS_DRAWN', { seat: 2, count: 2, reason: 'ATTACK', handCount: 9, drawPileCount: 20 }, 31);
+    store().applyEvent(drawn);
+    const first = store().lastDraw;
+    store().applyEvent(drawn);
+
+    expect(first).toEqual({ seq: 31, seat: 2, count: 2 });
+    expect(store().lastDraw).toBe(first);
+  });
+
+  it('처음과 reset 뒤에는 없고, 순번 없는 이벤트로는 남기지 않는다', () => {
+    expect(store().lastDraw).toBeNull();
+    store().applyEvent(ev('CARDS_DRAWN', { seat: 2, count: 1, reason: 'TURN', handCount: 8, drawPileCount: 21 }));
+    expect(store().lastDraw).toBeNull();
+    store().applyEvent(ev('CARDS_DRAWN', { seat: 2, count: 1, reason: 'TURN', handCount: 8, drawPileCount: 21 }, 40));
+    store().reset('r-1');
+    expect(store().lastDraw).toBeNull();
+  });
+});
