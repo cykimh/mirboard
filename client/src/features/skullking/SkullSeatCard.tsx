@@ -1,3 +1,5 @@
+import type { Tier } from '@/api/users';
+import { TierBadge } from '@/components/TierBadge';
 import type { SeatChatLine } from '@/features/chat/useSeatChatLines';
 import { avatarSrc } from '@/api/avatar';
 import { animalFor } from '@/components/avatarGlyph';
@@ -30,6 +32,8 @@ interface Props {
   onKick?: () => void;
   /** D-163 — 이 사람의 최근 채팅 한 줄(5초). */
   chat?: SeatChatLine;
+  /** D-166 — 이 사람의 계급(봇·게스트는 없음). */
+  tier?: Tier;
 }
 
 /**
@@ -52,6 +56,7 @@ export function SkullSeatCard({
   voice,
   onKick,
   chat,
+  tier,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -94,6 +99,7 @@ export function SkullSeatCard({
           ) : null}
           <span className="sk-seat-glyph">{glyph}</span>
         </span>
+        {tier && <TierBadge tier={tier} size={16} />}
         <span className="sk-seat-name" title={name}>
           {name}
         </span>

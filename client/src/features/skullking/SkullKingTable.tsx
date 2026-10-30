@@ -1,3 +1,5 @@
+import type { Tier } from '@/api/users';
+import { TierBadge } from '@/components/TierBadge';
 import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
@@ -45,6 +47,8 @@ interface Props {
   onAbort?: () => void;
   /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이). */
   onKick?: (userId: number) => void;
+  /** D-166 — userId → 이 게임 계급(봇·게스트 없음). 좌석 이름 옆 아이콘. */
+  tiers?: Record<number, Tier>;
 }
 
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
@@ -72,6 +76,7 @@ export function SkullKingTable({
   onBackToRoom,
   onAbort,
   onKick,
+  tiers = {},
   practice = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -140,6 +145,7 @@ export function SkullKingTable({
         slot={slot}
         voice={voiceStatusOf(voice, playerIds[seat])}
         chat={chatLines[seat]}
+        tier={tiers[playerIds[seat]]}
       />
     );
   };
@@ -321,6 +327,7 @@ export function SkullKingTable({
             className={`sk-me${myTurn ? ' sk-me-turn' : ''}`}
             style={{ ['--sk-accent' as string]: seatAccent(mySeat) }}
           >
+            {tiers[playerIds[mySeat]] && <TierBadge tier={tiers[playerIds[mySeat]]} size={18} />}
             <strong>{nameOf(mySeat)} (나)</strong>
             {chatLines[mySeat] && (
               <span key={chatLines[mySeat].id} className="sk-seat-chat" title={chatLines[mySeat].text}>
