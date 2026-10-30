@@ -186,6 +186,9 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 | `COMING_SOON` | "Coming Soon" | 404 `GAME_NOT_AVAILABLE` | **끝까지 정상 진행** |
 | `DISABLED` | 안 보인다 | 404 `GAME_NOT_AVAILABLE` | **멈춘다** — 액션은 `GAME_NOT_AVAILABLE`, resync 404, 봇·턴·경쟁 타이머가 오류로 멈추고 '나가기'도 404. 방은 마지막 입장부터 6시간(방 해시 TTL)까지 IN_GAME 으로 남고 결과는 기록되지 않는다 |
 
+**D-168 — 티츄·스컬킹도 같은 손잡이가 있다**: `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS`. 지금(2026-10-30~)은 원카드만 하려고
+`fly.toml [env]` 에 둘 다 `COMING_SOON` 이다 — 다시 열려면 그 두 줄을 지우고 배포한다(시크릿이 아니라 공개 설정이라 배포로 바뀐다).
+
 **되돌리기는 `COMING_SOON` 으로만 한다.** 새 방만 막고 진행 중인 판은 끝까지 간다. 이미 열려 있던 WAITING 원카드 방은
 허브 목록에 남고 입장·준비·시작이 된다(막는 것은 방 만들기뿐이다).
 

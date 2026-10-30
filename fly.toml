@@ -48,6 +48,10 @@ primary_region = "nrt"
   SPRING_PROFILES_ACTIVE = "prod"
   MIRBOARD_PORT = "8080"
   MIRBOARD_MESSAGING_GATEWAY = "redis"
+  # D-168 — 당분간 원카드만(사용자 결정 2026-10-30). 티츄·스컬킹은 "준비 중" — 새 방만 막고 진행 중인 판은 끝까지 간다.
+  # 다시 열기: 두 줄을 지우거나 AVAILABLE 로 바꾸고 배포.
+  MIRBOARD_TICHU_STATUS = "COMING_SOON"
+  MIRBOARD_SKULLKING_STATUS = "COMING_SOON"
 
 # VM 사이즈 — shared-cpu-1x / 512MB 면 친구 5~10명 시연 + Spring Boot 부팅 충분.
 [[vm]]
