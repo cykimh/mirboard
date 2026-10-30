@@ -31,6 +31,8 @@ const sendReaction = vi.fn();
 const sendVoice = vi.fn();
 let voiceHandler: ((m: unknown) => void) | null = null;
 let socketConnected = true;
+// D-159 — 음성 대화는 스위치로 꺼 두었다. 여기선 켜진 흐름(D-155·D-156)을 계속 본다 — 꺼진 모양은 VoiceControls.test.
+vi.mock('@/features/voice/voiceSwitch', () => ({ VOICE_ENABLED: true }));
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: socketConnected,
