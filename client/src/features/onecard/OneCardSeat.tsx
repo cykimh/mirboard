@@ -42,6 +42,8 @@ interface Props {
   reaction?: string;
   /** D-155 — 음성 대화 참여 중(on) / 나와의 연결 실패(failed). */
   voice?: 'on' | 'failed';
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(바로 탈주 처리). */
+  onKick?: () => void;
 }
 
 /**
@@ -60,6 +62,7 @@ export function OneCardSeat({
   slot,
   reaction,
   voice,
+  onKick,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -141,6 +144,11 @@ export function OneCardSeat({
         <span className="status-tag oc-seat-tag">
           {out ? ELIMINATED_LABEL[seat.eliminated!] : '연결 끊김'}
         </span>
+      )}
+      {!out && isDisconnected && onKick && (
+        <button type="button" className="oc-badge oc-seat-kick" onClick={onKick}>
+          내보내기
+        </button>
       )}
     </div>
   );

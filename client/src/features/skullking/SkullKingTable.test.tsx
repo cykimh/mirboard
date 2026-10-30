@@ -59,6 +59,7 @@ const seatOf = (n: number, over: Partial<SeatView> = {}): SeatView => ({
 function seed(opts: {
   seatCount: number;
   mySeat: number;
+  disconnectedSeats?: number[];
   phase: SkullKingPhase;
   hand?: SkullCard[];
   currentTurnSeat?: number;
@@ -99,7 +100,7 @@ function seed(opts: {
       opts.mySeat >= 0
         ? { seat: opts.mySeat, hand: opts.hand ?? [], myBid: null }
         : null,
-    disconnectedSeats: [],
+    disconnectedSeats: opts.disconnectedSeats ?? [],
     chips: null,
   });
 }
@@ -951,5 +952,22 @@ describe('음성 대화 (D-156)', () => {
       await Promise.resolve();
     });
     expect(container.querySelector('[data-seat="2"] .sk-seat-voice')).toHaveTextContent('🎧');
+  });
+});
+
+/** D-162 — 방장은 끊긴 좌석에서 [내보내기]를 누른다. */
+describe('끊긴 사람 내보내기 (D-162)', () => {
+  it('방장에게만 끊긴 좌석의 [내보내기]가 있고 누르면 그 사람을 넘긴다', () => {
+    const onKick = vi.fn();
+    seed({ seatCount: 3, mySeat: 0, phase: 'PLAYING', disconnectedSeats: [1] });
+    const view = renderTable({ playerIds: playerIds(3), onKick });
+
+    fireEvent.click(screen.getByRole('button', { name: '내보내기' }));
+    expect(onKick).toHaveBeenCalledWith(101);
+
+    view.unmount();
+    seed({ seatCount: 3, mySeat: 0, phase: 'PLAYING', disconnectedSeats: [1] });
+    renderTable({ playerIds: playerIds(3) });
+    expect(screen.queryByRole('button', { name: '내보내기' })).toBeNull();
   });
 });

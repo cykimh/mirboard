@@ -63,6 +63,8 @@ interface Props {
   roomFinished?: boolean;
   /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(이 세션이 전이를 봐 결과 화면을 유지하는 중). [대기실로]가 부른다. */
   onBackToRoom?: () => void;
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이). */
+  onKick?: (userId: number) => void;
   /** D-161 — 방장이 대기실에서 고른 "원카드!/잡기!" 버튼 크기(방 설정). */
   raceButtonSize?: RaceButtonSize;
 }
@@ -92,6 +94,7 @@ export function OneCardTable({
   roomFinished = false,
   onBackToRoom,
   raceButtonSize = 'MEDIUM',
+  onKick,
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const {
@@ -172,6 +175,7 @@ export function OneCardTable({
         isTurn={turnSeat === seat}
         isNext={nextSeat === seat}
         isDisconnected={s.disconnectedSeats.has(seat)}
+        onKick={onKick && !roomFinished && seat !== mySeat ? () => onKick(playerIds[seat]) : undefined}
         side={side}
         slot={slot}
         reaction={liveReactions[seat]?.emoji}

@@ -12,6 +12,7 @@ import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
 import { ParticipantCard } from '@/features/lobby/ParticipantCard';
 import { RoomSettingsPanel } from '@/features/lobby/RoomSettingsPanel';
+import { showToast } from '@/components/toast/toastStore';
 import { JoinBlockedPanel, type JoinBlock } from '@/features/lobby/JoinBlockedPanel';
 import {
   SpectateNotice,
@@ -488,6 +489,30 @@ export function RoomPage() {
     room.playerIds.every((uid, seat) => uid === user.userId || (room.botSeats ?? []).includes(seat));
   const onAbort = canAbortGame ? handleAbort : undefined;
 
+  // D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리 — 기록은 3분 유예가 끝났을 때와 같다). 티츄는 탈주가 곧 판 끝이라 알린다.
+  async function handleKick(userId: number) {
+    if (!token || !room) return;
+    const name = usernames[userId] ?? `#${userId}`;
+    const tichu = room.gameType === 'TICHU';
+    const message = tichu
+      ? `${name}님을 내보낼까요? 티츄는 팀전이라 이 판이 끝나요(상대 팀 승리). ${name}님은 탈주로 기록돼요.`
+      : `${name}님을 내보낼까요? 탈주로 기록되고 남은 사람끼리 계속해요.`;
+    if (!window.confirm(message)) return;
+    try {
+      await roomsApi.kick(token, roomId, userId);
+    } catch (err) {
+      if (!(err instanceof ApiError)) {
+        showToast('내보내지 못했어요 — 다시 눌러 주세요', 'error');
+        return;
+      }
+      showToast(
+        err.code === 'PLAYER_CONNECTED' ? `${name}님이 다시 연결됐어요 — 내보내지 않았어요` : errorText(err, '내보내지 못했어요'),
+        'error',
+      );
+    }
+  }
+  const onKick = iAmHost && !iAmSpectator ? handleKick : undefined;
+
   // D-143 — 친구와 하기 대기실은 [준비] 없이 방장이 시작한다. 사람이 게임 최소 인원 이상이면 켜진다(정원이 다 차도 저절로 시작하지 않는다 —
   // 서버도 같은 조건, room_start_now.lua). 최소 인원을 모르면(카탈로그 실패) 켜 두고 서버가 판단한다.
   // D-161 — 준비는 방장 아닌 사람(봇 제외)만 센다. 방장은 시작 버튼이 곧 준비다.
@@ -592,6 +617,7 @@ export function RoomPage() {
       spectatorCount: (room.spectatorIds ?? []).length,
       onExit: handleLeave,
       onAbort,
+      onKick,
       practice: room.fillWithBots ?? false,
       roomFinished,
       onBackToRoom,
@@ -629,6 +655,7 @@ export function RoomPage() {
             isHost={iAmHost}
             onExit={handleLeave}
             onAbort={onAbort}
+            onKick={onKick}
             onBackToRoom={onBackToRoom}
           />
         </Suspense>

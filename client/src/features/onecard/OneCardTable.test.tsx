@@ -74,6 +74,7 @@ interface SeedOptions {
   result?: OneCardMatchResult | null;
   /** D-131 — resync 의 남은 턴 시간(ms). */
   turnRemainingMs?: number | null;
+  disconnectedSeats?: number[];
 }
 
 function seed(opts: SeedOptions) {
@@ -102,7 +103,7 @@ function snapshotOf(opts: SeedOptions) {
     tableView: table,
     privateHand:
       opts.mySeat >= 0 ? { seat: opts.mySeat, hand: opts.hand ?? [], handVersion: 1 } : null,
-    disconnectedSeats: [],
+    disconnectedSeats: opts.disconnectedSeats ?? [],
     chips: null,
     turnRemainingMs: opts.turnRemainingMs ?? null,
   };
@@ -1192,6 +1193,28 @@ describe('OneCardTable — 차례 강조 (D-160)', () => {
     fireEvent.click(screen.getByRole('button', { name: '효과음' }));
     act(() => useOneCardStore.setState({ turnSeat: 0 }));
     expect(vibrate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** D-162 — 방장은 끊긴 좌석에서 [내보내기]를 누른다. 방장이 아니면(onKick 없음) 버튼이 없다. */
+describe('OneCardTable — 끊긴 사람 내보내기 (D-162)', () => {
+  it('방장에게는 끊긴 좌석에만 [내보내기]가 있고 누르면 그 사람을 넘긴다', () => {
+    const onKick = vi.fn();
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, disconnectedSeats: [2] });
+    renderTable({ playerIds: [100, 101, 102], onKick });
+
+    const buttons = screen.getAllByRole('button', { name: '내보내기' });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onKick).toHaveBeenCalledWith(102);
+  });
+
+  it('방장이 아니면 끊긴 좌석에도 버튼이 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, disconnectedSeats: [2] });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.queryByRole('button', { name: '내보내기' })).toBeNull();
+    expect(screen.getByText('연결 끊김')).toBeInTheDocument();
   });
 });
 

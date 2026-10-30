@@ -54,6 +54,15 @@ export const roomsApi = {
     });
   },
 
+  /** D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리). 응답 본문 없음. */
+  kick(token: string, roomId: string, userId: number): Promise<void> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/kick`, {
+      method: 'POST',
+      token,
+      body: { userId },
+    });
+  },
+
   get(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}`, { token });
   },

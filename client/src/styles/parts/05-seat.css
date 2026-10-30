@@ -36,6 +36,15 @@
   font-weight: 700;
 }
 
+/* D-162 — 방장만 보는 [내보내기](끊긴 좌석). */
+.status-tag.kick-btn {
+  border: 1px solid #e5484d;
+  background: #fff;
+  color: #c62f3a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* 티츄 선언 시 좌석 사각형이 아니라 아바타 원이 깜빡이고 종(🔔) 배지가 흔들린다(#3,#4). */
 .seat-avatar.declared {
   animation: seat-declared-blink 0.7s ease-in-out infinite;

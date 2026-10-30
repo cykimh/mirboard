@@ -170,6 +170,15 @@ public class GlobalExceptionHandler {
                         Map.of("roomId", e.roomId())));
     }
 
+    /** D-162 — 아직 연결된 사람은 내보내지 않는다. */
+    @ExceptionHandler(com.mirboard.infra.ws.PlayerStillConnectedException.class)
+    public ResponseEntity<ApiErrorEnvelope> handlePlayerStillConnected(
+            com.mirboard.infra.ws.PlayerStillConnectedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("PLAYER_CONNECTED", "아직 연결돼 있는 사람은 내보낼 수 없어요",
+                        Map.of("userId", e.userId())));
+    }
+
     @ExceptionHandler(NotInRoomException.class)
     public ResponseEntity<ApiErrorEnvelope> handleNotInRoom(NotInRoomException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

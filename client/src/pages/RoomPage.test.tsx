@@ -49,6 +49,7 @@ vi.mock('@/api/rooms', () => ({
     startNow: vi.fn(),
     join: vi.fn(),
     updateSettings: vi.fn(),
+    kick: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1476,5 +1477,77 @@ describe('RoomPage — 대기실 설정·준비 (D-161)', () => {
     });
     expect(roomsApi.setReady).toHaveBeenCalledWith('tok', 'r1', true);
     expect(screen.getByRole('button', { name: '준비 취소' })).toBeInTheDocument();
+  });
+});
+
+/** D-162 — 방장은 게임 중 끊긴 사람을 내보낸다. 확인 창을 거치고, 티츄는 판이 끝난다고 알린다. */
+describe('RoomPage — 끊긴 사람 내보내기 (D-162)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    oneCardProps.length = 0;
+    tichuProps.length = 0;
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }, { userId: 2, username: '철수' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+    useToastStore.getState().clear();
+  });
+
+  const inGame = (gameType: string) =>
+    ({ ...ROOM, gameType, status: 'IN_GAME', playerIds: [1, 2, 3, 4], playerCount: 4 }) as Room;
+
+  it('방장 게임판에 onKick 을 넘기고, 확인하면 내보낸다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.kick).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+    await waitFor(() => expect(oneCardProps.at(-1)?.onKick).toBeTypeOf('function'));
+
+    await act(async () => {
+      await (oneCardProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(confirm.mock.calls[0][0]).toContain('남은 사람끼리 계속해요');
+    expect(roomsApi.kick).toHaveBeenCalledWith('tok', 'r1', 2);
+    confirm.mockRestore();
+  });
+
+  it('티츄는 판이 끝난다고 알리고, 취소하면 부르지 않는다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom(inGame('TICHU'));
+    await screen.findByTestId('tichu-table');
+
+    await act(async () => {
+      await (tichuProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(confirm.mock.calls[0][0]).toContain('이 판이 끝나요');
+    expect(roomsApi.kick).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('그새 다시 연결됐으면(PLAYER_CONNECTED) 토스트로 알린다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.kick).mockRejectedValue(new ApiError(409, { error: { code: 'PLAYER_CONNECTED', message: 'connected' } }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+
+    await act(async () => {
+      await (oneCardProps.at(-1)!.onKick as (id: number) => Promise<void>)(2);
+    });
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['철수님이 다시 연결됐어요 — 내보내지 않았어요']);
+    confirm.mockRestore();
+  });
+
+  it('방장이 아니면 onKick 이 없다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: '철수' } as never });
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    renderRoom(inGame('ONE_CARD'));
+    await screen.findByTestId('onecard-table');
+
+    expect(oneCardProps.at(-1)?.onKick).toBeUndefined();
   });
 });

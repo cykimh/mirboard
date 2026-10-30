@@ -266,6 +266,32 @@ class RoomModesIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    /** D-162 — 게임 중 끊긴 사람(이 테스트의 손님은 소켓을 연 적이 없다)은 방장이 바로 탈주 처리한다. 원카드는 남은 사람끼리 계속한다. */
+    @Test
+    void the_host_kicks_a_disconnected_player_and_the_match_goes_on() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmkickhost"), registerAndLogin("rmkicka"), registerAndLogin("rmkickb"));
+        String roomId = friendsRoom(players, "ONE_CARD", null);
+        String host = bearer(players.get(0));
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", host)).andExpect(status().isOk());
+        long target = userIds.get(players.get(1));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", bearer(players.get(2)))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + target + "}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + userIds.get(players.get(0)) + "}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("NOT_IN_ROOM"));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/kick").header("Authorization", host)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userId\":" + target + "}"))
+                .andExpect(status().isNoContent());
+        assertThat(roomStatus(roomId, players.get(0))).isEqualTo("IN_GAME");
+        mockMvc.perform(get("/api/rooms/" + roomId + "/resync").header("Authorization", host))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tableView.seats[1].eliminated").value("DESERTED"));
+    }
+
     // ---------- helpers ----------
 
     private JsonNode create(String token, Map<String, Object> body) throws Exception {

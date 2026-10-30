@@ -42,6 +42,8 @@ interface Props {
   onBackToRoom?: () => void;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
+  /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이). */
+  onKick?: (userId: number) => void;
 }
 
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
@@ -68,6 +70,7 @@ export function SkullKingTable({
   roomFinished = false,
   onBackToRoom,
   onAbort,
+  onKick,
   practice = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -128,6 +131,7 @@ export function SkullKingTable({
         isNext={nextSeat === seat}
         isDeserted={s.desertedSeats.includes(seat)}
         isDisconnected={s.disconnectedSeats.has(seat)}
+        onKick={onKick && !roomFinished && seat !== mySeat ? () => onKick(playerIds[seat]) : undefined}
         bidsRevealed={revealed}
         side={side}
         slot={slot}

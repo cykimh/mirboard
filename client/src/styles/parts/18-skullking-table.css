@@ -289,6 +289,15 @@ html:not(.dark) .sk-felt .sk-stat-key {
   align-self: flex-start;
 }
 
+/* D-162 — 방장만 보는 [내보내기](끊긴 좌석). */
+.sk-seat-kick {
+  align-self: flex-start;
+  border-color: #c62f3a;
+  color: #c62f3a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* D-132 — 일반 진행 기준 다음 차례. 좌석 안에서는 위 테두리에 걸친 꼬리표라 좁은 옆줄 좌석의 이름 칸을 줄이지 않는다.
    "나" 줄에서는 다른 배지처럼 줄 안에 놓인다. 천 위에서도 읽히게 배경을 불투명하게 둔다. */
 .sk-seat-next {
