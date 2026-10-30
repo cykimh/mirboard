@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { showToast } from '@/components/toast/toastStore';
 import { shareRoomLink, type ShareEnv, type ShareResult } from './shareRoomLink';
 
 interface InviteLinkButtonProps {
@@ -25,9 +26,6 @@ function selectAll(input: HTMLInputElement) {
   input.select();
   input.setSelectionRange(0, input.value.length);
 }
-
-/** 공유됨·복사됨 알림이 떠 있는 시간. */
-const NOTICE_MS = 3000;
 
 /**
  * 브라우저 기본 공유 환경. 공유창은 휴대폰·태블릿(굵은 포인터)에서만 쓴다 — Web Share API 는 데스크톱 Chrome·Edge(Windows)·
@@ -63,6 +61,9 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
         env ?? browserShareEnv(),
       );
       setResult(outcome);
+      // D-157 — 공유됨·복사됨은 토스트로(버튼 줄에 글을 끼우면 줄이 일그러졌다).
+      if (outcome === 'shared') showToast('초대 링크를 보냈어요');
+      else if (outcome === 'copied') showToast('링크를 복사했어요');
     } finally {
       setBusy(false);
     }
@@ -77,35 +78,19 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
     selectAll(input);
   }, [result]);
 
-  // 공유됨·복사됨은 짧은 알림 — 잠시 뒤 내린다.
-  useEffect(() => {
-    if (result !== 'shared' && result !== 'copied') return;
-    const timer = setTimeout(() => setResult(null), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [result]);
-
-  // D-146 — 대기실 위쪽 버튼 줄에 버튼 하나만 둔다. 설명은 title 로, 알림은 버튼 아래에 떠서 줄 높이를 바꾸지 않는다. 수동 입력란은
+  // D-146 — 대기실 위쪽 버튼 줄에 버튼 하나만 둔다. 설명은 title 로, 알림은 토스트로(D-157). 수동 입력란은
   // 버튼 줄 아래에 한 줄을 다 쓰고 끼어든다(줄 안 flex-wrap 의 basis-full) — 버튼에 붙여 띄우면 휴대폰에서 화면 왼쪽 밖으로 나갔다.
   return (
     <>
-      <div className="relative">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleClick}
-          disabled={busy}
-          title={full ? '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요' : '링크를 보내면 친구가 바로 이 방에 들어와요'}
-        >
-          초대 링크
-        </Button>
-        {/* 라이브 영역은 늘 두고 내용만 바꾼다 — 영역과 내용을 함께 삽입하면 일부 스크린 리더가 읽지 않는다. */}
-        <p
-          role="status"
-          className="absolute right-0 top-full z-10 mt-1 whitespace-nowrap text-xs text-muted-foreground"
-        >
-          {result === 'shared' ? '초대 링크를 보냈어요' : result === 'copied' ? '링크를 복사했어요' : ''}
-        </p>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleClick}
+        disabled={busy}
+        title={full ? '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요' : '링크를 보내면 친구가 바로 이 방에 들어와요'}
+      >
+        초대 링크
+      </Button>
       {result === 'manual' && (
         <div className="order-last flex min-w-64 basis-full flex-col gap-1.5">
           <Label htmlFor="invite-link-manual">직접 복사해 주세요</Label>

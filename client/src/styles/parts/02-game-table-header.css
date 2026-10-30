@@ -84,8 +84,3 @@
 
 /* Phase 8E — 보드 풍 원형 좌석 배치. 본인 시점 기준 S(하단)/W(우)/N(상단)/E(좌).
    absolute positioning 으로 4개 좌석 + 중앙 currentTop. */
-/* D-156 — 음성 대화: 마이크를 못 쓰면 머리 줄에 이유 한 줄. */
-.voice-error {
-  font-size: 12px;
-  color: var(--color-danger, #d9483d);
-}

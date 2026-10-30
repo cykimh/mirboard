@@ -160,11 +160,7 @@ export function GameTable({
         unreadCount={unreadCount}
         onAbort={onAbort}
         voiceControls={
-          <VoiceControls
-            voice={voice}
-            buttonClassName={buttonVariants({ variant: 'outline', size: 'sm' })}
-            errorClassName="voice-error"
-          />
+          <VoiceControls voice={voice} buttonClassName={buttonVariants({ variant: 'outline', size: 'sm' })} />
         }
       />
 

@@ -310,7 +310,7 @@ export function OneCardTable({
           >
             {muted ? '🔇' : '🔊'}
           </button>
-          <VoiceControls voice={voice} buttonClassName="oc-badge" errorClassName="oc-badge oc-voice-error" />
+          <VoiceControls voice={voice} buttonClassName="oc-badge" />
           {!spectator && (
             <span className="oc-reaction-bar">
               <button

@@ -212,7 +212,7 @@ export function SkullKingTable({
           <span className="sk-badge">{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
         <div className="sk-header-badges">
-          <VoiceControls voice={voice} buttonClassName="sk-badge" errorClassName="sk-badge sk-voice-error" />
+          <VoiceControls voice={voice} buttonClassName="sk-badge" />
           <button
             type="button"
             className="sk-badge"

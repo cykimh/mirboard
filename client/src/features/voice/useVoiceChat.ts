@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { showToast } from '@/components/toast/toastStore';
 
 /** 클라 → 서버 (`/app/room/{id}/voice`). `to` 는 OFFER·ANSWER·ICE 의 받는 사람. */
 export interface VoiceSignal {
@@ -44,7 +45,6 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
   const [micOn, setMicOn] = useState(false);
   const [members, setMembers] = useState<number[]>([]);
   const [peerState, setPeerState] = useState<Record<number, PeerState>>({});
-  const [micError, setMicError] = useState<string | null>(null);
 
   const joinedRef = useRef(false);
   const sendRef = useRef(send);
@@ -228,10 +228,10 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
       for (const pc of pcs.current.values()) {
         for (const t of pc.getTransceivers()) await t.sender.replaceTrack(localTrack.current);
       }
-      setMicError(null);
       setMicOn(true);
     } catch {
-      setMicError('마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요');
+      // D-157 — 머리 줄에 글을 끼우지 않고 토스트로 알린다.
+      showToast('마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요', 'error');
     }
   }, [micOn]);
 
@@ -240,7 +240,7 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
   leaveRef.current = leave;
   useEffect(() => () => leaveRef.current(), []);
 
-  return { joined, micOn, micError, members, peerState, join, leave, toggleMic };
+  return { joined, micOn, members, peerState, join, leave, toggleMic };
 }
 
 /** 좌석 표시용 — 그 사람이 음성 대화에 있으면 on, 나와의 연결이 실패했으면 failed, 아니면 없음. */

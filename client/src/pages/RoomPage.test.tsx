@@ -1,10 +1,11 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 import { ApiError } from '@/api/client';
 import type { JoinOrReconnectResponse } from '@/api/rooms';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useToastStore } from '@/components/toast/toastStore';
 import { markSpectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import { GAME_TUTORIALS } from '@/features/tutorial/gameTutorials';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
@@ -471,7 +472,10 @@ describe('RoomPage — 초대 링크 (D-133)', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: '초대 링크' }));
 
-      expect(await screen.findByText('링크를 복사했어요')).toBeInTheDocument();
+      // D-157 — 알림은 토스트(앱에 하나뿐인 Toaster 가 그린다 — 여기선 스토어로 본다).
+      await waitFor(() =>
+        expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('링크를 복사했어요'),
+      );
       expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/rooms/r1`);
     } finally {
       delete (navigator as { clipboard?: unknown }).clipboard;

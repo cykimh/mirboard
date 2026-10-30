@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVoiceChat, type VoiceMessage, type VoiceSignal } from './useVoiceChat';
+import { useToastStore } from '@/components/toast/toastStore';
 
 /** jsdom 에는 WebRTC 가 없다 — 신호 흐름만 본다. */
 class FakePC {
@@ -206,5 +207,23 @@ describe('useVoiceChat — 신호 흐름 (D-155)', () => {
     });
 
     expect(hook.result.current.peerState[9]).toBe('failed');
+  });
+
+  // D-157 — 마이크를 못 쓰면 머리 줄에 글을 끼우지 않고 토스트(오류)로 알린다.
+  it('마이크 권한이 거절되면 오류 토스트를 띄우고 마이크는 꺼진 채다', async () => {
+    useToastStore.getState().clear();
+    getUserMedia.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
+    const { hook } = setup(5);
+    act(() => hook.result.current.join());
+
+    await act(async () => {
+      await hook.result.current.toggleMic();
+    });
+
+    expect(hook.result.current.micOn).toBe(false);
+    expect(useToastStore.getState().toasts).toEqual([
+      expect.objectContaining({ message: '마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요', tone: 'error' }),
+    ]);
+    useToastStore.getState().clear();
   });
 });

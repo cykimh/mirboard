@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InviteLinkButton } from './InviteLinkButton';
+import { Toaster } from '@/components/toast/Toaster';
+import { useToastStore } from '@/components/toast/toastStore';
 import type { ShareEnv } from './shareRoomLink';
 
 /**
  * D-133 — 대기실 "초대 링크" 버튼. 공유·복사는 `shareRoomLink` 가 하고 버튼은 결과만 그린다:
- * 공유됨·복사됨은 짧은 알림, 둘 다 안 되면(카톡 같은 앱 내 브라우저) 링크가 **선택된** 입력란, 취소는 아무것도 안 보인다.
+ * 공유됨·복사됨은 토스트(D-157), 둘 다 안 되면(카톡 같은 앱 내 브라우저) 링크가 **선택된** 입력란, 취소는 아무것도 안 보인다.
  */
 
 const ORIGIN = 'https://mirboard.test';
@@ -13,17 +15,22 @@ const LINK = `${ORIGIN}/rooms/r1`;
 
 function renderButton(env: ShareEnv) {
   render(
-    <InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" env={env} origin={ORIGIN} />,
+    <>
+      <InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" env={env} origin={ORIGIN} />
+      <Toaster />
+    </>,
   );
   return screen.getByRole('button', { name: '초대 링크' });
 }
+
+afterEach(() => useToastStore.getState().clear());
 
 describe('InviteLinkButton — 결과별 표시 (D-133)', () => {
   it('공유창이 있으면 방 주소 그대로를 게임·방 이름과 함께 공유하고 "보냈어요"를 알린다', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     fireEvent.click(renderButton({ share }));
 
-    expect(await screen.findByText('초대 링크를 보냈어요')).toHaveAttribute('role', 'status');
+    expect(screen.getByTestId('toaster')).toContainElement(await screen.findByText('초대 링크를 보냈어요'));
     expect(share).toHaveBeenCalledWith({
       title: '원카드 같이 해요',
       text: '금요일 한 판',
@@ -35,7 +42,7 @@ describe('InviteLinkButton — 결과별 표시 (D-133)', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     fireEvent.click(renderButton({ clipboard: { writeText } }));
 
-    expect(await screen.findByText('링크를 복사했어요')).toHaveAttribute('role', 'status');
+    expect(screen.getByTestId('toaster')).toContainElement(await screen.findByText('링크를 복사했어요'));
     expect(writeText).toHaveBeenCalledWith(LINK);
     expect(screen.queryByRole('textbox')).toBeNull();
   });
@@ -164,7 +171,12 @@ describe('InviteLinkButton — 기본 경로는 휴대폰만 공유창 (D-133)',
 
   it('데스크톱(마우스)이면 공유창이 있어도 링크를 복사한다', async () => {
     installBrowser(false);
-    render(<InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" origin={ORIGIN} />);
+    render(
+      <>
+        <InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" origin={ORIGIN} />
+        <Toaster />
+      </>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '초대 링크' }));
 
@@ -175,7 +187,12 @@ describe('InviteLinkButton — 기본 경로는 휴대폰만 공유창 (D-133)',
 
   it('휴대폰(굵은 포인터)이면 공유창을 연다', async () => {
     installBrowser(true);
-    render(<InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" origin={ORIGIN} />);
+    render(
+      <>
+        <InviteLinkButton roomId="r1" roomName="금요일 한 판" gameName="원카드" origin={ORIGIN} />
+        <Toaster />
+      </>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '초대 링크' }));
 

@@ -6,15 +6,13 @@ interface Props {
   voice: Voice;
   /** 게임판 머리 줄 버튼 모양(원카드 `.oc-badge`, 스컬킹 `.sk-badge`, 티츄 shadcn outline). */
   buttonClassName: string;
-  /** 마이크 오류 문구 모양. */
-  errorClassName: string;
 }
 
 /**
  * D-155·D-156 — 음성 대화 버튼 둘(세 게임판 공통). 🎧 참여(듣기 — 마이크를 묻지 않는다)·🎙 마이크(참여 중에만, 처음 켤 때 권한).
- * 마이크를 못 쓰면 이유를 곁에 띄운다.
+ * 마이크를 못 쓰면 이유는 토스트로 뜬다(D-157 — 머리 줄에 글을 끼우면 버튼 줄이 일그러졌다).
  */
-export function VoiceControls({ voice, buttonClassName, errorClassName }: Props) {
+export function VoiceControls({ voice, buttonClassName }: Props) {
   return (
     <>
       <button
@@ -38,11 +36,6 @@ export function VoiceControls({ voice, buttonClassName, errorClassName }: Props)
       >
         {voice.micOn ? '🎙' : '🎙✕'}
       </button>
-      {voice.micError && (
-        <span className={errorClassName} role="alert">
-          {voice.micError}
-        </span>
-      )}
     </>
   );
 }
