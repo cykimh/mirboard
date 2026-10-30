@@ -31,6 +31,10 @@ spring:
         # 기본값 true 는 매니지드 Redis(D-39 Upstash) 시절의 안전한 기본. D-114 의 Fly 자체
         # Redis 는 사설망이라 시크릿 MIRBOARD_REDIS_SSL=false 로 끈다.
         enabled: ${MIRBOARD_REDIS_SSL:true}
+      # D-148 — 운영 머신(shared-cpu-1x)이 CPU 크레딧을 다 쓰면 부팅이 수 분으로 늘고, Lettuce 핸드셰이크(명령 타임아웃 2s)가
+      # 그 사이에 끝나지 못해 기동 실패 → 재시작 → 크레딧이 더 안 차는 고리에 빠졌다. 운영만 넉넉히 잡는다.
+      timeout: 10s
+      connect-timeout: 10s
 
 # Phase 6D — 멀티 인스턴스 fan-out 기본값을 redis 로. fly.toml [env] 에서도 셋팅했지만
 # yml override 로 안전망 한 겹 더.
