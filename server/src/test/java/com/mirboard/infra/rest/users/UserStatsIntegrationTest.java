@@ -26,7 +26,7 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * Phase 8D — GET /api/users/{id}/stats 검증. 신규 가입 사용자는 rating 1000 +
- * tier MISSILE_1(D-164 — 시작 1000점).
+ * tier MISSILE(D-164·D-167 — 시작 1000점).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -73,7 +73,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.winCount").value(0))
                 .andExpect(jsonPath("$.loseCount").value(0))
                 .andExpect(jsonPath("$.rating").value(1000))
-                .andExpect(jsonPath("$.tier").value("MISSILE_1"));
+                .andExpect(jsonPath("$.tier").value("MISSILE"));
     }
 
     @Test
@@ -120,7 +120,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.games.length()").value(2))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].rating").value(985))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].desertCount").value(1))
-                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].tier").value("BULLET_3"));
+                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].tier").value("BULLET"));
     }
 
     @Test

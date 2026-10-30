@@ -244,9 +244,12 @@ class DistributedInfraIT {
     void concurrent_pollers_never_receive_the_same_deadline_twice() throws Exception {
         // 8개 폴러가 동시에 덤벼도 200개 항목이 정확히 한 번씩만 배분돼야 한다.
         // 여기서 중복이 나면 2인스턴스에서 중복 자동행동(턴 두 번 넘김)이 난다.
+        // 종류는 앱 폴러(DeadlinePoller — game·desertion·turn·waiting-leave 를 250ms 마다 뺀다)가 모르는 것이어야 한다.
+        // "turn" 을 쓰면 컨텍스트의 진짜 폴러가 가끔 몇 개를 먼저 가져가 개수가 모자랐다(CI 간헐 실패, 2026-10-30).
+        String kind = "it-concurrency";
         int items = 200;
         for (int i = 0; i < items; i++) {
-            deadlines.schedule("turn", "room-" + i, Duration.ZERO);
+            deadlines.schedule(kind, "room-" + i, Duration.ZERO);
         }
 
         int pollers = 8;
@@ -257,7 +260,7 @@ class DistributedInfraIT {
             pool.submit(() -> {
                 start.await();
                 for (int r = 0; r < 20; r++) {
-                    collected.addAll(deadlines.pollDue("turn"));
+                    collected.addAll(deadlines.pollDue(kind));
                 }
                 return null;
             });

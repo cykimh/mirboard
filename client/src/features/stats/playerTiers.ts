@@ -6,7 +6,7 @@ export function isGuestName(username: string | undefined): boolean {
 }
 
 /** 한 판도 안 한 사람의 계급 — 시작 1000점(D-164). */
-export const STARTING_TIER: Tier = 'MISSILE_1';
+export const STARTING_TIER: Tier = 'MISSILE';
 
 /**
  * D-166 — 게임판 좌석에 붙일 계급(userId → 계급). 봇·게스트는 빼고, 전적을 아직 못 받은 사람도 뺀다(받으면 붙는다). 그 게임을

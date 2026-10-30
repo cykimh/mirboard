@@ -1,18 +1,13 @@
 import { apiRequest } from './client';
 
-/** D-164 — 포트리스2식 21단계(낮은 것부터). 서버 `Tier` 미러 — 점수 구간 + 금훈장 이상은 순위로 왕관. */
+/** D-164·D-167 — 포트리스2식 16단계(낮은 것부터). 서버 `Tier` 미러 — 점수 구간 + 금훈장 이상은 순위로 왕관. */
 export type Tier =
   | 'SKULL'
-  | 'BULLET_1'
-  | 'BULLET_2'
-  | 'BULLET_3'
-  | 'MISSILE_1'
-  | 'MISSILE_2'
-  | 'MISSILE_3'
+  | 'BULLET'
+  | 'MISSILE'
   | 'BRONZE_STAR'
   | 'SILVER_STAR'
   | 'GOLD_STAR'
-  | 'DOUBLE_GOLD_STAR'
   | 'BRONZE_MEDAL'
   | 'SILVER_MEDAL'
   | 'GOLD_MEDAL'

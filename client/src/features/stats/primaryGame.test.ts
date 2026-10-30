@@ -5,7 +5,7 @@ import type { GameRecord } from '@/api/users';
 const rec = (gameType: string, win: number, lose: number, rating = 1000): GameRecord => ({
   gameType,
   rating,
-  tier: 'MISSILE_1',
+  tier: 'MISSILE',
   winCount: win,
   loseCount: lose,
   desertCount: 0,

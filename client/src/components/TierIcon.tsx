@@ -11,26 +11,21 @@ const METAL: Record<Metal, { stops: [string, string, string]; edge: string }> = 
 
 type Shape =
   | { kind: 'skull' }
-  | { kind: 'bullet'; count: number }
-  | { kind: 'missile'; count: number }
-  | { kind: 'star'; metal: Metal; count: number }
+  | { kind: 'bullet' }
+  | { kind: 'missile' }
+  | { kind: 'star'; metal: Metal }
   | { kind: 'medal'; metal: Metal }
   | { kind: 'badge'; metal: Metal }
   | { kind: 'crown'; metal: Metal; royal?: boolean };
 
-/** D-166 — 계급마다 그림. 총알·미사일 I~III 은 개수로, 금속 계급은 색으로 구분한다(포트리스2 이름·순서, 그림은 우리가 그렸다). */
+/** D-166 — 계급마다 그림 하나. 금속 계급은 색으로 구분한다(포트리스2 이름·순서, 그림은 우리가 그렸다). D-167 — 여러 개짜리 계급은 없다. */
 export const TIER_SHAPE: Record<Tier, Shape> = {
   SKULL: { kind: 'skull' },
-  BULLET_1: { kind: 'bullet', count: 1 },
-  BULLET_2: { kind: 'bullet', count: 2 },
-  BULLET_3: { kind: 'bullet', count: 3 },
-  MISSILE_1: { kind: 'missile', count: 1 },
-  MISSILE_2: { kind: 'missile', count: 2 },
-  MISSILE_3: { kind: 'missile', count: 3 },
-  BRONZE_STAR: { kind: 'star', metal: 'bronze', count: 1 },
-  SILVER_STAR: { kind: 'star', metal: 'silver', count: 1 },
-  GOLD_STAR: { kind: 'star', metal: 'gold', count: 1 },
-  DOUBLE_GOLD_STAR: { kind: 'star', metal: 'gold', count: 2 },
+  BULLET: { kind: 'bullet' },
+  MISSILE: { kind: 'missile' },
+  BRONZE_STAR: { kind: 'star', metal: 'bronze' },
+  SILVER_STAR: { kind: 'star', metal: 'silver' },
+  GOLD_STAR: { kind: 'star', metal: 'gold' },
   BRONZE_MEDAL: { kind: 'medal', metal: 'bronze' },
   SILVER_MEDAL: { kind: 'medal', metal: 'silver' },
   GOLD_MEDAL: { kind: 'medal', metal: 'gold' },
@@ -56,7 +51,7 @@ function Gradient({ id, metal }: { id: string; metal: Metal }) {
 
 const STAR_PATH = 'M12 2.2l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 16.8 6.1 20l1.3-6.5L2.5 9l6.6-.8z';
 
-/** 한 칸(24×24) 그림. 같은 그림 여러 개는 겹쳐 늘어놓는다. */
+/** 한 칸(24×24) 그림. */
 function Glyph({ shape, gid, size }: { shape: Shape; gid: string; size: number }) {
   const svg = { width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true } as const;
   switch (shape.kind) {
@@ -159,18 +154,12 @@ function Glyph({ shape, gid, size }: { shape: Shape; gid: string; size: number }
   }
 }
 
-/** 같은 그림 개수(총알·미사일 I~III, 쌍금별). */
-function countOf(shape: Shape): number {
-  return 'count' in shape ? shape.count : 1;
-}
-
 /**
  * D-166 — 계급 색 그림 아이콘. 글자는 없고 이름은 `label`(title·aria-label)로만 — 길게 누르거나 마우스를 올리면 보인다.
  */
 export function TierIcon({ tier, label, size = 20 }: { tier: Tier; label: string; size?: number }) {
   const gid = `tier-${useId().replace(/:/g, '')}`;
-  const shape = TIER_SHAPE[tier] ?? TIER_SHAPE.MISSILE_1;
-  const n = countOf(shape);
+  const shape = TIER_SHAPE[tier] ?? TIER_SHAPE.MISSILE;
   return (
     <span
       role="img"
@@ -179,11 +168,7 @@ export function TierIcon({ tier, label, size = 20 }: { tier: Tier; label: string
       data-tier={tier}
       style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, flexShrink: 0 }}
     >
-      {Array.from({ length: n }, (_, i) => (
-        <span key={i} style={{ marginLeft: i === 0 ? 0 : -size * 0.35, display: 'inline-flex' }}>
-          <Glyph shape={shape} gid={`${gid}-${i}`} size={size} />
-        </span>
-      ))}
+      <Glyph shape={shape} gid={gid} size={size} />
     </span>
   );
 }

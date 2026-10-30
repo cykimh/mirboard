@@ -259,7 +259,7 @@ describe('GameHubPage — 로비 정리 (D-146)', () => {
     stats.mockResolvedValue({
       userId: 1,
       username: 'me',
-      games: [{ gameType: 'TICHU', rating: 1200, tier: 'DOUBLE_GOLD_STAR', winCount: 3, loseCount: 2, desertCount: 1 }],
+      games: [{ gameType: 'TICHU', rating: 1200, tier: 'GOLD_STAR', winCount: 3, loseCount: 2, desertCount: 1 }],
     });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
   });
