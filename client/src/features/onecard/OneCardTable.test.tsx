@@ -153,7 +153,12 @@ describe('OneCardTable — 좌석', () => {
     expect(seven.querySelectorAll('.oc-seat-hand-card')).toHaveLength(7);
     expect(within(seven).getByRole('img', { name: '남은 손패 7장' })).toBeInTheDocument();
     expect(seven.textContent).not.toMatch(/7\s*장/);
-    expect(container.querySelector('[data-seat="2"]')!.querySelectorAll('.oc-seat-hand-card')).toHaveLength(19);
+    // D-151 — 10장을 넘으면 뒷면 10장 + 줄임표(…). 정확한 장수는 보조기기·마우스 오버로.
+    const nineteen = container.querySelector('[data-seat="2"]') as HTMLElement;
+    expect(nineteen.querySelectorAll('.oc-seat-hand-card')).toHaveLength(10);
+    expect(nineteen.querySelector('.oc-seat-hand-more')).toHaveTextContent('…');
+    expect(within(nineteen).getByRole('img', { name: '남은 손패 19장' })).toBeInTheDocument();
+    expect(seven.querySelector('.oc-seat-hand-more')).toBeNull();
   });
 
   it('탈락한 좌석에는 사유를 단다', () => {
@@ -245,7 +250,10 @@ describe('OneCardTable — 내기·먹기', () => {
     const center = screen.getByRole('region', { name: '테이블' });
     expect(within(center).getByRole('img', { name: '하트 7' })).toBeInTheDocument();
     expect(within(center).getByText('지정 ♣ 클로버')).toBeInTheDocument();
-    expect(within(center).getByText('뽑을 더미 30장')).toBeInTheDocument();
+    // D-151 — 더미는 작은 뒷면 위에 장수만 적는다. 전체 문장은 보조기기·마우스 오버로.
+    const pile = within(center).getByRole('img', { name: '뽑을 더미 30장' });
+    expect(pile).toHaveTextContent(/^30$/);
+    expect(within(center).queryByText('뽑을 더미 30장')).toBeNull();
     expect(within(center).getByText('#101 차례')).toBeInTheDocument();
   });
 

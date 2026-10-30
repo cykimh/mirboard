@@ -205,24 +205,14 @@ button.oc-badge {
   padding: 8px 6px;
 }
 
-/* 390px 3인 이상이면 가운데 칸이 ≈138px(내용 ≈126px)다. 더미 뒷면(62px)·"뽑을 더미 N장"(≈80px)·맨 위 카드(≤480px 48px)를
+/* D-151 이전 메모 — 더미가 크던(62px + "뽑을 더미 N장") 때의 폭 계산. 지금 더미는 40px 에 장수만이라 여유가 있다.
+   390px 3인 이상이면 가운데 칸이 ≈138px(내용 ≈126px)다. 더미 뒷면(62px)·"뽑을 더미 N장"(≈80px)·맨 위 카드(≤480px 48px)를
    그대로 두면 한 줄에 안 들어가 두 줄(천 +80px)이 되므로, 뒷면·문구 폭·간격을 화면 폭에 맞춰 줄인다(390px ≈110px — 문구는
    "뽑을 더미 / N장" 두 줄). 그래도 넘치면(7 의 지정 무늬 배지가 붙은 직후) 줄을 바꾼다 — 안 바꾸면 넘쳐 오른쪽 옆줄 좌석을
    덮는다. 넓은 화면은 62px·120px·24px 라 지금처럼 한 줄이다. */
 .oc-felt .oc-piles {
   flex-wrap: wrap;
   gap: 8px clamp(6px, 2vw, 24px);
-}
-
-.oc-felt .oc-pile-back {
-  width: clamp(40px, 11vw, 62px);
-  height: auto;
-  aspect-ratio: 62 / 88;
-}
-
-.oc-felt .oc-pile-count {
-  max-width: clamp(50px, 14vw, 120px);
-  text-align: center;
 }
 
 /* 가운데 배지는 칸 안에서 줄을 바꾼다 — .oc-badge 는 nowrap 이라 "guest-ab12cd34 차례"(≈137px)가 가운데 칸을 넘어 옆줄 좌석에
@@ -407,26 +397,56 @@ button.oc-badge {
   gap: 24px;
 }
 
+/* D-151 — 뽑을 더미: 맨 위 카드보다 작은 뒷면(40×56)에 아래로 두 겹이 비쳐 보이고(box-shadow), 가운데에 남은 장수. 비면 점선 칸. */
 .oc-pile {
+  box-sizing: border-box;
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 40px;
+  height: 56px;
+  border-radius: 6px;
+  border: 2px solid #f2f2f2;
+  background: repeating-linear-gradient(45deg, #3b5ba9, #3b5ba9 4px, #2f4c92 4px, #2f4c92 8px);
+  box-shadow:
+    2px 2px 0 -1px #2f4c92,
+    2px 2px 0 0 #f2f2f2,
+    4px 4px 0 -1px #2f4c92,
+    4px 4px 0 0 #f2f2f2,
+    4px 5px 4px rgba(0, 0, 0, 0.35);
 }
 
-.oc-pile-back {
-  display: block;
-  width: 62px;
-  height: 88px;
-  border-radius: 8px;
-  border: 2px solid #555555;
-  background: repeating-linear-gradient(45deg, #3b5ba9, #3b5ba9 6px, #2f4c92 6px, #2f4c92 12px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+.oc-pile[data-empty] {
+  border: 2px dashed var(--color-border);
+  background: transparent;
+  box-shadow: none;
 }
 
 .oc-pile-count {
+  min-width: 22px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
   font-size: 12px;
+  font-weight: 800;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.oc-pile[data-empty] .oc-pile-count {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* D-151 — 10장을 넘는 좌석은 뒷면 10장 뒤에 줄임표. */
+.oc-seat-hand-more {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  align-self: flex-end;
 }
 
 .oc-top {
