@@ -1,3 +1,4 @@
+import type { Tier } from '@/api/users';
 import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
@@ -52,6 +53,8 @@ interface GameTableProps {
   onAbort?: () => void;
   /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이 — 티츄는 판이 끝난다고 알린다). */
   onKick?: (userId: number) => void;
+  /** D-166 — userId → 티츄 계급(봇·게스트 없음). 좌석 이름 옆 아이콘. */
+  tiers?: Record<number, Tier>;
   /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(RoomPage 가 결과 화면을 유지하는 중). 매치 종료 화면의 [대기실로]가 부른다. */
   onBackToRoom?: () => void;
 }
@@ -78,6 +81,7 @@ export function GameTable({
   onExit,
   onAbort,
   onKick,
+  tiers,
   onBackToRoom,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
@@ -180,6 +184,7 @@ export function GameTable({
         chips={m.chips}
         disconnectedSeats={m.disconnectedSeats}
         onKickSeat={onKick ? (seat) => onKick(playerIds[seat]) : undefined}
+        tiers={tiers}
         spectator={spectator}
         turnSeconds={turnSeconds}
         isInDealing={m.isInDealing}

@@ -123,7 +123,7 @@ export function RankingCard({ token, games, myUserId }: Props) {
                     {e.username}
                   </TableCell>
                   <TableCell className="px-2 py-2">
-                    <TierBadge tier={e.tier} rating={e.rating} />
+                    <TierBadge tier={e.tier} size={24} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-2 py-2">
                     {e.winCount}승 {e.loseCount}패

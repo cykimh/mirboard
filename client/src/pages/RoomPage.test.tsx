@@ -1298,10 +1298,10 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
 
     const list = await screen.findByRole('list', { name: '참가자' });
     const host = await within(list).findByRole('listitem', { name: 'host' });
-    expect(await within(host).findByText('은메달')).toBeInTheDocument();
+    expect(await within(host).findByRole('img', { name: '은메달' })).toBeInTheDocument();
     expect(within(host).getByText('4승 1패 · 탈주 2')).toBeInTheDocument();
     expect(within(host).getByText('방장')).toBeInTheDocument();
-    expect(within(host).queryByText('은훈장')).toBeNull();
+    expect(within(host).queryByRole('img', { name: '은훈장' })).toBeNull();
 
     const friend = within(list).getByRole('listitem', { name: 'friend' });
     expect(await within(friend).findByText('첫 판')).toBeInTheDocument();

@@ -1251,6 +1251,19 @@ describe('OneCardTable — 좌석 채팅 한 줄 (D-163)', () => {
   });
 });
 
+/** D-166 — 좌석 이름 옆과 "(나)" 줄에 계급 아이콘. 받은 계급만(봇·게스트는 RoomPage 가 뺀다). */
+describe('OneCardTable — 좌석 계급 아이콘 (D-166)', () => {
+  it('계급이 있는 사람만 좌석·(나) 줄에 아이콘이 붙는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    const { container } = renderTable({ playerIds: [100, 101, 102], tiers: { 100: 'GOLD_STAR', 101: 'SKULL' } });
+
+    const seat1 = document.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(within(seat1).getByRole('img', { name: '해골' })).toBeInTheDocument();
+    expect((document.querySelector('[data-seat="2"]') as HTMLElement).querySelector('[data-tier]')).toBeNull();
+    expect(within(container.querySelector('.oc-me') as HTMLElement).getByRole('img', { name: '금별' })).toBeInTheDocument();
+  });
+});
+
 describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
   const seatEl = (seat: number) => document.querySelector(`[data-seat="${seat}"]`) as HTMLElement;
 

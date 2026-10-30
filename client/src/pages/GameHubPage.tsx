@@ -154,7 +154,7 @@ export function GameHubPage() {
             {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로. D-146 — 전적 합계는 뺐다(프로필에 있다). */}
             {primary && (
               <span title={`${gameName(primary.gameType)} 기준`}>
-                <TierBadge tier={primary.tier} rating={primary.rating} />
+                <TierBadge tier={primary.tier} size={24} />
               </span>
             )}
             <ThemeToggle />

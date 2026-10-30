@@ -57,7 +57,7 @@ export function ParticipantCard({
         <div className="flex flex-col items-center gap-1">
           {record ? (
             <>
-              <TierBadge tier={record.tier} rating={record.rating} />
+              <TierBadge tier={record.tier} size={24} />
               <span className="text-xs text-muted-foreground">{recordText(record)}</span>
             </>
           ) : (

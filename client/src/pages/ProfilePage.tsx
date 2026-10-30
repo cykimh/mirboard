@@ -68,7 +68,7 @@ export function ProfilePage() {
           </Avatar>
           <div className="flex flex-col gap-1">
             <span className="text-lg font-semibold">{user.username}</span>
-            {primary && <TierBadge tier={primary.tier} rating={primary.rating} />}
+            {primary && <TierBadge tier={primary.tier} size={24} />}
           </div>
           {/* D-117 — 게스트는 아바타를 못 바꾼다(서버도 403). 이유는 title 로. */}
           <Button

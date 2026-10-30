@@ -5,6 +5,7 @@ import { errorText } from '@/api/errorText';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi, type GameRecord } from '@/api/users';
 import { headToHeadText } from '@/features/stats/headToHead';
+import { playerTiers } from '@/features/stats/playerTiers';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
@@ -262,7 +263,8 @@ export function RoomPage() {
   );
 
   // D-146 — 대기실 참가자 카드의 계급·전적(이 방 게임 기준). 사람만 묻고, 참가자 집합·게임이 바뀔 때만 다시 묻는다.
-  const recordsWanted = room?.status === 'WAITING';
+  // D-166 — 게임 중에도 묻는다(게임판 좌석의 계급 아이콘).
+  const recordsWanted = room?.status === 'WAITING' || room?.status === 'IN_GAME';
   const humansKey = room
     ? room.playerIds.filter((_, seat) => !(room.botSeats ?? []).includes(seat)).join(',')
     : '';
@@ -283,8 +285,9 @@ export function RoomPage() {
     return () => {
       cancelled = true;
     };
+    // 상태가 바뀔 때(대기실 ↔ 게임)도 다시 묻는다 — 판이 끝나 돌아온 대기실 카드에 새 점수·계급이 보이게.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, humansKey, recordsWanted, room?.gameType]);
+  }, [token, humansKey, recordsWanted, room?.gameType, room?.status]);
 
   // D-154 — 대기실 참가자 카드의 "나와 N승 M패". 방 게임이 정해지면 한 번(참가자가 바뀌어도 내 전적 목록은 같다).
   const myId = user?.userId;
@@ -606,6 +609,8 @@ export function RoomPage() {
     BOARD_HELD_GAMES.has(room.gameType) &&
     (room.status === 'IN_GAME' || (boardHeld && roomFinished))
   ) {
+    // D-166 — 좌석 이름 옆 계급 아이콘(봇·게스트 제외).
+    const tiers = playerTiers(seats.playerIds, seats.botSeats, usernames, records);
     const board = {
       roomId: room.roomId,
       playerIds: seats.playerIds,
@@ -618,6 +623,7 @@ export function RoomPage() {
       onExit: handleLeave,
       onAbort,
       onKick,
+      tiers,
       practice: room.fillWithBots ?? false,
       roomFinished,
       onBackToRoom,
@@ -660,6 +666,7 @@ export function RoomPage() {
             onExit={handleLeave}
             onAbort={onAbort}
             onKick={onKick}
+            tiers={playerTiers(seats.playerIds, seats.botSeats, usernames, records)}
             onBackToRoom={onBackToRoom}
           />
         </Suspense>

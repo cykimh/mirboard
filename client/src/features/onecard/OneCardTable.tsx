@@ -1,3 +1,5 @@
+import type { Tier } from '@/api/users';
+import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
@@ -66,6 +68,8 @@ interface Props {
   onBackToRoom?: () => void;
   /** D-162 — 방장만: 끊긴 사람을 내보낸다(확인은 부르는 쪽이). */
   onKick?: (userId: number) => void;
+  /** D-166 — userId → 이 게임 계급(봇·게스트 없음). 좌석 이름 옆 아이콘. */
+  tiers?: Record<number, Tier>;
   /** D-161 — 방장이 대기실에서 고른 "원카드!/잡기!" 버튼 크기(방 설정). */
   raceButtonSize?: RaceButtonSize;
   /** D-165 — 방장이 대기실에서 고른 버튼 찾기 난이도(투명도). */
@@ -99,6 +103,7 @@ export function OneCardTable({
   raceButtonSize = 'MEDIUM',
   raceButtonVisibility = 'NORMAL',
   onKick,
+  tiers = {},
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const {
@@ -186,6 +191,7 @@ export function OneCardTable({
         slot={slot}
         reaction={liveReactions[seat]?.emoji}
         chat={chatLines[seat]}
+        tier={tiers[playerIds[seat]]}
         voice={voiceStatusOf(voice, playerIds[seat])}
       />
     );
@@ -460,6 +466,7 @@ export function OneCardTable({
             className={`oc-me${myTurn ? ' oc-me-turn' : ''}`}
             style={{ ['--oc-accent' as string]: seatAccent(mySeat) }}
           >
+            {tiers[playerIds[mySeat]] && <TierBadge tier={tiers[playerIds[mySeat]]} size={18} />}
             <strong>{nameOf(mySeat)} (나)</strong>
             {chatLines[mySeat] && (
               <span key={chatLines[mySeat].id} className="oc-seat-chat" title={chatLines[mySeat].text}>

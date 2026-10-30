@@ -34,12 +34,6 @@
   --radius: 0.5rem;
 
   /* D-147 — 계급 배지(TierBadge) 글자·테두리 색. 라이트는 흰 배경에서 대비 4.5:1 이상으로 진하게(TierBadge.test 가 계산). */
-  --tier-skull: #4b5563;
-  --tier-iron: #2f5d7c;
-  --tier-bronze: #8a5a2b;
-  --tier-silver: #5b6673;
-  --tier-gold: #8a6400;
-  --tier-royal: #8e3fbf;
 }
 
 .dark {
@@ -64,12 +58,6 @@
   --ring: 212.7 26.8% 83.9%;
 
   /* D-147 — 다크는 예전(Phase 8D) 색 그대로. */
-  --tier-skull: #9ca3af;
-  --tier-iron: #7fb0d4;
-  --tier-bronze: #a07045;
-  --tier-silver: #9aa3ad;
-  --tier-gold: #d9a93b;
-  --tier-royal: #cf6bff;
 }
 
 /* 레거시 의미 토큰 — 라이트 모드 전용 오버라이드(Slate light).

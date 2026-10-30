@@ -1,3 +1,5 @@
+import type { Tier } from '@/api/users';
+import { TierBadge } from '@/components/TierBadge';
 import type { MutableRefObject } from 'react';
 import { t } from '@/i18n/messages';
 import type { Card, TableView } from '@/types/tichu';
@@ -29,6 +31,8 @@ interface TableArenaProps {
   disconnectedSeats: Set<number>;
   /** D-162 — 방장만: 끊긴 좌석의 사람을 내보낸다(확인은 부르는 쪽이). */
   onKickSeat?: (seat: number) => void;
+  /** D-166 — userId → 계급(봇·게스트 없음). 좌석 이름 배지 앞 아이콘. */
+  tiers?: Record<number, Tier>;
   spectator: boolean;
   turnSeconds: number;
   isInDealing: boolean;
@@ -69,6 +73,7 @@ export function TableArena({
   chips,
   disconnectedSeats,
   onKickSeat,
+  tiers = {},
   spectator,
   turnSeconds,
   isInDealing,
@@ -123,6 +128,7 @@ export function TableArena({
               className={`seat-team ${viewPos === 'w' || viewPos === 'e' ? 'them' : 'us'}`}
               title={viewPos === 's' ? undefined : usernames[uid] ?? `#${uid}`}
             >
+              {tiers[uid] && <TierBadge tier={tiers[uid]} size={14} />}
               {viewPos === 's' ? '나' : usernames[uid] ?? `#${uid}`}
               {voiceOf?.(uid) && (
                 <span
