@@ -208,7 +208,7 @@ class FinishedRoomSeatIntegrationTest {
 
     /**
      * 방 액션 락을 못 잡아(다른 처리가 오래 쥠) 탈주 처리가 건너뛰어진 '나가기'도 좌석을 당기지
-     * 않는다. 좌석은 그대로 두고, 그 사람의 끊김은 유예 탈주(120s)가 처리한다.
+     * 않는다. 좌석은 그대로 두고, 그 사람의 끊김은 유예 탈주(180s)가 처리한다.
      */
     @Test
     void a_leave_that_cannot_take_the_room_lock_keeps_the_seat() throws Exception {

@@ -40,6 +40,7 @@ export function useRoomMeta(
       reconnectDelay: 2000,
       heartbeatIncoming: 10_000,
       heartbeatOutgoing: 10_000,
+      discardWebsocketOnCommFailure: true, // D-158 — 하트비트를 놓치면 소켓을 바로 버리고 다시 붙는다
       onConnect: () => {
         client.subscribe(`/topic/room/${roomId}/meta`, (frame) => {
           const env = JSON.parse(frame.body) as StompEnvelope<unknown>;

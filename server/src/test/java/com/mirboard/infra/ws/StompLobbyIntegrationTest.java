@@ -13,6 +13,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +27,7 @@ import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -122,6 +124,38 @@ class StompLobbyIntegrationTest {
         assertThat(env.get("type").asText()).isEqualTo("ROOM_UPDATED");
         assertThat(env.get("payload").get("gameType").asText()).isEqualTo("TICHU");
         assertThat(env.get("payload").get("name").asText()).isEqualTo("stomp-room");
+    }
+
+    /**
+     * D-158 — 서버가 STOMP 하트비트를 실제로 켠다. 예전엔 단순 브로커에 스케줄러가 없어 클라가 10초를 청해도 CONNECTED 가
+     * {@code 0,0} 이었다 — 망이 바뀌어 죽은 소켓을 클라가 몰라 "연결됨"인 채로 멈췄다.
+     */
+    @Test
+    void connected_frame_turns_on_heartbeats() throws Exception {
+        String token = registerAndLogin("stomphb", "validpass1");
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.initialize();
+        try {
+            WebSocketStompClient client = newStompClient();
+            client.setTaskScheduler(scheduler);
+            StompHeaders connect = new StompHeaders();
+            connect.add("Authorization", "Bearer " + token);
+            connect.setHeartbeat(new long[] {10_000, 10_000});
+            AtomicReference<StompHeaders> connected = new AtomicReference<>();
+
+            StompSession session = client.connectAsync(URI.create(wsUrl()), new WebSocketHttpHeaders(), connect,
+                    new StompSessionHandlerAdapter() {
+                        @Override
+                        public void afterConnected(StompSession s, StompHeaders headers) {
+                            connected.set(headers);
+                        }
+                    }).get(5, TimeUnit.SECONDS);
+
+            assertThat(connected.get().getHeartbeat()).containsExactly(10_000, 10_000);
+            session.disconnect();
+        } finally {
+            scheduler.shutdown();
+        }
     }
 
     // ---------- helpers ----------

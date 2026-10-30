@@ -36,7 +36,7 @@ public class DesertionGraceScheduler implements DeadlineHandler {
             RoomPresence presence,
             DesertionService desertion,
             DeadlineQueue deadlines,
-            @Value("${mirboard.desertion.grace-seconds:120}") long graceSeconds) {
+            @Value("${mirboard.desertion.grace-seconds:180}") long graceSeconds) {
         this.presence = presence;
         this.desertion = desertion;
         this.deadlines = deadlines;

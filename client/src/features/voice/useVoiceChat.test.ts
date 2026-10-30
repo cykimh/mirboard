@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useVoiceChat, type VoiceMessage, type VoiceSignal } from './useVoiceChat';
+import { MAX_VOICE_MEMBERS, VOICE_FULL_CHECK_MS, useVoiceChat, type VoiceMessage, type VoiceSignal } from './useVoiceChat';
 import { useToastStore } from '@/components/toast/toastStore';
 
 /** jsdom 에는 WebRTC 가 없다 — 신호 흐름만 본다. */
@@ -225,5 +225,50 @@ describe('useVoiceChat — 신호 흐름 (D-155)', () => {
       expect.objectContaining({ message: '마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요', tone: 'error' }),
     ]);
     useToastStore.getState().clear();
+  });
+
+  // D-158 — 메시라 인원이 늘면 폰마다 연결이 늘어 부담이 크다. 동시 참여는 4명까지 — 들어가 보니 이미 4명이면 스스로 나간다.
+  describe('인원 제한 (D-158)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      useToastStore.getState().clear();
+    });
+    afterEach(() => {
+      useToastStore.getState().clear();
+      vi.useRealTimers();
+    });
+
+    it('참여 직후 이미 4명이 있으면 나가고 꽉 찼다고 알린다', async () => {
+      expect(MAX_VOICE_MEMBERS).toBe(4);
+      const { hook, sent, receive } = setup(50);
+      act(() => hook.result.current.join());
+      for (const from of [9, 10, 11, 12]) await receive({ type: 'JOIN', from, data: null });
+
+      act(() => vi.advanceTimersByTime(VOICE_FULL_CHECK_MS));
+
+      expect(hook.result.current.joined).toBe(false);
+      expect(sent.at(-1)).toEqual({ type: 'LEAVE' });
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['음성 대화는 4명까지예요 — 지금 꽉 찼어요']);
+    });
+
+    it('나까지 4명이면 그대로 남는다', async () => {
+      const { hook, receive } = setup(50);
+      act(() => hook.result.current.join());
+      for (const from of [9, 10, 11]) await receive({ type: 'JOIN', from, data: null });
+
+      act(() => vi.advanceTimersByTime(VOICE_FULL_CHECK_MS));
+
+      expect(hook.result.current.joined).toBe(true);
+      expect(useToastStore.getState().toasts).toEqual([]);
+    });
+
+    it('이미 들어와 있던 사람은 뒤에 사람이 늘어도 나가지 않는다 — 판단은 참여 직후 한 번', async () => {
+      const { hook, receive } = setup(50);
+      act(() => hook.result.current.join());
+      act(() => vi.advanceTimersByTime(VOICE_FULL_CHECK_MS));
+      for (const from of [9, 10, 11, 12]) await receive({ type: 'JOIN', from, data: null });
+
+      expect(hook.result.current.joined).toBe(true);
+    });
   });
 });
