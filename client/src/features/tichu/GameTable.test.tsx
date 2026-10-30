@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Card, PrivateHand, Suit, TableView } from '@/types/tichu';
 
 /**
@@ -12,18 +12,29 @@ import type { Card, PrivateHand, Suit, TableView } from '@/types/tichu';
  * STOMP 만 모킹한다 — 나머지(store/SortableHand/CardChip/좌석)는 실물로 렌더해야
  * 조립 결과를 검증할 수 있기 때문.
  */
-const { sendAction, sendChat, sendReaction } = vi.hoisted(() => ({
+const { sendAction, sendChat, sendReaction, sendVoice, voice } = vi.hoisted(() => ({
+  sendVoice: vi.fn(),
+  voice: { handler: null as ((m: unknown) => void) | null },
   sendAction: vi.fn(),
   sendChat: vi.fn(),
   sendReaction: vi.fn(),
 }));
 
+// D-159 — 음성 대화는 스위치로 꺼 두었다. 여기선 켜진 흐름(D-155·D-156)을 계속 본다 — 꺼진 모양은 VoiceControls.test.
+vi.mock('@/features/voice/voiceSwitch', () => ({ VOICE_ENABLED: true }));
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: true,
     sendAction,
     sendChat,
     sendReaction,
+    sendVoice,
+    subscribeVoice: (h: (m: unknown) => void) => {
+      voice.handler = h;
+      return () => {
+        voice.handler = null;
+      };
+    },
     chatPanelOpenRef: { current: false },
   }),
 }));
@@ -446,5 +457,44 @@ describe('GameTable — 강제 종료 (D-135)', () => {
     renderTable();
 
     expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+  });
+});
+
+
+/** D-156 — 티츄에도 음성 대화(🎧 참여·🎙 마이크). 참여한 사람의 좌석 이름 옆에 🎧. */
+describe('GameTable — 음성 대화 (D-156)', () => {
+  beforeEach(() => {
+    sendVoice.mockReset();
+    vi.stubGlobal('RTCPeerConnection', class {
+      addTransceiver() {
+        return { direction: 'sendrecv', sender: { replaceTrack: async () => {} } };
+      }
+      getTransceivers() {
+        return [];
+      }
+      async createOffer() {
+        return { type: 'offer', sdp: '' };
+      }
+      async setLocalDescription() {}
+      close() {}
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('🎧 로 참여하면 방에 알리고, 참여한 사람 좌석에 🎧', async () => {
+    seed({ tableView: tableView(), privateHand: privateHand([card('JADE', 5)]) });
+    const { container } = renderTable();
+
+    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
+
+    await act(async () => {
+      voice.handler!({ type: 'JOIN', from: 30, data: null });
+      await Promise.resolve();
+    });
+    expect(container.querySelectorAll('.seat-voice')).toHaveLength(1);
+    expect(container.querySelector('.seat-voice')).toHaveTextContent('🎧');
   });
 });

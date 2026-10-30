@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { t } from '@/i18n/messages';
 import { Button } from '@/components/ui/button';
 import { REACTIONS } from '@/features/chat/reactionStore';
@@ -26,6 +26,8 @@ interface GameTableHeaderProps {
   unreadCount: number;
   /** D-135 — 방장 강제 종료(확인은 호출 측). 방장이고 나머지가 모두 봇일 때만 온다. */
   onAbort?: () => void;
+  /** D-156 — 음성 대화 버튼(🎧·🎙). 게임판이 만들어 넘긴다. */
+  voiceControls?: ReactNode;
 }
 
 /**
@@ -57,6 +59,7 @@ export function GameTableHeader({
   onToggleChat,
   unreadCount,
   onAbort,
+  voiceControls,
 }: GameTableHeaderProps) {
   const [reactionOpen, setReactionOpen] = useState(false);
 
@@ -99,6 +102,7 @@ export function GameTableHeader({
         )}
       </div>
       <div className="header-controls">
+        {voiceControls}
         <Button
           type="button"
           variant="outline"

@@ -30,6 +30,10 @@
 
 .header-controls {
   display: flex;
+  /* D-156 — 음성 버튼 2개가 붙어 휴대폰 폭을 넘으면 화면 밖으로 밀리지 않고 줄을 바꾼다. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;

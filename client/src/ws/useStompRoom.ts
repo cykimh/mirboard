@@ -116,6 +116,11 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
       brokerURL,
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 2000,
+      // D-158 — 하트비트 10초. 서버가 예전엔 0,0 으로 답해 꺼져 있었다 — 망이 바뀌어 죽은 소켓을 몰라 "연결됨"인 채로 멈췄다.
+      // 하트비트를 놓치면 닫힘 핸드셰이크를 기다리지 않고 소켓을 버리고 곧바로 다시 붙는다.
+      heartbeatIncoming: 10_000,
+      heartbeatOutgoing: 10_000,
+      discardWebsocketOnCommFailure: true,
       onConnect: () => {
         if (disposed) return;
         setConnected(true);
@@ -204,8 +209,8 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     client.activate();
     clientRef.current = client;
 
-    // 모바일 백그라운드(앱 전환·화면 잠금) 시 OS 가 소켓을 죽이는데, 게임 소켓엔
-    // 하트비트가 없어 클라가 끊김을 모를 수 있다. 포그라운드 복귀/네트워크 회복 때
+    // 모바일 백그라운드(앱 전환·화면 잠금) 시 OS 가 소켓을 죽인다. 하트비트(D-158)가 결국 알아채지만 백그라운드에선
+    // 타이머가 늦춰지므로 기다리지 않는다. 포그라운드 복귀/네트워크 회복 때
     // 소켓을 즉시 재가동하고 권위 스냅샷으로 화면을 곧바로 최신화(resync 는 REST 라
     // 소켓 상태와 무관). 이렇게 해야 탈주 유예가 끝나기 전에 빠르게 재접속된다.
     const onResume = () => {

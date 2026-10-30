@@ -5,6 +5,7 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { GameHubPage } from '@/pages/GameHubPage';
 import { RoomPage } from '@/pages/RoomPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { Toaster } from '@/components/toast/Toaster';
 
 /**
  * 토큰이 없으면 로그인 화면으로. D-133 — 가려던 경로(pathname + search)를 `state.from` 에 실어 보내, 초대 링크
@@ -52,6 +53,7 @@ export function App() {
         />
         <Route path="*" element={<Navigate to="/games" replace />} />
       </Routes>
+      <Toaster />
     </Router>
   );
 }

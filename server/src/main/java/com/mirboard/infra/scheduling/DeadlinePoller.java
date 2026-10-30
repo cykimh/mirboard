@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>대가: 타이머마다 최대 한 주기의 지연이 붙는다.</b> 정확한 시각에 깨는
  * {@code ScheduledExecutorService} 와 달리 "다음 폴링에서 발견"되기 때문이다.
- * 운영 값(턴 제한 30~90s, 탈주 유예 120s)에는 250ms 지터가 무의미하고 Redis 부하도
+ * 운영 값(턴 제한 30~90s, 탈주 유예 180s)에는 250ms 지터가 무의미하고 Redis 부하도
  * 인스턴스·kind 당 초당 4회 수준이라 무시할 만하다. 다만 <b>초 단위 타이머를 쓰는
  * 테스트에서는 이 지연이 그대로 증폭</b>되므로(turnSeconds=1 이면 최악 +25%),
  * 그런 테스트는 주기를 더 낮춰 잡는다.

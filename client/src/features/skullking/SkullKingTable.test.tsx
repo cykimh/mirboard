@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SkullKingTable } from './SkullKingTable';
 import { useSkullKingStore } from './skullkingStore';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -15,12 +15,23 @@ import type {
 
 // 소켓만 모킹하고 스토어는 실물을 seed 한다 (GameTable.test 와 같은 방식).
 const sendAction = vi.fn();
+const sendVoice = vi.fn();
+let voiceHandler: ((m: unknown) => void) | null = null;
+// D-159 — 음성 대화는 스위치로 꺼 두었다. 여기선 켜진 흐름(D-155·D-156)을 계속 본다 — 꺼진 모양은 VoiceControls.test.
+vi.mock('@/features/voice/voiceSwitch', () => ({ VOICE_ENABLED: true }));
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: true,
     sendAction: (a: Record<string, unknown>) => sendAction(a),
     sendChat: vi.fn(),
     sendReaction: vi.fn(),
+    sendVoice: (v: unknown) => sendVoice(v),
+    subscribeVoice: (h: (m: unknown) => void) => {
+      voiceHandler = h;
+      return () => {
+        voiceHandler = null;
+      };
+    },
     chatPanelOpenRef: { current: false },
   }),
 }));
@@ -902,5 +913,43 @@ describe('더블클릭으로 내기 (D-154)', () => {
     fireEvent.doubleClick(screen.getByRole('button', { name: '초록 5' }));
 
     expect(sendAction).not.toHaveBeenCalled();
+  });
+});
+
+
+/** D-156 — 스컬킹에도 음성 대화. 참여한 사람의 좌석 이름 옆에 🎧. */
+describe('음성 대화 (D-156)', () => {
+  beforeEach(() => {
+    sendVoice.mockReset();
+    vi.stubGlobal('RTCPeerConnection', class {
+      addTransceiver() {
+        return { direction: 'sendrecv', sender: { replaceTrack: async () => {} } };
+      }
+      getTransceivers() {
+        return [];
+      }
+      async createOffer() {
+        return { type: 'offer', sdp: '' };
+      }
+      async setLocalDescription() {}
+      close() {}
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('🎧 로 참여하면 방에 알리고, 참여한 사람 좌석에 🎧', async () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
+    const { container } = renderTable();
+
+    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
+
+    await act(async () => {
+      voiceHandler!({ type: 'JOIN', from: 102, data: null });
+      await Promise.resolve();
+    });
+    expect(container.querySelector('[data-seat="2"] .sk-seat-voice')).toHaveTextContent('🎧');
   });
 });

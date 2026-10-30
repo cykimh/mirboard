@@ -84,7 +84,7 @@ describe('App — 초대 링크로 들어온 사람 (D-133)', () => {
 
     fireEvent.click(screen.getByRole('link', { name: '회원가입' }));
     fireEvent.change(await screen.findByLabelText(/별명 \(한글/), { target: { value: '새내기' } });
-    fireEvent.change(screen.getByLabelText(/비밀번호 \(8~64자\)/), { target: { value: 'password1' } });
+    fireEvent.change(screen.getByLabelText(/비밀번호 \(4자 이상\)/), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '회원가입 후 로그인' }));
 
     expect(await screen.findByText('ROOM_PAGE abc-123')).toBeInTheDocument();

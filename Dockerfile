@@ -53,8 +53,9 @@ COPY --from=server-build --chown=mirboard:mirboard /app/server/build/libs/*.jar 
 
 EXPOSE 8080
 
-# Spring profile / GC / heap 한도 — Fly machine 의 RAM 75% 까지 사용.
+# Spring profile / GC / heap 한도. D-158 — 512MB·공유 1코어 머신용: 산 힙은 60MB 남짓인데 G1·힙 75% 로는 쉬는 상태에서도
+# VM 여유가 43MB 뿐이었다. SerialGC(1코어엔 가장 가볍다)·힙 55%·C1 만(C2 컴파일이 부팅 직후 공유 CPU 를 먹지 않게).
 ENV SPRING_PROFILES_ACTIVE=prod \
-    JAVA_TOOL_OPTIONS="-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+    JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:MaxRAMPercentage=55.0 -XX:TieredStopAtLevel=1 -Djava.security.egd=file:/dev/./urandom"
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

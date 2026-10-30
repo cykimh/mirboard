@@ -47,7 +47,7 @@ class AuthServiceTest {
 
     @Test
     void register_rejects_short_password() {
-        assertThatThrownBy(() -> service.register("alice01", "short"))
+        assertThatThrownBy(() -> service.register("alice01", "abc"))
                 .isInstanceOf(InvalidPasswordException.class);
     }
 

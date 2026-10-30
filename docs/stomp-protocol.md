@@ -10,6 +10,8 @@
 - 헤더: `Authorization: Bearer <JWT>` — `StompAuthChannelInterceptor` 가 CONNECT
   단계에서 검증(정지 계정 차단 포함, D-86), 실패 시 `ERROR` 프레임 후 연결 종료.
 - 클라는 CONNECT 직후 자기 큐 `/user/queue/...` 와 필요한 토픽을 구독한다.
+- 하트비트(D-158): 서버 CONNECTED `heart-beat:10000,10000`(단순 브로커 + `messageBrokerTaskScheduler`). 클라도 10초/10초를 청하고
+  하트비트를 놓치면 소켓을 버리고 2초 뒤 다시 붙는다(`discardWebsocketOnCommFailure`). 그 전엔 서버가 0,0 으로 답해 꺼져 있었다.
 - Phase 19(#1·#3, D-75): 서버가 `SessionSubscribeEvent`(`/topic/room/{id}`
   `/meta` `/chat` 정규식 매칭)로 세션→방을 `RoomPresence`(Redis 세션 카운터 —
   인스턴스 간 공유, D-96)에 기록하고, `SessionDisconnectEvent` 시
@@ -18,7 +20,7 @@
   (마지막이면 방 소멸), 같은 방 라이브 세션이 남으면 아무것도 안 함, 관전자는 즉시 stopSpectating
   (관전자0 방 소멸). 방 토픽 재구독이 대기실 유예를 조용히 취소한다(`RECONNECTED` 없음). **IN_GAME**:
   `DesertionGraceScheduler` 가 `mirboard.desertion.grace-seconds`(기본
-  **120s**, D-79) 후 재접속 없으면 탈주 확정(상대팀 승리, `desert_count`+1·
+  **180s**, D-79·D-158) 후 재접속 없으면 탈주 확정(상대팀 승리, `desert_count`+1·
   lose+1·ELO−). **FINISHED**: no-op.
 - **D-130 — 진행 킥.** 게임 토픽 그 자체(`/topic/room/{id}` — `/meta`·`/chat`·`/reaction` 은 아님)를 구독할 때와
   REST resync 응답 뒤에, 그 방의 **참가자·관전자**이면 서버가 그 방의 멈춘 진행을 다시 건다: 봇 차례인데 그

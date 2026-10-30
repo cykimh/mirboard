@@ -11,6 +11,8 @@ const calls: string[] = [];
 let activateCount = 0;
 let deactivateCount = 0;
 let clientCount = 0;
+/** 마지막으로 만든 Client 의 설정(D-158 — 하트비트). */
+let lastConfig: Record<string, unknown> = {};
 
 vi.mock('@stomp/stompjs', () => ({
   Client: class {
@@ -18,6 +20,7 @@ vi.mock('@stomp/stompjs', () => ({
     private onConnect: () => void;
     constructor(cfg: { onConnect: () => void }) {
       clientCount++;
+      lastConfig = cfg as unknown as Record<string, unknown>;
       this.onConnect = cfg.onConnect;
     }
     activate() {
@@ -296,6 +299,17 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
 
     expect(activateCount).toBeGreaterThan(beforeActivate);
     expect(resyncMock.mock.calls.length).toBeGreaterThan(beforeResync);
+  });
+
+  // D-158 — 서버가 하트비트를 켰다. 게임 소켓도 10초씩 주고받고, 놓치면 소켓을 바로 버리고 다시 붙는다.
+  it('하트비트 10초를 청하고 놓치면 소켓을 바로 버린다', () => {
+    renderHook(() => useStompRoom(ROOM, TOKEN, makeSink()));
+
+    expect(lastConfig).toMatchObject({
+      heartbeatIncoming: 10_000,
+      heartbeatOutgoing: 10_000,
+      discardWebsocketOnCommFailure: true,
+    });
   });
 
   it('언마운트 시 소켓을 정리한다', async () => {

@@ -1142,9 +1142,3 @@ button.oc-pile-draw {
   color: var(--oc-race-catch);
 }
 
-.oc-voice-error {
-  border-color: var(--oc-race-catch);
-  color: var(--oc-race-catch);
-  white-space: normal;
-}
-

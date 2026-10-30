@@ -48,7 +48,7 @@
 { "username": "철수", "password": "s3cret-pass" }
 ```
 - `username`(화면 이름 "별명", D-149): `^[가-힣A-Za-z0-9]{2,10}$` — 한글(완성형)·영문·숫자 2~10자. 서버가 NFC 로 맞춰 저장·조회(로그인도 같다).
-- `password`: 8~64자
+- `password`: 4~64자(D-156 — 문자 종류 제한 없음)
 
 응답 `201`
 ```json
@@ -126,7 +126,7 @@
 ```json
 { "currentPassword": "old-pass-1", "newPassword": "new-pass-12" }
 ```
-현재 비밀번호 재검증 → `PasswordPolicy`(8~64자) 검증 → BCrypt 재해시 후 `users.password_hash`
+현재 비밀번호 재검증 → `PasswordPolicy`(4~64자, D-156) 검증 → BCrypt 재해시 후 `users.password_hash`
 갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
 에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반),
 `GUEST_FORBIDDEN` (403 — 게스트 계정, D-117).
@@ -453,7 +453,7 @@ IN_GAME 방을 강제 종료. **방장 말고 모두 봇인 판에서만** 허�
 - WS 끊김(새로고침/탭닫기)은 서버 SessionDisconnect 후킹이 처리: WAITING
   플레이어는 준비 해제 + 유예(`mirboard.waiting.grace-seconds`, 기본 **120s**, D-134) 후
   미복귀 시 leave(같은 방 라이브 세션이 남아 있으면 아무것도 안 함), WAITING 관전자는 즉시
-  관전 종료, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`, 기본 **120s**, D-79) 후
+  관전 종료, IN_GAME 은 유예(`mirboard.desertion.grace-seconds`, 기본 **180s**, D-79·D-158) 후
   미복귀 시 탈주. 이 `/leave` 자체(명시적 '나가기')는 유예 없이 즉시다.
 
 ### GET `/api/rooms/{roomId}`

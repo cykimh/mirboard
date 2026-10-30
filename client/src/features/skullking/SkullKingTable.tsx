@@ -17,6 +17,8 @@ import { SkullMatchEndPanel, SkullRoundResultPanel } from './SkullScorePanels';
 import { SkullRoundHistoryModal } from './SkullRoundHistoryModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
+import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
+import { VoiceControls } from '@/features/voice/VoiceControls';
 import { SKULL_KING_TUTORIAL } from './tutorial/skullkingTutorial';
 
 interface Props {
@@ -69,11 +71,13 @@ export function SkullKingTable({
   practice = false,
 }: Props) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, chatPanelOpenRef } = useStompRoom(
+  const { connected, sendAction, sendChat, sendVoice, subscribeVoice, chatPanelOpenRef } = useStompRoom(
     roomId,
     token,
     skullkingRoomSink,
   );
+  // D-156 — 음성 대화(무료 P2P, D-155 와 같은 훅).
+  const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
   const [chatOpen, setChatOpen] = useState(false);
   const chatUnread = useRoomChatStore((s) => s.unreadCount);
   // D-120 — 점수표 모달·결과 패널 닫기는 서버 상태가 아니라 이 화면의 로컬 상태다.
@@ -127,6 +131,7 @@ export function SkullKingTable({
         bidsRevealed={revealed}
         side={side}
         slot={slot}
+        voice={voiceStatusOf(voice, playerIds[seat])}
       />
     );
   };
@@ -207,6 +212,7 @@ export function SkullKingTable({
           <span className="sk-badge">{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
         <div className="sk-header-badges">
+          <VoiceControls voice={voice} buttonClassName="sk-badge" />
           <button
             type="button"
             className="sk-badge"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { showToast } from '@/components/toast/toastStore';
 
 /** 클라 → 서버 (`/app/room/{id}/voice`). `to` 는 OFFER·ANSWER·ICE 의 받는 사람. */
 export interface VoiceSignal {
@@ -24,6 +25,15 @@ interface Options {
   subscribe: (handler: (m: VoiceMessage) => void) => () => void;
 }
 
+/**
+ * D-158 — 동시 참여 상한(나 포함). 메시라 N명이면 폰마다 연결 N-1 개를 맺고 소리를 N-1 번 보낸다 — 6명이면 휴대폰이 버거웠다.
+ * 서버는 참여자를 기억하지 않으므로 들어간 쪽이 스스로 판단한다: 참여 직후 {@link VOICE_FULL_CHECK_MS} 안에 JOIN 으로 답한 사람이
+ * 상한 이상이면 나간다. 동시에 둘이 들어오면 잠깐 넘칠 수 있다 — 드물고 해롭지 않다.
+ */
+export const MAX_VOICE_MEMBERS = 4;
+/** 참여 직후 기존 참여자의 JOIN 답을 기다리는 시간. */
+export const VOICE_FULL_CHECK_MS = 1500;
+
 /** 무료 공개 STUN 만 — 중계(TURN)는 두지 않는다(D-155, 무료 유지). */
 const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 
@@ -44,7 +54,6 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
   const [micOn, setMicOn] = useState(false);
   const [members, setMembers] = useState<number[]>([]);
   const [peerState, setPeerState] = useState<Record<number, PeerState>>({});
-  const [micError, setMicError] = useState<string | null>(null);
 
   const joinedRef = useRef(false);
   const sendRef = useRef(send);
@@ -54,6 +63,7 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
   const audios = useRef(new Map<number, HTMLAudioElement>());
   const localTrack = useRef<MediaStreamTrack | null>(null);
   const known = useRef(new Set<number>());
+  const fullCheck = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setState = (peer: number, state: PeerState | null) =>
     setPeerState((prev) => {
@@ -190,14 +200,11 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
     if (connected && joinedRef.current) sendRef.current({ type: 'JOIN' });
   }, [connected]);
 
-  const join = useCallback(() => {
-    if (joinedRef.current) return;
-    joinedRef.current = true;
-    setJoined(true);
-    sendRef.current({ type: 'JOIN' });
-  }, []);
-
   const leave = useCallback(() => {
+    if (fullCheck.current !== null) {
+      clearTimeout(fullCheck.current);
+      fullCheck.current = null;
+    }
     if (!joinedRef.current) return;
     joinedRef.current = false;
     sendRef.current({ type: 'LEAVE' });
@@ -210,6 +217,21 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
     setMicOn(false);
     setJoined(false);
   }, [closePeer]);
+
+  const join = useCallback(() => {
+    if (joinedRef.current) return;
+    joinedRef.current = true;
+    setJoined(true);
+    sendRef.current({ type: 'JOIN' });
+    // D-158 — 이미 꽉 찼으면(다른 참여자가 상한 이상) 스스로 나간다.
+    fullCheck.current = setTimeout(() => {
+      fullCheck.current = null;
+      if (joinedRef.current && known.current.size >= MAX_VOICE_MEMBERS) {
+        leave();
+        showToast(`음성 대화는 ${MAX_VOICE_MEMBERS}명까지예요 — 지금 꽉 찼어요`);
+      }
+    }, VOICE_FULL_CHECK_MS);
+  }, [leave]);
 
   const toggleMic = useCallback(async () => {
     if (!joinedRef.current) return;
@@ -228,10 +250,10 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
       for (const pc of pcs.current.values()) {
         for (const t of pc.getTransceivers()) await t.sender.replaceTrack(localTrack.current);
       }
-      setMicError(null);
       setMicOn(true);
     } catch {
-      setMicError('마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요');
+      // D-157 — 머리 줄에 글을 끼우지 않고 토스트로 알린다.
+      showToast('마이크를 쓸 수 없어요 — 브라우저에서 마이크를 허용해 주세요', 'error');
     }
   }, [micOn]);
 
@@ -240,5 +262,14 @@ export function useVoiceChat({ myUserId, connected, send, subscribe }: Options) 
   leaveRef.current = leave;
   useEffect(() => () => leaveRef.current(), []);
 
-  return { joined, micOn, micError, members, peerState, join, leave, toggleMic };
+  return { joined, micOn, members, peerState, join, leave, toggleMic };
+}
+
+/** 좌석 표시용 — 그 사람이 음성 대화에 있으면 on, 나와의 연결이 실패했으면 failed, 아니면 없음. */
+export function voiceStatusOf(
+  voice: Pick<ReturnType<typeof useVoiceChat>, 'members' | 'peerState'>,
+  userId: number | undefined,
+): 'on' | 'failed' | undefined {
+  if (userId == null || !voice.members.includes(userId)) return undefined;
+  return voice.peerState[userId] === 'failed' ? 'failed' : 'on';
 }
