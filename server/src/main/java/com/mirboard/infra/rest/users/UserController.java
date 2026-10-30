@@ -1,6 +1,7 @@
 package com.mirboard.infra.rest.users;
 
 import com.mirboard.domain.game.core.GameRegistry;
+import com.mirboard.domain.game.scoring.HeadToHeadService;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.User;
@@ -32,11 +33,14 @@ public class UserController {
     private final UserRepository userRepo;
     private final UserGameStatsService gameStats;
     private final GameRegistry games;
+    private final HeadToHeadService headToHead;
 
-    public UserController(UserRepository userRepo, UserGameStatsService gameStats, GameRegistry games) {
+    public UserController(UserRepository userRepo, UserGameStatsService gameStats, GameRegistry games,
+                          HeadToHeadService headToHead) {
         this.userRepo = userRepo;
         this.gameStats = gameStats;
         this.games = games;
+        this.headToHead = headToHead;
     }
 
     @GetMapping("/{userId}/stats")
@@ -51,6 +55,16 @@ public class UserController {
      * 좌석/참가자 표시용 userId→username 일괄 조회. `?ids=1,2,3` (최대 50개).
      * username 은 공개 정보(랭킹에도 노출)이며 그 외 식별 정보는 반환하지 않음(D-02).
      */
+    /** D-154 — 상대 전적(사람만, 게스트·봇 제외). gameType 을 주면 그 게임만. 많이 붙어 본 상대부터. */
+    @GetMapping("/{userId}/head-to-head")
+    public HeadToHeadResponse headToHead(@PathVariable long userId,
+                                         @RequestParam(required = false) String gameType) {
+        return new HeadToHeadResponse(headToHead.against(userId, gameType));
+    }
+
+    public record HeadToHeadResponse(List<HeadToHeadService.Entry> entries) {
+    }
+
     @GetMapping("/names")
     public NamesResponse names(@RequestParam List<Long> ids) {
         List<Long> distinct = ids.stream().distinct().limit(50).toList();

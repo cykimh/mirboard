@@ -45,6 +45,9 @@ interface CreateRoomModalProps {
  */
 type RoomMode = 'friends' | 'practice';
 
+/** D-154 — 게임이 턴 제한 선택지를 싣지 않았을 때(구 서버·픽스처). */
+const DEFAULT_TURN_CHOICES = [0, 30, 60, 90];
+
 /**
  * Phase 18(#2, D-74) 방 만들기 모달 — Phase 20b(D-76) shadcn Dialog 재디자인.
  * D-136 — 맨 위 "친구와 하기 / 봇과 연습". 봇 채우기 체크박스와 게스트 봇 기본값(D-117)은 없앴다.
@@ -267,15 +270,10 @@ export function CreateRoomModal({
               onValueChange={(v) => v !== '' && setTurnSeconds(Number(v))}
               className="justify-start"
             >
-              {/* 서버 RoomCreationDefaultsTest 가 이 선택지 목록(0·30·60·90)을 복사해 단언한다 — 같이 바꿀 것. */}
-              {[
-                { v: 0, label: '끔' },
-                { v: 30, label: '30초' },
-                { v: 60, label: '60초' },
-                { v: 90, label: '90초' },
-              ].map((o) => (
-                <ToggleGroupItem key={o.v} value={String(o.v)}>
-                  {o.label}
+              {/* D-154 — 선택지도 게임이 선언한다(카탈로그 turnSecondsChoices, 없으면 끔·30·60·90). */}
+              {(game?.turnSecondsChoices ?? DEFAULT_TURN_CHOICES).map((v) => (
+                <ToggleGroupItem key={v} value={String(v)}>
+                  {v === 0 ? '끔' : `${v}초`}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>

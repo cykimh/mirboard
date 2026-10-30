@@ -69,7 +69,8 @@ class RoomCreationDefaultsTest {
 
         assertThat(definitions).allSatisfy(def -> {
             assertThat(def.defaultPlayers()).as(def.id()).isBetween(def.minPlayers(), def.maxPlayers());
-            assertThat(def.defaultTurnSeconds()).as(def.id()).isIn(0, 30, 60, 90);
+            // D-154 — 처음 선택은 그 게임이 선언한 턴 제한 선택지 안이다.
+            assertThat(def.turnSecondsChoices()).as(def.id()).contains(def.defaultTurnSeconds());
         });
     }
 }

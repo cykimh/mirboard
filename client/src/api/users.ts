@@ -58,6 +58,20 @@ export interface NamesResponse {
   names: UserName[];
 }
 
+/** D-154 — 상대 전적 한 줄(사람만 — 게스트·봇은 서버가 뺀다). */
+export interface HeadToHeadEntry {
+  gameType: string;
+  opponentId: number;
+  opponentName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
+export interface HeadToHeadResponse {
+  entries: HeadToHeadEntry[];
+}
+
 export const usersApi = {
   stats(token: string, userId: number): Promise<UserStats> {
     return apiRequest(`/api/users/${userId}/stats`, { token });
@@ -68,6 +82,11 @@ export const usersApi = {
       `/api/users/ranking?limit=${limit}&gameType=${encodeURIComponent(gameType)}`,
       { token },
     );
+  },
+  /** D-154 — 상대 전적. gameType 을 주면 그 게임만. */
+  headToHead(token: string, userId: number, gameType?: string): Promise<HeadToHeadResponse> {
+    const q = gameType ? `?gameType=${encodeURIComponent(gameType)}` : '';
+    return apiRequest(`/api/users/${userId}/head-to-head${q}`, { token });
   },
   /** 좌석/참가자 표시용 userId→username 일괄 조회. */
   names(token: string, ids: number[]): Promise<NamesResponse> {

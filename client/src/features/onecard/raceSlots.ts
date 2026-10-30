@@ -48,3 +48,8 @@ export function racePosition(
 export function raceLeftCss(leftPercent: number): string {
   return `clamp(var(--oc-race-half-w), ${leftPercent}%, calc(100% - var(--oc-race-half-w)))`;
 }
+
+/** D-154 — 세로 위치(`top`)도 가장자리에서 버튼 반높이(`--oc-race-half-h`)만큼 안쪽으로(휴대폰에서 위쪽이 잘렸다). */
+export function raceTopCss(topPercent: number): string {
+  return `clamp(var(--oc-race-half-h), ${topPercent}%, calc(100% - var(--oc-race-half-h)))`;
+}

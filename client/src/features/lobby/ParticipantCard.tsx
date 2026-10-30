@@ -11,6 +11,8 @@ interface ParticipantCardProps {
   bot?: boolean;
   /** 이 방 게임의 전적. `null` 은 한 판도 안 함, `undefined` 는 아직 못 받음(빈칸). 봇은 쓰지 않는다. */
   record?: GameRecord | null;
+  /** D-154 — 나와의 상대 전적(이 방 게임). 나·봇·붙어 본 적 없으면 없음. */
+  versusMe?: string;
 }
 
 /** 승·패(탈주가 있으면 덧붙인다) — 프로필·랭킹과 같은 셈. */
@@ -22,7 +24,7 @@ export function recordText(r: GameRecord): string {
  * D-146 — 대기실 참가자 한 명. 목록 줄 대신 카드로 아바타·이름·방장/봇 표시와 **이 방 게임** 기준 계급·전적을 보인다(D-115 — 레이팅은
  * 게임별). 안 해 본 게임이면 "첫 판".
  */
-export function ParticipantCard({ userId, username, host = false, bot = false, record }: ParticipantCardProps) {
+export function ParticipantCard({ userId, username, host = false, bot = false, record, versusMe }: ParticipantCardProps) {
   return (
     <li aria-label={username} className="flex flex-col items-center gap-1.5 rounded-lg border bg-card p-3 text-center">
       <Avatar className="h-12 w-12">
@@ -48,6 +50,7 @@ export function ParticipantCard({ userId, username, host = false, bot = false, r
           )}
         </div>
       )}
+      {versusMe && <span className="text-xs font-medium text-primary">나와 {versusMe}</span>}
     </li>
   );
 }

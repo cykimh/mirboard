@@ -25,13 +25,15 @@ import type { GameSummary, Room, RoomOption } from '@/types/api';
 
 vi.mock('@/ws/useRoomMeta', () => ({ useRoomMeta: vi.fn() }));
 
-const { joinOrReconnect, spectate, loadGame, names, stats } = vi.hoisted(() => ({
+const { joinOrReconnect, spectate, loadGame, names, stats, headToHead } = vi.hoisted(() => ({
   joinOrReconnect: vi.fn(),
   spectate: vi.fn(),
   loadGame: vi.fn(),
   names: vi.fn(),
   // D-146 — 참가자 카드의 계급·전적. 기본은 기록 없음.
   stats: vi.fn((_token: string, _id: number) => Promise.resolve({ games: [] as unknown[] })),
+  // D-154 — 나와 상대 전적. 기본은 없음.
+  headToHead: vi.fn((_token: string, _id: number, _game?: string) => Promise.resolve({ entries: [] as unknown[] })),
 }));
 
 vi.mock('@/api/rooms', () => ({
@@ -48,7 +50,7 @@ vi.mock('@/api/rooms', () => ({
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
-vi.mock('@/api/users', () => ({ usersApi: { names, stats } }));
+vi.mock('@/api/users', () => ({ usersApi: { names, stats, headToHead } }));
 
 // 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120). 텍스트는
 // 대기실 튜토리얼 테스트(D-121)가 IN_GAME 분기 진입을 확인하는 데 쓴다.
@@ -343,19 +345,19 @@ describe('RoomPage — 대기실 첫 입장 튜토리얼 (D-121)', () => {
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
   });
 
-  it('그 게임 대기실에 처음 들어오면 1회 자동으로 뜨고, 닫으면 다시 안 뜬다', async () => {
-    const first = renderRoom({ gameType: 'SKULL_KING' });
+  // D-154 — 방을 만들거나 처음 들어와도 게임 소개(튜토리얼)를 저절로 띄우지 않는다(사용자 결정). "게임 방법" 버튼으로만 연다.
+  it('그 게임 대기실에 처음 들어와도 자동으로 뜨지 않는다 — 버튼으로 열고 닫으면 본 것으로 기록', async () => {
+    renderRoom({ gameType: 'SKULL_KING' });
 
+    await screen.findByText('테스트 방');
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '게임 방법' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('heading', { name: SK_TITLE })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
 
     expect(localStorage.getItem(SK_KEY)).toBe('1');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    first.unmount();
-
-    renderRoom({ gameType: 'SKULL_KING' });
-    await screen.findByText('테스트 방');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -1374,5 +1376,30 @@ describe('RoomPage — 다음 판: 대기실 복귀 뒤 결과 화면 유지 (D-
 
     expect(await screen.findByRole('list', { name: '참가자' })).toBeInTheDocument();
     expect(screen.queryByTestId('onecard-table')).toBeNull();
+  });
+});
+
+/** D-154 — 대기실 참가자 카드에 나와의 상대 전적(이 방 게임 기준). 나 자신·봇·기록 없는 사람에게는 없다. */
+describe('RoomPage — 참가자 카드의 상대 전적 (D-154)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }, { userId: 2, username: 'friend' }, { userId: 3, username: 'newbie' }] });
+    headToHead.mockResolvedValue({
+      entries: [{ gameType: 'ONE_CARD', opponentId: 2, opponentName: 'friend', wins: 3, losses: 1, draws: 0 }],
+    });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+  });
+
+  it('나와 붙어 본 사람 카드에 "나와 3승 1패"', async () => {
+    renderRoom({ gameType: 'ONE_CARD', capacity: 6, playerCount: 3, playerIds: [1, 2, 3] });
+
+    const list = await screen.findByRole('list', { name: '참가자' });
+    const friend = await within(list).findByRole('listitem', { name: 'friend' });
+    expect(await within(friend).findByText('나와 3승 1패')).toBeInTheDocument();
+    expect(within(within(list).getByRole('listitem', { name: 'newbie' })).queryByText(/나와/)).toBeNull();
+    expect(within(within(list).getByRole('listitem', { name: 'host' })).queryByText(/나와/)).toBeNull();
+    expect(headToHead).toHaveBeenCalledWith('tok', 1, 'ONE_CARD');
   });
 });

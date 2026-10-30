@@ -359,3 +359,14 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
    고르고, 어댑터는 정책이 예외·null·비합법 액션을 내면 ERROR 로그 후 `timeoutAction` 으로
    폴백한다 — 턴 제한 0 방에선 스케줄러가 재시도하지 않아 정책 버그가 방 정지로 이어진다.
    `timeoutAction`(사람·탈주 좌석 대리)은 봇 정책과 섞지 않는다.
+
+### 턴 제한 선택지·상대 전적도 게임이 선언한다 (D-154)
+
+- `GameDefinition.turnSecondsChoices()` — 방 만들기 모달의 턴 제한 선택지(기본 끔·30·60·90). 원카드는 끔·5·10·20·30.
+  `defaultTurnSeconds()` 는 이 안이어야 한다(`RoomCreationDefaultsTest`). 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
+- `HeadToHeadSource`(`domain.game.core`) — 게임이 자기 매치 기록에서 "나 대 상대" 승·패·무를 센다. `@Component` 로 두면
+  `HeadToHeadService` 가 모은다(게스트·봇 거르기·이름 붙이기는 모으는 쪽). 무엇을 이긴 것으로 볼지는 게임이 정한다.
+  - 티츄: 상대 팀만 센다(내 팀 승패).
+  - 스컬킹: 최종 점수로 센다.
+  - 원카드: 최종 순위로 센다.
+

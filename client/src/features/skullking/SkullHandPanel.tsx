@@ -15,6 +15,8 @@ interface Props {
   onSelect: (index: number | null) => void;
   onDeclare: (mode: TigressMode | null) => void;
   onPlay: () => void;
+  /** D-154 — 더블클릭으로 바로 낼 카드(인덱스). 티그리스(정체 선언)·내 차례 아님·따르기 위반 힌트는 부르지 않는다. */
+  onPlayCard?: (index: number) => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export function SkullHandPanel({
   onSelect,
   onDeclare,
   onPlay,
+  onPlayCard,
 }: Props) {
   const selected = selectedIndex !== null ? hand[selectedIndex] : null;
   const isTigress = selected?.special === 'TIGRESS';
@@ -51,6 +54,13 @@ export function SkullHandPanel({
             selected={selectedIndex === i}
             dimmed={myTurn && !isLegalPlayHint(card, hand, leadSuit)}
             onClick={() => onSelect(selectedIndex === i ? null : i)}
+            onDoubleClick={() => {
+              // 앞의 두 번 누름이 고르기를 켰다 껐다 하므로 결과와 상관없이 다시 고른다.
+              onSelect(i);
+              if (onPlayCard && myTurn && card.special !== 'TIGRESS' && isLegalPlayHint(card, hand, leadSuit)) {
+                onPlayCard(i);
+              }
+            }}
           />
         ))}
         {hand.length === 0 && <span className="sk-hand-empty">손패 없음</span>}

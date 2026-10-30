@@ -4,6 +4,7 @@ import {
   RACE_SLOT_COUNT,
   RACE_SLOTS,
   raceLeftCss,
+  raceTopCss,
   racePosition,
 } from './raceSlots';
 
@@ -58,5 +59,10 @@ describe('경쟁 버튼 가로 위치 CSS', () => {
     expect(raceLeftCss(81)).toBe(
       'clamp(var(--oc-race-half-w), 81%, calc(100% - var(--oc-race-half-w)))',
     );
+  });
+
+  // D-154 — 세로도 같은 보정(휴대폰에서 위쪽 슬롯 + 지터가 화면 위로 잘렸다).
+  it('세로도 가장자리에서 버튼 반높이(--oc-race-half-h)만큼 안쪽으로 보정한다', () => {
+    expect(raceTopCss(8)).toBe('clamp(var(--oc-race-half-h), 8%, calc(100% - var(--oc-race-half-h)))');
   });
 });

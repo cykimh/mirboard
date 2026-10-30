@@ -38,6 +38,8 @@ interface Props {
   side?: TableSide | 'bottom';
   /** 옆줄 안 순서(시계 방향, 0 부터). */
   slot?: number;
+  /** D-154 — 이 좌석이 방금 보낸 이모지(잠깐 떠 있다). */
+  reaction?: string;
 }
 
 /**
@@ -54,6 +56,7 @@ export function OneCardSeat({
   isDisconnected = false,
   side,
   slot,
+  reaction,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -79,6 +82,11 @@ export function OneCardSeat({
       data-slot={slot}
     >
       {isNext && <span className="oc-badge oc-seat-next">다음</span>}
+      {reaction && (
+        <span className="oc-seat-reaction" aria-hidden="true">
+          {reaction}
+        </span>
+      )}
       <div className="oc-seat-top">
         <span className="oc-seat-avatar" aria-hidden>
           {!isBot && userId != null ? (

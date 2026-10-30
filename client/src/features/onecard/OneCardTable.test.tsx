@@ -10,6 +10,7 @@ import {
 } from './OneCardTable';
 import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
+import { useReactionStore } from '@/features/chat/reactionStore';
 import { useOneCardStore } from './onecardStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
@@ -26,13 +27,14 @@ import type {
 const sendAction = vi.fn();
 /** D-130 — 훅의 권위 스냅샷 재요청. 훅이 주는 것처럼 렌더마다 같은 참조다. */
 const requestResync = vi.fn();
+const sendReaction = vi.fn();
 let socketConnected = true;
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: socketConnected,
     sendAction: (a: Record<string, unknown>) => sendAction(a),
     sendChat: vi.fn(),
-    sendReaction: vi.fn(),
+    sendReaction: (e: string) => sendReaction(e),
     chatPanelOpenRef: { current: false },
     requestResync,
   }),
@@ -346,7 +348,7 @@ describe('OneCardTable — 원카드 경쟁', () => {
     const button = screen.getByRole('button', { name: '잡기!' });
     // 슬롯 2(78%, 18%) + 지터(+30% × 10, −40% × 6) = (81%, 15.6%)
     expect(button.style.left).toContain('81%');
-    expect(button.style.top).toBe('15.6%');
+    expect(button.style.top).toContain('15.6%'); // D-154 — 세로도 가장자리 보정(clamp).
     expect(document.activeElement).not.toBe(button);
   });
 
@@ -1407,5 +1409,120 @@ describe('OneCardTable — 먹기 비행 효과 (D-152)', () => {
 
     drawn(2, 1, 2);
     expect(fly()).toBeNull();
+  });
+});
+
+/**
+ * D-154 — 카드를 내고 먹을 때 가운데 칸 크기가 바뀌어 게임판이 흔들렸다(지정 무늬 배지·이전 카드 줄·경쟁 결과 줄이 생겼다 사라짐).
+ * 그 자리들을 늘 두고 비었을 때는 보이지만 않게 한다 — 내용이 바뀌어도 칸 크기가 같다.
+ */
+describe('OneCardTable — 가운데 칸 자리 고정 (D-154)', () => {
+  it('지정 무늬·이전 카드·경쟁 결과 자리는 비어도 있다 — 보조기기에는 숨긴다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, topCard: c('HEART', 9) });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    const declared = container.querySelector('.oc-declared') as HTMLElement;
+    expect(declared).not.toBeNull();
+    expect(declared).toHaveAttribute('data-empty');
+    expect(declared).toHaveAttribute('aria-hidden', 'true');
+
+    const trail = container.querySelector('.oc-trail') as HTMLElement;
+    expect(trail).not.toBeNull();
+    expect(trail).toHaveAttribute('aria-hidden', 'true');
+    expect(trail.children).toHaveLength(0);
+
+    expect(container.querySelector('.oc-race-line')).not.toBeNull();
+  });
+
+  it('지정 무늬가 있으면 같은 자리에 보인다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, topCard: c('HEART', 7), declaredSuit: 'CLUB' });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    const declared = container.querySelector('.oc-declared') as HTMLElement;
+    expect(declared).not.toHaveAttribute('data-empty');
+    expect(declared).toHaveTextContent('지정 ♣ 클로버');
+  });
+});
+
+/** D-154 — 손패 카드를 두 번 누르면(더블클릭) 바로 낸다. 7 은 무늬를 골라야 해서 고르기만 하고, 낼 수 없는 카드·내 차례 아님은 보내지 않는다. */
+describe('OneCardTable — 더블클릭으로 내기 (D-154)', () => {
+  const HAND = [c('CLUB', 4), c('HEART', 3), c('SPADE', 9), c('CLUB', 7)];
+
+  it('낼 수 있는 카드를 더블클릭하면 그 카드를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: '하트 3' }));
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLAY_CARD', card: c('HEART', 3) });
+  });
+
+  it('7 은 더블클릭해도 보내지 않고 골라 둔다(무늬를 골라야 한다)', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND, topCard: c('CLUB', 9) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: '클로버 7' }));
+
+    expect(sendAction).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: '7 로 지정할 무늬' })).toBeInTheDocument();
+  });
+
+  it('낼 수 없는 카드·내 차례가 아니면 보내지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND, topCard: c('HEART', 9) });
+    const view = renderTable({ playerIds: [100, 101, 102] });
+    fireEvent.doubleClick(screen.getByRole('button', { name: '클로버 4' }));
+    expect(sendAction).not.toHaveBeenCalled();
+    view.unmount();
+
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: HAND });
+    renderTable({ playerIds: [100, 101, 102] });
+    fireEvent.doubleClick(screen.getByRole('button', { name: '하트 3' }));
+    expect(sendAction).not.toHaveBeenCalled();
+  });
+});
+
+
+/** D-154 — 원카드에도 티츄처럼 효과음 켜기/끄기와 이모지 반응. 반응은 보낸 사람 좌석 위에 잠깐 뜬다. */
+describe('OneCardTable — 효과음·이모지 (D-154)', () => {
+  beforeEach(() => {
+    sendReaction.mockReset();
+    useReactionStore.getState().reset();
+    localStorage.removeItem('mirboard.sfxMuted');
+  });
+
+  it('😀 로 고른 이모지를 보낸다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    fireEvent.click(screen.getByRole('button', { name: '이모지 반응' }));
+    fireEvent.click(screen.getByRole('button', { name: '👍' }));
+
+    expect(sendReaction).toHaveBeenCalledWith('👍');
+  });
+
+  it('받은 반응은 보낸 사람 좌석 위에 뜬다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    act(() => useReactionStore.getState().add(2, '🔥'));
+
+    expect(container.querySelector('[data-seat="2"] .oc-seat-reaction')).toHaveTextContent('🔥');
+  });
+
+  it('효과음 버튼으로 켜고 끈다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    const sound = screen.getByRole('button', { name: '효과음' });
+    expect(sound).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(sound);
+    expect(screen.getByRole('button', { name: '효과음' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('관전자에게는 이모지 버튼이 없다', () => {
+    seed({ seatCount: 3, mySeat: -1, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102], myUserId: 999, spectator: true });
+
+    expect(screen.queryByRole('button', { name: '이모지 반응' })).toBeNull();
   });
 });

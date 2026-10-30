@@ -8,7 +8,7 @@ import { MakeWishModal } from './MakeWishModal';
 import { GiveDragonTrickModal, opponentSeatsOf } from './GiveDragonTrickModal';
 import { EffectsOverlay } from './EffectsOverlay';
 import { useEffectStore } from './effectStore';
-import { useSfx } from './useSfx';
+import { useSfx } from '@/features/sound/useSfx';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';

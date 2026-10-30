@@ -163,6 +163,12 @@ export function SkullKingTable({
     });
   };
 
+  // D-154 — 손패 더블클릭으로 바로 내기(티그리스는 손패가 거른다 — 정체를 골라야 한다). 따르기 규칙은 서버가 판정한다.
+  const playIndex = (index: number) => {
+    const card = s.hand[index];
+    if (card) sendAction({ '@action': 'PLAY_CARD', card });
+  };
+
   // D-110 — 진행 중 나가기는 되돌릴 수 없는 탈주다(유령 좌석 자동조종, D-104).
   // 관전자·매치 종료 후·방 종료 후(D-120)는 잃을 것이 없어 묻지 않는다.
   const exit = () => {
@@ -355,6 +361,7 @@ export function SkullKingTable({
               onSelect={s.selectCard}
               onDeclare={s.setTigressDeclaration}
               onPlay={playSelected}
+              onPlayCard={playIndex}
             />
           )}
 

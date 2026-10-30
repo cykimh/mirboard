@@ -317,3 +317,32 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
     expect(checked('4')).toBe('true');
   });
 });
+
+/** D-154 — 턴 제한 선택지도 게임이 선언한다(카탈로그 `turnSecondsChoices`). 원카드는 끔·5·10·20·30초, 없으면 끔·30·60·90. */
+describe('CreateRoomModal — 게임이 선언한 턴 제한 선택지 (D-154)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMock.mockResolvedValue({ roomId: 'room-1' });
+  });
+
+  const labels = () =>
+    screen
+      .getAllByRole('radio')
+      .map((r) => r.textContent)
+      .filter((t) => t === '끔' || /초$/.test(t ?? ''));
+
+  it('원카드는 짧은 선택지 — 5초를 골라 보낼 수 있다', async () => {
+    openModal([{ ...DECLARED, turnSecondsChoices: [0, 5, 10, 20, 30] }]);
+    expect(labels()).toEqual(['끔', '5초', '10초', '20초', '30초']);
+
+    fireEvent.click(screen.getByRole('radio', { name: '5초' }));
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().turnSeconds).toBe(5);
+  });
+
+  it('선택지를 안 실은 게임은 끔·30·60·90초', () => {
+    openModal([FIXED]);
+    expect(labels()).toEqual(['끔', '30초', '60초', '90초']);
+  });
+});

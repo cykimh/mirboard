@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { t } from '@/i18n/messages';
 import { Button } from '@/components/ui/button';
+import { REACTIONS } from '@/features/chat/reactionStore';
 
 /** P2(7) — 빠른 이모지 반응 팔레트(서버 화이트리스트와 일치). */
-const REACTIONS = ['👍', '😂', '😮', '😢', '🔥', '👏', '❤️', '🎉'];
 
 interface GameTableHeaderProps {
   fillWithBots: boolean;
