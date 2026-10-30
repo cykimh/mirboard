@@ -8,6 +8,7 @@ import com.mirboard.domain.game.skullking.persistence.SkullKingMatchStateStore;
 import com.mirboard.domain.game.skullking.persistence.SkullKingStateStore;
 import java.security.SecureRandom;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -65,9 +66,21 @@ public final class SkullKingGameDefinition implements GameDefinition {
         return 8;
     }
 
+    /**
+     * D-168 — 공개 상태는 설정이다({@code mirboard.skullking.status} = 환경 변수 {@code MIRBOARD_SKULLKING_STATUS}, 기본 AVAILABLE). 원카드(D-128)와 같은 손잡이로,
+     * {@code COMING_SOON} 이면 카탈로그에 "준비 중"으로만 보이고 새 방을 만들 수 없다(진행 중인 판은 끝까지 간다). 생성자를 바꾸지
+     * 않으려고 setter 로 받는다 — 스프링 밖에서 만든 정의(테스트)는 AVAILABLE 그대로다.
+     */
+    private GameStatus status = GameStatus.AVAILABLE;
+
+    @Value("${mirboard.skullking.status:AVAILABLE}")
+    void setStatus(GameStatus status) {
+        this.status = java.util.Objects.requireNonNull(status, "mirboard.skullking.status(MIRBOARD_SKULLKING_STATUS)가 비어 있다 — 스컬킹 공개 상태");
+    }
+
     @Override
     public GameStatus status() {
-        return GameStatus.AVAILABLE;
+        return status;
     }
 
     @Override

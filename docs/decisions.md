@@ -178,6 +178,15 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-168 (2026-10-30) — 당분간 원카드만 연다
+
+사용자 결정이다. 당분간 원카드만 한다. 티츄·스컬킹은 "준비 중"(`COMING_SOON`)으로 둔다.
+- 카탈로그에는 원카드 뒤에 "준비 중"으로 보이고 새 방은 만들 수 없다(`GAME_NOT_AVAILABLE`).
+- 이미 진행 중인 판은 끝까지 간다. 열려 있던 대기실도 그대로다(D-131 원카드 되돌리기와 같은 손잡이).
+- 원카드처럼 공개 상태를 설정으로 연다: `mirboard.tichu.status`(`MIRBOARD_TICHU_STATUS`)·`mirboard.skullking.status`(`MIRBOARD_SKULLKING_STATUS`).
+  - 코드 기본은 AVAILABLE 이라 테스트·로컬은 그대로다. 운영만 `fly.toml [env]` 에 `COMING_SOON` 을 둔다.
+  - 다시 열 때는 두 줄을 지우거나 `AVAILABLE` 로 바꾸고 배포한다.
+
 ## D-167 (2026-10-30) — 계급 16단계: 그림이 여러 개인 계급 빼기
 
 사용자 요청이다. 총알 II·III, 미사일 II·III, 쌍금별처럼 그림 2개 이상으로 그리던 계급을 뺀다. 21단계가 16단계가 된다.
