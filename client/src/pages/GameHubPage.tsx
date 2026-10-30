@@ -36,7 +36,6 @@ import {
   AvatarImage,
 } from '@/components/ui/avatar';
 import { avatarSrc } from '@/api/avatar';
-import { AvatarSettingsModal } from '@/features/profile/AvatarSettingsModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
@@ -59,12 +58,10 @@ export function GameHubPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [spectateInput, setSpectateInput] = useState('');
-  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   // D-121 — 카드별 '게임 방법'으로 연 게임. 허브는 게임을 고를 수 없어 자동 노출하지 않는다
   // (자동 노출은 그 게임 대기실 첫 입장 — RoomPage).
   const [tutorialGameId, setTutorialGameId] = useState<string | null>(null);
   const hubTutorial = tutorialFor(tutorialGameId);
-  const [avatarVersion, setAvatarVersion] = useState(0);
 
   const refreshRooms = useCallback(async () => {
     if (!token) return;
@@ -138,35 +135,20 @@ export function GameHubPage() {
           <div className="ml-auto flex items-center gap-3">
             {user && (
               <div className="flex items-center gap-2">
-                {/* D-117 — 게스트는 아바타 업로드 불가(서버도 403). 버튼만 잠그고 이유는 title 로. */}
-                <button
-                  type="button"
-                  onClick={() => setAvatarModalOpen(true)}
-                  disabled={!!user.guest}
-                  title={user.guest ? t('hub.guest.avatarDisabled') : '아바타 설정'}
-                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:hover:opacity-100"
-                >
-                  <Avatar>
-                    <AvatarImage
-                      src={avatarSrc(user.userId, avatarVersion || undefined)}
-                      alt=""
-                    />
-                    <AvatarFallback>
-                      {user.username.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
+                {/* D-154 — 위쪽에는 아바타만. 누르면 내 프로필(이미지 설정도 거기서). */}
                 <button
                   type="button"
                   onClick={() => navigate('/profile')}
-                  className="text-sm font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  title="내 프로필"
+                  aria-label="내 프로필"
+                  title={`내 프로필 — ${user.username}`}
+                  className="rounded-full ring-offset-background transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  {user.username}
+                  <Avatar>
+                    <AvatarImage src={avatarSrc(user.userId)} alt="" />
+                    <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
                 </button>
-                {user.guest && (
-                  <Badge variant="secondary">{t('hub.guest.badge')}</Badge>
-                )}
+                {user.guest && <Badge variant="secondary">{t('hub.guest.badge')}</Badge>}
               </div>
             )}
             {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로. D-146 — 전적 합계는 뺐다(프로필에 있다). */}
@@ -199,75 +181,11 @@ export function GameHubPage() {
           </Alert>
         )}
 
-        {/* 게임 카탈로그 */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {games === null && !error
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-32" />
-                    <Skeleton className="h-4 w-full" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-4 w-24" />
-                  </CardContent>
-                </Card>
-              ))
-            : games?.map((game) => {
-                const available = game.status === 'AVAILABLE';
-                const wiki = gameWikiUrl(game.id);
-                const hasTutorial = !!tutorialFor(game.id);
-                return (
-                  <Card
-                    key={game.id}
-                    className={cn(
-                      'flex flex-col',
-                      !available && 'opacity-60',
-                    )}
-                  >
-                    <CardHeader>
-                      <CardTitle>{game.displayName}</CardTitle>
-                      <CardDescription>
-                        {game.shortDescription}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground">
-                      {game.minPlayers === game.maxPlayers
-                        ? `${game.maxPlayers}인 플레이`
-                        : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
-                    </CardContent>
-                    <CardFooter className="mt-auto gap-3">
-                      {!available && (
-                        <Badge variant="secondary">Coming Soon</Badge>
-                      )}
-                      {wiki && (
-                        <a
-                          className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-                          href={wiki}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          자세히 <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                      {hasTutorial && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setTutorialGameId(game.id)}
-                          aria-label={`${game.displayName} 게임 방법`}
-                        >
-                          <HelpCircle className="h-4 w-4" />
-                          게임 방법
-                        </Button>
-                      )}
-                    </CardFooter>
-                  </Card>
-                );
-              })}
-        </section>
-
+        {/* D-154 — 순서: 랭킹 → 대기 중인 방 → 게임 소개. */}
+        {/* 랭킹 — D-115 게임별 */}
+        {token && availableGames.length > 0 && (
+          <RankingCard token={token} games={availableGames} myUserId={user?.userId} />
+        )}
         {/* D-146 — 로비 채팅을 없애 대기 중인 방이 한 줄을 다 쓴다. */}
         <div className="grid grid-cols-1 gap-6">
           {/* 대기 중인 방 */}
@@ -284,7 +202,7 @@ export function GameHubPage() {
               </Button>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <ul className="flex flex-col gap-2">
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {rooms.length === 0 && (
                   <li className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
                     아직 방이 없습니다.
@@ -348,10 +266,76 @@ export function GameHubPage() {
           </Card>
         </div>
 
-        {/* 랭킹 — D-115 게임별 */}
-        {token && availableGames.length > 0 && (
-          <RankingCard token={token} games={availableGames} myUserId={user?.userId} />
-        )}
+        {/* 게임 카탈로그 */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {games === null && !error
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-4 w-full" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-24" />
+                  </CardContent>
+                </Card>
+              ))
+            : games?.map((game) => {
+                const available = game.status === 'AVAILABLE';
+                const wiki = gameWikiUrl(game.id);
+                const hasTutorial = !!tutorialFor(game.id);
+                return (
+                  <Card
+                    key={game.id}
+                    className={cn(
+                      'flex flex-col',
+                      !available && 'opacity-60',
+                    )}
+                  >
+                    {/* D-154 — 작은 카드: 여백·글자를 줄이고 소개는 두 줄까지. */}
+                    <CardHeader className="space-y-1 p-4 pb-1">
+                      <CardTitle className="text-base">{game.displayName}</CardTitle>
+                      <CardDescription className="line-clamp-2 text-xs">
+                        {game.shortDescription}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-1 text-xs text-muted-foreground">
+                      {game.minPlayers === game.maxPlayers
+                        ? `${game.maxPlayers}인 플레이`
+                        : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
+                    </CardContent>
+                    <CardFooter className="mt-auto gap-3 px-4 pb-3 pt-1">
+                      {!available && (
+                        <Badge variant="secondary">Coming Soon</Badge>
+                      )}
+                      {wiki && (
+                        <a
+                          className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+                          href={wiki}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          자세히 <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                      {hasTutorial && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setTutorialGameId(game.id)}
+                          aria-label={`${game.displayName} 게임 방법`}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                          게임 방법
+                        </Button>
+                      )}
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+        </section>
+
       </div>
 
       {token && (
@@ -364,17 +348,6 @@ export function GameHubPage() {
             setError(msg);
             setShowCreateModal(false);
           }}
-        />
-      )}
-
-      {token && user && !user.guest && (
-        <AvatarSettingsModal
-          open={avatarModalOpen}
-          onClose={() => setAvatarModalOpen(false)}
-          token={token}
-          userId={user.userId}
-          username={user.username}
-          onChanged={() => setAvatarVersion((v) => v + 1)}
         />
       )}
 

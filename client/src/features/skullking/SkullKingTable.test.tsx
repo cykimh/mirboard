@@ -873,3 +873,34 @@ describe('혼자 연습 표시 (D-136)', () => {
     expect(screen.queryByText(/혼자 연습/)).toBeNull();
   });
 });
+
+/** D-154 — 손패 카드를 더블클릭하면 바로 낸다. 티그리스는 정체를 골라야 해서 고르기만 하고, 내 차례가 아니면 보내지 않는다. */
+describe('더블클릭으로 내기 (D-154)', () => {
+  it('일반 카드를 더블클릭하면 그 카드를 보낸다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 0, hand: [suit('GREEN', 5), suit('YELLOW', 3)] });
+    renderTable();
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: '초록 5' }));
+
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLAY_CARD', card: suit('GREEN', 5) });
+  });
+
+  it('티그리스는 더블클릭해도 보내지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 0, hand: [special('TIGRESS')] });
+    renderTable();
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: '티그리스' }));
+
+    expect(sendAction).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: '티그리스 선언' })).toBeInTheDocument();
+  });
+
+  it('내 차례가 아니면 보내지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1, hand: [suit('GREEN', 5)] });
+    renderTable();
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: '초록 5' }));
+
+    expect(sendAction).not.toHaveBeenCalled();
+  });
+});

@@ -22,7 +22,7 @@ const { catalog, list, stats, spectate } = vi.hoisted(() => ({
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
 vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate } }));
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
-vi.mock('@/features/stats/RankingCard', () => ({ RankingCard: () => null }));
+vi.mock('@/features/stats/RankingCard', () => ({ RankingCard: () => <section data-testid="ranking" /> }));
 
 function game(id: string, displayName: string, status: GameSummary['status'] = 'AVAILABLE'): GameSummary {
   return {
@@ -66,8 +66,11 @@ function room(roomId: string, gameType: string, capacity: number): Room {
 
 function renderHub() {
   return render(
-    <MemoryRouter>
-      <GameHubPage />
+    <MemoryRouter initialEntries={['/games']}>
+      <Routes>
+        <Route path="/games" element={<GameHubPage />} />
+        <Route path="/profile" element={<div>PROFILE_PAGE</div>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -269,5 +272,37 @@ describe('GameHubPage — 로비 정리 (D-146)', () => {
     expect(container.textContent).not.toMatch(/3승|2패|탈주 1/);
     expect(screen.queryByText('로비 채팅')).toBeNull();
     expect(screen.queryByPlaceholderText(/메시지|연결 중/)).toBeNull();
+  });
+});
+
+
+/** D-154 — 메인 순서는 랭킹 → 대기 중인 방 → 게임 소개 카드. 위쪽에는 내 아바타만 두고 누르면 내 프로필로 간다. */
+describe('GameHubPage — 배치와 아바타 (D-154)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('랭킹 → 대기 중인 방 → 게임 소개 순서다', async () => {
+    renderHub();
+    const gameCard = await screen.findByRole('button', { name: '티츄 게임 방법' });
+    const ranking = screen.getByTestId('ranking');
+    const rooms = screen.getByText('대기 중인 방');
+
+    expect(ranking.compareDocumentPosition(rooms) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rooms.compareDocumentPosition(gameCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('위쪽에는 아바타만 — 이름 버튼이 없고, 아바타를 누르면 내 프로필로 간다', async () => {
+    renderHub();
+    await screen.findByRole('button', { name: '티츄 게임 방법' });
+
+    expect(screen.queryByRole('button', { name: 'me' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '내 프로필' }));
+    expect(await screen.findByText('PROFILE_PAGE')).toBeInTheDocument();
   });
 });

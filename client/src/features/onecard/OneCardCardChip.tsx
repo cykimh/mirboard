@@ -6,6 +6,8 @@ interface Props {
   /** 지금 낼 수 없는 카드 흐리게 (표시 전용 — 판정은 서버). */
   dimmed?: boolean;
   onClick?: () => void;
+  /** D-154 — 손패 카드 더블클릭(바로 내기). */
+  onDoubleClick?: () => void;
   /** 튜토리얼·작은 자리용. */
   compact?: boolean;
 }
@@ -26,6 +28,7 @@ export function OneCardCardChip({
   selected = false,
   dimmed = false,
   onClick,
+  onDoubleClick,
   compact = false,
 }: Props) {
   const className = [
@@ -77,6 +80,7 @@ export function OneCardCardChip({
       aria-label={label}
       aria-pressed={selected}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {body}
     </button>

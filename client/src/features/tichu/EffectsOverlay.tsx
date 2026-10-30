@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useEffectStore } from './effectStore';
-import { useSfx } from './useSfx';
+import { useSfx } from '@/features/sound/useSfx';
 
 /**
  * Phase 8G — 화면 전역 이펙트 오버레이. effectStore.active 가 셋팅되면 CSS

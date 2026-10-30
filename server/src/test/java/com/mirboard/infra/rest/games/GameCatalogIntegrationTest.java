@@ -85,6 +85,8 @@ class GameCatalogIntegrationTest {
                 // D-130 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(8))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(0))
+                // D-154 — 턴 제한 선택지도 게임이 선언한다. 기본은 끔·30·60·90.
+                .andExpect(jsonPath("$.games[0].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 30, 60, 90)))
                 .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
                 .andExpect(jsonPath("$.games[1].displayName").value("원카드"))
                 .andExpect(jsonPath("$.games[1].minPlayers").value(2))
@@ -95,6 +97,8 @@ class GameCatalogIntegrationTest {
                 // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
                 .andExpect(jsonPath("$.games[1].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(30))
+                // D-154 — 원카드는 짧게: 끔·5·10·20·30.
+                .andExpect(jsonPath("$.games[1].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 5, 10, 20, 30)))
                 .andExpect(jsonPath("$.games[2].id").value("TICHU"))
                 .andExpect(jsonPath("$.games[2].displayName").value("티츄"))
                 .andExpect(jsonPath("$.games[2].minPlayers").value(4))

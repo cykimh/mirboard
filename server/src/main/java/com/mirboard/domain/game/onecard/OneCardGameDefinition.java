@@ -105,6 +105,12 @@ public final class OneCardGameDefinition implements GameDefinition {
         return 30;
     }
 
+    /** D-154 — 빠르게 하고 싶은 판을 위해 짧게(사용자 결정): 끔·5·10·20·30초. 60·90초는 없다. */
+    @Override
+    public java.util.List<Integer> turnSecondsChoices() {
+        return java.util.List.of(0, 5, 10, 20, 30);
+    }
+
     /**
      * 설정에서 만든 경쟁 창 설정 — 엔진 어댑터({@link OneCardGameEngine})가 쓴다. 라운드 시작
      * ({@code OneCardRoundStarter})은 쓰지 않는다: 시작에는 경쟁 창이 없어 스타터는 {@link RaceSettings#DEFAULT} 로

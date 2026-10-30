@@ -23,6 +23,8 @@ interface Props {
   onSuit: (suit: OneCardSuit) => void;
   onPlay: () => void;
   onDraw: () => void;
+  /** D-154 — 더블클릭으로 바로 낼 카드. 7(무늬 지정)·낼 수 없는 카드·내 차례 아님은 부르지 않는다. */
+  onPlayCard?: (card: OneCardCard) => void;
 }
 
 /**
@@ -43,6 +45,7 @@ export function OneCardHand({
   onSuit,
   onPlay,
   onDraw,
+  onPlayCard,
 }: Props) {
   const selected = selectedKey ? (hand.find((c) => cardKey(c) === selectedKey) ?? null) : null;
   const needSuit = selected !== null && isSuitChange(selected);
@@ -72,6 +75,18 @@ export function OneCardHand({
               selected={selectedKey === key}
               dimmed={canAct && !canPlay(card, topCard, declaredSuit, attackStack)}
               onClick={() => onSelect(selectedKey === key ? null : key)}
+              onDoubleClick={() => {
+                // 더블클릭 앞의 두 번 누름이 고르기를 켰다 껐다 하므로 결과와 상관없이 다시 고른다.
+                onSelect(key);
+                if (
+                  onPlayCard &&
+                  canAct &&
+                  !isSuitChange(card) &&
+                  canPlay(card, topCard, declaredSuit, attackStack)
+                ) {
+                  onPlayCard(card);
+                }
+              }}
             />
           );
         })}

@@ -8,7 +8,9 @@ import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
-import { cardKey } from '@/types/onecard';
+import { REACTIONS, useLiveReactions } from '@/features/chat/reactionStore';
+import { useSfx } from '@/features/sound/useSfx';
+import { cardKey, type OneCardCard } from '@/types/onecard';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
 import { isSuitChange, nextTurnSeat } from './onecardRules';
@@ -86,12 +88,16 @@ export function OneCardTable({
   onBackToRoom,
 }: Props) {
   const token = useAuthStore((s) => s.token);
-  const { connected, sendAction, sendChat, chatPanelOpenRef, requestResync } = useStompRoom(
+  const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef, requestResync } = useStompRoom(
     roomId,
     token,
     onecardRoomSink,
   );
   const [chatOpen, setChatOpen] = useState(false);
+  // D-154 — 티츄처럼 효과음(내 차례 알림음) 켜기/끄기와 이모지 반응.
+  const { muted, toggleMute, playChime } = useSfx();
+  const [reactionOpen, setReactionOpen] = useState(false);
+  const liveReactions = useLiveReactions();
   const chatUnread = useRoomChatStore((s) => s.unreadCount);
   // 게임판에서는 수동으로만 연다 — 턴 타이머가 계속 흐른다(D-121).
   const rules = useTutorialGate(ONE_CARD_TUTORIAL.seenKey, false);
@@ -120,6 +126,13 @@ export function OneCardTable({
     !spectator && mySeat >= 0 && !iAmOut && s.result === null && !raceOpen && turnSeat === mySeat;
   const canPress = !spectator && mySeat >= 0 && !iAmOut && s.result === null && !roomFinished;
 
+  // D-154 — 내 차례가 되면 짧은 알림음(음소거면 무음).
+  const wasMyTurn = useRef(myTurn);
+  useEffect(() => {
+    if (myTurn && !wasMyTurn.current) playChime();
+    wasMyTurn.current = myTurn;
+  }, [myTurn, playChime]);
+
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
     if (botSeats.includes(seat)) return usernames[uid] ?? `봇 ${seat}`;
@@ -141,6 +154,7 @@ export function OneCardTable({
         isDisconnected={s.disconnectedSeats.has(seat)}
         side={side}
         slot={slot}
+        reaction={liveReactions[seat]?.emoji}
       />
     );
   };
@@ -230,6 +244,8 @@ export function OneCardTable({
   };
 
   const draw = () => sendAction({ '@action': 'DRAW' });
+  // D-154 — 손패 더블클릭으로 바로 내기(7 은 손패가 거른다 — 무늬를 골라야 한다).
+  const playCard = (card: OneCardCard) => sendAction({ '@action': 'PLAY_CARD', card });
 
   // 진행 중 나가기는 되돌릴 수 없는 탈주다 — 탈락으로 최하위가 된다(§10). 관전자·종료 뒤·이미 탈락한 좌석은 묻지 않는다.
   const exit = () => {
@@ -270,6 +286,46 @@ export function OneCardTable({
           <span className="oc-badge">{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
         <div className="oc-header-badges">
+          <button
+            type="button"
+            className="oc-badge"
+            onClick={toggleMute}
+            aria-label="효과음"
+            aria-pressed={!muted}
+            title={muted ? '효과음 켜기' : '효과음 끄기'}
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
+          {!spectator && (
+            <span className="oc-reaction-bar">
+              <button
+                type="button"
+                className="oc-badge"
+                onClick={() => setReactionOpen((v) => !v)}
+                aria-label="이모지 반응"
+                aria-expanded={reactionOpen}
+                title="이모지 반응"
+              >
+                😀
+              </button>
+              {reactionOpen && (
+                <span className="oc-reaction-palette">
+                  {REACTIONS.map((e) => (
+                    <button
+                      type="button"
+                      key={e}
+                      onClick={() => {
+                        sendReaction(e);
+                        setReactionOpen(false);
+                      }}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
+          )}
           <button type="button" className="oc-badge" onClick={() => setChatOpen((v) => !v)}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
@@ -372,6 +428,11 @@ export function OneCardTable({
             style={{ ['--oc-accent' as string]: seatAccent(mySeat) }}
           >
             <strong>{nameOf(mySeat)} (나)</strong>
+            {liveReactions[mySeat] && (
+              <span key={liveReactions[mySeat].id} className="oc-seat-reaction" aria-hidden="true">
+                {liveReactions[mySeat].emoji}
+              </span>
+            )}
             <span className="oc-me-count">손패 {s.hand.length}장</span>
             {myTurn && <span className="oc-badge oc-badge-turn">내 차례</span>}
             {nextSeat === mySeat && <span className="oc-badge oc-seat-next">다음</span>}
@@ -397,6 +458,7 @@ export function OneCardTable({
               onSuit={s.setSuitChoice}
               onPlay={playSelected}
               onDraw={draw}
+              onPlayCard={playCard}
             />
           )}
         </>

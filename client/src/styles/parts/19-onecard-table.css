@@ -215,12 +215,20 @@ button.oc-badge {
   gap: 8px clamp(6px, 2vw, 24px);
 }
 
-/* 가운데 배지는 칸 안에서 줄을 바꾼다 — .oc-badge 는 nowrap 이라 "guest-ab12cd34 차례"(≈137px)가 가운데 칸을 넘어 옆줄 좌석에
-   걸쳤다. 헤더 배지는 그대로 한 줄. */
-.oc-felt .oc-center-info .oc-badge {
+/* 가운데 배지 — "guest-ab12cd34 차례"(≈137px)가 가운데 칸을 넘어 옆줄 좌석에 걸쳤다. D-154 — 줄을 바꾸면(예전 처리) 차례마다
+   칸 높이가 달라져 게임판이 흔들려서, 한 줄 + 말줄임으로 둔다. 헤더 배지는 그대로 한 줄. */
+.oc-felt .oc-center-info {
+  flex-wrap: nowrap;
   max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  min-height: 24px;
+}
+
+.oc-felt .oc-center-info .oc-badge {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 옆줄 좌석은 화면 폭을 따라 64~150px, 윗줄·아래 좌석은 기준 폭(--oc-seat-min)에서 최대 168px. 이름은 말줄임(.oc-seat-name). */
@@ -539,6 +547,47 @@ button.oc-badge {
   font-weight: 700;
 }
 
+/* D-154 — 가운데 칸 자리 고정. 지정 무늬 배지는 맨 위 카드 아래 고정 자리에 떠 있다 — 글자 폭(하트·클로버…)이 맨 위 칸 폭을
+   바꾸면 좁은 화면에서 더미·맨 위 카드의 줄바꿈이 달라져 칸 높이가 64px 씩 뛰었다. 비면 보이지만 않는다. */
+.oc-top {
+  position: relative;
+  padding-bottom: 26px;
+}
+
+.oc-top > .oc-declared {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.oc-declared[data-empty] {
+  visibility: hidden;
+}
+
+/* 이전 카드 줄은 늘 3장 높이(48 + 18 × 2) — 1장 → 3장으로 쌓일 때 칸이 자랐다. */
+.oc-trail {
+  width: 34px;
+  min-height: 84px;
+}
+
+/* 경쟁 결과·"늦었어요"는 한 줄 자리 — 생겼다 사라져도 칸 높이가 같다. 넘치면 말줄임. */
+.oc-race-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  min-height: 18px;
+}
+
+.oc-race-line > p {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .oc-race-status {
   border-color: var(--oc-race-call);
   font-weight: 700;
@@ -731,9 +780,12 @@ button.oc-card {
 /* ── 외치기 경쟁 버튼 (설계서 §4.10) ─────────────────────────────── */
 /* 버튼 반폭 — 버튼을 담는 레이어와 튜토리얼 연습 칸이 같은 값으로 `left` 를 clamp 한다(raceLeftCss). 버튼 min-width(112px)의
  * 절반 이상이어야 clamp 한 중심에서도 버튼이 칸 안에 머문다. 변수가 없으면 clamp() 가 무효가 되어 left 가 auto 로 떨어진다. */
+/* D-154 — 반폭은 버튼 **최대 폭**(112px)의 절반 이상, 반높이는 최소 높이의 절반 이상. 휴대폰에서 가장자리 슬롯의 버튼이 잘렸다
+   (큰 글씨 설정이면 글자가 최소 폭을 넘겼다). */
 .oc-race-layer,
 .oc-practice-area {
-  --oc-race-half-w: 64px;
+  --oc-race-half-w: 60px;
+  --oc-race-half-h: 28px;
 }
 
 /* 화면 위 고정 레이어 — 게임판이 스크롤돼도 버튼은 화면 안에 뜬다. 채팅 패널(100)·규칙 다이얼로그(shadcn z-50) 위라
@@ -752,15 +804,18 @@ button.oc-card {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-width: 112px;
-  min-height: 56px;
-  padding: 8px 16px;
+  gap: 3px;
+  box-sizing: border-box;
+  min-width: 84px;
+  max-width: 112px;
+  min-height: 44px;
+  padding: 6px 12px;
   overflow: hidden;
-  border: 3px solid #ffffff;
-  border-radius: 14px;
+  border: 2px solid #ffffff;
+  border-radius: 12px;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 16px;
+  white-space: nowrap;
   font-weight: 800;
   pointer-events: auto;
   cursor: pointer;
@@ -1007,4 +1062,70 @@ button.oc-pile-draw {
   justify-content: center;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* D-154 — 이모지 반응: 머리 줄의 😀 → 팔레트, 받은 반응은 보낸 좌석(내 줄) 위에 잠깐 떠오른다. */
+.oc-reaction-bar {
+  position: relative;
+  display: inline-flex;
+}
+
+.oc-reaction-palette {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 120;
+  display: grid;
+  grid-template-columns: repeat(4, 36px);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.oc-reaction-palette button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.oc-reaction-palette button:hover {
+  background: var(--color-bg-surface-elevated);
+}
+
+.oc-seat-reaction {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  z-index: 5;
+  font-size: 26px;
+  line-height: 1;
+  pointer-events: none;
+  animation: oc-reaction-up 2.6s ease-out forwards;
+}
+
+.oc-me {
+  position: relative;
+}
+
+@keyframes oc-reaction-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -28px) scale(1);
+  }
 }

@@ -197,16 +197,26 @@ describe('19-onecard-table.css — 버튼 반폭(--oc-race-half-w)', () => {
     const layer = declared('.oc-race-layer', '--oc-race-half-w');
     const practice = declared('.oc-practice-area', '--oc-race-half-w');
 
-    expect(layer, '.oc-race-layer').toBe('64px');
+    expect(layer, '.oc-race-layer').toBe('60px');
     expect(practice, '.oc-practice-area').toBe(layer);
+    expect(declared('.oc-race-layer', '--oc-race-half-h')).toBe(declared('.oc-practice-area', '--oc-race-half-h'));
   });
 
-  it('버튼 최소 폭(.oc-race-btn min-width)의 절반 이상이다 — clamp 한 중심에서 버튼이 칸 안에 머문다', () => {
+  // D-154 — 휴대폰에서 버튼이 화면 가장자리에 잘린다는 피드백. 최소 폭이 아니라 **최대 폭** 기준이어야 한다 — 큰 글씨 설정이면
+  // 글자가 최소 폭을 넘겨 버튼이 반폭 보정보다 넓어졌다. 버튼을 줄이고(최대 112px) 반폭은 그 절반 이상으로.
+  it('버튼 최대 폭(.oc-race-btn max-width)의 절반 이상이다 — 큰 글씨여도 clamp 한 중심에서 버튼이 화면 안에 머문다', () => {
     const half = Number.parseFloat(declared('.oc-race-layer', '--oc-race-half-w') ?? '0');
-    const minWidth = Number.parseFloat(declared('.oc-race-btn', 'min-width') ?? '0');
+    const maxWidth = Number.parseFloat(declared('.oc-race-btn', 'max-width') ?? '0');
 
-    expect(minWidth).toBeGreaterThan(0);
-    expect(half).toBeGreaterThanOrEqual(minWidth / 2);
+    expect(maxWidth).toBeGreaterThan(0);
+    expect(maxWidth).toBeLessThanOrEqual(112);
+    expect(half).toBeGreaterThanOrEqual(maxWidth / 2);
+  });
+
+  it('버튼은 작게 — 최소 44px 높이(손가락)·글자 16px', () => {
+    expect(declared('.oc-race-btn', 'min-height')).toBe('44px');
+    expect(declared('.oc-race-btn', 'font-size')).toBe('16px');
+    expect(Number.parseFloat(declared('.oc-race-layer', '--oc-race-half-h') ?? '0')).toBeGreaterThanOrEqual(22);
   });
 });
 
@@ -277,9 +287,12 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
   });
 
   // .oc-badge 는 nowrap 이라 "guest-ab12cd34 차례" ≈137px 가 가운데 칸(≈126px)을 넘어 옆줄 좌석에 걸쳤다. 헤더 배지는 그대로.
-  it('가운데 칸 배지는 칸 안에서 줄을 바꾼다 — 긴 이름의 "차례" 배지가 옆줄 좌석으로 넘치지 않는다', () => {
-    expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'white-space')).toBe('normal');
+  // D-154 — 줄을 바꾸면 차례마다(이름 길이마다) 칸 높이가 바뀌어 게임판이 흔들렸다. 한 줄 + 말줄임으로 넘치지도, 흔들리지도 않게.
+  it('가운데 칸 배지는 한 줄 말줄임이다 — 긴 이름의 "차례" 배지가 넘치지도 칸 높이를 바꾸지도 않는다', () => {
+    expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'white-space')).toBe('nowrap');
+    expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'text-overflow')).toBe('ellipsis');
     expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'max-width')).toBe('100%');
+    expect(lastDeclared('.oc-felt .oc-center-info', 'flex-wrap')).toBe('nowrap');
   });
 });
 

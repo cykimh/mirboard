@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { OneCardClientRace, PressAction } from './onecardStore';
-import { raceLeftCss, racePosition } from './raceSlots';
+import { raceLeftCss, racePosition, raceTopCss } from './raceSlots';
 
 interface Props {
   race: OneCardClientRace;
@@ -51,7 +51,7 @@ export function RaceButton({ race, mySeat, pending, onPress }: Props) {
         className={`oc-race-btn ${owner ? 'oc-race-call' : 'oc-race-catch'}`}
         style={{
           left: raceLeftCss(left),
-          top: `${top}%`,
+          top: raceTopCss(top),
         }}
         disabled={pending}
         onClick={() => onPress(owner ? 'CALL_ONE_CARD' : 'CATCH')}

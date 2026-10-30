@@ -22,6 +22,8 @@ export interface GameSummary {
    */
   defaultPlayers?: number;
   defaultTurnSeconds?: number;
+  /** D-154 — 방 만들기의 턴 제한 선택지(초, 0 = 끔). 없으면 끔·30·60·90. 원카드는 끔·5·10·20·30. */
+  turnSecondsChoices?: number[];
 }
 
 export interface CatalogResponse {

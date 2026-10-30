@@ -152,7 +152,8 @@
       "status": "AVAILABLE",
       "supportedRoomOptions": [],
       "defaultPlayers": 8,
-      "defaultTurnSeconds": 0
+      "defaultTurnSeconds": 0,
+      "turnSecondsChoices": [0, 30, 60, 90]
     },
     {
       "id": "ONE_CARD",
@@ -163,7 +164,8 @@
       "status": "AVAILABLE",
       "supportedRoomOptions": [],
       "defaultPlayers": 4,
-      "defaultTurnSeconds": 30
+      "defaultTurnSeconds": 30,
+      "turnSecondsChoices": [0, 5, 10, 20, 30]
     },
     {
       "id": "TICHU",
@@ -174,11 +176,13 @@
       "status": "AVAILABLE",
       "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"],
       "defaultPlayers": 4,
-      "defaultTurnSeconds": 0
+      "defaultTurnSeconds": 0,
+      "turnSecondsChoices": [0, 30, 60, 90]
     }
   ]
 }
 ```
+- D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
 - 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 세 게임이 모두 공개라(D-131) 스컬킹·원카드·티츄.
@@ -372,6 +376,17 @@ rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라�
       "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
   ]
 }
+```
+
+### GET `/api/users/{userId}/head-to-head` *(D-154 — 상대 전적)*
+쿼리 `gameType`(선택 — 주면 그 게임만). 기존 매치 기록에서 계산한다. 게임마다 `HeadToHeadSource` 가 셈법을 정한다:
+- 티츄: 상대 팀 사람만 센다. 내 팀이 이기면 승이다.
+- 스컬킹: 최종 점수를 비교한다.
+- 원카드: 최종 순위를 비교한다(동순위면 무).
+
+상대가 게스트·봇이면 뺀다. 많이 붙어 본 상대부터 준다.
+```json
+{ "entries": [ { "gameType": "ONE_CARD", "opponentId": 17, "opponentName": "영희", "wins": 3, "losses": 2, "draws": 0 } ] }
 ```
 
 ### GET `/api/users/names` *(A6 — 좌석 닉네임 표시)*

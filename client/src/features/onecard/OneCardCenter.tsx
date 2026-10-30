@@ -106,12 +106,17 @@ export function OneCardCenter({
           ) : (
             <span className="oc-top-empty">—</span>
           )}
-          {shownSuit && (
-            <span className="oc-badge oc-declared">
-              지정 {SUIT_SYMBOL[shownSuit]} {SUIT_LABEL[shownSuit]}
-            </span>
-          )}
+          {/* D-154 — 자리를 늘 둔다(비면 보이지만 않게) — 7 을 낼 때마다 칸 높이가 바뀌어 게임판이 흔들렸다. */}
+          <span
+            className="oc-badge oc-declared"
+            data-empty={shownSuit ? undefined : ''}
+            aria-hidden={shownSuit ? undefined : true}
+          >
+            {shownSuit ? `지정 ${SUIT_SYMBOL[shownSuit]} ${SUIT_LABEL[shownSuit]}` : '지정'}
+          </span>
         </div>
+        {/* D-154 — 비어도 자리(폭)를 둔다 — 첫 카드를 낼 때 줄이 옆으로 밀렸다. */}
+        {beneath.length === 0 && <div className="oc-trail" aria-hidden="true" />}
         {beneath.length > 0 && (
           // D-150 — 맨 위 옆에 바로 전 카드들을 작게 겹친다. 위에서부터 오래된 순이라 맨 아래(맨 앞)가 바로 전 카드고, 위 카드들은
           // 귀퉁이의 숫자·무늬만 보인다. 보조기기에는 한 줄로(최근 것부터).
@@ -138,8 +143,11 @@ export function OneCardCenter({
         )}
       </div>
 
-      {lastRace && !raceOpen && <p className="oc-race-result">{raceResultText(lastRace, nameOf)}</p>}
-      {late && <p className="oc-race-late">늦었어요 — 이미 끝난 경쟁입니다</p>}
+      {/* D-154 — 경쟁 결과 줄도 자리를 둔다(한 줄). */}
+      <div className="oc-race-line">
+        {lastRace && !raceOpen && <p className="oc-race-result">{raceResultText(lastRace, nameOf)}</p>}
+        {late && <p className="oc-race-late">늦었어요 — 이미 끝난 경쟁입니다</p>}
+      </div>
     </section>
   );
 }

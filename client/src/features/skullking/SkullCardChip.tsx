@@ -29,6 +29,8 @@ interface Props {
   /** follow 의무 힌트로 흐리게 (표시 전용 — 권위는 서버). */
   dimmed?: boolean;
   onClick?: () => void;
+  /** D-154 — 손패 카드 더블클릭(바로 내기). */
+  onDoubleClick?: () => void;
   /** 트릭 레일용 소형. */
   compact?: boolean;
 }
@@ -44,6 +46,7 @@ export function SkullCardChip({
   selected = false,
   dimmed = false,
   onClick,
+  onDoubleClick,
   compact = false,
 }: Props) {
   const isSpecial = card.special !== null;
@@ -109,6 +112,7 @@ export function SkullCardChip({
       aria-label={aria}
       aria-pressed={selected}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {body}
     </button>

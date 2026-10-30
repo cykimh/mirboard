@@ -4,6 +4,7 @@ import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi, type GameRecord } from '@/api/users';
+import { headToHeadText } from '@/features/stats/headToHead';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
@@ -95,6 +96,8 @@ export function RoomPage() {
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
   const [usernames, setUsernames] = useState<Record<number, string>>({});
   const [records, setRecords] = useState<Record<number, GameRecord | null>>({});
+  // D-154 — 나와 상대 전적(이 방 게임) — 상대 userId → "3승 1패".
+  const [versus, setVersus] = useState<Record<number, string>>({});
   // D-106 — 이 게임이 쓰는 방 옵션. 대기실에서는 좌석 정책 **라벨**을 고르는 데만 쓴다.
   // null = 아직 모름(요청 중) → 행을 그리지 않는다. 티츄에서 "좌석 순서"가 잠깐 떴다
   // "팀 배정"으로 바뀌는 깜빡임을 막으려는 것이다.
@@ -276,6 +279,23 @@ export function RoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, humansKey, recordsWanted, room?.gameType]);
 
+  // D-154 — 대기실 참가자 카드의 "나와 N승 M패". 방 게임이 정해지면 한 번(참가자가 바뀌어도 내 전적 목록은 같다).
+  const myId = user?.userId;
+  useEffect(() => {
+    if (!token || myId == null || !recordsWanted || !room?.gameType) return;
+    let cancelled = false;
+    usersApi
+      .headToHead(token, myId, room.gameType)
+      .then((res) => {
+        if (cancelled) return;
+        setVersus(Object.fromEntries(res.entries.map((e) => [e.opponentId, headToHeadText(e)])));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token, myId, recordsWanted, room?.gameType]);
+
   // 좌석/참가자 표시용 username 일괄 조회. 참가자 집합이 바뀔 때만 재요청(최대 4명).
   const playersKey = room?.playerIds.join(',') ?? '';
   useEffect(() => {
@@ -439,11 +459,11 @@ export function RoomPage() {
   const startMin = minPlayers ?? 1;
   const canStart = !!room && room.status === 'WAITING' && room.playerCount >= startMin;
 
-  // D-121 — 그 게임 대기실 **첫 입장**에 튜토리얼을 1회 자동으로 띄운다(게임별 열람 키).
-  // 게임 중에는 띄우지 않는다 — 턴 타이머가 흐르는 중이라 타임아웃 자동조종을 부른다.
+  // D-121 → D-154 — 튜토리얼(게임 소개)은 대기실 "게임 방법" 버튼으로만 연다. 방을 만들거나 처음 들어와도 저절로 띄우지 않는다
+  // (사용자 결정 — 방 만들 때마다 소개가 가렸다). 열람 기록은 그대로 남긴다.
   const tutorial = tutorialFor(room?.gameType);
   const waiting = room?.status === 'WAITING';
-  const tutorialGate = useTutorialGate(tutorial?.seenKey ?? null, !!tutorial && waiting);
+  const tutorialGate = useTutorialGate(tutorial?.seenKey ?? null, false);
   const hideTutorial = tutorialGate.hide;
   // 연 채로 게임이 시작되면 기록 없이 닫는다 — 리매치로 대기실에 돌아와도 다시 열려 있지 않게.
   useEffect(() => {
@@ -647,6 +667,7 @@ export function RoomPage() {
                       host={id === room.hostId}
                       bot={isBot}
                       record={records[id]}
+                      versusMe={id === user.userId || isBot ? undefined : versus[id]}
                     />
                   );
                 })}

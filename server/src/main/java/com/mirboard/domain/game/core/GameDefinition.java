@@ -48,11 +48,19 @@ public interface GameDefinition {
 
     /**
      * D-130 — 방 만들기 모달이 처음 고르는 턴 제한(초). <b>기본은 0(끔)</b> — {@code RoomService.DEFAULT_TURN_SECONDS} 와
-     * 같다. 모달의 선택지(0·30·60·90) 중 하나여야 처음부터 선택돼 보인다. D-131 — 요청에서 턴 제한을 뺀 방도 이 값으로 열린다
+     * 같다. 모달의 선택지({@link #turnSecondsChoices()}) 중 하나여야 처음부터 선택돼 보인다. D-131 — 요청에서 턴 제한을 뺀 방도 이 값으로 열린다
      * ({@code RoomService} 의 생략 기본).
      */
     default int defaultTurnSeconds() {
         return 0;
+    }
+
+    /**
+     * D-154 — 방 만들기 모달의 턴 제한 선택지(초, 0 = 끔). <b>기본은 끔·30·60·90</b>. {@link #defaultTurnSeconds()} 는 이 안에
+     * 있어야 한다. 서버는 선택지 밖 값을 거절하지 않는다(테스트의 짧은 턴 등) — 화면이 고르는 목록일 뿐이다.
+     */
+    default java.util.List<Integer> turnSecondsChoices() {
+        return java.util.List.of(0, 30, 60, 90);
     }
 
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
