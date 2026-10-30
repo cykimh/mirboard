@@ -35,7 +35,7 @@ class OneCardGameDefinitionTest {
     }
 
     @Test
-    void the_catalog_entry_is_a_two_to_six_player_game_without_room_options() {
+    void the_catalog_entry_is_a_two_to_six_player_game_with_only_the_race_button_option() {
         OneCardGameDefinition def = defaults();
 
         assertThat(def.id()).isEqualTo("ONE_CARD");
@@ -43,7 +43,8 @@ class OneCardGameDefinitionTest {
         assertThat(def.minPlayers()).isEqualTo(2);
         assertThat(def.maxPlayers()).isEqualTo(6);
         assertThat(def.status()).isEqualTo(GameStatus.AVAILABLE);
-        assertThat(def.supportedRoomOptions()).isEmpty();
+        // D-161 — 목표 점수·팀·내기는 없고 경쟁 버튼 크기만 쓴다.
+        assertThat(def.supportedRoomOptions()).containsExactly(com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE);
     }
 
     /**
@@ -92,7 +93,7 @@ class OneCardGameDefinitionTest {
         OneCardGameDefinition def = definition(GameStatus.COMING_SOON, 2_000, 100, 200, 300, 400);
 
         assertThat(def.status()).isEqualTo(GameStatus.COMING_SOON);
-        assertThat(def.raceSettings()).isEqualTo(new RaceSettings(2_000, 100, 200, 300, 400, 8));
+        assertThat(def.raceSettings()).isEqualTo(new RaceSettings(2_000, 100, 200, 300, 400, 14));
     }
 
     @Test

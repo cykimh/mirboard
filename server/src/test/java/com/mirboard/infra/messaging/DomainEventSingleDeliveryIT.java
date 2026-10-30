@@ -152,7 +152,7 @@ class DomainEventSingleDeliveryIT {
         List<Long> ids = registerFour();
         String roomId = startTichuOnA(ids, 0);
 
-        // A 의 로컬 리스너(TichuRoundStarter)는 setReady 안에서 동기로 돌았다 — 패가 이미 있다.
+        // A 의 로컬 리스너(TichuRoundStarter)는 startNow 안에서 동기로 돌았다 — 패가 이미 있다.
         TichuGameStateStore stateStore = instanceA.getBean(TichuGameStateStore.class);
         List<Card> dealt = stateStore.loadHand(roomId, ids.get(0)).orElseThrow();
         assertThat(received("mirboard-A")).anyMatch(GameStartingEvent.class::isInstance);
@@ -212,7 +212,7 @@ class DomainEventSingleDeliveryIT {
 
     // ---------- helpers ----------
 
-    /** A 에서 방 생성 → 4명 입장 → 전원 준비. 마지막 setReady 가 A 에서 게임을 시작한다. */
+    /** A 에서 방 생성 → 4명 입장 → 방장 시작. startNow 가 A 에서 게임을 시작한다. */
     private static String startTichuOnA(List<Long> ids, int stake) {
         RoomService roomsA = instanceA.getBean(RoomService.class);
         String roomId = roomsA.createRoom(ids.get(0), "single-delivery", TichuGameDefinition.ID,
@@ -221,9 +221,7 @@ class DomainEventSingleDeliveryIT {
         for (int i = 1; i < ids.size(); i++) {
             roomsA.joinRoom(roomId, ids.get(i));
         }
-        for (long id : ids) {
-            roomsA.setReady(roomId, id, true);
-        }
+        roomsA.startNow(roomId, ids.get(0)); // D-161 — 친구 방은 방장이 시작한다(준비로는 시작 안 함)
         return roomId;
     }
 

@@ -238,7 +238,7 @@
 
 - **코드:** 창 열기 `OneCardEngine.openRace`(슬롯·지터, 봇 추첨 `fastestBot`), 누름 `OneCardEngine.press`,
   시간 전이 `OneCardEngine.timerDeadline`·`onTimer`, 해소·벌칙 `OneCardEngine.resolveRace`, 설정 `RaceSettings`
-  (`DEFAULT` — 창 3초, 봇 1.0~2.5초, 슬롯 8), 창 상태 `state/RaceWindow`
+  (`DEFAULT` — 창 3초, 봇 1.0~2.5초, 슬롯 14 — D-161 에서 8 → 14), 창 상태 `state/RaceWindow`
 - **테스트:** `OneCardEngineRaceTest`(17건 — 세 결과, 벌칙 뒤 차례(§9.1), K·J·공격, 창 번호 검사, 봇 반응) 중
   새로 더한 것: `being_caught_after_an_attack_card_keeps_the_stack_for_the_reserved_seat`(잡혀도 공격 누적 유지),
   `the_skipped_seat_may_catch_and_the_jack_still_skips_it`, `of_several_bots_only_the_fastest_press_is_kept`,

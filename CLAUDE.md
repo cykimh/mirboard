@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 3종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-160까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-161까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -137,9 +137,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Phase 16(#7): 게임별 로비 페이지(`/games/:id/lobby`) 폐지 — 메인페이지로
   통합. 방 생성/입장/관전/랭킹/로비채팅이 모두 `/games` 한 화면.
 - Phase 16(#2): 게임 시작 = 정원 4 + **전원 준비**(`POST /api/rooms/{id}/ready`,
-  봇은 join 시 서버가 자동 ready). capacity 자동시작 폐기. **D-143 으로 친구와 하기는 준비 없이 방장 시작만** — 준비 길은 봇과 연습 내부용.
+  봇은 join 시 서버가 자동 ready). capacity 자동시작 폐기. **D-143 으로 친구와 하기는 방장 시작만** — D-161 로 [준비]가 돌아왔지만 표시만(전원 준비 자동 시작은 `fillWithBots` 방만, `room_ready.lua`).
 - D-136: 방 만들기 = **친구와 하기**(기본, 게스트 포함 — 사람만, 봇 없음) / **봇과 연습**(`fillWithBots=true` — 방장 + 봇, 만들자마자
-  IN_GAME, `rooms:open` 에 안 오름, 초대 없음). D-143 — 친구와 하기는 인원을 고르지 않고(정원 = 게임 최대 인원) 대기실에 [준비]가 없다.
+  IN_GAME, `rooms:open` 에 안 오름, 초대 없음). D-143 — 친구와 하기는 인원을 고르지 않는다(정원 = 게임 최대 인원). D-161 — 친구와 하기 모달은 방 종류·게임·이름만, 턴 제한·목표 점수·판돈·원카드! 버튼 크기(`RoomOption.RACE_BUTTON_SIZE`)는 대기실 `RoomSettingsPanel` → `PUT /api/rooms/{id}/settings`(방장, WAITING).
   사람이 최소 인원 이상이면 방장이 **"N명으로 시작"**(`POST /api/rooms/{id}/start`, `room_start_now.lua` — 정원을 현재 인원으로 줄이고 시작,
   정원이 다 차도 자동 시작 없음, 티츄도 같다). 봇과 연습만 봇 수를 정하려고 인원을 고른다.
 - D-160: 원카드 차례 강조(좌석 "차례" 표시·맥박, 내 차례면 손패 칸 빛·진동 1회), 원카드 손패 **최대 2줄**(`OneCardHand.handRows` — 8장까지 한 줄, 넘치면 겹침), 랭킹 탭은 **전체에서 많이 한 게임부터**(`GET /api/users/ranking/games`). 후속 묶음 B·C 계획은 `docs/plans/table-lobby-polish.md`.

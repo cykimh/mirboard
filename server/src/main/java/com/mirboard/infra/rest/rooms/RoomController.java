@@ -113,6 +113,14 @@ public class RoomController {
         return rooms.updateTeamPolicy(roomId, me.userId(), req.teamPolicy());
     }
 
+    /** D-161 — 대기실에서 방장이 게임 설정(턴 제한·목표 점수·판돈·원카드! 버튼 크기)을 바꾼다. 부분 갱신. */
+    @org.springframework.web.bind.annotation.PutMapping("/{roomId}/settings")
+    public Room updateSettings(@PathVariable String roomId,
+                               @AuthenticationPrincipal AuthPrincipal me,
+                               @RequestBody com.mirboard.domain.lobby.room.RoomSettingsUpdate req) {
+        return rooms.updateSettings(roomId, me.userId(), req);
+    }
+
     @GetMapping("/{roomId}")
     public Room get(@PathVariable String roomId) {
         return rooms.getRoom(roomId);

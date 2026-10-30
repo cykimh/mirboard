@@ -91,7 +91,8 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[1].displayName").value("원카드"))
                 .andExpect(jsonPath("$.games[1].minPlayers").value(2))
                 .andExpect(jsonPath("$.games[1].maxPlayers").value(6))
-                .andExpect(jsonPath("$.games[1].supportedRoomOptions.length()").value(0))
+                // D-161 — 원카드는 경쟁 버튼 크기만 쓴다.
+                .andExpect(jsonPath("$.games[1].supportedRoomOptions").value(org.hamcrest.Matchers.contains("RACE_BUTTON_SIZE")))
                 // D-131 — 공개. 설정을 주지 않은 컨텍스트의 기본값이다.
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
                 // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).

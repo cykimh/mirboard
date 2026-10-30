@@ -238,9 +238,11 @@
   "targetScore": 1000,
   "turnSeconds": 0,
   "stake": 0,
-  "readyUserIds": []
+  "readyUserIds": [],
+  "raceButtonSize": "MEDIUM"
 }
 ```
+- `raceButtonSize`(D-161) 는 원카드 "원카드!/잡기!" 버튼 크기다. 방 설정이고 원카드 외 게임에서는 늘 `MEDIUM` 이다.
 - 좌석(seat)은 `playerIds` 의 인덱스다 — STOMP 이벤트의 `seat` 와 같은 축.
 - `botSeats` 는 `playerIds` 인덱스 기준 봇 좌석(D-50).
 
@@ -295,15 +297,33 @@
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
 > **Phase 16(#2)**: join 은 더 이상 정원 도달로 게임을 시작하지 않는다. **D-143**: 친구와 하기 방의 시작은 방장의
-> `/start` 뿐이다(준비 없음 — 화면에 [준비]가 없다). `/ready` 의 전원 준비 시작은 봇과 연습 방의 내부 시작 길로만 남았다.
+> `/start` 뿐이다. **D-161**: 대기실에 [준비]가 돌아왔지만 표시만 한다 — `/ready` 의 전원 준비 시작은 봇과 연습 방(`fillWithBots`)에서만 일어난다.
 
 ### POST `/api/rooms/{roomId}/ready` *(Phase 16 #2)*
 대기실 준비 토글. body `{ "ready": true|false }`. 응답 `200` — Room 갱신본
 (`readyUserIds` 포함). 좌석에 앉은 플레이어만 호출 가능. 정원이 모두 모이고
 전원 ready(봇은 join 시 서버가 자동 ready) 가 되면 서버가 원자적으로
 WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
-`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석). **D-143**: 화면은 이 호출을 쓰지 않는다 — 봇과 연습 방을 만들 때 서버가
-봇과 방장의 준비를 넣어 시작하는 내부 길이다(API 는 하위 호환으로 남긴다).
+`GAME_ALREADY_STARTED`(이미 시작/종료), `NOT_IN_ROOM`(미착석). **D-161**: 정원+전원 준비로 시작하는 것은 봇과 연습 방(`fillWithBots`)뿐이다
+(`room_ready.lua` 가 방 해시를 본다). 친구 방의 준비는 대기실 표시만 하고(손님의 [준비]/[준비 취소]) 시작은 늘 방장의 `/start` 다.
+
+### PUT `/api/rooms/{roomId}/settings` *(D-161 — 대기실 게임 설정, 방장 전용)*
+친구 방 대기실에서 방장이 게임 설정을 바꾼다. **부분 갱신** — 보낸 항목만 바꾼다.
+```json
+{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE" }
+```
+- `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
+- `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
+- `stake` 는 허용값 `{0,10,50,100,500}` 이고 `BETTING` 게임만 쓴다. 봇 방이면 0 만 된다.
+- `raceButtonSize` 는 `SMALL`·`MEDIUM`·`LARGE` 이고 `RACE_BUTTON_SIZE` 게임(원카드)만 쓴다.
+- 게임이 안 쓰는 항목을 보내면 값과 상관없이 `UNSUPPORTED_ROOM_OPTION` 이다. 만들 때와 달리 기본값도 통과하지 않는다.
+- `room_update_settings.lua` 가 WAITING 확인과 쓰기를 한 번에 한다. 성공하면 방 메타 갱신(`ROOM_UPDATED`)으로 다른 사람 화면도 바뀐다.
+
+응답 `200` — 갱신된 Room. 에러는 아래와 같다.
+- `NOT_HOST`(403)
+- `GAME_ALREADY_STARTED`(409)
+- `UNSUPPORTED_ROOM_OPTION`·`INVALID_STAKE`·`INVALID_ROOM_SETTING`(400 — details `setting`)
+- `ROOM_NOT_FOUND`
 
 ### POST `/api/rooms/{roomId}/start` *(D-136·D-143 — 방장 시작, 방장 전용)*
 친구와 하기 대기실의 유일한 시작. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상 — **준비는 조건이 아니고 정원이 다 찼어도 이 길로

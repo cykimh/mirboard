@@ -333,7 +333,7 @@ D-131 부터 공개(`AVAILABLE`)다 — 되돌리기는 설정 `mirboard.onecard
 `OWNER_CANNOT_CATCH`.
 
 **경쟁 창(§9)**:
-- `slot` 은 `0..7` — 슬롯 8개는 클라가 화면(뷰포트) 기준 좌표로 정의하는 **프로토콜 상수**다(`client/src/features/onecard/raceSlots.ts`, D-129). `jitterX`·`jitterY` 는
+- `slot` 은 `0..13` — 슬롯 14개(D-161, 예전 8개)는 클라가 화면(뷰포트) 기준 좌표로 정의하는 **프로토콜 상수**다(`client/src/features/onecard/raceSlots.ts`, D-129). `jitterX`·`jitterY` 는
   `−100..100`(슬롯 반경의 백분율). 창 길이 기본 3000ms(`mirboard.onecard.race-window-millis`).
 - 창이 열린 동안 `PLAY_CARD`·`DRAW` 는 `RACE_IN_PROGRESS`. `raceId` 가 지금 창과 다르면(이미 닫힘 포함) `NO_RACE`
   — 클라는 "늦었어요" 정도로 보여 주면 된다. 서버가 먼저 처리한 누름이 이기고, 창 끝·봇 시각 직후에 처리된

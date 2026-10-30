@@ -26,5 +26,11 @@ public enum RoomOption {
      * `RoomChipService` 가 티츄를 직접 참조하는 이유이자, 칩이 포트 밖에 있는 이유
      * (`docs/game-port.md` §2).
      */
-    BETTING
+    BETTING,
+
+    /**
+     * D-161 — 원카드 "원카드!/잡기!" 경쟁 버튼 크기(작게·보통·크게). 방 설정이라 모두 같은 크기다 — 크기가 누르기 쉬움에 영향을 주니
+     * 공평하게. 화면 표시만 바꾸고 룰·엔진은 모른다.
+     */
+    RACE_BUTTON_SIZE
 }

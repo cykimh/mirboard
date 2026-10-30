@@ -74,7 +74,7 @@ class AdminControllerIT {
         return "Bearer " + jwtService.issue(u.getId(), u.getUsername()).token();
     }
 
-    /** 봇 없음 + 타임아웃 0 → 4인 ready 후 안정 IN_GAME(자동 진행 없음). */
+    /** 봇 없음 + 타임아웃 0 → 4인 방장 시작 후 안정 IN_GAME(자동 진행 없음). */
     private String inGameRoom(User host) {
         User p2 = newUser("acp");
         User p3 = newUser("acp");
@@ -85,10 +85,7 @@ class AdminControllerIT {
         roomService.joinRoom(roomId, p2.getId());
         roomService.joinRoom(roomId, p3.getId());
         roomService.joinRoom(roomId, p4.getId());
-        roomService.setReady(roomId, host.getId(), true);
-        roomService.setReady(roomId, p2.getId(), true);
-        roomService.setReady(roomId, p3.getId(), true);
-        Room started = roomService.setReady(roomId, p4.getId(), true);
+        Room started = roomService.startNow(roomId, host.getId()); // D-161 — 방장 시작
         assertThat(started.status()).isEqualTo(RoomStatus.IN_GAME);
         return roomId;
     }

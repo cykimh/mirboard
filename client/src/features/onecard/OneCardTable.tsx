@@ -13,6 +13,7 @@ import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { VoiceControls } from '@/features/voice/VoiceControls';
 import { cardKey, type OneCardCard } from '@/types/onecard';
+import type { RaceButtonSize } from '@/types/api';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
 import { isSuitChange, nextTurnSeat } from './onecardRules';
@@ -62,6 +63,8 @@ interface Props {
   roomFinished?: boolean;
   /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(이 세션이 전이를 봐 결과 화면을 유지하는 중). [대기실로]가 부른다. */
   onBackToRoom?: () => void;
+  /** D-161 — 방장이 대기실에서 고른 "원카드!/잡기!" 버튼 크기(방 설정). */
+  raceButtonSize?: RaceButtonSize;
 }
 
 /**
@@ -88,6 +91,7 @@ export function OneCardTable({
   practice = false,
   roomFinished = false,
   onBackToRoom,
+  raceButtonSize = 'MEDIUM',
 }: Props) {
   const token = useAuthStore((s) => s.token);
   const {
@@ -486,6 +490,7 @@ export function OneCardTable({
       {s.race && canPress && (
         <RaceButton
           race={s.race}
+          size={raceButtonSize}
           mySeat={mySeat}
           pending={s.press !== null || !connected}
           onPress={press}

@@ -11,7 +11,7 @@ class RaceSettingsTest {
 
     @Test
     void the_default_is_a_three_second_window_with_bots_reacting_in_one_to_two_and_a_half_seconds() {
-        assertThat(RaceSettings.DEFAULT).isEqualTo(new RaceSettings(3_000, 1_000, 2_500, 1_000, 2_500, 8));
+        assertThat(RaceSettings.DEFAULT).isEqualTo(new RaceSettings(3_000, 1_000, 2_500, 1_000, 2_500, 14));
     }
 
     @Test

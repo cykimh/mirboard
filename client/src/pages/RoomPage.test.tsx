@@ -48,6 +48,7 @@ vi.mock('@/api/rooms', () => ({
     stopSpectating: vi.fn(),
     startNow: vi.fn(),
     join: vi.fn(),
+    updateSettings: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1070,13 +1071,15 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
     expect(roomsApi.startNow).toHaveBeenCalledWith('tok', 'r1');
   });
 
-  it('대기실에 [준비]·준비 표시가 없다', async () => {
+  // D-161 — 준비는 표시만 한다. 방장은 준비 버튼이 없고(시작 버튼이 곧 준비), 준비와 상관없이 시작한다.
+  it('방장에게는 [준비]가 없고, 손님 준비 수와 카드의 "준비" 표시를 본다', async () => {
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({ readyUserIds: [2] }));
     await screen.findByRole('button', { name: '3명으로 시작' });
 
     expect(screen.queryByRole('button', { name: /^준비/ })).toBeNull();
-    expect(screen.queryByText(/준비됨/)).toBeNull();
+    expect(screen.getByTestId('ready-count')).toHaveTextContent('준비 1/2');
+    expect(within(screen.getByRole('listitem', { name: '#2' })).getByText('준비')).toBeInTheDocument();
     expect(screen.queryByText(/자동으로 게임이 시작/)).toBeNull();
   });
 
@@ -1405,5 +1408,73 @@ describe('RoomPage — 참가자 카드의 상대 전적 (D-154)', () => {
     expect(within(within(list).getByRole('listitem', { name: 'newbie' })).queryByText(/나와/)).toBeNull();
     expect(within(within(list).getByRole('listitem', { name: 'host' })).queryByText(/나와/)).toBeNull();
     expect(headToHead).toHaveBeenCalledWith('tok', 1, 'ONE_CARD');
+  });
+});
+
+/** D-161 — 대기실 게임 설정(방장만 바꾼다)과 손님의 준비 토글(표시만). */
+describe('RoomPage — 대기실 설정·준비 (D-161)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+  });
+
+  const oneCard = {
+    ...game('ONE_CARD', ['RACE_BUTTON_SIZE']),
+    minPlayers: 2,
+    maxPlayers: 6,
+    turnSecondsChoices: [0, 5, 10, 20, 30],
+  };
+  const waiting = (extra: Partial<Room>) =>
+    ({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'WAITING',
+      capacity: 6,
+      playerIds: [1, 2, 3],
+      playerCount: 3,
+      readyUserIds: [],
+      turnSeconds: 30,
+      ...extra,
+    }) as Room;
+
+  it('방장은 턴 제한·버튼 크기를 바꾸고, 응답으로 바로 맞춘다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+    const { roomsApi } = await import('@/api/rooms');
+    const updateSettings = vi.mocked(roomsApi.updateSettings).mockResolvedValue(waiting({ turnSeconds: 10 }));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({}));
+
+    const turn = await screen.findByRole('group', { name: '턴 제한' });
+    await act(async () => {
+      fireEvent.click(within(turn).getByRole('radio', { name: '10초' }));
+    });
+    expect(updateSettings).toHaveBeenCalledWith('tok', 'r1', { turnSeconds: 10 });
+    expect(within(turn).getByRole('radio', { name: '10초' })).toHaveAttribute('aria-checked', 'true');
+
+    const size = screen.getByRole('group', { name: '원카드! 버튼 크기' });
+    await act(async () => {
+      fireEvent.click(within(size).getByRole('radio', { name: '크게' }));
+    });
+    expect(updateSettings).toHaveBeenLastCalledWith('tok', 'r1', { raceButtonSize: 'LARGE' });
+  });
+
+  it('손님은 설정을 보기만 하고 [준비]를 누른다 — 다시 누르면 준비 취소', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'guest' } as never });
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.setReady).mockResolvedValue(waiting({ readyUserIds: [2] }));
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ raceButtonSize: 'SMALL' }));
+
+    const panel = await screen.findByRole('region', { name: '게임 설정' });
+    expect(within(panel).queryByRole('radio')).toBeNull();
+    expect(within(panel).getByText('30초')).toBeInTheDocument();
+    expect(within(panel).getByText('작게')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '준비' }));
+    });
+    expect(roomsApi.setReady).toHaveBeenCalledWith('tok', 'r1', true);
+    expect(screen.getByRole('button', { name: '준비 취소' })).toBeInTheDocument();
   });
 });

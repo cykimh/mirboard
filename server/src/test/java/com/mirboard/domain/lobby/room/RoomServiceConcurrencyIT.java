@@ -151,7 +151,10 @@ class RoomServiceConcurrencyIT {
                 .isFalse();
     }
 
-    /** BY-3 — 시작 판정은 앉아 있는 사람의 준비만 센다. 좌석에 없는 준비가 남아 있어도 조기 시작하지 않는다. */
+    /**
+     * BY-3 → D-161 — 친구 방(사람만)은 준비가 표시일 뿐이라, 좌석에 없는 준비가 남아 있어도 앉은 전원이 준비해도
+     * 시작하지 않는다. 시작은 방장의 startNow 뿐이고, 남은 준비는 거기에 영향을 주지 않는다.
+     */
     @Test
     void stale_ready_of_a_non_seated_user_does_not_start_the_game() {
         String roomId = roomService.createRoom(400L, "by3-stale", "TICHU").roomId();
@@ -168,6 +171,11 @@ class RoomServiceConcurrencyIT {
                 .as("403 이 준비하지 않았으니 대기 그대로")
                 .isEqualTo(RoomStatus.WAITING);
         roomService.setReady(roomId, 403L, true);
-        assertThat(roomService.getRoom(roomId).status()).isEqualTo(RoomStatus.IN_GAME);
+        assertThat(roomService.getRoom(roomId).status())
+                .as("D-161 — 앉은 전원이 준비해도 친구 방은 자동 시작하지 않는다")
+                .isEqualTo(RoomStatus.WAITING);
+        assertThat(roomService.startNow(roomId, 400L).status())
+                .as("방장이 시작하면 시작된다")
+                .isEqualTo(RoomStatus.IN_GAME);
     }
 }

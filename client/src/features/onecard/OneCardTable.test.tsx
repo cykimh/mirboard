@@ -388,10 +388,22 @@ describe('OneCardTable — 원카드 경쟁', () => {
     renderTable({ playerIds: [100, 101, 102] });
 
     const button = screen.getByRole('button', { name: '잡기!' });
-    // 슬롯 2(78%, 18%) + 지터(+30% × 10, −40% × 6) = (81%, 15.6%)
+    // 슬롯 2(78%, 14%) + 지터(+30% × 10, −40% × 6) = (81%, 11.6%) — D-161 슬롯 표
     expect(button.style.left).toContain('81%');
-    expect(button.style.top).toContain('15.6%'); // D-154 — 세로도 가장자리 보정(clamp).
+    expect(button.style.top).toContain('11.6%'); // D-154 — 세로도 가장자리 보정(clamp).
     expect(document.activeElement).not.toBe(button);
+  });
+
+  // D-161 — 방장이 대기실에서 고른 크기(방 설정). 없으면 보통.
+  it('버튼 크기는 방 설정을 따른다 — 없으면 보통', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102] });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-size-medium');
+    unmount();
+
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102], raceButtonSize: 'LARGE' });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-size-large');
   });
 
   it('창이 열린 동안 내기·먹기 버튼을 막고 "경쟁 중"으로 알린다', () => {

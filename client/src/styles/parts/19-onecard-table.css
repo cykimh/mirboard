@@ -930,6 +930,34 @@ button.oc-card {
   line-height: 1;
 }
 
+/* D-161 — 방장이 대기실에서 고른 버튼 크기(모두 같다). 보통이 위 기본값이다. 레이어의 반폭·반높이(가장자리 clamp)도 크기를 따른다.
+   작게는 맞히기 어렵게 하려는 선택이라 터치 하한(44px)보다 작다. */
+.oc-race-layer.oc-race-size-small {
+  --oc-race-half-w: 48px;
+  --oc-race-half-h: 22px;
+}
+
+.oc-race-size-small .oc-race-btn {
+  min-width: 64px;
+  max-width: 90px;
+  min-height: 34px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.oc-race-layer.oc-race-size-large {
+  --oc-race-half-w: 76px;
+  --oc-race-half-h: 36px;
+}
+
+.oc-race-size-large .oc-race-btn {
+  min-width: 108px;
+  max-width: 144px;
+  min-height: 60px;
+  padding: 8px 16px;
+  font-size: 21px;
+}
+
 /* 창 끝까지 남은 시간 — 시작 비율(--oc-race-start)에서 0 으로 줄어든다. */
 .oc-race-timer {
   display: block;

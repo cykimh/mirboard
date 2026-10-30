@@ -56,13 +56,9 @@ class TichuRoundStarterIT {
     @Autowired
     TichuMatchStateStore matchStateStore;
 
-    /** Phase 16(#2) — 시작은 capacity 가 아니라 전원 ready 시점. 헬퍼로 전원 준비. */
-    private Room readyAll(String roomId, long... ids) {
-        Room r = roomService.getRoom(roomId);
-        for (long id : ids) {
-            r = roomService.setReady(roomId, id, true);
-        }
-        return r;
+    /** D-161 — 친구 방은 전원 준비로 시작하지 않는다. 방장이 시작한다(정원 4 = 티츄 최소 인원). */
+    private Room startByHost(String roomId, long hostId) {
+        return roomService.startNow(roomId, hostId);
     }
 
     @Test
@@ -73,9 +69,9 @@ class TichuRoundStarterIT {
         roomService.joinRoom(roomId, 103L);
         roomService.joinRoom(roomId, 104L);
 
-        Room afterReady = readyAll(roomId, 101L, 102L, 103L, 104L);
+        Room afterStart = startByHost(roomId, 101L);
 
-        assertThat(afterReady.status()).isEqualTo(RoomStatus.IN_GAME);
+        assertThat(afterStart.status()).isEqualTo(RoomStatus.IN_GAME);
 
         TichuState state = stateStore.load(roomId)
                 .orElseThrow(() -> new AssertionError("State must be persisted after 4th join"));
@@ -109,7 +105,7 @@ class TichuRoundStarterIT {
         roomService.joinRoom(roomId, 202L);
         roomService.joinRoom(roomId, 203L);
         roomService.joinRoom(roomId, 204L);
-        readyAll(roomId, 201L, 202L, 203L, 204L);
+        startByHost(roomId, 201L);
 
         TichuState reloaded = stateStore.load(roomId).orElseThrow();
         // Save again and reload — confirms full round-trip including sealed type discriminator.
@@ -129,7 +125,7 @@ class TichuRoundStarterIT {
         roomService.joinRoom(roomId, 402L);
         roomService.joinRoom(roomId, 403L);
         roomService.joinRoom(roomId, 404L);
-        readyAll(roomId, 401L, 402L, 403L, 404L);
+        startByHost(roomId, 401L);
 
         var matchState = matchStateStore.load(roomId)
                 .orElseThrow(() -> new AssertionError("match state must exist after game start"));
@@ -146,7 +142,7 @@ class TichuRoundStarterIT {
         roomService.joinRoom(roomId, 302L);
         roomService.joinRoom(roomId, 303L);
         roomService.joinRoom(roomId, 304L);
-        readyAll(roomId, 301L, 302L, 303L, 304L);
+        startByHost(roomId, 301L);
 
         for (long uid : new long[]{301L, 302L, 303L, 304L}) {
             var hand = stateStore.loadHand(roomId, uid)

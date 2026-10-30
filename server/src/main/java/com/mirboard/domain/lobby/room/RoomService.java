@@ -236,6 +236,82 @@ public class RoomService {
         return updated;
     }
 
+    /** D-161 — 대기실 설정 범위(턴 제한 초·목표 점수). 화면 선택지는 게임이 선언하고, 서버는 범위만 본다(D-154 와 같다). */
+    static final int MAX_TURN_SECONDS = 600;
+    static final int MIN_TARGET_SCORE = 100;
+    static final int MAX_TARGET_SCORE = 10_000;
+
+    /**
+     * D-161 — 대기실에서 방장이 게임 설정을 바꾼다(부분 갱신 — null 은 그대로). 검증은 만들 때와 같다: 게임이 선언한 방 설정만
+     * (D-106), 판돈 허용값·봇 방 판돈 금지. 시작 여부 확인과 쓰기는 {@code room_update_settings.lua} 한 번이라 확인 뒤 시작된
+     * 방의 설정은 바뀌지 않는다. 다른 사람 화면은 메타 갱신({@link RoomChangedEvent})으로 바로 바뀐다.
+     */
+    public Room updateSettings(String roomId, long requesterId, RoomSettingsUpdate update) {
+        Room room = getRoom(roomId);
+        if (room.hostId() != requesterId) {
+            throw new NotHostException(roomId);
+        }
+        if (room.status() != RoomStatus.WAITING) {
+            throw new GameAlreadyStartedException(roomId);
+        }
+        GameDefinition def = games.require(room.gameType());
+        var supported = def.supportedRoomOptions();
+        java.util.Map<String, String> fields = new java.util.LinkedHashMap<>();
+        if (update.turnSeconds() != null) {
+            int v = update.turnSeconds();
+            if (v < 0 || v > MAX_TURN_SECONDS) {
+                throw new InvalidRoomSettingException("turnSeconds", v);
+            }
+            fields.put("turnSeconds", Integer.toString(v));
+        }
+        if (update.targetScore() != null) {
+            int v = update.targetScore();
+            if (!supported.contains(RoomOption.TARGET_SCORE)) {
+                throw new UnsupportedRoomOptionException(def.id(), RoomOption.TARGET_SCORE);
+            }
+            if (v < MIN_TARGET_SCORE || v > MAX_TARGET_SCORE) {
+                throw new InvalidRoomSettingException("targetScore", v);
+            }
+            fields.put("targetScore", Integer.toString(v));
+        }
+        if (update.stake() != null) {
+            int v = update.stake();
+            if (!supported.contains(RoomOption.BETTING)) {
+                throw new UnsupportedRoomOptionException(def.id(), RoomOption.BETTING);
+            }
+            if (!ALLOWED_STAKES.contains(v)) {
+                throw new InvalidStakeException(v);
+            }
+            if (v > 0 && room.fillWithBots()) {
+                throw new StakedRoomNoBotsException();
+            }
+            fields.put("stake", Integer.toString(v));
+        }
+        if (update.raceButtonSize() != null) {
+            String v = update.raceButtonSize();
+            if (!supported.contains(RoomOption.RACE_BUTTON_SIZE)) {
+                throw new UnsupportedRoomOptionException(def.id(), RoomOption.RACE_BUTTON_SIZE);
+            }
+            if (!Room.RACE_BUTTON_SIZES.contains(v)) {
+                throw new InvalidRoomSettingException("raceButtonSize", v);
+            }
+            fields.put("raceButtonSize", v);
+        }
+        if (fields.isEmpty()) {
+            return room;
+        }
+        switch (repository.updateSettings(roomId, fields)) {
+            case 1 -> { }
+            case -1 -> throw new RoomNotFoundException(roomId);
+            case -2 -> throw new GameAlreadyStartedException(roomId);
+            default -> throw new IllegalStateException("room_update_settings.lua returned unexpected code");
+        }
+        Room updated = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(updated));
+        log.info("Room settings updated: roomId={} host={} fields={}", roomId, requesterId, fields);
+        return updated;
+    }
+
     public Room getRoom(String roomId) {
         return repository.findById(roomId).orElseThrow(() -> new RoomNotFoundException(roomId));
     }

@@ -278,13 +278,10 @@ class FinishedRoomSeatIntegrationTest {
                             .header("Authorization", bearer(players.get(i).token())))
                     .andExpect(status().isOk());
         }
-        for (Player p : players) {
-            mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                            .header("Authorization", bearer(p.token()))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"ready\":true}"))
-                    .andExpect(status().isOk());
-        }
+        // D-161 — 친구 방은 준비로 시작하지 않는다. 방장(첫 번째)이 시작한다.
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start")
+                        .header("Authorization", bearer(players.get(0).token())))
+                .andExpect(status().isOk());
         List<Long> ids = players.stream().map(Player::userId).toList();
         JsonNode room = getRoom(roomId, players.get(0).token());
         assertThat(room.get("status").asText()).isEqualTo("IN_GAME");

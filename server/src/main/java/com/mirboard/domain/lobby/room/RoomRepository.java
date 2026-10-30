@@ -26,6 +26,7 @@ public class RoomRepository {
     private final RedisScript<Long> deleteScript;
     private final RedisScript<Long> startNowScript;
     private final RedisScript<Long> returnWaitingScript;
+    private final RedisScript<Long> updateSettingsScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -38,6 +39,7 @@ public class RoomRepository {
             @Qualifier("roomDeleteScript") RedisScript<Long> deleteScript,
             @Qualifier("roomStartNowScript") RedisScript<Long> startNowScript,
             @Qualifier("roomReturnWaitingScript") RedisScript<Long> returnWaitingScript,
+            @Qualifier("roomUpdateSettingsScript") RedisScript<Long> updateSettingsScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
@@ -48,6 +50,7 @@ public class RoomRepository {
         this.deleteScript = deleteScript;
         this.startNowScript = startNowScript;
         this.returnWaitingScript = returnWaitingScript;
+        this.updateSettingsScript = updateSettingsScript;
         this.bots = bots;
     }
 
@@ -102,6 +105,19 @@ public class RoomRepository {
         String[] payload = newOrder.stream().map(String::valueOf).toArray(String[]::new);
         redis.opsForList().rightPushAll(key, payload);
         redis.expire(key, java.time.Duration.ofHours(6));
+    }
+
+    /**
+     * D-161 — 대기실 게임 설정 쓰기(room_update_settings.lua — WAITING 확인과 HSET 을 한 번에).
+     *
+     * @return 1 = 썼다, -1 = 방 없음, -2 = 이미 시작/종료
+     */
+    public int updateSettings(String roomId, java.util.Map<String, String> fields) {
+        String[] args = fields.entrySet().stream()
+                .flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue()))
+                .toArray(String[]::new);
+        Long result = redis.execute(updateSettingsScript, List.of("room:" + roomId), (Object[]) args);
+        return (int) unwrap(result);
     }
 
     /** Phase 8C — 호스트가 WAITING 중 정책을 변경. status=IN_GAME 이면 호출 불가. */
@@ -264,6 +280,9 @@ public class RoomRepository {
         // D-81 — stake 없으면 (구방) 0 (내기 없음) 기본값.
         String rawStake = (String) hash.get("stake");
         int stake = rawStake == null ? 0 : Integer.parseInt(rawStake);
+        // D-161 — 없으면(구방·설정 안 함) MEDIUM.
+        String rawRaceSize = (String) hash.get("raceButtonSize");
+        String raceButtonSize = rawRaceSize == null ? Room.DEFAULT_RACE_BUTTON_SIZE : rawRaceSize;
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -288,7 +307,8 @@ public class RoomRepository {
                 targetScore,
                 turnSeconds,
                 stake,
-                readyUserIds));
+                readyUserIds,
+                raceButtonSize));
     }
 
     /**

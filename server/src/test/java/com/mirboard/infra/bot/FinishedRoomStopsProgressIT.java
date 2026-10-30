@@ -237,13 +237,10 @@ class FinishedRoomStopsProgressIT {
         mockMvc.perform(post("/api/rooms/" + roomId + "/join")
                         .header("Authorization", bearer(tokens.get(1))))
                 .andExpect(status().isOk());
-        for (String token : tokens) {
-            mockMvc.perform(post("/api/rooms/" + roomId + "/ready")
-                            .header("Authorization", bearer(token))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"ready\":true}"))
-                    .andExpect(status().isOk());
-        }
+        // D-161 — 친구 방은 준비로 시작하지 않는다. 방장(첫 번째)이 시작한다.
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start")
+                        .header("Authorization", bearer(tokens.get(0))))
+                .andExpect(status().isOk());
         Table t = new Table(roomId, tokens);
         assertThat(roomStatus(t)).isEqualTo("IN_GAME");
         assertThat(pendingTurnDeadlines(roomId))

@@ -110,47 +110,41 @@ describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
   });
 });
 
-describe('CreateRoomModal — 방 옵션 게이팅 (D-106)', () => {
+/**
+ * D-161 — 친구와 하기는 방 종류·게임·방 이름만 고른다. 턴 제한·목표 점수·판돈은 대기실에서 방장이 바꾼다(`RoomSettingsPanel`) —
+ * 요청에도 싣지 않는다(서버가 게임 선언 기본으로 연다). 봇과 연습은 곧바로 시작하므로 인원·턴 제한만 고른다.
+ */
+describe('CreateRoomModal — 게임 설정은 대기실에서 (D-161)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockResolvedValue({ roomId: 'room-1' });
   });
 
-  it('옵션을 쓰는 게임에는 목표 점수·판돈을 노출한다', () => {
+  it('친구와 하기에는 목표 점수·판돈·턴 제한이 없고 대기실에서 바꾼다고 알린다', () => {
     openModal([FIXED]);
-    expect(screen.getByText('목표 점수')).toBeTruthy();
-    expect(screen.getByLabelText('판돈(내기) 켜기/끄기')).toBeTruthy();
-  });
-
-  it('옵션을 안 쓰는 게임에는 목표 점수·판돈을 노출하지 않는다', () => {
-    openModal([VARIABLE]);
     expect(screen.queryByText('목표 점수')).toBeNull();
     expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
+    expect(screen.queryByText('턴 제한')).toBeNull();
+    expect(screen.getByText(/대기실에서 방장이 바꿔요/)).toBeTruthy();
   });
 
-  it('게임과 무관한 옵션(턴 제한)은 계속 노출한다', () => {
-    openModal([VARIABLE]);
-    expect(screen.getByText('턴 제한')).toBeTruthy();
-  });
-
-  it('미지원 게임은 targetScore·stake 를 아예 보내지 않는다', async () => {
-    openModal([VARIABLE]);
+  it('친구와 하기는 targetScore·stake·turnSeconds 를 보내지 않는다', async () => {
+    openModal([FIXED]);
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     const opts = lastCreateOpts();
     expect(opts.targetScore).toBeUndefined();
     expect(opts.stake).toBeUndefined();
-    // 게임 중립 옵션은 그대로 실려야 한다 — 게이팅이 과하게 먹지 않았는지.
-    expect(opts.turnSeconds).toBe(0);
+    expect(opts.turnSeconds).toBeUndefined();
+    expect(opts.fillWithBots).toBe(false);
   });
 
-  it('지원 게임은 targetScore·stake 를 실어 보낸다', async () => {
+  it('봇과 연습에는 턴 제한이 있고 목표 점수·판돈은 없다', () => {
     openModal([FIXED]);
-    submit();
-    await waitFor(() => expect(createMock).toHaveBeenCalled());
-    const opts = lastCreateOpts();
-    expect(opts.targetScore).toBe(1000);
-    expect(opts.stake).toBe(0);
+    fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
+    expect(screen.getByText('턴 제한')).toBeTruthy();
+    expect(screen.queryByText('목표 점수')).toBeNull();
+    expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
   });
 });
 
@@ -206,18 +200,6 @@ describe('CreateRoomModal — 친구와 하기 / 봇과 연습 (D-136)', () => {
     expect(lastCreateOpts().turnSeconds).toBe(30);
   });
 
-  // 최종 리뷰 FR-1 — 티츄는 연습이면 목표 점수·판돈을 숨기는데, 그 게이팅이 바뀔 때 턴 제한까지 처음 값으로 돌아갔다(원카드는 그대로).
-  it('방 종류를 바꿔도 고른 턴 제한은 그대로다 (티츄)', async () => {
-    openModal([FIXED]);
-    fireEvent.click(screen.getByRole('radio', { name: '60초' }));
-    practice();
-    expect(screen.getByRole('radio', { name: '60초' })).toHaveAttribute('aria-checked', 'true');
-
-    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
-    await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().turnSeconds).toBe(60);
-  });
-
   it('다시 열면 처음 선택(친구와 하기)으로 돌아간다', () => {
     const view = render(
       <MemoryRouter>
@@ -238,16 +220,6 @@ describe('CreateRoomModal — 친구와 하기 / 봇과 연습 (D-136)', () => {
 
     expect(screen.getByRole('radio', { name: '친구와 하기' })).toHaveAttribute('aria-checked', 'true');
   });
-
-  it('판돈을 켠 뒤 봇과 연습으로 바꾸면 판돈을 보내지 않는다 (판돈 방 봇 금지)', async () => {
-    openModal([FIXED]);
-    fireEvent.click(screen.getByLabelText('판돈(내기) 켜기/끄기'));
-    practice();
-    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
-    await waitFor(() => expect(createMock).toHaveBeenCalled());
-    expect(lastCreateOpts().stake).toBeUndefined();
-    expect(lastCreateOpts().fillWithBots).toBe(true);
-  });
 });
 
 describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => {
@@ -258,17 +230,20 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
 
   const practice = () => fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
 
+  // D-161 — 턴 제한은 봇과 연습에서만 고른다(친구 방은 대기실에서).
+  const start = () => fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
+
   it('게임이 선언한 턴 제한을 처음부터 골라 두고, 봇과 연습의 인원도 선언값이다', () => {
     openModal([DECLARED]);
-    expect(screen.getByRole('radio', { name: '30초' })).toHaveAttribute('aria-checked', 'true');
-
     practice();
+    expect(screen.getByRole('radio', { name: '30초' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: '4' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('바꾸지 않으면 선언한 턴 제한으로 보낸다', async () => {
     openModal([DECLARED]);
-    submit();
+    practice();
+    start();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
 
     expect(lastCreateOpts().turnSeconds).toBe(30);
@@ -276,8 +251,9 @@ describe('CreateRoomModal — 게임이 선언한 처음 선택 (D-130)', () => 
 
   it('사용자가 바꾼 턴 제한을 그대로 보낸다', async () => {
     openModal([DECLARED]);
+    practice();
     fireEvent.click(screen.getByRole('radio', { name: '끔' }));
-    submit();
+    start();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
 
     expect(lastCreateOpts().turnSeconds).toBe(0);
@@ -331,18 +307,22 @@ describe('CreateRoomModal — 게임이 선언한 턴 제한 선택지 (D-154)',
       .map((r) => r.textContent)
       .filter((t) => t === '끔' || /초$/.test(t ?? ''));
 
-  it('원카드는 짧은 선택지 — 5초를 골라 보낼 수 있다', async () => {
+  const practice = () => fireEvent.click(screen.getByRole('radio', { name: '봇과 연습' }));
+
+  it('원카드는 짧은 선택지 — 5초를 골라 보낼 수 있다 (봇과 연습)', async () => {
     openModal([{ ...DECLARED, turnSecondsChoices: [0, 5, 10, 20, 30] }]);
+    practice();
     expect(labels()).toEqual(['끔', '5초', '10초', '20초', '30초']);
 
     fireEvent.click(screen.getByRole('radio', { name: '5초' }));
-    submit();
+    fireEvent.click(screen.getByRole('button', { name: '연습 시작' }));
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().turnSeconds).toBe(5);
   });
 
   it('선택지를 안 실은 게임은 끔·30·60·90초', () => {
     openModal([FIXED]);
+    practice();
     expect(labels()).toEqual(['끔', '30초', '60초', '90초']);
   });
 });
