@@ -378,6 +378,15 @@ rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라�
 }
 ```
 
+### GET `/api/users/ranking/games` *(D-160 — 랭킹 탭 순서)*
+게임별 판수(`user_game_stats` 의 승+패 합, 봇 제외)를 많이 한 게임부터 준다. 한 판도 없는 게임은 싣지 않는다(클라가 카탈로그 순서로 뒤에
+붙인다). 한 매치를 여러 사람이 하므로 "사람-판" 수다 — 순서를 정하는 데 쓴다.
+
+응답 `200`
+```json
+{ "games": [ { "gameType": "ONE_CARD", "plays": 120 }, { "gameType": "TICHU", "plays": 48 } ] }
+```
+
 ### GET `/api/users/{userId}/head-to-head` *(D-154 — 상대 전적)*
 쿼리 `gameType`(선택 — 주면 그 게임만). 기존 매치 기록에서 계산한다. 게임마다 `HeadToHeadSource` 가 셈법을 정한다:
 - 티츄: 상대 팀 사람만 센다. 내 팀이 이기면 승이다.

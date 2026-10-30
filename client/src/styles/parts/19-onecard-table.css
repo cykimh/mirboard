@@ -258,8 +258,28 @@ button.oc-badge {
 }
 
 .oc-seat-turn {
-  box-shadow: 0 0 0 2px var(--oc-accent);
+  /* D-160 — 차례가 확실히 보이게: 두꺼운 테두리 + 빛이 천천히 맥박친다(움직임 줄이기면 멈춘 빛 — 미디어는 17 끝, 이 파일은
+     미디어 0개). */
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
 }
+
+@keyframes oc-turn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 6px 0 var(--oc-accent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 18px 4px var(--oc-accent);
+  }
+}
+
 
 .oc-seat-out {
   opacity: 0.5;
@@ -276,8 +296,26 @@ button.oc-badge {
 /* 1장 남은 사람의 차례 — 둘 다 box-shadow 라 뒤의 규칙이 이기면 차례 링이 사라진다. 두 링을 겹쳐 그린다. */
 .oc-seat-turn.oc-seat-last {
   box-shadow:
-    0 0 0 2px var(--oc-accent),
-    0 0 0 4px var(--oc-race-catch);
+    0 0 0 3px var(--oc-accent),
+    0 0 0 5px var(--oc-race-catch);
+  animation-name: oc-turn-pulse-last;
+}
+
+/* D-160 — 맥박이 "1장!" 빨간 바깥 고리를 지우지 않게 따로 둔다. */
+@keyframes oc-turn-pulse-last {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 0 5px var(--oc-race-catch),
+      0 0 6px 0 var(--oc-race-catch);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--oc-accent),
+      0 0 0 5px var(--oc-race-catch),
+      0 0 18px 4px var(--oc-race-catch);
+  }
 }
 
 /* 좁은 좌석(내용 < 아바타 28 + 간격 6 + 이름 44 = 78px — 390px 옆줄 ≈65px)에서는 이름이 아바타 아래 줄로 내려가 좌석 폭을 다
@@ -385,6 +423,19 @@ button.oc-badge {
   top: -9px;
   right: 6px;
   padding: 0 6px;
+}
+
+/* D-160 — 차례 표시: 좌석 왼쪽 위, 좌석 색으로 채운다("다음"은 오른쪽 위 테두리만). */
+.oc-seat > .oc-seat-now {
+  position: absolute;
+  top: -9px;
+  left: 6px;
+  padding: 0 6px;
+  border-color: var(--oc-accent);
+  background: var(--oc-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* ── 가운데 — 더미·맨 위 카드·상태 ─────────────────────────────────── */
@@ -683,7 +734,19 @@ button.oc-card {
 }
 
 .oc-me-turn {
-  box-shadow: 0 0 0 2px var(--oc-accent);
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
+}
+
+/* D-160 — 내 차례면 손패 칸도 빛난다. */
+.oc-hand-myturn {
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
 }
 
 .oc-me-count {
@@ -691,11 +754,39 @@ button.oc-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* 손패는 감긴다 — 원카드 손패는 20장 가까이 늘 수 있어 한 줄 겹치기(.overlap)를 쓰지 않는다. */
-.oc-hand-cards {
-  justify-content: center;
+/* D-160 — 손패는 최대 2줄(8장까지 한 줄, 넘으면 반씩 — OneCardHand.handRows). 줄이 폭을 넘으면 카드를 감싼 칸
+   (.oc-hand-slot)이 줄어들고 카드는 그대로라 다음 카드 밑으로 겹친다. 마지막 칸은 줄지 않아 끝 카드는 다 보인다. */
+/* 공용 `.my-hand .hand-cards:not(.overlap)`(flex-wrap: wrap — 특이도 0,3,0)를 이겨야 한다. wrap 이면 세로 줄이 내용 폭으로 늘어
+   줄이 화면 밖으로 밀렸다(실측 390px). 그래서 같은 특이도에 뒤에 둔다. */
+.oc-hand .hand-cards.oc-hand-cards {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
   min-height: 96px;
   padding-top: 8px;
+}
+
+.oc-hand-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oc-hand-slot {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.oc-hand-slot:last-child {
+  flex-shrink: 0;
+}
+
+/* 고른 카드는 겹친 이웃 위로 올라온다. */
+.oc-hand-slot .oc-card-selected {
+  z-index: 3;
 }
 
 .oc-hand-empty {

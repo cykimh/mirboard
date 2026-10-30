@@ -25,6 +25,18 @@ interface Props {
   onDraw: () => void;
   /** D-154 — 더블클릭으로 바로 낼 카드. 7(무늬 지정)·낼 수 없는 카드·내 차례 아님은 부르지 않는다. */
   onPlayCard?: (card: OneCardCard) => void;
+  /** D-160 — 내 차례 강조 색(내 좌석 색). */
+  accent?: string;
+}
+
+/** D-160 — 이 장수까지는 한 줄. */
+export const HAND_ONE_ROW_MAX = 8;
+
+/** D-160 — 손패는 최대 2줄: {@link HAND_ONE_ROW_MAX} 장까지 한 줄, 넘으면 반씩(윗줄이 한 장 더). 줄이 넘치면 CSS 가 겹친다. */
+export function handRows<T>(cards: T[]): T[][] {
+  if (cards.length <= HAND_ONE_ROW_MAX) return [cards];
+  const top = Math.ceil(cards.length / 2);
+  return [cards.slice(0, top), cards.slice(top)];
 }
 
 /**
@@ -46,6 +58,7 @@ export function OneCardHand({
   onPlay,
   onDraw,
   onPlayCard,
+  accent,
 }: Props) {
   const selected = selectedKey ? (hand.find((c) => cardKey(c) === selectedKey) ?? null) : null;
   const needSuit = selected !== null && isSuitChange(selected);
@@ -64,32 +77,41 @@ export function OneCardHand({
           : '카드 내기';
 
   return (
-    <section className="my-hand oc-hand" aria-label="내 손패">
+    <section
+      className={`my-hand oc-hand${myTurn ? ' oc-hand-myturn' : ''}`}
+      style={accent ? { ['--oc-accent' as string]: accent } : undefined}
+      aria-label="내 손패"
+    >
       <div className="hand-cards oc-hand-cards">
-        {sortForDisplay(hand).map((card) => {
-          const key = cardKey(card);
-          return (
-            <OneCardCardChip
-              key={key}
-              card={card}
-              selected={selectedKey === key}
-              dimmed={canAct && !canPlay(card, topCard, declaredSuit, attackStack)}
-              onClick={() => onSelect(selectedKey === key ? null : key)}
-              onDoubleClick={() => {
-                // 더블클릭 앞의 두 번 누름이 고르기를 켰다 껐다 하므로 결과와 상관없이 다시 고른다.
-                onSelect(key);
-                if (
-                  onPlayCard &&
-                  canAct &&
-                  !isSuitChange(card) &&
-                  canPlay(card, topCard, declaredSuit, attackStack)
-                ) {
-                  onPlayCard(card);
-                }
-              }}
-            />
-          );
-        })}
+        {handRows(sortForDisplay(hand)).map((row, i) => (
+          <div key={i} className="oc-hand-row">
+            {row.map((card) => {
+              const key = cardKey(card);
+              return (
+                <span key={key} className="oc-hand-slot">
+                  <OneCardCardChip
+                    card={card}
+                    selected={selectedKey === key}
+                    dimmed={canAct && !canPlay(card, topCard, declaredSuit, attackStack)}
+                    onClick={() => onSelect(selectedKey === key ? null : key)}
+                    onDoubleClick={() => {
+                      // 더블클릭 앞의 두 번 누름이 고르기를 켰다 껐다 하므로 결과와 상관없이 다시 고른다.
+                      onSelect(key);
+                      if (
+                        onPlayCard &&
+                        canAct &&
+                        !isSuitChange(card) &&
+                        canPlay(card, topCard, declaredSuit, attackStack)
+                      ) {
+                        onPlayCard(card);
+                      }
+                    }}
+                  />
+                </span>
+              );
+            })}
+          </div>
+        ))}
         {hand.length === 0 && <span className="oc-hand-empty">손패 없음</span>}
       </div>
 

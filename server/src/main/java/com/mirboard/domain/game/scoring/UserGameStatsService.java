@@ -77,6 +77,12 @@ public class UserGameStatsService {
         repo.record(userId, gameType, newRating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
     }
 
+    /** D-160 — 랭킹 탭 순서용 게임별 판수(많이 한 게임부터). */
+    @Transactional(readOnly = true)
+    public List<UserGameStatsRepository.GamePlays> playsByGame() {
+        return repo.countPlaysByGame();
+    }
+
     @Transactional(readOnly = true)
     public List<RankRow> ranking(String gameType, int limit) {
         // D-117 — 일회용 게스트는 랭킹에 싣지 않는다.

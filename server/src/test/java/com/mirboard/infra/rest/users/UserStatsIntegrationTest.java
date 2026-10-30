@@ -149,6 +149,22 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** D-160 — 랭킹 탭 순서: 전체에서 많이 한 게임부터(승+패 합). */
+    @Test
+    void game_plays_are_ordered_by_total_plays() throws Exception {
+        long oc = registerAndGetId("gsocmany", "validpass1");
+        String token = login("gsocmany", "validpass1");
+        for (int i = 0; i < 6; i++) {
+            gameStats.record(oc, "ONE_CARD", i % 2 == 0, null, false);
+        }
+
+        mockMvc.perform(get("/api/users/ranking/games")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.games[0].gameType").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[0].plays").value(org.hamcrest.Matchers.greaterThanOrEqualTo(6)));
+    }
+
     @Test
     void me_win_lose_is_the_sum_over_games() throws Exception {
         long userId = registerAndGetId("gsme", "validpass1");

@@ -84,6 +84,8 @@ export function OneCardSeat({
       data-side={side}
       data-slot={slot}
     >
+      {/* D-160 — 지금 차례가 확실히 보이게. 테두리 맥박과 함께. */}
+      {isTurn && <span className="oc-badge oc-seat-now">차례</span>}
       {isNext && <span className="oc-badge oc-seat-next">다음</span>}
       {reaction && (
         <span className="oc-seat-reaction" aria-hidden="true">

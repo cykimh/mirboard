@@ -106,6 +106,23 @@ public class UserController {
         return new RankingResponse(game, entries);
     }
 
+    /**
+     * D-160 — 랭킹 탭 순서: 전체에서 많이 한 게임부터(게임별 승+패 합, 봇 제외). 한 판도 없는 게임은 싣지 않는다 — 클라가
+     * 카탈로그 순서로 뒤에 붙인다.
+     */
+    @GetMapping("/ranking/games")
+    public GamePlaysResponse rankingGames() {
+        return new GamePlaysResponse(gameStats.playsByGame().stream()
+                .map(p -> new GamePlays(p.gameType(), p.plays()))
+                .toList());
+    }
+
+    public record GamePlays(String gameType, long plays) {
+    }
+
+    public record GamePlaysResponse(List<GamePlays> games) {
+    }
+
     public record RankEntry(
             int rank,
             long userId,

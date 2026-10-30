@@ -49,6 +49,11 @@ export interface RankingResponse {
   entries: RankEntry[];
 }
 
+/** D-160 — 게임별 판수(승+패 합, 봇 제외). 많이 한 게임부터, 한 판도 없는 게임은 없다. */
+export interface GamePlaysResponse {
+  games: { gameType: string; plays: number }[];
+}
+
 export interface UserName {
   userId: number;
   username: string;
@@ -82,6 +87,10 @@ export const usersApi = {
       `/api/users/ranking?limit=${limit}&gameType=${encodeURIComponent(gameType)}`,
       { token },
     );
+  },
+  /** D-160 — 랭킹 탭 순서용 게임별 판수. */
+  rankingGames(token: string): Promise<GamePlaysResponse> {
+    return apiRequest('/api/users/ranking/games', { token });
   },
   /** D-154 — 상대 전적. gameType 을 주면 그 게임만. */
   headToHead(token: string, userId: number, gameType?: string): Promise<HeadToHeadResponse> {

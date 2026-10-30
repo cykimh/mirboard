@@ -139,12 +139,15 @@ export function OneCardTable({
     !spectator && mySeat >= 0 && !iAmOut && s.result === null && !raceOpen && turnSeat === mySeat;
   const canPress = !spectator && mySeat >= 0 && !iAmOut && s.result === null && !roomFinished;
 
-  // D-154 — 내 차례가 되면 짧은 알림음(음소거면 무음).
+  // D-154 — 내 차례가 되면 짧은 알림음(음소거면 무음). D-160 — 휴대폰은 한 번 짧게 진동한다(효과음 끄기를 따른다).
   const wasMyTurn = useRef(myTurn);
   useEffect(() => {
-    if (myTurn && !wasMyTurn.current) playChime();
+    if (myTurn && !wasMyTurn.current) {
+      playChime();
+      if (!muted) navigator.vibrate?.(120);
+    }
     wasMyTurn.current = myTurn;
-  }, [myTurn, playChime]);
+  }, [myTurn, playChime, muted]);
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
@@ -461,6 +464,7 @@ export function OneCardTable({
 
           {!roomFinished && s.result === null && !iAmOut && (
             <OneCardHand
+              accent={seatAccent(mySeat)}
               hand={s.hand}
               selectedKey={s.selectedKey}
               suitChoice={s.suitChoice}

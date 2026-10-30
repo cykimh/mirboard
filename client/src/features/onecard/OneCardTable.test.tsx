@@ -195,6 +195,37 @@ describe('OneCardTable — 좌석', () => {
   });
 });
 
+/** D-160 — 손패는 최대 2줄. 8장까지 한 줄, 9장부터 반씩 두 줄(윗줄이 한 장 더). 넘치면 겹친다(CSS). */
+describe('OneCardTable — 손패 최대 2줄 (D-160)', () => {
+  const handOf = (n: number) =>
+    Array.from({ length: n }, (_, i) => c((['SPADE', 'HEART', 'DIAMOND', 'CLUB'] as const)[i % 4], (i % 13) + 1));
+  const rowSizes = () =>
+    Array.from(screen.getByRole('region', { name: '내 손패' }).querySelectorAll('.oc-hand-row')).map(
+      (row) => row.querySelectorAll('button.oc-card').length,
+    );
+
+  it('8장까지는 한 줄이다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(8) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([8]);
+  });
+
+  it('9장부터는 두 줄로 나눈다 — 윗줄이 한 장 더', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(9) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([5, 4]);
+  });
+
+  it('20장이어도 두 줄이다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: handOf(20) });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(rowSizes()).toEqual([10, 10]);
+  });
+});
+
 describe('OneCardTable — 내기·먹기', () => {
   const HAND = [c('CLUB', 4), c('HEART', 3), c('SPADE', 9), c('CLUB', 7)];
 
@@ -1102,6 +1133,53 @@ describe('OneCardTable — 테이블 좌석 배치 (D-132)', () => {
     const seat = container.querySelector('[data-seat="1"]') as HTMLElement;
     expect(seat).toHaveAttribute('data-side', 'left');
     expect(seat.querySelector('.oc-seat-name')).toHaveAttribute('title', long);
+  });
+});
+
+/** D-160 — 차례가 확실히 보이게: 차례 좌석에 "차례" 표시, 내 차례면 손패 칸이 빛나고 휴대폰이 한 번 진동한다. */
+describe('OneCardTable — 차례 강조 (D-160)', () => {
+  const seatEl = (seat: number) => document.querySelector(`[data-seat="${seat}"]`) as HTMLElement;
+  const vibrate = vi.fn();
+
+  beforeEach(() => {
+    vibrate.mockReset();
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    window.localStorage.removeItem('mirboard.sfxMuted');
+  });
+  afterEach(() => {
+    delete (navigator as { vibrate?: unknown }).vibrate;
+    window.localStorage.removeItem('mirboard.sfxMuted');
+  });
+
+  it('차례 좌석에 "차례" 표시가 붙고 다른 좌석에는 없다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    expect(within(seatEl(2)).getByText('차례')).toBeInTheDocument();
+    expect(within(seatEl(1)).queryByText('차례')).toBeNull();
+  });
+
+  it('내 차례면 손패 칸이 강조되고, 아니면 강조가 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)] });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(screen.getByRole('region', { name: '내 손패' })).toHaveClass('oc-hand-myturn');
+
+    act(() => useOneCardStore.setState({ turnSeat: 1 }));
+    expect(screen.getByRole('region', { name: '내 손패' })).not.toHaveClass('oc-hand-myturn');
+  });
+
+  it('내 차례가 되는 순간 한 번 진동한다 — 효과음을 끄면 진동도 없다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(vibrate).not.toHaveBeenCalled();
+
+    act(() => useOneCardStore.setState({ turnSeat: 0 }));
+    expect(vibrate).toHaveBeenCalledTimes(1);
+
+    act(() => useOneCardStore.setState({ turnSeat: 1 }));
+    fireEvent.click(screen.getByRole('button', { name: '효과음' }));
+    act(() => useOneCardStore.setState({ turnSeat: 0 }));
+    expect(vibrate).toHaveBeenCalledTimes(1);
   });
 });
 
