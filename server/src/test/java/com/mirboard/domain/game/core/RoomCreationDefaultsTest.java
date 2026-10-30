@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>D-131 — 이 값은 서버의 생략 기본이기도 하다({@code RoomService} — {@code RoomServiceCreateDefaultsTest}). 정의는
  * 저장소를 생성자로 받지만 이 메서드는 쓰지 않으므로 null
- * (원카드는 모의 저장소)로 인스턴스를 만든다({@link RematchSupportTest} 와 같은 방식).
+ * (원카드는 모의 저장소)로 인스턴스를 만든다(예전 RematchSupportTest 와 같은 방식).
  */
 class RoomCreationDefaultsTest {
 

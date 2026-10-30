@@ -993,3 +993,18 @@ button.oc-pile-draw {
   filter: drop-shadow(0 0 5px rgba(91, 141, 239, 0.95));
 }
 
+
+/* D-153 — 판 종료 화면: 친구 방이 대기실로 돌아오면 안내 한 줄 + [대기실로]·[나가기]. */
+.oc-match-next {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.oc-match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}

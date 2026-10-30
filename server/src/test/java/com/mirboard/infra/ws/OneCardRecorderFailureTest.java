@@ -73,7 +73,7 @@ class OneCardRecorderFailureTest {
     }
 
     @Test
-    void the_last_card_reaches_everyone_and_the_room_finishes_even_if_recording_fails() {
+    void the_last_card_reaches_everyone_and_the_room_goes_back_to_waiting_even_if_recording_fails() {
         List<Long> players = List.of(10L, 30L);
         when(roomService.getRoom(ROOM)).thenReturn(new Room(ROOM, "방", "ONE_CARD", 10L, RoomStatus.IN_GAME, 2, 2,
                 players, Set.of(), TeamPolicy.SEQUENTIAL, 0L, false, List.of(), 1000, 0, 0, Set.of()));
@@ -91,7 +91,7 @@ class OneCardRecorderFailureTest {
         when(games.require(anyString())).thenReturn(mock(GameDefinition.class));
         MirboardMetrics metrics = mock(MirboardMetrics.class);
         GameStompController controller = new GameStompController(roomService, engines, new ObjectMapper(),
-                broadcaster, lock, new MatchProgressService(roomService, metrics, games),
+                broadcaster, lock, new MatchProgressService(roomService, metrics, mock(RoomPresence.class), mock(WaitingLeaveGraceScheduler.class)),
                 mock(BotScheduler.class), mock(TurnTimeoutScheduler.class), metrics);
 
         controller.onAction(ROOM, Map.of("@action", "PLAY_CARD", "card", Map.of("suit", "HEART", "rank", 9)),
@@ -101,6 +101,7 @@ class OneCardRecorderFailureTest {
         verify(broadcaster).broadcast(eq(ROOM), argThat((List<? extends GameEvent> events) ->
                 events.stream().anyMatch(OneCardEvent.CardPlayed.class::isInstance)
                         && events.getLast() instanceof OneCardEvent.MatchEnded), eq(players));
-        verify(roomService).markFinished(ROOM);
+        // D-153 — 사람끼리 방은 대기실로 돌아간다.
+        verify(roomService).returnToWaiting(ROOM);
     }
 }

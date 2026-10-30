@@ -36,6 +36,8 @@ interface Props {
   roomFinished?: boolean;
   /** D-136 — 봇과 연습 방(방의 fillWithBots). 머리 줄에 "🤖 혼자 연습". */
   practice?: boolean;
+  /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(이 세션이 전이를 봐 결과 화면을 유지하는 중). [대기실로]가 부른다. */
+  onBackToRoom?: () => void;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
 }
@@ -62,6 +64,7 @@ export function SkullKingTable({
   spectatorCount = 0,
   onExit,
   roomFinished = false,
+  onBackToRoom,
   onAbort,
   practice = false,
 }: Props) {
@@ -272,6 +275,7 @@ export function SkullKingTable({
           mySeat={mySeat}
           nameOf={nameOf}
           onExit={onExit}
+          onBackToRoom={onBackToRoom}
           completedRounds={s.completedRounds}
           seats={allSeats}
           desertedSeats={s.desertedSeats}

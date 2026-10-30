@@ -109,7 +109,7 @@ class TichuRecorderFailureTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(ListenerOrder.class)
-    void a_normal_match_end_still_settles_chips_waits_for_a_rematch_and_ends_the_match(ListenerOrder order) {
+    void a_normal_match_end_still_settles_chips_goes_back_to_waiting_and_ends_the_match(ListenerOrder order) {
         when(matchRepo.save(any())).thenThrow(
                 new DataAccessResourceFailureException("simulated DB outage in MatchResultRecorder"));
         List<GameEvent> outbound = new ArrayList<>();
@@ -122,7 +122,8 @@ class TichuRecorderFailureTest {
                     .doesNotThrowAnyException();
 
             assertThat(outbound.getLast()).isInstanceOf(TichuEvent.MatchEnded.class);
-            // 사람끼리 티츄 방은 리매치를 기다린다(D-82) — FINISHED 로 가지 않는다.
+            // D-153 — 사람끼리 방은 대기실로 돌아가 다음 판을 기다린다(FINISHED 로 가지 않는다).
+            verify(roomService).returnToWaiting(ROOM);
             verify(roomService, never()).markFinished(ROOM);
             assertChipsSettled();
             assertRecordFailureLogged(logs, DataAccessResourceFailureException.class);
@@ -196,7 +197,7 @@ class TichuRecorderFailureTest {
     private MatchProgressService progress() {
         GameRegistry games = mock(GameRegistry.class);
         when(games.require(TichuGameDefinition.ID)).thenReturn(new TichuGameDefinition(null, null, null, null));
-        return new MatchProgressService(roomService, mock(MirboardMetrics.class), games);
+        return new MatchProgressService(roomService, mock(MirboardMetrics.class), mock(RoomPresence.class), mock(WaitingLeaveGraceScheduler.class));
     }
 
     private static Room room() {

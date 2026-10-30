@@ -1,13 +1,10 @@
 import type { MouseEvent } from 'react';
-import { roomsApi } from '@/api/rooms';
 import { t } from '@/i18n/messages';
 import type { Card } from '@/types/tichu';
 
 type SendAction = (action: Record<string, unknown>) => void;
 
 interface UseGameActionsArgs {
-  roomId: string;
-  token: string | null;
   sendAction: SendAction;
   /** 현재 선택된 카드 (플레이 제출 페이로드). */
   selectedCards: Card[];
@@ -31,8 +28,6 @@ interface UseGameActionsArgs {
  * D-87 에서 GameTable 에서 분리. 각 핸들러 본문은 이동 전과 동일하다.
  */
 export function useGameActions({
-  roomId,
-  token,
   sendAction,
   selectedCards,
   selectedCardKeys,
@@ -110,17 +105,6 @@ export function useGameActions({
     sendAction({ '@action': 'READY' });
   }
 
-  // D-82 — 호스트가 매치 종료 후 '한 판 더'. 새 매치 이벤트→resync→applySnapshot 이
-  // matchEnded 를 정리하므로 별도 상태 처리 불필요.
-  async function handleRematch() {
-    if (!token) return;
-    try {
-      await roomsApi.rematch(token, roomId);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
   function handleCardClick(c: Card) {
     if (isInPassing && !iAmPassSubmitted) {
       selectPassCard(c);
@@ -141,7 +125,6 @@ export function useGameActions({
     handleCancelWishPlay,
     handleGiveDragon,
     handleReady,
-    handleRematch,
     handleCardClick,
   };
 }

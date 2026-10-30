@@ -68,7 +68,7 @@ class SkullKingRecorderFailureTest {
             2, new RoundScore(0, 0, 10, 0));
 
     @Test
-    void the_final_round_still_ends_the_match_and_finishes_the_room_when_recording_fails() {
+    void the_final_round_still_ends_the_match_and_returns_the_room_to_waiting_when_recording_fails() {
         SkullKingMatchState beforeLastRound = SkullKingMatchState.initial(3, 0);
         for (int i = 0; i < SkullKingMatchState.TOTAL_ROUNDS - 1; i++) {
             beforeLastRound = scored(beforeLastRound, Map.of(0, 10, 1, 20, 2, 0), 3);
@@ -78,7 +78,7 @@ class SkullKingRecorderFailureTest {
         GameRegistry games = mock(GameRegistry.class);
         // 스컬킹은 리매치를 선언하지 않는다(기본 false) — 끝나면 방이 FINISHED 로 간다.
         when(games.require(anyString())).thenReturn(mock(GameDefinition.class));
-        MatchProgressService progress = new MatchProgressService(roomService, mock(MirboardMetrics.class), games);
+        MatchProgressService progress = new MatchProgressService(roomService, mock(MirboardMetrics.class), mock(RoomPresence.class), mock(WaitingLeaveGraceScheduler.class));
         List<GameEvent> outbound = new ArrayList<>();
 
         try (LogCapture logs = LogCapture.of(SkullKingGameEngine.class)) {
@@ -88,7 +88,8 @@ class SkullKingRecorderFailureTest {
             assertThat(outbound).anyMatch(SkullKingEvent.RoundEnded.class::isInstance);
             assertThat(outbound.getLast()).isInstanceOf(SkullKingEvent.MatchEnded.class);
             verify(matchStates).save(eq(ROOM), argThat(SkullKingMatchState::isMatchOver));
-            verify(roomService).markFinished(ROOM);
+            // D-153 — 사람끼리 방은 대기실로 돌아간다.
+            verify(roomService).returnToWaiting(ROOM);
             assertRecordFailureLogged(logs);
         }
     }

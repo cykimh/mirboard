@@ -41,12 +41,14 @@ interface GameTableProps {
   spectatorCount?: number;
   /** userId→username 맵. 좌석에 #id 대신 닉네임 표시(없으면 #id 폴백). */
   usernames?: Record<number, string>;
-  /** D-82 — 내가 호스트인지 (매치 종료 화면 '한 판 더' 버튼 노출용). */
+  /** 내가 호스트인지. D-153 — '한 판 더'를 없애 지금은 쓰지 않는다(RoomPage 호환). */
   isHost?: boolean;
   /** Phase 16(#3) — 매치 종료 화면에서 "메인으로" 클릭 시 호출 (방 나가기+이동). */
   onExit?: () => void;
   /** D-135 — 방장 강제 종료(확인은 호출 측). RoomPage 가 방장이고 나머지가 모두 봇일 때만 넘긴다 — 없으면 버튼도 없다. */
   onAbort?: () => void;
+  /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(RoomPage 가 결과 화면을 유지하는 중). 매치 종료 화면의 [대기실로]가 부른다. */
+  onBackToRoom?: () => void;
 }
 
 /**
@@ -68,9 +70,9 @@ export function GameTable({
   stake = 0,
   spectatorCount = 0,
   usernames = {},
-  isHost = false,
   onExit,
   onAbort,
+  onBackToRoom,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, sendReaction, chatPanelOpenRef } =
@@ -105,8 +107,6 @@ export function GameTable({
   });
 
   const a = useGameActions({
-    roomId,
-    token,
     sendAction,
     selectedCards: m.selectedCards,
     selectedCardKeys: m.selectedCardKeys,
@@ -263,9 +263,8 @@ export function GameTable({
           chips={m.chips}
           chipDeltas={m.chipDeltas}
           spectator={spectator}
-          isHost={isHost}
-          onRematch={a.handleRematch}
           onExit={onExit}
+          onBackToRoom={onBackToRoom}
         />
       ) : (
         m.roundEnded && (

@@ -876,3 +876,18 @@ html:not(.dark) .sk-table {
   --sk-special-bg: #f4f1e8;
   --sk-special-fg: #2a2620;
 }
+
+/* D-153 — 매치 종료 화면: 친구 방이 대기실로 돌아오면 안내 한 줄 + [대기실로]·[나가기]. */
+.sk-match-next {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.sk-match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}

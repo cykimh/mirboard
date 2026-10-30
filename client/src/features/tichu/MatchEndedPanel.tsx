@@ -19,14 +19,14 @@ interface MatchEndedPanelProps {
   chips: Record<number, number>;
   chipDeltas: Record<number, number>;
   spectator: boolean;
-  isHost: boolean;
-  onRematch: () => void;
   onExit?: () => void;
+  /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(결과 화면 유지 중). [대기실로]가 부른다. 없으면 나가기만. */
+  onBackToRoom?: () => void;
 }
 
 /**
  * 매치 종료 결과 패널 — 승패 헤드라인, 최종 점수, 칩 정산(내기 방), MVP,
- * 라운드별 점수표, 그리고 '한 판 더'/'메인으로' 액션.
+ * 라운드별 점수표, 그리고 [대기실로](D-153 — '한 판 더' 대신)·'메인으로' 액션.
  *
  * D-87 에서 GameTable 에서 분리. 마크업·클래스명·문구 모두 이동 전과 동일하다.
  */
@@ -42,10 +42,8 @@ export function MatchEndedPanel({
   stake,
   chips,
   chipDeltas,
-  spectator,
-  isHost,
-  onRematch,
   onExit,
+  onBackToRoom,
 }: MatchEndedPanelProps) {
   return (
     <div className="match-ended">
@@ -135,13 +133,13 @@ export function MatchEndedPanel({
         {t('match.ended.roundsPlayed')}: {matchEnded.roundsPlayed}
       </p>
       <div className="match-actions">
-        {!spectator && isHost && (
-          <Button type="button" onClick={onRematch}>
-            🔄 한 판 더
-          </Button>
-        )}
-        {!spectator && !isHost && (
-          <p className="hint">호스트가 '한 판 더' 를 누르면 같은 테이블에서 다시 시작합니다.</p>
+        {onBackToRoom && (
+          <>
+            <p className="hint">대기실에서 방장이 시작하면 다음 판이에요.</p>
+            <Button type="button" onClick={onBackToRoom}>
+              대기실로
+            </Button>
+          </>
         )}
         {onExit && (
           <Button type="button" variant="outline" className="match-exit" onClick={onExit}>

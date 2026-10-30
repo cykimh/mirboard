@@ -38,8 +38,13 @@ function room(over: Partial<Room>): Room {
 }
 
 describe('spectateNoticeOf (D-133 결정 A)', () => {
-  it('관전으로 받아졌고 게임이 시작된 방이면 started', () => {
-    expect(spectateNoticeOf('SPECTATING', room({ status: 'IN_GAME' }))).toBe('started');
+  // D-153 — 친구 방은 판이 끝나면 대기실로 돌아가 관전자가 자동으로 앉는다. 봇과 연습 방은 한 판으로 끝난다.
+  it('관전으로 받아졌고 게임이 시작된 친구 방이면 nextRound', () => {
+    expect(spectateNoticeOf('SPECTATING', room({ status: 'IN_GAME' }))).toBe('nextRound');
+  });
+
+  it('봇과 연습 방이면 started', () => {
+    expect(spectateNoticeOf('SPECTATING', room({ status: 'IN_GAME', fillWithBots: true }))).toBe('started');
   });
 
   it('관전으로 받아졌고 꽉 찬 대기실이면 full', () => {
@@ -91,6 +96,7 @@ describe('SpectateNotice (D-133 결정 A)', () => {
 
   it.each([
     ['started', '게임이 이미 시작돼 관전으로 들어왔어요'],
+    ['nextRound', '게임이 이미 시작돼 관전 중이에요 — 이 판이 끝나면 다음 판에 함께해요'],
     ['full', '자리가 없어 관전으로 들어왔어요'],
   ] as const)('%s 문구', (kind, text) => {
     render(<SpectateNotice kind={kind} onClose={() => {}} />);

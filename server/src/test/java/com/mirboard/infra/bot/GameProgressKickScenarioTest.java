@@ -36,6 +36,8 @@ import com.mirboard.infra.ws.GameEngineProvider;
 import com.mirboard.infra.ws.GameEventBroadcaster;
 import com.mirboard.infra.ws.GameStompController;
 import com.mirboard.infra.ws.MatchProgressService;
+import com.mirboard.infra.ws.RoomPresence;
+import com.mirboard.infra.ws.WaitingLeaveGraceScheduler;
 import com.mirboard.infra.ws.RoomActionLock;
 import java.time.Clock;
 import java.time.Duration;
@@ -136,7 +138,6 @@ class GameProgressKickScenarioTest {
         when(engines.forRoom(any())).thenAnswer(i ->
                 new OneCardGameEngine(ctx, store, clock, new Random(7), RaceSettings.DEFAULT, publisher));
         GameDefinition def = mock(GameDefinition.class);
-        when(def.supportsRematch()).thenReturn(false);
         when(games.require(anyString())).thenReturn(def);
 
         when(store.load(ROOM)).thenAnswer(i -> Optional.ofNullable(stored.get()));
@@ -182,7 +183,7 @@ class GameProgressKickScenarioTest {
             return null;
         }).when(broadcaster).broadcast(anyString(), anyList(), anyList());
 
-        MatchProgressService matchProgress = new MatchProgressService(roomService, metrics, games);
+        MatchProgressService matchProgress = new MatchProgressService(roomService, metrics, mock(RoomPresence.class), mock(WaitingLeaveGraceScheduler.class));
         turnTimeout = new TurnTimeoutScheduler(roomService, engines, broadcaster, lock, matchProgress, botProxy,
                 deadlines, generations);
         bots = new BotScheduler(roomService, engines, broadcaster, lock, matchProgress,

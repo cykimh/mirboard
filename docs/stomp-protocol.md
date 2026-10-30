@@ -29,6 +29,7 @@
 ## 토픽 / 큐 카탈로그
 
 > D-146 — 로비 채팅(`/topic/lobby/chat`·`/app/lobby/chat`)은 없앴다. 방 채팅만 남는다.
+> D-153 — 사람만의 방은 매치 정상 종료 뒤 `/topic/room/{id}/meta` 의 `ROOM_META_UPDATED` 가 `status: WAITING`(IN_GAME→WAITING)을 싣는다(관전자가 자동으로 앉은 `playerIds`). 다음 `IN_GAME` 은 방장 시작.
 
 | 종류 | 목적지 | 흐름 | 내용 |
 | --- | --- | --- | --- |

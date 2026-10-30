@@ -36,6 +36,12 @@ public class RedisConfig {
         return scriptOf("lua/room_start_now.lua");
     }
 
+    /** D-153 — 정상 종료한 친구 방을 대기실로(관전자 자동 착석). */
+    @Bean
+    public RedisScript<Long> roomReturnWaitingScript() {
+        return scriptOf("lua/room_return_waiting.lua");
+    }
+
     @Bean
     public RedisScript<Long> roomFinishScript() {
         return scriptOf("lua/room_finish.lua");

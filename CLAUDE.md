@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 3종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131).
 
-현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-152까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
+현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-153까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
 - **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
@@ -97,8 +97,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **시작된 게임의 좌석은 불변 (D-122)**: 좌석 인덱스가 STOMP 좌석 판정·비공개 이벤트 라우팅·resync 의
   기준이라, 진행 중 매치에서 탈주로 처리되지 않은 leave 는 no-op, FINISHED 방 leave 는 좌석 목록을
   건드리지 않는다. 매치를 액션 경로 밖에서 끝내는 쪽(탈주 MATCH_ENDED·강제 종료)은 방 액션 락 안에서
-  FINISHED 전이 + 턴 데드라인 취소(`infra.ws.GameAbortService`). 리매치 여부는 `GameDefinition.supportsRematch()`
-  (기본 false, 티츄만 true).
+  FINISHED 전이 + 턴 데드라인 취소(`infra.ws.GameAbortService`). **D-153** — 사람만의 방이 정상 종료하면 FINISHED 대신
+  `RoomService.returnToWaiting`(`room_return_waiting.lua`)으로 대기실 복귀(정원 = 게임 최대, 관전자 자동 착석, 끊긴 플레이어는 D-134 유예).
+  리매치('한 판 더'·`supportsRematch`)는 없앴다. 봇과 연습·탈주·강제 종료는 FINISHED.
 - **봇 정책은 게임이 소유한다 (D-118·D-119)**: 어댑터가 포트 `botAction` 을 override 해 공개 정보만
   담은 뷰를 받는 결정적 정책에 위임한다(티츄 `HeuristicBotPolicy`, 스컬킹 `SkullKingBotPolicy`).
   정책이 예외·비합법 수를 내면 ERROR 로그 후 `timeoutAction` 으로 폴백 — `timeoutAction`·탈주 유령
@@ -141,6 +142,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   IN_GAME, `rooms:open` 에 안 오름, 초대 없음). D-143 — 친구와 하기는 인원을 고르지 않고(정원 = 게임 최대 인원) 대기실에 [준비]가 없다.
   사람이 최소 인원 이상이면 방장이 **"N명으로 시작"**(`POST /api/rooms/{id}/start`, `room_start_now.lua` — 정원을 현재 인원으로 줄이고 시작,
   정원이 다 차도 자동 시작 없음, 티츄도 같다). 봇과 연습만 봇 수를 정하려고 인원을 고른다.
+- D-153: **다음 판** — 친구 방은 판이 끝나면 대기실로 돌아가고, 판 도중 링크로 들어와 관전하던 사람은 그때 자동으로 앉는다
+  (`spectators_since` 순서, 게임 최대 인원까지). 클라는 이 세션이 IN_GAME→WAITING 을 보면 결과 화면을 유지하고 [대기실로](`onBackToRoom`)로
+  넘어간다(세 게임 공통). 진행 중 방의 관전 안내는 "이 판이 끝나면 다음 판에 함께해요".
 - D-146: 로비(메인) 채팅·색약 모드·메인 헤더 전적 합계 제거. 기본 테마 light. 대기실 참가자는 카드(이 방 게임의 계급·전적 —
   `GET /api/users/{id}/stats` 를 사람마다), 초대 링크는 위쪽 버튼 줄의 버튼 하나. 채팅은 방 안 채팅(`/topic/room/{id}/chat`)만.
 - Phase 18(D-74): 메인 입장은 `join-or-reconnect`(멱등) — 나갔다 재입장
@@ -158,10 +162,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - D-82(D-81 보정): **방 단위 테이블 칩 내기 모드**(계정 지갑 아님 — 칩을 계정에 안 둠).
   방 게임 시작 시 전원 동일 칩(`STARTING_STACK` 1000), 매치 종료마다 판돈
   `{0,10,50,100,500}`(0=없음)이 승팀↔패팀으로 이동(제로섬, 패자 보유분 한도 올인, 봇 매치
-  제외). **'한 판 더'(리매치)** 로 같은 4명이 같은 테이블 계속 → 칩 누적, 판돈 미만 보유 시
+  제외). 다음 판(D-153 대기실 복귀 → 방장 시작)에도 칩 누적, 판돈 미만 보유 시
   무료 재바이인, 방 나가면 칩 소멸. **stake>0 방은 봇 금지**. 칩은 `room:{id}:chips`
   (Redis HASH) + `CHIPS_SETTLED` 공개 이벤트(테이블 공개 정보), 정산은 신규 `RoomChipService`.
-  매치 정상 종료는 FINISHED 대신 WAITING 복귀(리매치), 탈주는 FINISHED 유지. 판돈은 Redis
+  매치 정상 종료는 FINISHED 대신 WAITING 복귀(D-153), 탈주는 FINISHED 유지. 판돈은 Redis
   room 해시 고정 → `TichuMatchCompleted.stake` 로 정산 전달.
 - D-133: **초대 링크 = 방 주소 그대로**(`/rooms/{id}`). 대기실 "초대 링크"가 공유창 → 복사 → 선택된 입력란, 서버 `GET /rooms/{id}`(공개 HTML,
   `infra.web.RoomPagePreviewController`)가 빌드된 `index.html` 의 `<!--og:start-->`…`<!--og:end-->` 를 그 방의 미리보기로 바꾼다(표식을 지우지 말 것).
