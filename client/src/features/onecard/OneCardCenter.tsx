@@ -69,9 +69,17 @@ export function OneCardCenter({
   return (
     <section className="oc-center" aria-label="테이블">
       <div className="oc-piles">
-        <div className="oc-pile" title="뽑을 더미">
-          <span className="oc-pile-back" aria-hidden />
-          <span className="oc-pile-count">뽑을 더미 {drawPileCount}장</span>
+        {/* D-151 — 작은 뒷면 몇 겹 위에 장수만. 전체 문장은 보조기기·마우스 오버로. */}
+        <div
+          className="oc-pile"
+          role="img"
+          aria-label={`뽑을 더미 ${drawPileCount}장`}
+          title={`뽑을 더미 ${drawPileCount}장`}
+          data-empty={drawPileCount === 0 ? '' : undefined}
+        >
+          <span className="oc-pile-count" aria-hidden="true">
+            {drawPileCount}
+          </span>
         </div>
         <div className="oc-top">
           {shownTop ? (

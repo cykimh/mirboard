@@ -17,6 +17,9 @@ export function seatAccent(seat: number): string {
   return ACCENTS[((seat % ACCENTS.length) + ACCENTS.length) % ACCENTS.length];
 }
 
+/** D-151 — 좌석에 그리는 뒷면 최대 장수. 넘으면 줄임표(…) — 많을 때 장수를 하나하나 보는 의미가 없다. */
+export const SEAT_HAND_SHOWN_MAX = 10;
+
 export const ELIMINATED_LABEL: Record<EliminationReason, string> = {
   BANKRUPT: '파산',
   DESERTED: '탈주',
@@ -102,11 +105,12 @@ export function OneCardSeat({
           role="img"
           aria-label={`남은 손패 ${seat.handCount}장`}
           title={`남은 손패 ${seat.handCount}장`}
-          style={{ ['--oc-hand-count' as string]: seat.handCount }}
+          style={{ ['--oc-hand-count' as string]: Math.min(seat.handCount, SEAT_HAND_SHOWN_MAX) }}
         >
-          {Array.from({ length: seat.handCount }, (_, i) => (
+          {Array.from({ length: Math.min(seat.handCount, SEAT_HAND_SHOWN_MAX) }, (_, i) => (
             <span key={i} className="oc-seat-hand-card" />
           ))}
+          {seat.handCount > SEAT_HAND_SHOWN_MAX && <span className="oc-seat-hand-more">…</span>}
         </span>
         {last && <span className="oc-seat-one">1장!</span>}
       </div>

@@ -270,9 +270,9 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
   });
 
   // 390px 가운데 칸 ≈138px — 더미 뒷면 62px + 문구 + 맨 위 카드 48px 가 한 줄에 안 들어가 천이 ≈80px 높아졌다.
-  it('가운데 칸이 좁으면 더미 뒷면·문구·간격이 폭을 따라 줄어 더미와 맨 위 카드가 한 줄에 든다', () => {
-    expect(lastDeclared('.oc-felt .oc-pile-back', 'width')).toBe('clamp(40px, 11vw, 62px)');
-    expect(lastDeclared('.oc-felt .oc-pile-count', 'max-width')).toBe('clamp(50px, 14vw, 120px)');
+  // D-151 — 더미를 40px 뒷면 + 장수 배지로 줄여 폭을 따라 줄일 필요가 없어졌다. 간격만 화면 폭을 따른다.
+  it('가운데 더미는 작은 고정 폭이고 간격은 폭을 따라 줄어 더미와 맨 위 카드가 한 줄에 든다', () => {
+    expect(lastDeclared('.oc-pile', 'width')).toBe('40px');
     expect(lastDeclared('.oc-felt .oc-piles', 'gap')).toBe('8px clamp(6px, 2vw, 24px)');
   });
 
