@@ -1283,8 +1283,8 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
         id === 1
           ? {
               games: [
-                { gameType: 'TICHU', rating: 1400, tier: 'PLATINUM', winCount: 9, loseCount: 9, desertCount: 0 },
-                { gameType: 'ONE_CARD', rating: 1250, tier: 'GOLD', winCount: 4, loseCount: 1, desertCount: 2 },
+                { gameType: 'TICHU', rating: 1400, tier: 'SILVER_BADGE', winCount: 9, loseCount: 9, desertCount: 0 },
+                { gameType: 'ONE_CARD', rating: 1250, tier: 'SILVER_MEDAL', winCount: 4, loseCount: 1, desertCount: 2 },
               ],
             }
           : { games: [] },
@@ -1298,10 +1298,10 @@ describe('RoomPage — 참가자 카드 (D-146)', () => {
 
     const list = await screen.findByRole('list', { name: '참가자' });
     const host = await within(list).findByRole('listitem', { name: 'host' });
-    expect(await within(host).findByText('골드')).toBeInTheDocument();
+    expect(await within(host).findByText('은메달')).toBeInTheDocument();
     expect(within(host).getByText('4승 1패 · 탈주 2')).toBeInTheDocument();
     expect(within(host).getByText('방장')).toBeInTheDocument();
-    expect(within(host).queryByText('플래티넘')).toBeNull();
+    expect(within(host).queryByText('은훈장')).toBeNull();
 
     const friend = within(list).getByRole('listitem', { name: 'friend' });
     expect(await within(friend).findByText('첫 판')).toBeInTheDocument();

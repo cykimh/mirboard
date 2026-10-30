@@ -61,6 +61,8 @@ describe('RoomSettingsPanel (D-161)', () => {
     expect(within(turn).getAllByRole('radio').map((r) => r.textContent)).toEqual(['끔', '5초', '10초', '20초', '30초']);
     expect(within(turn).getByRole('radio', { name: '10초' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: '크게' })).toHaveAttribute('aria-checked', 'true');
+    // D-165 — 찾기 난이도는 게임이 선언해야 보인다(여기 원카드 픽스처는 크기만).
+    expect(screen.queryByRole('group', { name: '원카드! 찾기 난이도' })).toBeNull();
     expect(screen.queryByRole('group', { name: '목표 점수' })).toBeNull();
   });
 
@@ -84,5 +86,22 @@ describe('RoomSettingsPanel (D-161)', () => {
     expect(screen.getByText('끔')).toBeInTheDocument();
     expect(screen.getByText('50칩')).toBeInTheDocument();
     expect(screen.getByText('게임 설정은 방장이 바꿔요.')).toBeInTheDocument();
+  });
+
+  it('D-165 — 찾기 난이도를 선언한 게임이면 보통·어려움·매우 어려움 중 고른다', () => {
+    const onChange = vi.fn();
+    render(
+      <RoomSettingsPanel
+        room={room({ gameType: 'ONE_CARD' })}
+        game={game('ONE_CARD', ['RACE_BUTTON_SIZE', 'RACE_BUTTON_VISIBILITY'])}
+        canEdit
+        onChange={onChange}
+      />,
+    );
+
+    const vis = screen.getByRole('group', { name: '원카드! 찾기 난이도' });
+    expect(within(vis).getAllByRole('radio').map((r) => r.textContent)).toEqual(['보통', '어려움', '매우 어려움']);
+    fireEvent.click(within(vis).getByRole('radio', { name: '매우 어려움' }));
+    expect(onChange).toHaveBeenCalledWith({ raceButtonVisibility: 'VERY_HARD' });
   });
 });

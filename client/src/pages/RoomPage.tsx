@@ -627,7 +627,11 @@ export function RoomPage() {
         {notice}
         <Suspense fallback={<TableLoading />}>
           {room.gameType === 'ONE_CARD' ? (
-            <OneCardTable {...board} raceButtonSize={room.raceButtonSize} />
+            <OneCardTable
+              {...board}
+              raceButtonSize={room.raceButtonSize}
+              raceButtonVisibility={room.raceButtonVisibility}
+            />
           ) : (
             <SkullKingTable {...board} />
           )}

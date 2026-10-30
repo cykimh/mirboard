@@ -12,6 +12,7 @@ import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import { useOneCardStore } from './onecardStore';
+import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import type {
@@ -389,9 +390,9 @@ describe('OneCardTable — 원카드 경쟁', () => {
     renderTable({ playerIds: [100, 101, 102] });
 
     const button = screen.getByRole('button', { name: '잡기!' });
-    // 슬롯 2(78%, 14%) + 지터(+30% × 10, −40% × 6) = (81%, 11.6%) — D-161 슬롯 표
-    expect(button.style.left).toContain('81%');
-    expect(button.style.top).toContain('11.6%'); // D-154 — 세로도 가장자리 보정(clamp).
+    // 슬롯 2(78%, 14%) + 지터(+30% × 14, −40% × 9) = (82.2%, 10.4%) — D-161 슬롯 표, D-165 지터 반경
+    expect(button.style.left).toContain('82.2%');
+    expect(button.style.top).toContain('10.4%'); // D-154 — 세로도 가장자리 보정(clamp).
     expect(document.activeElement).not.toBe(button);
   });
 
@@ -405,6 +406,18 @@ describe('OneCardTable — 원카드 경쟁', () => {
     seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
     renderTable({ playerIds: [100, 101, 102], raceButtonSize: 'LARGE' });
     expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-size-large');
+  });
+
+  // D-165 — 찾기 난이도(투명도)도 방 설정. 없으면 보통.
+  it('찾기 난이도는 방 설정을 따른다 — 없으면 보통', () => {
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const { unmount } = renderTable({ playerIds: [100, 101, 102] });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-vis-normal');
+    unmount();
+
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102], raceButtonVisibility: 'VERY_HARD' });
+    expect(document.querySelector('.oc-race-layer')).toHaveClass('oc-race-vis-very-hard');
   });
 
   it('창이 열린 동안 내기·먹기 버튼을 막고 "경쟁 중"으로 알린다', () => {
@@ -1215,6 +1228,26 @@ describe('OneCardTable — 끊긴 사람 내보내기 (D-162)', () => {
 
     expect(screen.queryByRole('button', { name: '내보내기' })).toBeNull();
     expect(screen.getByText('연결 끊김')).toBeInTheDocument();
+  });
+});
+
+/** D-163 — 채팅을 보낸 사람 좌석(나는 "(나)" 줄) 위에 한 줄로 잠깐 보인다. */
+describe('OneCardTable — 좌석 채팅 한 줄 (D-163)', () => {
+  afterEach(() => useRoomChatStore.getState().reset('r-1'));
+
+  it('상대 채팅은 그 좌석 위에, 내 채팅은 "(나)" 줄 위에', () => {
+    useRoomChatStore.getState().reset('r-1');
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1, hand: [c('HEART', 3)] });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+    act(() => {
+      const add = useRoomChatStore.getState().appendIncoming;
+      add({ eventId: 'e1', ts: 0, userId: 101, username: 'b', message: '빨리 내요' }, true);
+      add({ eventId: 'e2', ts: 0, userId: 100, username: 'a', message: '잠깐만' }, true);
+    });
+
+    const seat1 = document.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(within(seat1).getByText('빨리 내요')).toHaveClass('oc-seat-chat');
+    expect(within(container.querySelector('.oc-me') as HTMLElement).getByText('잠깐만')).toBeInTheDocument();
   });
 });
 

@@ -18,6 +18,7 @@ import { SkullRoundHistoryModal } from './SkullRoundHistoryModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
+import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { VoiceControls } from '@/features/voice/VoiceControls';
 import { SKULL_KING_TUTORIAL } from './tutorial/skullkingTutorial';
 
@@ -94,6 +95,8 @@ export function SkullKingTable({
   const seatCount = s.seats.length || playerIds.length;
   const mySeat = spectator ? -1 : s.mySeat;
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
+  // D-163 — 보낸 사람 좌석(나는 "(나)" 줄) 위에 최근 채팅 한 줄.
+  const chatLines = useSeatChatLines(playerIds);
   const leadSuit = leadSuitOf(s.trick);
   // D-132 후속 m2 — 강제 종료는 결과 없이 방만 끝나 스토어의 차례가 남는다. 끝난 판에는 차례(테두리·"다음"·"내 차례")가 없다.
   const turnSeat = roomFinished ? -1 : s.currentTurnSeat;
@@ -136,6 +139,7 @@ export function SkullKingTable({
         side={side}
         slot={slot}
         voice={voiceStatusOf(voice, playerIds[seat])}
+        chat={chatLines[seat]}
       />
     );
   };
@@ -318,6 +322,11 @@ export function SkullKingTable({
             style={{ ['--sk-accent' as string]: seatAccent(mySeat) }}
           >
             <strong>{nameOf(mySeat)} (나)</strong>
+            {chatLines[mySeat] && (
+              <span key={chatLines[mySeat].id} className="sk-seat-chat" title={chatLines[mySeat].text}>
+                {chatLines[mySeat].text}
+              </span>
+            )}
             <span className="sk-stat">
               <span className="sk-stat-key">예측</span>
               <span className="sk-stat-val">

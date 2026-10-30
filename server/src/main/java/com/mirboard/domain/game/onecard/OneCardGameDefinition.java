@@ -105,10 +105,11 @@ public final class OneCardGameDefinition implements GameDefinition {
         return 30;
     }
 
-    /** D-161 — 방장이 대기실에서 "원카드!/잡기!" 버튼 크기를 고른다(모두 같은 크기). */
+    /** D-161 — 방장이 대기실에서 "원카드!/잡기!" 버튼 크기를, D-165 — 찾기 난이도(투명도)를 고른다(모두 같은 값). */
     @Override
     public java.util.Set<com.mirboard.domain.game.core.RoomOption> supportedRoomOptions() {
-        return java.util.Set.of(com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE);
+        return java.util.EnumSet.of(com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE,
+                com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_VISIBILITY);
     }
 
     /** D-154 — 빠르게 하고 싶은 판을 위해 짧게(사용자 결정): 끔·5·10·20·30초. 60·90초는 없다. */

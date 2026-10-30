@@ -9,11 +9,12 @@ import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { REACTIONS, useLiveReactions } from '@/features/chat/reactionStore';
+import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { VoiceControls } from '@/features/voice/VoiceControls';
 import { cardKey, type OneCardCard } from '@/types/onecard';
-import type { RaceButtonSize } from '@/types/api';
+import type { RaceButtonSize, RaceButtonVisibility } from '@/types/api';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
 import { isSuitChange, nextTurnSeat } from './onecardRules';
@@ -67,6 +68,8 @@ interface Props {
   onKick?: (userId: number) => void;
   /** D-161 — 방장이 대기실에서 고른 "원카드!/잡기!" 버튼 크기(방 설정). */
   raceButtonSize?: RaceButtonSize;
+  /** D-165 — 방장이 대기실에서 고른 버튼 찾기 난이도(투명도). */
+  raceButtonVisibility?: RaceButtonVisibility;
 }
 
 /**
@@ -94,6 +97,7 @@ export function OneCardTable({
   roomFinished = false,
   onBackToRoom,
   raceButtonSize = 'MEDIUM',
+  raceButtonVisibility = 'NORMAL',
   onKick,
 }: Props) {
   const token = useAuthStore((s) => s.token);
@@ -116,6 +120,8 @@ export function OneCardTable({
   const { muted, toggleMute, playChime } = useSfx();
   const [reactionOpen, setReactionOpen] = useState(false);
   const liveReactions = useLiveReactions();
+  // D-163 — 보낸 사람 좌석(나는 "(나)" 줄) 위에 최근 채팅 한 줄.
+  const chatLines = useSeatChatLines(playerIds);
   // D-155 — 음성 대화(무료 P2P). 🎧 참여(듣기)·🎙 마이크. 좌석에는 참여 중 🎧 / 연결 실패 표시.
   const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
   const chatUnread = useRoomChatStore((s) => s.unreadCount);
@@ -179,6 +185,7 @@ export function OneCardTable({
         side={side}
         slot={slot}
         reaction={liveReactions[seat]?.emoji}
+        chat={chatLines[seat]}
         voice={voiceStatusOf(voice, playerIds[seat])}
       />
     );
@@ -454,6 +461,11 @@ export function OneCardTable({
             style={{ ['--oc-accent' as string]: seatAccent(mySeat) }}
           >
             <strong>{nameOf(mySeat)} (나)</strong>
+            {chatLines[mySeat] && (
+              <span key={chatLines[mySeat].id} className="oc-seat-chat" title={chatLines[mySeat].text}>
+                {chatLines[mySeat].text}
+              </span>
+            )}
             {liveReactions[mySeat] && (
               <span key={liveReactions[mySeat].id} className="oc-seat-reaction" aria-hidden="true">
                 {liveReactions[mySeat].emoji}
@@ -495,6 +507,7 @@ export function OneCardTable({
         <RaceButton
           race={s.race}
           size={raceButtonSize}
+          visibility={raceButtonVisibility}
           mySeat={mySeat}
           pending={s.press !== null || !connected}
           onPress={press}

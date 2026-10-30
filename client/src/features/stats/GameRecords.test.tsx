@@ -7,8 +7,8 @@ describe('GameRecords (D-115 — 프로필 게임별 전적)', () => {
     render(
       <GameRecords
         records={[
-          { gameType: 'TICHU', rating: 1020, tier: 'BRONZE', winCount: 3, loseCount: 1, desertCount: 0 },
-          { gameType: 'SKULL_KING', rating: 985, tier: 'BRONZE', winCount: 0, loseCount: 2, desertCount: 1 },
+          { gameType: 'TICHU', rating: 1020, tier: 'MISSILE_1', winCount: 3, loseCount: 1, desertCount: 0 },
+          { gameType: 'SKULL_KING', rating: 985, tier: 'BULLET_3', winCount: 0, loseCount: 2, desertCount: 1 },
         ]}
         names={{ TICHU: '티츄', SKULL_KING: '스컬킹' }}
       />,
@@ -23,7 +23,7 @@ describe('GameRecords (D-115 — 프로필 게임별 전적)', () => {
   it('표시명을 모르면 게임 id 로 폴백', () => {
     render(
       <GameRecords
-        records={[{ gameType: 'YACHT', rating: 1000, tier: 'BRONZE', winCount: 1, loseCount: 0, desertCount: 0 }]}
+        records={[{ gameType: 'YACHT', rating: 1000, tier: 'MISSILE_1', winCount: 1, loseCount: 0, desertCount: 0 }]}
         names={{}}
       />,
     );

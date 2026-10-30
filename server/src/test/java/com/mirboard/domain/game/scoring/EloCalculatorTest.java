@@ -66,18 +66,7 @@ class EloCalculatorTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void tier_boundaries() {
-        assertThat(Tier.fromRating(0)).isEqualTo(Tier.BRONZE);
-        assertThat(Tier.fromRating(1099)).isEqualTo(Tier.BRONZE);
-        assertThat(Tier.fromRating(1100)).isEqualTo(Tier.SILVER);
-        assertThat(Tier.fromRating(1249)).isEqualTo(Tier.SILVER);
-        assertThat(Tier.fromRating(1250)).isEqualTo(Tier.GOLD);
-        assertThat(Tier.fromRating(1400)).isEqualTo(Tier.PLATINUM);
-        assertThat(Tier.fromRating(1550)).isEqualTo(Tier.DIAMOND);
-        assertThat(Tier.fromRating(1700)).isEqualTo(Tier.MASTER);
-        assertThat(Tier.fromRating(9999)).isEqualTo(Tier.MASTER);
-    }
+    // 계급 구간은 TierTest(D-164).
 
     // ---------- D-115 — 개인전(free-for-all) 쌍대 ELO ----------
 

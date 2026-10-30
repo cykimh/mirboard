@@ -297,6 +297,16 @@ public class RoomService {
             }
             fields.put("raceButtonSize", v);
         }
+        if (update.raceButtonVisibility() != null) {
+            String v = update.raceButtonVisibility();
+            if (!supported.contains(RoomOption.RACE_BUTTON_VISIBILITY)) {
+                throw new UnsupportedRoomOptionException(def.id(), RoomOption.RACE_BUTTON_VISIBILITY);
+            }
+            if (!Room.RACE_BUTTON_VISIBILITIES.contains(v)) {
+                throw new InvalidRoomSettingException("raceButtonVisibility", v);
+            }
+            fields.put("raceButtonVisibility", v);
+        }
         if (fields.isEmpty()) {
             return room;
         }

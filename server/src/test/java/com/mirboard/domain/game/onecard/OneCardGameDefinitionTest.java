@@ -44,7 +44,10 @@ class OneCardGameDefinitionTest {
         assertThat(def.maxPlayers()).isEqualTo(6);
         assertThat(def.status()).isEqualTo(GameStatus.AVAILABLE);
         // D-161 — 목표 점수·팀·내기는 없고 경쟁 버튼 크기만 쓴다.
-        assertThat(def.supportedRoomOptions()).containsExactly(com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE);
+        // D-165 — 찾기 난이도(투명도)도.
+        assertThat(def.supportedRoomOptions()).containsExactlyInAnyOrder(
+                com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_SIZE,
+                com.mirboard.domain.game.core.RoomOption.RACE_BUTTON_VISIBILITY);
     }
 
     /**

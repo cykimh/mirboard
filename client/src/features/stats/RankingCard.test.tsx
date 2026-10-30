@@ -21,7 +21,7 @@ const entry = (userId: number, username: string, rating: number) => ({
   userId,
   username,
   rating,
-  tier: 'BRONZE' as const,
+  tier: 'MISSILE_1' as const,
   winCount: 1,
   loseCount: 0,
   desertCount: 0,

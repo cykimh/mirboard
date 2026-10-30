@@ -98,7 +98,8 @@ public class UserController {
                         r.userId(),
                         r.username(),
                         r.stats().rating(),
-                        r.stats().tier(),
+                        // D-164 — 목록 순위로 왕관(금훈장 이상).
+                        com.mirboard.domain.game.scoring.Tier.withRank(r.stats().rating(), r.rank()).name(),
                         r.stats().winCount(),
                         r.stats().loseCount(),
                         r.stats().desertCount()))
@@ -140,7 +141,7 @@ public class UserController {
     private UserStatsResponse toResponse(User u) {
         GameStats legacy = gameStats.get(u.getId(), LEGACY_GAME);
         List<GameRecord> played = gameStats.playedGames(u.getId()).stream()
-                .map(g -> new GameRecord(g.gameType(), g.rating(), g.tier(),
+                .map(g -> new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(g),
                         g.winCount(), g.loseCount(), g.desertCount()))
                 .toList();
         return new UserStatsResponse(
@@ -149,7 +150,7 @@ public class UserController {
                 legacy.winCount(),
                 legacy.loseCount(),
                 legacy.rating(),
-                legacy.tier(),
+                gameStats.tierOf(legacy),
                 legacy.desertCount(),
                 played);
     }

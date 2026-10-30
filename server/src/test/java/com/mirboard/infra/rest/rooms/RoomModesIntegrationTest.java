@@ -240,10 +240,12 @@ class RoomModesIntegrationTest {
         String host = bearer(players.get(0));
 
         mockMvc.perform(put("/api/rooms/" + roomId + "/settings").header("Authorization", host)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"turnSeconds\":10,\"raceButtonSize\":\"LARGE\"}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"turnSeconds\":10,\"raceButtonSize\":\"LARGE\",\"raceButtonVisibility\":\"HARD\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.turnSeconds").value(10))
-                .andExpect(jsonPath("$.raceButtonSize").value("LARGE"));
+                .andExpect(jsonPath("$.raceButtonSize").value("LARGE"))
+                .andExpect(jsonPath("$.raceButtonVisibility").value("HARD"));
         mockMvc.perform(get("/api/rooms/" + roomId).header("Authorization", host))
                 .andExpect(jsonPath("$.raceButtonSize").value("LARGE"));
 

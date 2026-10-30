@@ -33,15 +33,16 @@ describe('경쟁 버튼 슬롯', () => {
     });
   });
 
-  it('어떤 슬롯·지터에서도 화면 가장자리를 피한다', () => {
+  // D-165 — 지터를 넓혀 중심은 가장자리 2% 까지 갈 수 있다. 버튼이 잘리지 않는 것은 CSS clamp(아래 두 테스트)가 맡는다.
+  it('어떤 슬롯·지터에서도 중심이 화면 안(2~98% · 3~89%)에 있다', () => {
     for (let slot = 0; slot < RACE_SLOT_COUNT; slot++) {
       for (const jx of [-100, 0, 100]) {
         for (const jy of [-100, 0, 100]) {
           const { left, top } = racePosition(slot, jx, jy);
-          expect(left, `slot ${slot} x`).toBeGreaterThanOrEqual(5);
-          expect(left, `slot ${slot} x`).toBeLessThanOrEqual(95);
-          expect(top, `slot ${slot} y`).toBeGreaterThanOrEqual(5);
-          expect(top, `slot ${slot} y`).toBeLessThanOrEqual(88);
+          expect(left, `slot ${slot} x`).toBeGreaterThanOrEqual(2);
+          expect(left, `slot ${slot} x`).toBeLessThanOrEqual(98);
+          expect(top, `slot ${slot} y`).toBeGreaterThanOrEqual(3);
+          expect(top, `slot ${slot} y`).toBeLessThanOrEqual(89);
         }
       }
     }

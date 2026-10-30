@@ -1,4 +1,4 @@
-import type { GameSummary, RaceButtonSize, Room, RoomSettingsUpdate } from '@/types/api';
+import type { GameSummary, RaceButtonSize, RaceButtonVisibility, Room, RoomSettingsUpdate } from '@/types/api';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
@@ -9,6 +9,11 @@ const TARGET_SCORE_CHOICES = [300, 500, 700, 1000];
 /** 판돈 선택지 — 서버 허용 집합 `RoomService.ALLOWED_STAKES`. 0 = 내기 없음. */
 const STAKE_CHOICES = [0, 10, 50, 100, 500];
 const RACE_SIZE_LABEL: Record<RaceButtonSize, string> = { SMALL: '작게', MEDIUM: '보통', LARGE: '크게' };
+const RACE_VISIBILITY_LABEL: Record<RaceButtonVisibility, string> = {
+  NORMAL: '보통',
+  HARD: '어려움',
+  VERY_HARD: '매우 어려움',
+};
 
 interface Props {
   room: Room;
@@ -25,7 +30,7 @@ const turnLabel = (v: number) => (v === 0 ? '끔' : `${v}초`);
 const stakeLabel = (v: number) => (v === 0 ? '없음' : `${v}칩`);
 
 /**
- * D-161 — 대기실 게임 설정. 방 만들기에서 고르던 턴 제한·목표 점수·판돈과 원카드! 버튼 크기를 방장이 여기서 바꾼다. 게임이 선언한
+ * D-161 — 대기실 게임 설정. 방 만들기에서 고르던 턴 제한·목표 점수·판돈과 원카드! 버튼 크기(D-165 — 찾기 난이도도)를 방장이 여기서 바꾼다. 게임이 선언한
  * 설정만 보인다(D-106 — 서버도 같은 집합으로 검증). 다른 사람 화면은 방 메타 갱신으로 바로 바뀐다.
  */
 export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = false }: Props) {
@@ -60,6 +65,17 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
       value: room.raceButtonSize ?? 'MEDIUM',
       choices: (Object.keys(RACE_SIZE_LABEL) as RaceButtonSize[]).map((v) => ({ value: v, text: RACE_SIZE_LABEL[v] })),
       send: (v) => ({ raceButtonSize: v as RaceButtonSize }),
+    });
+  }
+  if (options.includes('RACE_BUTTON_VISIBILITY')) {
+    rows.push({
+      label: '원카드! 찾기 난이도',
+      value: room.raceButtonVisibility ?? 'NORMAL',
+      choices: (Object.keys(RACE_VISIBILITY_LABEL) as RaceButtonVisibility[]).map((v) => ({
+        value: v,
+        text: RACE_VISIBILITY_LABEL[v],
+      })),
+      send: (v) => ({ raceButtonVisibility: v as RaceButtonVisibility }),
     });
   }
 

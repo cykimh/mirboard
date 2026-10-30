@@ -283,6 +283,9 @@ public class RoomRepository {
         // D-161 — 없으면(구방·설정 안 함) MEDIUM.
         String rawRaceSize = (String) hash.get("raceButtonSize");
         String raceButtonSize = rawRaceSize == null ? Room.DEFAULT_RACE_BUTTON_SIZE : rawRaceSize;
+        // D-165 — 없으면 NORMAL.
+        String rawRaceVisibility = (String) hash.get("raceButtonVisibility");
+        String raceButtonVisibility = rawRaceVisibility == null ? Room.DEFAULT_RACE_BUTTON_VISIBILITY : rawRaceVisibility;
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -308,7 +311,8 @@ public class RoomRepository {
                 turnSeconds,
                 stake,
                 readyUserIds,
-                raceButtonSize));
+                raceButtonSize,
+                raceButtonVisibility));
     }
 
     /**

@@ -1,12 +1,28 @@
 import { apiRequest } from './client';
 
+/** D-164 — 포트리스2식 21단계(낮은 것부터). 서버 `Tier` 미러 — 점수 구간 + 금훈장 이상은 순위로 왕관. */
 export type Tier =
-  | 'BRONZE'
-  | 'SILVER'
-  | 'GOLD'
-  | 'PLATINUM'
-  | 'DIAMOND'
-  | 'MASTER';
+  | 'SKULL'
+  | 'BULLET_1'
+  | 'BULLET_2'
+  | 'BULLET_3'
+  | 'MISSILE_1'
+  | 'MISSILE_2'
+  | 'MISSILE_3'
+  | 'BRONZE_STAR'
+  | 'SILVER_STAR'
+  | 'GOLD_STAR'
+  | 'DOUBLE_GOLD_STAR'
+  | 'BRONZE_MEDAL'
+  | 'SILVER_MEDAL'
+  | 'GOLD_MEDAL'
+  | 'BRONZE_BADGE'
+  | 'SILVER_BADGE'
+  | 'GOLD_BADGE'
+  | 'BRONZE_CROWN'
+  | 'SILVER_CROWN'
+  | 'GOLD_CROWN'
+  | 'STAR_CROWN';
 
 /** D-115 — 한 게임의 전적. */
 export interface GameRecord {

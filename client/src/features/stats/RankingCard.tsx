@@ -97,19 +97,19 @@ export function RankingCard({ token, games, myUserId }: Props) {
           ))}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-2 sm:px-6">
         {entries.length === 0 ? (
           <p className="text-sm italic text-muted-foreground">아직 랭킹 데이터가 없습니다.</p>
         ) : (
+          // D-164 — 휴대폰 폭에서 줄이 세로로 꺾여 행이 길어지고 오른쪽이 잘렸다. 점수는 계급 배지 안으로, 칸은 한 줄로, 탈주는 넓은 화면만.
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>유저</TableHead>
-                <TableHead>티어</TableHead>
-                <TableHead>레이팅</TableHead>
-                <TableHead>전적</TableHead>
-                <TableHead>탈주</TableHead>
+                <TableHead className="w-6 px-1 sm:px-2">#</TableHead>
+                <TableHead className="px-2">유저</TableHead>
+                <TableHead className="px-2">계급</TableHead>
+                <TableHead className="px-2">전적</TableHead>
+                <TableHead className="hidden px-2 sm:table-cell">탈주</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -118,16 +118,17 @@ export function RankingCard({ token, games, myUserId }: Props) {
                   key={e.userId}
                   className={cn(e.userId === myUserId && 'bg-accent font-semibold')}
                 >
-                  <TableCell>{e.rank}</TableCell>
-                  <TableCell>{e.username}</TableCell>
-                  <TableCell>
-                    <TierBadge tier={e.tier} />
+                  <TableCell className="px-1 py-2 sm:px-2">{e.rank}</TableCell>
+                  <TableCell className="max-w-[4.5rem] truncate px-2 py-2 sm:max-w-none" title={e.username}>
+                    {e.username}
                   </TableCell>
-                  <TableCell>{e.rating}</TableCell>
-                  <TableCell>
+                  <TableCell className="px-2 py-2">
+                    <TierBadge tier={e.tier} rating={e.rating} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-2 py-2">
                     {e.winCount}승 {e.loseCount}패
                   </TableCell>
-                  <TableCell>{e.desertCount}</TableCell>
+                  <TableCell className="hidden px-2 py-2 sm:table-cell">{e.desertCount}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

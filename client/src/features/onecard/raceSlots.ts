@@ -27,8 +27,11 @@ export const RACE_SLOTS: ReadonlyArray<{ readonly x: number; readonly y: number 
   { x: 50, y: 80 },
 ];
 
-/** 지터가 버튼을 옮기는 최대 거리 — 뷰포트 % (가로, 세로). */
-export const RACE_JITTER_RADIUS = { x: 10, y: 6 } as const;
+/**
+ * 지터가 버튼을 옮기는 최대 거리 — 뷰포트 % (가로, 세로). D-165 — 10·6 → 14·9 로 넓혀 이웃 슬롯끼리 겹친다(사실상 화면 어디든).
+ * 가장자리는 `raceLeftCss`·`raceTopCss` 의 clamp 가 버튼 반폭·반높이만큼 안쪽으로 당긴다.
+ */
+export const RACE_JITTER_RADIUS = { x: 14, y: 9 } as const;
 
 function clampJitter(v: number): number {
   return Math.max(-100, Math.min(100, v));

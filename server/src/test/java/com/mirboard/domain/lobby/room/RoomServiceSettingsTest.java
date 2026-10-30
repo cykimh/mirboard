@@ -48,7 +48,8 @@ class RoomServiceSettingsTest {
     void games() {
         GameDefinition oneCard = mock(GameDefinition.class);
         when(oneCard.id()).thenReturn("ONE_CARD");
-        when(oneCard.supportedRoomOptions()).thenReturn(Set.of(RoomOption.RACE_BUTTON_SIZE));
+        when(oneCard.supportedRoomOptions())
+                .thenReturn(Set.of(RoomOption.RACE_BUTTON_SIZE, RoomOption.RACE_BUTTON_VISIBILITY));
         when(games.require("ONE_CARD")).thenReturn(oneCard);
         GameDefinition tichu = mock(GameDefinition.class);
         when(tichu.id()).thenReturn("TICHU");
@@ -150,5 +151,22 @@ class RoomServiceSettingsTest {
     @DisplayName("방에 읽힌 버튼 크기 기본은 MEDIUM")
     void race_size_defaults_to_medium() {
         assertThat(room("ONE_CARD", RoomStatus.WAITING).raceButtonSize()).isEqualTo("MEDIUM");
+    }
+
+    @Test
+    @DisplayName("D-165 — 원카드 찾기 난이도를 바꾼다. 틀린 값·티츄는 거절")
+    void race_visibility() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room("ONE_CARD", RoomStatus.WAITING)));
+        when(repository.updateSettings(ROOM_ID, Map.of("raceButtonVisibility", "VERY_HARD"))).thenReturn(1);
+
+        service.updateSettings(ROOM_ID, HOST, new RoomSettingsUpdate(null, null, null, null, "VERY_HARD"));
+        verify(repository).updateSettings(ROOM_ID, Map.of("raceButtonVisibility", "VERY_HARD"));
+
+        assertThatThrownBy(() -> service.updateSettings(ROOM_ID, HOST, new RoomSettingsUpdate(null, null, null, null, "GHOST")))
+                .isInstanceOf(InvalidRoomSettingException.class);
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room("TICHU", RoomStatus.WAITING)));
+        assertThatThrownBy(() -> service.updateSettings(ROOM_ID, HOST, new RoomSettingsUpdate(null, null, null, null, "HARD")))
+                .isInstanceOf(UnsupportedRoomOptionException.class);
+        assertThat(room("ONE_CARD", RoomStatus.WAITING).raceButtonVisibility()).isEqualTo("NORMAL");
     }
 }

@@ -239,10 +239,12 @@
   "turnSeconds": 0,
   "stake": 0,
   "readyUserIds": [],
-  "raceButtonSize": "MEDIUM"
+  "raceButtonSize": "MEDIUM",
+  "raceButtonVisibility": "NORMAL"
 }
 ```
 - `raceButtonSize`(D-161) 는 원카드 "원카드!/잡기!" 버튼 크기다. 방 설정이고 원카드 외 게임에서는 늘 `MEDIUM` 이다.
+- `raceButtonVisibility`(D-165) 는 같은 버튼의 찾기 난이도다. `NORMAL`·`HARD`(60%)·`VERY_HARD`(35%) 중 하나이고, 원카드 외 게임에서는 늘 `NORMAL` 이다.
 - 좌석(seat)은 `playerIds` 의 인덱스다 — STOMP 이벤트의 `seat` 와 같은 축.
 - `botSeats` 는 `playerIds` 인덱스 기준 봇 좌석(D-50).
 
@@ -310,12 +312,13 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 ### PUT `/api/rooms/{roomId}/settings` *(D-161 — 대기실 게임 설정, 방장 전용)*
 친구 방 대기실에서 방장이 게임 설정을 바꾼다. **부분 갱신** — 보낸 항목만 바꾼다.
 ```json
-{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE" }
+{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE", "raceButtonVisibility": "HARD" }
 ```
 - `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
 - `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
 - `stake` 는 허용값 `{0,10,50,100,500}` 이고 `BETTING` 게임만 쓴다. 봇 방이면 0 만 된다.
 - `raceButtonSize` 는 `SMALL`·`MEDIUM`·`LARGE` 이고 `RACE_BUTTON_SIZE` 게임(원카드)만 쓴다.
+- `raceButtonVisibility`(D-165) 는 `NORMAL`·`HARD`·`VERY_HARD` 이고 `RACE_BUTTON_VISIBILITY` 게임(원카드)만 쓴다.
 - 게임이 안 쓰는 항목을 보내면 값과 상관없이 `UNSUPPORTED_ROOM_OPTION` 이다. 만들 때와 달리 기본값도 통과하지 않는다.
 - `room_update_settings.lua` 가 WAITING 확인과 쓰기를 한 번에 한다. 성공하면 방 메타 갱신(`ROOM_UPDATED`)으로 다른 사람 화면도 바뀐다.
 
@@ -378,8 +381,19 @@ schema constraint 유지.
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
 
-tier 는 derived (rating 구간에서 계산): BRONZE <1100 / SILVER 1100–1249 / GOLD
-1250–1399 / PLATINUM 1400–1549 / DIAMOND 1550–1699 / MASTER ≥1700.
+tier 는 derived 값이다(D-164 — 포트리스2식 21단계, 서버 `Tier`). 점수 구간은 아래와 같다.
+
+| 계급 | 점수 |
+|---|---|
+| `SKULL` | <910 |
+| `BULLET_1`·`_2`·`_3` | 910·940·970 |
+| `MISSILE_1`·`_2`·`_3` | 1000(시작)·1030·1060 |
+| `BRONZE_STAR`·`SILVER_STAR`·`GOLD_STAR`·`DOUBLE_GOLD_STAR` | 1090·1120·1150·1180 |
+| `BRONZE_MEDAL`·`SILVER_MEDAL`·`GOLD_MEDAL` | 1210·1250·1290 |
+| `BRONZE_BADGE`·`SILVER_BADGE`·`GOLD_BADGE` | 1330·1380·1430 |
+
+금훈장(1430+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
+11~30위 `BRONZE_CROWN`. 랭킹은 목록 순위를 쓰고, 전적 조회는 나보다 점수가 높은 사람 수 +1 을 쓴다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
