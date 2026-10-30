@@ -139,6 +139,9 @@ class RateLimitRoutingTest {
                 .isEqualTo(RateLimitProperties.STOMP_DEFAULT);
         assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/reaction"))
                 .isEqualTo(RateLimitProperties.REACTION);
+        // D-155 — 음성 신호(ICE 후보가 한꺼번에 몰린다)는 자기 버킷.
+        assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/voice"))
+                .isEqualTo(RateLimitProperties.VOICE);
     }
 
     @Test

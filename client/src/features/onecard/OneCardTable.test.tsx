@@ -28,6 +28,8 @@ const sendAction = vi.fn();
 /** D-130 — 훅의 권위 스냅샷 재요청. 훅이 주는 것처럼 렌더마다 같은 참조다. */
 const requestResync = vi.fn();
 const sendReaction = vi.fn();
+const sendVoice = vi.fn();
+let voiceHandler: ((m: unknown) => void) | null = null;
 let socketConnected = true;
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
@@ -35,6 +37,13 @@ vi.mock('@/ws/useStompRoom', () => ({
     sendAction: (a: Record<string, unknown>) => sendAction(a),
     sendChat: vi.fn(),
     sendReaction: (e: string) => sendReaction(e),
+    sendVoice: (v: unknown) => sendVoice(v),
+    subscribeVoice: (h: (m: unknown) => void) => {
+      voiceHandler = h;
+      return () => {
+        voiceHandler = null;
+      };
+    },
     chatPanelOpenRef: { current: false },
     requestResync,
   }),
@@ -1524,5 +1533,54 @@ describe('OneCardTable — 효과음·이모지 (D-154)', () => {
     renderTable({ playerIds: [100, 101, 102], myUserId: 999, spectator: true });
 
     expect(screen.queryByRole('button', { name: '이모지 반응' })).toBeNull();
+  });
+});
+
+
+/** D-155 — 음성 대화: 🎧 로 참여(듣기, 마이크는 묻지 않음), 🎙 는 참여 중에만. 참여한 사람 좌석에 🎧. */
+describe('OneCardTable — 음성 대화 (D-155)', () => {
+  beforeEach(() => {
+    sendVoice.mockReset();
+    vi.stubGlobal('RTCPeerConnection', class {
+      addTransceiver() {
+        return { direction: 'sendrecv', sender: { replaceTrack: async () => {} } };
+      }
+      getTransceivers() {
+        return [];
+      }
+      async createOffer() {
+        return { type: 'offer', sdp: '' };
+      }
+      async setLocalDescription() {}
+      close() {}
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('🎧 로 참여하면 방에 알리고, 🎙 는 참여 전엔 잠겨 있다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102] });
+
+    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+
+    expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
+    expect(screen.getByRole('button', { name: '음성 대화' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '마이크' })).toBeEnabled();
+  });
+
+  it('참여한 사람의 좌석에 🎧 가 붙는다', async () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+
+    await act(async () => {
+      voiceHandler!({ type: 'JOIN', from: 102, data: null });
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[data-seat="2"] .oc-seat-voice')).toHaveTextContent('🎧');
+    expect(container.querySelector('[data-seat="1"] .oc-seat-voice')).toBeNull();
   });
 });

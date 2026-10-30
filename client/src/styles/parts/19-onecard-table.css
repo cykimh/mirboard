@@ -1129,3 +1129,22 @@ button.oc-pile-draw {
     transform: translate(-50%, -28px) scale(1);
   }
 }
+
+/* D-155 — 음성 대화: 좌석 이름 옆 🎧(참여 중), 연결 실패면 흐리게 ✕. */
+.oc-seat-voice {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.oc-seat-voice-failed {
+  opacity: 0.55;
+  color: var(--oc-race-catch);
+}
+
+.oc-voice-error {
+  border-color: var(--oc-race-catch);
+  color: var(--oc-race-catch);
+  white-space: normal;
+}
+

@@ -40,6 +40,8 @@ interface Props {
   slot?: number;
   /** D-154 — 이 좌석이 방금 보낸 이모지(잠깐 떠 있다). */
   reaction?: string;
+  /** D-155 — 음성 대화 참여 중(on) / 나와의 연결 실패(failed). */
+  voice?: 'on' | 'failed';
 }
 
 /**
@@ -57,6 +59,7 @@ export function OneCardSeat({
   side,
   slot,
   reaction,
+  voice,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -104,6 +107,15 @@ export function OneCardSeat({
         <span className="oc-seat-name" title={name}>
           {name}
         </span>
+        {voice && (
+          <span
+            className={`oc-seat-voice${voice === 'failed' ? ' oc-seat-voice-failed' : ''}`}
+            title={voice === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+            aria-label={voice === 'failed' ? '음성 연결 안 됨' : '음성 대화 참여 중'}
+          >
+            {voice === 'failed' ? '🎧✕' : '🎧'}
+          </span>
+        )}
       </div>
 
       {/* D-144 — 숫자 대신 장수만큼 작은 뒷면. 정확한 장수는 보조기기·마우스 오버로. */}
