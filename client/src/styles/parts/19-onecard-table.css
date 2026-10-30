@@ -436,38 +436,33 @@ button.oc-badge {
   gap: 4px;
 }
 
-/* D-144 — 맨 위 카드 아래에 직전 카드를 살짝 비틀어 깐다(장식, aria-hidden). 겹친 카드는 자리를 차지하지 않아 가운데 칸 폭이
-   그대로다 — 좁은 화면(가운데 ≈126px)에서도 줄이 바뀌지 않는다. */
-.oc-top-stack {
-  position: relative;
-  display: inline-flex;
-}
-
-.oc-top-stack > .oc-card,
-.oc-top-stack > .oc-top-empty {
-  z-index: 1;
-}
-
-.oc-top-trail {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.oc-top-trail-card {
-  position: absolute;
-  inset: 0;
+/* D-150 — 맨 위 카드 옆의 이전 카드 줄. 작은 카드를 위아래로 겹쳐 위 카드들은 귀퉁이의 무늬·숫자만, 맨 아래(바로 전 카드)는 다 보인다.
+   폭이 작아(34px) 좁은 가운데 칸(≈126px)에서도 더미·맨 위 카드와 한 줄에 선다. */
+.oc-trail {
   display: flex;
-  justify-content: center;
-  filter: brightness(0.82);
+  flex-direction: column;
+  align-self: flex-start;
 }
 
-.oc-top-trail-card[data-depth='1'] {
-  transform: translate(-9px, 2px) rotate(-10deg);
+.oc-trail-card {
+  box-sizing: border-box;
+  display: block;
+  width: 34px;
+  height: 48px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: var(--oc-card-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  letter-spacing: -0.5px;
 }
 
-.oc-top-trail-card[data-depth='2'] {
-  transform: translate(9px, 3px) rotate(9deg);
+.oc-trail-card + .oc-trail-card {
+  margin-top: -30px;
 }
 
 .oc-top-empty {

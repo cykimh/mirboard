@@ -136,7 +136,7 @@ class GameCatalogIntegrationTest {
 
     private String authenticate() throws Exception {
         var body = objectMapper.writeValueAsString(
-                Map.of("username", "catalog_u", "password", "validpass1"));
+                Map.of("username", "catalogu", "password", "validpass1"));
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));

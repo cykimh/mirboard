@@ -10,8 +10,8 @@ interface Props {
   compact?: boolean;
 }
 
-/** 무늬 색 — ♥♦ 빨강, ♠♣ 검정, 조커는 따로. */
-function toneOf(card: OneCardCard): string {
+/** 무늬 색 — ♥♦ 빨강, ♠♣ 검정, 조커는 따로. 이전 카드 줄(D-150)도 같이 쓴다. */
+export function toneOf(card: OneCardCard): string {
   if (card.joker === 'COLOR') return 'oc-card-joker-color';
   if (card.joker === 'BLACK') return 'oc-card-joker-black';
   return card.suit === 'HEART' || card.suit === 'DIAMOND' ? 'oc-card-red' : 'oc-card-black';

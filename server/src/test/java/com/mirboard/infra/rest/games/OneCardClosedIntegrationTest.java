@@ -59,7 +59,7 @@ class OneCardClosedIntegrationTest {
 
     @Test
     void a_closed_one_card_is_listed_as_coming_soon_after_the_open_games() throws Exception {
-        String token = authenticate("closed_catalog_u");
+        String token = authenticate("closedc6e6");
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -72,7 +72,7 @@ class OneCardClosedIntegrationTest {
 
     @Test
     void a_closed_one_card_room_cannot_be_created() throws Exception {
-        String token = authenticate("closed_room_u");
+        String token = authenticate("closedr90c");
 
         mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)

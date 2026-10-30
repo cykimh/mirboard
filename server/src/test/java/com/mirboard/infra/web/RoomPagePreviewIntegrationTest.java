@@ -91,7 +91,7 @@ class RoomPagePreviewIntegrationTest {
     @Test
     @DisplayName("토큰 없이 방 주소를 열면 그 방의 미리보기 HTML — 방 이름은 이스케이프, 방장·정원 포함")
     void anonymous_preview_of_real_room() throws Exception {
-        String token = registerAndLogin("preview_host", "validpass1");
+        String token = registerAndLogin("preview5a9", "validpass1");
         JsonNode room = createRoom(token, "<b>금요일</b> 한 판", "ONE_CARD");
         String roomId = room.get("roomId").asText();
 
@@ -103,7 +103,7 @@ class RoomPagePreviewIntegrationTest {
 
         assertThat(body)
                 .contains("<meta property=\"og:title\" content=\"원카드 · &lt;b&gt;금요일&lt;/b&gt; 한 판\" />")
-                .contains("preview_host님이 초대했어요 · " + room.get("capacity").asInt() + "인 방 · 누르면 바로 입장")
+                .contains("preview5a9님이 초대했어요 · " + room.get("capacity").asInt() + "인 방 · 누르면 바로 입장")
                 .contains("<meta property=\"og:url\" content=\"http://localhost/rooms/" + roomId + "\" />")
                 .doesNotContain("<b>금요일");
     }
@@ -128,7 +128,7 @@ class RoomPagePreviewIntegrationTest {
     @Test
     @DisplayName("같은 방의 REST(/api/rooms/{id}/…)는 그대로 인증이 필요하다 — 미리보기 매핑이 가로채지 않는다")
     void api_rooms_still_requires_auth() throws Exception {
-        String token = registerAndLogin("preview_api", "validpass1");
+        String token = registerAndLogin("previewapi", "validpass1");
         String roomId = createRoom(token, "방", "ONE_CARD").get("roomId").asText();
 
         mockMvc.perform(post("/api/rooms/" + roomId + "/join-or-reconnect"))

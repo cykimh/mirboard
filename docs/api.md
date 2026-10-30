@@ -45,14 +45,14 @@
 
 요청
 ```json
-{ "username": "alice_01", "password": "s3cret-pass" }
+{ "username": "철수", "password": "s3cret-pass" }
 ```
-- `username`: `^[A-Za-z0-9_]{3,20}$`
+- `username`(화면 이름 "별명", D-149): `^[가-힣A-Za-z0-9]{2,10}$` — 한글(완성형)·영문·숫자 2~10자. 서버가 NFC 로 맞춰 저장·조회(로그인도 같다).
 - `password`: 8~64자
 
 응답 `201`
 ```json
-{ "userId": 17, "username": "alice_01" }
+{ "userId": 17, "username": "철수" }
 ```
 
 에러: `USERNAME_TAKEN`, `INVALID_INPUT`.
@@ -60,7 +60,7 @@
 ### POST `/api/auth/login`
 요청
 ```json
-{ "username": "alice_01", "password": "s3cret-pass" }
+{ "username": "철수", "password": "s3cret-pass" }
 ```
 응답 `200`
 ```json
@@ -68,7 +68,7 @@
   "accessToken": "eyJhbGciOi...",
   "tokenType": "Bearer",
   "expiresAt": 1715600000000,
-  "user": { "userId": 17, "username": "alice_01", "guest": false }
+  "user": { "userId": 17, "username": "철수", "guest": false }
 }
 ```
 `user.guest` *(D-117, 가산)* — 게스트 계정이면 `true`(아래 `/api/auth/guest`). 로그인은 언제나 `false`.
@@ -113,7 +113,7 @@
 ### GET `/api/me`
 응답 `200`
 ```json
-{ "userId": 17, "username": "alice_01", "winCount": 3, "loseCount": 4 }
+{ "userId": 17, "username": "철수", "winCount": 3, "loseCount": 4 }
 ```
 > D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
 > 응답에 칩 잔액 없음.

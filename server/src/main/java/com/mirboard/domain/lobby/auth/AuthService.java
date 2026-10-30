@@ -24,7 +24,8 @@ public class AuthService {
     }
 
     @Transactional
-    public RegisteredUser register(String username, String password) {
+    public RegisteredUser register(String rawUsername, String password) {
+        String username = UsernamePolicy.normalize(rawUsername);
         UsernamePolicy.validate(username);
         PasswordPolicy.validate(password);
         if (userRepository.existsByUsername(username)) {
@@ -36,7 +37,8 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public AuthenticatedUser authenticate(String username, String password) {
+    public AuthenticatedUser authenticate(String rawUsername, String password) {
+        String username = UsernamePolicy.normalize(rawUsername);
         // D-84 — 실패 누적 잠금 검사 → 인증 → 결과에 따라 카운터 갱신.
         loginAttempts.assertNotLocked(username);
         var user = userRepository.findByUsername(username).orElse(null);

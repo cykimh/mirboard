@@ -57,7 +57,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_then_list_then_get_then_leave() throws Exception {
-        String token = registerAndLogin("rooms_user", "validpass1");
+        String token = registerAndLogin("roomsuser", "validpass1");
 
         // Create
         var createBody = objectMapper.writeValueAsString(
@@ -107,7 +107,7 @@ class RoomControllerIntegrationTest {
      */
     @Test
     void a_one_card_room_opens_with_its_declared_choices_when_they_are_omitted() throws Exception {
-        String token = registerAndLogin("one_card_host", "validpass1");
+        String token = registerAndLogin("onecardda5", "validpass1");
 
         mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
@@ -121,7 +121,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_unavailable_game_returns_404() throws Exception {
-        String token = registerAndLogin("bad_game_user", "validpass1");
+        String token = registerAndLogin("badgame0a6", "validpass1");
 
         var body = objectMapper.writeValueAsString(
                 Map.of("name", "wrong game", "gameType", "NOT_A_REAL_GAME"));
@@ -142,7 +142,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void joining_unknown_room_is_404() throws Exception {
-        String token = registerAndLogin("nonexistent_join", "validpass1");
+        String token = registerAndLogin("nonexisb32", "validpass1");
 
         mockMvc.perform(post("/api/rooms/00000000-0000-0000-0000-000000000000/join")
                         .header("Authorization", "Bearer " + token))
@@ -152,7 +152,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_fillWithBots_is_a_practice_room_that_starts_right_away() throws Exception {
-        String token = registerAndLogin("solo_user", "validpass1");
+        String token = registerAndLogin("solouser", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "솔로 모드",
@@ -175,7 +175,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_without_fillWithBots_stays_waiting_with_only_host() throws Exception {
-        String token = registerAndLogin("default_user", "validpass1");
+        String token = registerAndLogin("default58e", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "친구 기다리는 방",
@@ -193,7 +193,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_custom_target_score_persists_it() throws Exception {
-        String token = registerAndLogin("target_user", "validpass1");
+        String token = registerAndLogin("targetuser", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "300점 빠른 판",
@@ -209,7 +209,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_turn_seconds_persists_it() throws Exception {
-        String token = registerAndLogin("turn_user", "validpass1");
+        String token = registerAndLogin("turnuser", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "30초 턴 방",
@@ -225,7 +225,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_without_turn_seconds_defaults_to_zero() throws Exception {
-        String token = registerAndLogin("default_turn_user", "validpass1");
+        String token = registerAndLogin("default8da", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "턴 제한 끔 방",
@@ -240,7 +240,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_without_target_score_defaults_to_1000() throws Exception {
-        String token = registerAndLogin("default_target_user", "validpass1");
+        String token = registerAndLogin("default8d6", "validpass1");
 
         var body = objectMapper.writeValueAsString(Map.of(
                 "name", "기본 목표 방",
@@ -255,7 +255,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_stake_persists_and_defaults_to_zero() throws Exception {
-        String token = registerAndLogin("stake_user", "validpass1");
+        String token = registerAndLogin("stakeuser", "validpass1");
         MvcResult staked = mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -281,7 +281,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_with_invalid_stake_returns_400() throws Exception {
-        String token = registerAndLogin("bad_stake_user", "validpass1");
+        String token = registerAndLogin("badstak79f", "validpass1");
         mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -293,7 +293,7 @@ class RoomControllerIntegrationTest {
 
     @Test
     void create_staked_room_with_bots_returns_400() throws Exception {
-        String token = registerAndLogin("stake_bot_user", "validpass1");
+        String token = registerAndLogin("stakeboded", "validpass1");
         mockMvc.perform(post("/api/rooms")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)

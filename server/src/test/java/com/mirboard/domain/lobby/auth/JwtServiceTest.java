@@ -21,12 +21,12 @@ class JwtServiceTest {
 
     @Test
     void issue_then_parse_round_trips_claims() {
-        var issued = service.issue(42L, "alice_01");
+        var issued = service.issue(42L, "alice01");
 
         var principal = service.parse(issued.token());
 
         assertThat(principal.userId()).isEqualTo(42L);
-        assertThat(principal.username()).isEqualTo("alice_01");
+        assertThat(principal.username()).isEqualTo("alice01");
         assertThat(issued.expiresAt()).isEqualTo(fixedNow.plus(Duration.ofMinutes(30)));
     }
 

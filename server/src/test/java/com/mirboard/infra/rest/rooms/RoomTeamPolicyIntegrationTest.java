@@ -64,7 +64,7 @@ class RoomTeamPolicyIntegrationTest {
 
     @Test
     void default_team_policy_is_sequential() throws Exception {
-        String hostToken = registerAndLogin("tp_seq_host", "validpass1");
+        String hostToken = registerAndLogin("tpseqhost", "validpass1");
         String roomId = createRoom(hostToken, null);
 
         mockMvc.perform(get("/api/rooms/" + roomId)
@@ -75,7 +75,7 @@ class RoomTeamPolicyIntegrationTest {
 
     @Test
     void create_with_random_policy_persists() throws Exception {
-        String hostToken = registerAndLogin("tp_rand_host", "validpass1");
+        String hostToken = registerAndLogin("tprandhost", "validpass1");
         String roomId = createRoom(hostToken, "RANDOM");
 
         mockMvc.perform(get("/api/rooms/" + roomId)
@@ -85,7 +85,7 @@ class RoomTeamPolicyIntegrationTest {
 
     @Test
     void host_can_change_policy_in_waiting() throws Exception {
-        String hostToken = registerAndLogin("tp_chg_host", "validpass1");
+        String hostToken = registerAndLogin("tpchghost", "validpass1");
         String roomId = createRoom(hostToken, null);
 
         var body = objectMapper.writeValueAsString(Map.of("teamPolicy", "RANDOM"));
@@ -99,8 +99,8 @@ class RoomTeamPolicyIntegrationTest {
 
     @Test
     void non_host_cannot_change_policy() throws Exception {
-        String hostToken = registerAndLogin("tp_nh_host", "validpass1");
-        String guestToken = registerAndLogin("tp_nh_guest", "validpass1");
+        String hostToken = registerAndLogin("tpnhhost", "validpass1");
+        String guestToken = registerAndLogin("tpnhguest", "validpass1");
         String roomId = createRoom(hostToken, null);
 
         var body = objectMapper.writeValueAsString(Map.of("teamPolicy", "RANDOM"));
@@ -115,9 +115,9 @@ class RoomTeamPolicyIntegrationTest {
     @Test
     void cannot_change_policy_after_game_started() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("tp_started_host", "tp_started_b", "tp_started_c", "tp_started_d"));
+                List.of("tpstartdb3", "tpstartedb", "tpstartedc", "tpstartedd"));
         String roomId = createAndJoinAll(tokens, "RANDOM");
-        String hostToken = tokens.get("tp_started_host");
+        String hostToken = tokens.get("tpstartdb3");
 
         var body = objectMapper.writeValueAsString(Map.of("teamPolicy", "SEQUENTIAL"));
         mockMvc.perform(put("/api/rooms/" + roomId + "/team-policy")
@@ -137,9 +137,9 @@ class RoomTeamPolicyIntegrationTest {
     @Test
     void random_policy_shuffles_seats_on_game_start() throws Exception {
         Map<String, String> tokens = registerAndLoginAll(
-                List.of("tp_sh_host", "tp_sh_b", "tp_sh_c", "tp_sh_d"));
+                List.of("tpshhost", "tpshb", "tpshc", "tpshd"));
         String roomId = createAndJoinAll(tokens, "RANDOM");
-        String hostToken = tokens.get("tp_sh_host");
+        String hostToken = tokens.get("tpshhost");
 
         MvcResult res = mockMvc.perform(get("/api/rooms/" + roomId)
                         .header("Authorization", "Bearer " + hostToken))

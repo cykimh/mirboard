@@ -70,7 +70,7 @@ describe('App — 초대 링크로 들어온 사람 (D-133)', () => {
     login.mockResolvedValue({ ...SESSION_RESPONSE, user: { userId: 3, username: 'alice' } });
     openAt('/rooms/abc-123');
 
-    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('별명'), { target: { value: 'alice' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
 
@@ -83,12 +83,12 @@ describe('App — 초대 링크로 들어온 사람 (D-133)', () => {
     openAt('/rooms/abc-123');
 
     fireEvent.click(screen.getByRole('link', { name: '회원가입' }));
-    fireEvent.change(await screen.findByLabelText(/아이디 \(영문/), { target: { value: 'newbie' } });
+    fireEvent.change(await screen.findByLabelText(/별명 \(한글/), { target: { value: '새내기' } });
     fireEvent.change(screen.getByLabelText(/비밀번호 \(8~64자\)/), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '회원가입 후 로그인' }));
 
     expect(await screen.findByText('ROOM_PAGE abc-123')).toBeInTheDocument();
-    expect(register).toHaveBeenCalledWith('newbie', 'password1');
+    expect(register).toHaveBeenCalledWith('새내기', 'password1');
   });
 
   it('이미 로그인한 사람은 로그인 화면 없이 바로 그 방으로 들어간다', () => {
@@ -109,7 +109,7 @@ describe('App — 초대 링크로 들어온 사람 (D-133)', () => {
 
     expect(window.location.pathname).toBe('/login');
     expect(screen.queryByText(/방에 초대받았어요/)).toBeNull();
-    fireEvent.change(screen.getByLabelText('아이디'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('별명'), { target: { value: 'alice' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'password1' } });
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
 

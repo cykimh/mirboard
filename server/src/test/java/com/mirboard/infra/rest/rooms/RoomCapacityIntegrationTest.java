@@ -76,7 +76,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void variable_game_uses_requested_capacity() throws Exception {
-        String token = registerAndLogin("cap_pick_user", "validpass1");
+        String token = registerAndLogin("cappickbbf", "validpass1");
 
         mockMvc.perform(create(token, Map.of(
                         "name", "4인 방", "gameType", VARIABLE_GAME, "capacity", 4)))
@@ -87,7 +87,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void variable_game_without_capacity_defaults_to_declared_players() throws Exception {
-        String token = registerAndLogin("cap_default_user", "validpass1");
+        String token = registerAndLogin("capdefaf5f", "validpass1");
 
         // D-131 — capacity 미지정이면 게임 선언 def.defaultPlayers()(스컬킹은 최대 8 과 같다 — 예전 생략 기본 그대로).
         mockMvc.perform(create(token, Map.of(
@@ -98,7 +98,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void variable_game_accepts_min_and_max_bounds() throws Exception {
-        String token = registerAndLogin("cap_bounds_user", "validpass1");
+        String token = registerAndLogin("capboun8bb", "validpass1");
 
         mockMvc.perform(create(token, Map.of(
                         "name", "최소 인원", "gameType", VARIABLE_GAME, "capacity", 2)))
@@ -113,7 +113,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void capacity_above_max_players_is_rejected() throws Exception {
-        String token = registerAndLogin("cap_over_user", "validpass1");
+        String token = registerAndLogin("capover930", "validpass1");
 
         mockMvc.perform(create(token, Map.of(
                         "name", "9인 방", "gameType", VARIABLE_GAME, "capacity", 9)))
@@ -123,7 +123,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void capacity_below_min_players_is_rejected() throws Exception {
-        String token = registerAndLogin("cap_under_user", "validpass1");
+        String token = registerAndLogin("capundefa4", "validpass1");
 
         mockMvc.perform(create(token, Map.of(
                         "name", "1인 방", "gameType", VARIABLE_GAME, "capacity", 1)))
@@ -133,7 +133,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void fixed_game_accepts_its_only_capacity() throws Exception {
-        String token = registerAndLogin("cap_tichu_ok_user", "validpass1");
+        String token = registerAndLogin("captich0b5", "validpass1");
 
         // 티츄는 min=max=4 — 명시해도 통과하고 응답은 기존과 동일.
         mockMvc.perform(create(token, Map.of(
@@ -144,7 +144,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void fixed_game_rejects_other_capacity() throws Exception {
-        String token = registerAndLogin("cap_tichu_bad_user", "validpass1");
+        String token = registerAndLogin("captiche63", "validpass1");
 
         mockMvc.perform(create(token, Map.of(
                         "name", "티츄 2인", "gameType", "TICHU", "capacity", 2)))
@@ -154,7 +154,7 @@ class RoomCapacityIntegrationTest {
 
     @Test
     void fill_with_bots_fills_up_to_requested_capacity_not_max_players() throws Exception {
-        String token = registerAndLogin("cap_bots_user", "validpass1");
+        String token = registerAndLogin("capbots176", "validpass1");
 
         // capacity 3 → 호스트 1 + 봇 2. maxPlayers(8) 를 따르면 봇 7 을 시도해 실패한다.
         mockMvc.perform(create(token, Map.of(

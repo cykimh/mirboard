@@ -82,9 +82,9 @@ class AdminUserSuspensionIT {
 
     @Test
     void admin_suspends_and_lifts_user_login() throws Exception {
-        User admin = newUser("su_admin");
+        User admin = newUser("suadmin");
         adminRoleRepo.save(new AdminRole(admin.getId(), clock.instant()));
-        User target = newUser("su_target");
+        User target = newUser("sutarget");
 
         // 정지 전 로그인 OK.
         org.assertj.core.api.Assertions.assertThat(login(target.getUsername())).isEqualTo(200);
@@ -110,8 +110,8 @@ class AdminUserSuspensionIT {
 
     @Test
     void non_admin_cannot_suspend() throws Exception {
-        User notAdmin = newUser("su_plain");
-        User target = newUser("su_victim");
+        User notAdmin = newUser("suplain");
+        User target = newUser("suvictim");
         mockMvc.perform(post("/api/admin/users/" + target.getId() + "/suspend")
                 .header("Authorization", bearer(notAdmin))
                 .contentType(MediaType.APPLICATION_JSON)

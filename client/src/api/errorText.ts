@@ -7,7 +7,7 @@ import { ApiError } from './client';
  */
 const MESSAGES: Record<string, string> = {
   ALREADY_IN_ROOM: '이미 이 방에 있어요',
-  BAD_CREDENTIALS: '아이디 또는 비밀번호가 맞지 않아요',
+  BAD_CREDENTIALS: '별명 또는 비밀번호가 맞지 않아요',
   GAME_ALREADY_STARTED: '이미 시작한 게임이에요',
   GAME_NOT_AVAILABLE: '지금은 할 수 없는 게임이에요',
   GAME_NOT_IN_PROGRESS: '진행 중인 게임이 아니에요',
@@ -20,7 +20,7 @@ const MESSAGES: Record<string, string> = {
   ROOM_FULL: '자리가 다 찼어요',
   ROOM_NOT_FOUND: '방이 없어졌어요',
   UNAUTHORIZED: '다시 로그인해 주세요',
-  USERNAME_TAKEN: '이미 쓰는 아이디예요',
+  USERNAME_TAKEN: '이미 쓰는 별명이에요',
 };
 
 /** 한국어로 옮기는 서버 오류 코드(테스트가 서버 소스와 대조한다). */

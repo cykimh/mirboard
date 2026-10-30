@@ -97,7 +97,7 @@ export interface OneCardRoomState {
   /** D-139 — 방금 낸 카드(카드 내기 비행 효과). 같은 이벤트를 두 번 적용해도 같다(순번이 같다). */
   lastPlay: LastPlay | null;
   /**
-   * D-144 — 맨 위 카드 아래에 깔린 이전 카드(최근 것이 앞, 최대 `DISCARD_TRAIL_MAX` 장). 서버 뷰에 없는 화면 기억이라
+   * D-144 — 맨 위 카드 바로 전에 낸 카드들(최근 것이 앞, 최대 `DISCARD_TRAIL_MAX` 장, D-150 — 맨 위 옆에 작게). 서버 뷰에 없는 화면 기억이라
    * 이 세션에서 본 내기만 쌓는다 — 다시 섞으면 비우고, resync 는 맨 위가 같을 때만 지킨다.
    */
   discardTrail: OneCardCard[];
@@ -173,8 +173,8 @@ export interface OneCardActions {
   requestTurnResync: (turnEpoch: number) => void;
 }
 
-/** D-144 — 맨 위 아래에 겹쳐 보이는 이전 카드 수. */
-export const DISCARD_TRAIL_MAX = 2;
+/** D-144 — 맨 위 카드 옆에 작게 보이는 이전 카드 수(D-150 — 2 → 3). */
+export const DISCARD_TRAIL_MAX = 3;
 
 function sameCard(a: OneCardCard | null, b: OneCardCard | null): boolean {
   return a !== null && b !== null && cardKey(a) === cardKey(b);

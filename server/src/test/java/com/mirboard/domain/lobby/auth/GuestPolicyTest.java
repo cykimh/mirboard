@@ -50,7 +50,7 @@ class GuestPolicyTest {
         assertThat(GuestPolicy.isGuest("guest-abcd2345")).isTrue();
         assertThat(GuestPolicy.isGuest("guest_abc")).isFalse();
         assertThat(GuestPolicy.isGuest("bot_north")).isFalse();
-        assertThat(GuestPolicy.isGuest("alice_01")).isFalse();
+        assertThat(GuestPolicy.isGuest("alice01")).isFalse();
         assertThat(GuestPolicy.isGuest(null)).isFalse();
     }
 
@@ -58,7 +58,7 @@ class GuestPolicyTest {
     void require_not_guest_blocks_only_guests() {
         assertThatThrownBy(() -> GuestPolicy.requireNotGuest(new AuthPrincipal(1L, "guest-abcd2345")))
                 .isInstanceOf(GuestForbiddenException.class);
-        assertThatCode(() -> GuestPolicy.requireNotGuest(new AuthPrincipal(2L, "alice_01")))
+        assertThatCode(() -> GuestPolicy.requireNotGuest(new AuthPrincipal(2L, "alice01")))
                 .doesNotThrowAnyException();
     }
 

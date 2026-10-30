@@ -76,9 +76,9 @@ class AdminControllerIT {
 
     /** 봇 없음 + 타임아웃 0 → 4인 ready 후 안정 IN_GAME(자동 진행 없음). */
     private String inGameRoom(User host) {
-        User p2 = newUser("ac_p");
-        User p3 = newUser("ac_p");
-        User p4 = newUser("ac_p");
+        User p2 = newUser("acp");
+        User p3 = newUser("acp");
+        User p4 = newUser("acp");
         Room room = roomService.createRoom(host.getId(), "admin-abort", "TICHU",
                 TeamPolicy.SEQUENTIAL, /*fillWithBots*/ false, /*targetScore*/ 300, /*turnSeconds*/ 0);
         String roomId = room.roomId();
@@ -95,8 +95,8 @@ class AdminControllerIT {
 
     @Test
     void admin_can_force_abort_in_game_match() throws Exception {
-        User host = newUser("ac_host");
-        User admin = newUser("ac_admin");
+        User host = newUser("achost");
+        User admin = newUser("acadmin");
         adminRoleRepo.save(new AdminRole(admin.getId(), clock.instant()));
         String roomId = inGameRoom(host);
 
@@ -109,7 +109,7 @@ class AdminControllerIT {
 
     @Test
     void non_admin_cannot_abort_and_match_unchanged() throws Exception {
-        User host = newUser("ac_host"); // host 는 어드민 아님
+        User host = newUser("achost"); // host 는 어드민 아님
         String roomId = inGameRoom(host);
 
         mockMvc.perform(post("/api/admin/rooms/" + roomId + "/abort")

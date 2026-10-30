@@ -278,6 +278,19 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 
 ---
 
+## 회원 초기화 (D-149)
+
+사람 계정과 그에 딸린 기록(전적·랭킹·매치 기록·아바타·신고·관리자 권한, 게스트 포함)을 모두 지우고 시드 봇 8명만 남긴다. **되돌릴 수 없다.**
+운영자가 직접, 아래 순서로 한다.
+
+1. DB — `flyctl postgres connect -a mirboard-db -d mirboard` 로 psql 을 열고 [`ops/db/reset-members.sql`](../ops/db/reset-members.sql) 내용을 붙여
+   넣는다. 끝에 `remaining_users = bots = 8` 이 찍히면 된다.
+2. Redis — `flyctl apps restart mirboard-redis`. 저장을 끈 Redis 라(`--save ''`) 다시 켜면 방·대기열·로그인 실패 기록이 비워진다.
+3. 로그인 풀기 — `flyctl secrets set MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)" -a mirboard`. 지워진 계정의 토큰이 남은 브라우저가
+   다시 로그인하게 한다(앱이 다시 시작된다).
+
+관리자 권한(`admin_roles`)도 지워지므로 필요하면 새 계정에 다시 준다.
+
 ## CD (GitHub Actions)
 
 `.github/workflows/deploy.yml` — `main` 푸시 + 수동 실행(`workflow_dispatch`).

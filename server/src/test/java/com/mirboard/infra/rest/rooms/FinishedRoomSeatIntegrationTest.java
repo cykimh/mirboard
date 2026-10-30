@@ -121,7 +121,7 @@ class FinishedRoomSeatIntegrationTest {
         // 허브 목록·다른 방 입장. ALREADY_IN_ROOM 은 방 단위 검사라 다른 방에 영향이 없다.
         mockMvc.perform(get("/api/rooms").header("Authorization", bearer(t.token(0))))
                 .andExpect(status().isOk());
-        Player other = registerAndLogin("fs2_other");
+        Player other = registerAndLogin("fs2other");
         String otherRoom = createRoom(other.token(), "TICHU", null);
         mockMvc.perform(post("/api/rooms/" + otherRoom + "/join")
                         .header("Authorization", bearer(t.token(0))))
@@ -151,8 +151,8 @@ class FinishedRoomSeatIntegrationTest {
 
     @Test
     void a_waiting_room_leave_still_shrinks_the_seats_and_promotes_the_host() throws Exception {
-        Player host = registerAndLogin("fs4_host");
-        Player guest = registerAndLogin("fs4_guest");
+        Player host = registerAndLogin("fs4host");
+        Player guest = registerAndLogin("fs4guest");
         String roomId = createRoom(host.token(), "SKULL_KING", 3);
         mockMvc.perform(post("/api/rooms/" + roomId + "/join")
                         .header("Authorization", bearer(guest.token())))
@@ -199,7 +199,7 @@ class FinishedRoomSeatIntegrationTest {
         assertThat(carol.get("hand")).isEqualTo(carolBefore.get("hand"));
 
         // 탈주한 사람은 이 방에 묶이지 않는다 — 다른 방 입장 정상.
-        Player other = registerAndLogin("fs7_other");
+        Player other = registerAndLogin("fs7other");
         String otherRoom = createRoom(other.token(), "TICHU", null);
         mockMvc.perform(post("/api/rooms/" + otherRoom + "/join")
                         .header("Authorization", bearer(t.token(0))))
@@ -270,7 +270,7 @@ class FinishedRoomSeatIntegrationTest {
     private Table startSkullKing(String prefix) throws Exception {
         List<Player> players = new ArrayList<>();
         for (String name : List.of("a", "b", "c")) {
-            players.add(registerAndLogin(prefix + "_" + name));
+            players.add(registerAndLogin(prefix + name));
         }
         String roomId = createRoom(players.get(0).token(), "SKULL_KING", 3);
         for (int i = 1; i < players.size(); i++) {
