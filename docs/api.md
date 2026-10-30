@@ -381,18 +381,18 @@ schema constraint 유지.
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.
 
-tier 는 derived 값이다(D-164 — 포트리스2식 21단계, 서버 `Tier`). 점수 구간은 아래와 같다.
+tier 는 derived 값이다(D-164·D-167 — 포트리스2식 16단계, 서버 `Tier`). 점수 구간은 아래와 같다.
 
 | 계급 | 점수 |
 |---|---|
-| `SKULL` | <910 |
-| `BULLET_1`·`_2`·`_3` | 910·940·970 |
-| `MISSILE_1`·`_2`·`_3` | 1000(시작)·1030·1060 |
-| `BRONZE_STAR`·`SILVER_STAR`·`GOLD_STAR`·`DOUBLE_GOLD_STAR` | 1090·1120·1150·1180 |
-| `BRONZE_MEDAL`·`SILVER_MEDAL`·`GOLD_MEDAL` | 1210·1250·1290 |
-| `BRONZE_BADGE`·`SILVER_BADGE`·`GOLD_BADGE` | 1330·1380·1430 |
+| `SKULL` | <940 |
+| `BULLET` | 940 |
+| `MISSILE` | 1000(시작) |
+| `BRONZE_STAR`·`SILVER_STAR`·`GOLD_STAR` | 1040·1080·1120 |
+| `BRONZE_MEDAL`·`SILVER_MEDAL`·`GOLD_MEDAL` | 1160·1200·1250 |
+| `BRONZE_BADGE`·`SILVER_BADGE`·`GOLD_BADGE` | 1300·1350·1400 |
 
-금훈장(1430+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
+금훈장(1400+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
 11~30위 `BRONZE_CROWN`. 랭킹은 목록 순위를 쓰고, 전적 조회는 나보다 점수가 높은 사람 수 +1 을 쓴다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
