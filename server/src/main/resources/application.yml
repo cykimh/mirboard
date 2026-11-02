@@ -23,6 +23,9 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
+      # D-169 — 운영 DB 는 sideinfra Supabase 의 mirboard 스키마(공유 프로젝트라 public 을 못 쓴다). 네이티브 쿼리도
+      # 스키마 이름을 쓰지 않으므로 연결마다 search_path 를 이 스키마로. 기본 public = 로컬·테스트·예전 운영 그대로.
+      schema: ${MIRBOARD_DB_SCHEMA:public}
 
   jpa:
     open-in-view: false
@@ -31,9 +34,12 @@ spring:
     properties:
       hibernate.jdbc.time_zone: UTC
       hibernate.format_sql: false
+      hibernate.default_schema: ${MIRBOARD_DB_SCHEMA:public}
 
   flyway:
     enabled: true
+    # D-169 — 이력 테이블·마이그레이션 대상 스키마(위 hikari.schema 와 같은 값).
+    schemas: ${MIRBOARD_DB_SCHEMA:public}
     locations: classpath:db/migration
     baseline-on-migrate: true
 
