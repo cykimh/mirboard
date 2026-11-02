@@ -1,0 +1,116 @@
+name: Redis
+
+# D-171 — 운영 Redis(`mirboard-redis`) 배포와 본 앱의 Redis 주소 전환을 GitHub 에서 한다. 수동 실행만.
+# 로컬 네트워크가 Fly Machines API(api.machines.dev)의 TLS 를 가로채 flyctl 이 막히는 곳(2026-11-02 사내망)에서도
+# 돌릴 수 있게 하려는 것. **Redis 를 다시 배포하면 방·게임 상태가 지워진다**(영속 없음) — 열린 방이 있으면 멈춘다.
+#
+# - action=deploy : 열린 방 확인 → 사설 주소(Flycast) 확인·할당 → ops/redis 배포(공개 IP 없음)
+#                   → (switch_app_host) 본 앱 MIRBOARD_REDIS_HOST=mirboard-redis.flycast → 헬스 확인
+# - action=status : 두 앱의 머신 상태·IP 만 본다(자동 정지 확인용, 아무것도 바꾸지 않는다)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'deploy = Redis 배포(+주소 전환), status = 상태만 보기'
+        type: choice
+        options: [status, deploy]
+        default: status
+      switch_app_host:
+        description: '본 앱의 MIRBOARD_REDIS_HOST 를 mirboard-redis.flycast 로 (앱 재시작)'
+        type: boolean
+        default: true
+      force:
+        description: '열린 방(IN_GAME·WAITING)이 있어도 진행 — 그 방들은 사라진다'
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  redis:
+    name: mirboard-redis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # deploy.yml 과 같은 이유로 커밋 SHA 고정(토큰과 함께 실행되는 바이너리).
+      - name: flyctl 설치
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master @ 2026-04-08
+
+      - name: 지금 상태
+        run: |
+          flyctl machine list -a mirboard-redis
+          flyctl ips list -a mirboard-redis
+          flyctl machine list -a mirboard
+
+      - name: 열린 방 확인
+        if: inputs.action == 'deploy'
+        run: |
+          state=$(flyctl machine list -a mirboard-redis --json | jq -r '.[0].state // "none"')
+          if [ "$state" != started ]; then
+            echo "Redis 머신이 $state — 앱이 잠들어 연결이 없다는 뜻이라 열린 방도 없다(멈추면 상태가 지워진다)"; exit 0
+          fi
+          # 머신 안에서 돌릴 스크립트 — 따옴표가 세 겹(YAML·flyctl -C·sh -c)이라 base64 로 넘긴다. 끝 표식으로 ssh 실패를 가려낸다.
+          script='export REDISCLI_AUTH="$REDIS_PASSWORD"
+          redis-cli --scan --pattern "room:*" | while read -r k; do
+            [ "$(redis-cli TYPE "$k")" = hash ] || continue
+            s=$(redis-cli HGET "$k" status)
+            case "$s" in IN_GAME|WAITING) echo "OPEN $k $s" ;; esac
+          done
+          echo "__SCAN_DONE__"'
+          b64=$(printf '%s' "$script" | base64 -w0)
+          out=$(flyctl ssh console -a mirboard-redis -C "sh -c 'echo $b64 | base64 -d | sh'")
+          echo "$out"
+          echo "$out" | grep -q '__SCAN_DONE__' || { echo "::error::Redis 안을 확인하지 못했다"; exit 1; }
+          if echo "$out" | grep -q '^OPEN '; then
+            if [ "${{ inputs.force }}" = true ]; then
+              echo "::warning::열린 방이 있지만 force — 위 방들은 사라진다"
+            else
+              echo "::error::열린 방이 있다 — 비워진 뒤 다시 실행하거나 force"; exit 1
+            fi
+          fi
+
+      - name: 사설 주소(Flycast)
+        if: inputs.action == 'deploy'
+        run: |
+          flyctl ips list -a mirboard-redis | grep -qi private || flyctl ips allocate-v6 --private -a mirboard-redis
+          flyctl ips list -a mirboard-redis
+
+      - name: Redis 배포
+        if: inputs.action == 'deploy'
+        working-directory: ops/redis
+        run: flyctl deploy --remote-only --ha=false --no-public-ips
+
+      - name: 공개 IP 없음 확인
+        if: inputs.action == 'deploy'
+        run: |
+          if flyctl ips list -a mirboard-redis | grep -qi public; then
+            echo "::error::mirboard-redis 에 공개 IP 가 있다 — flyctl ips release 로 지울 것"; exit 1
+          fi
+
+      - name: 본 앱 Redis 주소 전환
+        if: inputs.action == 'deploy' && inputs.switch_app_host
+        run: flyctl secrets set MIRBOARD_REDIS_HOST=mirboard-redis.flycast -a mirboard
+
+      - name: 헬스 확인
+        if: inputs.action == 'deploy'
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://mirboard.fly.dev/actuator/health || true)
+            [ "$code" = 200 ] && { echo "UP (${i}회째)"; exit 0; }
+            sleep 10
+          done
+          echo "::error::헬스가 200 이 아니다 — 되돌리기: flyctl secrets set MIRBOARD_REDIS_HOST=mirboard-redis.internal -a mirboard"
+          exit 1
+
+      - name: 끝난 뒤 상태
+        if: always() && inputs.action == 'deploy'
+        run: |
+          flyctl machine list -a mirboard-redis
+          flyctl machine list -a mirboard

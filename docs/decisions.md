@@ -178,6 +178,15 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-171 (2026-11-02) — 운영 Redis 도 쓸 때만 켠다 (Flycast 자동 정지)
+
+D-169 뒤 Fly 고정비는 상시 가동 `mirboard-redis`(약 $2/월)뿐이다. 앱 안으로 합치는 안은 배포·재시작마다 진행 중인 판이 지워지고
+512MB 앱 머신의 여유(약 130MB)를 나눠야 해서 버리고(사용자 결정), Redis 를 따로 둔 채 **사설 주소(Flycast) TCP 서비스 + 자동 정지**로 바꾼다.
+- `ops/redis/fly.toml` 에 `[[services]]`(tcp 6379, `auto_stop_machines="stop"`, `min_machines_running=0`). 공개 IP 없이 사설 IPv6 만.
+- 본 앱은 `MIRBOARD_REDIS_HOST=mirboard-redis.flycast` — 프록시를 거쳐 앱이 연결하면 Redis 가 켜지고, 앱이 잠들어 연결이 없으면 멈춘다.
+  앱 재배포 동안엔 앱 연결만 잠깐 끊기므로 대개 Redis(진행 중인 판)는 남는다. 멈출 때 지워지는 상태는 원래 휘발(D-114)이라 손실 범위는 같다.
+- 사내망이 Fly Machines API TLS 를 가로채 로컬 flyctl 이 막혀서, 배포·전환은 GitHub Actions `Redis` 워크플로(수동, 열린 방 있으면 중단)로 한다.
+
 ## D-170 (2026-11-02) — 허브 서버가 어드민 API 를 부르는 서비스 토큰
 
 허브(별도 서버)가 mirboard 의 신고 목록·정지·강제 종료를 서버끼리 호출해야 하는데, 어드민 JWT 는 로그인(사람) 용이라 12시간 만에 만료된다. 그래서 `/api/admin/` 로 시작하는 경로에서만 `Authorization: Bearer <서비스 토큰>` 을 받는다.

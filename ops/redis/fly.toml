@@ -1,13 +1,16 @@
-# D-114 — 운영 Redis. 배포: 이 디렉터리에서 `flyctl deploy --local-only`.
+# D-114 — 운영 Redis. 배포: GitHub Actions "Redis" 워크플로, 또는 이 디렉터리에서
+# `flyctl deploy --remote-only --ha=false --no-public-ips`.
 #
 # 최초 1회 (계정 소유자):
 #   flyctl apps create mirboard-redis -o personal
 #   flyctl secrets set REDIS_PASSWORD="$(openssl rand -hex 32)" -a mirboard-redis --stage
 #   (같은 값을 본 앱에 MIRBOARD_REDIS_PASSWORD 로 — docs/deploy.md 참고)
 #
-# [http_service]/[[services]] 가 없으므로 공개 포트가 없고, 본 앱은
-# mirboard-redis.internal:6379 (Fly 사설망)로만 접근한다. 서비스가 없어 auto-stop 대상도
-# 아니므로 머신은 상시 가동이다(월 약 $2).
+# D-171 — 사설 주소(Flycast)로만 받는 TCP 서비스. 공개 IP 는 없다(배포는 --no-public-ips, 사설 IPv6 만 할당).
+# 본 앱은 mirboard-redis.flycast:6379 로 붙는다 — Fly 프록시를 거치므로 앱이 연결하면 이 머신이 켜지고,
+# 연결이 하나도 없으면(앱이 잠들면) 멈춘다. 상시 가동(월 약 $2) 대신 앱이 켜진 시간만 과금.
+# 멈추면 상태가 지워진다(원래 영속 없음 — 아래 Dockerfile). 배포는 GitHub Actions "Redis" 워크플로(수동 실행).
+# (예전 D-114: 서비스 없이 mirboard-redis.internal 로 직접 — 프록시를 안 거쳐 자동 정지가 없었다)
 
 app = "mirboard-redis"
 primary_region = "nrt"
@@ -18,3 +21,19 @@ primary_region = "nrt"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "256mb"
+
+[[services]]
+  internal_port = 6379
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 6379
+
+  # 본 앱 한 대가 여는 연결은 몇 개뿐(명령·pub/sub). 프록시가 연결을 거절하지 않게 넉넉히.
+  [services.concurrency]
+    type = "connections"
+    soft_limit = 80
+    hard_limit = 100
