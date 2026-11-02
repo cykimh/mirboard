@@ -178,6 +178,18 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-169 (2026-11-02) — 운영 DB 를 sideinfra Supabase 의 mirboard 스키마로
+
+Fly 10월 청구가 $6.84 로 처음 $5 를 넘었다. 항상 켜진 `mirboard-db`(약 $2.2/월)를 없애려고 운영 DB 를 이미 쓰는 sideinfra Supabase
+무료 프로젝트로 옮긴다(사용자 결정, 무료 범위 원칙).
+- 공유 프로젝트라 `public` 대신 전용 스키마 `mirboard` + 로그인 역할 `mirboard_app`. 스키마·역할만 sideinfra 마이그레이션
+  (`20261102120000_mirboard_schema.sql`)이 만들고 **테이블은 계속 이 저장소 Flyway** 가 관리한다. Data API 에 노출하지 않는다.
+- 앱은 `MIRBOARD_DB_SCHEMA`(기본 `public`)를 Hikari `schema`·Flyway `schemas`·Hibernate `default_schema` 에 쓴다 — 네이티브 쿼리도
+  스키마 이름이 없어 연결 search_path 로 맞춘다. 로컬·테스트·CI 는 그대로 `public`.
+- 접속은 Supabase 세션 풀러(5432, IPv4). 서울 DB ↔ 도쿄 앱이라 쿼리당 약 30ms 가 늘지만 게임 진행은 Redis 라 체감은 로그인·전적·랭킹뿐.
+- 이전은 운영자가 `ops/db/migrate-to-supabase.sh` 로 한 번(덤프 → 스키마 이름 변경 → 한 트랜잭션 복원 → 행 수 대조 → 접속 정보 교체).
+  `mirboard-db` 는 1주일 두었다가 운영자가 지운다. 계획·리허설 기록은 `docs/plans/db-supabase-migration.md`.
+
 ## D-168 (2026-10-30) — 당분간 원카드만 연다
 
 사용자 결정이다. 당분간 원카드만 한다. 티츄·스컬킹은 "준비 중"(`COMING_SOON`)으로 둔다.

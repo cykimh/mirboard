@@ -1,6 +1,7 @@
 # 배포 (Fly.io + Postgres + Redis)
 
-시연용 단일 머신 배포. Tokyo(`nrt`) 리전, 비용 약 $5~10/mo.
+시연용 단일 머신 배포. Tokyo(`nrt`) 리전. DB 는 D-169 부터 sideinfra Supabase(무료)의 `mirboard` 스키마라 Fly 고정비는 Redis 머신(약 $2/mo)뿐이고,
+앱 머신은 켜져 있는 시간만큼 붙는다(2026-10 청구 $6.84 — 그때는 Fly Postgres 포함).
 `fly.toml` 은 `min_machines_running=0` + `auto_stop_machines="stop"` 이라 유휴 시 머신이
 멈춥니다 — **첫 접속에 콜드 스타트 약 5초**가 걸리는 대신 비용이 거의 들지 않습니다.
 
@@ -12,8 +13,8 @@ brew install flyctl                      # macOS
 flyctl auth signup                       # 또는 flyctl auth login
 flyctl apps create mirboard              # 앱 이름은 fly.toml 의 app= 값과 일치 (전역 유니크)
 
-# 2) Postgres (Fly Postgres / Supabase / Neon 중 택1)
-#    Fly Postgres 예시 — Tokyo, dev preset:
+# 2) Postgres — D-169 부터 운영은 sideinfra Supabase 의 mirboard 스키마(아래 "운영 DB (D-169)").
+#    새로 셋업할 때 Fly Postgres 를 쓴다면 (예전 방식) — Tokyo, dev preset:
 flyctl postgres create --name mirboard-db --region nrt --initial-cluster-size 1 \
         --vm-size shared-cpu-1x --volume-size 1
 flyctl postgres attach --app mirboard mirboard-db
@@ -34,11 +35,12 @@ flyctl secrets set REDIS_PASSWORD="$(cat /tmp/redis-pw)" -a mirboard-redis --sta
 # JWT 시크릿 (32바이트 이상)
 flyctl secrets set MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)"
 
-# Postgres
+# Postgres — 운영(D-169)은 ops/db/migrate-to-supabase.sh 가 아래 넷을 넣는다. 직접 넣는다면:
 flyctl secrets set \
-  MIRBOARD_DB_URL="jdbc:postgresql://<pg-host>:5432/mirboard?sslmode=require" \
+  MIRBOARD_DB_URL="jdbc:postgresql://<pg-host>:5432/<db>?sslmode=require" \
   MIRBOARD_DB_USER="<user>" \
-  MIRBOARD_DB_PASSWORD="<password>"
+  MIRBOARD_DB_PASSWORD="<password>" \
+  MIRBOARD_DB_SCHEMA="<schema, 기본 public>"
 
 # Redis (D-114 — 사설망 mirboard-redis.internal, TLS 없음). 비밀번호는 위 3) 과 같은 값
 flyctl secrets set \
@@ -281,13 +283,28 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 
 ---
 
+## 운영 DB (D-169)
+
+운영 DB 는 sideinfra Supabase 프로젝트(`bonkcrwavdzqaedlktzi`, 서울)의 **`mirboard` 스키마**다. 스키마와 로그인 역할 `mirboard_app` 은
+sideinfra 마이그레이션이 만들고, 테이블은 이 저장소 Flyway 가 앱 기동 때 관리한다. Data API 에는 노출하지 않는다.
+
+- 접속: 세션 풀러 `aws-0-ap-northeast-2.pooler.supabase.com:5432`, 사용자 `mirboard_app.bonkcrwavdzqaedlktzi`, `sslmode=require`,
+  `MIRBOARD_DB_SCHEMA=mirboard`. 직접 연결 호스트(`db.<ref>.supabase.co`)는 IPv6 전용이라 쓰지 않는다
+- 연결 한도: 역할 `connection limit 15`(Hikari 최대 8). 프로젝트는 다른 앱과 공유 — DB 500MB·풀러 200 연결이 전 앱 합산이다
+- 백업: Supabase 무료는 자동 백업이 없다 → `sideinfra/scripts/backup.sh`(전 앱 스키마 포함)
+- 비밀번호 바꾸기: 새 값을 SQL 편집기에서 `alter role mirboard_app with password '…'` 로 넣고 `flyctl secrets set MIRBOARD_DB_PASSWORD=…`
+
+**한 번만 — Fly Postgres 에서 옮기기:** 저장소 루트에서 `bash ops/db/migrate-to-supabase.sh`. 지금 접속 정보를 `~/.mirboard-db-rollback.env` 에
+보관 → 새 비밀번호 설정 → 앱 머신 내리기 → 덤프 → 스키마 이름 변경 → 한 트랜잭션 복원 → 행 수 대조 → 접속 정보 교체 → 같은 이미지로 다시 배포.
+앱이 몇 분 멈추므로 게임이 없을 때. 1주일 문제없으면 `flyctl apps destroy mirboard-db`(되돌릴 수 없다)와 보관 파일 두 개를 지운다.
+
 ## 회원 초기화 (D-149)
 
 사람 계정과 그에 딸린 기록(전적·랭킹·매치 기록·아바타·신고·관리자 권한, 게스트 포함)을 모두 지우고 시드 봇 8명만 남긴다. **되돌릴 수 없다.**
 운영자가 직접, 아래 순서로 한다.
 
-1. DB — `flyctl postgres connect -a mirboard-db -d mirboard` 로 psql 을 열고 [`ops/db/reset-members.sql`](../ops/db/reset-members.sql) 내용을 붙여
-   넣는다. 끝에 `remaining_users = bots = 8` 이 찍히면 된다.
+1. DB — Supabase 대시보드 SQL 편집기(D-169 — 예전에는 `flyctl postgres connect -a mirboard-db`)에서 첫 줄에 `set search_path = mirboard;` 를 두고
+   [`ops/db/reset-members.sql`](../ops/db/reset-members.sql) 내용을 붙여 넣는다. 끝에 `remaining_users = bots = 8` 이 찍히면 된다.
 2. Redis — `flyctl apps restart mirboard-redis`. 저장을 끈 Redis 라(`--save ''`) 다시 켜면 방·대기열·로그인 실패 기록이 비워진다.
 3. 로그인 풀기 — `flyctl secrets set MIRBOARD_JWT_SECRET="$(openssl rand -hex 32)" -a mirboard`. 지워진 계정의 토큰이 남은 브라우저가
    다시 로그인하게 한다(앱이 다시 시작된다).
