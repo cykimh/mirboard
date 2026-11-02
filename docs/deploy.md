@@ -1,7 +1,7 @@
 # 배포 (Fly.io + Postgres + Redis)
 
-시연용 단일 머신 배포. Tokyo(`nrt`) 리전. DB 는 D-169 부터 sideinfra Supabase(무료)의 `mirboard` 스키마라 Fly 고정비는 Redis 머신(약 $2/mo)뿐이고,
-앱 머신은 켜져 있는 시간만큼 붙는다(2026-10 청구 $6.84 — 그때는 Fly Postgres 포함).
+시연용 단일 머신 배포. Tokyo(`nrt`) 리전. DB 는 D-169 부터 sideinfra Supabase(무료)의 `mirboard` 스키마, Redis 는 D-171 부터 앱이 켜져
+있을 때만 켜진다 — Fly 요금은 앱·Redis 머신이 켜져 있는 시간만큼이다(2026-10 청구 $6.84 — 그때는 Fly Postgres·상시 Redis 포함).
 `fly.toml` 은 `min_machines_running=0` + `auto_stop_machines="stop"` 이라 유휴 시 머신이
 멈춥니다 — **첫 접속에 콜드 스타트 약 5초**가 걸리는 대신 비용이 거의 들지 않습니다.
 
@@ -21,12 +21,14 @@ flyctl postgres attach --app mirboard mirboard-db
 #    → 자동으로 DATABASE_URL secret 이 셋됨. 본 앱은 별도 명명을 쓰므로 아래
 #       MIRBOARD_DB_URL 로 다시 설정한다 (Postgres URI → jdbc URL 변환).
 
-# 3) Redis — Fly 자체 앱 (D-114, 월 약 $2 고정). 설정은 ops/redis/ 에 있다.
+# 3) Redis — Fly 자체 앱 (D-114). 설정은 ops/redis/ 에 있다. D-171 — Flycast 사설 주소로만 받고 앱이 잠들면 같이 멈춘다.
+#    배포는 GitHub Actions "Redis" 워크플로(action=deploy)가 사설 IP 할당까지 한다. 손으로 할 때:
 #    (Upstash 무료 DB 는 방치 중 삭제됐고, 종량제는 D-96 폴링 때문에 요금이 튈 수 있어 택하지 않음)
 flyctl apps create mirboard-redis -o personal
 openssl rand -hex 32 > /tmp/redis-pw && chmod 600 /tmp/redis-pw
 flyctl secrets set REDIS_PASSWORD="$(cat /tmp/redis-pw)" -a mirboard-redis --stage
-(cd ops/redis && flyctl deploy --local-only --ha=false)
+flyctl ips allocate-v6 --private -a mirboard-redis
+(cd ops/redis && flyctl deploy --remote-only --ha=false --no-public-ips)
 ```
 
 ### 1. Secret 셋업
@@ -42,9 +44,10 @@ flyctl secrets set \
   MIRBOARD_DB_PASSWORD="<password>" \
   MIRBOARD_DB_SCHEMA="<schema, 기본 public>"
 
-# Redis (D-114 — 사설망 mirboard-redis.internal, TLS 없음). 비밀번호는 위 3) 과 같은 값
+# Redis (D-171 — Flycast 사설 주소, TLS 없음). 비밀번호는 위 3) 과 같은 값.
+# .internal 은 프록시를 안 거쳐 멈춘 Redis 를 깨우지 못한다 — 반드시 .flycast
 flyctl secrets set \
-  MIRBOARD_REDIS_HOST="mirboard-redis.internal" \
+  MIRBOARD_REDIS_HOST="mirboard-redis.flycast" \
   MIRBOARD_REDIS_PORT="6379" \
   MIRBOARD_REDIS_PASSWORD="$(cat /tmp/redis-pw)" \
   MIRBOARD_REDIS_SSL="false" && rm /tmp/redis-pw
@@ -339,6 +342,16 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 5. Sentry·로그에 `match record failed` ERROR 가 0건이다(위 "매치 기록 실패" — 있으면 그 절대로 영향 범위부터 본다).
 
 ---
+
+## 운영 Redis (D-171)
+
+`mirboard-redis` 는 Flycast 사설 주소(`mirboard-redis.flycast:6379`)로만 받고, Fly 프록시가 연결이 없으면 머신을 멈춘다. 앱이 켜지며
+연결하면 Redis 도 켜진다(첫 연결 1~2초). 멈추면 방·대기열·로그인 실패 기록이 지워진다 — 원래 영속 없는 휘발 상태(D-114)다.
+
+- 배포·상태: GitHub → Actions → **Redis** → Run workflow. `status` 는 두 앱 머신 상태만, `deploy` 는 열린 방(IN_GAME·WAITING)이 있으면 멈춘다
+  (`force` 로 무시 — 그 방들은 사라진다). 로컬 flyctl 이 되는 네트워크면 위 3) 의 손 명령도 같다
+- 잘 도는지: 아무도 없을 때 몇 분 뒤 `status` 에서 두 앱 모두 `stopped`
+- 되돌리기(상시 가동): `ops/redis/fly.toml` 의 `[[services]]` 를 지워 배포 → `flyctl secrets set MIRBOARD_REDIS_HOST=mirboard-redis.internal -a mirboard`
 
 ## 운영 DB (D-169)
 
