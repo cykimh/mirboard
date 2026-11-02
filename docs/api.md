@@ -760,6 +760,14 @@ Open Graph 로 바꿔 준다(`infra.web.RoomPagePreviewController`, 렌더러 `R
 `/api/admin/**` 은 `admin_roles` 에 등록된 사용자만 접근(매 요청 조회). 비어드민은
 `NOT_ADMIN` (403). 어드민 부여는 DB insert(운영 스크립트)로만.
 
+**인증 방식 두 가지** *(D-170)*:
+- 사람(어드민 계정): 로그인 JWT — `Authorization: Bearer <JWT>`.
+- 허브 서버(서버끼리): 서비스 토큰 — `Authorization: Bearer <서비스 토큰>`. `/api/admin/` 로 시작하는
+  경로에서만 받고(디코딩·`..` 정리 후 판정), 설정값(`MIRBOARD_ADMIN_SERVICE_TOKEN`)과 상수 시간 비교로
+  같으면 `MIRBOARD_ADMIN_SERVICE_USER_ID` 사용자(이름 `hub-service`)로 인증된다. 그 사용자도
+  `admin_roles` 에 있어야 하며 없으면 `NOT_ADMIN` (403). 토큰이 비었거나 사용자 id 가 0 이하면
+  꺼진다. 어드민 경로가 아니거나 값이 다르면 일반 JWT 로 해석하다 실패해 `UNAUTHORIZED` (401).
+
 ### POST `/api/admin/rooms/{roomId}/abort`
 어드민이 진행 중(IN_GAME) 매치를 강제 종료. host 검증 없음(host용 `/api/rooms/{id}/abort`
 와 분리). 응답 `204`. 에러: `NOT_ADMIN` (403), `GAME_NOT_IN_PROGRESS` (409), `ROOM_NOT_FOUND` (404).

@@ -101,6 +101,63 @@ docker stop mirboard-deploycheck
 
 ---
 
+## 허브 서비스 토큰 (D-170)
+
+허브 서버가 `/api/admin/**`(신고 목록·정지·강제 종료)를 서버끼리 부를 때 쓰는 토큰입니다. **두 값이 모두
+있어야 켜지고**(기본 꺼짐), 값은 Fly secrets 와 허브의 비밀 환경변수에만 둡니다 — `fly.toml`·코드·문서·파일에 적지 않습니다.
+
+서비스 사용자는 새 계정이 아니라 **운영자 본인의 계정**입니다(이미 `admin_roles` 에 있는 userId).
+
+1. 내 userId 가 `admin_roles` 에 있는지 **현재 운영 DB** 에서 읽기 전용으로 확인합니다. 운영 DB 는 Fly Postgres(`mirboard-db`)에서
+   공유 Supabase 프로젝트의 `mirboard` 스키마로 옮겨가는 중이라(sideinfra `e89f9ec`, `sideinfra/CLAUDE.md`), 지금 앱이 붙어 있는 쪽에 접속합니다.
+   - Fly Postgres: `flyctl postgres connect -a mirboard-db -d mirboard`
+   - Supabase: 대시보드 SQL editor 또는 `psql` 로 접속하고 `SET search_path TO mirboard;` 를 먼저 실행합니다.
+
+```sql
+-- psql 에서 (읽기 전용)
+SELECT u.id, u.username FROM users u JOIN admin_roles a ON a.user_id = u.id WHERE u.username = '<내 별명>';
+```
+
+한 줄이 나오면 그 `id` 가 서비스 사용자 id 입니다. 안 나오면 이 절차를 멈추고 어드민 부여부터 확인합니다.
+
+2. 토큰을 **셸 변수에 한 번만** 만들어 Fly 와 허브(Vercel)에 같은 값을 넣습니다. 파일에 쓰거나 `echo` 하지 않습니다.
+
+```bash
+TOKEN=$(openssl rand -hex 32)
+# Fly — 값이 프로세스 목록(ps)에 안 보이게 stdin 으로. 머신 재시작됨
+printf 'MIRBOARD_ADMIN_SERVICE_TOKEN=%s\nMIRBOARD_ADMIN_SERVICE_USER_ID=%s\n' "$TOKEN" "<1번에서 확인한 내 userId>" \
+  | flyctl secrets import -a mirboard
+# 허브 프로젝트 디렉터리에서 — Sensitive 로 저장
+printf %s "$TOKEN" | vercel env add MIRBOARD_ADMIN_SERVICE_TOKEN production --sensitive
+unset TOKEN
+```
+
+허브가 mirboard 를 부를 주소도 같은 Vercel 프로젝트에 넣습니다. 비밀이 아니라 Sensitive 가 아니어도 됩니다.
+**이 값이 없으면 허브가 503(「mirboard 연동이 설정되지 않았어요」)을 돌려주고 mirboard 를 호출하지 않습니다.**
+운영(`NODE_ENV=production`)에서는 `https://` 가 아니면 같은 503 입니다(토큰이 평문으로 나가지 않게).
+
+```bash
+printf %s "https://mirboard.fly.dev" | vercel env add MIRBOARD_API_URL production
+```
+
+허브는 환경변수를 배포 시점에 읽으므로, 값을 넣은 뒤 허브를 **재배포**해야 반영됩니다.
+
+허브 쪽 복사본은 Vercel **Sensitive** 환경변수이면서 서버 전용(`MIRBOARD_ADMIN_SERVICE_TOKEN`)이어야 합니다 —
+`NEXT_PUBLIC_` 접두를 절대 붙이지 않습니다(브라우저 번들에 실립니다).
+
+중간 단계가 실패하면 옛 값을 되살리려 하지 말고 **새 토큰을 만들어 양쪽을 다시 설정**합니다(교체).
+교체로 허브 값을 다시 넣을 때는 이미 있는 변수라 `add` 가 "already exists" 로 실패하므로, 먼저 지웁니다.
+
+```bash
+vercel env rm MIRBOARD_ADMIN_SERVICE_TOKEN production --yes
+# 이어서 2번의 TOKEN 생성 → flyctl secrets import → vercel env add 를 다시 실행
+```
+
+서비스 주체의 userId 가 운영자 본인이라 허브 호출은 운영자의 사용자별 레이트리밋 버킷을 같이 씁니다(운영자 1명이라 허용).
+교체는 두 쪽 값을 같이 바꾸고 재시작합니다. 끄려면 `flyctl secrets unset MIRBOARD_ADMIN_SERVICE_TOKEN -a mirboard`.
+
+---
+
 ## 게스트 체험 (D-117)
 
 로그인 화면의 「게스트로 바로 체험하기」(`POST /api/auth/guest`)는 **기본 켜짐**이라 새

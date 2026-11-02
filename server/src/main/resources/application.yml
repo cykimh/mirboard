@@ -80,6 +80,12 @@ management:
         enabled: true
 
 mirboard:
+  admin:
+    # D-170 — 허브 서버가 /api/admin/** 를 부르는 서비스 토큰. **비어 있거나 service-user-id 가 0 이하면
+    # 꺼진다**(로컬·테스트 기본). service-user-id 는 운영자 본인의 userId(이미 admin_roles 에 있어야 함).
+    # 값은 Fly secrets(MIRBOARD_ADMIN_SERVICE_TOKEN·MIRBOARD_ADMIN_SERVICE_USER_ID)로만 준다.
+    service-token: ${MIRBOARD_ADMIN_SERVICE_TOKEN:}
+    service-user-id: ${MIRBOARD_ADMIN_SERVICE_USER_ID:0}
   sentry:
     # D-107 (C3) — 오류 리포팅. **DSN 이 없으면 아무 일도 일어나지 않는다**(SentryConfig 가
     # @ConditionalOnProperty 로 아예 생성되지 않음). 로컬·CI 무영향.

@@ -178,6 +178,15 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-170 (2026-11-02) — 허브 서버가 어드민 API 를 부르는 서비스 토큰
+
+허브(별도 서버)가 mirboard 의 신고 목록·정지·강제 종료를 서버끼리 호출해야 하는데, 어드민 JWT 는 로그인(사람) 용이라 12시간 만에 만료된다. 그래서 `/api/admin/` 로 시작하는 경로에서만 `Authorization: Bearer <서비스 토큰>` 을 받는다.
+- 토큰이 설정값(`mirboard.admin.service-token`)과 같으면(상수 시간 비교 `MessageDigest.isEqual`) `AuthPrincipal(serviceUserId, "hub-service")` 로 인증한다. 권한은 기존 그대로 `admin_roles` 조회다 — `serviceUserId`(`mirboard.admin.service-user-id`)는 새 계정이 아니라 **운영자 본인의 userId** 이고 이미 `admin_roles` 에 있어야 하며(배포 전 읽기 전용 SQL 로 확인), 없으면 `NOT_ADMIN` 403. 권한 모델은 새로 만들지 않는다(가짜 계정을 운영 DB 에 만들지 않는다).
+- 토큰이 비었거나 `serviceUserId` ≤ 0 이면 이 분기는 꺼진다(코드 기본, 로컬·테스트 무영향). 값이 다르거나 어드민 경로가 아니면 기존 JWT 처리 그대로라 서비스 토큰을 `/api/rooms` 등에 내밀어도 인증되지 않는다.
+- 비밀은 Fly secrets `MIRBOARD_ADMIN_SERVICE_TOKEN`·`MIRBOARD_ADMIN_SERVICE_USER_ID` 로만 둔다(코드·`fly.toml`·문서에 값을 적지 않는다). 허브 쪽 복사본은 Vercel **Sensitive** 서버 전용 환경변수 `MIRBOARD_ADMIN_SERVICE_TOKEN` 이며 `NEXT_PUBLIC_` 접두는 절대 쓰지 않는다. 토큰은 셸 변수에 한 번 만들어 두 곳에 같은 값을 넣고 파일에 남기지 않는다(절차 `docs/deploy.md`). 교체는 양쪽 값을 같이 바꾸고 재시작.
+- 별도 필터가 아니라 `JwtAuthFilter` 안의 분기로 둔다. `JwtAuthFilter` 는 JWT 해석 실패 때 `SecurityContextHolder.clearContext()` 를 부르므로 앞에 필터를 두면 서비스 인증이 지워지고, 서블릿 필터 빈 둘은 실행 순서도 보장되지 않는다. 레이트리밋 필터는 지금처럼 `JwtAuthFilter` 뒤라 서비스 주체는 userId 키 버킷을 쓴다 — 서비스 주체가 운영자 본인의 userId 이므로 허브 호출은 운영자의 사용자별 버킷을 같이 쓴다(운영자 1명이라 허용). STOMP 는 영향 없음(`StompAuthChannelInterceptor` 는 JWT 만).
+- 경로 판정은 레이트리밋(D-117 보정)과 같은 방식이다 — 디코딩·`;` 제거·contextPath 제외 후 `..` 를 정리한 경로가 `/api/admin/` 로 시작할 때만. 해석할 수 없으면 서비스 토큰을 받지 않는다(닫는 쪽으로).
+
 ## D-169 (2026-11-02) — 운영 DB 를 sideinfra Supabase 의 mirboard 스키마로
 
 Fly 10월 청구가 $6.84 로 처음 $5 를 넘었다. 항상 켜진 `mirboard-db`(약 $2.2/월)를 없애려고 운영 DB 를 이미 쓰는 sideinfra Supabase
