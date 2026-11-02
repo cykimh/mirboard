@@ -327,6 +327,11 @@
   게스트 포함 매치 ELO 미적용(`RatedMatchPolicy`). IP(IPv6 /64)당 하루 10회 + UTC 하루 전역 200명
   (Lua 원자 카운터, fail-closed). 48h 미참여 게스트 자동 정리(10분 1회). 킬스위치
   `MIRBOARD_GUEST_ENABLED`. 공유 데모 계정은 같은 계정 동시 접속이 좌석 탈취·손패 유출을 일으켜 폐기.
+- **허브 서비스 토큰(D-170)**: 허브 서버가 `/api/admin/**` 를 서버끼리 부르는 인증. `JwtAuthFilter` 안의
+  분기(`AdminServiceProperties`, `MIRBOARD_ADMIN_SERVICE_TOKEN`·`MIRBOARD_ADMIN_SERVICE_USER_ID`) —
+  `/api/admin/` 경로에서만, 상수 시간 비교, 토큰 비었거나 id ≤ 0 이면 꺼짐(기본). 서비스 사용자는 운영자 본인
+  userId 이고 권한은 그 `admin_roles` 등록으로 기존 게이트를 그대로 쓴다. 테스트: `JwtAuthFilterServiceTokenTest`(단위 9, Docker
+  불필요)·`AdminServiceTokenIT`(5).
 - **레이트리밋 보정(D-117 ← D-90)**: `/api/auth/**` 는 Bearer 와 무관하게 항상 IP 키, 클라 IP 는
   신뢰 헤더(운영 `Fly-Client-IP`)·IPv6 /64, 버킷·대상 판정은 원본 URI 가 아니라 디코딩·contextPath
   제외 경로(인코딩·`X-Forwarded-Prefix` 우회 차단). 429 `Retry-After` = 버킷 윈도.
