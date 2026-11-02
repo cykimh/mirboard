@@ -7,6 +7,9 @@ name: Redis
 # - action=deploy : 열린 방 확인 → 사설 주소(Flycast) 확인·할당 → ops/redis 배포(공개 IP 없음)
 #                   → (switch_app_host) 본 앱 MIRBOARD_REDIS_HOST=mirboard-redis.flycast → 헬스 확인
 # - action=status : 두 앱의 머신 상태·IP 만 본다(자동 정지 확인용, 아무것도 바꾸지 않는다)
+#
+# 토큰: 배포용 FLY_API_TOKEN 은 mirboard 앱 전용(deploy 토큰)이라 mirboard-redis 를 못 만진다 → Redis 단계는
+# FLY_REDIS_API_TOKEN(`flyctl tokens create deploy -a mirboard-redis` 또는 대시보드 → mirboard-redis → Tokens)을 쓴다.
 
 on:
   workflow_dispatch:
@@ -35,7 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      APP_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      REDIS_TOKEN: ${{ secrets.FLY_REDIS_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,14 +47,21 @@ jobs:
       - name: flyctl 설치
         uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master @ 2026-04-08
 
+      - name: 토큰 확인
+        run: |
+          [ -n "$REDIS_TOKEN" ] || { echo "::error::FLY_REDIS_API_TOKEN 시크릿이 없다 (위 주석 참고)"; exit 1; }
+          [ -n "$APP_TOKEN" ] || { echo "::error::FLY_API_TOKEN 시크릿이 없다"; exit 1; }
+
       - name: 지금 상태
         run: |
-          flyctl machine list -a mirboard-redis
-          flyctl ips list -a mirboard-redis
-          flyctl machine list -a mirboard
+          FLY_API_TOKEN=$REDIS_TOKEN flyctl machine list -a mirboard-redis
+          FLY_API_TOKEN=$REDIS_TOKEN flyctl ips list -a mirboard-redis
+          FLY_API_TOKEN=$APP_TOKEN flyctl machine list -a mirboard
 
       - name: 열린 방 확인
         if: inputs.action == 'deploy'
+        env:
+          FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: |
           state=$(flyctl machine list -a mirboard-redis --json | jq -r '.[0].state // "none"')
           if [ "$state" != started ]; then
@@ -78,6 +89,8 @@ jobs:
 
       - name: 사설 주소(Flycast)
         if: inputs.action == 'deploy'
+        env:
+          FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: |
           flyctl ips list -a mirboard-redis | grep -qi private || flyctl ips allocate-v6 --private -a mirboard-redis
           flyctl ips list -a mirboard-redis
@@ -85,10 +98,14 @@ jobs:
       - name: Redis 배포
         if: inputs.action == 'deploy'
         working-directory: ops/redis
+        env:
+          FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: flyctl deploy --remote-only --ha=false --no-public-ips
 
       - name: 공개 IP 없음 확인
         if: inputs.action == 'deploy'
+        env:
+          FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: |
           if flyctl ips list -a mirboard-redis | grep -qi public; then
             echo "::error::mirboard-redis 에 공개 IP 가 있다 — flyctl ips release 로 지울 것"; exit 1
@@ -96,6 +113,8 @@ jobs:
 
       - name: 본 앱 Redis 주소 전환
         if: inputs.action == 'deploy' && inputs.switch_app_host
+        env:
+          FLY_API_TOKEN: ${{ env.APP_TOKEN }}
         run: flyctl secrets set MIRBOARD_REDIS_HOST=mirboard-redis.flycast -a mirboard
 
       - name: 헬스 확인
@@ -112,5 +131,5 @@ jobs:
       - name: 끝난 뒤 상태
         if: always() && inputs.action == 'deploy'
         run: |
-          flyctl machine list -a mirboard-redis
-          flyctl machine list -a mirboard
+          FLY_API_TOKEN=$REDIS_TOKEN flyctl machine list -a mirboard-redis
+          FLY_API_TOKEN=$APP_TOKEN flyctl machine list -a mirboard
