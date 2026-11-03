@@ -351,6 +351,7 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 - 배포·상태: GitHub → Actions → **Redis** → Run workflow. `status` 는 두 앱 머신 상태만, `deploy` 는 열린 방(IN_GAME·WAITING)이 있으면 멈춘다
   (`force` 로 무시 — 그 방들은 사라진다). 로컬 flyctl 이 되는 네트워크면 위 3) 의 손 명령도 같다
 - 잘 도는지: 아무도 없을 때 몇 분 뒤 `status` 에서 두 앱 모두 `stopped`
+- 구독 연결은 30초 하트비트로 유지된다(D-172). 로그에 `Redis pub/sub heartbeat silent … resubscribing` 이 보이면 프록시가 연결을 끊었다가 다시 붙은 것
 - 되돌리기(상시 가동): `ops/redis/fly.toml` 의 `[[services]]` 를 지워 배포 → `flyctl secrets set MIRBOARD_REDIS_HOST=mirboard-redis.internal -a mirboard`
 
 ## 운영 DB (D-169)

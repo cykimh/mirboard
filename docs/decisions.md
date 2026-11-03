@@ -178,6 +178,13 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-172 (2026-11-03) — Redis 구독 연결 하트비트
+
+D-171 로 운영 Redis 가 Fly 프록시(Flycast)를 거치게 되면서, 게임 이벤트가 없을 때 조용한 pub/sub 구독 연결이 프록시에서 끊기면
+STOMP 방송(`stomp:routes`)이 소리 없이 멈출 위험이 생겼다(명령 연결은 데드라인 폴링 250ms 로 늘 바쁘다). `RedisMessageGateway` 가
+`mirboard.messaging.redis-heartbeat`(기본 30s)마다 전용 채널 `mirboard:pubsub-heartbeat` 에 발행해 구독 연결에 트래픽을 흘리고,
+3번 연속 돌아오지 않으면 리스너 컨테이너를 다시 시작해 구독을 다시 붙인다. TCP keepalive 는 프록시가 TCP 를 끝내므로 쓰지 않는다.
+
 ## D-171 (2026-11-02) — 운영 Redis 도 쓸 때만 켠다 (Flycast 자동 정지)
 
 D-169 뒤 Fly 고정비는 상시 가동 `mirboard-redis`(약 $2/월)뿐이다. 앱 안으로 합치는 안은 배포·재시작마다 진행 중인 판이 지워지고

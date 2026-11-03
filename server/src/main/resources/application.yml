@@ -190,6 +190,9 @@ mirboard:
     # Phase 6D — 멀티 인스턴스 fan-out 모드. in-memory (default, 단일 인스턴스) 또는 redis.
     # redis 로 전환 시 STOMP broadcast 와 도메인 이벤트가 Redis Pub/Sub 위에서 흐른다.
     gateway: ${MIRBOARD_MESSAGING_GATEWAY:in-memory}
+    # D-172 — redis 게이트웨이의 구독 연결 하트비트 주기. 운영 Redis 는 Fly 프록시를 거쳐(D-171) 조용한 연결이 끊길 수 있어
+    # 이 주기마다 구독 연결에 메시지를 흘리고, 3번 연속 안 돌아오면 구독을 다시 붙인다. 0s 면 끈다.
+    redis-heartbeat: ${MIRBOARD_REDIS_HEARTBEAT:30s}
   bot:
     # 봇 액션 사이 딜레이(ms) — 사람 페이스 흉내 + 클라 UI 따라잡기. 기본 200(거의
     # 즉시) 은 체감이 없어 700 으로 상향(D-76 후속). 봇 구동 IT 는 0 으로 override.
