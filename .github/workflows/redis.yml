@@ -92,8 +92,10 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: |
-          flyctl ips list -a mirboard-redis | grep -qi private || flyctl ips allocate-v6 --private -a mirboard-redis
-          flyctl ips list -a mirboard-redis
+          # 표 출력 끝의 안내문에도 public·private 낱말이 있어 grep 으로는 못 가린다(2026-11-03 오판) → JSON 의 Type 으로.
+          n=$(flyctl ips list -a mirboard-redis --json | jq '[.[] | select((.Type // .type // "") | test("private"; "i"))] | length')
+          [ "$n" -gt 0 ] || flyctl ips allocate-v6 --private -a mirboard-redis
+          flyctl ips list -a mirboard-redis --json | jq -c '.[] | {Type: (.Type // .type), Address: (.Address // .address)}'
 
       - name: Redis 배포
         if: inputs.action == 'deploy'
@@ -107,7 +109,8 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ env.REDIS_TOKEN }}
         run: |
-          if flyctl ips list -a mirboard-redis | grep -qi public; then
+          n=$(flyctl ips list -a mirboard-redis --json | jq '[.[] | select(((.Type // .type // "") | test("private"; "i")) | not)] | length')
+          if [ "$n" -gt 0 ]; then
             echo "::error::mirboard-redis 에 공개 IP 가 있다 — flyctl ips release 로 지울 것"; exit 1
           fi
 
