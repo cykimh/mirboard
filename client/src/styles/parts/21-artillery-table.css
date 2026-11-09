@@ -1,0 +1,510 @@
+/* 씨앗포 게임판 (씨앗포 S3, D-223) — 스컬킹(18)·원카드(19)·요트·오목(20)과 같은 규칙을 따른다.
+ *
+ * ⚠ 캐스케이드: index.css 에서 20 다음, **17-responsive 앞**에 import 된다. 이 파일에는 폭 미디어가 **0개**다 — 전장은 폭 100%
+ *   + aspect-ratio 16/9, 조작부는 flex-wrap 으로 375px 에 들어간다. 폭 규칙이 불가피하면 17-responsive.css **맨 끝**에 .ar-* 블록만.
+ *
+ * ⚠ 네임스페이스: 모든 선택자는 `.ar-` 클래스를 포함한다(styles/artilleryCssNamespace.test.ts 가 기계로 검사).
+ *
+ * 테마: 중립색은 전역 토큰(--color-*). 하늘·구름 색은 Canvas 가 `--ar-sky-*`·`--ar-cloud*`·`--ar-label` 을 읽는다(다크면 저녁 하늘).
+ */
+
+.ar-table,
+.ar-table *,
+.ar-table *::before,
+.ar-table *::after {
+  box-sizing: border-box;
+}
+
+/* ── 토큰 ─────────────────────────────────────────────────────────── */
+.ar-table {
+  --ar-accent: #7c8ea0;
+  --ar-sky-top: #8fcdf3;
+  --ar-sky-bottom: #e6f4ff;
+  --ar-cloud: #ffffff;
+  --ar-cloud-edge: #cfe0ee;
+  --ar-label: #1d2a36;
+  --ar-fire: #e8613c;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  min-height: 100vh;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+html.dark .ar-table {
+  --ar-sky-top: #1d2b4f;
+  --ar-sky-bottom: #4b5d8a;
+  --ar-cloud: #c9d3e6;
+  --ar-cloud-edge: #95a3bf;
+  --ar-label: #f3f6fb;
+}
+
+/* ── 헤더 ─────────────────────────────────────────────────────────── */
+.ar-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ar-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ar-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+button.ar-badge {
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.ar-badge-title {
+  font-weight: 700;
+}
+
+.ar-badge-turn {
+  border-color: var(--ar-fire);
+  color: var(--ar-fire);
+  font-weight: 700;
+}
+
+.ar-badge-warn {
+  border-color: #8b9bb8;
+  font-weight: 600;
+}
+
+.ar-countdown-urgent {
+  border-color: #ef5a4c;
+  color: #ef5a4c;
+  font-weight: 700;
+}
+
+.ar-reaction-bar {
+  position: relative;
+}
+
+.ar-reaction-palette {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated, var(--color-bg));
+}
+
+.ar-reaction-palette button {
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.ar-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(232, 93, 117, 0.18);
+  border: 1px solid rgba(232, 93, 117, 0.5);
+  font-size: 13px;
+}
+
+.ar-error-close {
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* ── 좌석 띠 ──────────────────────────────────────────────────────── */
+.ar-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ar-seat {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  border-left: 4px solid var(--ar-accent);
+  background: var(--color-bg-elevated, var(--color-bg));
+  font-size: 13px;
+}
+
+.ar-seat-turn {
+  border-color: var(--ar-accent);
+}
+
+.ar-seat-out {
+  opacity: 0.5;
+}
+
+.ar-seat-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-seat-hp {
+  position: relative;
+  flex: 1 1 48px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+
+.ar-seat-hp-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #5ccf6a;
+}
+
+.ar-seat-ammo {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-seat-tag {
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+}
+
+.ar-seat-kick {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ar-seat-chat {
+  flex-basis: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.ar-seat-reaction {
+  position: absolute;
+  top: -10px;
+  right: 6px;
+  font-size: 20px;
+}
+
+/* ── 전장 ─────────────────────────────────────────────────────────── */
+.ar-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 2px solid var(--color-border);
+}
+
+.ar-stage-myturn {
+  border-color: var(--ar-fire);
+  box-shadow: 0 0 0 3px rgba(232, 97, 60, 0.18);
+}
+
+.ar-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ar-wind {
+  font-weight: 600;
+}
+
+.ar-field {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ar-sky-bottom);
+}
+
+.ar-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+
+/* 내 차례에는 끌어서 조준 — 스크롤·확대가 끼지 않게. */
+.ar-canvas-aiming {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* ── 조작부 ───────────────────────────────────────────────────────── */
+.ar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated, var(--color-bg));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ar-label {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 28px;
+}
+
+.ar-value {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.ar-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ar-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ar-btn-small {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.ar-btn-ghost {
+  border-style: dashed;
+}
+
+.ar-btn-charge {
+  border-color: var(--ar-fire);
+  color: var(--ar-fire);
+  font-weight: 700;
+}
+
+.ar-btn-fire {
+  border-color: var(--ar-fire);
+  background: var(--ar-fire);
+  color: #fff;
+  font-weight: 700;
+}
+
+.ar-fuel {
+  position: relative;
+  width: 64px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+
+.ar-fuel-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #e0a323;
+}
+
+.ar-power {
+  position: relative;
+  flex: 1 1 160px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.ar-power input {
+  width: 100%;
+  accent-color: var(--ar-fire);
+}
+
+.ar-power-last {
+  position: absolute;
+  top: 6px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--ar-fire);
+  pointer-events: none;
+}
+
+.ar-shells {
+  display: flex;
+  gap: 6px;
+}
+
+.ar-chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ar-chip-on {
+  border-color: var(--ar-fire);
+  background: rgba(232, 97, 60, 0.14);
+  font-weight: 700;
+}
+
+.ar-chip:disabled {
+  opacity: 0.45;
+}
+
+.ar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* ── 결과 ─────────────────────────────────────────────────────────── */
+.ar-end {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated, var(--color-bg));
+}
+
+.ar-end-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.ar-end-reason {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.ar-end-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ar-end-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.ar-end-me {
+  background: rgba(232, 97, 60, 0.12);
+  font-weight: 700;
+}
+
+.ar-end-rank {
+  min-width: 36px;
+}
+
+.ar-end-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-end-hp {
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-end-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ar-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -63,14 +63,15 @@ class OneCardClosedIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(5))
-                // D-190·D-200 — 오목·요트도 공개라 열린 게임(이름순)에 끼고, 닫힌 원카드는 맨 뒤다.
+                .andExpect(jsonPath("$.games.length()").value(6))
+                // D-190·D-200·D-223 — 오목·요트·씨앗포도 공개라 열린 게임(이름순)에 끼고, 닫힌 원카드는 맨 뒤다.
                 .andExpect(jsonPath("$.games[0].id").value("SKULL_KING"))
-                .andExpect(jsonPath("$.games[1].id").value("OMOK"))
-                .andExpect(jsonPath("$.games[2].id").value("YACHT"))
-                .andExpect(jsonPath("$.games[3].id").value("TICHU"))
-                .andExpect(jsonPath("$.games[4].id").value("ONE_CARD"))
-                .andExpect(jsonPath("$.games[4].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[1].id").value("ARTILLERY"))
+                .andExpect(jsonPath("$.games[2].id").value("OMOK"))
+                .andExpect(jsonPath("$.games[3].id").value("YACHT"))
+                .andExpect(jsonPath("$.games[4].id").value("TICHU"))
+                .andExpect(jsonPath("$.games[5].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[5].status").value("COMING_SOON"));
     }
 
     @Test

@@ -25,6 +25,7 @@
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼·턴 카운트다운 — D-131 공개, `MIRBOARD_ONECARD_STATUS` 로 되돌림) | ✅ | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127~D-131, §17) |
 | 5d | 요트 (순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
+| 5e | 씨앗포 (턴제 포격 — 서버 정수 물리·연출 대기 엔진 타이머·봇·기록 + 클라 Canvas 전장·대본 재생·터치 조작·튜토리얼 — D-223 공개, `MIRBOARD_ARTILLERY_STATUS` 로 되돌림) | ✅ | `domain.game.artillery`, `client/src/features/artillery`, `docs/rules-artillery.md` (D-220~D-223, §19) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -471,3 +472,15 @@
   홀드 모아 보내기·`BUSY` 재전송(D-200), 튜토리얼 6단계 + 퀴즈. e2e `practice.e2e.ts` 에 요트 포함(데스크톱·휴대폰).
 - **테스트**: 요트 도메인 106건(점수 전수 7,776×12, 1~4인 시뮬레이션 각 2,000판) + Docker IT 5건(`YachtBotMatchSimulationIT`·`YachtRecorderFailureTest`),
   클라 요트 35건(게임판·스토어·튜토리얼·CSS).
+
+## 19. 씨앗포 (S0~S3, D-220~D-223)
+
+- **룰**: 하늘 정원 흙섬 위 화분 포대, 2~4인 개인전(엔진은 6인까지 검증), 차례당 한 발(이동은 발사에 실음), 각도·힘·바람(−10~10)·지형 파괴·낙하,
+  체력 100, 콩알·호박탄(2발), 10 × 인원 차례 뒤 구름 밀물(판 길이 상한). 정본 `docs/rules-artillery.md`, 설계 `docs/plans/artillery.md`.
+- **물리**: 서버가 한 발에 한 번 정수(Q16·삼각 정수표·SplitMix64)로 계산, 상태는 (시드, 구멍 목록)만 저장 — 실측 한 발 0.064ms(구멍 60개)·맵 0.34ms.
+  클라는 대본을 재생만 한다(궤적 미리보기 없음).
+- **포트**: 변경 0 — 발사 뒤 연출 대기는 엔진 타이머(D-128), 비공개 뷰 없음, 공개 뷰에 시드 없음. `grep -rni artillery …/infra` 0건.
+- **봇**: "보통" — 같은 엔진으로 후보 발사를 시뮬레이션(예산 900회, 시간 아닌 횟수라 결정적) + 결정적 오차 ±2°·±2. 무작위 상대 60/60 승, 한 수 평균 2ms.
+- **기록**: `artillery_match_results`·`artillery_match_participants`(V16) + `user_game_stats`(ARTILLERY), 상대 전적은 최종 순위.
+- **클라**: `features/artillery` — Canvas 전장·대본 재생·끌어서 조준·꾹 눌러 쏘기·이동 미리보기·튜토리얼 5단계. e2e `practice.e2e.ts` 에 씨앗포(데스크톱·휴대폰).
+- **테스트**: 씨앗포 서버 55건(물리·맵·엔진·시뮬레이션 2~6인 × 200판·골든·비용·어댑터·봇 + Docker IT 5건), 클라 26건(지형·재생·스토어·게임판·튜토리얼·CSS).

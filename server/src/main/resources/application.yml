@@ -191,9 +191,9 @@ mirboard:
     # 진행 중인 판은 끝까지). YachtGameDefinition 의 @Value 기본값과 같아야 한다. 런북은 docs/deploy.md.
     status: ${MIRBOARD_YACHT_STATUS:AVAILABLE}
   artillery:
-    # 씨앗포(D-220) 공개 상태. 완성 전 단계는 DISABLED(카탈로그 비노출 — 관제 규칙), 클라 게임판이 완성되는 S3 에서 기본 AVAILABLE 로.
-    # ArtilleryGameDefinition 의 @Value 기본값과 같아야 한다.
-    status: ${MIRBOARD_ARTILLERY_STATUS:DISABLED}
+    # 씨앗포(D-220) 공개 상태. D-223 — 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_ARTILLERY_STATUS=COMING_SOON(새 방만 막음,
+    # 진행 중인 판은 끝까지)·DISABLED(카탈로그에서도 뺌). ArtilleryGameDefinition 의 @Value 기본값과 같아야 한다. 런북은 docs/deploy.md.
+    status: ${MIRBOARD_ARTILLERY_STATUS:AVAILABLE}
     # 발사 뒤 연출 대기 상한(ms, 룰 §9.2). 운영은 룰 그대로 18000 — 봇끼리 도는 통합 테스트만 줄인다.
     resolve-cap-millis: 18000
   moderation:

@@ -16,7 +16,7 @@ function here(relative: string): URL {
 describe('게임판은 지연 로딩으로만 (번들 나누기)', () => {
   const read = readFileSync as unknown as (p: URL, enc: string) => string;
   const staticTableImport =
-    /^import [^;]*from '@\/features\/(tichu\/GameTable|skullking\/SkullKingTable|onecard\/OneCardTable|yacht\/YachtTable)';/m;
+    /^import [^;]*from '@\/features\/(tichu\/GameTable|skullking\/SkullKingTable|onecard\/OneCardTable|yacht\/YachtTable|artillery\/ArtilleryTable)';/m;
 
   it.each(['./RoomPage.tsx', './GameHubPage.tsx', './ProfilePage.tsx', './gameTables.ts', '../App.tsx'])(
     '%s 는 게임판 파일을 정적으로 import 하지 않는다',
@@ -27,7 +27,7 @@ describe('게임판은 지연 로딩으로만 (번들 나누기)', () => {
 
   it('gameTables 는 세 게임판을 모두 동적 import 한다', () => {
     const src = read(here('./gameTables.ts'), 'utf-8');
-    for (const path of ['tichu/GameTable', 'skullking/SkullKingTable', 'onecard/OneCardTable', 'yacht/YachtTable']) {
+    for (const path of ['tichu/GameTable', 'skullking/SkullKingTable', 'onecard/OneCardTable', 'yacht/YachtTable', 'artillery/ArtilleryTable']) {
       expect(src).toContain(`import('@/features/${path}')`);
     }
   });

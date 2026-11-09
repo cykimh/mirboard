@@ -11,6 +11,7 @@ const imports = {
   ONE_CARD: () => import('@/features/onecard/OneCardTable'),
   YACHT: () => import('@/features/yacht/YachtTable'),
   OMOK: () => import('@/features/omok/OmokTable'),
+  ARTILLERY: () => import('@/features/artillery/ArtilleryTable'),
 };
 
 // 게임판에 들어갈 때만 "못 받으면 한 번 새로고침" — 배포 전에 연 탭이 사라진 조각을 찾는 경우(lazyWithReload).
@@ -23,6 +24,9 @@ export const OneCardTable = lazy(() =>
 );
 export const YachtTable = lazy(() => loadWithReload('yacht', imports.YACHT).then((m) => ({ default: m.YachtTable })));
 export const OmokTable = lazy(() => loadWithReload('omok', imports.OMOK).then((m) => ({ default: m.OmokTable })));
+export const ArtilleryTable = lazy(() =>
+  loadWithReload('artillery', imports.ARTILLERY).then((m) => ({ default: m.ArtilleryTable })),
+);
 
 /**
  * 이 게임의 게임판 조각을 미리 받는다(모르는 게임은 아무것도 안 한다). 실패는 삼키고 새로고침하지 않는다 — 대기실이 잠깐의 네트워크
