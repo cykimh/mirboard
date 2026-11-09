@@ -8,6 +8,7 @@ import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.core.RoomOption;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -87,10 +88,29 @@ class GameSummaryOrderTest {
     /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
     @Test
     void declaration_order_is_the_contract() {
-        // D-161 — 원카드 경쟁 버튼 크기가 맨 뒤에 붙었다.
+        // D-161 — 원카드 경쟁 버튼 크기가 맨 뒤에 붙었다. D-176 — 맵 옵션 셋이 그 뒤에.
         assertThat(RoomOption.values())
                 .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING,
-                        RoomOption.RACE_BUTTON_SIZE, RoomOption.RACE_BUTTON_VISIBILITY);
+                        RoomOption.RACE_BUTTON_SIZE, RoomOption.RACE_BUTTON_VISIBILITY,
+                        RoomOption.TEAM_MODE, RoomOption.OMOK_RULE, RoomOption.BOT_LEVEL);
+    }
+
+    /** D-176 — 선언한 맵 옵션만 선택지·기본값이 실린다(자기 필드가 있는 예전 옵션은 빠진다). 선언 순서. */
+    @Test
+    void valued_room_options_carry_their_choices() {
+        Set<RoomOption> declared = new LinkedHashSet<>();
+        declared.add(RoomOption.BOT_LEVEL);
+        declared.add(RoomOption.TARGET_SCORE);
+        declared.add(RoomOption.TEAM_MODE);
+
+        var summary = GameCatalogController.GameSummary.of(new ShuffledOptionsGame(declared));
+
+        assertThat(summary.roomOptionChoices()).containsExactly(
+                new GameCatalogController.RoomOptionChoices(RoomOption.TEAM_MODE, List.of("SOLO", "TEAMS_2V2"), "SOLO"),
+                new GameCatalogController.RoomOptionChoices(RoomOption.BOT_LEVEL, List.of("EASY", "NORMAL", "HARD"),
+                        "NORMAL"));
+        assertThat(GameCatalogController.GameSummary.of(new ShuffledOptionsGame(Set.of())).roomOptionChoices())
+                .isEmpty();
     }
 
     /** D-130 — 방 만들기의 처음 선택(인원·턴 제한)도 정의에서 그대로 실린다. 재정의하지 않으면 최대 인원·끔. */

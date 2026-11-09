@@ -177,11 +177,15 @@
       "supportedRoomOptions": ["TARGET_SCORE", "TEAMS", "BETTING"],
       "defaultPlayers": 4,
       "defaultTurnSeconds": 0,
-      "turnSecondsChoices": [0, 30, 60, 90]
+      "turnSecondsChoices": [0, 30, 60, 90],
+      "roomOptionChoices": []
     }
   ]
 }
 ```
+- D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`)의 선택지와 기본값이다
+  (`[{ "option": "TEAM_MODE", "values": ["SOLO", "TEAMS_2V2"], "defaultValue": "SOLO" }]`, enum 선언 순서). 세 게임은 빈 배열이다.
+  대기실은 이것만 보고 설정 줄을 그린다. 방의 값은 Room 의 `options`.
 - D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
@@ -313,7 +317,8 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 ### PUT `/api/rooms/{roomId}/settings` *(D-161 — 대기실 게임 설정, 방장 전용)*
 친구 방 대기실에서 방장이 게임 설정을 바꾼다. **부분 갱신** — 보낸 항목만 바꾼다.
 ```json
-{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE", "raceButtonVisibility": "HARD" }
+{ "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE", "raceButtonVisibility": "HARD",
+  "options": { "TEAM_MODE": "TEAMS_2V2" } }
 ```
 - `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
 - `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
@@ -321,16 +326,23 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 - `raceButtonSize` 는 `SMALL`·`MEDIUM`·`LARGE` 이고 `RACE_BUTTON_SIZE` 게임(원카드)만 쓴다.
 - `raceButtonVisibility`(D-165) 는 `NORMAL`·`HARD`·`VERY_HARD` 이고 `RACE_BUTTON_VISIBILITY` 게임(원카드)만 쓴다.
 - 게임이 안 쓰는 항목을 보내면 값과 상관없이 `UNSUPPORTED_ROOM_OPTION` 이다. 만들 때와 달리 기본값도 통과하지 않는다.
+- `options`(D-176) 는 값을 가진 방 옵션 이름 → 값이고 적은 것만 바꾼다. 게임이 선언한 옵션만 받는다 — 선언하지 않은 옵션은 기본값이면 무시,
+  아니면 `UNSUPPORTED_ROOM_OPTION`. 모르는 이름·허용값 밖(카탈로그 `roomOptionChoices`)·자기 필드가 있는 옵션(`TARGET_SCORE` 등)은
+  `INVALID_ROOM_SETTING`(details `setting` = `options.<NAME>`).
+- 바꾼 옵션으로 게임의 정원(`capacityFor`)이 달라지면 `capacity` 도 같이 바뀐다(예: 1:1 → 2:2 면 2 → 4). 지금 앉은 인원이 새 정원보다 많으면
+  `TOO_MANY_PLAYERS`(409, details `capacity` = 바꾸려던 정원, 메시지 "N명만 남기고 바꿔 주세요") — 방장이 [봇 빼기] 등으로 줄인 뒤 바꾼다. 준비 표시는 풀지 않는다.
 - `room_update_settings.lua` 가 WAITING 확인과 쓰기를 한 번에 한다. 성공하면 방 메타 갱신(`ROOM_UPDATED`)으로 다른 사람 화면도 바뀐다.
 
 응답 `200` — 갱신된 Room. 에러는 아래와 같다.
 - `NOT_HOST`(403)
 - `GAME_ALREADY_STARTED`(409)
 - `UNSUPPORTED_ROOM_OPTION`·`INVALID_STAKE`·`INVALID_ROOM_SETTING`(400 — details `setting`)
+- `TOO_MANY_PLAYERS`(409 — D-176, details `roomId`·`capacity`)
 - `ROOM_NOT_FOUND`
 
 ### POST `/api/rooms/{roomId}/start` *(D-136·D-143 — 방장 시작, 방장 전용)*
-친구와 하기 대기실의 유일한 시작. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상 — **준비는 조건이 아니고 정원이 다 찼어도 이 길로
+친구와 하기 대기실의 유일한 시작. 조건: 방장, WAITING, 사람이 게임 `minPlayers` 이상(D-176 — 정확히는 방 옵션에 따른
+`playersToStart(options)`, 기본 `minPlayers`. 오목 2:2 처럼 정원과 같으면 정확히 그 인원) — **준비는 조건이 아니고 정원이 다 찼어도 이 길로
 시작한다**(D-143, 티츄 포함). `room_start_now.lua` 가 정원을 현재 인원으로 줄이고 WAITING→IN_GAME 을 한 번에 한다(`ZREM rooms:open`) — 이후는
 전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 친구와 하기의 정원은 처음에 게임 최대 인원이다(클라가 `capacity=maxPlayers`).
 응답 `200` — 시작된 Room(`capacity` = 인원). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details

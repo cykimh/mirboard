@@ -61,7 +61,9 @@ class RoomServiceCreateDefaultsTest {
     /** 저장소에 들어간 인원·턴 제한. 나머지 인자는 이 테스트의 관심이 아니다. */
     private void verifyStored(int capacity, int turnSeconds) {
         verify(repository).create(anyString(), anyLong(), anyString(), anyString(), eq(capacity), anyLong(),
-                eq(TeamPolicy.SEQUENTIAL), anyBoolean(), anyInt(), eq(turnSeconds), anyInt());
+                eq(TeamPolicy.SEQUENTIAL), anyBoolean(), anyInt(), eq(turnSeconds), anyInt(),
+                eq(java.util.Map.of())); // D-176 — 세 게임은 맵 옵션을 선언하지 않는다
+
     }
 
     @Test

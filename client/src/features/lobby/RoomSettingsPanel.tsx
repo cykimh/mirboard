@@ -1,4 +1,4 @@
-import type { GameSummary, RaceButtonSize, RaceButtonVisibility, Room, RoomSettingsUpdate } from '@/types/api';
+import type { GameSummary, RaceButtonSize, RaceButtonVisibility, Room, RoomOption, RoomSettingsUpdate } from '@/types/api';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
@@ -14,6 +14,12 @@ const RACE_VISIBILITY_LABEL: Record<RaceButtonVisibility, string> = {
   HARD: '어려움',
   VERY_HARD: '매우 어려움',
 };
+
+/**
+ * D-176 — 값을 가진 방 옵션의 화면 문구(줄 이름·값 이름). 그 옵션을 처음 쓰는 게임 단계에서 채운다(오목은 S4). 비어 있으면 서버
+ * 이름이 그대로 보인다 — 새 옵션이 화면에서 빠지지 않게 하려는 기본 경로다.
+ */
+const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Record<string, string> }>> = {};
 
 interface Props {
   room: Room;
@@ -76,6 +82,19 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
         text: RACE_VISIBILITY_LABEL[v],
       })),
       send: (v) => ({ raceButtonVisibility: v as RaceButtonVisibility }),
+    });
+  }
+  // D-176 — 값을 가진 방 옵션은 카탈로그의 선택지만으로 그린다(게임별 분기 없음). 이름·값의 한국어 문구는 그 옵션을 처음 쓰는 게임이
+  // ROOM_OPTION_TEXT 에 더한다 — 없으면 서버 이름 그대로 보인다.
+  for (const choice of game?.roomOptionChoices ?? []) {
+    if (!options.includes(choice.option)) continue;
+    const text = ROOM_OPTION_TEXT[choice.option];
+    const current = room.options?.[choice.option];
+    rows.push({
+      label: text?.label ?? choice.option,
+      value: current !== undefined && choice.values.includes(current) ? current : choice.defaultValue,
+      choices: choice.values.map((v) => ({ value: v, text: text?.values?.[v] ?? v })),
+      send: (v) => ({ options: { [choice.option]: v } }),
     });
   }
 

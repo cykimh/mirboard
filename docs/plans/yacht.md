@@ -1,6 +1,6 @@
 # 요트(주사위) — 네 번째 게임 후보 — 기획
 
-> 상태: **S4 완료(클라 게임판 — 서버 S3 와 함께 보관 브랜치, 기본 `DISABLED`)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
+> 상태: **S4 완료(클라 게임판 — 오목 S3a 위로 S3·S4 다시 올림, 기본 `DISABLED`)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
 > 근거: `docs/game-port.md`(포트 계약) · `docs/plans/multi-game.md` §2·§3("요트 — 포트가 진짜 일반적인지 시험하는 리트머스")
 > · 형식 본보기 `docs/plans/onecard.md`·`docs/rules-onecard.md`
 > 룰 정본은 `docs/rules-yacht.md`(S1) 다. 이 문서의 §3 은 그 입력이었고, 어긋나면 정본이 이긴다.

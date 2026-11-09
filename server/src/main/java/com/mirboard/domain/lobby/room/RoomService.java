@@ -144,15 +144,21 @@ public class RoomService {
             throw new StakedRoomNoBotsException();
         }
         requireSupportedRoomOptions(def, targetScore, stake);
-        int capacity = requestedCapacity == null ? def.defaultPlayers() : requestedCapacity;
+        // D-176 — 게임이 선언한 맵 옵션은 기본값으로 시작한다(값은 늘 맵에 있다 — 봇을 나중에 채워도 그 값을 쓴다).
+        // 정원 상한은 그 옵션일 때의 정원이다(기본 maxPlayers — 세 게임은 그대로).
+        java.util.Map<RoomOption, String> options = RoomOption.resolve(def.supportedRoomOptions(), java.util.Map.of());
+        int maxCapacity = capacityOf(def, options);
+        int capacity = requestedCapacity == null ? Math.min(def.defaultPlayers(), maxCapacity) : requestedCapacity;
         int turnSeconds = requestedTurnSeconds == null ? def.defaultTurnSeconds() : requestedTurnSeconds;
-        if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
-            throw new InvalidCapacityException(capacity, def.minPlayers(), def.maxPlayers());
+        if (capacity < def.minPlayers() || capacity > maxCapacity) {
+            throw new InvalidCapacityException(capacity, def.minPlayers(), maxCapacity);
         }
         String roomId = UUID.randomUUID().toString();
         long now = Instant.now(clock).toEpochMilli();
+        java.util.Map<String, String> optionFields = new java.util.LinkedHashMap<>();
+        options.forEach((option, value) -> optionFields.put(option.hashField(), value));
         repository.create(roomId, hostUserId, name, gameType, capacity, now, teamPolicy,
-                fillWithBots, targetScore, turnSeconds, stake);
+                fillWithBots, targetScore, turnSeconds, stake, optionFields);
         Room room = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(room));
         metrics.roomOpened(gameType);
@@ -211,6 +217,23 @@ public class RoomService {
         if (stake != DEFAULT_STAKE && !supported.contains(RoomOption.BETTING)) {
             throw new UnsupportedRoomOptionException(def.id(), RoomOption.BETTING);
         }
+    }
+
+    /**
+     * D-176 — 이 방이 실제로 쓰는 맵 옵션 값(게임이 선언한 것만, 없으면 기본값). 정원·시작 인원 계산과 엔진 전달이 같은 값을 본다.
+     */
+    public static java.util.Map<RoomOption, String> effectiveOptions(GameDefinition def, Room room) {
+        return RoomOption.resolve(def.supportedRoomOptions(), room.options());
+    }
+
+    /** D-176 — 게임이 정한 정원. 게임 정의가 범위 밖 값을 내면 정의 버그라 바로 드러낸다. */
+    private static int capacityOf(GameDefinition def, java.util.Map<RoomOption, String> options) {
+        int capacity = def.capacityFor(options);
+        if (capacity < def.minPlayers() || capacity > def.maxPlayers()) {
+            throw new IllegalStateException(def.id() + ".capacityFor out of " + def.minPlayers() + ".."
+                    + def.maxPlayers() + ": " + capacity);
+        }
+        return capacity;
     }
 
     /**
@@ -308,19 +331,77 @@ public class RoomService {
             }
             fields.put("raceButtonVisibility", v);
         }
+        int newCapacity = putOptionFields(def, room, update.options(), fields);
         if (fields.isEmpty()) {
             return room;
         }
-        switch (repository.updateSettings(roomId, fields)) {
+        if (newCapacity >= 0 && room.playerIds().size() > newCapacity) {
+            throw new TooManyPlayersException(roomId, newCapacity);
+        }
+        int code = newCapacity < 0
+                ? repository.updateSettings(roomId, fields)
+                : repository.updateSettings(roomId, fields, newCapacity);
+        switch (code) {
             case 1 -> { }
             case -1 -> throw new RoomNotFoundException(roomId);
             case -2 -> throw new GameAlreadyStartedException(roomId);
+            // D-176 — 서비스 확인 뒤 누가 앉아 새 정원을 넘었다(Lua 가 같은 원자 구간에서 다시 본다).
+            case -3 -> throw new TooManyPlayersException(roomId, newCapacity);
             default -> throw new IllegalStateException("room_update_settings.lua returned unexpected code");
         }
         Room updated = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(updated));
         log.info("Room settings updated: roomId={} host={} fields={}", roomId, requesterId, fields);
         return updated;
+    }
+
+    /**
+     * D-176 — 맵 옵션 갱신을 검증해 {@code fields} 에 {@code opt:<NAME>} 로 담는다. 모르는 이름·값을 갖지 않는 옵션·허용값 밖은
+     * {@code INVALID_ROOM_SETTING}, 게임이 선언하지 않은 옵션은 기본값이면 무시하고 아니면 {@code UNSUPPORTED_ROOM_OPTION}(D-106 과
+     * 같은 규칙). 바꾼 옵션으로 게임의 정원이 달라지면 {@code capacity} 도 담고 새 정원을 돌려준다(아니면 -1). 준비 표시는 풀지 않는다.
+     */
+    private static int putOptionFields(GameDefinition def, Room room, java.util.Map<String, String> requested,
+                                       java.util.Map<String, String> fields) {
+        if (requested.isEmpty()) {
+            return -1;
+        }
+        var supported = def.supportedRoomOptions();
+        java.util.Map<RoomOption, String> current = effectiveOptions(def, room);
+        java.util.Map<RoomOption, String> next = new java.util.EnumMap<>(RoomOption.class);
+        next.putAll(current);
+        // 응답·로그가 실행마다 흔들리지 않게 이름 순으로.
+        for (var entry : new java.util.TreeMap<>(requested).entrySet()) {
+            String name = entry.getKey();
+            String value = entry.getValue();
+            RoomOption option;
+            try {
+                option = RoomOption.valueOf(name);
+            } catch (IllegalArgumentException unknown) {
+                throw new InvalidRoomSettingException("options." + name, value);
+            }
+            if (!option.valued()) {
+                // 목표 점수·판돈·버튼 크기 등은 자기 필드로 바꾼다.
+                throw new InvalidRoomSettingException("options." + name, value);
+            }
+            if (!supported.contains(option)) {
+                if (option.defaultValue().equals(value)) {
+                    continue;
+                }
+                throw new UnsupportedRoomOptionException(def.id(), option);
+            }
+            if (!option.accepts(value)) {
+                throw new InvalidRoomSettingException("options." + name, value);
+            }
+            next.put(option, value);
+            fields.put(option.hashField(), value);
+        }
+        int before = capacityOf(def, current);
+        int after = capacityOf(def, next);
+        if (after == before) {
+            return -1;
+        }
+        fields.put("capacity", Integer.toString(after));
+        return after;
     }
 
     public Room getRoom(String roomId) {
@@ -367,7 +448,9 @@ public class RoomService {
         if (room.hostId() != hostUserId) {
             throw new NotHostException(roomId);
         }
-        int minPlayers = games.require(room.gameType()).minPlayers();
+        // D-176 — 시작 인원은 방 옵션에 따라 게임이 정한다(기본 minPlayers). 정원과 같으면 "그 이상"이 곧 "정확히"다 — Lua 무변경.
+        GameDefinition def = games.require(room.gameType());
+        int minPlayers = def.playersToStart(effectiveOptions(def, room));
         int code = repository.startNow(roomId, hostUserId, minPlayers);
         switch (code) {
             case 1 -> { }
@@ -423,7 +506,9 @@ public class RoomService {
      */
     public Room returnToWaiting(String roomId) {
         Room room = getRoom(roomId);
-        int max = games.require(room.gameType()).maxPlayers();
+        // D-176 — 돌아갈 정원도 방 옵션에 따라 게임이 정한다(기본 maxPlayers).
+        GameDefinition def = games.require(room.gameType());
+        int max = capacityOf(def, effectiveOptions(def, room));
         int seated = repository.returnToWaiting(roomId, max, Instant.now(clock).toEpochMilli());
         if (seated == -1) {
             throw new RoomNotFoundException(roomId);

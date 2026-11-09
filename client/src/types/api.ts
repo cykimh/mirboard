@@ -6,7 +6,25 @@ export type GameStatus = 'AVAILABLE' | 'COMING_SOON' | 'DISABLED';
  * D-106 — 게임에 따라 뜻이 있기도 없기도 한 방 설정. 서버 `RoomOption` 미러.
  * 방 만들기·대기실은 이 목록에 있는 것만 노출한다.
  */
-export type RoomOption = 'TARGET_SCORE' | 'TEAMS' | 'BETTING' | 'RACE_BUTTON_SIZE' | 'RACE_BUTTON_VISIBILITY';
+export type RoomOption =
+  | 'TARGET_SCORE'
+  | 'TEAMS'
+  | 'BETTING'
+  | 'RACE_BUTTON_SIZE'
+  | 'RACE_BUTTON_VISIBILITY'
+  | 'TEAM_MODE'
+  | 'OMOK_RULE'
+  | 'BOT_LEVEL';
+
+/**
+ * D-176 — 값을 가진 방 옵션(서버 `RoomOption.valued()`) 하나의 선택지(선언 순서)와 기본값. 카탈로그가 게임이 선언한 것만 싣는다.
+ * 대기실은 이 목록만 보고 줄을 그린다(게임별 화면 코드 없이). 방의 값은 `Room.options`.
+ */
+export interface RoomOptionChoices {
+  option: RoomOption;
+  values: string[];
+  defaultValue: string;
+}
 
 export interface GameSummary {
   id: string;
@@ -24,6 +42,8 @@ export interface GameSummary {
   defaultTurnSeconds?: number;
   /** D-154 — 방 만들기의 턴 제한 선택지(초, 0 = 끔). 없으면 끔·30·60·90. 원카드는 끔·5·10·20·30. */
   turnSecondsChoices?: number[];
+  /** D-176 — 선언한 맵 옵션의 선택지·기본값. 없으면(구 서버·픽스처) 맵 옵션 없음. */
+  roomOptionChoices?: RoomOptionChoices[];
 }
 
 export interface CatalogResponse {
@@ -62,6 +82,11 @@ export interface Room {
   raceButtonSize?: RaceButtonSize;
   /** D-165 — 원카드 경쟁 버튼 찾기 난이도(투명도, 방 설정). 옛 서버면 없다 — NORMAL 로 본다. */
   raceButtonVisibility?: RaceButtonVisibility;
+  /**
+   * D-176 — 값을 가진 방 옵션의 저장값(Redis `opt:<NAME>`). 만들 때 게임이 선언한 옵션의 기본값이 들어간다. 옛 서버·옛 방이면 없거나
+   * 빠진 옵션이 있다 — 카탈로그 `defaultValue` 로 본다.
+   */
+  options?: Partial<Record<RoomOption, string>>;
 }
 
 /** D-161 — 원카드 "원카드!/잡기!" 버튼 크기. */
@@ -76,6 +101,8 @@ export interface RoomSettingsUpdate {
   stake?: number;
   raceButtonSize?: RaceButtonSize;
   raceButtonVisibility?: RaceButtonVisibility;
+  /** D-176 — 맵 방 옵션(적은 것만). 정원이 줄어 인원이 넘치면 서버가 `TOO_MANY_PLAYERS`(409). */
+  options?: Partial<Record<RoomOption, string>>;
 }
 
 export interface RoomListResponse {

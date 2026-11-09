@@ -1,6 +1,8 @@
 package com.mirboard.domain.game.core;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 게임 엔진 생성 시 전달되는 방 정보. per-room 엔진의 유일한 방 지식이다 — 엔진은
@@ -14,31 +16,50 @@ import java.util.List;
  * @param stake       판돈(가상 칩, D-81/82). 0=내기 없음. 칩 정산 자체는 포트 밖이고
  *                    (`docs/game-port.md` §2) 매치 종료 이벤트에 실어 보내기만 한다.
  * @param botSeats    봇이 앉은 좌석. MVP 산정에서 봇을 빼는 등 게임 내부 판단에 쓴다.
+ * @param options     D-176 — 이 게임이 선언한 맵 옵션({@link RoomOption#valued()})의 실제 값. 선언한 옵션은 늘 값이 있고
+ *                    (고르지 않았으면 기본값), 선언하지 않은 옵션은 없다({@code GameEngineProvider.forRoom} 이
+ *                    {@link RoomOption#resolve} 로 거른다). 옵션을 안 쓰는 게임은 빈 맵. 방 설정을 하나 더 실을 때(요트의 턴 제한 제안
+ *                    등)는 이 레코드 끝에 붙이고 짧은 생성자를 하나 남긴다 — 지금 짧은 생성자 둘이 그 모양이다.
  * @param turnSeconds D-183 — 방의 턴 제한(초), 0 = 끔. 매치 중에는 바뀌지 않는다(설정은 WAITING 에서만). 인프라 턴 타이머는
  *                    액션마다 다시 걸리므로 "한 차례 = 여러 액션"인 게임(요트)이 차례 전체 마감을 엔진 타이머로 걸 때 쓴다.
- *                    한 차례 = 한 액션인 게임은 무시한다.
+ *                    한 차례 = 한 액션인 게임은 무시한다. 위 규칙대로 끝에 붙였고 짧은 생성자는 0(끔)을 넣는다.
  */
 public record GameContext(String roomId,
                           List<Long> playerIds,
                           int targetScore,
                           int stake,
                           List<Integer> botSeats,
+                          Map<RoomOption, String> options,
                           int turnSeconds) {
 
     public GameContext {
         playerIds = List.copyOf(playerIds);
         botSeats = botSeats == null ? List.of() : List.copyOf(botSeats);
+        options = options == null || options.isEmpty()
+                ? Map.of()
+                : java.util.Collections.unmodifiableMap(new EnumMap<>(options));
         turnSeconds = Math.max(0, turnSeconds);
     }
 
     /** D-183 이전 모양 — 턴 제한 끔(0). 한 차례 = 한 액션인 게임·테스트가 쓴다. */
+    public GameContext(String roomId, List<Long> playerIds, int targetScore, int stake, List<Integer> botSeats,
+                       Map<RoomOption, String> options) {
+        this(roomId, playerIds, targetScore, stake, botSeats, options, 0);
+    }
+
+    /** D-176 이전 모양 — 방 옵션 없음(빈 맵). */
     public GameContext(String roomId, List<Long> playerIds, int targetScore, int stake, List<Integer> botSeats) {
-        this(roomId, playerIds, targetScore, stake, botSeats, 0);
+        this(roomId, playerIds, targetScore, stake, botSeats, Map.of(), 0);
     }
 
     /** 룰 단위 테스트용 — 방 설정이 결과에 영향을 주지 않는 경로에서 쓴다. */
     public GameContext(String roomId, List<Long> playerIds) {
-        this(roomId, playerIds, 0, 0, List.of(), 0);
+        this(roomId, playerIds, 0, 0, List.of(), Map.of(), 0);
+    }
+
+    /** D-176 — 맵 옵션 값. 게임이 선언하지 않은 옵션이면 null. */
+    public String option(RoomOption option) {
+        return options.get(option);
     }
 
     /** 좌석 수 = 참가자 수. 인원 가변 게임(D-99)에서 라운드 초기화가 참조한다. */

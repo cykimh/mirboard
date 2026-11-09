@@ -9,6 +9,7 @@ import com.mirboard.domain.game.yacht.dice.DiceRoller;
 import com.mirboard.domain.game.yacht.score.Scoring;
 import com.mirboard.domain.game.yacht.state.YachtState;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.BiFunction;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class YachtBotStrengthTest {
     }
 
     private static double soloAverage(BiFunction<YachtState, YachtEngine, YachtAction> bot, long seed) {
-        YachtEngine engine = new YachtEngine(new GameContext("s", List.of(1L), 0, 0, List.of(0), 0));
+        YachtEngine engine = new YachtEngine(new GameContext("s", List.of(1L), 0, 0, List.of(0), Map.of(), 0));
         DiceRoller roller = DiceRoller.from(new Random(seed));
         long sum = 0;
         for (int g = 0; g < GAMES; g++) {
@@ -62,7 +63,7 @@ class YachtBotStrengthTest {
 
     @Test
     void the_heuristic_beats_greedy_head_to_head() {
-        YachtEngine engine = new YachtEngine(new GameContext("h", List.of(1L, 2L), 0, 0, List.of(0, 1), 0));
+        YachtEngine engine = new YachtEngine(new GameContext("h", List.of(1L, 2L), 0, 0, List.of(0, 1), Map.of(), 0));
         DiceRoller roller = DiceRoller.from(new Random(7));
         int wins = 0;
         int games = 500;

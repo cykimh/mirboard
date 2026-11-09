@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,7 +50,7 @@ class YachtGameEngineTest {
 
     private YachtGameEngine adapter(int turnSeconds, long nowMillis, ApplicationEventPublisher pub) {
         Clock clock = Clock.fixed(Instant.ofEpochMilli(nowMillis), ZoneOffset.UTC);
-        return new YachtGameEngine(new GameContext("r1", PLAYERS, 0, 0, List.of(1), turnSeconds), store, clock,
+        return new YachtGameEngine(new GameContext("r1", PLAYERS, 0, 0, List.of(1), Map.of(), turnSeconds), store, clock,
                 new Random(5), pub);
     }
 

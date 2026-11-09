@@ -1,6 +1,9 @@
 package com.mirboard.domain.lobby.room;
 
+import com.mirboard.domain.game.core.RoomOption;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public record Room(
@@ -26,7 +29,26 @@ public record Room(
         // D-161 — 원카드 경쟁 버튼 크기(SMALL·MEDIUM·LARGE). 방 설정(RoomOption.RACE_BUTTON_SIZE). 없으면 MEDIUM.
         String raceButtonSize,
         // D-165 — 원카드 경쟁 버튼 찾기 난이도(NORMAL·HARD·VERY_HARD). 방 설정(RACE_BUTTON_VISIBILITY). 없으면 NORMAL.
-        String raceButtonVisibility) {
+        String raceButtonVisibility,
+        // D-176 — 값을 가진 방 옵션(RoomOption.valued()). Redis 해시 opt:<NAME>. 저장된 것 그대로라 게임이 선언하지 않은 옵션이
+        // 있을 수도, 선언한 옵션이 빠져 있을 수도 있다 — 쓰는 쪽은 RoomOption.resolve(선언, options) 로 읽는다.
+        Map<RoomOption, String> options) {
+
+    public Room {
+        options = options == null || options.isEmpty()
+                ? Map.of()
+                : java.util.Collections.unmodifiableMap(new EnumMap<>(options));
+    }
+
+    /** D-176 이전 모양(방 옵션 맵 없음). */
+    public Room(String roomId, String name, String gameType, long hostId, RoomStatus status, int capacity,
+                int playerCount, List<Long> playerIds, Set<Long> spectatorIds, TeamPolicy teamPolicy, long createdAt,
+                boolean fillWithBots, List<Integer> botSeats, int targetScore, int turnSeconds, int stake,
+                Set<Long> readyUserIds, String raceButtonSize, String raceButtonVisibility) {
+        this(roomId, name, gameType, hostId, status, capacity, playerCount, playerIds, spectatorIds, teamPolicy,
+                createdAt, fillWithBots, botSeats, targetScore, turnSeconds, stake, readyUserIds,
+                raceButtonSize, raceButtonVisibility, Map.of());
+    }
 
     /** D-161 — 버튼 크기 기본값과 허용값. */
     public static final String DEFAULT_RACE_BUTTON_SIZE = "MEDIUM";
@@ -42,13 +64,13 @@ public record Room(
                 Set<Long> readyUserIds) {
         this(roomId, name, gameType, hostId, status, capacity, playerCount, playerIds, spectatorIds, teamPolicy,
                 createdAt, fillWithBots, botSeats, targetScore, turnSeconds, stake, readyUserIds,
-                DEFAULT_RACE_BUTTON_SIZE, DEFAULT_RACE_BUTTON_VISIBILITY);
+                DEFAULT_RACE_BUTTON_SIZE, DEFAULT_RACE_BUTTON_VISIBILITY, Map.of());
     }
 
     /** 관전자 추가/제거 같이 spectatorIds 만 다른 사본을 만들 때 사용. */
     public Room withSpectatorIds(Set<Long> newSpectatorIds) {
         return new Room(roomId, name, gameType, hostId, status, capacity, playerCount,
                 playerIds, newSpectatorIds, teamPolicy, createdAt, fillWithBots, botSeats,
-                targetScore, turnSeconds, stake, readyUserIds, raceButtonSize, raceButtonVisibility);
+                targetScore, turnSeconds, stake, readyUserIds, raceButtonSize, raceButtonVisibility, options);
     }
 }
