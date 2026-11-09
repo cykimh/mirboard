@@ -78,7 +78,7 @@ export function OneCardHand({
 
   return (
     <section
-      className={`my-hand oc-hand${myTurn ? ' oc-hand-myturn' : ''}`}
+      className="my-hand oc-hand"
       style={accent ? { ['--oc-accent' as string]: accent } : undefined}
       aria-label="내 손패"
     >

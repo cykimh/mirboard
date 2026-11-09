@@ -50,6 +50,8 @@ vi.mock('@/api/rooms', () => ({
     join: vi.fn(),
     updateSettings: vi.fn(),
     kick: vi.fn(),
+    fillBots: vi.fn(),
+    removeBots: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1549,5 +1551,93 @@ describe('RoomPage — 끊긴 사람 내보내기 (D-162)', () => {
     await screen.findByTestId('onecard-table');
 
     expect(oneCardProps.at(-1)?.onKick).toBeUndefined();
+  });
+});
+
+/**
+ * D-174 — 방 종류 없이 만든 방에서 방장이 대기실의 [빈자리 봇으로 채우기]로 정원까지 봇을 앉히고, [봇 빼기]로 모두 뺀다. 시작은 그대로
+ * [N명으로 시작]. 시작 줄은 안내 문구가 왼쪽, 버튼이 오른쪽이다.
+ */
+describe('RoomPage — 대기실 봇 채우기·시작 줄 (D-174)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
+    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
+    loadGame.mockResolvedValue({ ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 });
+  });
+
+  const waiting = (extra: Partial<Room>) =>
+    ({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', capacity: 6, playerIds: [1, 2], playerCount: 2, botSeats: [], readyUserIds: [], ...extra }) as Room;
+
+  it('방장이 [빈자리 봇으로 채우기]를 누르면 봇을 앉히고 응답 방으로 바로 맞춘다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.fillBots).mockResolvedValue(
+      waiting({ playerIds: [1, 2, 900, 901, 902, 903], playerCount: 6, botSeats: [2, 3, 4, 5] }),
+    );
+    renderRoom(waiting({}));
+
+    const fill = await screen.findByRole('button', { name: '빈자리 봇으로 채우기' });
+    await act(async () => {
+      fireEvent.click(fill);
+    });
+
+    expect(roomsApi.fillBots).toHaveBeenCalledWith('tok', 'r1');
+    expect(await screen.findByRole('button', { name: '6명으로 시작' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: '빈자리 봇으로 채우기' })).toBeNull(); // 빈자리가 없다
+    expect(screen.getByRole('button', { name: '봇 빼기' })).toBeInTheDocument();
+  });
+
+  it('봇이 있으면 [봇 빼기] — 누르면 봇을 모두 뺀다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.removeBots).mockResolvedValue(waiting({}));
+    renderRoom(waiting({ playerIds: [1, 2, 900], playerCount: 3, botSeats: [2] }));
+
+    const remove = await screen.findByRole('button', { name: '봇 빼기' });
+    await act(async () => {
+      fireEvent.click(remove);
+    });
+
+    expect(roomsApi.removeBots).toHaveBeenCalledWith('tok', 'r1');
+    expect(await screen.findByRole('button', { name: '2명으로 시작' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '봇 빼기' })).toBeNull();
+  });
+
+  it('방장이 아니면 봇 버튼이 없다', async () => {
+    renderRoom(waiting({ hostId: 2, playerIds: [2, 1, 900], playerCount: 3, botSeats: [2] }));
+
+    await screen.findByText(/방장이 시작하면 게임이 시작돼요/);
+    expect(screen.queryByRole('button', { name: '빈자리 봇으로 채우기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '봇 빼기' })).toBeNull();
+  });
+
+  it('판돈 방에는 봇을 앉힐 수 없다고 버튼을 잠근다', async () => {
+    loadGame.mockResolvedValue({ ...game('TICHU', ['TEAMS', 'BETTING', 'TARGET_SCORE']), minPlayers: 4, maxPlayers: 4 });
+    renderRoom(waiting({ gameType: 'TICHU', capacity: 4, stake: 100 }));
+
+    expect(await screen.findByRole('button', { name: '빈자리 봇으로 채우기' })).toBeDisabled();
+    expect(screen.getByText('판돈 방에는 봇을 앉힐 수 없어요')).toBeInTheDocument();
+  });
+
+  it('시작 줄은 안내 문구가 왼쪽, [N명으로 시작]이 오른쪽(같은 줄)이다', async () => {
+    renderRoom(waiting({}));
+
+    const start = await screen.findByRole('button', { name: '2명으로 시작' });
+    const row = screen.getByTestId('start-row');
+    expect(row).toHaveClass('justify-between');
+    expect(row).toContainElement(start);
+    expect(within(row).getByText('지금 2명 · 최대 6명')).toBeInTheDocument();
+    // 문구가 버튼보다 앞(왼쪽)에 온다.
+    const hint = within(row).getByText('지금 2명 · 최대 6명');
+    expect(hint.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('손님도 같은 줄 — 안내 문구 왼쪽, [준비] 오른쪽', async () => {
+    renderRoom(waiting({ hostId: 2, playerIds: [2, 1], playerCount: 2 }));
+
+    const ready = await screen.findByRole('button', { name: '준비' });
+    const row = screen.getByTestId('start-row');
+    expect(row).toContainElement(ready);
+    expect(within(row).getByText('방장이 시작하면 게임이 시작돼요 (지금 2명 · 최대 6명)')).toBeInTheDocument();
   });
 });

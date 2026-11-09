@@ -213,6 +213,24 @@ describe('19-onecard-table.css — 버튼 반폭(--oc-race-half-w)', () => {
     expect(half).toBeGreaterThanOrEqual(maxWidth / 2);
   });
 
+  // D-174 — 사각이 너무 잘 보여 원형으로. 지름이 곧 폭·높이라 세로 보정(반높이)도 반지름 이상이어야 위·아래 가장자리에서 안 잘린다.
+  it('버튼은 원형이다 — 크기마다 폭 = 높이, 반지름 이하의 가장자리 보정', () => {
+    expect(declared('.oc-race-btn', 'border-radius')).toBe('50%');
+    const sizes: [string, string][] = [
+      ['.oc-race-btn', '.oc-race-layer'],
+      ['.oc-race-size-small .oc-race-btn', '.oc-race-layer.oc-race-size-small'],
+      ['.oc-race-size-large .oc-race-btn', '.oc-race-layer.oc-race-size-large'],
+    ];
+    for (const [btn, layer] of sizes) {
+      const w = declared(btn, 'width');
+      expect(w, btn).toBeDefined();
+      expect(declared(btn, 'height'), btn).toBe(w);
+      const radius = Number.parseFloat(w ?? '0') / 2;
+      expect(Number.parseFloat(declared(layer, '--oc-race-half-h') ?? '0'), layer).toBeGreaterThanOrEqual(radius);
+      expect(Number.parseFloat(declared(layer, '--oc-race-half-w') ?? '0'), layer).toBeGreaterThanOrEqual(radius);
+    }
+  });
+
   it('버튼은 작게 — 최소 44px 높이(손가락)·글자 16px', () => {
     expect(declared('.oc-race-btn', 'min-height')).toBe('44px');
     expect(declared('.oc-race-btn', 'font-size')).toBe('16px');

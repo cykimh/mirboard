@@ -217,7 +217,7 @@ class OneCardEnginePlayTest {
     }
 
     @Test
-    void with_two_players_jack_and_queen_give_another_turn() {
+    void with_two_players_a_jack_gives_another_turn_and_a_queen_passes_to_the_other() {
         OneCardEngine engine = engine(2);
         OneCardState jack = seats(hand(heart(PlayingCard.JACK), club(3), club(4)), hand(spade(4), spade(6), spade(8)))
                 .top(heart(5)).turn(0).build();
@@ -226,8 +226,9 @@ class OneCardEnginePlayTest {
                 .top(heart(5)).turn(0).build();
 
         assertThat(play(engine, jack, 0, heart(PlayingCard.JACK)).turnSeat()).isZero();
+        // D-173 — 2인 Q 는 방향만 뒤집고 상대에게 넘긴다.
         OneCardState afterQueen = play(engine, queen, 0, heart(PlayingCard.QUEEN));
-        assertThat(afterQueen.turnSeat()).isZero();
+        assertThat(afterQueen.turnSeat()).isEqualTo(1);
         assertThat(afterQueen.direction()).isEqualTo(-1);
     }
 

@@ -115,6 +115,8 @@ export function RoomPage() {
   const [readyPending, setReadyPending] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(false);
+  // D-174 — [빈자리 봇으로 채우기]·[봇 빼기] 요청 중.
+  const [botsPending, setBotsPending] = useState(false);
   // D-137 — 관전자 [자리에 앉기].
   const [sitPending, setSitPending] = useState(false);
   const [sitError, setSitError] = useState<string | null>(null);
@@ -396,6 +398,21 @@ export function RoomPage() {
     }
   }
 
+  // D-174 — 대기실의 봇 채우기·빼기(방장). 응답으로 바로 맞추고, 다른 사람은 방 메타 갱신으로 받는다. 실패는 토스트(D-157).
+  async function handleBots(fill: boolean) {
+    if (!token || botsPending) return;
+    setBotsPending(true);
+    try {
+      setRoom(await (fill ? roomsApi.fillBots(token, roomId) : roomsApi.removeBots(token, roomId)));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
+      const fallback = fill ? '봇을 앉히지 못했어요' : '봇을 빼지 못했어요';
+      showToast(err instanceof ApiError ? errorText(err, fallback) : `${fallback} — 다시 눌러 주세요`, 'error');
+    } finally {
+      setBotsPending(false);
+    }
+  }
+
   // D-161 — 대기실 게임 설정(방장). 응답으로 바로 맞추고, 다른 사람은 방 메타 갱신으로 받는다.
   async function handleSettingsChange(settings: RoomSettingsUpdate) {
     if (!token || settingsPending) return;
@@ -524,6 +541,10 @@ export function RoomPage() {
   const allGuestsReady = guests.length > 0 && readyGuests === guests.length;
   const iAmReady = !!(room && user && (room.readyUserIds ?? []).includes(user.userId));
   const startMin = minPlayers ?? 1;
+  // D-174 — 대기실 봇(방장만 채우고 뺀다). 판돈 방은 봇 금지(D-81).
+  const botCount = room ? (room.botSeats ?? []).length : 0;
+  const emptySeats = room ? room.capacity - room.playerIds.length : 0;
+  const stakedRoom = !!room && (room.stake ?? 0) > 0;
   const canStart = !!room && room.status === 'WAITING' && room.playerCount >= startMin;
 
   // D-121 → D-154 — 튜토리얼(게임 소개)은 대기실 "게임 방법" 버튼으로만 연다. 방을 만들거나 처음 들어와도 저절로 띄우지 않는다
@@ -755,6 +776,31 @@ export function RoomPage() {
                 })}
               </ul>
 
+              {/* D-174 — 방장만: 빈자리를 봇으로 채우거나 봇을 모두 뺀다(시작은 아래 [N명으로 시작]). */}
+              {iAmPlayer && iAmHost && (emptySeats > 0 || botCount > 0) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {emptySeats > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBots(true)}
+                      disabled={botsPending || stakedRoom}
+                    >
+                      빈자리 봇으로 채우기
+                    </Button>
+                  )}
+                  {botCount > 0 && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleBots(false)} disabled={botsPending}>
+                      봇 빼기
+                    </Button>
+                  )}
+                  {stakedRoom && emptySeats > 0 && (
+                    <span className="text-xs text-muted-foreground">판돈 방에는 봇을 앉힐 수 없어요</span>
+                  )}
+                </div>
+              )}
+
               {roomOptions !== null && (
               <>
               <Separator />
@@ -806,44 +852,41 @@ export function RoomPage() {
                   {allGuestsReady && ' — 모두 준비됐어요'}
                 </p>
               )}
-              {iAmPlayer && !iAmHost && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={iAmReady ? 'outline' : 'default'}
-                    onClick={() => handleReady(!iAmReady)}
-                    disabled={readyPending}
-                  >
-                    {iAmReady ? '준비 취소' : '준비'}
-                  </Button>
-                </div>
-              )}
-              {iAmPlayer && iAmHost && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleStartNow}
-                    disabled={!canStart || startPending}
-                    className={allGuestsReady && canStart ? 'ring-2 ring-emerald-500 ring-offset-2' : undefined}
-                  >
-                    {room.playerCount}명으로 시작
-                  </Button>
+              {/* D-174 — 시작 줄: 안내 문구는 왼쪽, 버튼(방장 [N명으로 시작] / 손님 [준비])은 같은 줄 오른쪽. */}
+              {iAmPlayer && (
+                <div data-testid="start-row" className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {iAmHost
+                      ? canStart || minPlayers === null
+                        ? `지금 ${room.playerCount}명 · 최대 ${room.capacity}명`
+                        : `${minPlayers}명 이상 모이면 시작할 수 있어요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`
+                      : `방장이 시작하면 게임이 시작돼요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`}
+                  </p>
+                  {iAmHost ? (
+                    <Button
+                      type="button"
+                      className={`ml-auto${allGuestsReady && canStart ? ' ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+                      onClick={handleStartNow}
+                      disabled={!canStart || startPending}
+                    >
+                      {room.playerCount}명으로 시작
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="ml-auto"
+                      variant={iAmReady ? 'outline' : 'default'}
+                      onClick={() => handleReady(!iAmReady)}
+                      disabled={readyPending}
+                    >
+                      {iAmReady ? '준비 취소' : '준비'}
+                    </Button>
+                  )}
                 </div>
               )}
               {startError && (
                 <p role="alert" className="text-sm text-destructive">
                   {startError}
-                </p>
-              )}
-
-              {iAmPlayer && iAmHost && !canStart && minPlayers !== null && (
-                <p className="text-sm text-muted-foreground">
-                  {minPlayers}명 이상 모이면 시작할 수 있어요 (지금 {room.playerCount}명 · 최대 {room.capacity}명)
-                </p>
-              )}
-              {iAmPlayer && !iAmHost && (
-                <p className="text-sm text-muted-foreground">
-                  방장이 시작하면 게임이 시작돼요 (지금 {room.playerCount}명 · 최대 {room.capacity}명)
                 </p>
               )}
             </CardContent>

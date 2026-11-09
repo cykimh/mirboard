@@ -176,7 +176,7 @@ export const ONE_CARD_TUTORIAL_STEPS: TutorialStep[] = [
             <strong>7</strong> — 낼 때 다음 기준 무늬를 지정합니다
           </li>
         </ul>
-        <p>살아 있는 사람이 2명이면 J·Q 도 "한 번 더"로 동작합니다.</p>
+        <p>살아 있는 사람이 2명이면 J 는 상대를 건너뛰어 다시 내 차례가 됩니다. Q 는 방향만 바뀌고 상대 차례입니다.</p>
       </>
     ),
   },

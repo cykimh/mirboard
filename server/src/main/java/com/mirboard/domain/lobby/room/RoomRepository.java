@@ -120,6 +120,13 @@ public class RoomRepository {
         return (int) unwrap(result);
     }
 
+    /** D-174 — 방장을 바꾼다(봇이 방장이 됐을 때 사람에게 넘기기). 방이 없으면 아무것도 하지 않는다. */
+    public void setHost(String roomId, long userId) {
+        if (Boolean.TRUE.equals(redis.hasKey("room:" + roomId))) {
+            redis.opsForHash().put("room:" + roomId, "hostId", Long.toString(userId));
+        }
+    }
+
     /** Phase 8C — 호스트가 WAITING 중 정책을 변경. status=IN_GAME 이면 호출 불가. */
     public void updateTeamPolicy(String roomId, TeamPolicy newPolicy) {
         if (Boolean.FALSE.equals(redis.hasKey("room:" + roomId))) {

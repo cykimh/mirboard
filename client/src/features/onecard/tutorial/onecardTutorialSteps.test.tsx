@@ -82,8 +82,9 @@ describe('원카드 튜토리얼 — 룰 문서와 맞물린 문구 (§ 인용)'
     expect(bodyText('공격과 반격')).toContain('2 < A < 흑백 조커 < 컬러 조커');
   });
 
-  it('2인이면 J·Q 도 한 번 더 (§8.1)', () => {
-    expect(bodyText('특수 카드 — J·Q·K·7')).toContain('2명이면 J·Q 도 "한 번 더"');
+  it('2인이면 J 는 한 번 더, Q 는 상대 차례 (§8.1, D-173)', () => {
+    expect(bodyText('특수 카드 — J·Q·K·7')).toContain('2명이면 J 는 상대를 건너뛰어 다시 내 차례');
+    expect(bodyText('특수 카드 — J·Q·K·7')).toContain('Q 는 방향만 바뀌고 상대 차례');
   });
 
   it('경쟁 창 3초·벌칙 1장·봇 1.0~2.5초 (§9)', () => {

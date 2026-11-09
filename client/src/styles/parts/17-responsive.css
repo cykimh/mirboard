@@ -188,11 +188,10 @@
   }
 }
 
-/* D-160 — 원카드 차례 맥박은 움직임 줄이기 설정이면 멈춘다(빛은 남는다). 19 는 미디어 0개 규칙이라 여기 둔다. */
+/* D-160·D-173 — 원카드 차례 맥박(좌석·경기장)은 움직임 줄이기 설정이면 멈춘다(빛은 남는다). 19 는 미디어 0개 규칙이라 여기 둔다. */
 @media (prefers-reduced-motion: reduce) {
   .oc-seat-turn,
-  .oc-me-turn,
-  .oc-hand-myturn {
+  .oc-felt-myturn {
     animation: none;
   }
 }
