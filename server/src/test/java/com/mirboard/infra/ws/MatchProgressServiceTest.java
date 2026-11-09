@@ -21,7 +21,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-153 — 매치가 정상으로 끝나면 사람만의 방은 대기실로 돌아가고(다음 판, 관전자 자동 착석), 봇이 낀 방(봇과 연습)은 FINISHED 로 닫힌다.
+ * D-153 — 매치가 정상으로 끝나면 사람만의 방은 대기실로 돌아가고(다음 판, 관전자 자동 착석), 봇과 연습(fillWithBots) 방은 FINISHED 로 닫힌다(D-174 — 대기실에서 봇으로 채운 방은 대기실로).
  * 대기실로 돌아갈 때 라이브 세션이 없는 플레이어(판 도중 끊긴 채 남은 사람)에게는 대기실 끊김 유예(D-134)를 건다 — 걸지 않으면 유령
  * 좌석이 다음 판에 낀다.
  */
@@ -38,9 +38,13 @@ class MatchProgressServiceTest {
             roomService, metrics, sessions, waitingGrace);
 
     private static Room room(RoomStatus status, List<Long> players, List<Integer> botSeats) {
+        return room(status, players, botSeats, false);
+    }
+
+    private static Room room(RoomStatus status, List<Long> players, List<Integer> botSeats, boolean practice) {
         return new Room("r1", "방", "ONE_CARD", 1L, status, 4, players.size(),
                 players, Set.of(), TeamPolicy.SEQUENTIAL, 0L,
-                !botSeats.isEmpty(), botSeats, 1000, 0, 0, Set.of());
+                practice, botSeats, 1000, 0, 0, Set.of());
     }
 
     private void matchEnds() {
@@ -76,13 +80,32 @@ class MatchProgressServiceTest {
     }
 
     @Test
-    void bot_match_finishes_the_room() {
+    void practice_room_finishes_the_room() {
+        // fillWithBots(곧바로 시작하는 연습 방 — API 호환으로만 남음)은 대기실이 없어 한 판으로 끝난다.
         matchEnds();
 
-        service.advance(engine, room(RoomStatus.IN_GAME, List.of(1L, 900L), List.of(1)), state, new ArrayList<>());
+        service.advance(engine, room(RoomStatus.IN_GAME, List.of(1L, 900L), List.of(1), true), state, new ArrayList<>());
 
         verify(roomService).markFinished("r1");
         verify(roomService, never()).returnToWaiting(any());
+    }
+
+    @Test
+    void a_waiting_room_match_with_bots_goes_back_to_waiting_and_bots_get_no_grace() {
+        // D-174 — 대기실에서 봇으로 채운 방은 봇과 함께 대기실로. 봇은 세션이 없지만 유예를 걸면 120초 뒤 쫓겨난다.
+        matchEnds();
+        when(roomService.returnToWaiting("r1"))
+                .thenReturn(room(RoomStatus.WAITING, List.of(1L, 900L, 901L), List.of(1, 2)));
+        when(sessions.hasLiveSession(anyLong(), eq("r1"))).thenReturn(false);
+
+        service.advance(engine, room(RoomStatus.IN_GAME, List.of(1L, 900L, 901L), List.of(1, 2)), state,
+                new ArrayList<>());
+
+        verify(roomService).returnToWaiting("r1");
+        verify(roomService, never()).markFinished(any());
+        verify(waitingGrace).scheduleGrace("r1", 1L);
+        verify(waitingGrace, never()).scheduleGrace("r1", 900L);
+        verify(waitingGrace, never()).scheduleGrace("r1", 901L);
     }
 
     @Test

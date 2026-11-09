@@ -24,7 +24,7 @@ export function recordText(r: GameRecord): string {
 
 /**
  * D-146 — 대기실 참가자 한 명. 목록 줄 대신 카드로 아바타·이름·방장/봇 표시와 **이 방 게임** 기준 계급·전적을 보인다(D-115 — 레이팅은
- * 게임별). 안 해 본 게임이면 "첫 판".
+ * 게임별). 안 해 본 게임이면 "첫 판". D-174 — 계급 아이콘은 이름 왼쪽.
  */
 export function ParticipantCard({
   userId,
@@ -41,8 +41,12 @@ export function ParticipantCard({
         {!bot && <AvatarImage src={avatarSrc(userId)} alt="" />}
         <AvatarFallback>{bot ? '🤖' : username.slice(0, 2).toUpperCase()}</AvatarFallback>
       </Avatar>
-      <span className="w-full truncate text-sm font-semibold" title={username}>
-        {username}
+      {/* D-174 — 계급 아이콘은 이름 왼쪽(게임판 좌석과 같은 자리). */}
+      <span className="flex w-full min-w-0 items-center justify-center gap-1" data-testid="participant-name">
+        {!bot && record && <TierBadge tier={record.tier} size={18} />}
+        <span className="truncate text-sm font-semibold" title={username}>
+          {username}
+        </span>
       </span>
       <div className="flex flex-wrap justify-center gap-1">
         {host && <Badge>방장</Badge>}
@@ -56,10 +60,7 @@ export function ParticipantCard({
       {!bot && record !== undefined && (
         <div className="flex flex-col items-center gap-1">
           {record ? (
-            <>
-              <TierBadge tier={record.tier} size={24} />
-              <span className="text-xs text-muted-foreground">{recordText(record)}</span>
-            </>
+            <span className="text-xs text-muted-foreground">{recordText(record)}</span>
           ) : (
             <span className="text-xs text-muted-foreground">첫 판</span>
           )}

@@ -282,7 +282,8 @@ public class RoomService {
             if (!ALLOWED_STAKES.contains(v)) {
                 throw new InvalidStakeException(v);
             }
-            if (v > 0 && room.fillWithBots()) {
+            // D-174 — 대기실에서 봇으로 채운 방도 판돈을 걸 수 없다(봇 = 무한 잔액, D-81).
+            if (v > 0 && (room.fillWithBots() || !room.botSeats().isEmpty())) {
                 throw new StakedRoomNoBotsException();
             }
             fields.put("stake", Integer.toString(v));
@@ -407,6 +408,7 @@ public class RoomService {
 
     public void leaveRoom(String roomId, long userId) {
         repository.leave(roomId, userId); // BY-3 — 준비 플래그도 스크립트가 같은 원자 구간에서 지운다.
+        settleBotsAfterHumanChange(roomId);
         Optional<Room> remaining = repository.findById(roomId);
         events.publishEvent(remaining
                 .map(RoomChangedEvent::updated)
@@ -426,6 +428,7 @@ public class RoomService {
         if (seated == -1) {
             throw new RoomNotFoundException(roomId);
         }
+        settleBotsAfterHumanChange(roomId);
         Room after = getRoom(roomId);
         if (seated >= 0) {
             events.publishEvent(RoomChangedEvent.updated(after));
@@ -433,6 +436,89 @@ public class RoomService {
                     roomId, after.playerIds(), after.spectatorIds());
         }
         return after;
+    }
+
+    /**
+     * D-174 — 대기실의 [빈자리 봇으로 채우기]. 방장만, WAITING 에서만, 판돈 방은 안 된다(D-81). 정원까지 방에 없는 봇을 앉힌다 — 준비는
+     * 넣지 않는다(친구 방의 준비는 사람만 센다, D-161). 채우는 도중 사람이 마지막 자리에 먼저 앉으면(ROOM_FULL) 거기서 멈춘다.
+     */
+    public Room fillBots(String roomId, long hostUserId) {
+        Room room = requireHostWhileWaiting(roomId, hostUserId);
+        if (room.stake() > 0) {
+            throw new StakedRoomNoBotsException();
+        }
+        int empty = room.capacity() - room.playerIds().size();
+        if (empty <= 0) {
+            return room;
+        }
+        List<Long> picked = bots.getBotIds().stream()
+                .filter(id -> !room.playerIds().contains(id))
+                .limit(empty)
+                .toList();
+        long now = Instant.now(clock).toEpochMilli();
+        for (long botId : picked) {
+            try {
+                repository.join(roomId, botId, now);
+            } catch (RoomFullException e) {
+                break;
+            }
+        }
+        Room after = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(after));
+        log.info("Room bots filled: roomId={} host={} botSeats={}", roomId, hostUserId, after.botSeats());
+        return after;
+    }
+
+    /** D-174 — 대기실의 [봇 빼기]. 방장만, WAITING 에서만 — 봇 좌석을 모두 비운다(사람 좌석 순서는 그대로). */
+    public Room removeBots(String roomId, long hostUserId) {
+        Room room = requireHostWhileWaiting(roomId, hostUserId);
+        List<Long> seatedBots = room.playerIds().stream().filter(bots::isBot).toList();
+        if (seatedBots.isEmpty()) {
+            return room;
+        }
+        for (long botId : seatedBots) {
+            repository.leave(roomId, botId);
+        }
+        Room after = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(after));
+        log.info("Room bots removed: roomId={} host={} removed={}", roomId, hostUserId, seatedBots);
+        return after;
+    }
+
+    private Room requireHostWhileWaiting(String roomId, long userId) {
+        Room room = getRoom(roomId);
+        if (room.hostId() != userId) {
+            throw new NotHostException(roomId);
+        }
+        if (room.status() != RoomStatus.WAITING) {
+            throw new GameAlreadyStartedException(roomId);
+        }
+        return room;
+    }
+
+    /**
+     * D-174 — 사람이 빠지거나(나가기) 대기실로 돌아온 뒤, 대기실에 봇만 남았으면 봇을 모두 빼 방을 없애고(마지막 leave 가 방을 지운다),
+     * 방장이 봇이면 앞 좌석의 사람에게 넘긴다. 봇 방장은 시작·설정·봇 채우기를 할 사람이 없다. 사람만의 방은 아무것도 하지 않는다.
+     */
+    private void settleBotsAfterHumanChange(String roomId) {
+        Optional<Room> found = repository.findById(roomId);
+        if (found.isEmpty() || found.get().status() != RoomStatus.WAITING) {
+            return;
+        }
+        Room room = found.get();
+        List<Long> humans = room.playerIds().stream().filter(id -> !bots.isBot(id)).toList();
+        if (humans.size() == room.playerIds().size()) {
+            return;
+        }
+        if (humans.isEmpty()) {
+            for (long botId : room.playerIds()) {
+                repository.leave(roomId, botId);
+            }
+            log.info("Room left with only bots — removed: roomId={}", roomId);
+        } else if (bots.isBot(room.hostId())) {
+            repository.setHost(roomId, humans.get(0));
+            log.info("Room host handed from bot to human: roomId={} newHost={}", roomId, humans.get(0));
+        }
     }
 
     public void markFinished(String roomId) {

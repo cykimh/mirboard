@@ -55,8 +55,9 @@ public class MatchProgressService {
             return;
         }
         metrics.matchCompleted(room.gameType());
-        // D-153 — 봇이 낀 방(봇과 연습)은 한 판으로 끝난다. 사람만의 방은 대기실로 돌아가 다음 판을 기다린다.
-        if (!room.botSeats().isEmpty()) {
+        // D-153 — 봇과 연습(fillWithBots — 대기실이 없는 방)은 한 판으로 끝난다. 그 밖의 방은 대기실로 돌아가 다음 판을 기다린다
+        // (D-174 — 대기실에서 봇으로 채운 방도 봇과 함께 돌아간다).
+        if (room.fillWithBots()) {
             try {
                 roomService.markFinished(room.roomId());
             } catch (RuntimeException e) {
@@ -68,7 +69,13 @@ public class MatchProgressService {
         try {
             Room back = roomService.returnToWaiting(room.roomId());
             // 판 도중 끊긴 채 남은 플레이어 — 탈주 유예는 IN_GAME 에서만 돌므로 대기실 끊김 유예(D-134)로 넘긴다. 돌아오면 재구독이 취소한다.
-            for (Long userId : back.playerIds()) {
+            // D-174 — 봇은 세션이 없다. 유예를 걸면 만료 때 봇이 쫓겨난다.
+            List<Long> players = back.playerIds();
+            for (int seat = 0; seat < players.size(); seat++) {
+                Long userId = players.get(seat);
+                if (back.botSeats().contains(seat)) {
+                    continue;
+                }
                 if (!sessions.hasLiveSession(userId, room.roomId())) {
                     waitingGrace.scheduleGrace(room.roomId(), userId);
                 }

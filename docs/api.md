@@ -258,7 +258,8 @@
   `capacity`(D-99).
 - **`fillWithBots`(D-136 — 봇과 연습)**: `true` 면 **연습 방**이다 — 방장 + 봇으로 정원을 채우고 방장 준비까지 서버가 넣어
   **응답 방이 이미 `IN_GAME`**(대기실·초대 없음), `rooms:open`(대기 중인 방 목록)에 한 번도 오르지 않는다. 관전은 막지 않는다.
-  `false`(기본 — 친구와 하기)면 봇이 들어갈 길이 없다(사람끼리만).
+  `false`(기본)면 대기실이 있는 방이다. **D-174** — 클라는 더 이상 `fillWithBots` 를 보내지 않는다(방 종류 선택 없음). 봇은 대기실에서
+  방장이 `POST /api/rooms/{roomId}/bots` 로 앉힌다. `fillWithBots` 는 API 호환으로만 남는다.
 - `capacity`(D-99): 방 인원. **생략하면 게임 선언 `defaultPlayers`**(D-131 — 카탈로그와 같은 값, 티츄 4·스컬킹 8·원카드 4. 예전
   생략 기본 `maxPlayers` 와는 원카드만 다르다). 게임이 정한
   `minPlayers() <= capacity <= maxPlayers()` 를 벗어나면 `INVALID_CAPACITY`. 인원이
@@ -294,7 +295,7 @@
 ### ~~POST `/api/rooms/{roomId}/rematch`~~ *(D-82 → D-153 폐기)*
 '한 판 더'(리매치)는 없앴다. 사람만의 방은 매치가 정상으로 끝나면 서버가 방을 **WAITING** 으로 돌린다(정원 = 게임 최대 인원, 준비
 비움, 관전자를 들어온 순서대로 빈자리에 자동 착석, 방 목록 재등록 — `room_return_waiting.lua`). 다음 판은 방장의
-`POST /api/rooms/{roomId}/start`(D-143). 봇과 연습 방·탈주 종료·강제 종료는 그대로 FINISHED. 방 칩은 이어진다.
+`POST /api/rooms/{roomId}/start`(D-143). 탈주 종료·강제 종료는 그대로 FINISHED(D-174 — 봇이 낀 방도 정상 종료면 대기실로). 봇과 연습(`fillWithBots`) 방은 FINISHED. 방 칩은 이어진다.
 
 성공 시 서버는 `/topic/lobby/rooms` 로 `ROOM_UPDATED` 브로드캐스트.
 
@@ -334,6 +335,20 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 전원 준비로 시작할 때와 같다(좌석 섞기·게임 시작). 친구와 하기의 정원은 처음에 게임 최대 인원이다(클라가 `capacity=maxPlayers`).
 응답 `200` — 시작된 Room(`capacity` = 인원). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details
 `minPlayers`), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`. (`PLAYERS_NOT_READY`·`ROOM_ALREADY_FULL` 은 D-143 에서 없앴다.)
+
+### POST `/api/rooms/{roomId}/bots` *(D-174 — 빈자리 봇으로 채우기, 방장 전용)*
+대기실(WAITING)의 빈자리를 정원(친구 방은 게임 최대 인원)까지 봇으로 채운다. 이미 앉은 봇은 그대로 두고 다른 봇을 고른다. 봇은 준비 표시를
+하지 않고(준비는 사람만 센다), 시작은 그대로 방장의 `/start` 다. 빈자리가 없으면 아무것도 하지 않는다. 채우는 도중 사람이 마지막 자리에 먼저
+앉으면 거기서 멈춘다(오류 아님).
+응답 `200` — 갱신된 Room(`botSeats` 포함). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `STAKED_ROOM_NO_BOTS`(400 — 판돈 방),
+`ROOM_NOT_FOUND`.
+
+### DELETE `/api/rooms/{roomId}/bots` *(D-174 — 봇 빼기, 방장 전용)*
+대기실의 봇을 모두 뺀다(사람 좌석 순서는 그대로). 봇이 없으면 아무것도 하지 않는다.
+응답 `200` — 갱신된 Room. 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `ROOM_NOT_FOUND`.
+
+> **D-174 — 봇이 있는 대기실의 나가기.** 사람이 나가 봇만 남으면 방을 없앤다(`ROOM_REMOVED`). 방장이 나가면 방장은 남은 **사람** 중 가장
+> 앞 좌석에게 넘어간다(봇 방장 없음). 봇이 낀 판도 정상 종료면 대기실로 돌아간다(봇 자리 유지 — D-153 의 FINISHED 예외를 없앴다).
 
 ### POST `/api/rooms/{roomId}/join-or-reconnect` *(Phase 8A)*
 직접 링크 진입 시나리오. 본인 상태에 따라 자동 분기:

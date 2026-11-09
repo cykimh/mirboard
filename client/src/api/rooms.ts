@@ -81,6 +81,16 @@ export const roomsApi = {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/start`, { method: 'POST', token });
   },
 
+  /** D-174 — 대기실에서 방장이 빈자리를 봇으로 채운다(시작은 따로 startNow). */
+  fillBots(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots`, { method: 'POST', token });
+  },
+
+  /** D-174 — 대기실에서 방장이 봇을 모두 뺀다. */
+  removeBots(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots`, { method: 'DELETE', token });
+  },
+
   join(token: string, roomId: string): Promise<Room> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
       method: 'POST',
