@@ -1,9 +1,9 @@
 # 요트(주사위) — 네 번째 게임 후보 — 기획
 
-> 상태: **S0 완료(설계 채택)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
+> 상태: **S1 완료(룰 명세)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
 > 근거: `docs/game-port.md`(포트 계약) · `docs/plans/multi-game.md` §2·§3("요트 — 포트가 진짜 일반적인지 시험하는 리트머스")
 > · 형식 본보기 `docs/plans/onecard.md`·`docs/rules-onecard.md`
-> 룰 정본은 S1 에서 만들 `docs/rules-yacht.md` 다. 이 문서의 §3 은 그 입력이다.
+> 룰 정본은 `docs/rules-yacht.md`(S1) 다. 이 문서의 §3 은 그 입력이었고, 어긋나면 정본이 이긴다.
 > 상표 주의: 일반 공용 룰(주사위 5개·12칸)만 쓴다. 특정 상표 게임의 이름·점수표 디자인·그림을 쓰지 않는다.
 
 ## 1. 목표와 성공 기준
@@ -77,7 +77,7 @@
   보너스 기준 변형. 원문마다 갈리는 부분이라 v1 은 가장 단순한 형태로 둔다.
 - 칸 이름은 일반 명사(숫자·초이스·포 카드·풀 하우스·스트레이트·요트)만 쓴다. 영어 상표식 칸 이름(예: 1 칸을 부르는 고유 명칭)은 쓰지 않는다.
 
-### 3.3 세부 (S1 에서 확정할 기본안)
+### 3.3 세부 (S1 에서 확정 — 정본 `docs/rules-yacht.md` §4·§6~§8·§10)
 
 1. **홀드 변경은 굴림 1·2번째 뒤에만** 받는다. 첫 굴림 전·3번째 굴림 뒤·차례가 아닐 때는 `HOLD_NOT_ALLOWED`.
 2. **5개 전부 홀드하고 굴리기**는 거절한다(`NOTHING_TO_ROLL`) — 굴림 횟수만 날리는 수라 실수일 뿐이다.
@@ -306,7 +306,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 | `docs/decisions.md` | D-181~D-183(§11), 단계별 후속 | S0 ✅ |
 | `docs/plans/multi-game.md` | §7 미결 "요트 턴 대기 UX" → 결정 링크 | S0 ✅ |
 | `docs/plans/mvp-roadmap.md` | M9 행 | S0 ✅ |
-| `docs/rules-yacht.md` | 신규(§3 확정 — 코드/테스트/갭 표기는 `rules-onecard.md` 형식) | S1 |
+| `docs/rules-yacht.md` | 신규(§3 확정 — 코드/테스트/갭 표기는 `rules-onecard.md` 형식) | S1 ✅ |
 | `docs/game-port.md` | §1 표 "요트가 깨는 지점" 열을 실측으로 정정(조합 폭발 → 최대 45), `GameContext.turnSeconds` | S3 |
 | `docs/stomp-protocol.md` · `docs/redis-keys.md` · `docs/api.md` | 요트 액션·이벤트, 상태 키, 카탈로그 1~4인 | S3 |
 | `CLAUDE.md` · `README.md` · `docs/case-study-multi-game.md` · `docs/implementation-status.md` | 게임 4종, "한 차례 = 한 액션" 측정 결과, 인용 수치 재측정 | S5 |
@@ -316,7 +316,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 | 단계 | 범위 | 선행 | 코드 | 검증(테스트 기준) |
 | --- | --- | --- | --- | --- |
 | S0 | 결정 기록(D-181~D-183) + 이 기획 확정 — **완료** | — | 없음 | 사용자 승인 |
-| S1 | 룰 명세 `docs/rules-yacht.md`(§3.3 확정) | S0 | 없음(문서) | 사용자 검토 |
+| S1 | 룰 명세 `docs/rules-yacht.md`(§3.3 확정) — **완료** | S0 | 없음(문서) | 사용자 검토 |
 | S2 | 순수 엔진: 주사위·점수표·액션 검증·순위·불변식 + 시뮬레이션 | S1 | 서버 신규 패키지(Docker 불필요) | `Scoring` 전수(7,776 × 12) · 거절 사유별 단위 테스트 · 1~4인 무작위 봇 2,000판 전부 종료 + 매 전이 불변식 |
 | S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(V 다음)·라운드 스타터·상대 전적. 정의 `COMING_SOON` | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
 | S4 | 클라 게임판·점수표·주사위 판·튜토리얼·위키 | S3 | 클라 | Vitest(스토어·sink·게임판·튜토리얼, `gameTables.test`·`gameTutorials.test` 원문 검사 통과) · 브라우저 실측(데스크톱·375px, 4인 점수표 가로 스크롤 없음, 44px) |
