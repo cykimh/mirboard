@@ -63,11 +63,14 @@ class OnlyOneCardOpenIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(3))
-                .andExpect(jsonPath("$.games[0].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games.length()").value(4))
+                // D-190 — 오목도 공개라 열린 게임 둘이 이름순(오목 · 원카드)으로 앞에 선다.
+                .andExpect(jsonPath("$.games[0].id").value("OMOK"))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[1].status").value("COMING_SOON"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
     }
 
     @Test

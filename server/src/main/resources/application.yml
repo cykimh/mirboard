@@ -177,8 +177,9 @@ mirboard:
     # COMING_SOON(카탈로그 "준비 중", 방 생성 거절)·DISABLED(카탈로그에서도 뺌). 런북은 docs/deploy.md.
     status: ${MIRBOARD_ONECARD_STATUS:AVAILABLE}
   omok:
-    # 오목(D-175) — 완성(S5 공개 전환) 전에는 DISABLED(카탈로그에서도 뺌). 운영 손잡이는 MIRBOARD_OMOK_STATUS.
-    status: ${MIRBOARD_OMOK_STATUS:DISABLED}
+    # 오목(D-175) — D-190 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_OMOK_STATUS 로 — COMING_SOON(카탈로그 "준비 중",
+    # 방 생성 거절)·DISABLED(카탈로그에서도 뺌). 런북은 docs/deploy.md. fly.toml [env] 에는 두지 않는다.
+    status: ${MIRBOARD_OMOK_STATUS:AVAILABLE}
     # "원카드!/잡기!" 경쟁 창 길이와 봇 반응 시간 구간(ms) — 창마다 봇별로 균등 추첨(룰 §9).
     race-window-millis: 3000
     bot-reaction-owner-min-millis: 1000

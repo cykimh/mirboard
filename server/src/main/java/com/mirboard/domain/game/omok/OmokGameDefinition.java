@@ -19,9 +19,9 @@ import org.springframework.stereotype.Component;
  * 오목의 카탈로그 메타데이터 + 엔진 팩토리 (D-175). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정 없이 이
  * Bean 등록으로 인게임까지 연결된다.
  *
- * <p><b>공개 상태는 설정이다</b>({@code mirboard.omok.status} = {@code MIRBOARD_OMOK_STATUS}, 기본 {@code DISABLED} — 카탈로그에도
- * 안 보인다). 단계마다 main 에 들어가므로 완성(S5 공개 전환) 전에는 보이면 안 된다(관제 규칙). 기본값은 {@code application.yml} 과
- * 아래 {@code @Value} 두 곳에 있고 같아야 한다.
+ * <p><b>공개 상태는 설정이다</b>({@code mirboard.omok.status} = {@code MIRBOARD_OMOK_STATUS}, 기본 {@code AVAILABLE} — D-190 공개,
+ * 게임판이 완성되는 대로 공개한다는 사용자 결정). 되돌리기는 운영 시크릿으로 {@code COMING_SOON}·{@code DISABLED}({@code docs/deploy.md}).
+ * 기본값은 {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다.
  *
  * <p>방 설정은 셋(D-176): 모드({@code TEAM_MODE} — 1:1 정원 2 / 2:2 정원 4), 룰({@code OMOK_RULE}), 봇 난이도
  * ({@code BOT_LEVEL}). 정원과 시작 인원은 모드가 정한다 — 2:2 를 3명으로 시작할 수 없다.
@@ -37,7 +37,7 @@ public final class OmokGameDefinition implements GameDefinition {
 
     public OmokGameDefinition(OmokStateStore stateStore,
                               ApplicationEventPublisher publisher,
-                              @Value("${mirboard.omok.status:DISABLED}") GameStatus status) {
+                              @Value("${mirboard.omok.status:AVAILABLE}") GameStatus status) {
         this.stateStore = stateStore;
         this.publisher = publisher;
         this.status = Objects.requireNonNull(status,
