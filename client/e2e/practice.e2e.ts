@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * 첫 화면부터 세 게임판까지 한 번에 — 게스트로 들어가 허브를 보고, 게임마다 "봇과 연습"으로 판을 열어 게임판이 뜨는지(게임판은
- * 따로 받는 조각이다 — D-141), 방장 "게임 종료"(D-135)로 끝내고 허브로 나온다. 게스트는 IP 당 발급 한도가 있어 한 번만 만든다.
+ * 첫 화면부터 세 게임판까지 한 번에 — 게스트로 들어가 허브를 보고, 게임마다 방을 만들어 대기실에서 [빈자리 봇으로 채우기]
+ * → [N명으로 시작](D-174 — 방 종류 선택 없음)으로 판을 열어 게임판이 뜨는지(게임판은 따로 받는 조각이다 — D-141), 방장
+ * "게임 종료"(D-135)로 끝내고 허브로 나온다. 게스트는 IP 당 발급 한도가 있어 한 번만 만든다.
  */
 test.describe.configure({ mode: 'serial' });
 
@@ -31,16 +32,19 @@ const GAMES = [
 ] as const;
 
 for (const game of GAMES) {
-  test(`${game.name} — 봇과 연습을 열면 게임판이 뜨고, 게임 종료 뒤 허브로 나온다`, async () => {
+  test(`${game.name} — 대기실에서 봇으로 채워 시작하면 게임판이 뜨고, 게임 종료 뒤 허브로 나온다`, async () => {
     await page.goto('/games');
     await page.getByRole('button', { name: '새 방 만들기' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByText('봇과 연습', { exact: true }).click();
     await dialog.getByRole('combobox', { name: '게임 선택' }).click();
     await page.getByRole('option', { name: game.name }).click();
-    await dialog.getByRole('button', { name: '연습 시작' }).click();
+    await dialog.getByLabel('방 이름').fill(`${game.name} 봇 판`);
+    await dialog.getByRole('button', { name: '방 만들기' }).click();
 
     await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
+    await page.getByRole('button', { name: '빈자리 봇으로 채우기' }).click();
+    await expect(page.getByRole('button', { name: '봇 빼기' })).toBeVisible();
+    await page.getByRole('button', { name: /명으로 시작$/ }).click();
     await expect(page.locator(game.board)).toBeVisible();
 
     page.once('dialog', (d) => void d.accept());
