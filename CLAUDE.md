@@ -244,6 +244,7 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.bot.*"       # 티츄 봇 정책·순수 시뮬레이션 (D-118, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·강도 평가 (D-119, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*Test"     # 원카드 엔진·어댑터·봇 (D-127/D-128, Docker 불필요)
+./gradlew :server:test --tests "com.mirboard.domain.game.cloudroute.*"   # 구름항로 순수 엔진·불변식·시뮬레이션 + 길이 통계 → server/build/cloudroute-sim-stats.txt (D-185, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.TurnRemainingTest"   # resync 남은 턴 시간·재무장을 락 안에서 (D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.*RecorderFailureTest"   # 매치 기록 실패 격리 3게임 (D-130·D-131)

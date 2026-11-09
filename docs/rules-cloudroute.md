@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:** /
 **갭:**)로 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/cloudroute/` 기준, 위치는 메서드 이름으로 적는다.
 
-> **상태:** S0 초안 · 2026-11-09 · 사용자 확인 3건 반영(탈락자 땅 은행행·2~4인·바람 나눔 유지) · 전체 검토 대기. 설계 배경은 `docs/plans/property-board.md`.
+> **상태:** 채택(D-184) · S1 순수 엔진 구현(D-185, 2026-11-09) — 아래 §17 이 코드·테스트 위치다. 설계 배경은 `docs/plans/property-board.md`.
 > **독창 게임.** 주사위·땅 구매·통행료 장르만 따르고 이름·판·칸·카드는 새로 만들었다(설계서 §2). 기존 게임의 규칙서를 출처로 삼지
 > 않으므로 모든 세부는 우리가 정한 것이다 — 설계서에서 바로 오지 않고 이 문서에서 처음 정한 항목은 **[결정]** 으로 표시하고 §15 에 모았다.
 > **[수치]** 는 S1 시뮬레이션으로 조정할 값이다(바꾸면 이 문서를 같이 고친다).
@@ -141,6 +141,7 @@
 - 인수가 = (땅값 + 단계 × 건설비) × 1.5, 10G 단위 반올림 [결정]. 돈은 옛 주인에게 간다. 옛 주인은 거절할 수 없다.
 - 건물 단계는 그대로 넘어온다. 그 땅에 축제가 있으면 꺼진다.
 - 인수한 차례에는 그 땅에 더 짓지 못한다(§6.2). 인수로 섬 독점이 생기면 다음 통행료부터 ×1.5.
+- **[결정] 인수 결정 중 그 땅 주인이 탈주하면 인수 결정은 사라진다**(땅이 은행으로 갔으므로 — 건너뛴 것으로 보고 차례를 잇는다, D-185).
 
 ### 6.5 특수 칸
 
@@ -290,6 +291,7 @@
 | 12 | 탈락자 땅 | 건물을 헐고 은행으로(사용자 확인 2026-11-09) | 눈덩이 방지 |
 | 13 | 탈주 | 파산과 같은 처리, 순위 맨 아래 | 원카드와 같음 |
 | 14 | 동순위 | 1, 1, 3 | 원카드와 같음 |
+| 15 | 인수 중 판 사람 탈주 | 인수 결정 사라짐 | 땅이 은행으로 갔다(D-185) |
 
 ## 16. 검증 기준 (S1)
 
@@ -303,3 +305,39 @@
   §6.1~§6.6 각 결정의 후보·최대 단계, §6.3 배수 네 조합과 반올림, §6.4 인수(풍등탑 불가·축제 꺼짐·같은 차례 건설 불가), §7.2 세 선택과 자동 해제,
   §9 열 장 각각과 더미 재사용, §10 청산 순서·파산, §11 차례 중/밖 탈락, §12 세 사유와 순위(동순위·파산 순서·탈주).
 - 엔진은 난수(주사위·셔플)를 주입받는다 — 테스트는 주사위 열을 정해 넣는다.
+
+## 17. 구현 (S1, D-185)
+
+경로는 `server/src/{main,test}/java/com/mirboard/domain/game/cloudroute/` 기준. 전부 Docker 가 필요 없다.
+
+| 절 | 코드 | 테스트 |
+| --- | --- | --- |
+| §2 판·§6.3 통행료표 | `board/Board`(칸 표·`partner`·`forward`), `board/Tile`, `board/Economy`(수치·`toll`·`takeoverPrice`·`roundLimit`) | `CloudRouteEngineTest$Lands`(배수·반올림) |
+| §3 시작 | `CloudRouteEngine.startMatch` | `$Start` |
+| §4 차례·더블·라운드 | `Table.roll`·`proceed`·`endTurn`·`beginTurn` | `$TurnsAndDoubles`(8건 — 라운드 셈·상한 종료 포함) |
+| §5 이동·급여 | `Table.moveForward`·`moveBack`·`sendToWhirlpool` | `$TurnsAndDoubles`·`$Letters` |
+| §6 칸 처리 | `Table.land`·`landOnLand`·`payToll`·`buy`·`build`·`takeover`·`hostFestival`·`fly` | `$Lands`(10건)·`$SpecialTiles`(4건) |
+| §7 소용돌이 | `Table.rollInWhirlpool`·`trap`·`leave`, `apply` 의 `PayEscape`·`UseBuoy` | `$Whirlpool`(4건) |
+| §8 행동·시간 초과 | `CloudRouteEngine.legalActions`·`timeoutAction`·`pendingSeats`, `state/Pending`, `action/CloudRouteAction` | `$Rejections` |
+| §9 편지 | `Table.drawLetter`, `board/Letter` | `$Letters`(10건) |
+| §10 청산·파산 | `Table.charge`·`liquidate`·`cheapest`·`payBank` | `$PaymentAndElimination` |
+| §11 탈락·탈주 | `Table.eliminate`, `CloudRouteEngine.desert` | `$PaymentAndElimination`(7건) |
+| §12 종료·순위 | `Table.finish`·`standings`, `state/MatchResult` | `$Ranking`·`$TurnsAndDoubles` |
+| §13 공개 정보 | `event/CloudRouteEvent`(전부 공개, 결과값) | `CloudRouteJsonRoundTripTest`(5건) |
+| §16 불변식 | `invariant/CloudRouteInvariantChecker` | `CloudRouteInvariantCheckerTest`(통과 1 + 고의 위반 13) |
+
+- **시뮬레이션** `CloudRouteMatchSimulationTest`(6건): 무작위(합법수 균등 + 가끔 탈주·봇 좌석)와 상식(잔고 300G 를 남기고 사고 짓는 단순 수)
+  각각 인원별 2,000판. 매 전이 뒤 불변식, **돈 장부**(현금 합 변화 = 이벤트의 은행 흐름), **이벤트 거울**(이벤트만으로 그린 공개 상태 = 엔진 상태)을
+  본다. 고의 결함 확인 — 탈락 때 `FestivalCleared` 발행을 지우면 거울이 바로 실패한다.
+- **길이 실측** (상식 수, 시드 고정 — `server/build/cloudroute-sim-stats.txt`):
+
+| 인원 | 상한 | 평균 차례 | 상한 도달 | 1명 남음 | 판당 파산 | 상한 절반 전 첫 파산 | 사람만 15초/차례 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 30 | 49.1 | 39.9% | 60.1% | 0.60 | 10.8% | 12.3분 |
+| 3 | 24 | 65.9 | 88.2% | 11.9% | 0.79 | 13.7% | 16.5분 |
+| 4 | 20 | 75.5 | 99.3% | 0.7% | 0.81 | 11.4% | 18.9분 |
+
+  설계서 §1-3 목표(4인 평균 차례 ≤ 80)를 맞췄고, 일찍(상한 절반 전) 파산해 오래 기다리는 판은 열에 하나 남짓이다. 수치는 그대로 두고 S2 봇·
+  실플레이 뒤에 다시 본다(상식 수는 봇 정책이 아니다).
+- **합계:** 구름항로 도메인 테스트 74건 — `CloudRouteEngineTest` 49 + `CloudRouteInvariantCheckerTest` 14 + `CloudRouteJsonRoundTripTest` 5 +
+  `CloudRouteMatchSimulationTest` 6.
