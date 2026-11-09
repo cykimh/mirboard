@@ -335,7 +335,7 @@ AwaitWhirlpool ──ROLL / PAY_ESCAPE / USE_BUOY──▶ …
 | S0 | 룰 정본 `docs/rules-cloudroute.md`(§3 확정 + 수치표), 결정 번호 발급 — **완료(D-210)** | 없음(문서) | 사용자 검토 |
 | S1 **완료(D-211)** | 순수 엔진(`CloudRouteEngine` — 저장소·시계 없음, 난수 주입) + Pending 상태 기계 + 자동 청산 + 불변식 검사기 + 시뮬레이션 | 서버 신규 패키지 `domain.game.cloudroute` | 룰 단위 테스트, 2~4인 각 2,000판 전부 종료, 불변식(아래) 통과, **길이 통계**(첫 파산 라운드 분포·판당 파산자 수·`LAST_STANDING` 비율·평균 차례 수) 리포트 → 배수 조정 |
 | S2 **완료(D-212)** | 포트 어댑터 + 봇 정책 + 기록기(새 마이그레이션 `cloudroute_match_results`·`_participants`) + 라운드 스타터(`GameStartingEvent`) + `HeadToHeadSource`, 정의는 **`DISABLED`**(관제 규칙) | 서버 | 봇 풀매치 IT, 봇 강도 테스트, 공개 뷰 직렬화(더미 순서 없음), 기록 실패 격리(`*RecorderFailureTest` 에 한 줄), 인프라 grep 0건, 세 게임 회귀 |
-| S3 | 클라 게임판 + 결정 패널 + 연출 큐 + 튜토리얼 | 클라 | Vitest(스토어·레이아웃·패널), 브라우저 실측(데스크톱·390px·다크) |
+| S3 **완료(D-213)** | 클라 게임판 + 결정 패널 + 사건 줄(연출 큐 대신 — D-213) + 튜토리얼, CSS part 21 | 클라 | Vitest(스토어·레이아웃·패널), 브라우저 실측(데스크톱·390px·다크) |
 | S4 | 공개 전 보강(실플레이 길이 측정·수치 조정·상표 검색) → `AVAILABLE` → 문서 수치(README·케이스 스터디·status) → 배포 | 서버·클라 | `check.sh` 전체, 운영 스모크 |
 | 후속 | 라운드 상한 방 옵션·결정형 편지 2장·수동 매각·(수요 확인 시) 단순 거래 | — | — |
 

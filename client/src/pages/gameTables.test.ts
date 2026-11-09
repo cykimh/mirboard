@@ -25,9 +25,9 @@ describe('게임판은 지연 로딩으로만 (번들 나누기)', () => {
     },
   );
 
-  it('gameTables 는 세 게임판을 모두 동적 import 한다', () => {
+  it('gameTables 는 모든 게임판을 동적 import 한다', () => {
     const src = read(here('./gameTables.ts'), 'utf-8');
-    for (const path of ['tichu/GameTable', 'skullking/SkullKingTable', 'onecard/OneCardTable']) {
+    for (const path of ['tichu/GameTable', 'skullking/SkullKingTable', 'onecard/OneCardTable', 'cloudroute/CloudRouteTable']) {
       expect(src).toContain(`import('@/features/${path}')`);
     }
   });

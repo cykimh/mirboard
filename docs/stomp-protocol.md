@@ -365,6 +365,57 @@ boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있
 
 ---
 
+## 구름항로 (gameType=CLOUD_ROUTE, D-212·D-213)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~4). 룰 정본은 `docs/rules-cloudroute.md`. **아직 공개 전**이다 —
+설정 `mirboard.cloudroute.status` 기본 `DISABLED`(카탈로그에 안 보이고 방을 만들 수 없다).
+
+**클라 → 서버 `@action`** — 클라가 보내는 것은 **선택**뿐이다(주사위·가격·통행료는 서버가 정한다). 지금 기다리는 결정과 다른
+행동은 `WRONG_DECISION`:
+
+| @action | 추가 필드 | 기다리는 결정(`pending.kind`) |
+| --- | --- | --- |
+| `ROLL` | — | `ROLL`, `WHIRLPOOL`(더블이면 탈출) |
+| `PAY_ESCAPE` · `USE_BUOY` | — | `WHIRLPOOL` |
+| `BUY` · `DECLINE` | `buildTo: 0..maxLevel`(BUY) | `PURCHASE` |
+| `BUILD` | `buildTo: minLevel..maxLevel` | `BUILD` |
+| `TAKEOVER` | — | `TAKEOVER` |
+| `HOST_FESTIVAL` | `tile`(후보 안) | `FESTIVAL` |
+| `FLY` | `tile`(후보 안) | `FLIGHT` |
+| `SKIP` | — | `BUILD`·`TAKEOVER`·`FESTIVAL`·`FLIGHT` |
+
+**서버 → 클라 (공개)** — 이벤트가 **전부 공개**다(숨길 손패가 없다). payload 는 결과값(뒤 현금 등):
+
+| type | payload |
+| --- | --- |
+| `DICE_ROLLED` | `{ seat, die1, die2, doubles, doublesThisTurn }` |
+| `TOKEN_MOVED` | `{ seat, from, to, kind: ROLL·FLY·LETTER·WHIRLPOOL, salary, cash }` |
+| `LAND_BOUGHT` · `BUILT` | `{ seat, tile, level, paid, cash }` |
+| `TOLL_PAID` | `{ payer, owner, tile, amount, monopoly, festival, payerCash, ownerCash }` |
+| `TAKEN_OVER` | `{ buyer, seller, tile, price, buyerCash, sellerCash }` |
+| `LETTER_DRAWN` | `{ seat, letter, deckCount, reshuffled }` — 더미 **순서는 싣지 않는다**(장수만) |
+| `MONEY_CHANGED` | `{ seat, delta, reason: CUSTOMS·LETTER·ESCAPE·FLIGHT, cash }` — 은행과의 돈 |
+| `MONEY_TRANSFERRED` | `{ from, to, amount, reason: ISLAND_FEAST·WIND_SHARE, fromCash, toCash }` |
+| `WHIRLPOOL_ENTERED` · `ESCAPE_FAILED` · `WHIRLPOOL_LEFT` | `{ seat }` · `{ seat, failedEscapes }` · `{ seat, method: DOUBLES·PAID·BUOY·SERVED }` |
+| `FESTIVAL_HOSTED` · `FESTIVAL_CLEARED` | `{ seat, tile }` · `{ tile }` |
+| `ASSETS_LIQUIDATED` | `{ seat, sales: [{ tile, land, levelAfter, received }], cash }` — 자동 청산(§10) |
+| `PLAYER_ELIMINATED` | `{ seat, reason: BANKRUPT·DESERTED, creditor, returnedTiles, cashForfeited }` |
+| `TURN_CHANGED` | `{ seat, round }` |
+| `DECISION_REQUIRED` | `{ seat, pending }` — 결정이 바뀔 때마다. `pending` 은 `kind` 판별자(`ROLL`·`WHIRLPOOL{canPay,canUseBuoy}`·`PURCHASE{tile,maxLevel}`·`BUILD{tile,minLevel,maxLevel}`·`TAKEOVER{tile,owner,price}`·`FESTIVAL{candidates}`·`FLIGHT{candidates}`) |
+| `MATCH_ENDED` | `{ result: { reason: LAST_STANDING·NO_HUMANS·ROUND_LIMIT, rounds, standings: [{seat, rank, totalAssets, cash, status}] } }` |
+
+**서버 → 클라 (비공개)**: `ERROR` 만. 고유 코드 `MATCH_OVER`·`PLAYER_ELIMINATED`·`NOT_YOUR_TURN`·`WRONG_DECISION`·
+`INVALID_LEVEL`·`INVALID_TILE`·`INSUFFICIENT_FUNDS`·`NO_BUOY`.
+
+**턴 시계**: 서버는 성공한 전이마다 턴 데드라인을 처음부터 다시 건다 — 한 차례에 결정이 여럿이면 결정마다 다시 센다. 클라는
+`DECISION_REQUIRED`·`PLAYER_ELIMINATED` 에서 방의 턴 제한부터 다시 세고, resync 의 `turnRemainingMs` 로 맞춘다(D-131 과 같은 기준).
+
+**resync**: `tableView` = `{ phase, seats: [{seat, cash, position, trapped, failedEscapes, holdsBuoy, eliminated, totalAssets}],
+tiles: [{tile, owner, level}], festivalTile, round, roundLimit, turnSeat, doublesThisTurn, pending, lastDice, deckCount, discard,
+result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 좌석은 방의 좌석 목록에서 찾는다).
+
+---
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.
