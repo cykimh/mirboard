@@ -61,8 +61,10 @@ public class CloudRouteRoundStarter {
                     MIN_SEATS, MAX_SEATS, seatCount, event.roomId());
             return;
         }
-        // 봇 좌석은 시작 상태에 영향이 없다(종료 판정 NO_HUMANS 는 진행 중 어댑터의 GameContext 가 맡는다).
-        CloudRouteEngine engine = new CloudRouteEngine(new GameContext(event.roomId(), event.playerIds()), random);
+        // 봇 좌석은 시작 상태에 영향이 없다(종료 판정 NO_HUMANS 는 진행 중 어댑터의 GameContext 가 맡는다). 방 옵션(판 길이, D-215)은
+        // 라운드 상한을 정하므로 넘긴다.
+        CloudRouteEngine engine = new CloudRouteEngine(
+                new GameContext(event.roomId(), event.playerIds(), 0, 0, java.util.List.of(), event.options()), random);
         CloudRouteState state = engine.startMatch().newState();
         stateStore.save(event.roomId(), state);
 

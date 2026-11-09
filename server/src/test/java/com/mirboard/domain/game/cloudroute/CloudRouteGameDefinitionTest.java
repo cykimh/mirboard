@@ -21,14 +21,14 @@ class CloudRouteGameDefinitionTest {
     }
 
     @Test
-    void the_catalog_entry_is_a_two_to_four_player_game_without_room_options() {
+    void the_catalog_entry_is_a_two_to_four_player_game_with_a_match_length_option() {
         CloudRouteGameDefinition def = definition(GameStatus.AVAILABLE);
         assertThat(def.id()).isEqualTo("CLOUD_ROUTE");
         assertThat(def.displayName()).isEqualTo("구름항로");
         assertThat(def.minPlayers()).isEqualTo(2);
         assertThat(def.maxPlayers()).isEqualTo(4);
         assertThat(def.defaultPlayers()).isEqualTo(4);
-        assertThat(def.supportedRoomOptions()).isEmpty();
+        assertThat(def.supportedRoomOptions()).containsExactly(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH);
         assertThat(def.turnSecondsChoices()).containsExactly(0, 15, 30, 60).contains(def.defaultTurnSeconds());
         assertThat(def.newEngine(new GameContext("r", List.of(1L, 2L)))).isInstanceOf(CloudRouteGameEngine.class);
     }

@@ -88,11 +88,11 @@ class GameSummaryOrderTest {
     /** 순서 계약이 enum 선언 순서를 따른다는 것 자체를 못박는다 — 상수를 재배치하면 깨진다. */
     @Test
     void declaration_order_is_the_contract() {
-        // D-161 — 원카드 경쟁 버튼 크기가 맨 뒤에 붙었다. D-176 — 맵 옵션 셋이 그 뒤에.
+        // D-161 — 원카드 경쟁 버튼 크기가 맨 뒤에 붙었다. D-176 — 맵 옵션 셋이 그 뒤에. D-215 — 판 길이가 맨 뒤에.
         assertThat(RoomOption.values())
                 .containsExactly(RoomOption.TARGET_SCORE, RoomOption.TEAMS, RoomOption.BETTING,
                         RoomOption.RACE_BUTTON_SIZE, RoomOption.RACE_BUTTON_VISIBILITY,
-                        RoomOption.TEAM_MODE, RoomOption.OMOK_RULE, RoomOption.BOT_LEVEL);
+                        RoomOption.TEAM_MODE, RoomOption.OMOK_RULE, RoomOption.BOT_LEVEL, RoomOption.MATCH_LENGTH);
     }
 
     /** D-176 — 선언한 맵 옵션만 선택지·기본값이 실린다(자기 필드가 있는 예전 옵션은 빠진다). 선언 순서. */

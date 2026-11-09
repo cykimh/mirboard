@@ -101,6 +101,8 @@ export const LETTER_TEXT: Record<CloudRouteLetter, { name: string; effect: strin
   ISLAND_FEAST: { name: '섬 잔치 초대', effect: '다른 사람마다 30G 씩 받는다' },
   WIND_SHARE: { name: '바람 나눔', effect: '가장 부자가 가장 가난한 사람에게 100G' },
   GUST: { name: '등 떠미는 바람', effect: '2칸 앞으로' },
+  LANTERN_GIFT: { name: '등불 선물', effect: '내 땅 하나에 1단계 무료 건설' },
+  FREE_FLIGHT: { name: '정류장 무료권', effect: '정류장으로 가서 무료로 난다' },
 };
 
 export function partnerOf(tile: number): number {

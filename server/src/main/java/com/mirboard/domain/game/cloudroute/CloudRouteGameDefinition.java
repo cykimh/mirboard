@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.cloudroute.status} = 환경 변수 {@code MIRBOARD_CLOUDROUTE_STATUS}, 기본
  * {@code AVAILABLE} — D-214 공개). S2·S3 동안은 기본 {@code DISABLED} 였다(관제 규칙 — 완성 전 카탈로그 비노출). 되돌리기는
- * {@code COMING_SOON}(새 방만 막고 진행 중인 판은 끝까지 — `docs/deploy.md`). {@code supportedRoomOptions()} 는 빈 집합(기본) — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
+ * {@code COMING_SOON}(새 방만 막고 진행 중인 판은 끝까지 — `docs/deploy.md`). {@code supportedRoomOptions()} 는 판 길이 하나(D-215) — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
  */
 @Component
 public final class CloudRouteGameDefinition implements GameDefinition {
@@ -74,6 +74,12 @@ public final class CloudRouteGameDefinition implements GameDefinition {
     @Override
     public int defaultTurnSeconds() {
         return 30;
+    }
+
+    /** D-215 — 방장이 대기실에서 판 길이(라운드 상한)를 고른다. */
+    @Override
+    public java.util.Set<com.mirboard.domain.game.core.RoomOption> supportedRoomOptions() {
+        return java.util.EnumSet.of(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH);
     }
 
     @Override

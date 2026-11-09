@@ -161,11 +161,21 @@ export function CloudRouteTable({
 
   // 축제·비행 결정 중에는 판의 후보 칸을 눌러 고른다.
   const pickable = new Set(
-    pending?.kind === 'FESTIVAL' || pending?.kind === 'FLIGHT' ? pending.candidates : [],
+    pending?.kind === 'FESTIVAL' || pending?.kind === 'FLIGHT' || pending?.kind === 'GIFT' || pending?.kind === 'SALE'
+      ? pending.candidates
+      : [],
   );
   const onTile = (tile: number) => {
     if (pickable.has(tile) && pending) {
-      send(pending.kind === 'FESTIVAL' ? { '@action': 'HOST_FESTIVAL', tile } : { '@action': 'FLY', tile });
+      send(
+        pending.kind === 'FESTIVAL'
+          ? { '@action': 'HOST_FESTIVAL', tile }
+          : pending.kind === 'GIFT'
+            ? { '@action': 'GIFT_BUILD', tile }
+            : pending.kind === 'SALE'
+              ? { '@action': 'SELL', tile }
+              : { '@action': 'FLY', tile },
+      );
       return;
     }
     setSheetTile(tile);
@@ -319,6 +329,7 @@ export function CloudRouteTable({
           waitingOn={turnSeat >= 0 && !myTurn ? nameOf(turnSeat) : null}
           othersPending={!myTurn ? s.pending : null}
           me={me}
+          tiles={s.tiles}
           doubles={s.doublesThisTurn}
           level={level}
           setLevel={setLevel}
@@ -483,6 +494,7 @@ function DecisionPanel({
   waitingOn,
   othersPending,
   me,
+  tiles,
   doubles,
   level,
   setLevel,
@@ -494,6 +506,7 @@ function DecisionPanel({
   waitingOn: string | null;
   othersPending: CloudRoutePending | null;
   me: CloudRouteSeatView | null;
+  tiles: CloudRouteTileView[];
   doubles: number;
   level: number | null;
   setLevel: (level: number) => void;
@@ -634,10 +647,62 @@ function DecisionPanel({
             </div>
           </>
         );
+      case 'SALE': {
+        const to = pending.creditor >= 0 ? `${ownerName(pending.creditor)}에게` : '은행에';
+        return (
+          <>
+            <p>
+              {to} <strong>{g(pending.debt)}</strong>을(를) 내야 하는데 현금이 {g(cash)}입니다 — 팔 땅을 고르세요(반값, 건물이 있으면 한 단계씩).
+            </p>
+            <div className="cr-panel-actions">
+              {pending.candidates.map((tile) => {
+                const lvl = tiles.find((t) => t.tile === tile)?.level ?? 0;
+                const info = TILES[tile];
+                const unit = lvl > 0 ? `${LEVEL_NAME[lvl]} 한 단계` : '땅';
+                const got = lvl > 0 ? Math.floor(info.buildCost / 2) : Math.floor(info.price / 2);
+                return (
+                  <button
+                    key={tile}
+                    type="button"
+                    className="cr-btn"
+                    disabled={disabled}
+                    onClick={() => send({ '@action': 'SELL', tile })}
+                  >
+                    {info.name} {unit} +{g(got)}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        );
+      }
+      case 'GIFT':
+        return (
+          <>
+            <p>등불 선물 — 1단계 무료로 올릴 내 땅을 판에서 누르세요(풍등탑은 선물로 세울 수 없어요).</p>
+            <div className="cr-panel-actions">
+              {pending.candidates.map((tile) => (
+                <button
+                  key={tile}
+                  type="button"
+                  className="cr-btn"
+                  disabled={disabled}
+                  onClick={() => send({ '@action': 'GIFT_BUILD', tile })}
+                >
+                  🎁 {TILES[tile].name}
+                </button>
+              ))}
+            </div>
+          </>
+        );
       case 'FLIGHT':
         return (
           <>
-            <p>50G 를 내고 날아갈 칸을 판에서 누르세요(출발 항구를 지나면 급여).</p>
+            <p>
+              {pending.free
+                ? '정류장 무료권 — 날아갈 칸을 판에서 누르세요(무료, 출발 항구를 지나면 급여).'
+                : '50G 를 내고 날아갈 칸을 판에서 누르세요(출발 항구를 지나면 급여).'}
+            </p>
             <div className="cr-panel-actions">
               <button type="button" className="cr-btn" disabled={disabled} onClick={() => send({ '@action': 'SKIP' })}>
                 안 날기
@@ -662,6 +727,8 @@ const PENDING_TEXT: Record<CloudRoutePending['kind'], string> = {
   TAKEOVER: '인수할지 고르는 중',
   FESTIVAL: '축제 땅 고르는 중',
   FLIGHT: '날아갈 곳 고르는 중',
+  GIFT: '선물할 땅 고르는 중',
+  SALE: '팔 땅 고르는 중',
 };
 
 function LevelPicker({
