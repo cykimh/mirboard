@@ -153,7 +153,7 @@ v1 은 포대 한 종류(새싹포)다.
 
 ### 9.3 종료와 순위
 
-- 해소 직후(또는 차례 시작의 밀물 직후·탈주 직후) **살아 있는 포대가 1개 이하**면 매치 종료. 사람 포대가 하나도 안 남으면(봇만 남음) 그 자리에서 종료(`NO_HUMANS`).
+- 해소 직후(또는 차례 시작의 밀물 직후·탈주 직후) **살아 있는 포대가 1개 이하**면 매치 종료. 사람이 있던 판에서 사람 포대가 하나도 안 남으면(봇만 남음) 그 자리에서 종료(`NO_HUMANS`). 처음부터 봇만인 판은 끝까지 간다.
 - 종료 판정은 `FIRE` 해소 직후에 한다 — 끝난 판은 연출 대기 없이 바로 `ENDED`(클라는 마지막 대본을 재생한 뒤 결과를 보인다).
 - **순위**:
   1. 살아 있는 포대 — 체력 높은 순(같으면 동순위). 보통은 1명이다.
@@ -202,3 +202,14 @@ splitmix(seed, k):  z = seed + (k + 1) × 0x9E3779B97F4A7C15
 | §12 불변식 | `invariant/ArtilleryInvariantChecker` | `ArtillerySimulationTest`(2~6인 × 200판) |
 | §12 결정성 | — | `ArtilleryGoldenTest`(두 번 같음·고정 해시·JSON 왕복) |
 | §12 비용 | — | `ArtilleryCostTest`(구멍 60개 판 한 발·맵 생성) |
+
+### S2 (D-222) — 서버 경로
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 포트 어댑터(연출 대기 = 엔진 타이머, 비공개 뷰 없음, 봇 안전망) | `ArtilleryGameEngine` | `ArtilleryGameEngineTest`(5건) |
+| 카탈로그(2~4인·턴 20/30/45/60·기본 `DISABLED`) | `ArtilleryGameDefinition` | `ArtilleryGameDefinitionTest` |
+| 공개 뷰(시드 없음·지형 RLE) | `state/ArtilleryPublicView` | `ArtilleryGameEngineTest` |
+| 봇 "보통" | `bot/ArtilleryBotPolicy` | `bot/ArtilleryBotPolicyTest`(결정성·무작위 상대 60/60·한 수 ≤200ms) |
+| 시작 | `lifecycle/ArtilleryRoundStarter`(`SecureRandom` 시드, 봇 좌석은 계정으로) | `infra.bot.ArtilleryBotMatchSimulationIT`(2·4봇·손 놓은 사람, Docker) |
+| 기록·상대 전적 | `persistence/ArtilleryMatchRecorder`·`ArtilleryHeadToHead`, `V16__artillery_match.sql` | `persistence/ArtilleryMatchRecorderIT`(Docker), `infra.ws.ArtilleryRecorderFailureTest` |

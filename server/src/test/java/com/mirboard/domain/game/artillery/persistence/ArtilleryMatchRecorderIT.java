@@ -1,0 +1,108 @@
+package com.mirboard.domain.game.artillery.persistence;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.mirboard.domain.game.artillery.ArtilleryGameDefinition;
+import com.mirboard.domain.game.artillery.event.ArtilleryMatchCompleted;
+import com.mirboard.domain.game.artillery.state.MatchResult;
+import com.mirboard.domain.game.artillery.state.MatchResult.EndReason;
+import com.mirboard.domain.game.artillery.state.MatchResult.Placement;
+import com.mirboard.domain.game.core.HeadToHeadSource;
+import com.mirboard.domain.game.scoring.UserGameStatsService;
+import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
+import com.mirboard.domain.lobby.auth.BotUserRegistry;
+import com.mirboard.domain.lobby.auth.User;
+import com.mirboard.domain.lobby.auth.UserRepository;
+import java.time.Clock;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+/** D-222 — 씨앗포 매치 종료가 매치 기록(V16) + 게임별 전적(승패·개인전 ELO·탈주) + 상대 전적으로 남는지. */
+@SpringBootTest
+@Testcontainers
+@TestPropertySource(properties = {
+        "mirboard.jwt.secret=ar-recorder-test-secret-must-be-32-bytes-or-more"
+})
+class ArtilleryMatchRecorderIT {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @Container
+    static final GenericContainer<?> REDIS =
+            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+
+    @DynamicPropertySource
+    static void wireRedis(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", REDIS::getFirstMappedPort);
+    }
+
+    @Autowired ApplicationEventPublisher publisher;
+    @Autowired UserGameStatsService stats;
+    @Autowired UserRepository users;
+    @Autowired BotUserRegistry bots;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired ArtilleryHeadToHead headToHead;
+
+    private long human() {
+        String name = "ar" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        return users.save(User.create(name, "x", Clock.systemUTC())).getId();
+    }
+
+    private GameStats ar(long userId) {
+        return stats.get(userId, ArtilleryGameDefinition.ID);
+    }
+
+    @Test
+    void a_human_match_records_rows_win_lose_free_for_all_elo_and_head_to_head() {
+        long a = human();
+        long b = human();
+        long c = human();
+        String room = UUID.randomUUID().toString();
+
+        publisher.publishEvent(new ArtilleryMatchCompleted(room, List.of(a, b, c), new MatchResult(EndReason.LAST_STANDING,
+                List.of(new Placement(1, 1, 64, false), new Placement(0, 2, 0, false), new Placement(2, 3, 30, true)))));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM artillery_match_results WHERE room_id = ? AND end_reason = 'LAST_STANDING'",
+                Integer.class, room)).isEqualTo(1);
+        assertThat(jdbc.queryForList(
+                "SELECT p.final_rank, p.final_hp, p.is_win, p.deserted FROM artillery_match_participants p"
+                        + " JOIN artillery_match_results r ON r.id = p.match_id WHERE r.room_id = ? ORDER BY p.seat", room))
+                .extracting(r -> r.get("final_rank") + "/" + r.get("final_hp") + "/" + r.get("is_win") + "/" + r.get("deserted"))
+                .containsExactly("2/0/false/false", "1/64/true/false", "3/30/false/true");
+        assertThat(ar(b).rating()).isEqualTo(1020);
+        assertThat(ar(a).rating()).isEqualTo(1000);
+        assertThat(ar(c).rating()).isEqualTo(980);
+        assertThat(ar(b).winCount()).isEqualTo(1);
+        assertThat(ar(c).desertCount()).isEqualTo(1);
+        assertThat(headToHead.against(b)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(a, c);
+    }
+
+    @Test
+    void a_match_with_a_bot_records_win_lose_but_no_elo() {
+        long a = human();
+        long bot = bots.getBotIds().get(0);
+        String room = UUID.randomUUID().toString();
+        publisher.publishEvent(new ArtilleryMatchCompleted(room, List.of(a, bot), new MatchResult(EndReason.NO_HUMANS,
+                List.of(new Placement(1, 1, 80, false), new Placement(0, 2, 0, false)))));
+        assertThat(ar(a).loseCount()).isEqualTo(1);
+        assertThat(ar(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+    }
+}

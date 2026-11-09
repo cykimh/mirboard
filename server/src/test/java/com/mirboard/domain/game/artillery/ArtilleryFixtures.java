@@ -12,18 +12,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** 엔진 테스트 도우미. */
-final class ArtilleryFixtures {
+public final class ArtilleryFixtures {
 
-    static final ArtilleryEngine ENGINE = new ArtilleryEngine();
+    public static final ArtilleryEngine ENGINE = new ArtilleryEngine();
 
     private ArtilleryFixtures() {
     }
 
-    static ArtilleryState start(long seed, int seats, Integer... bots) {
+    public static ArtilleryState start(long seed, int seats, Integer... bots) {
         return ENGINE.startMatch(seed, seats, List.of(bots)).newState();
     }
 
-    static ArtilleryState withUnit(ArtilleryState s, Unit u) {
+    public static ArtilleryState withUnit(ArtilleryState s, Unit u) {
         List<Unit> units = new ArrayList<>(s.units());
         units.set(u.seat(), u);
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
@@ -32,7 +32,7 @@ final class ArtilleryFixtures {
     }
 
     /** 차례 주인이 {@code target} 을 직격하는 (각도, 힘)을 찾는다 — 없으면 null. */
-    static ArtilleryAction.Fire directHit(ArtilleryState s, int target, Shell shell) {
+    public static ArtilleryAction.Fire directHit(ArtilleryState s, int target, Shell shell) {
         Terrain t = ArtilleryEngine.terrainOf(s);
         int seat = s.turnSeat();
         Unit me = s.unit(seat);

@@ -178,6 +178,16 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-222 (2026-11-09) — 씨앗포 S2: 포트 어댑터·봇 "보통"·기록(V16)·라운드 시작, 카탈로그 숨김
+
+순수 엔진을 `ArtilleryGameEngine`(포트 어댑터 — 상태 Redis `room:{id}:state`, 공개 뷰, 매치 기록 로컬 발행)으로 감싸고 `ArtilleryGameDefinition`
+(ID `ARTILLERY`, 2~4인, 턴 20·30·45·60 기본 30)으로 등록한다. **공개 상태 기본은 `DISABLED`**(`mirboard.artillery.status`). 포트 확장은 없다 —
+발사 뒤 연출 대기는 엔진 타이머(그동안 `pendingSeats` 비움), 비공개 뷰 empty, 공개 뷰에 시드 없음. 봇은 같은 순수 엔진으로 표적 쪽 반원을 거칠게
+(필요하면 좌우 15·30칸 옮겨서) 시뮬레이션한 뒤 세밀하게 다듬고 ±2°·±2 의 결정적 오차를 얹는다 — 예산은 시간이 아니라 시뮬레이션 900회라 부하와
+무관하게 같은 상태면 같은 수(한 수 실측 평균 2ms, 무작위 상대 60/60 승). 기록은 `V16__artillery_match.sql` 의 `artillery_match_results`·`_participants`
+(순위·끝 체력·탈주), 개인전 ELO(점수 = 좌석 수 − 순위), 봇·게스트 판 ELO 제외. 룰 정본에 하나 고침: `NO_HUMANS` 는 사람이 있던 판에서 사람이 모두
+탈락했을 때만(처음부터 봇만인 판은 끝까지 간다 — 봇끼리 IT 가 시작하자마자 끝나던 것). 통합 테스트만 연출 대기 상한을 줄인다(`resolve-cap-millis`).
+
 ## D-221 (2026-11-09) — 씨앗포 S1: 순수 엔진·정수 물리·불변식·시뮬레이션
 
 `domain.game.artillery` 에 저장소·시계·난수 객체 없는 순수 엔진(`ArtilleryEngine`)과 물리 코어(`physics/` — Q16 정수 탄도·삼각 정수표·
