@@ -1,6 +1,7 @@
 import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
 import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
 import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
+import { YACHT_TUTORIAL } from '@/features/yacht/tutorial/yachtTutorial';
 import { CLOUD_ROUTE_TUTORIAL } from '@/features/cloudroute/tutorial/cloudrouteTutorial';
 import type { GameTutorial } from './types';
 
@@ -15,6 +16,7 @@ export const GAME_TUTORIALS: Readonly<Record<string, GameTutorial>> = {
   TICHU: TICHU_TUTORIAL,
   SKULL_KING: SKULL_KING_TUTORIAL,
   ONE_CARD: ONE_CARD_TUTORIAL,
+  YACHT: YACHT_TUTORIAL,
   CLOUD_ROUTE: CLOUD_ROUTE_TUTORIAL,
 };
 

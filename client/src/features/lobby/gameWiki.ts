@@ -9,6 +9,8 @@ const GAME_WIKI_URL: Record<string, string> = {
   skull_king: 'https://boardgamegeek.com/boardgame/150145/skull-king',
   // 원카드는 한국식 하우스 룰 게임이라 영문 문서가 없다. 나무위키 '원카드' 문서(퍼센트 인코딩).
   one_card: 'https://namu.wiki/w/%EC%9B%90%EC%B9%B4%EB%93%9C',
+  // 요트는 나무위키 '요트(주사위 게임)' 문서(퍼센트 인코딩). 특정 상표 게임 문서가 아니라 일반 주사위 게임 문서다.
+  yacht: 'https://namu.wiki/w/%EC%9A%94%ED%8A%B8(%EC%A3%BC%EC%82%AC%EC%9C%84%20%EA%B2%8C%EC%9E%84)',
 };
 
 export function gameWikiUrl(gameId: string): string | undefined {

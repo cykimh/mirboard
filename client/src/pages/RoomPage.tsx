@@ -8,7 +8,7 @@ import { headToHeadText } from '@/features/stats/headToHead';
 import { playerTiers } from '@/features/stats/playerTiers';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
-import { CloudRouteTable, GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
+import { CloudRouteTable, GameTable, OneCardTable, SkullKingTable, YachtTable, preloadGameTable } from '@/pages/gameTables';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
 import { ParticipantCard } from '@/features/lobby/ParticipantCard';
@@ -50,7 +50,7 @@ import {
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
  * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
  */
-const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'CLOUD_ROUTE']);
+const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'YACHT', 'CLOUD_ROUTE']);
 
 /**
  * D-133 — 첫 입장(`join-or-reconnect`)이 막힌 이유. 자리 없음은 관전을, 방 없음은 메인으로를 제안한다. 그 밖의 오류는
@@ -70,7 +70,7 @@ interface HeldSeats {
 
 /**
  * 대기실 + 게임판 컨테이너. 대기실/에러/로딩 셸은 shadcn(D-76, `.app-shell` 안). IN_GAME 은 게임별 게임판 —
- * 티츄(`GameTable`)·스컬킹(`SkullKingTable`)·원카드(`OneCardTable`)로 가르는 곳은 이 파일 한 곳뿐이고(D-103), 각
+ * 티츄(`GameTable`)·스컬킹(`SkullKingTable`)·원카드(`OneCardTable`)·요트(`YachtTable`)로 가르는 곳은 이 파일 한 곳뿐이고(D-103), 각
  * 게임판이 자기 소켓·sink 를 소유한다. 게임판은 `.app-shell` 밖이다(스코프 base 가 닿지 않는다 — 게임판 CSS 는 자기
  * 스코프에서 명시). 종료 화면을 가진 게임(`BOARD_HELD_GAMES`)은 이 세션이 IN_GAME→FINISHED 를 보면 게임판을 내리지
  * 않고 `roomFinished` 를 넘긴다(D-120·D-129).
@@ -659,6 +659,8 @@ export function RoomPage() {
               raceButtonSize={room.raceButtonSize}
               raceButtonVisibility={room.raceButtonVisibility}
             />
+          ) : room.gameType === 'YACHT' ? (
+            <YachtTable {...board} />
           ) : room.gameType === 'CLOUD_ROUTE' ? (
             <CloudRouteTable {...board} />
           ) : (

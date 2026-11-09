@@ -7,6 +7,7 @@ import { GAME_TUTORIALS, tutorialFor } from './gameTutorials';
 import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
 import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
 import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
+import { YACHT_TUTORIAL } from '@/features/yacht/tutorial/yachtTutorial';
 import { CLOUD_ROUTE_TUTORIAL } from '@/features/cloudroute/tutorial/cloudrouteTutorial';
 
 /**
@@ -31,6 +32,10 @@ describe('tutorialFor', () => {
   it('원카드 id 로 원카드 튜토리얼을 돌려준다', () => {
     expect(tutorialFor('ONE_CARD')).toBe(ONE_CARD_TUTORIAL);
     expect(tutorialFor('one_card')).toBe(ONE_CARD_TUTORIAL);
+  });
+
+  it('요트 id 로 요트 튜토리얼을 돌려준다', () => {
+    expect(tutorialFor('YACHT')).toBe(YACHT_TUTORIAL);
   });
 
   it('구름항로 id 로 구름항로 튜토리얼을 돌려준다', () => {

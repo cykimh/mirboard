@@ -75,7 +75,7 @@ class YachtMatchSimulationTest {
     }
 
     private List<YachtEvent> eventsOf(long seed) {
-        YachtEngine engine = new YachtEngine(context(2, List.of()), 30);
+        YachtEngine engine = new YachtEngine(context(2, List.of(), 30));
         Random choices = new Random(seed);
         DiceRoller roller = DiceRoller.from(new Random(seed * 31));
         YachtEngine.Result start = engine.start(T0);
@@ -90,14 +90,14 @@ class YachtMatchSimulationTest {
         return events;
     }
 
-    private static GameContext context(int seats, List<Integer> bots) {
-        return new GameContext("sim", LongStream.rangeClosed(1, seats).boxed().toList(), 0, 0, bots);
+    private static GameContext context(int seats, List<Integer> bots, int turnSeconds) {
+        return new GameContext("sim", LongStream.rangeClosed(1, seats).boxed().toList(), 0, 0, bots, Map.of(), turnSeconds);
     }
 
     private Stats run(int seats, List<Integer> bots, int matches, long seed, double desertRate, double expireRate) {
         Random random = new Random(seed);
         DiceRoller roller = DiceRoller.from(random);
-        YachtEngine engine = new YachtEngine(context(seats, bots), 45);
+        YachtEngine engine = new YachtEngine(context(seats, bots, 45));
         int actionLimit = 0;
         int noHumans = 0;
         long actions = 0;

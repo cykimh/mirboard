@@ -2,13 +2,14 @@ import { lazy } from 'react';
 import { loadWithReload } from '@/lib/lazyWithReload';
 
 /**
- * 게임판은 따로 받는 조각이다 — 첫 화면(로그인·허브)이 게임판 코드를 받지 않는다. 게임판 파일을 정적으로 import 하면 그 게임
+ * 게임판은 게임마다 따로 받는 조각이다 — 첫 화면(로그인·허브)이 게임판 코드를 받지 않는다. 게임판 파일을 정적으로 import 하면 그 게임
  * 코드가 다시 첫 번들에 섞인다(`gameTables.test` 가 원문 검사). 대기실에서 미리 받아 두면({@link preloadGameTable}) 시작할 때 기다리지 않는다.
  */
 const imports = {
   TICHU: () => import('@/features/tichu/GameTable'),
   SKULL_KING: () => import('@/features/skullking/SkullKingTable'),
   ONE_CARD: () => import('@/features/onecard/OneCardTable'),
+  YACHT: () => import('@/features/yacht/YachtTable'),
   CLOUD_ROUTE: () => import('@/features/cloudroute/CloudRouteTable'),
 };
 
@@ -20,6 +21,7 @@ export const SkullKingTable = lazy(() =>
 export const OneCardTable = lazy(() =>
   loadWithReload('onecard', imports.ONE_CARD).then((m) => ({ default: m.OneCardTable })),
 );
+export const YachtTable = lazy(() => loadWithReload('yacht', imports.YACHT).then((m) => ({ default: m.YachtTable })));
 export const CloudRouteTable = lazy(() =>
   loadWithReload('cloudroute', imports.CLOUD_ROUTE).then((m) => ({ default: m.CloudRouteTable })),
 );
