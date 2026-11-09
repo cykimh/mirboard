@@ -888,7 +888,7 @@ public final class CloudRouteEngine {
                 pending = null;
                 rollAgain = false;
             } else if (pending instanceof Pending.AwaitTakeover offer && owner[offer.tile()] != offer.owner()) {
-                // 인수 결정 중 그 땅 주인이 탈락했다 — 땅이 은행으로 갔으므로 결정은 사라진다(D-185).
+                // 인수 결정 중 그 땅 주인이 탈락했다 — 땅이 은행으로 갔으므로 결정은 사라진다(D-211).
                 pending = null;
             }
             List<Integer> alive = aliveSeats();
