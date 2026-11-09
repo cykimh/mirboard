@@ -13,7 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 
-/** D-212 — 카탈로그 메타데이터, 기본 숨김(DISABLED), 엔진 팩토리. */
+/** D-212·D-214 — 카탈로그 메타데이터, 공개 상태 기본값, 엔진 팩토리. */
 class CloudRouteGameDefinitionTest {
 
     private static CloudRouteGameDefinition definition(GameStatus status) {
@@ -33,12 +33,12 @@ class CloudRouteGameDefinitionTest {
         assertThat(def.newEngine(new GameContext("r", List.of(1L, 2L)))).isInstanceOf(CloudRouteGameEngine.class);
     }
 
-    /** 관제 규칙(2026-11-09) — 게임판이 붙기 전에는 설정 없이 띄워도 카탈로그에 보이지 않는다. */
+    /** D-214 — 공개. 설정 없이 띄우면 카탈로그에 보이고 방을 만들 수 있다(되돌리기는 환경 변수). */
     @Test
-    void the_status_defaults_to_disabled() throws Exception {
+    void the_status_defaults_to_available() throws Exception {
         Parameter status = Arrays.stream(CloudRouteGameDefinition.class.getConstructors()[0].getParameters())
                 .filter(p -> p.getType() == GameStatus.class).findFirst().orElseThrow();
-        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.cloudroute.status:DISABLED}");
+        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.cloudroute.status:AVAILABLE}");
         assertThat(definition(GameStatus.DISABLED).status()).isEqualTo(GameStatus.DISABLED);
     }
 

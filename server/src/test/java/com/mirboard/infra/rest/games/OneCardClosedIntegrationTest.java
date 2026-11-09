@@ -63,11 +63,13 @@ class OneCardClosedIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(3))
-                .andExpect(jsonPath("$.games[0].id").value("SKULL_KING"))
-                .andExpect(jsonPath("$.games[1].id").value("TICHU"))
-                .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games.length()").value(4))
+                // D-214 — 구름항로도 공개라 맨 앞(이름순).
+                .andExpect(jsonPath("$.games[0].id").value("CLOUD_ROUTE"))
+                .andExpect(jsonPath("$.games[1].id").value("SKULL_KING"))
+                .andExpect(jsonPath("$.games[2].id").value("TICHU"))
+                .andExpect(jsonPath("$.games[3].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
     }
 
     @Test

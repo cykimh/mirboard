@@ -248,6 +248,9 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 | `COMING_SOON` | "Coming Soon" | 404 `GAME_NOT_AVAILABLE` | **끝까지 정상 진행** |
 | `DISABLED` | 안 보인다 | 404 `GAME_NOT_AVAILABLE` | **멈춘다** — 액션은 `GAME_NOT_AVAILABLE`, resync 404, 봇·턴·경쟁 타이머가 오류로 멈추고 '나가기'도 404. 방은 마지막 입장부터 6시간(방 해시 TTL)까지 IN_GAME 으로 남고 결과는 기록되지 않는다 |
 
+**D-214 — 구름항로도 같은 손잡이**: `MIRBOARD_CLOUDROUTE_STATUS`(코드 기본값 `AVAILABLE`, `@Value` 한 곳 — `application.yml` 에는 없다).
+되돌리기·다시 열기·값 확인은 아래 원카드 명령에서 키 이름만 바꾼다. 표의 동작(진행 중인 판·`DISABLED` 의 멈춤)도 같다.
+
 **D-168 — 티츄·스컬킹도 같은 손잡이가 있다**: `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS`. 지금(2026-10-30~)은 원카드만 하려고
 `fly.toml [env]` 에 둘 다 `COMING_SOON` 이다 — 다시 열려면 그 두 줄을 지우고 배포한다(시크릿이 아니라 공개 설정이라 배포로 바뀐다).
 

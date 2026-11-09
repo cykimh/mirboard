@@ -63,11 +63,14 @@ class OnlyOneCardOpenIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(3))
-                .andExpect(jsonPath("$.games[0].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games.length()").value(4))
+                // D-214 — 구름항로도 공개라 공개 게임은 이름순(구름항로 · 원카드), 그 뒤에 준비 중인 티츄·스컬킹.
+                .andExpect(jsonPath("$.games[0].id").value("CLOUD_ROUTE"))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[1].status").value("COMING_SOON"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
     }
 
     @Test
