@@ -339,6 +339,27 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 
 ---
 
+## §10 다섯 번째 게임 — 한 차례에 결정이 여럿인 게임 (구름항로, D-210~D-214)
+
+주사위·부동산 장르의 독창 게임(이름·판·카드 새로 만듦)을 붙였습니다. 이 장르는 한 차례에 결정이 여럿입니다 — 굴린 뒤 살지, 몇
+단계까지 지을지, 통행료를 낸 뒤 인수할지, 축제를 어디에 열지. 포트는 "좌석이 액션 하나를 낸다"만 알고, 인프라는 성공한 액션마다 턴
+데드라인을 새로 겁니다.
+
+**포트를 넓히지 않았습니다.** 게임 상태에 "지금 기다리는 결정"(`Pending`, sealed 7종) 하나를 두고 액션 하나가 결정 하나를 풉니다.
+결정이 없는 처리(이동·통행료·청산·다음 좌석)는 그 액션 안에서 끝까지 진행하므로 "차례 끝내기" 액션이 없고, `pendingSeats` 는 늘 차례
+좌석 하나입니다. 턴 타이머는 결정마다 다시 걸리는데, 이것을 계약 결함이 아니라 게임의 성질로 받아들였습니다(결정은 보통 1~2개). 같은
+때 붙인 요트는 "한 차례 전체"에 제한을 거는 확장(`GameContext.turnSeconds`, D-183)을 택했습니다 — 같은 문제를 두 게임이 다르게 푼
+셈이고, 둘 다 인프라에 게임 이름을 늘리지 않았습니다.
+
+- `grep -rni cloudroute server/src/main/java/com/mirboard/infra` → **0건**. 비공개 뷰는 empty(손패가 없다), 엔진 타이머 없음.
+- 클라 공용 변경은 `RoomPage`(종료 화면 유지 목록·분기 한 줄)·`gameTables`·튜토리얼 목록·CSS 진입점뿐(D-213).
+- 검증은 이벤트 거울: 시뮬레이션이 이벤트만으로 그린 공개 상태를 매 전이 엔진 상태와 대조합니다(인원별 2,000판). 탈락 때
+  `FestivalCleared` 발행 한 줄을 지우면 바로 실패합니다 — "공개 상태가 바뀌는 곳마다 이벤트가 있다"(D-126 교훈)를 기계로 지킵니다.
+
+**드러난 것 — 규칙의 우세 전략.** 봇을 만들다 "현금을 남기는" 정책이 "다 쓰는" 단순 정책에 지는 것을 봤습니다(4인 0.17). 총자산에서
+건물을 절반만 세도 그대로라 원인은 자산 계산이 아니라 통행료 수입이었고, 장르의 성격으로 받아들였습니다(D-214). 포트가 아니라 **게임
+설계**의 결함을 시뮬레이션이 찾은 사례입니다.
+
 ## 부록 — 재현 명령
 
 ```bash
@@ -381,8 +402,8 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8·§9) — main 소스 줄 수
-for d in core tichu skullking onecard yacht; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8~§10) — main 소스 줄 수
+for d in core tichu skullking onecard yacht cloudroute; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
 # → core 684 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170, GameEngine.java 184   (D-200 시점 — D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 

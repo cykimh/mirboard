@@ -60,5 +60,7 @@
 @import './parts/20-yacht-table.css';
 /* 오목 게임판(D-175) — `.om-` 접두 전용, 19 와 같은 규칙(공용 클래스 재정의 금지, 폭 미디어 0개). */
 @import './parts/20-omok-table.css';
+/* 구름항로 게임판(D-213) — `.cr-` 접두 전용, 18·19 와 같은 규칙(공용 클래스 재정의 금지, 폭 미디어 0개). */
+@import './parts/21-cloudroute-table.css';
 /* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
 @import './parts/17-responsive.css';

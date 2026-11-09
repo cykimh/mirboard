@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * 첫 화면부터 네 게임판까지 한 번에 — 게스트로 들어가 허브를 보고, 게임마다 방을 만들어 대기실에서 [빈자리 봇으로 채우기]
+ * 첫 화면부터 공개 게임판 전부까지 한 번에 — 게스트로 들어가 허브를 보고, 게임마다 방을 만들어 대기실에서 [빈자리 봇으로 채우기]
  * → [N명으로 시작](D-174 — 방 종류 선택 없음)으로 판을 열어 게임판이 뜨는지(게임판은 따로 받는 조각이다 — D-141), 방장
  * "게임 종료"(D-135)로 끝내고 허브로 나온다. 게스트는 IP 당 발급 한도가 있어 한 번만 만든다.
  */
@@ -32,6 +32,8 @@ const GAMES = [
   { name: '오목', board: '.om-table' },
   { name: '스컬킹', board: '.sk-table' },
   { name: '티츄', board: '.game-table-layout' },
+  // D-214 — 구름항로 공개. 2~4인이라 봇 3으로 4명 판.
+  { name: '구름항로', board: '.cr-table' },
 ] as const;
 
 for (const game of GAMES) {

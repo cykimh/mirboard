@@ -53,9 +53,9 @@ class CloudRouteMatchSimulationTest {
 
     private static final Map<String, String> REPORT = new java.util.TreeMap<>();
 
-    enum Policy { RANDOM, SENSIBLE }
+    enum Policy { RANDOM, SENSIBLE, BOT }
 
-    private record Outcome(EndReason reason, int rounds, int turns, int bankrupts, int firstBankruptRound) {
+    private record Outcome(EndReason reason, int rounds, int turns, int bankrupts, int firstBankruptRound, int actions) {
     }
 
     @ParameterizedTest(name = "{0}인 무작위 {1}판")
@@ -115,6 +115,39 @@ class CloudRouteMatchSimulationTest {
         assertThat(outcomes).allMatch(o -> o.rounds() <= limit);
     }
 
+    /**
+     * S4(D-214) — 실제 봇 정책끼리의 판 길이. 사람 판의 어림은 "굴림 1회 = 4초(주사위·이동 연출), 그 밖의 결정 1회 = 6초"로 센다 —
+     * 결정 수가 판마다 달라 차례당 고정 초보다 덜 틀린다.
+     */
+    @ParameterizedTest(name = "{0}인 봇 {1}판 — 길이 통계")
+    @ValueSource(ints = {2, 3, 4})
+    @Timeout(120)
+    void bot_play_reports_length(int seats) {
+        List<Outcome> outcomes = new ArrayList<>();
+        for (int game = 0; game < GAMES_PER_SEAT_COUNT; game++) {
+            outcomes.add(play(seats, 104_729L * seats + game, Set.of(), Policy.BOT, false));
+        }
+        int limit = Economy.roundLimit(seats);
+        double avgTurns = outcomes.stream().mapToInt(Outcome::turns).average().orElseThrow();
+        double avgActions = outcomes.stream().mapToInt(Outcome::actions).average().orElseThrow();
+        double avgBankrupts = outcomes.stream().mapToInt(Outcome::bankrupts).average().orElseThrow();
+        long lastStanding = outcomes.stream().filter(o -> o.reason() == EndReason.LAST_STANDING).count();
+        List<Integer> firsts = outcomes.stream().map(Outcome::firstBankruptRound).filter(r -> r > 0).sorted().toList();
+        long earlyFirst = firsts.stream().filter(r -> r <= limit / 2).count();
+        // 결정 수 중 굴림이 아닌 것 ≈ 결정 − 차례(차례마다 굴림이 적어도 1회 — 더블의 추가 굴림은 결정으로 센다).
+        double minutes = (avgTurns * 4 + (avgActions - avgTurns) * 6) / 60.0;
+        REPORT.put("%d-bot".formatted(seats), ("[봇] %d인(상한 %d): 평균 차례 %.1f · 평균 결정 %.1f · 1명 남음 %.1f%% · 판당 파산 %.2f명 · "
+                + "첫 파산 있는 판 %.1f%%(중앙값 %s라운드) · 상한 절반 전 첫 파산 %.1f%% · 사람만 어림 %.1f분")
+                .formatted(seats, limit, avgTurns, avgActions, 100.0 * lastStanding / outcomes.size(), avgBankrupts,
+                        100.0 * firsts.size() / outcomes.size(), firsts.isEmpty() ? "-" : firsts.get(firsts.size() / 2),
+                        100.0 * earlyFirst / outcomes.size(), minutes));
+        assertThat(avgTurns).isLessThanOrEqualTo(seats * (double) limit);
+        // 설계서 §1 목표 — 사람만 4인 판이 30분 안.
+        if (seats == 4) {
+            assertThat(minutes).isLessThan(30.0);
+        }
+    }
+
     @AfterAll
     static void writeReport() throws IOException {
         if (REPORT.isEmpty()) {
@@ -122,7 +155,7 @@ class CloudRouteMatchSimulationTest {
         }
         Path out = Path.of("build", "cloudroute-sim-stats.txt");
         Files.createDirectories(out.getParent());
-        Files.writeString(out, "구름항로 시뮬레이션(상식 정책, 인원별 " + GAMES_PER_SEAT_COUNT + "판, 시드 고정)\n"
+        Files.writeString(out, "구름항로 시뮬레이션(상식 정책·봇 정책, 인원별 " + GAMES_PER_SEAT_COUNT + "판, 시드 고정)\n"
                 + String.join("\n", REPORT.values()) + "\n");
     }
 
@@ -137,6 +170,7 @@ class CloudRouteMatchSimulationTest {
         List<CloudRouteEvent> events = List.of();
         int turns = 0;
         int firstBankruptRound = 0;
+        int actions = 0;
         try {
             CloudRouteEngine.Result start = engine.startMatch();
             CloudRouteState state = start.newState();
@@ -151,7 +185,7 @@ class CloudRouteMatchSimulationTest {
                 if (state.ended()) {
                     int bankrupts = (int) state.eliminations().stream()
                             .filter(e -> e.reason() == Elimination.Reason.BANKRUPT).count();
-                    return new Outcome(state.result().reason(), state.round(), turns, bankrupts, firstBankruptRound);
+                    return new Outcome(state.result().reason(), state.round(), turns, bankrupts, firstBankruptRound, actions);
                 }
                 CloudRouteState before = state;
                 if (deserts && rng.nextInt(300) == 0) {
@@ -170,9 +204,13 @@ class CloudRouteMatchSimulationTest {
                     if (legal.isEmpty() || !legal.contains(engine.timeoutAction(state, seat))) {
                         throw new AssertionError("legal " + legal + " lacks timeout " + engine.timeoutAction(state, seat));
                     }
-                    CloudRouteAction action = policy == Policy.RANDOM
-                            ? legal.get(rng.nextInt(legal.size()))
-                            : sensible(state, seat, legal);
+                    CloudRouteAction action = switch (policy) {
+                        case RANDOM -> legal.get(rng.nextInt(legal.size()));
+                        case SENSIBLE -> sensible(state, seat, legal);
+                        case BOT -> com.mirboard.domain.game.cloudroute.bot.CloudRouteBotPolicy.choose(
+                                com.mirboard.domain.game.cloudroute.bot.CloudRouteBotView.of(state, seat), legal);
+                    };
+                    actions++;
                     transition = action.toString();
                     CloudRouteEngine.Result r = engine.apply(state, seat, action);
                     state = r.newState();

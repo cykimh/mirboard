@@ -59,10 +59,11 @@ vi.mock('@/api/users', () => ({ usersApi: { names, stats, headToHead } }));
 
 // 게임판은 소켓을 여는 무거운 컴포넌트라 props 만 잡는 스텁으로 바꾼다 (D-120). 텍스트는
 // 대기실 튜토리얼 테스트(D-121)가 IN_GAME 분기 진입을 확인하는 데 쓴다.
-const { skullProps, tichuProps, oneCardProps } = vi.hoisted(() => ({
+const { skullProps, tichuProps, oneCardProps, cloudRouteProps } = vi.hoisted(() => ({
   skullProps: [] as Record<string, unknown>[],
   tichuProps: [] as Record<string, unknown>[],
   oneCardProps: [] as Record<string, unknown>[],
+  cloudRouteProps: [] as Record<string, unknown>[],
 }));
 vi.mock('@/features/skullking/SkullKingTable', () => ({
   SkullKingTable: (props: Record<string, unknown>) => {
@@ -74,6 +75,12 @@ vi.mock('@/features/onecard/OneCardTable', () => ({
   OneCardTable: (props: Record<string, unknown>) => {
     oneCardProps.push(props);
     return <div data-testid="onecard-table">원카드 게임판</div>;
+  },
+}));
+vi.mock('@/features/cloudroute/CloudRouteTable', () => ({
+  CloudRouteTable: (props: Record<string, unknown>) => {
+    cloudRouteProps.push(props);
+    return <div data-testid="cloudroute-table">구름항로 게임판</div>;
   },
 }));
 vi.mock('@/features/tichu/GameTable', () => ({
@@ -320,6 +327,22 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
 
     expect(screen.getByTestId('onecard-table')).toBeInTheDocument();
     expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
+  });
+
+  // D-213 — 구름항로도 종료 화면(순위)을 가진 게임이다. 분기가 없으면 스컬킹 게임판으로 떨어진다.
+  it('구름항로 게임 중이면 구름항로 게임판을 그리고, FINISHED 를 받아도 유지한다', async () => {
+    loadGame.mockResolvedValue(game('CLOUD_ROUTE', []));
+    renderRoom({ gameType: 'CLOUD_ROUTE', status: 'IN_GAME', playerIds: [1, 2] });
+
+    await screen.findByTestId('cloudroute-table');
+    expect(screen.queryByTestId('skullking-table')).toBeNull();
+    expect(cloudRouteProps.at(-1)!.playerIds).toEqual([1, 2]);
+
+    act(() => {
+      metaCallback()({ ...ROOM, gameType: 'CLOUD_ROUTE', status: 'FINISHED' } as Room);
+    });
+    expect(screen.getByTestId('cloudroute-table')).toBeInTheDocument();
+    expect(cloudRouteProps.at(-1)!.roomFinished).toBe(true);
   });
 
   it('티츄 방은 기존대로 FINISHED 전이 시 종료 카드로 바뀐다', async () => {

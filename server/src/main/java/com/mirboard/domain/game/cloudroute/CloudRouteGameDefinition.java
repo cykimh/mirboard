@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
  * 구름항로의 카탈로그 메타데이터 + 엔진 팩토리 (D-212). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정 없이 이 Bean
  * 등록으로 인게임까지 연결된다.
  *
- * <p><b>공개 상태는 설정이고 기본은 {@code DISABLED}</b>({@code mirboard.cloudroute.status} = 환경 변수
- * {@code MIRBOARD_CLOUDROUTE_STATUS}) — 게임판(S3)이 붙기 전까지 카탈로그에 보이면 안 된다(관제 규칙, 2026-11-09). 공개할 때 이 기본값을
- * 바꾼다. {@code supportedRoomOptions()} 는 빈 집합(기본) — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
+ * <p><b>공개 상태는 설정이다</b>({@code mirboard.cloudroute.status} = 환경 변수 {@code MIRBOARD_CLOUDROUTE_STATUS}, 기본
+ * {@code AVAILABLE} — D-214 공개). S2·S3 동안은 기본 {@code DISABLED} 였다(관제 규칙 — 완성 전 카탈로그 비노출). 되돌리기는
+ * {@code COMING_SOON}(새 방만 막고 진행 중인 판은 끝까지 — `docs/deploy.md`). {@code supportedRoomOptions()} 는 빈 집합(기본) — 목표 점수·팀·내기를 쓰지 않는 개인전이다(D-106).
  */
 @Component
 public final class CloudRouteGameDefinition implements GameDefinition {
@@ -32,7 +32,7 @@ public final class CloudRouteGameDefinition implements GameDefinition {
 
     public CloudRouteGameDefinition(CloudRouteStateStore stateStore,
                                     ApplicationEventPublisher publisher,
-                                    @Value("${mirboard.cloudroute.status:DISABLED}") GameStatus status) {
+                                    @Value("${mirboard.cloudroute.status:AVAILABLE}") GameStatus status) {
         this.stateStore = stateStore;
         this.publisher = publisher;
         this.status = Objects.requireNonNull(status,

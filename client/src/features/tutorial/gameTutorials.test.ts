@@ -8,6 +8,7 @@ import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
 import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
 import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
 import { YACHT_TUTORIAL } from '@/features/yacht/tutorial/yachtTutorial';
+import { CLOUD_ROUTE_TUTORIAL } from '@/features/cloudroute/tutorial/cloudrouteTutorial';
 
 /**
  * D-121 — 튜토리얼 레지스트리. 클라에서 "튜토리얼용 게임 id" 를 아는 곳은 여기 하나뿐이다.
@@ -35,6 +36,10 @@ describe('tutorialFor', () => {
 
   it('요트 id 로 요트 튜토리얼을 돌려준다', () => {
     expect(tutorialFor('YACHT')).toBe(YACHT_TUTORIAL);
+  });
+
+  it('구름항로 id 로 구름항로 튜토리얼을 돌려준다', () => {
+    expect(tutorialFor('CLOUD_ROUTE')).toBe(CLOUD_ROUTE_TUTORIAL);
   });
 
   it('대소문자를 정규화한다 (loadGame 과 같은 규약)', () => {

@@ -34,6 +34,7 @@
 | 12 | 멀티 인스턴스 (opt-in) | ✅(opt-in) | `infra.messaging.RedisMessageGateway` |
 | 13 | 관측성 (Prometheus 게임별 차원, Grafana, Sentry) | ✅ | `infra.metrics`, `infra.config.SentryConfig`, `ops/grafana` (D-107) |
 | 14 | **`GameEngine` 포트 (멀티게임 기반)** | ✅ | `domain.game.core.GameEngine`, `infra.ws.GameEngineProvider`, `TichuGameEngine` |
+| 5d | 구름항로 (독창 주사위·부동산 2~4인 — 순수 엔진·포트 어댑터·봇·기록 + 클라 7×7 판·결정 패널·튜토리얼, 포트 확장 0건 — D-214 공개, `MIRBOARD_CLOUDROUTE_STATUS` 로 되돌림) | ✅ | `domain.game.cloudroute`, `client/src/features/cloudroute`, `docs/rules-cloudroute.md` (D-210~D-214, §17~§19) |
 | 15 | 테이블 좌석 배치 (원카드·스컬킹 시계 방향 테이블형 좌석 + "다음" 표시·방향 화살표, 티츄 +1 을 왼쪽에 — 클라만) | ✅ | `client/src/components/seatOrder.ts`(`tableLayout`), `features/tichu/seatView.ts`, `docs/plans/table-seating.md` (D-132) |
 | 16 | 방 초대 링크 (공유창·복사·수동, 방마다 다른 카톡 미리보기, 로그인·게스트·가입 뒤 그 방으로, 자리 없음 → 바로 관전 + 안내, 대기실 끊김 120초 유예·화면 재동기화) | ✅ | `features/lobby/InviteLinkButton.tsx`·`shareRoomLink.ts`·`SpectateNotice.tsx`, `features/auth/returnPath.ts`, `infra.web.RoomPagePreviewController`, `infra.ws.WaitingLeaveGraceScheduler`, `ws/useRoomMeta.ts`, `docs/plans/room-invite.md` (D-133·D-134) |
 
