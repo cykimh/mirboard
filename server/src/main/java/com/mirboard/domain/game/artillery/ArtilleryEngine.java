@@ -42,8 +42,25 @@ public final class ArtilleryEngine {
     public static final int MAX_PLAYERS = 6;
     static final int EXPLOSION_TICKS = 36;
     static final int WALK_TICKS_PER_STEP = 2;
-    static final long MIN_RESOLVE_MS = 600;
-    static final long MAX_RESOLVE_MS = 18_000;
+    public static final long MIN_RESOLVE_MS = 600;
+    public static final long MAX_RESOLVE_MS = 18_000;
+
+    private final long minResolveMs;
+    private final long maxResolveMs;
+
+    /** 룰 그대로의 연출 대기(600ms~18s, §9.2). */
+    public ArtilleryEngine() {
+        this(MAX_RESOLVE_MS);
+    }
+
+    /**
+     * 연출 대기 상한만 바꾼다 — 봇끼리 도는 통합 테스트가 판을 빨리 끝내려고 쓴다({@code mirboard.artillery.resolve-cap-millis}).
+     * 하한은 600ms 와 이 상한 중 작은 값. 운영은 기본 생성자와 같다.
+     */
+    public ArtilleryEngine(long maxResolveMs) {
+        this.maxResolveMs = Math.max(0, maxResolveMs);
+        this.minResolveMs = Math.min(MIN_RESOLVE_MS, this.maxResolveMs);
+    }
 
     public record Result(ArtilleryState newState, List<ArtilleryEvent> events) {
         public Result {
@@ -333,7 +350,7 @@ public final class ArtilleryEngine {
 
         long ticks = (long) walk.steps() * WALK_TICKS_PER_STEP + walkFallTicks + flightTicks + maxFall
                 + (exploded ? EXPLOSION_TICKS : 0);
-        long durationMs = Math.clamp(ticks * 1000 / 60, MIN_RESOLVE_MS, MAX_RESOLVE_MS);
+        long durationMs = Math.clamp(ticks * 1000 / 60, minResolveMs, maxResolveMs);
         ShotReport report = new ShotReport(seat, fire.angle(), fire.power(), fire.shell(), state.wind(), move, shot,
                 damages, falls, eliminated, units.stream().map(ShotReport.UnitView::of).toList(), durationMs);
 
@@ -423,7 +440,9 @@ public final class ArtilleryEngine {
             reason = MatchResult.EndReason.LAST_STANDING;
         } else if (alive.isEmpty()) {
             reason = MatchResult.EndReason.ALL_DOWN;
-        } else if (alive.stream().allMatch(u -> state.botSeats().contains(u.seat()))) {
+        } else if (state.botSeats().size() < state.seatCount()
+                && alive.stream().allMatch(u -> state.botSeats().contains(u.seat()))) {
+            // 사람이 있던 판에서 사람이 모두 탈락했다. 처음부터 봇만인 판(시험·관전)은 끝까지 간다.
             reason = MatchResult.EndReason.NO_HUMANS;
         } else {
             return null;

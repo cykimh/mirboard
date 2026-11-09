@@ -186,6 +186,12 @@ class ArtilleryEngineTest {
     }
 
     @Test
+    void an_all_bot_match_does_not_end_at_the_start() {
+        ArtilleryState s = start(61L, 2, 0, 1);
+        assertThat(s.phase()).isEqualTo(Phase.AIMING);
+    }
+
+    @Test
     void ranking_puts_later_and_healthier_eliminations_higher_and_deserters_last() {
         List<Unit> units = List.of(
                 new Unit(0, 10, 10, 40, 2, null),
