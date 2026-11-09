@@ -186,6 +186,10 @@ mirboard:
     # 요트 S3 — 공개 상태. 단계마다 main 에 들어가므로 완성 전에는 기본 DISABLED(카탈로그에서도 뺌, 방 생성 거절).
     # 공개는 S5 에서 기본값을 바꾸거나 MIRBOARD_YACHT_STATUS 로. YachtGameDefinition 의 @Value 기본값과 같아야 한다.
     status: ${MIRBOARD_YACHT_STATUS:DISABLED}
+  cloudroute:
+    # D-214 — 구름항로 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_CLOUDROUTE_STATUS=COMING_SOON(docs/deploy.md).
+    # CloudRouteGameDefinition 의 @Value 기본값과 같아야 한다(CloudRouteGameDefinitionTest).
+    status: ${MIRBOARD_CLOUDROUTE_STATUS:AVAILABLE}
   moderation:
     # D-86 — 채팅 금칙어(같은 길이 '*' 마스킹, 대소문자 무시). 운영자가 콤마로 커스터마이즈.
     # 자모 분리 우회 등 고급 회피 대응은 범위 밖. 비우면 마스킹 없음. (예시: 비속어)

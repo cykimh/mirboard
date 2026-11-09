@@ -39,6 +39,12 @@ class CloudRouteGameDefinitionTest {
         Parameter status = Arrays.stream(CloudRouteGameDefinition.class.getConstructors()[0].getParameters())
                 .filter(p -> p.getType() == GameStatus.class).findFirst().orElseThrow();
         assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.cloudroute.status:AVAILABLE}");
+        // application.yml 의 환경 변수 기본값(운영이 실제로 타는 값)도 같아야 한다 — 갈리면 어느 쪽으로 뜨느냐에 따라 공개 여부가 달라진다.
+        org.springframework.beans.factory.config.YamlPropertiesFactoryBean yaml =
+                new org.springframework.beans.factory.config.YamlPropertiesFactoryBean();
+        yaml.setResources(new org.springframework.core.io.ClassPathResource("application.yml"));
+        assertThat(yaml.getObject().getProperty("mirboard.cloudroute.status"))
+                .isEqualTo("${MIRBOARD_CLOUDROUTE_STATUS:AVAILABLE}");
         assertThat(definition(GameStatus.DISABLED).status()).isEqualTo(GameStatus.DISABLED);
     }
 
