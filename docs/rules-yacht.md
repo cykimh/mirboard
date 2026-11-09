@@ -2,8 +2,8 @@
 
 본 문서는 Mirboard 요트 룰의 **단일 진실 공급원**이다. 코드(S2 순수 엔진)는 이 문서를 따르고, 어긋나면 코드를 고치거나 이 문서와
 결정(`docs/decisions.md`)을 함께 고친다. 각 절 끝의 **코드:** / **테스트:** 는 `rules-onecard.md` 와 같은 표기이고, 경로는
-`server/src/{main,test}/java/com/mirboard/domain/game/yacht/` 기준, 위치는 메서드 이름으로 적는다. S1 시점에는 코드가 없으므로
-**코드(S2 예정):** 로 만들 자리를 적어 두고, S2 에서 실제 이름으로 바꾼다. 어댑터·봇·기록은 S3, 클라는 S4 에서 같은 방식으로 덧붙인다 —
+`server/src/{main,test}/java/com/mirboard/domain/game/yacht/` 기준, 위치는 메서드 이름으로 적는다(줄 번호는 코드가 바뀌면 바로 틀린다).
+순수 엔진은 S2 에서 붙였다. 어댑터·봇·기록은 S3(**코드(S3):**), 클라는 S4(**코드(S4):**) 에서 같은 방식으로 덧붙인다 —
 클라는 판정하지 않으며 표시만 한다(권위는 서버, 후보 점수도 서버가 계산).
 
 > **출처와 하우스 룰.** 주사위 5개·12칸을 쓰는 일반 공용 룰만 다룬다(특정 상표 게임의 이름·점수표 디자인은 쓰지 않는다). 원문마다 갈리거나
@@ -20,7 +20,7 @@
 | 점수표 | 좌석마다 12칸, 칸마다 "빈 칸" 또는 점수(0 이상) | `Scorecard` — `Map<Category, Integer>`(빈 칸은 키 없음) |
 
 - 주사위 눈은 **굴리는 순간 서버가 정한다**. 상태에 미래 눈·시드·난수기 상태를 두지 않는다 **[결정]**(D-182).
-- **코드(S2 예정):** `dice/Dice`, `dice/HoldMask`, `dice/DiceRoller`(눈 하나를 주는 함수형 인터페이스 — 테스트는 정해진 눈을, 어댑터는 `Random` 을 주입), `score/Scorecard`.
+- **코드:** `dice/Dice`(JSON 은 정수 5개 배열), `dice/HoldMask`(JSON 은 불리언 5개 배열, 길이가 다르면 역직렬화 실패 → `INVALID_ACTION`), `dice/DiceRoller`(`from(Random)` — 어댑터, `sequence(...)` — 테스트), `score/Scorecard`.
 
 ## 2. 인원과 좌석
 
@@ -32,7 +32,7 @@
 | 좌석 | 0 부터. 좌석 순서는 방의 좌석 정책을 따른다(엔진은 받은 순서 그대로) |
 | 차례 순서 | 좌석 오름차순, 탈주자 건너뜀. 좌석 +1 이 다음 사람(D-132 의 시계 방향과 같다) |
 
-- **코드(S2 예정):** `YachtEngine.start(seatCount, now)`, `YachtEngine.nextSeat`.
+- **코드:** `YachtEngine.start(now)`(좌석 수·봇 좌석은 생성자의 `GameContext`), 다음 좌석은 `YachtEngine.endTurn`.
 
 ## 3. 매치 진행
 
@@ -42,7 +42,8 @@
 4. 살아 있는 좌석 전원이 12칸을 다 채우면 매치가 끝난다(§8). 1판 = 1매치.
 
 - 라운드 r 에 차례를 기다리는 좌석은 r−1 칸, 이미 한 좌석은 r 칸을 채웠다(§11 불변식).
-- **코드(S2 예정):** `YachtEngine.endTurn`(다음 좌석·라운드·종료 판정 한 곳).
+- **코드:** `YachtEngine.endTurn`(다음 좌석·라운드·종료 판정 한 곳).
+- **테스트:** `YachtEngineTurnTest`(`the_last_seat_of_a_round_starts_the_next_round_from_the_first_seat`·`the_last_score_of_round_12_finishes_the_match`·`a_solo_match_cycles_through_12_rounds_of_its_only_seat`).
 
 ## 4. 한 차례
 
@@ -65,8 +66,8 @@
 7. 차례가 아닌 좌석의 액션은 `NOT_YOUR_TURN`, 끝난 매치의 액션은 `MATCH_OVER`, 탈주한 좌석의 액션은 `NOT_YOUR_TURN`.
 
 - 굴릴 때마다 서버는 그 좌석의 **빈 칸 전부에 대한 후보 점수**(0 포함)를 계산해 `DICE_ROLLED` 와 공개 뷰에 싣는다 **[결정]**(D-182 — 클라 룰 미러 없음).
-- **코드(S2 예정):** `YachtEngine.roll` · `hold` · `score`, `action/YachtAction`(sealed `Roll`·`Hold`·`Score`), `action/RejectionReason`.
-- **테스트(S2 예정):** `YachtEngineTurnTest` — 표의 각 행과 1~7 의 거절 사유마다 하나.
+- **코드:** `YachtEngine.apply` → `roll` · `hold` · `score`, `action/YachtAction`(sealed `Roll`·`Hold`·`Score`, JSON 판별자 `@action`), `action/RejectionReason`, `action/YachtActionRejectedException`.
+- **테스트:** `YachtEngineTurnTest` — 표의 각 행, 거절 사유 전부(`rejections`·`a_finished_match_rejects_everything`), 거절 뒤 상태 불변, 합법 액션 수(굴림 1번 뒤 31 + 1 + 12)와 합법 액션이 전부 받아들여지는지.
 
 ### 4.1 거절 사유 (`ERROR`, 비공개)
 
@@ -126,8 +127,8 @@
 | 1 2 3 5 6 | 없음 | |
 
 - 요트 추가 보너스·조커 규칙, 13칸 변형은 **없다**(§12).
-- **코드(S2 예정):** `score/Category`(enum, 위 순서), `score/Scoring.points(Category, Dice)`, `score/Scoring.candidates(Scorecard, Dice)`, `score/Scorecard.upperSubtotal`·`bonus`·`total`.
-- **테스트(S2 예정):** `ScoringTest`(§5.2 표 각 행) + `ScoringExhaustiveTest`(6⁵ = 7,776 조합 × 12칸을 이 표에서 직접 쓴 독립 기대값 함수와 대조 —
+- **코드:** `score/Category`(enum, 위 순서 — 상수 순서가 동점 판정에 쓰인다), `score/Scoring.points(Category, Dice)`, `score/Scoring.candidates(Scorecard, Dice)`, `score/Scoring.best(Scorecard, Dice)`(§6), `score/Scorecard.upperSubtotal`·`bonus`·`total`.
+- **테스트:** `ScoringTest`(§5.2 표 각 행) + `ScoringExhaustiveTest`(6⁵ = 7,776 조합 × 12칸을 이 표에서 직접 쓴 독립 기대값 함수와 대조 —
   같은 구현을 두 번 쓰지 않게 기대값 함수는 눈별 개수 배열만으로 쓴다), `ScorecardTest`(보너스 경계 62·63, 최고점 325).
 
 ## 6. 차례 제한과 자동 처리
@@ -140,9 +141,9 @@
 3. 턴 제한 기본 45초, 선택지 끔·20·30·45·60(D-182).
 4. **폴백 `timeoutAction`**(인프라 턴 데드라인이 먼저 닿는 드문 경우·봇 정책 실패): 안 굴렸으면 `ROLL`, 아니면 위 2 의 칸으로 `SCORE`. 결정적이다.
 
-- **코드(S2 예정):** `YachtEngine.remaining(state, turnSeconds, now)`(남은 시간 — 0 이하면 만기), `YachtEngine.expire(state, now, roller)`(위 2),
+- **코드:** `YachtEngine.remainingMillis(state, now)`(남은 시간 — 0 이하면 만기, 제한은 생성자의 `turnSeconds`), `YachtEngine.expire(state, roller, now)`(위 2 — 액션 수에 넣지 않는다),
   `YachtEngine.fallbackAction(state)`(위 4). 시계는 인자로 받는다(순수 엔진에 시계 없음). 어댑터의 포트 ⑦ `timer`/`onTimer` 연결은 S3.
-- **테스트(S2 예정):** `YachtEngineTimeoutTest` — 안 굴림/1·2·3번 굴림 뒤 만기, 동점 칸 순서, 홀드를 여러 번 바꿔도 남은 시간이 줄기만 함, 끔이면 없음.
+- **테스트:** `YachtEngineTimeoutTest` — 안 굴림/1·2·3번 굴림 뒤 만기, 동점 칸 순서, 홀드를 여러 번 바꿔도 남은 시간이 줄기만 함, 끔이면 없음.
 
 ## 7. 탈주
 
@@ -154,8 +155,8 @@
    - 그 밖 → 계속(`MATCH_CONTINUES`). 사람이 1명만 남아도 계속한다 **[결정]**(1인 플레이가 허용된 게임이다).
 4. 이미 탈주한 좌석의 다시 탈주는 해당 없음(`NOT_APPLICABLE`).
 
-- **코드(S2 예정):** `YachtEngine.desert(state, seat, humanSeats)`. 사람 좌석은 어댑터가 `GameContext.botSeats` 로 알려 준다.
-- **테스트(S2 예정):** `YachtEngineDesertionTest` — 차례 중 탈주·차례 아닐 때·라운드 마지막 좌석·12라운드 마지막 좌석(→ `FINISHED`)·마지막 사람(→ `NO_HUMANS`)·
+- **코드:** `YachtEngine.desert(state, seat, now)` → `Desertion(newState, outcome, events)` — outcome 은 포트 `DesertOutcome` 과 같은 3치. 사람 좌석은 생성자의 `GameContext.botSeats` 밖 좌석이다.
+- **테스트:** `YachtEngineDesertionTest` — 차례 중 탈주·차례 아닐 때·라운드 마지막 좌석·12라운드 마지막 좌석(→ `FINISHED`)·마지막 사람(→ `NO_HUMANS`)·
   사람 1명 남음(→ 계속)·이중 탈주.
 
 ## 8. 종료와 순위
@@ -168,7 +169,7 @@
 | `NO_HUMANS` | 탈주로 살아 있는 사람이 없음(§7-3) |
 | `ACTION_LIMIT` | 성공한 액션 수가 상한 `좌석 수 × 12 × 40` 에 닿음 **[결정]** — 남은 빈 칸을 0 으로 보고 현재 총점으로 |
 
-- `ACTION_LIMIT` 은 홀드를 끝없이 바꾸는 클라에 대한 안전장치다. 정상 판의 차례당 액션은 6~10개(굴림 최대 3 + 홀드 몇 번 + 기록)라 상한(차례당 40)에 닿을 일이 없고,
+- `ACTION_LIMIT` 은 상한에 닿은 액션의 이벤트(다음 차례 알림 포함) 뒤에 `MATCH_ENDED` 를 붙인다. 홀드를 끝없이 바꾸는 클라에 대한 안전장치다. 정상 판의 차례당 액션은 6~10개(굴림 최대 3 + 홀드 몇 번 + 기록)라 상한(차례당 40)에 닿을 일이 없고,
   시뮬레이션에서 발생 0 을 확인한다.
 
 ### 8.2 순위
@@ -178,8 +179,8 @@
 3. 탈주자는 그 아래 **모두 같은 최하위**(탈주자끼리 동순위, 점수 무관).
 4. **승리 = 1위**(동순위면 모두).
 
-- **코드(S2 예정):** `rules/Ranking.rank(state)`, `state/MatchResult(reason, placements)`.
-- **테스트(S2 예정):** `RankingTest` — 동점 2·3명, 탈주자 여럿, 1인, 전원 탈주 후 봇만.
+- **코드:** `rules/Ranking.placements(state)`·`result(state, reason)`, `state/MatchResult(reason, placements)`(`winners()` 는 1위 중 탈주하지 않은 좌석).
+- **테스트:** `RankingTest` — 동점 2·3명, 탈주자 여럿, 1인, 전원 탈주 후 봇만.
 
 ## 9. 공개·비공개와 기록
 
@@ -199,7 +200,7 @@
 
 ### 9.2 비공개 (`/user/queue/room/{roomId}`)
 
-- `ERROR`(§4.1)뿐이다. 순번을 쓰지 않는다(`sequenced()` = false, D-126).
+- `ERROR`(§4.1)뿐이고, 이것도 엔진 이벤트가 아니다 — 엔진은 `YachtActionRejectedException` 을 던지고 인프라가 그 `code()` 로 본인 큐에 보낸다. 그래서 엔진 이벤트는 전부 공개이고 `privateSeat`·`sequenced` 를 재정의하지 않는다.
 - 비공개 뷰는 없다(`privateView` = empty). 숨길 정보가 없다 — 공개 뷰가 상태의 전부를 보인다(난수기는 상태에 없다).
 
 ### 9.3 기록
@@ -209,8 +210,8 @@
 - **1인 매치: 아무것도 쓰지 않는다**(결과·참가자·`user_game_stats` — D-181). 1인 + 봇은 2인 이상 매치다.
 - 상대 전적: 최종 순위로 센다.
 
-- **코드(S2 예정):** `event/YachtEvent`(sealed), `state/YachtStateMapper.toPublicView`. 기록기·상대 전적은 S3.
-- **테스트(S2 예정):** `YachtJsonRoundTripTest`(상태·액션·이벤트 JSON 왕복, envelope 이름, 상태 JSON 에 난수 관련 키 없음),
+- **코드:** `event/YachtEvent`(sealed, JSON 판별자 `@event`), `state/YachtStateMapper.toPublicView(state, turnRemainingMs)`(남은 시간은 어댑터가 `remainingMillis` 로 넣는다). 기록기·상대 전적은 S3.
+- **테스트:** `YachtJsonRoundTripTest`(상태·액션·이벤트 JSON 왕복, envelope 이름, 상태 JSON 에 난수 관련 키 없음),
   시뮬레이션의 "이벤트만 듣는 클라" 대조(§11).
 
 ## 10. 우리가 정한 것 (미규정·하우스 룰 선택)
@@ -249,6 +250,15 @@
 - **거절**: §4.1 의 모든 사유마다 단위 테스트, 거절 뒤 상태 불변.
 - **시간 초과·탈주**: §6·§7 테스트 목록.
 - **결정성**: 같은 `DiceRoller` 수열이면 같은 판(이벤트 목록이 같다).
+
+- **코드:** `invariant/YachtInvariantChecker`(위 불변식 + 점수가 칸 최대 이하 + 끝난 판의 순위가 `Ranking` 재계산과 같음).
+- **테스트:** `invariant/YachtInvariantCheckerTest`(14건 — 통과 1건 + 고의 위반, 위반마다 그 규칙 하나만 걸린다), `YachtMatchSimulationTest`(7건 — 1~4인 무작위 봇
+  인원별 2,000판, 사람 1·봇 3 300판과 사람 2·봇 1 500판에 무작위 탈주·시간 초과를 섞음, 굴림에 홀드를 실어 보내는 경로 포함, 같은 수열 재현).
+  **실측(S2, 시드 고정)**: `ACTION_LIMIT` 0판(전 인원), 판당 액션 1인 112 · 2인 224 · 3인 338 · 4인 449(차례당 약 9.3 — 상한 40 의 4분의 1).
+  `SCORED` 의 총점을 기록 전 값으로 바꾸는 고의 결함을 넣으면 시뮬레이션 7건 중 6건이 이벤트 대조에서 실패한다(재현 테스트만 통과).
+- **합계:** 요트 도메인 테스트 85건 — `ScoringTest` 14 + `ScoringExhaustiveTest` 1 + `ScorecardTest` 4 + `YachtEngineTurnTest` 18 + `YachtEngineTimeoutTest` 7 +
+  `YachtEngineDesertionTest` 8 + `RankingTest` 5 + `YachtInvariantCheckerTest` 14 + `YachtJsonRoundTripTest` 7 + `YachtMatchSimulationTest` 7.
+  `./gradlew :server:test --tests "com.mirboard.domain.game.yacht.*"`(Docker 불필요, 약 5초).
 
 ## 12. 범위 밖 (v1)
 

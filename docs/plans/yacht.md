@@ -1,6 +1,6 @@
 # 요트(주사위) — 네 번째 게임 후보 — 기획
 
-> 상태: **S1 완료(룰 명세)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
+> 상태: **S2 완료(순수 엔진)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
 > 근거: `docs/game-port.md`(포트 계약) · `docs/plans/multi-game.md` §2·§3("요트 — 포트가 진짜 일반적인지 시험하는 리트머스")
 > · 형식 본보기 `docs/plans/onecard.md`·`docs/rules-onecard.md`
 > 룰 정본은 `docs/rules-yacht.md`(S1) 다. 이 문서의 §3 은 그 입력이었고, 어긋나면 정본이 이긴다.
@@ -177,6 +177,11 @@ yacht/
   persistence/ YachtStateStore · YachtMatchRecorder · YachtHeadToHead (S3)
 ```
 
+S2 에서 처음 그림과 달라진 점: 엔진은 `GameContext`(좌석 수·봇 좌석)와 `turnSeconds` 를 생성자로 받는다(`GameContext.turnSeconds` 는 S3 의
+포트 확장이라 S2 에서는 따로 넘긴다). 엔진이 만드는 비공개 이벤트는 **0종**이다 — 거절은 예외 코드로 인프라가 `ERROR` 를 보내므로
+`YachtEvent` 는 전부 공개이고 `sequenced()` 를 재정의하지 않는다. 액션 상한에 닿은 전이는 다음 차례 알림을 지우지 않고 그 뒤에 `MATCH_ENDED` 를 붙인다
+(공개 뷰의 라운드와 이벤트가 어긋나지 않게).
+
 ### 6.2 상태
 
 불변 레코드. 원카드처럼 엔진 안에서만 가변 사본을 고쳐 새 레코드로 얼린다.
@@ -201,10 +206,10 @@ yacht/
 | 공개 | `SCORED` | 좌석, 칸, 점수, 그 좌석의 상단 소계·보너스·총점, `auto`(시간 초과 자동 기록) |
 | 공개 | `PLAYER_ELIMINATED` | 좌석, 사유 `DESERTED`, 멈춘 총점 |
 | 공개 | `MATCH_ENDED` | 순위(좌석·총점·순위), 사유 `FINISHED` / `NO_HUMANS` / `ACTION_LIMIT` |
-| 비공개 | `ERROR` | `NOT_YOUR_TURN`, `HOLD_NOT_ALLOWED`, `NOTHING_TO_ROLL`, `NO_ROLLS_LEFT`, `NOT_ROLLED_YET`, `CATEGORY_FILLED`, `MATCH_OVER` |
+| 비공개 | `ERROR` | `NOT_YOUR_TURN`, `HOLD_NOT_ALLOWED`, `HOLD_UNCHANGED`, `NOTHING_TO_ROLL`, `NO_ROLLS_LEFT`, `NOT_ROLLED_YET`, `CATEGORY_FILLED`, `MATCH_OVER`, `INVALID_ACTION` — 인프라가 예외 코드로 보낸다(엔진 이벤트 아님) |
 
 - 이벤트 type 문자열은 게임 간 재사용(`TURN_CHANGED`·`PLAYER_ELIMINATED`·`MATCH_ENDED`) — 방 단위 토픽이라 충돌 없음.
-- **비공개 이벤트는 순번을 쓰지 않는다** — `YachtEvent.sequenced()` = `!isPrivate()`(D-126 권장 패턴, 원카드와 같다). 요트의 비공개 이벤트는 `ERROR` 뿐이다.
+- **엔진의 비공개 이벤트는 없다**(S2) — `ERROR` 는 인프라가 거절 예외로 만든다. 그래서 `YachtEvent` 는 전부 공개·순번 있음(기본값)이다.
 - **공개 payload 는 결과값**(원카드 원칙): `DICE_ROLLED` 는 주사위 전체·홀드·횟수, `SCORED` 는 소계·총점까지. 두 번 적용해도 같고 하나 빠져도 다음 이벤트가 맞춘다.
 - `MATCH_STARTED` 는 두지 않는다 — 시작 상태는 resync 로(원카드 D-129 와 같은 결론). 첫 `TURN_CHANGED` 만 시작 직후 발행.
 - 공개 뷰도 같은 원칙: 좌석별 점수표(칸별 점수|null)·소계·보너스·총점·탈주 여부, 차례 좌석, 라운드, 주사위·홀드·굴린 횟수, 후보 점수, `turnRemainingMs`(엔진 계산), 결과.
@@ -317,7 +322,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 | --- | --- | --- | --- | --- |
 | S0 | 결정 기록(D-181~D-183) + 이 기획 확정 — **완료** | — | 없음 | 사용자 승인 |
 | S1 | 룰 명세 `docs/rules-yacht.md`(§3.3 확정) — **완료** | S0 | 없음(문서) | 사용자 검토 |
-| S2 | 순수 엔진: 주사위·점수표·액션 검증·순위·불변식 + 시뮬레이션 | S1 | 서버 신규 패키지(Docker 불필요) | `Scoring` 전수(7,776 × 12) · 거절 사유별 단위 테스트 · 1~4인 무작위 봇 2,000판 전부 종료 + 매 전이 불변식 |
+| S2 | 순수 엔진: 주사위·점수표·액션 검증·순위·불변식 + 시뮬레이션 — **완료**(테스트 85건, `rules-yacht.md` §11 실측) | S1 | 서버 신규 패키지(Docker 불필요) | `Scoring` 전수(7,776 × 12) · 거절 사유별 단위 테스트 · 1~4인 무작위 봇 2,000판 전부 종료 + 매 전이 불변식 |
 | S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(V 다음)·라운드 스타터·상대 전적. 정의 `COMING_SOON` | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
 | S4 | 클라 게임판·점수표·주사위 판·튜토리얼·위키 | S3 | 클라 | Vitest(스토어·sink·게임판·튜토리얼, `gameTables.test`·`gameTutorials.test` 원문 검사 통과) · 브라우저 실측(데스크톱·375px, 4인 점수표 가로 스크롤 없음, 44px) |
 | S5 | 공개 전 보강 → 공개 전환(운영 `MIRBOARD_YACHT_STATUS` 패턴, D-168 와 맞춰 결정) → 문서 수치 → 배포 | S4 | 서버·클라 | `check.sh` 전체, 운영 스모크(1인·봇 3·사람 2) |
