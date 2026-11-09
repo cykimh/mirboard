@@ -52,6 +52,7 @@ class RoomServiceStartNowTest {
     void oneCardNeedsTwo() {
         GameDefinition def = mock(GameDefinition.class);
         when(def.minPlayers()).thenReturn(2);
+        when(def.playersToStart(org.mockito.ArgumentMatchers.any())).thenCallRealMethod(); // D-176 기본 = minPlayers
         when(games.require("ONE_CARD")).thenReturn(def);
     }
 

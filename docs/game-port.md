@@ -370,3 +370,29 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
   - 스컬킹: 최종 점수로 센다.
   - 원카드: 최종 순위로 센다.
 
+### 방 설정이 엔진에 닿는다 — 게임 중립 확장 3건 (D-176)
+
+첫 쓰임은 오목(모드 1:1/2:2·룰·봇 난이도, `docs/plans/omok.md` §3.3)이지만 세 확장 모두 게임 이름이 없고, **기본값이 지금 동작**이라
+티츄·스컬킹·원카드는 한 줄도 바뀌지 않았다. 인프라에 게임 이름 분기도 늘지 않았다(`GameEngineProvider` 한 곳만 바뀌었다).
+
+| # | 확장 | 기본 | 어디서 쓰나 |
+| --- | --- | --- | --- |
+| E1 | **맵 방 옵션** — 허용값·기본값을 가진 `RoomOption` 상수(`valued()` — `TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`)는 `Room.options`(`Map<RoomOption,String>`, Redis `room:{id}` 해시 `opt:<NAME>`)에 둔다 | 옵션 없음 | 방 만들기(선언한 옵션의 기본값을 `room_create.lua` 같은 원자 구간에서 씀), `PUT /settings` 의 `options`, 카탈로그 `roomOptionChoices` |
+| E2 | **정원·시작 인원** — `GameDefinition.capacityFor(options)`·`playersToStart(options)` | `maxPlayers()`·`minPlayers()` | 방 만들기 정원 상한, 설정 변경의 정원 재계산, 대기실 복귀 정원(`room_return_waiting.lua`), 방장 시작(`room_start_now.lua` 의 최소 인원 — Lua 무변경). 봇 채우기는 방 정원을 따르므로 자동 |
+| E3 | **엔진에 옵션 전달** — `GameContext.options` | 빈 맵 | `GameEngineProvider.forRoom` 이 `RoomService.effectiveOptions(def, room)` 를 싣는다 |
+
+- **늘 값이 있다**: 정원·시작 인원·엔진이 보는 옵션은 모두 `RoomOption.resolve(선언, 저장값)` 결과다 — 게임이 선언한 맵 옵션만, 저장값이
+  허용값이면 그 값, 없거나 모르는 값이면 기본값. 그래서 `capacityFor`·엔진은 `options.get(...)` 이 null 인 경우를 다루지 않아도 된다.
+  저장값은 그대로 두므로(`Room.options`) 선언을 바꿔도 옛 방이 깨지지 않는다.
+- **검증(D-106 과 같은 규칙)**: `PUT /settings` 의 `options` 에서 선언하지 않은 옵션은 기본값이면 무시, 아니면 `UNSUPPORTED_ROOM_OPTION`.
+  모르는 이름·허용값 밖·자기 필드가 있는 예전 옵션(`TARGET_SCORE` 등)은 `INVALID_ROOM_SETTING`.
+- **정원이 바뀌는 쓰기**: 바꾼 옵션으로 `capacityFor` 가 달라지면 `capacity` 도 같이 쓴다. 지금 앉은 인원이 새 정원보다 많으면
+  `TOO_MANY_PLAYERS`(409) — 서비스가 먼저 보고, `room_update_settings.lua` 가 같은 원자 구간에서 `LLEN players ≤ 새 정원` 을 다시 본다
+  (확인 뒤 누가 앉는 경합). `room_join.lua` 도 같은 해시의 `capacity` 를 원자적으로 읽으므로 capacity 위반 0 이 유지된다. 준비 표시는 풀지 않는다.
+- `capacityFor` 는 `minPlayers()..maxPlayers()` 안이어야 한다 — 밖이면 서버가 정의 버그로 바로 던진다. `playersToStart` 를 정원과 같게
+  돌려주면 "정확히 그 인원"이다(`room_start_now.lua` 는 "그 이상"만 보지만 정원을 넘을 수는 없다).
+- 원카드 버튼 두 설정(`raceButtonSize`·`raceButtonVisibility`)은 아직 자기 필드다 — 맵으로 옮기는 정리는 후속(동작 무변경 리팩토링).
+- `GameContext` 에 방 설정을 하나 더 실을 때(요트의 턴 제한 제안 등)는 레코드 끝에 붙이고 짧은 생성자를 남긴다(지금 5인자·2인자 생성자가 그 모양).
+- 검증: `RoomOptionTest`·`RoomServiceRoomOptionsTest`·`GameEngineProviderOptionsTest`(단위, 가짜 게임 `TeamModeTestGame` — 정원 2↔4,
+  3명 시작 거절, 인원 초과 축소 거절, 선언한 옵션만 전달), `RoomOptionsIntegrationTest`(실 Redis·Lua).
+
