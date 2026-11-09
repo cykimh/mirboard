@@ -350,7 +350,7 @@ omok/
 | 2:2 기권 | 팀원 동의 없이 즉시 팀 패(확인 창만) |
 | 무승부 | ELO 변화 없음, 승패 증가 없이 기록 행만 남긴다 |
 
-미결 질문은 남아 있지 않다. S0~S4 완료, 공개 전환은 S4 끝에 앞당겼다(D-190 — 게임판이 완성되는 대로 공개한다는 사용자 결정). 남은 것은 S5 의 문서 수치 정리(README·케이스 스터디·CLAUDE.md·구현 현황).
+미결 질문은 남아 있지 않다. S0~S4 완료, 공개 전환은 S4 끝에 앞당겼다(D-190 — 게임판이 완성되는 대로 공개한다는 사용자 결정). S5 의 문서 수치 정리도 끝났다(아래 "S5 결과").
 
 ### S1 결과 (2026-11-09)
 
@@ -402,6 +402,14 @@ omok/
 - 테스트: 단위 `OmokGameDefinitionTest` 6 · `OmokGameEngineTest` 8 · `OmokRoundStarterTest` 5 · `infra.ws.OmokRecorderFailureTest` 1, Docker
   `OmokMatchRecorderIT` 6 · `infra.bot.OmokServerFlowIT` 4(봇 1:1 완주·2:2 설정 → 정원 4 → 봇 완주·사람 2:2 시간 초과 한 번 자동 수 → 두 번째 팀
   시간패·resync 에 `privateHand` 없음).
+
+### S5 결과 (2026-11-09) — 문서 수치·메인 카드 인원
+
+- 문서 수치를 실측으로 맞췄다: `docs/implementation-status.md` §19(오목)·표 5e, `docs/case-study-multi-game.md` §10(오목 — 구름항로는 §11 로) + 부록 (8)·(10),
+  README. 서버 `--rerun` 1,955건(건너뜀 5·실패 0, Docker 불필요 1,679 · 86%) — 오목 도메인 144(Docker 불필요 138)·서버 경로 IT 4·기록 실패 격리 1, 클라 1,209건 / 103파일
+  (오목 33). 비공개 뷰 없음은 "처음"이 아니었다 — 같은 날 구름항로·요트 어댑터가 먼저 main 에 들어갔다(케이스 스터디 §10).
+- 메인 카드 "2~4인 플레이" → "2·4인 플레이": 카탈로그에 할 수 있는 인원 `playerCounts`(D-196, 맵 옵션 조합의 시작 인원~정원 합집합)를 싣고 클라
+  `playerCountLabel` 이 이어지면 "~", 끊기면 "·". 다섯 게임 값은 min..max 그대로(카탈로그 IT).
 
 ### S2 결과 (2026-11-09)
 

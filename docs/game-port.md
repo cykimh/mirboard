@@ -411,6 +411,8 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
   (확인 뒤 누가 앉는 경합). `room_join.lua` 도 같은 해시의 `capacity` 를 원자적으로 읽으므로 capacity 위반 0 이 유지된다. 준비 표시는 풀지 않는다.
 - `capacityFor` 는 `minPlayers()..maxPlayers()` 안이어야 한다 — 밖이면 서버가 정의 버그로 바로 던진다. `playersToStart` 를 정원과 같게
   돌려주면 "정확히 그 인원"이다(`room_start_now.lua` 는 "그 이상"만 보지만 정원을 넘을 수는 없다).
+- D-196 — 카탈로그의 `playerCounts`(할 수 있는 인원)는 `GameDefinition.playerCounts()` 기본 구현이 선언한 맵 옵션의 값 조합마다
+  `playersToStart..capacityFor` 를 모은 합집합이다(오목 [2, 4]). 맵 옵션이 없으면 `minPlayers..maxPlayers` 라 재정의할 일이 거의 없다.
 - 원카드 버튼 두 설정(`raceButtonSize`·`raceButtonVisibility`)은 아직 자기 필드다 — 맵으로 옮기는 정리는 후속(동작 무변경 리팩토링).
 - `GameContext` 에 방 설정을 하나 더 실을 때(요트의 턴 제한 제안 등)는 레코드 끝에 붙이고 짧은 생성자를 남긴다(지금 5인자·2인자 생성자가 그 모양).
 - 검증: `RoomOptionTest`·`RoomServiceRoomOptionsTest`·`GameEngineProviderOptionsTest`(단위, 가짜 게임 `TeamModeTestGame` — 정원 2↔4,

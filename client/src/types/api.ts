@@ -44,6 +44,8 @@ export interface GameSummary {
   turnSecondsChoices?: number[];
   /** D-176 — 선언한 맵 옵션의 선택지·기본값. 없으면(구 서버·픽스처) 맵 옵션 없음. */
   roomOptionChoices?: RoomOptionChoices[];
+  /** D-196 — 할 수 있는 인원(오름차순). 오목은 [2, 4]. 없으면(구 서버·픽스처) minPlayers..maxPlayers. */
+  playerCounts?: number[];
 }
 
 export interface CatalogResponse {

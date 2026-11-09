@@ -178,6 +178,14 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-196 (2026-11-09) — 카탈로그 `playerCounts`: 할 수 있는 인원을 서버가 준다
+
+메인 오목 카드가 "2~4인 플레이"로 보였지만 오목은 모드가 정원을 정해 2명 또는 4명만 된다(D-176) — 카탈로그는 최소·최대만 알고 정원 규칙
+(`capacityFor`·`playersToStart`)은 서버에만 있어, 클라가 "값을 가진 옵션이면 최소·최대 둘" 같은 추측으로는 다음 게임에서 틀린다. 그래서
+`GameDefinition.playerCounts()` 기본 구현(선언한 맵 옵션의 값 조합마다 시작 인원~정원을 모은 합집합, 게임 이름 분기 없음)을 카탈로그
+`GameSummary.playerCounts` 로 싣는다(가산 필드 — 기존 필드·다섯 게임 값은 그대로, 카탈로그 IT 로 고정). 클라는 이어지면 "2~4인", 끊기면
+"2·4인"(`features/lobby/playerCountLabel`), 필드가 없으면 min~max. 관제 승인. 계약 `docs/api.md` 카탈로그.
+
 ## D-221 (2026-11-09) — 씨앗포 S1: 순수 엔진·정수 물리·불변식·시뮬레이션
 
 `domain.game.artillery` 에 저장소·시계·난수 객체 없는 순수 엔진(`ArtilleryEngine`)과 물리 코어(`physics/` — Q16 정수 탄도·삼각 정수표·
