@@ -5,7 +5,7 @@
 -- users 컬럼 화이트리스트는 건드리지 않는다.
 --
 -- end_reason: FINISHED / NO_HUMANS / ACTION_LIMIT (`docs/rules-yacht.md` §8.1).
--- 번호 주의: 병렬로 기획 중인 다른 게임(오목 등)도 다음 V 를 쓴다 — 먼저 main 에 들어간 쪽이 이 번호를 갖고, 늦은 쪽은 다음 번호로 바꾼다.
+-- 번호는 파일 이름에만 둔다 — 병렬 게임 작업은 관제가 번호 순서대로 병합하고, 순서가 바뀌면 파일 이름만 고친다. 이 파일은 요트 테이블만 만든다.
 
 CREATE TABLE yacht_match_results (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY,

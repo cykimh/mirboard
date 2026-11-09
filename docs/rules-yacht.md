@@ -214,7 +214,7 @@
 - 상대 전적: 최종 순위로 센다.
 
 - **코드:** `event/YachtEvent`(sealed, JSON 판별자 `@event`), `state/YachtStateMapper.toPublicView(state, turnRemainingMs)`(남은 시간은 어댑터가 `remainingMillis` 로 넣는다). 기록기·상대 전적은 S3.
-- **코드(S3):** `persistence/YachtMatchRecorder`(로컬 발행 `YachtMatchCompleted` 리스너, 1인 판은 바로 반환), `persistence/YachtHeadToHead`(최종 순위), `V13__yacht_match.sql`(`yacht_match_results`·`yacht_match_participants`).
+- **코드(S3):** `persistence/YachtMatchRecorder`(로컬 발행 `YachtMatchCompleted` 리스너, 1인 판은 바로 반환), `persistence/YachtHeadToHead`(최종 순위), 마이그레이션 `*__yacht_match.sql`(`yacht_match_results`·`yacht_match_participants` — 요트 테이블만).
 - **테스트(S3):** `infra/bot/YachtBotMatchSimulationIT`(2·4봇 판 기록, 사람 + 봇 판의 사람 전적·ELO 제외, 1인 판 기록 0행·전적 0·대기실 복귀), `infra/ws/YachtRecorderFailureTest`(기록 실패에도 마지막 `SCORED`·`MATCH_ENDED` 방송 + 대기실 복귀).
 - **테스트:** `YachtJsonRoundTripTest`(상태·액션·이벤트 JSON 왕복, envelope 이름, 상태 JSON 에 난수 관련 키 없음),
   시뮬레이션의 "이벤트만 듣는 클라" 대조(§11).

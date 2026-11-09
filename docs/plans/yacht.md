@@ -245,8 +245,8 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 
 - **탈주**(`desert`): §3.3-6. 사람이 남으면 `MATCH_CONTINUES`, 없으면 `MATCH_ENDED(NO_HUMANS)`. 이미 탈주한 좌석이면 `NOT_APPLICABLE`(D-122).
 - **정상 종료**: 사람만의 방·봇이 낀 방 모두 D-153·D-174 대로 대기실 복귀(인프라가 처리 — 요트는 손댈 것 없음).
-- **기록 V(다음 번호)**: `yacht_match_results`(room_id, finished_at, end_reason, payload_json) + `yacht_match_participants`(match_id, user_id, seat, final_rank,
-  total_score, is_win, deserted). 스컬킹·원카드의 2테이블 구조 그대로. 마이그레이션 번호는 착수 시점에 정한다(다른 기획 세션도 V13 을 노린다).
+- **기록(마이그레이션 `*__yacht_match.sql` — 번호는 관제가 병합 순서대로 파일 이름에만 붙인다)**: `yacht_match_results`(room_id, finished_at, end_reason, payload_json) + `yacht_match_participants`(match_id, user_id, seat, final_rank,
+  total_score, is_win, deserted). 스컬킹·원카드의 2테이블 구조 그대로이고 요트 테이블만 새로 만든다.
 - **`YachtMatchRecorder`**: 로컬 발행 `YachtMatchCompleted` 구독(D-116). 매치 기록기 계약 3가지(`RatedMatchPolicy.eloApplies` · 비봇 참가자마다
   `user_game_stats` · 발행 지점에서 실패 격리)를 따른다. 승리 = 1등(동순위면 모두). ELO 는 `EloCalculator.applyFreeForAll`, 점수 = 좌석 수 − 순위.
 - **1인 매치 (D-181)**: 결과·참가자·`user_game_stats` **아무것도 쓰지 않는다**. 셋 중 일부만 쓰면 게스트 정리 계약(기록기 계약 2)이 깨지고,
@@ -333,7 +333,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 | S0 | 결정 기록(D-181~D-183) + 이 기획 확정 — **완료** | — | 없음 | 사용자 승인 |
 | S1 | 룰 명세 `docs/rules-yacht.md`(§3.3 확정) — **완료** | S0 | 없음(문서) | 사용자 검토 |
 | S2 | 순수 엔진: 주사위·점수표·액션 검증·순위·불변식 + 시뮬레이션 — **완료**(테스트 85건, `rules-yacht.md` §11 실측) | S1 | 서버 신규 패키지(Docker 불필요) | `Scoring` 전수(7,776 × 12) · 거절 사유별 단위 테스트 · 1~4인 무작위 봇 2,000판 전부 종료 + 매 전이 불변식 |
-| S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(V13)·라운드 스타터·상대 전적. 정의 기본 `DISABLED`(관제 규칙 — 완성 전 카탈로그 비노출) — **완료**(`rules-yacht.md` §11 S3 실측) | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
+| S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(마이그레이션)·라운드 스타터·상대 전적. 정의 기본 `DISABLED`(관제 규칙 — 완성 전 카탈로그 비노출) — **완료**(`rules-yacht.md` §11 S3 실측) | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
 | S4 | 클라 게임판·점수표·주사위 판·튜토리얼·위키 — **완료**(클라 1,109건, 브라우저 실측 375px 가로 스크롤 0·주사위 56px·굴리기 44px) | S3 | 클라 | Vitest(스토어·sink·게임판·튜토리얼, `gameTables.test`·`gameTutorials.test` 원문 검사 통과) · 브라우저 실측(데스크톱·375px, 4인 점수표 가로 스크롤 없음, 44px) |
 | S5 | 공개 전 보강 → 공개 전환(운영 `MIRBOARD_YACHT_STATUS` 패턴, D-168 와 맞춰 결정) → 문서 수치 → 배포 | S4 | 서버·클라 | `check.sh` 전체, 운영 스모크(1인·봇 3·사람 2) |
 
