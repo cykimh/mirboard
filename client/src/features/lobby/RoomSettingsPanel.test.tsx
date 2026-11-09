@@ -114,54 +114,72 @@ describe('RoomSettingsPanel (D-161)', () => {
       ],
     });
 
-    it('카탈로그의 선택지만으로 줄을 그리고, 고르면 options 로 보낸다', () => {
+    it('카탈로그의 선택지만으로 줄을 그리고(문구는 오목 S4 가 채운 표), 고르면 options 로 보낸다', () => {
       const onChange = vi.fn();
       render(
         <RoomSettingsPanel
-          room={room({ gameType: 'TEAM_MODE_TEST', options: { TEAM_MODE: 'TEAMS_2V2' } })}
+          room={room({ gameType: 'TEAM_MODE_TEST', options: { TEAM_MODE: 'TEAMS_2V2' }, botSeats: [1] })}
           game={modeGame(['TEAM_MODE', 'BOT_LEVEL'])}
           canEdit
           onChange={onChange}
         />,
       );
 
-      const mode = screen.getByRole('group', { name: 'TEAM_MODE' });
-      expect(within(mode).getAllByRole('radio').map((r) => r.textContent)).toEqual(['SOLO', 'TEAMS_2V2']);
-      expect(within(mode).getByRole('radio', { name: 'TEAMS_2V2' })).toHaveAttribute('aria-checked', 'true');
+      const mode = screen.getByRole('group', { name: '모드' });
+      expect(within(mode).getAllByRole('radio').map((r) => r.textContent)).toEqual(['1:1', '2:2 팀전']);
+      expect(within(mode).getByRole('radio', { name: '2:2 팀전' })).toHaveAttribute('aria-checked', 'true');
       // 저장값이 없는 옵션은 기본값이 골라져 있다.
-      const bot = screen.getByRole('group', { name: 'BOT_LEVEL' });
-      expect(within(bot).getByRole('radio', { name: 'NORMAL' })).toHaveAttribute('aria-checked', 'true');
+      const bot = screen.getByRole('group', { name: '봇 난이도' });
+      expect(within(bot).getByRole('radio', { name: '보통' })).toHaveAttribute('aria-checked', 'true');
 
-      fireEvent.click(within(mode).getByRole('radio', { name: 'SOLO' }));
+      fireEvent.click(within(mode).getByRole('radio', { name: '1:1' }));
       expect(onChange).toHaveBeenCalledWith({ options: { TEAM_MODE: 'SOLO' } });
     });
 
     it('선언하지 않은 옵션은 선택지가 실려 와도 그리지 않는다', () => {
       render(
         <RoomSettingsPanel
-          room={room({ gameType: 'TEAM_MODE_TEST' })}
+          room={room({ gameType: 'TEAM_MODE_TEST', botSeats: [1] })}
           game={modeGame(['TEAM_MODE'])}
           canEdit
           onChange={() => {}}
         />,
       );
 
-      expect(screen.getByRole('group', { name: 'TEAM_MODE' })).toBeInTheDocument();
-      expect(screen.queryByRole('group', { name: 'BOT_LEVEL' })).toBeNull();
+      expect(screen.getByRole('group', { name: '모드' })).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: '봇 난이도' })).toBeNull();
+    });
+
+    it('봇 난이도는 봇이 앉은 방에서만 보인다', () => {
+      render(
+        <RoomSettingsPanel
+          room={room({ gameType: 'TEAM_MODE_TEST' })}
+          game={modeGame(['TEAM_MODE', 'BOT_LEVEL'])}
+          canEdit
+          onChange={() => {}}
+        />,
+      );
+
+      expect(screen.getByRole('group', { name: '모드' })).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: '봇 난이도' })).toBeNull();
     });
 
     it('방장이 아니면 지금 값만 보인다', () => {
       render(
         <RoomSettingsPanel
-          room={room({ gameType: 'TEAM_MODE_TEST', options: { TEAM_MODE: 'TEAMS_2V2', BOT_LEVEL: 'HARD' } })}
+          room={room({
+            gameType: 'TEAM_MODE_TEST',
+            options: { TEAM_MODE: 'TEAMS_2V2', BOT_LEVEL: 'HARD' },
+            botSeats: [1],
+          })}
           game={modeGame(['TEAM_MODE', 'BOT_LEVEL'])}
           canEdit={false}
           onChange={() => {}}
         />,
       );
 
-      expect(screen.getByText('TEAMS_2V2')).toBeInTheDocument();
-      expect(screen.getByText('HARD')).toBeInTheDocument();
+      expect(screen.getByText('2:2 팀전')).toBeInTheDocument();
+      expect(screen.getByText('어려움')).toBeInTheDocument();
     });
   });
 });

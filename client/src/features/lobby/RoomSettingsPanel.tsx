@@ -19,7 +19,17 @@ const RACE_VISIBILITY_LABEL: Record<RaceButtonVisibility, string> = {
  * D-176 — 값을 가진 방 옵션의 화면 문구(줄 이름·값 이름). 그 옵션을 처음 쓰는 게임 단계에서 채운다(오목은 S4). 비어 있으면 서버
  * 이름이 그대로 보인다 — 새 옵션이 화면에서 빠지지 않게 하려는 기본 경로다.
  */
-const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Record<string, string> }>> = {};
+const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Record<string, string> }>> = {
+  TEAM_MODE: { label: '모드', values: { SOLO: '1:1', TEAMS_2V2: '2:2 팀전' } },
+  OMOK_RULE: {
+    label: '룰',
+    values: { RENJU: '렌주(흑 33·44·장목 금지)', DOUBLE_THREE_ONLY: '삼삼만 금지', FREESTYLE: '자유 오목(흑이 유리해요)' },
+  },
+  BOT_LEVEL: { label: '봇 난이도', values: { EASY: '쉬움', NORMAL: '보통', HARD: '어려움' } },
+};
+
+/** 봇 난이도는 봇이 앉은 방에서만 뜻이 있다 — 봇이 없으면 줄을 숨긴다(값은 그대로라 나중에 봇을 채워도 그 값을 쓴다). */
+const NEEDS_BOTS: ReadonlySet<RoomOption> = new Set<RoomOption>(['BOT_LEVEL']);
 
 interface Props {
   room: Room;
@@ -88,6 +98,7 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
   // ROOM_OPTION_TEXT 에 더한다 — 없으면 서버 이름 그대로 보인다.
   for (const choice of game?.roomOptionChoices ?? []) {
     if (!options.includes(choice.option)) continue;
+    if (NEEDS_BOTS.has(choice.option) && (room.botSeats ?? []).length === 0) continue;
     const text = ROOM_OPTION_TEXT[choice.option];
     const current = room.options?.[choice.option];
     rows.push({

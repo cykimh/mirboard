@@ -1,0 +1,123 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import './testPointerEvent';
+import { OmokBoard } from './OmokBoard';
+import type { OmokPoint } from '@/types/omok';
+
+/** 판은 300×300 px 로 둔다 — 교차점 간격 20px, (0,0) 교차점이 (10,10). */
+const SIZE = 300;
+const at = (p: OmokPoint) => ({ clientX: 10 + p.x * 20, clientY: 10 + p.y * 20 });
+
+function setup(over: Partial<React.ComponentProps<typeof OmokBoard>> = {}) {
+  const setPreview = vi.fn();
+  const onConfirm = vi.fn();
+  const props: React.ComponentProps<typeof OmokBoard> = {
+    moves: [],
+    forbidden: [],
+    forbiddenIsMine: false,
+    preview: null,
+    pending: null,
+    myColor: 'BLACK',
+    winLine: [],
+    showNumbers: false,
+    enabled: true,
+    singleClick: false,
+    setPreview,
+    onConfirm,
+    ...over,
+  };
+  const utils = render(<OmokBoard {...props} />);
+  const svg = utils.container.querySelector('svg')!;
+  svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: SIZE, height: SIZE, right: SIZE, bottom: SIZE, x: 0, y: 0, toJSON: () => ({}) });
+  return { ...utils, svg, setPreview, onConfirm, props };
+}
+
+describe('OmokBoard — 두 단계 확정 (D-180)', () => {
+  it('누르면 가장 가까운 교차점에 미리보기를 둔다(확정하지 않는다)', () => {
+    const { svg, setPreview, onConfirm } = setup();
+    const p = at({ x: 4, y: 6 });
+    fireEvent.pointerDown(svg, { ...p, clientX: p.clientX + 6, clientY: p.clientY - 7, pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...p, pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 4, y: 6 });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('미리보기를 한 번 더 누르면 확정한다', () => {
+    const { svg, onConfirm } = setup({ preview: { x: 4, y: 6 } });
+    fireEvent.pointerDown(svg, { ...at({ x: 4, y: 6 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...at({ x: 4, y: 6 }), pointerId: 1, pointerType: 'touch' });
+    expect(onConfirm).toHaveBeenCalledWith({ x: 4, y: 6 });
+  });
+
+  it('손가락으로 끌면 미리보기가 1.5칸 위를 따라가고, 끈 뒤 떼면 확정하지 않는다', () => {
+    const { svg, setPreview, onConfirm } = setup({ preview: { x: 4, y: 6 } });
+    fireEvent.pointerDown(svg, { ...at({ x: 4, y: 6 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerMove(svg, { ...at({ x: 6, y: 9 }), pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 6, y: 8 }); // 9 − 1.5 = 7.5 → 반올림 8
+    fireEvent.pointerUp(svg, { ...at({ x: 6, y: 9 }), pointerId: 1, pointerType: 'touch' });
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('누른 칸 안의 작은 떨림은 끌기가 아니다 — 확정이 취소되지 않는다', () => {
+    const { svg, onConfirm } = setup({ preview: { x: 4, y: 6 } });
+    const p = at({ x: 4, y: 6 });
+    fireEvent.pointerDown(svg, { ...p, pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerMove(svg, { clientX: p.clientX + 4, clientY: p.clientY + 3, pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...p, pointerId: 1, pointerType: 'touch' });
+    expect(onConfirm).toHaveBeenCalledWith({ x: 4, y: 6 });
+  });
+
+  it('돌이 있는 자리에는 미리보기를 두지 않는다', () => {
+    const { svg, setPreview } = setup({ moves: [{ seat: 0, x: 4, y: 6, timedOut: false }] });
+    fireEvent.pointerDown(svg, { ...at({ x: 4, y: 6 }), pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).not.toHaveBeenCalled();
+  });
+
+  it('내 차례가 아니면(enabled=false) 아무것도 하지 않는다', () => {
+    const { svg, setPreview, onConfirm } = setup({ enabled: false, preview: { x: 1, y: 1 } });
+    fireEvent.pointerDown(svg, { ...at({ x: 1, y: 1 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...at({ x: 1, y: 1 }), pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('om-preview')).toBeNull();
+  });
+
+  it('마우스 한 번 클릭 설정이면 마우스 클릭 한 번에 확정하고, 손가락은 그래도 두 단계다', () => {
+    const mouse = setup({ singleClick: true });
+    fireEvent.pointerDown(mouse.svg, { ...at({ x: 2, y: 3 }), pointerId: 1, pointerType: 'mouse' });
+    fireEvent.pointerUp(mouse.svg, { ...at({ x: 2, y: 3 }), pointerId: 1, pointerType: 'mouse' });
+    expect(mouse.onConfirm).toHaveBeenCalledWith({ x: 2, y: 3 });
+    mouse.unmount();
+
+    const touch = setup({ singleClick: true });
+    fireEvent.pointerDown(touch.svg, { ...at({ x: 2, y: 3 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(touch.svg, { ...at({ x: 2, y: 3 }), pointerId: 1, pointerType: 'touch' });
+    expect(touch.onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('키보드: 화살표로 미리보기를 옮기고 Enter 로 확정한다', () => {
+    const { svg, setPreview, onConfirm, rerender, props } = setup();
+    fireEvent.keyDown(svg, { key: 'ArrowRight' });
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 8, y: 7 });
+    rerender(<OmokBoard {...props} preview={{ x: 8, y: 7 }} />);
+    fireEvent.keyDown(svg, { key: 'Enter' });
+    expect(onConfirm).toHaveBeenCalledWith({ x: 8, y: 7 });
+  });
+
+  it('돌·금수 ✕·승리 줄을 그린다', () => {
+    const { container } = setup({
+      moves: [
+        { seat: 0, x: 1, y: 1, timedOut: false },
+        { seat: 1, x: 2, y: 2, timedOut: false },
+      ],
+      forbidden: [{ x: 5, y: 5, kind: 'DOUBLE_THREE' }],
+      winLine: [
+        { x: 0, y: 0 },
+        { x: 4, y: 4 },
+      ],
+    });
+    expect(screen.getAllByTestId('om-stone').map((s) => s.getAttribute('data-color'))).toEqual(['BLACK', 'WHITE']);
+    expect(container.querySelector('.om-forbidden[data-kind="DOUBLE_THREE"]')).not.toBeNull();
+    expect(container.querySelector('.om-winline')).not.toBeNull();
+  });
+});

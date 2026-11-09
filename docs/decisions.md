@@ -178,6 +178,13 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-190 (2026-11-09) — 오목 공개(기본 AVAILABLE)
+
+사용자 결정 — 새 게임은 게임판이 완성되는 대로 바로 공개한다. 오목 S4(클라 게임판)가 끝나 `mirboard.omok.status` 기본값을 `AVAILABLE` 로 바꾼다
+(`@Value`·`application.yml` 두 곳). 운영 `fly.toml [env]` 에는 덮어쓰기 줄을 두지 않고, 되돌리기는 원카드와 같이 시크릿
+`MIRBOARD_OMOK_STATUS`(`COMING_SOON`·`DISABLED`, `docs/deploy.md`). 카탈로그 게임 수 테스트 3곳(4종, 이름순 스컬킹·오목·원카드·티츄)과
+화면 자동 점검 `client/e2e/practice.e2e.ts` 에 오목을 더한다. 원래 계획의 S5(공개 전환)는 여기로 앞당겼고, 남은 것은 문서 수치 정리다.
+
 ## D-184 (2026-11-09) — 모든 게임 공개: 티츄·스컬킹 다시 열기, 새 게임은 게임판 완성 즉시
 
 사용자 결정("다 일단 바로 공개하자"). D-168 의 "당분간 원카드만"을 되돌려 운영 `fly.toml [env]` 의 `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS

@@ -2,6 +2,7 @@ import { TICHU_TUTORIAL } from '@/features/tichu/tutorial/tichuTutorial';
 import { SKULL_KING_TUTORIAL } from '@/features/skullking/tutorial/skullkingTutorial';
 import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
 import { YACHT_TUTORIAL } from '@/features/yacht/tutorial/yachtTutorial';
+import { OMOK_TUTORIAL } from '@/features/omok/tutorial/omokTutorial';
 import type { GameTutorial } from './types';
 
 /**
@@ -16,6 +17,7 @@ export const GAME_TUTORIALS: Readonly<Record<string, GameTutorial>> = {
   SKULL_KING: SKULL_KING_TUTORIAL,
   ONE_CARD: ONE_CARD_TUTORIAL,
   YACHT: YACHT_TUTORIAL,
+  OMOK: OMOK_TUTORIAL,
 };
 
 /** 서버 게임 id(`TICHU` 등)로 조회한다. 대소문자는 `loadGame` 과 같이 대문자로 정규화한다. */

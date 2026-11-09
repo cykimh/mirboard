@@ -28,6 +28,8 @@ test('게스트로 바로 들어가면 허브가 보인다', async () => {
 const GAMES = [
   { name: '원카드', board: '.oc-table' },
   { name: '요트', board: '.yt-table' },
+  // D-190 — 오목(1:1 기본 정원 2 — 봇 하나를 채워 [2명으로 시작]).
+  { name: '오목', board: '.om-table' },
   { name: '스컬킹', board: '.sk-table' },
   { name: '티츄', board: '.game-table-layout' },
 ] as const;

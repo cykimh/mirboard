@@ -135,4 +135,20 @@ describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () =
     openModal([FIXED]);
     expect(screen.getByRole('button', { name: '방 만들기' })).toBeDisabled();
   });
+
+  it('D-176 — 정원을 방 설정이 정하는 게임(값을 가진 방 옵션)은 capacity 를 보내지 않는다', async () => {
+    const BY_SETTINGS: GameSummary = {
+      ...VARIABLE,
+      id: 'OMOK',
+      displayName: '오목',
+      minPlayers: 2,
+      maxPlayers: 4,
+      roomOptionChoices: [{ option: 'TEAM_MODE', values: ['SOLO', 'TEAMS_2V2'], defaultValue: 'SOLO' }],
+    };
+    openModal([BY_SETTINGS]);
+    expect(screen.getByText('2~4명 — 대기실의 게임 설정(모드)이 정원을 정해요')).toBeInTheDocument();
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(lastCreateOpts().capacity).toBeUndefined();
+  });
 });

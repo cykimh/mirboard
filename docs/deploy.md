@@ -348,6 +348,18 @@ FINISHED 전이·티츄 칩 정산과 리매치 대기). 대신 Sentry 에 ERROR
 
 ---
 
+
+## 오목 공개 상태 (`MIRBOARD_OMOK_STATUS`, D-190)
+
+원카드와 같은 손잡이다 — 코드 기본값 `AVAILABLE`(공개), 운영에서는 시크릿으로만 덮어쓰고 `fly.toml [env]` 에는 두지 않는다. 값의 뜻도 같다
+(`COMING_SOON` — 카탈로그 "준비 중"·새 방 거절, `DISABLED` — 카탈로그에서도 뺌, 진행 중인 방은 그대로 끝까지).
+
+```bash
+# 되돌리기(새 오목 방 막기)
+flyctl secrets set MIRBOARD_OMOK_STATUS=COMING_SOON -a mirboard
+# 다시 열기(시크릿을 지워 코드 기본값 — 공개)
+flyctl secrets unset MIRBOARD_OMOK_STATUS -a mirboard
+```
 ## 운영 Redis (D-171)
 
 `mirboard-redis` 는 Flycast 사설 주소(`mirboard-redis.flycast:6379`)로만 받고, Fly 프록시가 연결이 없으면 머신을 멈춘다. 앱이 켜지며

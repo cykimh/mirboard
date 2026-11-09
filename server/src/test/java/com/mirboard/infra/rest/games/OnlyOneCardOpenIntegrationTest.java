@@ -65,14 +65,16 @@ class OnlyOneCardOpenIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(4))
-                // 열린 두 게임이 이름순(요트·원카드)으로 먼저, 닫힌 두 게임이 뒤에.
-                .andExpect(jsonPath("$.games[0].id").value("YACHT"))
+                .andExpect(jsonPath("$.games.length()").value(5))
+                // D-190·D-200 — 오목·요트도 공개라 열린 게임 셋이 이름순(오목 · 요트 · 원카드)으로 앞에, 닫힌 두 게임이 뒤에.
+                .andExpect(jsonPath("$.games[0].id").value("OMOK"))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[1].id").value("YACHT"))
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
-                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[2].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"))
+                .andExpect(jsonPath("$.games[4].status").value("COMING_SOON"));
     }
 
     @Test
