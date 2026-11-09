@@ -81,6 +81,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].maxPlayers").value(4))
                 .andExpect(jsonPath("$.games[0].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[0].playerCounts").value(org.hamcrest.Matchers.contains(2, 3, 4)))
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(30))
                 .andExpect(jsonPath("$.games[0].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 15, 30, 60)))
@@ -92,6 +93,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions").isArray())
                 .andExpect(jsonPath("$.games[1].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[1].playerCounts").value(org.hamcrest.Matchers.contains(2, 3, 4, 5, 6, 7, 8)))
                 // D-130 — 방 만들기의 처음 선택. 재정의하지 않은 게임은 최대 인원·턴 제한 끔(지금까지와 같다).
                 .andExpect(jsonPath("$.games[1].defaultPlayers").value(8))
                 .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(0))
@@ -104,6 +106,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[2].maxPlayers").value(4))
                 .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[2].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[2].playerCounts").value(org.hamcrest.Matchers.contains(2, 3, 4)))
                 .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(30))
                 .andExpect(jsonPath("$.games[2].turnSecondsChoices").value(org.hamcrest.Matchers.contains(20, 30, 45, 60)))
@@ -115,6 +118,8 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[3].supportedRoomOptions").value(
                         org.hamcrest.Matchers.contains("TEAM_MODE", "OMOK_RULE", "BOT_LEVEL")))
                 .andExpect(jsonPath("$.games[3].status").value("AVAILABLE"))
+                // D-196 — 할 수 있는 인원: 모드가 정원을 정해(1:1 → 2, 2:2 → 4) 3명은 없다. 나머지 게임은 min..max 그대로.
+                .andExpect(jsonPath("$.games[3].playerCounts").value(org.hamcrest.Matchers.contains(2, 4)))
                 .andExpect(jsonPath("$.games[3].defaultPlayers").value(2))
                 .andExpect(jsonPath("$.games[3].defaultTurnSeconds").value(30))
                 .andExpect(jsonPath("$.games[3].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 15, 30, 60)))
@@ -125,6 +130,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[4].maxPlayers").value(4))
                 .andExpect(jsonPath("$.games[4].supportedRoomOptions.length()").value(0))
                 .andExpect(jsonPath("$.games[4].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[4].playerCounts").value(org.hamcrest.Matchers.contains(1, 2, 3, 4)))
                 .andExpect(jsonPath("$.games[4].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[4].defaultTurnSeconds").value(45))
                 .andExpect(jsonPath("$.games[4].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 20, 30, 45, 60)))
@@ -137,6 +143,7 @@ class GameCatalogIntegrationTest {
                         org.hamcrest.Matchers.contains("RACE_BUTTON_SIZE", "RACE_BUTTON_VISIBILITY")))
                 // D-131 — 공개. 설정을 주지 않은 컨텍스트의 기본값이다.
                 .andExpect(jsonPath("$.games[5].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[5].playerCounts").value(org.hamcrest.Matchers.contains(2, 3, 4, 5, 6)))
                 // D-130 — 원카드만 4명·30초를 선언한다(설계 §3.1 기본 4, 버티기 대응).
                 .andExpect(jsonPath("$.games[5].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[5].defaultTurnSeconds").value(30))
@@ -154,6 +161,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[6].supportedRoomOptions[1]").value("TEAMS"))
                 .andExpect(jsonPath("$.games[6].supportedRoomOptions[2]").value("BETTING"))
                 .andExpect(jsonPath("$.games[6].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[6].playerCounts").value(org.hamcrest.Matchers.contains(4)))
                 .andExpect(jsonPath("$.games[6].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[6].defaultTurnSeconds").value(0));
     }
@@ -169,6 +177,7 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.supportedRoomOptions.length()").value(3))
                 .andExpect(jsonPath("$.defaultPlayers").value(4))
                 .andExpect(jsonPath("$.defaultTurnSeconds").value(0))
+                .andExpect(jsonPath("$.playerCounts").value(org.hamcrest.Matchers.contains(4)))
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
     }
 

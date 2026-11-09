@@ -80,6 +80,37 @@ public interface GameDefinition {
         return minPlayers();
     }
 
+    /**
+     * D-196 — 이 게임을 실제로 할 수 있는 인원(오름차순, 중복 없음). 카탈로그가 실어 메인 카드가 "2~4인"·"2·4인"을 고른다.
+     * 선언한 맵 옵션의 값 조합마다 {@link #playersToStart}..{@link #capacityFor} 를 모은 합집합이라 게임 이름을 몰라도 된다 —
+     * 맵 옵션이 없으면 {@code minPlayers()..maxPlayers()}(지금 동작). 오목은 1:1 → 2, 2:2 → 4 라 [2, 4].
+     */
+    default java.util.List<Integer> playerCounts() {
+        java.util.List<RoomOption> valued = supportedRoomOptions().stream().filter(RoomOption::valued).sorted().toList();
+        java.util.List<java.util.Map<RoomOption, String>> combos = new java.util.ArrayList<>();
+        combos.add(new java.util.EnumMap<>(RoomOption.class));
+        for (RoomOption option : valued) {
+            java.util.List<java.util.Map<RoomOption, String>> next = new java.util.ArrayList<>();
+            for (java.util.Map<RoomOption, String> partial : combos) {
+                for (String value : option.choices()) {
+                    java.util.Map<RoomOption, String> combo = new java.util.EnumMap<>(RoomOption.class);
+                    combo.putAll(partial);
+                    combo.put(option, value);
+                    next.add(combo);
+                }
+            }
+            combos = next;
+        }
+        java.util.SortedSet<Integer> counts = new java.util.TreeSet<>();
+        for (java.util.Map<RoomOption, String> combo : combos) {
+            java.util.Map<RoomOption, String> options = java.util.Collections.unmodifiableMap(combo);
+            for (int n = playersToStart(options); n <= capacityFor(options); n++) {
+                counts.add(n);
+            }
+        }
+        return java.util.List.copyOf(counts);
+    }
+
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
     GameEngine newEngine(GameContext ctx);
 }

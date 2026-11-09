@@ -38,6 +38,7 @@ import {
 import { avatarSrc } from '@/api/avatar';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { tutorialFor } from '@/features/tutorial/gameTutorials';
+import { playerCountLabel } from '@/features/lobby/playerCountLabel';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -300,9 +301,8 @@ export function GameHubPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="px-4 pb-1 text-xs text-muted-foreground">
-                      {game.minPlayers === game.maxPlayers
-                        ? `${game.maxPlayers}인 플레이`
-                        : `${game.minPlayers}~${game.maxPlayers}인 플레이`}
+                      {/* D-196 — 서버가 준 할 수 있는 인원으로(오목은 2·4인). */}
+                      {`${playerCountLabel(game)} 플레이`}
                     </CardContent>
                     <CardFooter className="mt-auto gap-3 px-4 pb-3 pt-1">
                       {!available && (

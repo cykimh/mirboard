@@ -44,7 +44,7 @@ public class GameCatalogController {
      * 게임이 안 쓰는 설정을 화면에 띄우지 않기 위한 것이며, 서버도 같은 집합으로 검증한다.
      *
      * <p>D-130 — `defaultPlayers`·`defaultTurnSeconds` 는 방 만들기 모달의 처음 선택이다(사용자는 바꿀 수 있다). D-154 —
-     * `turnSecondsChoices` 는 모달의 턴 제한 선택지다.
+     * `turnSecondsChoices` 는 모달의 턴 제한 선택지다. D-196 — `playerCounts` 는 할 수 있는 인원(오름차순)이다.
      */
     public record GameSummary(
             String id,
@@ -57,7 +57,8 @@ public class GameCatalogController {
             int defaultPlayers,
             int defaultTurnSeconds,
             List<Integer> turnSecondsChoices,
-            List<RoomOptionChoices> roomOptionChoices) {
+            List<RoomOptionChoices> roomOptionChoices,
+            List<Integer> playerCounts) {
 
         static GameSummary of(GameDefinition d) {
             return new GameSummary(
@@ -75,7 +76,9 @@ public class GameCatalogController {
                     // D-176 — 선언한 맵 옵션의 선택지·기본값. 대기실이 옵션 이름만 보고 줄을 그릴 수 있게(게임별 화면 코드 없이).
                     d.supportedRoomOptions().stream().sorted().filter(RoomOption::valued)
                             .map(o -> new RoomOptionChoices(o, o.choices(), o.defaultValue()))
-                            .toList());
+                            .toList(),
+                    // D-196 — 할 수 있는 인원(게임 선언 — 맵 옵션 조합의 시작 인원..정원 합집합). 메인 카드의 인원 표기.
+                    d.playerCounts());
         }
     }
 

@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1825건 중 1567건(86%)이 Docker 불필요**합니다(D-200 시점, 부록 (6)).
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1955건 중 1679건(86%)이 Docker 불필요**합니다(D-196 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -339,7 +339,50 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 
 ---
 
-## §10 다섯 번째 게임 — 한 차례에 결정이 여럿인 게임 (구름항로, D-210~D-214)
+## §10 다섯 번째 게임 — 방 설정이 정원과 룰을 정하는 게임 (오목, D-175~D-180·D-190)
+
+**문제** — 오목은 방장이 대기실에서 모드(1:1 / 2:2 팀전)·룰(렌주 / 삼삼만 금지 / 자유 오목)·봇 난이도를 고릅니다(D-175·D-177·D-179).
+그런데 엔진에 들어가는 방 설정은 `GameContext(roomId, playerIds, targetScore, stake, botSeats)` 뿐이었고, 정원은 카탈로그의 상수
+(`maxPlayers`)였습니다. 모드가 정원을 정하는 게임 — 1:1 이면 2명, 2:2 면 4명, 3명으로는 시작할 수 없다 — 을 포트가 말할 수 없었습니다.
+
+**후보와 배제**
+
+- 옵션마다 `Room` 필드 추가(원카드 버튼 크기·찾기 난이도가 그랬다) — 옵션 하나에 Redis 필드·Lua·REST·클라 타입이 같이 는다. 세 개면 세 배.
+- 로비가 오목 모드를 알고 정원을 정한다 — `domain.lobby` → 게임 직접 의존 금지(도메인 경계) 위반.
+- **선택: 게임 중립 확장 3건**(D-176) — ① 값을 가진 옵션은 `Room.options` 맵(`opt:<NAME>`) 하나에, ② 정원·시작 인원은
+  `GameDefinition.capacityFor/playersToStart(options)`(기본 `maxPlayers`·`minPlayers` — 다른 게임 0줄), ③ 엔진은 `GameContext.options` 로
+  선언한 옵션 값만 받는다. 상수 이름도 게임 중립(`TEAM_MODE`·`BOT_LEVEL`, 오목 전용은 `OMOK_RULE` 하나)이라 다음 게임이 그대로 선언하면 됩니다.
+
+**결과** — 확장 커밋(`333feef`)의 공용 서버 변경은 core 3파일(`GameContext`·`GameDefinition`·`RoomOption`)·로비 5파일(방 저장·설정 변경·
+`TOO_MANY_PLAYERS`)·인프라 3파일(카탈로그가 선택지를 싣고, 오류 코드 한 줄, `GameEngineProvider` 가 옵션을 넘김)이고, 인프라에 게임 이름
+분기는 없습니다 — `grep -rniE 'omok|오목' …/infra` → **0건**. 같은 날 붙은 요트의 `turnSeconds` 는 이 레코드 끝에 붙였습니다(§9).
+비공개 뷰는 `Optional.empty()` 입니다. D-175 는 "요트 가정으로만 있던 비공개 뷰 없음을 처음 실제로 쓴다"고 적었지만, 같은 날 구름항로·요트
+어댑터가 각각 42분·17분 먼저 main 에 들어가 세 게임이 함께 실증했습니다 — 포트 판단 2(`privateView` 는 Optional)가 손대지 않고 통과한 셈입니다.
+클라 머지(`6ad51b8`)는 30파일 +2,490/−20 이고 공용 파일은 `RoomPage`(분기·종료 뒤 게임판 유지·2:2 면 "팀 배정" 라벨)·지연 로딩 한 줄·
+튜토리얼·위키 한 항목·CSS 진입점·대기실 설정 패널(옵션 문구 표)·방 만들기 창이고, `useStompRoom` 은 0줄입니다. 오목 도메인 2,838줄(부록 (8)).
+
+**대가 — 옵션이 닿아야 할 길이 하나 더 있었다.** 확장 3건은 "엔진이 옵션을 받는다"를 풀었지만, 포트 밖에서 정원·시작을 정하던 길 두 곳이
+남아 있었습니다. ① 판 시작(색·첫 수 추첨 후 `startMatch`)은 엔진이 아니라 `GameStartingEvent` 를 받는 스타터가 해서, 모드·룰이 판 시작에 닿지 않았습니다 —
+시작 이벤트에도 같은 값을 실었습니다(D-176 S3b 보정, 4인자 생성자는 빈 맵으로 유지). ② 단위 테스트를 다 통과한 뒤 브라우저에서 오목 방을
+만들자 "허용되지 않은 방 인원"으로 거절됐습니다 — 방 만들기 창이 정원으로 게임 최대 인원(4)을 보냈는데 오목 기본 설정(1:1)의 정원은 2입니다.
+가짜 게임 테스트는 방 만들기 창을 거치지 않아 잡지 못했습니다 → 값을 가진 옵션을 선언한 게임은 정원을 보내지 않습니다(서버 기본 = 기본
+설정의 정원). 세 번째 게임이 **시간 모델**을, 네 번째 게임이 **입력 모델**을 고쳤다면 다섯 번째 게임은 정원이 상수라는 **방 모델**을 고쳤습니다.
+
+**봇 — 측정 방법부터 고쳤다.** 봇이 결정적이라 여는 두 수가 판을 정합니다. 흑·백에 서로 다른 여는 수를 주자 같은 봇끼리도 0.36 이 나와,
+여는 수 하나로 흑백을 바꿔 두 판씩 두는 듀플리케이트로 쟀습니다(200판). 보통 대 무작위 1.000 · 보통 대 쉬움 0.925 · **어려움 대 보통 0.700**
+— 목표 0.8 에 못 미쳐 테스트 기준을 0.65 로 두고 부채로 남겼습니다(노드 상한을 15만 → 30만으로 올려도 0.718 — 예산이 아니라 탐색 구조의
+한계). 봇은 방 액션 락(2초 TTL) 안에서 계산하므로 시간이 아니라 **노드 수**로 상한을 둡니다(같은 국면 같은 수). 로컬 국면 1,000개에서 어려움
+p99 46.5ms · 최대 노드 88,356.
+
+`코드:` `domain/game/core/GameDefinition.java`(`capacityFor`·`playersToStart`) · `domain/game/core/RoomOption.java`(`TEAM_MODE`·`OMOK_RULE`·
+`BOT_LEVEL`) · `domain/game/core/GameStartingEvent.java`(`options`) · `domain/game/omok/OmokGameDefinition.java` · `domain/game/omok/bot/` ·
+`client/src/features/lobby/CreateRoomModal.tsx` · `테스트:` `OmokGameDefinitionTest` · `OmokServerFlowIT`(2:2 설정 → 정원 4 → 봇 완주 ·
+시간 초과 두 번째에 팀 시간패 · resync 에 `privateHand` 없음) · `OmokBotStrengthTest`·`OmokBotBudgetTest` · `CreateRoomModal.test` ·
+`결정:` D-175 · D-176 · D-177 · D-178 · D-179 · D-180 · D-190
+
+---
+
+## §11 여섯 번째 게임 — 한 차례에 결정이 여럿인 게임 (구름항로, D-210~D-214)
 
 주사위·부동산 장르의 독창 게임(이름·판·카드 새로 만듦)을 붙였습니다. 이 장르는 한 차례에 결정이 여럿입니다 — 굴린 뒤 살지, 몇
 단계까지 지을지, 통행료를 낸 뒤 인수할지, 축제를 어디에 열지. 포트는 "좌석이 액션 하나를 낸다"만 알고, 인프라는 성공한 액션마다 턴
@@ -394,7 +437,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1825 skipped=5 failed=0 dockerfree=1567 (86%)   (D-200 시점 — 요트·오목·구름항로 도메인 포함. D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
+# → tests=1955 skipped=5 failed=0 dockerfree=1679 (86%)   (D-196 시점 — 여섯 게임 공개 뒤, 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -402,19 +445,29 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8~§10) — main 소스 줄 수
-for d in core tichu skullking onecard yacht cloudroute; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8~§11) — main 소스 줄 수
+for d in core tichu skullking onecard yacht omok cloudroute; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 684 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170, GameEngine.java 184   (D-200 시점 — D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840, GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
 grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
 git diff --stat 5d36395^ 5d36395 -- server/src/main/java/com/mirboard/infra server/src/main/java/com/mirboard/domain/game/core
 git diff --name-only 26f011f^ 26f011f -- client/src | grep -vE 'features/yacht|types/yacht|20-yacht|yachtCss'
+
+# (10) 다섯 번째 게임(§10) — 인프라가 이름을 아는가 / 게임 중립 확장(S3a)의 공용 서버 파일 / S3b 의 공용 파일 / 클라 통합 규모·공용 파일(S4)
+grep -rniE 'omok|오목' server/src/main/java/com/mirboard/infra   # → 0건
+git diff --stat 333feef^ 333feef -- server/src/main/java | tail -1   # → 11 files (core 3 · lobby 5 · infra 3)
+git diff --name-status 3e407c0^ 3e407c0 -- server/src/main | grep -v domain/game/omok   # → GameStartingEvent·UserGameStatsService·RoomService·application.yml·마이그레이션
+git diff --stat 6ad51b8^ 6ad51b8 -- client/src | tail -1   # → 30 files changed, 2490 insertions(+), 20 deletions(-)
+git diff --name-only 6ad51b8^ 6ad51b8 -- client/src | grep -vE 'features/omok|types/omok|20-omok|omokCss'
+./gradlew :server:test --tests 'com.mirboard.domain.game.omok.*'   # → 오목 도메인 144건(Docker 불필요 138 — Docker 는 OmokMatchRecorderIT 6건만, 봇 강도 듀플리케이트 200판 포함)
+npm --prefix client run test -- omok   # → 33건(게임판·스토어·판 입력·튜토리얼 28 + CSS 네임스페이스 5)
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·
 [rules-skullking.md](rules-skullking.md)(룰 ↔ 코드 1:1) ·
 [rules-onecard.md](rules-onecard.md) · [plans/onecard.md](plans/onecard.md)(세 번째 게임 설계·단계) ·
 [rules-yacht.md](rules-yacht.md) · [plans/yacht.md](plans/yacht.md)(네 번째 게임) ·
-[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-181 ~ D-183, D-200)
+[rules-omok.md](rules-omok.md) · [plans/omok.md](plans/omok.md)(다섯 번째 게임) ·
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-200)

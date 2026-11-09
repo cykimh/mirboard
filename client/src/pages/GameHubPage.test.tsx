@@ -110,6 +110,23 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
     ).toBeInTheDocument();
   });
 
+  it('게임 카드의 인원은 서버가 준 playerCounts 로 — 끊기면 "2·4인" (D-196)', async () => {
+    catalog.mockResolvedValue({
+      games: [
+        { ...game('OMOK', '오목'), minPlayers: 2, maxPlayers: 4, playerCounts: [2, 4] },
+        { ...game('TICHU', '티츄'), minPlayers: 4, maxPlayers: 4, playerCounts: [4] },
+        game('SKULL_KING', '스컬킹'),
+      ],
+    });
+    renderHub();
+
+    expect(await screen.findByText('2·4인 플레이')).toBeInTheDocument();
+    expect(screen.getByText('4인 플레이')).toBeInTheDocument();
+    // playerCounts 없는 픽스처는 min..max.
+    expect(screen.getByText('2~8인 플레이')).toBeInTheDocument();
+    expect(screen.queryByText('2~4인 플레이')).toBeNull();
+  });
+
   it('빈 localStorage 로 마운트해도 허브는 튜토리얼을 자동으로 열지 않는다', async () => {
     renderHub();
 

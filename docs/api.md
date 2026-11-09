@@ -153,7 +153,26 @@
       "supportedRoomOptions": [],
       "defaultPlayers": 8,
       "defaultTurnSeconds": 0,
-      "turnSecondsChoices": [0, 30, 60, 90]
+      "turnSecondsChoices": [0, 30, 60, 90],
+      "playerCounts": [2, 3, 4, 5, 6, 7, 8]
+    },
+    {
+      "id": "OMOK",
+      "displayName": "오목",
+      "shortDescription": "15×15 판에 다섯 개를 먼저 잇는다. 1:1 이나 2:2 팀전(같은 팀이 같은 색을 번갈아), 렌주 금수를 고를 수 있다.",
+      "minPlayers": 2,
+      "maxPlayers": 4,
+      "status": "AVAILABLE",
+      "supportedRoomOptions": ["TEAM_MODE", "OMOK_RULE", "BOT_LEVEL"],
+      "defaultPlayers": 2,
+      "defaultTurnSeconds": 30,
+      "turnSecondsChoices": [0, 15, 30, 60],
+      "roomOptionChoices": [
+        { "option": "TEAM_MODE", "values": ["SOLO", "TEAMS_2V2"], "defaultValue": "SOLO" },
+        { "option": "OMOK_RULE", "values": ["RENJU", "DOUBLE_THREE_ONLY", "FREESTYLE"], "defaultValue": "RENJU" },
+        { "option": "BOT_LEVEL", "values": ["EASY", "NORMAL", "HARD"], "defaultValue": "NORMAL" }
+      ],
+      "playerCounts": [2, 4]
     },
     {
       "id": "YACHT",
@@ -165,7 +184,8 @@
       "supportedRoomOptions": [],
       "defaultPlayers": 4,
       "defaultTurnSeconds": 45,
-      "turnSecondsChoices": [0, 20, 30, 45, 60]
+      "turnSecondsChoices": [0, 20, 30, 45, 60],
+      "playerCounts": [1, 2, 3, 4]
     },
     {
       "id": "ONE_CARD",
@@ -177,7 +197,8 @@
       "supportedRoomOptions": [],
       "defaultPlayers": 4,
       "defaultTurnSeconds": 30,
-      "turnSecondsChoices": [0, 5, 10, 20, 30]
+      "turnSecondsChoices": [0, 5, 10, 20, 30],
+      "playerCounts": [2, 3, 4, 5, 6]
     },
     {
       "id": "TICHU",
@@ -190,7 +211,8 @@
       "defaultPlayers": 4,
       "defaultTurnSeconds": 0,
       "turnSecondsChoices": [0, 30, 60, 90],
-      "roomOptionChoices": []
+      "roomOptionChoices": [],
+      "playerCounts": [4]
     }
   ]
 }
@@ -198,6 +220,9 @@
 - D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`)의 선택지와 기본값이다
   (`[{ "option": "TEAM_MODE", "values": ["SOLO", "TEAMS_2V2"], "defaultValue": "SOLO" }]`, enum 선언 순서). 세 게임은 빈 배열이다.
   대기실은 이것만 보고 설정 줄을 그린다. 방의 값은 Room 의 `options`.
+- D-196 — `playerCounts` 는 **할 수 있는 인원**(오름차순, 중복 없음)이다. 게임이 선언한 맵 옵션의 값 조합마다 시작 인원(`playersToStart`)~정원
+  (`capacityFor`)을 모은 합집합이라, 모드가 정원을 정하는 오목은 `[2, 4]`(3명 없음)이고 맵 옵션이 없는 게임은 `minPlayers..maxPlayers` 그대로다.
+  메인 게임 카드가 이것으로 "2~4인"(이어짐)·"2·4인"(끊김)을 고른다. `minPlayers`·`maxPlayers` 는 그대로 남는다(가산 필드).
 - D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
