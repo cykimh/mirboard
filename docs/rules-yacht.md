@@ -269,6 +269,17 @@
   **봇 실측(시드 고정)**: 1인 1,000판 평균 총점 — 휴리스틱 177.2 · 탐욕(한 번 굴리고 바로 최고점) 77.8 · 무작위(포트 기본) 39.0. 탐욕 봇과 1:1 500판 승률 1.00.
   결정당 계산은 주사위 묶음 252가지 점수를 미리 계산해 두고 조회만 한다(처음 구현은 결정마다 전수 계산이라 1,000판이 2분을 넘겼다).
 
+## 11b. 클라 (S4)
+
+클라는 판정하지 않는다 — 점수·후보 점수·거절은 전부 서버 값이다. 경로는 `client/src/features/yacht/` 기준.
+
+- **코드(S4):** `YachtTable`(조립 루트·자기 소켓 — D-103), `yachtStore`(순번 없는 순수 리듀서, 결과값 이벤트), `yachtRoomSink`(거절 문구 — `HOLD_UNCHANGED` 는 조용히),
+  `DiceTray`(홀드 = 실제 `<button aria-pressed>`), `YachtScorecard`(칸 × 좌석, 차례 열 후보 점수, 내 차례면 칸이 버튼 — 0점은 확인 창), `YachtTurnCountdown`
+  (`tableView.turnRemainingMs` 기준 — §6), `YachtMatchEnd`, `tutorial/`(6단계 + "어디에 넣을까?" 퀴즈), CSS `styles/parts/20-yacht-table.css`(`.yt-`).
+- **홀드 전송**: 마지막 탭 뒤 250ms 에 마스크 전체를 한 번(`HOLD`), 굴리기는 지금 홀드를 실어 바로(§4-2). 내 좌석의 `DICE_HELD` 메아리는 반영하지 않는다.
+- **테스트(S4):** `YachtTable.test`(14), `yachtStore.test`(11 — sink 포함), `tutorial/yachtTutorial.test`(3), `styles/yachtCssNamespace.test`(5),
+  `gameTables.test`·`gameTutorials.test`·`gameWiki.test` 에 요트 추가. 클라 전체 1,109건.
+
 ## 12. 범위 밖 (v1)
 
 동시 진행(방 옵션 후보), 2~6인, 요트 추가 보너스·조커 규칙, 13칸 변형, 개인 최고 점수(1인 판 기록), 내기 칩, 하우스 룰 방 옵션.

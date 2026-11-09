@@ -13,7 +13,11 @@ describe('gameWikiUrl', () => {
     expect(gameWikiUrl('SKULL_KING')).toContain('boardgamegeek.com');
   });
 
+  it('요트는 나무위키 일반 주사위 게임 문서다(상표 게임 문서가 아니다)', () => {
+    expect(decodeURIComponent(gameWikiUrl('YACHT')!)).toBe('https://namu.wiki/w/요트(주사위 게임)');
+  });
+
   it('없는 게임은 undefined — "자세히" 링크를 그리지 않는다', () => {
-    expect(gameWikiUrl('YACHT')).toBeUndefined();
+    expect(gameWikiUrl('NOT_A_GAME')).toBeUndefined();
   });
 });
