@@ -148,6 +148,30 @@ class CloudRouteMatchSimulationTest {
         }
     }
 
+    /** D-215 — 판 길이 셋(짧게·보통·길게)이 모두 끝나고 상한을 지키며, 길이 순서대로 판이 길어진다. 봇 정책 인원별 500판. */
+    @ParameterizedTest(name = "{0}인 판 길이 셋")
+    @ValueSource(ints = {2, 3, 4})
+    @Timeout(120)
+    void match_lengths_order_the_game_length(int seats) {
+        double previous = 0;
+        StringBuilder line = new StringBuilder("[판 길이] %d인".formatted(seats));
+        for (Economy.MatchLength length : Economy.MatchLength.values()) {
+            int limit = Economy.roundLimit(seats, length);
+            List<Outcome> outcomes = new ArrayList<>();
+            for (int game = 0; game < 500; game++) {
+                outcomes.add(play(seats, 7_777L * seats + game, Set.of(), Policy.BOT, false, length));
+            }
+            assertThat(outcomes).allMatch(o -> o.rounds() <= limit);
+            double turns = outcomes.stream().mapToInt(Outcome::turns).average().orElseThrow();
+            double actions = outcomes.stream().mapToInt(Outcome::actions).average().orElseThrow();
+            double minutes = (turns * 4 + (actions - turns) * 6) / 60.0;
+            assertThat(turns).as(length + " 이 앞 길이보다 길다").isGreaterThan(previous);
+            previous = turns;
+            line.append(" · %s(상한 %d) 평균 차례 %.1f, 어림 %.1f분".formatted(length, limit, turns, minutes));
+        }
+        REPORT.put("%d-length".formatted(seats), line.toString());
+    }
+
     @AfterAll
     static void writeReport() throws IOException {
         if (REPORT.isEmpty()) {
@@ -160,10 +184,16 @@ class CloudRouteMatchSimulationTest {
     }
 
     private static Outcome play(int seats, long seed, Set<Integer> bots, Policy policy, boolean deserts) {
+        return play(seats, seed, bots, policy, deserts, Economy.MatchLength.NORMAL);
+    }
+
+    private static Outcome play(int seats, long seed, Set<Integer> bots, Policy policy, boolean deserts,
+                                Economy.MatchLength length) {
         Random rng = new Random(seed);
         List<Long> ids = LongStream.range(0, seats).map(i -> 100 + i).boxed().toList();
-        CloudRouteEngine engine = new CloudRouteEngine(
-                new GameContext("sim", ids, 0, 0, new ArrayList<>(bots)), new Random(seed * 31 + 7));
+        CloudRouteEngine engine = new CloudRouteEngine(new GameContext("sim", ids, 0, 0, new ArrayList<>(bots),
+                java.util.Map.of(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH, length.name())),
+                new Random(seed * 31 + 7));
         EventMirror mirror = new EventMirror(seats);
         int step = 0;
         String transition = "startMatch";

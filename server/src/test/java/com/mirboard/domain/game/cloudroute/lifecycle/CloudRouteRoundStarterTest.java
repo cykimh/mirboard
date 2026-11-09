@@ -55,6 +55,16 @@ class CloudRouteRoundStarterTest {
     }
 
     @Test
+    void the_room_match_length_reaches_the_round_limit() {
+        List<Long> ids = LongStream.range(0, 3).map(i -> 100 + i).boxed().toList();
+        starter(store, 1).onGameStarting(new GameStartingEvent("room-1", "CLOUD_ROUTE", ids, 0,
+                java.util.Map.of(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH, "LONG")));
+        ArgumentCaptor<CloudRouteState> saved = ArgumentCaptor.forClass(CloudRouteState.class);
+        verify(store).save(eq("room-1"), saved.capture());
+        assertThat(saved.getValue().roundLimit()).isEqualTo(32);
+    }
+
+    @Test
     void the_same_seed_sets_up_the_same_table() {
         ArgumentCaptor<CloudRouteState> first = ArgumentCaptor.forClass(CloudRouteState.class);
         ArgumentCaptor<CloudRouteState> second = ArgumentCaptor.forClass(CloudRouteState.class);

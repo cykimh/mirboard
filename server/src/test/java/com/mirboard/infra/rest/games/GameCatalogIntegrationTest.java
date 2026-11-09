@@ -79,7 +79,8 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].displayName").value("구름항로"))
                 .andExpect(jsonPath("$.games[0].minPlayers").value(2))
                 .andExpect(jsonPath("$.games[0].maxPlayers").value(4))
-                .andExpect(jsonPath("$.games[0].supportedRoomOptions.length()").value(0))
+                // D-215 — 판 길이(짧게·보통·길게).
+                .andExpect(jsonPath("$.games[0].supportedRoomOptions").value(org.hamcrest.Matchers.contains("MATCH_LENGTH")))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(30))

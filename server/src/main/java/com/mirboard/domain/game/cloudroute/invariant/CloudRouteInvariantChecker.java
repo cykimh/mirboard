@@ -26,7 +26,7 @@ public final class CloudRouteInvariantChecker {
         if (n < 2 || n > 4) {
             fail("seat count " + n);
         }
-        if (s.roundLimit() != Economy.roundLimit(n)) {
+        if (!Economy.isRoundLimit(n, s.roundLimit())) {
             fail("round limit " + s.roundLimit() + " for " + n + " seats");
         }
         if (s.round() < 1 || s.round() > s.roundLimit()) {

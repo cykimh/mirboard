@@ -195,7 +195,7 @@
   ]
 }
 ```
-- D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`)의 선택지와 기본값이다
+- D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`·D-215 `MATCH_LENGTH`)의 선택지와 기본값이다
   (`[{ "option": "TEAM_MODE", "values": ["SOLO", "TEAMS_2V2"], "defaultValue": "SOLO" }]`, enum 선언 순서). 세 게임은 빈 배열이다.
   대기실은 이것만 보고 설정 줄을 그린다. 방의 값은 Room 의 `options`.
 - D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).

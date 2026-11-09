@@ -397,7 +397,7 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 
 | # | 확장 | 기본 | 어디서 쓰나 |
 | --- | --- | --- | --- |
-| E1 | **맵 방 옵션** — 허용값·기본값을 가진 `RoomOption` 상수(`valued()` — `TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`)는 `Room.options`(`Map<RoomOption,String>`, Redis `room:{id}` 해시 `opt:<NAME>`)에 둔다 | 옵션 없음 | 방 만들기(선언한 옵션의 기본값을 `room_create.lua` 같은 원자 구간에서 씀), `PUT /settings` 의 `options`, 카탈로그 `roomOptionChoices` |
+| E1 | **맵 방 옵션** — 허용값·기본값을 가진 `RoomOption` 상수(`valued()` — `TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`·D-215 `MATCH_LENGTH`)는 `Room.options`(`Map<RoomOption,String>`, Redis `room:{id}` 해시 `opt:<NAME>`)에 둔다 | 옵션 없음 | 방 만들기(선언한 옵션의 기본값을 `room_create.lua` 같은 원자 구간에서 씀), `PUT /settings` 의 `options`, 카탈로그 `roomOptionChoices` |
 | E2 | **정원·시작 인원** — `GameDefinition.capacityFor(options)`·`playersToStart(options)` | `maxPlayers()`·`minPlayers()` | 방 만들기 정원 상한, 설정 변경의 정원 재계산, 대기실 복귀 정원(`room_return_waiting.lua`), 방장 시작(`room_start_now.lua` 의 최소 인원 — Lua 무변경). 봇 채우기는 방 정원을 따르므로 자동 |
 | E3 | **엔진에 옵션 전달** — `GameContext.options` | 빈 맵 | `GameEngineProvider.forRoom` 이 `RoomService.effectiveOptions(def, room)` 를 싣는다 |
 

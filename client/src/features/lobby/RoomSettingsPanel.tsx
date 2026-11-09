@@ -26,6 +26,8 @@ const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Rec
     values: { RENJU: '렌주(흑 33·44·장목 금지)', DOUBLE_THREE_ONLY: '삼삼만 금지', FREESTYLE: '자유 오목(흑이 유리해요)' },
   },
   BOT_LEVEL: { label: '봇 난이도', values: { EASY: '쉬움', NORMAL: '보통', HARD: '어려움' } },
+  // D-215 — 판 길이(구름항로: 라운드 상한). 값이 뜻하는 수는 게임마다 달라 이름만 둔다.
+  MATCH_LENGTH: { label: '판 길이', values: { SHORT: '짧게', NORMAL: '보통', LONG: '길게' } },
 };
 
 /** 봇 난이도는 봇이 앉은 방에서만 뜻이 있다 — 봇이 없으면 줄을 숨긴다(값은 그대로라 나중에 봇을 채워도 그 값을 쓴다). */

@@ -106,7 +106,9 @@ public final class CloudRouteEngine {
     /** 첫 차례 좌석과 편지 더미 순서를 정해 시작한다(테스트용 — 실제 판은 {@link #startMatch()}). */
     public Result startMatch(int firstSeat, List<Letter> deckOrder) {
         int seatCount = context.seatCount();
-        int roundLimit = Economy.roundLimit(seatCount);
+        // D-215 — 방장이 고른 판 길이. 상한은 시작 때 상태에 박혀 판 도중 바뀌지 않는다.
+        int roundLimit = Economy.roundLimit(seatCount,
+                Economy.MatchLength.of(context.option(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH)));
         if (firstSeat < 0 || firstSeat >= seatCount) {
             throw new IllegalArgumentException("no such seat: " + firstSeat);
         }

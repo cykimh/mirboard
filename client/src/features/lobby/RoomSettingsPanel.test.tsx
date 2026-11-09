@@ -136,6 +136,21 @@ describe('RoomSettingsPanel (D-161)', () => {
       expect(onChange).toHaveBeenCalledWith({ options: { TEAM_MODE: 'SOLO' } });
     });
 
+    it('D-215 — 판 길이는 짧게·보통·길게로 보이고, 고르면 options 로 보낸다', () => {
+      const onChange = vi.fn();
+      const lengthGame: GameSummary = {
+        ...game('CLOUD_ROUTE', ['MATCH_LENGTH']),
+        roomOptionChoices: [{ option: 'MATCH_LENGTH', values: ['SHORT', 'NORMAL', 'LONG'], defaultValue: 'NORMAL' }],
+      };
+      render(<RoomSettingsPanel room={room({ gameType: 'CLOUD_ROUTE' })} game={lengthGame} canEdit onChange={onChange} />);
+
+      const length = screen.getByRole('group', { name: '판 길이' });
+      expect(within(length).getAllByRole('radio').map((r) => r.textContent)).toEqual(['짧게', '보통', '길게']);
+      expect(within(length).getByRole('radio', { name: '보통' })).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(within(length).getByRole('radio', { name: '길게' }));
+      expect(onChange).toHaveBeenCalledWith({ options: { MATCH_LENGTH: 'LONG' } });
+    });
+
     it('선언하지 않은 옵션은 선택지가 실려 와도 그리지 않는다', () => {
       render(
         <RoomSettingsPanel

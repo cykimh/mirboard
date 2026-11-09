@@ -76,6 +76,23 @@ class CloudRouteEngineTest {
         }
 
         @Test
+        void the_match_length_option_sets_the_round_limit() {
+            for (var entry : java.util.Map.of("SHORT", 14, "NORMAL", 20, "LONG", 28).entrySet()) {
+                CloudRouteEngine e = new CloudRouteEngine(new com.mirboard.domain.game.core.GameContext("t",
+                        List.of(1L, 2L, 3L, 4L), 0, 0, List.of(),
+                        java.util.Map.of(com.mirboard.domain.game.core.RoomOption.MATCH_LENGTH, entry.getKey())), new Random(3));
+                CloudRouteState s = e.startMatch().newState();
+                assertThat(s.roundLimit()).as(entry.getKey()).isEqualTo(entry.getValue());
+                CloudRouteInvariantChecker.check(s);
+            }
+            // 값이 없거나 모르면 보통.
+            CloudRouteEngine plain = new CloudRouteEngine(CloudRouteTables.context(2), new Random(3));
+            assertThat(plain.startMatch().newState().roundLimit()).isEqualTo(30);
+            assertThat(com.mirboard.domain.game.cloudroute.board.Economy.MatchLength.of("WHATEVER"))
+                    .isEqualTo(com.mirboard.domain.game.cloudroute.board.Economy.MatchLength.NORMAL);
+        }
+
+        @Test
         void five_seats_are_refused() {
             CloudRouteEngine e = new CloudRouteEngine(CloudRouteTables.context(5), new Random(3));
             assertThatThrownBy(e::startMatch).isInstanceOf(IllegalArgumentException.class);

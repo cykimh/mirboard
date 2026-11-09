@@ -30,14 +30,51 @@ public final class Economy {
     private Economy() {
     }
 
-    /** 인원별 라운드 상한(§4.3) — 2인 30·3인 24·4인 20. */
+    /** 판 길이(D-215, 방 설정 {@code MATCH_LENGTH}) — 라운드 상한을 고른다. */
+    public enum MatchLength {
+        SHORT,
+        NORMAL,
+        LONG;
+
+        /** 방 옵션 값 → 길이. 없거나 모르는 값이면 보통. */
+        public static MatchLength of(String value) {
+            if (value != null) {
+                for (MatchLength length : values()) {
+                    if (length.name().equals(value)) {
+                        return length;
+                    }
+                }
+            }
+            return NORMAL;
+        }
+    }
+
+    /** 인원별 라운드 상한(§4.3) — 보통 2인 30·3인 24·4인 20. */
     public static int roundLimit(int seatCount) {
-        return switch (seatCount) {
-            case 2 -> 30;
-            case 3 -> 24;
-            case 4 -> 20;
-            default -> throw new IllegalArgumentException("Cloud Route seats 2~4: " + seatCount);
+        return roundLimit(seatCount, MatchLength.NORMAL);
+    }
+
+    /** 인원·판 길이별 라운드 상한(§4.3, D-215) — 짧게 4인 14·3인 18·2인 22 / 보통 20·24·30 / 길게 28·32·40. */
+    public static int roundLimit(int seatCount, MatchLength length) {
+        int[] bySeats = switch (length) {
+            case SHORT -> new int[] {22, 18, 14};
+            case NORMAL -> new int[] {30, 24, 20};
+            case LONG -> new int[] {40, 32, 28};
         };
+        if (seatCount < 2 || seatCount > 4) {
+            throw new IllegalArgumentException("Cloud Route seats 2~4: " + seatCount);
+        }
+        return bySeats[seatCount - 2];
+    }
+
+    /** 이 인원에 있을 수 있는 상한인가(불변식). */
+    public static boolean isRoundLimit(int seatCount, int limit) {
+        for (MatchLength length : MatchLength.values()) {
+            if (roundLimit(seatCount, length) == limit) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 십분의 일 단위 금액을 10G 단위로 반올림(5 는 올림, §6.3·§6.4). */

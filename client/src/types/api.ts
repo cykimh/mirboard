@@ -14,7 +14,8 @@ export type RoomOption =
   | 'RACE_BUTTON_VISIBILITY'
   | 'TEAM_MODE'
   | 'OMOK_RULE'
-  | 'BOT_LEVEL';
+  | 'BOT_LEVEL'
+  | 'MATCH_LENGTH';
 
 /**
  * D-176 — 값을 가진 방 옵션(서버 `RoomOption.valued()`) 하나의 선택지(선언 순서)와 기본값. 카탈로그가 게임이 선언한 것만 싣는다.
