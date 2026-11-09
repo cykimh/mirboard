@@ -1,9 +1,9 @@
 # 오목 룰 명세 (Omok Rules)
 
 본 문서는 Mirboard 오목 룰의 **단일 진실 공급원**이다(D-177). 코드(S1 순수 엔진)는 이 문서를 따르고, 어긋나면 코드를 고치거나
-이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 각 절 끝의 **코드(예정):** / **테스트(예정):** 는 S1 에서 만들 위치이고, 경로는
-`server/src/{main,test}/java/com/mirboard/domain/game/omok/` 기준이다. 구현이 붙으면 원카드 명세처럼 **코드:** / **테스트:** 로 바꾸고
-메서드 이름으로 적는다(줄 번호는 코드가 바뀌면 바로 틀린다). 클라는 판정하지 않으며 서버가 보낸 결과(금수 자리 포함)를 표시만 한다.
+이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 각 절 끝에 원카드 명세와 같은 표기(**코드:** / **테스트:** / **갭:**)로 코드 위치와 테스트를 붙였다. 경로는
+`server/src/{main,test}/java/com/mirboard/domain/game/omok/` 기준이고 위치는 메서드 이름으로 적는다(줄 번호는 코드가 바뀌면 바로 틀린다).
+순수 엔진은 S1 에서 붙었다. 포트 어댑터·저장·기록·봇은 S2·S3b 에서 붙으며, 아직 없는 것은 **코드(S3b 예정):** 로 적는다. 클라는 판정하지 않으며 서버가 보낸 결과(금수 자리 포함)를 표시만 한다.
 
 > **출처와 우리가 정한 것.** 금수 정의는 렌주(국제 렌주 연맹 규칙)의 정의를 따른다. 렌주의 개막 규칙(스왑·5수 2개 제시)은
 > 쓰지 않는다. 원문이 답하지 않거나 갈리는 항목을 우리가 정한 것은 본문에 **[결정]** 으로 표시하고 §11 에 모았다.
@@ -17,7 +17,7 @@
 - 돌은 흑(`BLACK`)·백(`WHITE`) 두 색. 돌은 한 번 놓이면 움직이거나 사라지지 않는다.
 - 화면 좌표 글자(A~O, 1~15)는 표시용이다 — 프로토콜은 숫자 좌표만 쓴다.
 
-**코드(예정):** `board/Point`·`board/Board`(불변, `place`·`stoneAt`) · **테스트(예정):** `BoardTest`
+**코드:** `board/Point`·`board/Board`(불변 — `with`·`stoneAt`·`isFull`, 계산용 가변 사본 `cells`) · **테스트:** 따로 없음 — 모든 엔진·규칙 테스트가 판 그림(`OmokBoards`)으로 쓴다
 
 ## 2. 모드·인원·좌석
 
@@ -34,7 +34,7 @@
 
 이하 "편"은 1:1 에서는 그 사람, 2:2 에서는 그 팀이다.
 
-**코드(예정):** `OmokSettings`(모드 해석) · `rules/TurnOrder`
+**코드:** `OmokMode`(좌석 수) · `rules/TurnOrder`(`team`·`colorOf`·`next`) · **코드(S3b 예정):** 방 설정 값 → 모드·룰 해석
 
 ## 3. 시작 — 색과 첫 차례
 
@@ -43,7 +43,7 @@
 3. 빈 판에서 흑이 먼저 둔다. **첫 수는 자유**다 — 천원(7,7) 고정 없음. **[결정]**
 4. 색은 매 판 새로 추첨한다 — 지난 판 결과(진 사람이 흑 등)를 보지 않는다. **[결정]**
 
-**코드(예정):** `lifecycle/OmokRoundStarter`(추첨) · `OmokEngine.startMatch(blackSide, firstSeat)`(추첨 결과를 인자로 받는 순수 함수)
+**코드:** `OmokEngine.startMatch(mode, rule, seatCount, blackTeam, firstSeat)`(추첨 결과를 인자로 받는 순수 함수 — 좌석 수가 모드와 다르거나 첫 수 좌석이 흑 팀이 아니면 `IllegalArgumentException`) · **코드(S3b 예정):** `lifecycle/OmokRoundStarter`(추첨) · **테스트:** `OmokEnginePlayTest`(`start_*` 2건)
 
 ## 4. 차례
 
@@ -60,7 +60,7 @@
 | `FORBIDDEN_MOVE` | 흑 차례에 그 룰의 금수 자리(§6) — 사유에 금수 종류를 싣는다 |
 | `MATCH_OVER` | 판이 끝남 |
 
-**코드(예정):** `OmokEngine.apply` · `action/RejectionReason` · **테스트(예정):** `OmokEnginePlayTest`(거절 사유마다 1건 이상)
+**코드:** `OmokEngine.apply`·`place`·`requireTurn` · `action/RejectionReason` · **테스트:** `OmokEnginePlayTest`(`rejects_*` 3건 — 다섯 사유 전부, 2:2 차례 순서, 백은 금수 없음, 흑 차례 이벤트의 금수 목록)
 
 ## 5. 승리 — 5목
 
@@ -78,7 +78,7 @@
 - **5목은 금수보다 먼저다**: 흑이 놓은 수가 이기는 줄을 만들면 그 수가 동시에 33·44·장목 모양을 만들어도 흑이 이긴다(렌주 규정, 삼삼만 룰도 같다).
   렌주에서 장목만 생기고 다른 방향에 정확히 5 가 없으면 그 수는 금수다(§6).
 
-**코드(예정):** `rules/LineScanner` · `rules/WinRule` · **테스트(예정):** `WinRuleTest`(룰 3종 × 정확히 5 / 6 / 5 와 6 동시 / 5 와 33 동시)
+**코드:** `rules/Lines`(줄 연속 구간, 판 밖은 벽) · `rules/WinRule`(`isWinningLength`·`winLine`) · **테스트:** `WinRuleTest`(10건 — 룰 3종 × 정확히 5·흑 6·백 6, 렌주 5 와 다른 방향 7 동시, 승리 줄 위치) · 5 와 33 동시는 `ForbiddenMovesTest.FiveComesFirst`
 
 ## 6. 금수 (흑만)
 
@@ -125,8 +125,9 @@
 
 - `q` 후보가 둘 이상이면(예: `__●●●__` 의 양 끝) **하나라도** 금수가 아니면 3 이다.
 - `q` 를 판정할 때는 `p` 에 흑 돌이 놓인 판에서 판정한다.
-- 재귀는 같은 줄 앞뒤 몇 칸 안에서만 일어나 실제 깊이는 작다. 구현은 (판 상태, 좌표) 단위로 메모해 같은 자리를 두 번 풀지 않는다.
-  안전 상한(깊이 8)을 두고, 넘으면 "금수 아님"으로 본다 — 실제 판에서 도달하지 않음을 시뮬레이션으로 확인한다. **[결정]**
+- 재귀는 같은 줄 앞뒤 몇 칸 안에서만 일어나 실제 깊이는 작다. 안전 상한(깊이 8)을 두고, 넘으면 "금수 아님"으로 본다. **[결정]**
+- 메모는 두지 않았다(S1) — 싼 거르기(`mayBeForbidden`: 33 은 두 방향에 흑 2개 이상, 44·장목은 한 방향에 4개 이상이어야 생긴다)로 대부분의
+  빈칸을 건너뛰어 무작위 18,000판 시뮬레이션이 약 36초다. 봇(S2)이 금수 판정을 많이 부르면 그때 메모를 더한다.
 - 삼삼만 룰에서는 `q` 가 금수인지 볼 때도 33 만 본다(44·장목은 그 룰에서 금수가 아니다).
 
 ### 6.4 고정 국면 (S1 테스트의 기준)
@@ -145,7 +146,10 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 | 룰 차이 | 4 | 같은 국면을 삼삼만·자유로 판정(44·장목 허용, 장목은 승리) |
 | 백 | 3 | 백은 같은 모양에서도 금수 없음, 백 장목은 승리 |
 
-**코드(예정):** `rules/ForbiddenRule`(룰별 금수 집합, 메모 재귀) · **테스트(예정):** `ForbiddenMovesTest`
+**코드:** `rules/ForbiddenRule`(`check`·`all`, 내부 `kind`·`countFours`·`isThree`·`isStraightFour`) — 4 는 "이기는 자리마다 그 줄의 흑 돌 집합"을
+모아 서로 다른 집합 수로 센다(열린 4 의 두 자리는 같은 네 돌이라 1, 한 줄 44 는 2) · **테스트:** `ForbiddenMovesTest`(31건 — 위 표의 국면 30개 + 빈칸
+아님 1). 재귀를 끄면(완성 자리를 늘 금수 아님으로) 거짓 33 두 건만, 돌 집합 계산을 깨면 10건이 실패한다(고의 결함으로 확인)
+- **갭:** 깊이 상한(8)에 실제로 닿는 국면이 있는지는 아직 재지 않았다 — S2 봇 평가 때 계측한다.
 
 ## 7. 기권
 
@@ -165,7 +169,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 4. 같은 사람이 **연속 2번째** 시간 초과가 되면 자동 수를 두지 않고 **그 편이 진다**(사유 `TIMEOUT`, 원인 좌석 = 그 사람). 2:2 는 팀 패. **[결정]**
 5. 시간 초과 패는 탈주가 아니다.
 
-**코드(예정):** `OmokEngine.timeoutMove` · `action/TimeoutPlace` · **테스트(예정):** `OmokEngineTimeoutTest`(자리 고르기·금수 건너뛰기·연속 수 리셋·2연속 패·2:2 사람별 계수)
+**코드:** `OmokEngine.timeoutAction`·`timeoutPoint` · `action/TimeoutPlace`(Jackson 미등록) · **테스트:** `OmokEngineTimeoutTest`(8건 — 천원·가까운 자리와 동률 순서·금수 건너뛰기·2연속 패·손으로 두면 리셋·2:2 사람별 계수·자동 수 5목 승리) · 클라가 못 만드는 것은 `OmokJsonRoundTripTest`
 
 ## 9. 탈주
 
@@ -174,7 +178,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 - 이미 끝난 판의 나가기는 탈주가 아니다(`NOT_APPLICABLE`).
 - 탈주자만 탈주 수(`desert_count`)가 오른다. 2:2 에서 탈주하지 않은 팀원은 일반 패다.
 
-**코드(예정):** `OmokEngine.desert` · **테스트(예정):** `OmokEngineDesertionTest`
+**코드:** `OmokEngine.desert`(`Desertion.ended` — 어댑터가 포트 `MATCH_ENDED`/`NOT_APPLICABLE` 로 옮긴다) · **테스트:** `OmokEngineDesertionTest`(3건)
 
 ## 10. 무승부와 종료
 
@@ -196,7 +200,9 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 - **무승부는 ELO 변화 없음**, 승·패 수도 늘지 않고 전적 행만 남긴다(게스트 정리의 "매치를 끝낸 증거" — `docs/game-port.md` 매치 기록기 계약 2). **[결정]**
 - 상대 전적(`HeadToHeadSource`)은 상대 편만 센다(2:2 의 팀원은 상대가 아니다) — 승·패·무.
 
-**코드(예정, S3b):** `persistence/OmokMatchRecorder` · `persistence/OmokHeadToHead`
+**코드:** 종료 판정은 `OmokEngine.place`·`lose` · **테스트:** `OmokEnginePlayTest`(5목 1:1·2:2, 기권 2건, 무승부 2건 — 줄무늬 판으로 `BOARD_FULL`, 맨 윗줄
+`XXX_XX` 로 장목만 남긴 `NO_LEGAL_MOVE`) · 무작위 18,000판에서 `BOARD_FULL`·`NO_LEGAL_MOVE` 는 0건이었다(`OmokMatchSimulationTest`)
+**코드(S3b 예정):** `persistence/OmokMatchRecorder` · `persistence/OmokHeadToHead`
 
 ## 11. 우리가 정한 것
 
@@ -232,4 +238,12 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 - **이벤트 대조**: 공개 이벤트만 듣는 클라이언트 모형이 그린 판과 엔진 상태가 매 전이 뒤 같다(원카드 `OneCardMatchSimulationTest` 방식).
 - 전부 Docker 가 필요 없다.
 
-**코드(예정):** `invariant/OmokInvariantChecker` · **테스트(예정):** `OmokInvariantCheckerTest`(고의 위반마다 1건) · `OmokMatchSimulationTest` · `OmokJsonRoundTripTest`
+**코드:** `invariant/OmokInvariantChecker`(수순을 처음부터 다시 두며 검사 — 좌석·색·흑 금수 이력은 첫 수 좌석·흑 팀에서 파생하므로 "색 불일치"는 첫 수
+좌석이 흑 팀이 아닌 상태로만 생긴다)
+- **테스트:** `OmokInvariantCheckerTest`(15건 — 통과 1 + 고의 위반 14), `OmokMatchSimulationTest`(6건 — 모드 2 × 룰 3 × 3,000판, 시드 고정, 착수는
+  무작위 빈칸이고 시간 초과 1.5%·기권 0.05%·탈주 0.03% 를 섞는다. 처음 30판은 매 전이, 나머지는 끝에서 불변식 검사 — 수순 재생이 수의 제곱이라.
+  공개 이벤트만 듣는 클라 모형의 판·차례를 매 전이 대조), `OmokJsonRoundTripTest`(6건 — 상태·결과 키 집합, 구 JSON 의 시간 초과 수 기본값, 클라
+  액션 이름, `TimeoutPlace` 역직렬화 거절, 이벤트 4종 envelope·키, 공개 뷰 키).
+- 결과 분포(1:1 렌주 예): 5목 2,697 · 기권 150 · 시간패 66 · 탈주 87. 전체 약 36초.
+- **합계:** 오목 도메인 테스트 93건 — `ForbiddenMovesTest` 31 + `WinRuleTest` 10 + `OmokEnginePlayTest` 14 + `OmokEngineTimeoutTest` 8 +
+  `OmokEngineDesertionTest` 3 + `OmokInvariantCheckerTest` 15 + `OmokMatchSimulationTest` 6 + `OmokJsonRoundTripTest` 6. 전부 Docker 가 필요 없다.

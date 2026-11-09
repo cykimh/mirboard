@@ -1,6 +1,6 @@
 # 오목 — 네 번째 게임 후보 — 기획
 
-> 상태: **설계 채택 · S0 완료** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-175~D-180(§11 의 초안을 옮겼다)
+> 상태: **설계 채택 · S0·S1 완료**(S3a 병행 중) · 2026-11-09 · 결정 이력 `docs/decisions.md` D-175~D-180(§11 의 초안을 옮겼다)
 > 근거: `docs/game-port.md`(포트 계약) · 원카드 선례 `docs/plans/onecard.md`·`docs/rules-onecard.md`
 > 룰 정본은 `docs/rules-omok.md`(S0, D-177)다. 이 문서의 §2 는 그 입력이었다 — 어긋나면 정본이 이긴다.
 
@@ -150,9 +150,9 @@ omok/
                        (MIRBOARD_OMOK_STATUS, 기본 COMING_SOON → S5 에서 AVAILABLE) (S3b)
   OmokEngine           순수 룰 엔진 — 저장소·시계 없음, 모드·룰은 생성 인자 (S1)
   OmokGameEngine       포트 어댑터 — 상태 저장(Redis)·로컬 발행·봇 안전망 (S3b)
-  OmokSettings         GameContext.options → 모드·룰·봇 난이도(모르는 값은 기본) (S1)
+  OmokSettings         GameContext.options → 모드·룰·봇 난이도(모르는 값은 기본) (S3b — E3 뒤)
   board/      Point · Stone · Board(15×15, 놓기·읽기, 불변) (S1)
-  rules/      LineScanner(4방향 연속 수) · WinRule(정확히 5 / 5 이상) · ForbiddenRule(룰별 금수 집합, 재귀 3 판정) · TurnOrder (S1)
+  rules/      Lines(4방향 연속 구간, 판 밖은 벽) · WinRule(정확히 5 / 5 이상) · ForbiddenRule(룰별 금수 집합, 재귀 3 판정) · TurnOrder (S1)
   state/      OmokState · MatchResult · OmokStateMapper(공개 뷰) (S1)
   action/     OmokAction(sealed: Place · Resign · TimeoutPlace*) · RejectionReason · OmokActionRejectedException (S1)
   event/      OmokEvent(sealed) (S1) · OmokMatchCompleted (S3b)
@@ -312,7 +312,7 @@ omok/
 | 단계 | 범위 | 선행 | 코드 | 검증 |
 | --- | --- | --- | --- | --- |
 | S0 ✅ | 룰 명세 `docs/rules-omok.md` + decisions 기록(D-175~D-180) + 로드맵 M8 | — | 없음(문서) | 사용자 검토 |
-| S1 | 순수 엔진: 판·줄 스캔·5목·룰 3종 금수·모드 2종 차례·상태·액션·이벤트·불변식 | S0 | 서버 신규 패키지 | 금수 고정 국면 ≥ 30, 시뮬레이션 모드 2 × 룰 3 × 3,000판 전부 종료·불변식, 판 가득 참 무승부 경로, 2연속 시간 초과 패(1:1·2:2) |
+| S1 ✅ | 순수 엔진: 판·줄 스캔·5목·룰 3종 금수·모드 2종 차례·상태·액션·이벤트·불변식 | S0 | 서버 신규 패키지 | 금수 고정 국면 ≥ 30, 시뮬레이션 모드 2 × 룰 3 × 3,000판 전부 종료·불변식, 판 가득 참 무승부 경로, 2연속 시간 초과 패(1:1·2:2) |
 | S2 | 봇 정책 3단계 + 강도 평가 + 시간 예산 | S1 | 서버(`bot/`) | 강도 표(§4.4) 충족, 어려움 p99 ≤ 150ms, 같은 국면 같은 수 |
 | S3a | 게임 중립 확장 E1~E3 + 설정 변경 규칙(`TOO_MANY_PLAYERS`) | S0 | 인프라·`domain.lobby`·`domain.game.core` | 세 게임 회귀 0, 가짜 게임 정의로 E2(정원 2↔4·3명 시작 거절)·E3(선언한 옵션만 전달) 단위·IT, `check.sh` 전체 |
 | S3b | 어댑터 + 정의(`COMING_SOON`) + 라운드 시작(색·첫 차례 추첨) + 기록기 V13 + 상대 전적 + 무승부 행 보장 | S2·S3a | 서버 | 봇 풀매치 IT(1:1·2:2), 시간 초과 1번 자동 한 수·2번 패 IT, 2:2 탈주 = 팀 패 IT, 기록 실패 격리(`*RecorderFailureTest` 에 오목 추가), resync `privateHand=null` IT, 공개 뷰 직렬화 테스트, 인프라 grep 0 |
@@ -349,7 +349,16 @@ omok/
 | 2:2 기권 | 팀원 동의 없이 즉시 팀 패(확인 창만) |
 | 무승부 | ELO 변화 없음, 승패 증가 없이 기록 행만 남긴다 |
 
-미결 질문은 남아 있지 않다. S0 완료(2026-11-09) — 다음은 S1 순수 엔진(S3a 와 병행 가능).
+미결 질문은 남아 있지 않다. S0·S1 완료(2026-11-09) — 다음은 S2 봇(S3a 는 별도 세션에서 병행 중).
+
+### S1 결과 (2026-11-09)
+
+- 순수 엔진 `domain.game.omok`(판·규칙·상태·액션·이벤트·불변식) + 테스트 93건(Docker 불필요, 약 40초 — 대부분 시뮬레이션 18,000판). 세부와 테스트
+  목록은 `docs/rules-omok.md` 각 절의 **코드:**/**테스트:**.
+- 설계와 달라진 점: ① 엔진은 `GameContext` 도 난수도 받지 않는다 — 모드·룰·색 추첨 결과를 `startMatch` 인자로 받는다(어댑터·스타터가 S3b 에서
+  넘긴다). ② `TimeoutPlace` 는 필드가 없다 — 자리는 엔진이 정한다. ③ 금수 재귀에 메모를 두지 않았다 — 거르기만으로 충분히 빠르다(재면 S2 에서 더함).
+  ④ "색 불일치" 불변식은 따로 두지 않았다 — 좌석·색이 첫 수 좌석·흑 팀에서 파생해 "첫 수 좌석이 흑 팀인가" 검사가 같은 것을 잡는다.
+- 무작위 판에서 `BOARD_FULL`·`NO_LEGAL_MOVE` 는 0건 — 두 경로는 만든 국면 테스트로만 고정했다.
 
 ## 11. 결정 (S0 에서 `docs/decisions.md` 로 옮겼다)
 
