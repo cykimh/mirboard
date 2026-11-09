@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1955건 중 1679건(86%)이 Docker 불필요**합니다(D-196 시점, 부록 (6)).
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1971건 중 1690건(86%)이 Docker 불필요**합니다(D-223 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -403,6 +403,41 @@ p99 46.5ms · 최대 노드 88,356.
 건물을 절반만 세도 그대로라 원인은 자산 계산이 아니라 통행료 수입이었고, 장르의 성격으로 받아들였습니다(D-214). 포트가 아니라 **게임
 설계**의 결함을 시뮬레이션이 찾은 사례입니다.
 
+---
+
+## §12 일곱 번째 게임 — 물리가 있는 게임 (씨앗포, D-220~D-223)
+
+**문제** — 각도·힘·바람·지형 파괴가 있는 턴제 포격(이름·맵·그림은 새로 만든 독창 게임). 물리가 들어오면 Server-Authoritative 가 흔들리기
+쉽습니다 — 흔한 길은 클라가 탄도를 계산하고 서버는 결과만 받거나, 서버가 틱마다 도는 실시간 루프를 두는 것입니다. 앞엣것은 클라를 믿는 것이고,
+뒤엣것은 빈 방에도 CPU 를 쓰며 무료 서버(shared-cpu-1x, C1 JIT 만) 예산을 넘습니다. 그리고 포트는 여전히 "좌석이 액션 하나를 낸다"뿐입니다.
+
+**선택 — 한 발에 한 번, 정수로.** 서버가 `FIRE` 를 적용하는 순간 탄도·구멍·피해·낙하를 끝까지 계산하고 결과를 **대본**(궤적 점열·구멍·
+피해·낙하 경로·연출 길이)으로 보냅니다. 클라는 대본을 시간축에 맞춰 재생만 하고 물리를 계산하지 않습니다(조준 궤적 미리보기도 없다). 계산은
+전부 정수 — 좌표 Q16, 0~180° 삼각 정수표, 자체 SplitMix64 — 라 어느 인스턴스·테스트에서도 같은 비트이고(골든 테스트·봇이 보는 결과 = 실제
+결과), 상태는 (시드, 구멍 목록)만 저장해 지형을 다시 만듭니다. 시드는 공개 뷰에 싣지 않습니다(알면 앞으로의 바람을 계산할 수 있다). 실측 한 발
+**0.064ms**(구멍 60개, 지형 재구성 포함)·맵 생성 0.34ms — 설계 추정(≤ 6ms)보다 두 자릿수 작고, 상시 루프가 없으니 빈 방은 0 입니다.
+
+**포트 확장 0건.** 남은 두 문제를 이미 있는 것으로 풀었습니다.
+
+- 액션마다 턴 데드라인이 다시 걸린다(§9 요트가 깬 그 가정) → 이동을 따로 보내지 않고 **`FIRE` 에 싣는다**. 대가: 남에게 내 이동이 실시간으로
+  보이지 않고 대본 앞부분으로 재생된다(실시간 공유가 필요해지면 포트 확장을 검토 — 후속).
+- 발사 뒤 연출이 끝날 때까지 다음 차례를 열면 안 된다 → 원카드가 넣은 **엔진 타이머**(⑦, D-128)의 `RESOLVING` 단계. 상태는 발사 순간 이미
+  결과이고 연출 대기는 "다음 차례를 언제 여는가"만 정한다 — 그 사이 resync 하면 결과 상태를 받는다. 대기 중 `pendingSeats` 는 비어 봇 루프·턴
+  타이머가 끼지 않는다.
+
+비공개 뷰는 empty, 인프라 코드 0줄 — `grep -rni artillery …/infra` → **0건**. 서버 통합(`0666aeb`)의 게임 밖 변경은 `application.yml` 의 상태
+설정과 마이그레이션 `V16` 뿐이고, 클라(`666a26c`, 24파일 +2,991/−4)의 공용 파일은 `RoomPage`·지연 로딩·튜토리얼 목록·CSS 진입점입니다.
+`useStompRoom` 은 0줄. 씨앗포 도메인 2,654줄(부록 (8)).
+
+**봇도 같은 엔진으로.** 봇은 순수 엔진으로 후보 발사를 시뮬레이션하고(예산은 시간이 아니라 **시뮬레이션 900회** — 부하와 무관하게 같은 상태면
+같은 수, 오목 노드 상한과 같은 이유) 결정적 오차 ±2°·±2 를 얹습니다. 물리가 정수라 봇이 보는 결과가 곧 실제 결과입니다. 한 수 평균 2ms,
+무작위 상대 60/60 승. **드러난 것** — 봇끼리 IT 가 시작하자마자 끝났습니다. "사람이 모두 탈락하면 끝"(`NO_HUMANS`)이 처음부터 사람이 없는
+판에도 걸렸던 것이라, 사람이 있던 판에서만으로 룰 정본을 고쳤습니다(D-222).
+
+`코드:` `domain/game/artillery/physics/`(정수 탄도·지형 마스크·맵 생성) · `domain/game/artillery/ArtilleryGameEngine.java`(`timer`·`onTimer`) ·
+`client/src/features/artillery/`(Canvas 전장·대본 재생) · `테스트:` `ArtilleryCostTest`(한 발 비용) · `ArtillerySimulationTest`(2~6인 무작위) ·
+`ArtilleryGoldenTest`(골든 해시) · `ArtilleryBotMatchSimulationIT` · `ArtilleryTable.test` · `결정:` D-220 · D-221 · D-222 · D-223
+
 ## 부록 — 재현 명령
 
 ```bash
@@ -437,7 +472,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1955 skipped=5 failed=0 dockerfree=1679 (86%)   (D-196 시점 — 여섯 게임 공개 뒤, 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
+# → tests=1971 skipped=5 failed=0 dockerfree=1690 (86%)   (D-223 시점 — 일곱 게임 공개 뒤, 씨앗포 도메인 51 / 49. D-196 시점 1955 / 1679 — 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -445,10 +480,10 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8~§11) — main 소스 줄 수
-for d in core tichu skullking onecard yacht omok cloudroute; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8~§12) — main 소스 줄 수
+for d in core tichu skullking onecard yacht omok cloudroute artillery; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840, GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 2654, GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
 grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
@@ -463,6 +498,14 @@ git diff --stat 6ad51b8^ 6ad51b8 -- client/src | tail -1   # → 30 files change
 git diff --name-only 6ad51b8^ 6ad51b8 -- client/src | grep -vE 'features/omok|types/omok|20-omok|omokCss'
 ./gradlew :server:test --tests 'com.mirboard.domain.game.omok.*'   # → 오목 도메인 144건(Docker 불필요 138 — Docker 는 OmokMatchRecorderIT 6건만, 봇 강도 듀플리케이트 200판 포함)
 npm --prefix client run test -- omok   # → 33건(게임판·스토어·판 입력·튜토리얼 28 + CSS 네임스페이스 5)
+
+# (11) 일곱 번째 게임(§12) — 인프라가 이름을 아는가 / 서버 통합(S2)의 게임 밖 변경 / 클라 통합 규모·공용 파일(S3)
+grep -rniE 'artillery|씨앗포' server/src/main/java/com/mirboard/infra   # → 0건
+git diff --name-status 0666aeb^ 0666aeb -- server/src/main | grep -v domain/game/artillery   # → application.yml · V16__artillery_match.sql
+git diff --stat 666a26c^ 666a26c -- client/src | tail -1   # → 24 files changed, 2991 insertions(+), 4 deletions(-)
+git diff --name-only 666a26c^ 666a26c -- client/src | grep -vE 'features/artillery|types/artillery|artillery-table|artilleryCss'
+./gradlew :server:test --tests 'com.mirboard.domain.game.artillery.*'   # → 씨앗포 도메인 51건(Docker 불필요 49 — Docker 는 ArtilleryMatchRecorderIT 만) + 서버 경로 IT 3(ArtilleryBotMatchSimulationIT)·기록 실패 격리 1
+npm --prefix client run test -- artillery   # → 26건
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·
@@ -470,4 +513,5 @@ npm --prefix client run test -- omok   # → 33건(게임판·스토어·판 입
 [rules-onecard.md](rules-onecard.md) · [plans/onecard.md](plans/onecard.md)(세 번째 게임 설계·단계) ·
 [rules-yacht.md](rules-yacht.md) · [plans/yacht.md](plans/yacht.md)(네 번째 게임) ·
 [rules-omok.md](rules-omok.md) · [plans/omok.md](plans/omok.md)(다섯 번째 게임) ·
-[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-200)
+[rules-artillery.md](rules-artillery.md) · [plans/artillery.md](plans/artillery.md)(일곱 번째 게임) ·
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-196, D-200, D-220 ~ D-223)
