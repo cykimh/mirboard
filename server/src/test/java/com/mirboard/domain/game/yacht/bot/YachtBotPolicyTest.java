@@ -12,6 +12,7 @@ import com.mirboard.domain.game.yacht.score.Category;
 import com.mirboard.domain.game.yacht.score.Scorecard;
 import com.mirboard.domain.game.yacht.state.YachtState;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 
@@ -62,7 +63,7 @@ class YachtBotPolicyTest {
 
     @Test
     void the_policy_is_deterministic_and_always_legal_through_whole_matches() {
-        YachtEngine engine = new YachtEngine(new GameContext("p", List.of(1L, 2L), 0, 0, List.of(0, 1), 0));
+        YachtEngine engine = new YachtEngine(new GameContext("p", List.of(1L, 2L), 0, 0, List.of(0, 1), Map.of(), 0));
         for (long seed = 0; seed < 40; seed++) {
             DiceRoller roller = DiceRoller.from(new Random(seed));
             YachtState s = engine.start(0).newState();

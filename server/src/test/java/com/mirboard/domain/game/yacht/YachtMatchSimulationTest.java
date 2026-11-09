@@ -91,7 +91,7 @@ class YachtMatchSimulationTest {
     }
 
     private static GameContext context(int seats, List<Integer> bots, int turnSeconds) {
-        return new GameContext("sim", LongStream.rangeClosed(1, seats).boxed().toList(), 0, 0, bots, turnSeconds);
+        return new GameContext("sim", LongStream.rangeClosed(1, seats).boxed().toList(), 0, 0, bots, Map.of(), turnSeconds);
     }
 
     private Stats run(int seats, List<Integer> bots, int matches, long seed, double desertRate, double expireRate) {

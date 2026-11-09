@@ -9,6 +9,7 @@ import com.mirboard.domain.game.yacht.state.TurnState;
 import com.mirboard.domain.game.yacht.state.YachtState;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -23,7 +24,7 @@ public final class YachtFixtures {
     /** 좌석 {@code seats} 개, {@code bots} 좌석은 봇. */
     public static YachtEngine timedEngine(int seats, int turnSeconds, Integer... bots) {
         List<Long> players = LongStream.rangeClosed(1, seats).boxed().toList();
-        return new YachtEngine(new GameContext("room-1", players, 0, 0, List.of(bots), turnSeconds));
+        return new YachtEngine(new GameContext("room-1", players, 0, 0, List.of(bots), Map.of(), turnSeconds));
     }
 
     public static YachtEngine engine(int seats, Integer... bots) {

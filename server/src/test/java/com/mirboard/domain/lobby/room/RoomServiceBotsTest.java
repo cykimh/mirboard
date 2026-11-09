@@ -198,6 +198,7 @@ class RoomServiceBotsTest {
     void returning_to_waiting_hands_a_bot_host_to_a_human() {
         com.mirboard.domain.game.core.GameDefinition def = mock(com.mirboard.domain.game.core.GameDefinition.class);
         when(def.maxPlayers()).thenReturn(6);
+        when(def.capacityFor(org.mockito.ArgumentMatchers.any())).thenCallRealMethod(); // D-176 기본 = maxPlayers
         RoomService withGames = gamesWith(def);
         when(repository.findById(ROOM_ID)).thenReturn(
                 Optional.of(room(RoomStatus.IN_GAME, 900L, 3, 0, 900L, GUEST, 901L)),

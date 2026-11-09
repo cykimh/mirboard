@@ -208,6 +208,16 @@ public class GlobalExceptionHandler {
                         Map.of("roomId", e.roomId(), "minPlayers", e.minPlayers())));
     }
 
+    // D-176 — 정원이 줄어드는 설정 변경인데 지금 인원이 새 정원보다 많다.
+    @ExceptionHandler(com.mirboard.domain.lobby.room.TooManyPlayersException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleTooManyPlayers(
+            com.mirboard.domain.lobby.room.TooManyPlayersException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiErrorEnvelope.of("TOO_MANY_PLAYERS",
+                        e.capacity() + "명만 남기고 바꿔 주세요",
+                        Map.of("roomId", e.roomId(), "capacity", e.capacity())));
+    }
+
     // D-135 — 방장 강제 종료는 방장 말고 모두 봇인 판만.
     @ExceptionHandler(HumanPlayersPresentException.class)
     public ResponseEntity<ApiErrorEnvelope> handleHumanPlayersPresent(HumanPlayersPresentException e) {
