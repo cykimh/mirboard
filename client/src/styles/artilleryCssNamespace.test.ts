@@ -3,7 +3,7 @@ import { artilleryCssSource, indexCssSource } from './cssSources';
 
 /**
  * `.ar-` 네임스페이스 규칙을 기계로 강제한다(요트 `yachtCssNamespace.test` 와 같은 규칙). 씨앗포 게임판 CSS 가 공용 클래스를
- * 재정의하면 다른 게임판이 조용히 번진다. 캐스케이드 순서(21 이 20 뒤·17 앞)와 "21 에 미디어 0개"도 고정한다.
+ * 재정의하면 다른 게임판이 조용히 번진다. 캐스케이드 순서(22 가 21 뒤·17 앞)와 "22 에 미디어 0개"도 고정한다.
  */
 const cssCode = artilleryCssSource
   .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -29,7 +29,7 @@ function tokensOf(selector: string): Map<string, string> {
   return tokens;
 }
 
-describe('21-artillery-table.css — 네임스페이스 격리', () => {
+describe('22-artillery-table.css — 네임스페이스 격리', () => {
   const groups = selectorGroups(cssCode);
 
   it('선택자 그룹이 실제로 추출된다 (파서 자체 가드)', () => {
@@ -45,13 +45,13 @@ describe('21-artillery-table.css — 네임스페이스 격리', () => {
     expect(cssCode).not.toMatch(/@media/);
   });
 
-  it('index.css 에서 20(오목) 다음, 17 앞에 import 된다', () => {
-    const i20 = indexCssSource.indexOf("'./parts/20-omok-table.css'");
-    const i21 = indexCssSource.indexOf("'./parts/21-artillery-table.css'");
+  it('index.css 에서 21(구름항로) 다음, 17 앞에 import 된다', () => {
+    const i21 = indexCssSource.indexOf("'./parts/21-cloudroute-table.css'");
+    const i22 = indexCssSource.indexOf("'./parts/22-artillery-table.css'");
     const i17 = indexCssSource.indexOf("'./parts/17-responsive.css'");
-    expect(i20).toBeGreaterThan(-1);
-    expect(i21).toBeGreaterThan(i20);
-    expect(i17).toBeGreaterThan(i21);
+    expect(i21).toBeGreaterThan(-1);
+    expect(i22).toBeGreaterThan(i21);
+    expect(i17).toBeGreaterThan(i22);
   });
 
   it('Canvas 가 읽는 하늘·구름 토큰이 라이트·다크 둘 다 있다', () => {

@@ -10,6 +10,7 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   ArtilleryTable,
+  CloudRouteTable,
   GameTable,
   OmokTable,
   OneCardTable,
@@ -58,7 +59,7 @@ import {
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
  * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
  */
-const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'ARTILLERY']);
+const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY']);
 
 /**
  * D-133 — 첫 입장(`join-or-reconnect`)이 막힌 이유. 자리 없음은 관전을, 방 없음은 메인으로를 제안한다. 그 밖의 오류는
@@ -673,6 +674,8 @@ export function RoomPage() {
             <YachtTable {...board} />
           ) : room.gameType === 'OMOK' ? (
             <OmokTable {...board} />
+          ) : room.gameType === 'CLOUD_ROUTE' ? (
+            <CloudRouteTable {...board} />
           ) : room.gameType === 'ARTILLERY' ? (
             <ArtilleryTable {...board} />
           ) : (

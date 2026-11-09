@@ -251,6 +251,9 @@ UPDATE users SET password_hash = '__retired_no_login__' WHERE username = 'demo';
 **D-200 — 요트도 같은 손잡이가 있다**: `MIRBOARD_YACHT_STATUS`(코드 기본 `AVAILABLE` — 공개). 되돌리기·확인은 아래 원카드 명령에서
 이름만 바꾼다(`flyctl secrets set MIRBOARD_YACHT_STATUS=COMING_SOON -a mirboard`, 다시 열기는 `unset`). 진행 중인 판은 끝까지 간다.
 
+**D-214 — 구름항로도 같은 손잡이**: `MIRBOARD_CLOUDROUTE_STATUS`(기본값 `AVAILABLE` — `application.yml` 과 정의의 `@Value` 두 곳, 같아야 한다). 운영 `fly.toml` 에는 덮어쓰기 줄을 두지 않는다.
+되돌리기·다시 열기·값 확인은 아래 원카드 명령에서 키 이름만 바꾼다. 표의 동작(진행 중인 판·`DISABLED` 의 멈춤)도 같다.
+
 **D-168 — 티츄·스컬킹도 같은 손잡이가 있다**: `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS`. 2026-10-30~11-09 에는 원카드만 하려고
 `fly.toml [env]` 에 둘 다 `COMING_SOON` 이었고, **D-184(2026-11-09)로 그 두 줄을 지워 다시 열었다**. 지금 운영 `fly.toml` 에는 게임 공개 상태
 덮어쓰기가 없다 — 모든 게임이 코드 기본값을 따른다. 다시 숨기려면 `MIRBOARD_<GAME>_STATUS = "COMING_SOON"` 을 넣고 배포한다(시크릿이 아니라 공개

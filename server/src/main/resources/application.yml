@@ -190,6 +190,10 @@ mirboard:
     # 요트 공개 상태. D-200 — 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_YACHT_STATUS=COMING_SOON(새 방만 막음,
     # 진행 중인 판은 끝까지). YachtGameDefinition 의 @Value 기본값과 같아야 한다. 런북은 docs/deploy.md.
     status: ${MIRBOARD_YACHT_STATUS:AVAILABLE}
+  cloudroute:
+    # D-214 — 구름항로 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_CLOUDROUTE_STATUS=COMING_SOON(docs/deploy.md).
+    # CloudRouteGameDefinition 의 @Value 기본값과 같아야 한다(CloudRouteGameDefinitionTest).
+    status: ${MIRBOARD_CLOUDROUTE_STATUS:AVAILABLE}
   artillery:
     # 씨앗포(D-220) 공개 상태. D-223 — 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_ARTILLERY_STATUS=COMING_SOON(새 방만 막음,
     # 진행 중인 판은 끝까지)·DISABLED(카탈로그에서도 뺌). ArtilleryGameDefinition 의 @Value 기본값과 같아야 한다. 런북은 docs/deploy.md.
