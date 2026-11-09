@@ -30,6 +30,8 @@ const GAMES = [
   { name: '요트', board: '.yt-table' },
   // D-190 — 오목(1:1 기본 정원 2 — 봇 하나를 채워 [2명으로 시작]).
   { name: '오목', board: '.om-table' },
+  // D-223 — 씨앗포(2~4인 — 봇 셋을 채워 [4명으로 시작]).
+  { name: '씨앗포', board: '.ar-table' },
   { name: '스컬킹', board: '.sk-table' },
   { name: '티츄', board: '.game-table-layout' },
   // D-214 — 구름항로 공개. 2~4인이라 봇 3으로 4명 판.

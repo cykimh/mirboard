@@ -213,3 +213,14 @@ splitmix(seed, k):  z = seed + (k + 1) × 0x9E3779B97F4A7C15
 | 봇 "보통" | `bot/ArtilleryBotPolicy` | `bot/ArtilleryBotPolicyTest`(결정성·무작위 상대 60/60·한 수 ≤200ms) |
 | 시작 | `lifecycle/ArtilleryRoundStarter`(`SecureRandom` 시드, 봇 좌석은 계정으로) | `infra.bot.ArtilleryBotMatchSimulationIT`(2·4봇·손 놓은 사람, Docker) |
 | 기록·상대 전적 | `persistence/ArtilleryMatchRecorder`·`ArtilleryHeadToHead`, `V16__artillery_match.sql` | `persistence/ArtilleryMatchRecorderIT`(Docker), `infra.ws.ArtilleryRecorderFailureTest` |
+
+### S3 (D-223) — 클라
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 지형 마스크·구멍·걷기 미리보기(서버 미러) | `client/src/features/artillery/terrain.ts` | `artilleryLogic.test.ts`(서버 `PhysicsTest` 와 같은 수) |
+| 대본 재생 타임라인 | `replay.ts` | `artilleryLogic.test.ts` |
+| 스토어(순수 리듀서)·sink | `artilleryStore.ts`·`artilleryRoomSink.ts` | `artilleryLogic.test.ts` |
+| Canvas 그리기·전장 | `draw.ts`·`ArtilleryField.tsx` | 브라우저 실측(데스크톱·375px) |
+| 조작부·게임판·결과·튜토리얼 | `ArtilleryControls.tsx`·`ArtilleryTable.tsx`·`ArtilleryMatchEnd.tsx`·`tutorial/` | `ArtilleryTable.test.tsx`·`artilleryTutorial.test.tsx`, e2e `practice.e2e.ts` |
+| CSS `.ar-` 네임스페이스 | `styles/parts/22-artillery-table.css` | `styles/artilleryCssNamespace.test.ts` |

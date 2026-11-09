@@ -16,8 +16,9 @@ import org.springframework.stereotype.Component;
  * 씨앗포의 카탈로그 메타데이터 + 엔진 팩토리 (S2, D-220~D-222). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정
  * 없이 이 Bean 등록으로 인게임까지 연결된다.
  *
- * <p><b>공개 상태는 설정이다</b>({@code mirboard.artillery.status} = 환경 변수 {@code MIRBOARD_ARTILLERY_STATUS}). 완성 전 단계는
- * 기본 {@code DISABLED}(카탈로그 비노출 — 관제 규칙), 클라 게임판이 완성되는 단계(S3)에서 기본을 {@code AVAILABLE} 로 바꾼다. 기본값은
+ * <p><b>공개 상태는 설정이다</b>({@code mirboard.artillery.status} = 환경 변수 {@code MIRBOARD_ARTILLERY_STATUS}, 기본 {@code AVAILABLE}
+ * — D-223 공개. 완성 전 단계(S1·S2)에서는 {@code DISABLED} 였다). {@code COMING_SOON} 이면 카탈로그에 "준비 중"으로만 보이고 새 방을 만들 수 없다
+ * (진행 중인 판은 끝까지) — 운영의 되돌리기 손잡이다({@code docs/deploy.md}). 기본값은
  * {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다. 방 옵션은 쓰지 않는다(D-106 옵트인 기본).
  *
  * <p>엔진은 2~6인을 검증했지만 MVP 공개 상한은 4인이다(D-220 — 한 바퀴 대기 시간).
@@ -36,7 +37,7 @@ public final class ArtilleryGameDefinition implements GameDefinition {
     public ArtilleryGameDefinition(ArtilleryStateStore stateStore,
                                    Clock clock,
                                    ApplicationEventPublisher publisher,
-                                   @Value("${mirboard.artillery.status:DISABLED}") GameStatus status,
+                                   @Value("${mirboard.artillery.status:AVAILABLE}") GameStatus status,
                                    @Value("${mirboard.artillery.resolve-cap-millis:18000}") long resolveCapMillis) {
         this.stateStore = stateStore;
         this.clock = clock;

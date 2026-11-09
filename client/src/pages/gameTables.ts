@@ -12,6 +12,7 @@ const imports = {
   YACHT: () => import('@/features/yacht/YachtTable'),
   OMOK: () => import('@/features/omok/OmokTable'),
   CLOUD_ROUTE: () => import('@/features/cloudroute/CloudRouteTable'),
+  ARTILLERY: () => import('@/features/artillery/ArtilleryTable'),
 };
 
 // 게임판에 들어갈 때만 "못 받으면 한 번 새로고침" — 배포 전에 연 탭이 사라진 조각을 찾는 경우(lazyWithReload).
@@ -26,6 +27,9 @@ export const YachtTable = lazy(() => loadWithReload('yacht', imports.YACHT).then
 export const OmokTable = lazy(() => loadWithReload('omok', imports.OMOK).then((m) => ({ default: m.OmokTable })));
 export const CloudRouteTable = lazy(() =>
   loadWithReload('cloudroute', imports.CLOUD_ROUTE).then((m) => ({ default: m.CloudRouteTable })),
+);
+export const ArtilleryTable = lazy(() =>
+  loadWithReload('artillery', imports.ARTILLERY).then((m) => ({ default: m.ArtilleryTable })),
 );
 
 /**

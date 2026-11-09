@@ -4,6 +4,7 @@ import { ONE_CARD_TUTORIAL } from '@/features/onecard/tutorial/onecardTutorial';
 import { YACHT_TUTORIAL } from '@/features/yacht/tutorial/yachtTutorial';
 import { OMOK_TUTORIAL } from '@/features/omok/tutorial/omokTutorial';
 import { CLOUD_ROUTE_TUTORIAL } from '@/features/cloudroute/tutorial/cloudrouteTutorial';
+import { ARTILLERY_TUTORIAL } from '@/features/artillery/tutorial/artilleryTutorial';
 import type { GameTutorial } from './types';
 
 /**
@@ -20,6 +21,7 @@ export const GAME_TUTORIALS: Readonly<Record<string, GameTutorial>> = {
   YACHT: YACHT_TUTORIAL,
   OMOK: OMOK_TUTORIAL,
   CLOUD_ROUTE: CLOUD_ROUTE_TUTORIAL,
+  ARTILLERY: ARTILLERY_TUTORIAL,
 };
 
 /** 서버 게임 id(`TICHU` 등)로 조회한다. 대소문자는 `loadGame` 과 같이 대문자로 정규화한다. */
