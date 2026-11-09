@@ -61,7 +61,13 @@ public enum RoomOption {
     OMOK_RULE("RENJU", "RENJU", "DOUBLE_THREE_ONLY", "FREESTYLE"),
 
     /** D-176·D-179 — 방의 봇 전원에 같은 난이도(쉬움·보통·어려움). 게임 중립 — 봇 강도를 고르는 게임은 누구나 선언한다. */
-    BOT_LEVEL("NORMAL", "EASY", "NORMAL", "HARD");
+    BOT_LEVEL("NORMAL", "EASY", "NORMAL", "HARD"),
+
+    /**
+     * D-215 — 판 길이(짧게·보통·길게). 게임 중립 — 판 길이를 고를 수 있는 게임은 누구나 선언하고, 값이 무엇을 뜻하는지(라운드 수 등)는
+     * 게임이 정한다(구름항로: 인원별 라운드 상한).
+     */
+    MATCH_LENGTH("NORMAL", "SHORT", "NORMAL", "LONG");
 
     /** Redis {@code room:{id}} 해시에서 맵 옵션 필드의 접두. */
     public static final String HASH_FIELD_PREFIX = "opt:";

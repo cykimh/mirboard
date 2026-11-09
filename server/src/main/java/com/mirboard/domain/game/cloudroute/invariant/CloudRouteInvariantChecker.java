@@ -26,7 +26,7 @@ public final class CloudRouteInvariantChecker {
         if (n < 2 || n > 4) {
             fail("seat count " + n);
         }
-        if (s.roundLimit() != Economy.roundLimit(n)) {
+        if (!Economy.isRoundLimit(n, s.roundLimit())) {
             fail("round limit " + s.roundLimit() + " for " + n + " seats");
         }
         if (s.round() < 1 || s.round() > s.roundLimit()) {
@@ -190,8 +190,21 @@ public final class CloudRouteInvariantChecker {
                     fail("festival candidates " + f);
                 }
             }
+            case Pending.AwaitSale sale -> {
+                List<Integer> owned = s.ownedTiles(seat);
+                if (owned.isEmpty() || !sale.candidates().equals(owned) || cash >= sale.debt()
+                        || (sale.creditor() >= 0 && (sale.creditor() == seat || !s.alive(sale.creditor())))) {
+                    fail("sale " + sale + " cash " + cash + " owned " + owned);
+                }
+            }
+            case Pending.AwaitGift g -> {
+                if (g.candidates().isEmpty() || g.candidates().stream()
+                        .anyMatch(t -> s.owners().get(t) != seat || s.levels().get(t) >= Economy.MAX_LEVEL - 1)) {
+                    fail("gift candidates " + g);
+                }
+            }
             case Pending.AwaitFlight f -> {
-                if (s.flewThisTurn() || cash < Economy.FLIGHT_FEE || f.candidates().contains(Board.STATION)
+                if (s.flewThisTurn() || (!f.free() && cash < Economy.FLIGHT_FEE) || f.candidates().contains(Board.STATION)
                         || f.candidates().size() != Board.SIZE - 1) {
                     fail("flight " + f + " cash " + cash + " flew " + s.flewThisTurn());
                 }

@@ -50,7 +50,7 @@ class CloudRouteGameEngineTest {
         CloudRouteState s = table(2).own(1, 7, 2).deckTop(Letter.GUST, Letter.BUOY).build();
         JsonNode json = new ObjectMapper().valueToTree(e.publicView(s));
         assertThat(json.toString()).doesNotContain("letterDeck").doesNotContain("GUST");
-        assertThat(json.get("deckCount").asInt()).isEqualTo(10);
+        assertThat(json.get("deckCount").asInt()).isEqualTo(Letter.values().length);
         assertThat(json.get("seats").get(1).get("totalAssets").asInt()).isEqualTo(1_500 + 100 + 2 * 50);
         assertThat(json.get("pending").get("kind").asText()).isEqualTo("ROLL");
         assertThat(e.privateView(s, 0)).isEmpty();

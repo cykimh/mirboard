@@ -51,6 +51,14 @@ public final class CloudRouteBotPolicy {
             case Pending.AwaitTakeover t -> takeover(view, t, cash, reserve);
             case Pending.AwaitFestival f -> festival(view, f);
             case Pending.AwaitFlight f -> flight(view, f, cash, reserve);
+            // 매각은 자동 청산 순서(싼 땅의 건물부터) — 통행료를 버는 비싼 땅을 끝까지 지킨다.
+            case Pending.AwaitSale sale -> new CloudRouteAction.Sell(cheapestUnit(view, sale.candidates()));
+            // 선물은 통행료가 가장 크게 오르는 땅에(같으면 낮은 칸).
+            case Pending.AwaitGift g -> new CloudRouteAction.GiftBuild(g.candidates().stream()
+                    .max(Comparator.<Integer>comparingInt(t -> Board.tile(t).tolls().get(view.levels().get(t) + 1)
+                            - Board.tile(t).tolls().get(view.levels().get(t)))
+                            .thenComparing(Comparator.reverseOrder()))
+                    .orElseThrow());
         };
     }
 
@@ -122,11 +130,18 @@ public final class CloudRouteBotPolicy {
     }
 
     private static CloudRouteAction flight(CloudRouteBotView view, Pending.AwaitFlight f, int cash, int reserve) {
-        int budget = cash - Economy.FLIGHT_FEE - reserve;
+        int budget = cash - (f.free() ? 0 : Economy.FLIGHT_FEE) - reserve;
         Optional<Integer> target = f.candidates().stream()
                 .filter(t -> Board.isLand(t) && view.owners().get(t) < 0 && Board.tile(t).price() <= budget)
                 .max(Comparator.<Integer>comparingInt(t -> Board.tile(t).price()).thenComparing(Comparator.reverseOrder()));
         return target.<CloudRouteAction>map(CloudRouteAction.Fly::new).orElse(new CloudRouteAction.Skip());
+    }
+
+    private static int cheapestUnit(CloudRouteBotView view, List<Integer> candidates) {
+        Comparator<Integer> cheap = Comparator.<Integer>comparingInt(t -> Board.tile(t).price())
+                .thenComparing(Comparator.naturalOrder());
+        return candidates.stream().filter(t -> view.levels().get(t) > 0).min(cheap)
+                .orElseGet(() -> candidates.stream().min(cheap).orElseThrow());
     }
 
     private static long unownedLands(CloudRouteBotView view) {
