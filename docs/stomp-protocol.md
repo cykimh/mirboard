@@ -366,7 +366,7 @@ boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있
 ## 요트 (gameType=YACHT, 요트 S3)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (1~4). 룰 정본은 `docs/rules-yacht.md`, 설계 `docs/plans/yacht.md`.
-기본 `DISABLED`(완성 전엔 카탈로그에도 없음) — 설정 `mirboard.yacht.status`.
+D-200 부터 공개(`AVAILABLE`) — 되돌리기는 설정 `mirboard.yacht.status`(운영 런북 `docs/deploy.md`).
 
 **클라 → 서버 `@action`**:
 

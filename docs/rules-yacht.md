@@ -6,6 +6,8 @@
 순수 엔진은 S2 에서 붙였다. 어댑터·봇·기록은 S3(**코드(S3):**), 클라는 S4(**코드(S4):**) 에서 같은 방식으로 덧붙인다 —
 클라는 판정하지 않으며 표시만 한다(권위는 서버, 후보 점수도 서버가 계산).
 
+> **공개**: D-200 부터 `AVAILABLE`(되돌리기 `MIRBOARD_YACHT_STATUS`).
+>
 > **출처와 하우스 룰.** 주사위 5개·12칸을 쓰는 일반 공용 룰만 다룬다(특정 상표 게임의 이름·점수표 디자인은 쓰지 않는다). 원문마다 갈리거나
 > 답하지 않는 항목을 우리가 정한 것은 본문에 **[결정]** 으로 표시하고 §10 에 모았다. 설계 배경은 `docs/plans/yacht.md`, 결정은 D-181~D-183.
 
@@ -277,6 +279,7 @@
   `DiceTray`(홀드 = 실제 `<button aria-pressed>`), `YachtScorecard`(칸 × 좌석, 차례 열 후보 점수, 내 차례면 칸이 버튼 — 0점은 확인 창), `YachtTurnCountdown`
   (`tableView.turnRemainingMs` 기준 — §6), `YachtMatchEnd`, `tutorial/`(6단계 + "어디에 넣을까?" 퀴즈), CSS `styles/parts/20-yacht-table.css`(`.yt-`).
 - **홀드 전송**: 마지막 탭 뒤 250ms 에 마스크 전체를 한 번(`HOLD`), 굴리기는 지금 홀드를 실어 바로(§4-2). 내 좌석의 `DICE_HELD` 메아리는 반영하지 않는다.
+- **BUSY 재전송(S5, D-200)**: `ROLL`·`SCORE` 가 방 락 경합 `BUSY` 로 거절되면 150ms 뒤 한 번 다시 보낸다(보낸 지 2초 안, 결과 이벤트가 오면 취소). 두 번째 `BUSY` 는 문구를 보인다.
 - **테스트(S4):** `YachtTable.test`(14), `yachtStore.test`(11 — sink 포함), `tutorial/yachtTutorial.test`(3), `styles/yachtCssNamespace.test`(5),
   `gameTables.test`·`gameTutorials.test`·`gameWiki.test` 에 요트 추가. 클라 전체 1,109건.
 

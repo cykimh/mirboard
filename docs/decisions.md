@@ -195,6 +195,13 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 `BETTING` 미지원). 포트 확장 없이 붙는다(엔진 타이머·비공개 뷰 불필요 — 숨길 것은 편지 더미 순서뿐). 설계 `docs/plans/property-board.md`,
 룰 정본 `docs/rules-cloudroute.md`.
 
+## D-200 (2026-11-09) — 요트 공개(S5): 원카드와 함께 연다
+
+사용자 결정. 요트를 바로 공개한다 — 코드 기본값을 `DISABLED` 에서 `AVAILABLE` 로 바꿔 main 병합·배포와 함께 원카드 옆에 연다. 되돌리기는
+원카드와 같은 손잡이 `MIRBOARD_YACHT_STATUS`(`COMING_SOON` 이면 새 방만 막고 진행 중인 판은 끝까지, `docs/deploy.md`). D-168 의 "당분간 원카드만"은
+"원카드·요트"가 된다 — 티츄·스컬킹은 그대로 `fly.toml` 에서 `COMING_SOON`. 공개 전 보강으로 클라는 `ROLL`·`SCORE` 가 방 락 경합(`BUSY`)으로
+거절되면 한 번 다시 보낸다(홀드를 모아 보내도 굴리기 직전의 홀드와 겹칠 수 있다). 설계 `docs/plans/yacht.md` §9 S5.
+
 ## D-183 (2026-11-09) — 차례 전체 제한: `GameContext.turnSeconds` (요트가 깨는 포트 가정)
 
 인프라 턴 타이머는 "액션 하나 = 차례 하나"를 전제해 성공한 액션마다 제한을 처음부터 다시 건다. 요트는 한 차례가 굴림·홀드·기록 여러 액션이라
@@ -327,6 +334,8 @@ Fly 10월 청구가 $6.84 로 처음 $5 를 넘었다. 항상 켜진 `mirboard-d
 - 원카드처럼 공개 상태를 설정으로 연다: `mirboard.tichu.status`(`MIRBOARD_TICHU_STATUS`)·`mirboard.skullking.status`(`MIRBOARD_SKULLKING_STATUS`).
   - 코드 기본은 AVAILABLE 이라 테스트·로컬은 그대로다. 운영만 `fly.toml [env]` 에 `COMING_SOON` 을 둔다.
   - 다시 열 때는 두 줄을 지우거나 `AVAILABLE` 로 바꾸고 배포한다.
+
+*변경 → D-200*: 요트도 연다(원카드·요트).
 
 ## D-167 (2026-10-30) — 계급 16단계: 그림이 여러 개인 계급 빼기
 

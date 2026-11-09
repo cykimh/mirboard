@@ -63,11 +63,13 @@ class OneCardClosedIntegrationTest {
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(3))
+                .andExpect(jsonPath("$.games.length()").value(4))
+                // D-200 — 요트도 공개라 열린 게임(이름순)에 끼고, 닫힌 원카드는 맨 뒤다.
                 .andExpect(jsonPath("$.games[0].id").value("SKULL_KING"))
-                .andExpect(jsonPath("$.games[1].id").value("TICHU"))
-                .andExpect(jsonPath("$.games[2].id").value("ONE_CARD"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[1].id").value("YACHT"))
+                .andExpect(jsonPath("$.games[2].id").value("TICHU"))
+                .andExpect(jsonPath("$.games[3].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
     }
 
     @Test

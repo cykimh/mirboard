@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOLD_SEND_DELAY_MS, YachtTable, STALE_TURN_GRACE_MS, STALE_TURN_JITTER_MS } from './YachtTable';
+import { BUSY_RETRY_DELAY_MS, HOLD_SEND_DELAY_MS, YachtTable, STALE_TURN_GRACE_MS, STALE_TURN_JITTER_MS } from './YachtTable';
 import { useYachtStore } from './yachtStore';
+import { yachtRoomSink } from './yachtRoomSink';
 import { useAuthStore } from '@/features/auth/authStore';
 import type { Held, YachtSeatView, YachtTableView } from '@/types/yacht';
 
@@ -241,6 +242,47 @@ describe('YachtTable', () => {
     renderTable({ onKick });
     fireEvent.click(screen.getByRole('button', { name: '내보내기' }));
     expect(onKick).toHaveBeenCalledWith(20);
+  });
+
+  it('a roll refused as BUSY is sent once more, a second BUSY shows the message', () => {
+    vi.useFakeTimers();
+    seed({ dice: [1, 2, 3, 4, 5], rolls: 1 });
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: /굴리기 · 2번 남음/ }));
+    expect(sendAction).toHaveBeenCalledTimes(1);
+    act(() => {
+      yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'busy' } } as never);
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(BUSY_RETRY_DELAY_MS);
+    });
+    expect(sendAction).toHaveBeenCalledTimes(2);
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'ROLL', held: [false, false, false, false, false] });
+    act(() => {
+      yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'busy' } } as never);
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(BUSY_RETRY_DELAY_MS * 3);
+    });
+    expect(sendAction).toHaveBeenCalledTimes(2);
+  });
+
+  it('a BUSY with nothing pending (or after the result came) is shown as an error', () => {
+    seed({ dice: [3, 3, 3, 5, 5], rolls: 1, candidates: { CHOICE: 19 } });
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: '초이스에 19점 기록' }));
+    act(() => {
+      useYachtStore.getState().applyEvent({
+        type: 'SCORED',
+        seq: 2,
+        payload: { seat: 0, category: 'CHOICE', points: 19, upperSubtotal: 0, bonus: 0, total: 19, auto: false },
+      });
+      yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'busy' } } as never);
+    });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(sendAction).toHaveBeenCalledTimes(1);
   });
 
   it('does not send while disconnected', () => {

@@ -49,7 +49,7 @@ import org.testcontainers.utility.DockerImageName;
         "mirboard.bot.seed=4242",
         "mirboard.bot.delay-millis=0",
         "mirboard.scheduling.poll-interval-millis=50",
-        // 기본 DISABLED(완성 전) — 방을 만들려면 연다.
+        // D-200 기본값과 같지만 지우지 말 것 — 되돌리기 시험으로 MIRBOARD_YACHT_STATUS 를 export 한 환경과 무관하게 연다(원카드 IT 와 같은 이유).
         "mirboard.yacht.status=AVAILABLE"
 })
 class YachtBotMatchSimulationIT {

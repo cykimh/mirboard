@@ -156,6 +156,18 @@
       "turnSecondsChoices": [0, 30, 60, 90]
     },
     {
+      "id": "YACHT",
+      "displayName": "요트",
+      "shortDescription": "1~4인 주사위 게임. 주사위 5개를 세 번까지 굴려 12칸 점수표를 채운다.",
+      "minPlayers": 1,
+      "maxPlayers": 4,
+      "status": "AVAILABLE",
+      "supportedRoomOptions": [],
+      "defaultPlayers": 4,
+      "defaultTurnSeconds": 45,
+      "turnSecondsChoices": [0, 20, 30, 45, 60]
+    },
+    {
       "id": "ONE_CARD",
       "displayName": "원카드",
       "shortDescription": "2~6인 손패 털기. 공격을 쌓아 넘기고, 한 장 남으면 누구보다 먼저 \"원카드!\"를 외친다.",
@@ -189,7 +201,7 @@
 - D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
-- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 세 게임이 모두 공개라(D-131) 스컬킹·원카드·티츄. 요트(S3)는 완성 전까지 기본 `DISABLED` 라 목록에 없다 — 열면 `minPlayers` 1(처음으로 1 — 방장 혼자 "1명으로 시작", D-181, 1인 판은 기록 없음)·`maxPlayers` 4·`defaultTurnSeconds` 45·`turnSecondsChoices` `[0, 20, 30, 45, 60]`·`supportedRoomOptions` `[]`.
+- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 네 게임이 모두 공개면(D-131·D-200) 스컬킹·요트·원카드·티츄(운영은 D-168 로 티츄·스컬킹이 `COMING_SOON` 이라 요트·원카드 뒤). 요트는 처음으로 `minPlayers` 1 — 방장 혼자 "1명으로 시작"할 수 있다(D-181, 1인 판은 기록 없음).
 - `supportedRoomOptions`(D-106): 이 게임이 **실제로 쓰는** 방 설정. 값은
   `TARGET_SCORE`·`TEAMS`·`BETTING` 이고 enum 선언 순서로 정렬된다. 방 만들기 UI 와
   대기실은 여기 있는 것만 노출하고, 서버도 같은 집합으로 검증한다
