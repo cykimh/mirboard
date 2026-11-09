@@ -24,8 +24,8 @@ public class GameEngineProvider {
     }
 
     /**
-     * 이 방의 per-room 엔진. 방 설정(목표점수·판돈·봇 좌석)을 {@link GameContext} 에 실어
-     * 엔진이 매치 종료를 스스로 판정할 수 있게 한다.
+     * 이 방의 per-room 엔진. 방 설정(목표점수·판돈·봇 좌석·턴 제한)을 {@link GameContext} 에 실어
+     * 엔진이 매치 종료를 스스로 판정할 수 있게 한다. D-183 — 턴 제한은 차례 전체 마감을 엔진 타이머로 거는 게임(요트)이 쓴다.
      *
      * @throws com.mirboard.domain.game.core.GameNotFoundException 알 수 없는/비활성 게임
      */
@@ -35,6 +35,7 @@ public class GameEngineProvider {
                 room.playerIds(),
                 room.targetScore(),
                 room.stake(),
-                room.botSeats()));
+                room.botSeats(),
+                room.turnSeconds()));
     }
 }

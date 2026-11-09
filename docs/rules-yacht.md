@@ -144,6 +144,8 @@
 - **코드:** `YachtEngine.remainingMillis(state, now)`(남은 시간 — 0 이하면 만기, 제한은 생성자의 `turnSeconds`), `YachtEngine.expire(state, roller, now)`(위 2 — 액션 수에 넣지 않는다),
   `YachtEngine.fallbackAction(state)`(위 4). 시계는 인자로 받는다(순수 엔진에 시계 없음). 어댑터의 포트 ⑦ `timer`/`onTimer` 연결은 S3.
 - **테스트:** `YachtEngineTimeoutTest` — 안 굴림/1·2·3번 굴림 뒤 만기, 동점 칸 순서, 홀드를 여러 번 바꿔도 남은 시간이 줄기만 함, 끔이면 없음.
+- **코드(S3):** `YachtGameEngine.timer`·`onTimer`(포트 ⑦ 엔진 타이머 — 차례 시작 + `GameContext.turnSeconds`, D-183), `timeoutAction` = `fallbackAction`, 공개 뷰의 `turnRemainingMs` 도 같은 계산.
+- **테스트(S3):** `YachtGameEngineTest`(남은 시간·만기 자동 기록·끔이면 없음), `infra/bot/YachtBotMatchSimulationIT.an_idle_human_is_carried_by_the_whole_turn_timer_until_the_match_ends`(제한 1초 — 손 놓은 사람의 12칸이 자동 기록으로 다 찬다).
 
 ## 7. 탈주
 
@@ -156,6 +158,7 @@
 4. 이미 탈주한 좌석의 다시 탈주는 해당 없음(`NOT_APPLICABLE`).
 
 - **코드:** `YachtEngine.desert(state, seat, now)` → `Desertion(newState, outcome, events)` — outcome 은 포트 `DesertOutcome` 과 같은 3치. 사람 좌석은 생성자의 `GameContext.botSeats` 밖 좌석이다.
+- **코드(S3):** `YachtGameEngine.desert` — 3치를 포트 `DesertOutcome` 으로 그대로, 바뀐 경우만 저장, 끝났으면 기록 발행.
 - **테스트:** `YachtEngineDesertionTest` — 차례 중 탈주·차례 아닐 때·라운드 마지막 좌석·12라운드 마지막 좌석(→ `FINISHED`)·마지막 사람(→ `NO_HUMANS`)·
   사람 1명 남음(→ 계속)·이중 탈주.
 
@@ -211,6 +214,8 @@
 - 상대 전적: 최종 순위로 센다.
 
 - **코드:** `event/YachtEvent`(sealed, JSON 판별자 `@event`), `state/YachtStateMapper.toPublicView(state, turnRemainingMs)`(남은 시간은 어댑터가 `remainingMillis` 로 넣는다). 기록기·상대 전적은 S3.
+- **코드(S3):** `persistence/YachtMatchRecorder`(로컬 발행 `YachtMatchCompleted` 리스너, 1인 판은 바로 반환), `persistence/YachtHeadToHead`(최종 순위), `V13__yacht_match.sql`(`yacht_match_results`·`yacht_match_participants`).
+- **테스트(S3):** `infra/bot/YachtBotMatchSimulationIT`(2·4봇 판 기록, 사람 + 봇 판의 사람 전적·ELO 제외, 1인 판 기록 0행·전적 0·대기실 복귀), `infra/ws/YachtRecorderFailureTest`(기록 실패에도 마지막 `SCORED`·`MATCH_ENDED` 방송 + 대기실 복귀).
 - **테스트:** `YachtJsonRoundTripTest`(상태·액션·이벤트 JSON 왕복, envelope 이름, 상태 JSON 에 난수 관련 키 없음),
   시뮬레이션의 "이벤트만 듣는 클라" 대조(§11).
 
@@ -259,6 +264,10 @@
 - **합계:** 요트 도메인 테스트 85건 — `ScoringTest` 14 + `ScoringExhaustiveTest` 1 + `ScorecardTest` 4 + `YachtEngineTurnTest` 18 + `YachtEngineTimeoutTest` 7 +
   `YachtEngineDesertionTest` 8 + `RankingTest` 5 + `YachtInvariantCheckerTest` 14 + `YachtJsonRoundTripTest` 7 + `YachtMatchSimulationTest` 7.
   `./gradlew :server:test --tests "com.mirboard.domain.game.yacht.*"`(Docker 불필요, 약 5초).
+- **S3 추가:** `YachtGameEngineTest` 11 + `YachtGameDefinitionTest` 3 + `bot/YachtBotPolicyTest` 5 + `bot/YachtBotStrengthTest` 2 → 도메인 106건(약 10초).
+  인프라 `infra/bot/YachtBotMatchSimulationIT` 4(Docker, 약 35초) + `infra/ws/YachtRecorderFailureTest` 1.
+  **봇 실측(시드 고정)**: 1인 1,000판 평균 총점 — 휴리스틱 177.2 · 탐욕(한 번 굴리고 바로 최고점) 77.8 · 무작위(포트 기본) 39.0. 탐욕 봇과 1:1 500판 승률 1.00.
+  결정당 계산은 주사위 묶음 252가지 점수를 미리 계산해 두고 조회만 한다(처음 구현은 결정마다 전수 계산이라 1,000판이 2분을 넘겼다).
 
 ## 12. 범위 밖 (v1)
 

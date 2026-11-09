@@ -14,21 +14,31 @@ import java.util.List;
  * @param stake       판돈(가상 칩, D-81/82). 0=내기 없음. 칩 정산 자체는 포트 밖이고
  *                    (`docs/game-port.md` §2) 매치 종료 이벤트에 실어 보내기만 한다.
  * @param botSeats    봇이 앉은 좌석. MVP 산정에서 봇을 빼는 등 게임 내부 판단에 쓴다.
+ * @param turnSeconds D-183 — 방의 턴 제한(초), 0 = 끔. 매치 중에는 바뀌지 않는다(설정은 WAITING 에서만). 인프라 턴 타이머는
+ *                    액션마다 다시 걸리므로 "한 차례 = 여러 액션"인 게임(요트)이 차례 전체 마감을 엔진 타이머로 걸 때 쓴다.
+ *                    한 차례 = 한 액션인 게임은 무시한다.
  */
 public record GameContext(String roomId,
                           List<Long> playerIds,
                           int targetScore,
                           int stake,
-                          List<Integer> botSeats) {
+                          List<Integer> botSeats,
+                          int turnSeconds) {
 
     public GameContext {
         playerIds = List.copyOf(playerIds);
         botSeats = botSeats == null ? List.of() : List.copyOf(botSeats);
+        turnSeconds = Math.max(0, turnSeconds);
+    }
+
+    /** D-183 이전 모양 — 턴 제한 끔(0). 한 차례 = 한 액션인 게임·테스트가 쓴다. */
+    public GameContext(String roomId, List<Long> playerIds, int targetScore, int stake, List<Integer> botSeats) {
+        this(roomId, playerIds, targetScore, stake, botSeats, 0);
     }
 
     /** 룰 단위 테스트용 — 방 설정이 결과에 영향을 주지 않는 경로에서 쓴다. */
     public GameContext(String roomId, List<Long> playerIds) {
-        this(roomId, playerIds, 0, 0, List.of());
+        this(roomId, playerIds, 0, 0, List.of(), 0);
     }
 
     /** 좌석 수 = 참가자 수. 인원 가변 게임(D-99)에서 라운드 초기화가 참조한다. */

@@ -33,8 +33,8 @@ CLAUDE.md 의 "새 게임 = Bean 추가" 문구는 이제 **인게임까지 참*
 | 3' | **비공개 뷰** | `toPrivateHand(state, seat)` | 동일(손패) | **없음** — 점수판이 공개 → Optional |
 | 4 | 단계 이름 | `phaseName(state)` | 입찰/플레이 | 굴림/기록 |
 | 5 | 라운드·매치 진행 | `MatchProgressService.onRoundEnd` + `TichuMatchState.isMatchOver` | **10라운드 고정** | **12칸 채우면 종료** |
-| 6 | 합법 액션 | `LegalActionEnumerator.enumerate` + `TimeoutActionPolicy.choose` | 동일 | 조합 폭발(주사위 고정 2^5 × 남은 칸) |
-| 7 | 엔진 타이머 *(선택, D-128)* | 없음(기본 empty) | 없음(기본 empty) | 해당 없음 — 원카드의 경쟁 창이 쓴다(§2) |
+| 6 | 합법 액션 | `LegalActionEnumerator.enumerate` + `TimeoutActionPolicy.choose` | 동일 | ~~조합 폭발(주사위 고정 2^5 × 남은 칸)~~ *실측(요트 S2): 홀드와 기록이 별개 액션이라 곱이 아니라 합 — 최대 45개* |
+| 7 | 엔진 타이머 *(선택, D-128)* | 없음(기본 empty) | 없음(기본 empty) | ~~해당 없음~~ *요트가 쓴다 — 차례 전체 제한(D-183, §2). 원카드는 경쟁 창* |
 
 ### 확정한 인터페이스
 
@@ -94,7 +94,7 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 
 `GameState` · `GameAction` 은 마커, `GameEvent` 는 `envelopeType()` + `privateSeat()` +
 `sequenced()` 만 노출한다(브로드캐스터가 게임을 모른 채 라우팅할 최소치). `GameContext` 는
-`(roomId, playerIds, targetScore, stake, botSeats)` — 방 설정이 엔진에 들어오는 유일한 창구다.
+`(roomId, playerIds, targetScore, stake, botSeats, turnSeconds)` — 방 설정이 엔진에 들어오는 유일한 창구다(`turnSeconds` 는 D-183).
 
 *(D-126)* `GameEvent.sequenced()`(기본 true)가 false 면 브로드캐스터는 방 순번을 발급하지
 않고 envelope 의 `seq` 를 비운다. 방 순번은 클라가 **공개 토픽**에서 구멍을 찾는 기준이라,
@@ -301,6 +301,26 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
   킥이 봇 차례인데 이 인스턴스에 봇 루프가 없으면(재기동) 루프도 다시 건다. 게임에 새로 요구하는 것은 없다 — 위 계약(남은
   시간·락 안 재확인)이 그대로 지킨다. 킥은 `onTurnAdvanced` 를 부르지 않는다(세대를 올리면 resync 반복으로 턴 데드라인을
   미룰 수 있다).
+
+### 한 차례가 여러 액션인 게임은 차례 전체 마감을 엔진 타이머로 건다 (D-183)
+
+요트가 실제로 깬 가정은 §1 표가 예상한 곳(비공개 뷰·12칸 종료·조합 폭발 — 셋 다 이미 포트에 있었다)이 아니라 표에 없던
+**"액션 하나 = 차례 하나"**였다. 진행 경로는 성공한 액션마다 `onTurnAdvanced` 로 세대를 올리고 턴 데드라인을 `turnSeconds` 로
+처음부터 다시 건다. 티츄·스컬킹·원카드는 차례당 액션이 하나라 문제가 없지만, 요트는 굴림·홀드·기록이 한 차례라 홀드를 바꾸기만
+해도 제한이 끝없이 늘어난다.
+
+- **포트 변경은 `GameContext.turnSeconds` 하나다**(방 설정 — 0 = 끔, 매치 중 불변). `GameEngineProvider.forRoom` 이 `room.turnSeconds()`
+  를 싣는다. 예전 5필드 생성자는 0 으로 남겼고 다른 게임은 이 값을 무시한다 — 동작 무변경. 인프라는 그대로다.
+- 게임은 차례 시작 시각을 상태에 두고 ⑦ `timer(state)` = 차례 시작 + `turnSeconds` − 지금을 돌려준다. 만기면 `onTimer` 가 자동 처리한다
+  (요트: 필요하면 한 번 굴리고 최고점 칸에 기록). 재무장해도 처음부터 세지 않는다(⑦ 계약 그대로).
+- 인프라 턴 데드라인(마지막 액션 + T)은 그대로 걸리지만 늘 차례 마감(차례 시작 + T)보다 늦어, 엔진 타이머가 먼저 발화해 세대를 올리면
+  지워진다. 그쪽 `timeoutAction` 은 폴백으로만 남는다.
+- resync 의 바깥 `turnRemainingMs`(인프라 — 마지막 액션 기준)는 이런 게임에서 차례 남은 시간과 다르다. 요트는 공개 뷰에 엔진이 계산한
+  `turnRemainingMs` 를 싣는다. 인프라 쪽을 고치지 않은 이유: 다른 세 게임은 둘이 같다.
+- 포격 기획처럼 이동을 발사 액션에 실어 "한 차례 = 한 액션"으로 맞추는 방법도 있다. 요트는 홀드를 실시간으로 보여 주기로 해
+  (D-181) 그 길을 못 쓴다.
+- *병합 메모*: 오목 S3a(D-176)가 같은 레코드에 `options` 를 더한다(다른 브랜치). 두 짧은 생성자는 마지막 인자 타입이 달라(`int`·`Map`)
+  함께 둘 수 있고, 합치면 `(…, botSeats, options, turnSeconds)` 순서로 둔다.
 
 ## 3. 인원 가변 (스컬킹 2~8 결정의 파급) — **구현 완료 (D-99 / S2)**
 

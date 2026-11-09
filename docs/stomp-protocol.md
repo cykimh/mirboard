@@ -363,6 +363,43 @@ boolean 이 아니라 탈락 사유 `"BANKRUPT"`·`"DESERTED"` 이고 살아 있
 > **순번**: 비공개 `HAND_*` 는 방 순번(`seq`)을 쓰지 않는다(D-129 — D-126 의 `GameEvent.sequenced()` 를 false 로 재정의).
 > 받지 않는 좌석에 구멍을 만들지 않으며, 손패의 순서는 `handVersion` 이 지킨다.
 
+## 요트 (gameType=YACHT, 요트 S3)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (1~4). 룰 정본은 `docs/rules-yacht.md`, 설계 `docs/plans/yacht.md`.
+기본 `DISABLED`(완성 전엔 카탈로그에도 없음) — 설정 `mirboard.yacht.status`.
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `ROLL` | `held?: boolean[5]` | 홀드 안 한 주사위를 굴린다. `held` 를 실으면 먼저 적용(첫 굴림은 모두 false 여야 한다) |
+| `HOLD` | `held: boolean[5]` | 굴림 1·2번째 뒤에만. 지금과 같으면 `HOLD_UNCHANGED` |
+| `SCORE` | `category` | `ONES`·`TWOS`·`THREES`·`FOURS`·`FIVES`·`SIXES`·`CHOICE`·`FOUR_OF_A_KIND`·`FULL_HOUSE`·`SMALL_STRAIGHT`·`LARGE_STRAIGHT`·`YACHT` |
+
+`held` 길이가 5 가 아니거나 모르는 칸이면 역직렬화 실패 → `INVALID_ACTION`. 주사위 직렬화는 정수 5개 배열(`[3,3,4,1,5]`).
+
+**서버 → 클라 (공개)** — 전부 결과값. 요트에는 **엔진의 비공개 이벤트가 없다**(숨길 정보 없음 — `ERROR` 만 본인 큐):
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `TURN_CHANGED` | `{ seat, round, turnSeconds }` | 차례 시작 — 주사위 비움·홀드 풀림. `turnSeconds` 는 차례 **전체** 제한(0 = 끔, D-183). 시작 직후 첫 차례는 이벤트 없이 resync 로 |
+| `DICE_HELD` | `{ seat, held }` | 홀드 실시간 공개(D-181) |
+| `DICE_ROLLED` | `{ seat, dice, held, rolls, candidates }` | `rolls` 1~3. `candidates` = 그 좌석의 빈 칸 → 지금 주사위 점수(0 포함, 서버 계산 — 클라는 점수를 계산하지 않는다) |
+| `SCORED` | `{ seat, category, points, upperSubtotal, bonus, total, auto }` | 기록 뒤 그 좌석의 소계·보너스·총점. `auto` 는 차례 제한 만기 자동 기록 |
+| `PLAYER_ELIMINATED` | `{ seat, total }` | 탈주 — 점수표가 멈춘다. 그 좌석의 차례였으면 뒤에 `TURN_CHANGED` 가 온다 |
+| `MATCH_ENDED` | `{ reason, placements: [{seat, rank, total, deserted}] }` | `reason`: `FINISHED`·`NO_HUMANS`·`ACTION_LIMIT`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위 |
+
+`ERROR` 요트 코드: `NOT_YOUR_TURN`·`MATCH_OVER`·`NO_ROLLS_LEFT`·`NOTHING_TO_ROLL`·`HOLD_NOT_ALLOWED`·`HOLD_UNCHANGED`·
+`NOT_ROLLED_YET`·`CATEGORY_FILLED`·`INVALID_ACTION`.
+
+- **차례 전체 제한(D-183).** 인프라 턴 데드라인은 액션마다 처음부터 다시 걸리므로 요트는 엔진 타이머로 "차례 시작 + `turnSeconds`" 에
+  마감을 건다. 만기면 서버가 (안 굴렸으면 한 번 굴리고) 점수가 가장 높은 빈 칸에 기록한다 — `DICE_ROLLED`(필요하면) → `SCORED{auto:true}` →
+  `TURN_CHANGED`. 그래서 resync 의 바깥 `turnRemainingMs`(마지막 액션 기준)는 요트에서 쓰지 말고 `tableView.turnRemainingMs`(차례 기준)를 쓴다.
+
+**resync**: `tableView` = `{ phase, seats: [{seat, scores, upperSubtotal, bonus, total, deserted}], round, turnSeat, dice, held, rolls,
+candidates, turnRemainingMs, result }` — `phase` 는 `PLAYING`·`ENDED`, `scores` 는 채운 칸만(칸 → 점수), `dice` 는 첫 굴림 전 null,
+`turnRemainingMs` 는 제한이 꺼졌거나 끝났으면 null, `result` 는 `MATCH_ENDED` 와 같은 모양. `privateHand` 는 늘 null(비공개 뷰 없음).
+
 ---
 
 ## 보안 검토 체크리스트

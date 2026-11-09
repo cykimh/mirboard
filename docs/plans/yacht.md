@@ -1,6 +1,6 @@
 # 요트(주사위) — 네 번째 게임 후보 — 기획
 
-> 상태: **S2 완료(순수 엔진)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
+> 상태: **S3 완료(서버 — 포트 확장·어댑터·봇·기록, 기본 `DISABLED`)** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-181(채택)·D-182(룰)·D-183(포트 확장 `GameContext.turnSeconds`) · 로드맵 M9
 > 근거: `docs/game-port.md`(포트 계약) · `docs/plans/multi-game.md` §2·§3("요트 — 포트가 진짜 일반적인지 시험하는 리트머스")
 > · 형식 본보기 `docs/plans/onecard.md`·`docs/rules-onecard.md`
 > 룰 정본은 `docs/rules-yacht.md`(S1) 다. 이 문서의 §3 은 그 입력이었고, 어긋나면 정본이 이긴다.
@@ -162,7 +162,7 @@ public record GameContext(String roomId, List<Long> playerIds, int targetScore, 
 
 ```
 yacht/
-  YachtGameDefinition    @Component · ID "YACHT" · 1~4인 · 상태 COMING_SOON(→ 공개는 별건, D-168 의 MIRBOARD_*_STATUS 패턴) (S3)
+  YachtGameDefinition    @Component · ID "YACHT" · 1~4인 · 상태 기본 DISABLED(완성 전 카탈로그 비노출 — 공개는 S5, MIRBOARD_YACHT_STATUS) (S3)
   YachtEngine            순수 룰 엔진 — 저장소·시계 없음, 주사위·시각은 인자로 (S2)
   YachtGameEngine        포트 어댑터 — 상태 저장·시계·Random·로컬 발행·엔진 타이머 (S3)
   dice/       Dice(5개 눈 불변 레코드) · HoldMask(5비트) · DiceRoller(주입용 함수형 인터페이스) (S2)
@@ -238,7 +238,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
   - 버려야 할 때는 기대 손실이 가장 작은 칸(보통 1 칸·요트 순)에 0 을 쓴다.
 - **어댑터 폴백**: 정책이 예외·null·비합법 수를 내면 ERROR 로그 후 `timeoutAction`(포트 권장 패턴).
 - **`timeoutAction`**(턴 데드라인 폴백·탈주 아닌 자동 처리): 굴림 0회면 `ROLL`, 아니면 즉시 점수가 가장 높은 빈 칸에 `SCORE`(같으면 위 칸). 봇 정책과 섞지 않는다.
-- **강도 확인**(S3, 시드 고정 1,000판): 휴리스틱 봇 평균 총점이 무작위 봇(포트 기본 — 합법수 균등)과 "탐욕 봇(굴리지 않고 바로 최고점 기록)"보다 높고,
+- **강도 확인 — 실측(S3)**: 1인 평균 휴리스틱 177.2 · 탐욕 77.8 · 무작위 39.0, 탐욕 1:1 승률 1.00(`bot/YachtBotStrengthTest`). 처음 기준: 휴리스틱 봇 평균 총점이 무작위 봇(포트 기본 — 합법수 균등)과 "탐욕 봇(굴리지 않고 바로 최고점 기록)"보다 높고,
   탐욕 봇 1:1 승률이 0.5 를 넘을 것. 절대 수치(평균 몇 점)는 실측 뒤 회귀 기준으로 고정한다.
 
 ### 6.6 탈주·종료·기록
@@ -323,7 +323,7 @@ TURN_CHANGED(seat=A, round=r)          ← 차례 시작 시각 기록, 홀드 �
 | S0 | 결정 기록(D-181~D-183) + 이 기획 확정 — **완료** | — | 없음 | 사용자 승인 |
 | S1 | 룰 명세 `docs/rules-yacht.md`(§3.3 확정) — **완료** | S0 | 없음(문서) | 사용자 검토 |
 | S2 | 순수 엔진: 주사위·점수표·액션 검증·순위·불변식 + 시뮬레이션 — **완료**(테스트 85건, `rules-yacht.md` §11 실측) | S1 | 서버 신규 패키지(Docker 불필요) | `Scoring` 전수(7,776 × 12) · 거절 사유별 단위 테스트 · 1~4인 무작위 봇 2,000판 전부 종료 + 매 전이 불변식 |
-| S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(V 다음)·라운드 스타터·상대 전적. 정의 `COMING_SOON` | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
+| S3 | 포트 확장 1건(`GameContext.turnSeconds`) + 어댑터·엔진 타이머·봇·기록기(V13)·라운드 스타터·상대 전적. 정의 기본 `DISABLED`(관제 규칙 — 완성 전 카탈로그 비노출) — **완료**(`rules-yacht.md` §11 S3 실측) | S2 | 서버(인프라 1건) | 차례 전체 타이머(홀드 토글로 안 늘어남·끔이면 없음·재무장 시 남은 시간) · 봇 강도 테스트 · 봇 풀매치 IT · 1인 방 시작→종료→대기실 복귀 IT · 탈주(차례 중/아닐 때/마지막 사람) · 기록 실패 격리(`*RecorderFailureTest` 에 요트 추가) · 상태에 시드 없음 · 인프라 grep 0 · 3게임 회귀 |
 | S4 | 클라 게임판·점수표·주사위 판·튜토리얼·위키 | S3 | 클라 | Vitest(스토어·sink·게임판·튜토리얼, `gameTables.test`·`gameTutorials.test` 원문 검사 통과) · 브라우저 실측(데스크톱·375px, 4인 점수표 가로 스크롤 없음, 44px) |
 | S5 | 공개 전 보강 → 공개 전환(운영 `MIRBOARD_YACHT_STATUS` 패턴, D-168 와 맞춰 결정) → 문서 수치 → 배포 | S4 | 서버·클라 | `check.sh` 전체, 운영 스모크(1인·봇 3·사람 2) |
 

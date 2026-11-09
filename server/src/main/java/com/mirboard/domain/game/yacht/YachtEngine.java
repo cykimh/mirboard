@@ -36,16 +36,14 @@ public final class YachtEngine {
     private final Set<Integer> botSeats;
     private final int turnSeconds;
 
-    /**
-     * @param turnSeconds 차례 전체 제한(초), 0 이면 끔(§6, D-183). S3 에서 {@code GameContext.turnSeconds} 로 받는다
-     */
-    public YachtEngine(GameContext context, int turnSeconds) {
+    /** 좌석 수·봇 좌석·차례 전체 제한({@code turnSeconds}, 0 이면 끔 — §6, D-183)을 방 설정에서 받는다. */
+    public YachtEngine(GameContext context) {
         if (context.seatCount() < 1) {
             throw new IllegalArgumentException("Yacht needs at least one seat");
         }
         this.seatCount = context.seatCount();
         this.botSeats = Collections.unmodifiableSet(new TreeSet<>(context.botSeats()));
-        this.turnSeconds = Math.max(0, turnSeconds);
+        this.turnSeconds = context.turnSeconds();
     }
 
     public record Result(YachtState newState, List<YachtEvent> events) {
