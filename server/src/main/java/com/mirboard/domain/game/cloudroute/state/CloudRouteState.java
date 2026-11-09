@@ -128,6 +128,7 @@ public record CloudRouteState(List<SeatState> seats,
             case Pending.AwaitFestival __ -> "AWAIT_FESTIVAL";
             case Pending.AwaitFlight __ -> "AWAIT_FLIGHT";
             case Pending.AwaitGift __ -> "AWAIT_GIFT";
+            case Pending.AwaitSale __ -> "AWAIT_SALE";
         };
     }
 }

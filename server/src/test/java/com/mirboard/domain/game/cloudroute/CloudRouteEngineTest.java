@@ -475,17 +475,72 @@ class CloudRouteEngineTest {
 
     @Nested
     class PaymentAndElimination {
+        /** 남의 차례에 내는 돈(섬 잔치)은 자동 청산이다 — 싼 땅의 건물부터 한 단계씩, 다음 땅(§10). */
         @Test
-        void liquidation_sells_buildings_cheapest_first_then_lands_and_puts_out_the_festival() {
-            CloudRouteState s = table(2).at(0, 5).cash(0, 10).own(0, 1, 1).own(0, 4, 2).own(0, 7, 0).festival(1).build();
-            Result r = apply(engine(2, new ScriptedDice(1, 3)), s, 0, ROLL);
+        void an_off_turn_payment_liquidates_automatically_cheapest_buildings_first_then_lands() {
+            CloudRouteState s = table(2).cash(1, 10).own(1, 1, 1).own(1, 4, 2).own(1, 7, 0).festival(1)
+                    .deckTop(Letter.ISLAND_FEAST).build();
+            Result r = apply(engine(2, new ScriptedDice(1, 2)), s, 0, ROLL);
             CloudRouteEvent.AssetsLiquidated sold = of(r, CloudRouteEvent.AssetsLiquidated.class).getFirst();
-            assertThat(sold.sales()).containsExactly(new Sale(1, false, 0, 15), new Sale(4, false, 1, 20),
-                    new Sale(4, false, 0, 20), new Sale(1, true, 0, 30), new Sale(4, true, 0, 40));
-            assertThat(sold.cash()).isEqualTo(135);
-            assertThat(r.events()).contains(new CloudRouteEvent.FestivalCleared(1));
-            assertThat(r.newState().cash(0)).isEqualTo(35);
-            assertThat(r.newState().owners().get(7)).isZero();
+            assertThat(sold.seat()).isEqualTo(1);
+            assertThat(sold.sales()).containsExactly(new Sale(1, false, 0, 15), new Sale(4, false, 1, 20));
+            assertThat(r.newState().cash(1)).isEqualTo(15);
+            assertThat(r.newState().owners().get(1)).isEqualTo(1);
+        }
+
+        /** D-217 — 내 차례에 낼 돈이 모자라면 팔 칸을 직접 고른다. 칸마다 다음 단위(건물 한 단계, 없으면 땅). */
+        @Test
+        void a_short_turn_payment_asks_which_tile_to_sell_one_unit_at_a_time() {
+            CloudRouteEngine e = engine(2, new ScriptedDice(1, 3));
+            CloudRouteState s = table(2).at(0, 5).cash(0, 10).own(0, 1, 1).own(0, 4, 2).own(0, 7, 0).festival(7).build();
+            s = apply(e, s, 0, ROLL).newState(); // 세관 100G
+            assertThat(s.pending()).isEqualTo(new Pending.AwaitSale(100, -1, "CUSTOMS", -1, false, false, List.of(1, 4, 7)));
+            assertThat(e.timeoutAction(s, 0)).isEqualTo(new CloudRouteAction.Sell(1)); // 시간 초과 = 자동 순서
+            Result r = apply(e, s, 0, new CloudRouteAction.Sell(7)); // 버섯 숲길 땅 +50 → 60, 축제 꺼짐
+            assertThat(r.events()).contains(new CloudRouteEvent.FestivalCleared(7));
+            s = r.newState();
+            assertThat(s.pending()).isInstanceOf(Pending.AwaitSale.class);
+            assertThat(((Pending.AwaitSale) s.pending()).candidates()).containsExactly(1, 4);
+            r = apply(e, s, 0, new CloudRouteAction.Sell(4)); // 상점 → 천막 +20 → 80
+            r = apply(e, r.newState(), 0, new CloudRouteAction.Sell(4)); // 천막 → 땅만 +20 → 100 → 냄
+            assertThat(of(r, CloudRouteEvent.MoneyChanged.class))
+                    .containsExactly(new CloudRouteEvent.MoneyChanged(0, -100, MoneyReason.CUSTOMS, 0));
+            assertThat(r.newState().turnSeat()).isEqualTo(1);
+            assertThat(r.newState().owners().get(1)).isZero();
+            assertThat(r.newState().levels().get(1)).isEqualTo(1);
+        }
+
+        @Test
+        void a_manual_sale_for_a_toll_pays_the_owner_and_still_offers_the_takeover() {
+            CloudRouteEngine e = engine(2, new ScriptedDice(3, 4));
+            CloudRouteState s = table(2).cash(0, 100).own(0, 23, 0).own(1, 7, 2).build();
+            s = apply(e, s, 0, ROLL).newState(); // 버섯 숲길 상점 140G
+            assertThat(s.pending()).isEqualTo(new Pending.AwaitSale(140, 1, "TOLL", 7, false, false, List.of(23)));
+            Result r = apply(e, s, 0, new CloudRouteAction.Sell(23)); // +120 → 220 → 140 냄 → 80
+            assertThat(of(r, CloudRouteEvent.TollPaid.class))
+                    .containsExactly(new CloudRouteEvent.TollPaid(0, 1, 7, 140, false, false, 80, 1_640));
+            assertThat(r.newState().turnSeat()).isEqualTo(1); // 인수가 300 > 80 이라 인수 제안 없음
+        }
+
+        @Test
+        void selling_everything_short_is_bankruptcy() {
+            CloudRouteState s = table(3).cash(0, 0).own(0, 1, 0).own(1, 7, 3).build();
+            CloudRouteEngine e3 = engine(3, new ScriptedDice(3, 4));
+            s = apply(e3, s, 0, ROLL).newState(); // 280G
+            Result r = apply(e3, s, 0, new CloudRouteAction.Sell(1)); // +30 → 30 전부 내고 파산
+            assertThat(of(r, CloudRouteEvent.TollPaid.class).getFirst().amount()).isEqualTo(30);
+            assertThat(r.newState().alive(0)).isFalse();
+            assertThat(r.newState().turnSeat()).isEqualTo(1);
+        }
+
+        @Test
+        void a_debt_vanishes_when_its_creditor_deserts_during_the_sale() {
+            CloudRouteEngine e = engine(3, new ScriptedDice(3, 4));
+            CloudRouteState s = apply(e, table(3).cash(0, 100).own(0, 23, 0).own(1, 7, 2).build(), 0, ROLL).newState();
+            Desertion d = e.desert(s, 1);
+            assertThat(d.newState().turnSeat()).isEqualTo(2);
+            assertThat(d.newState().cash(0)).isEqualTo(100);
+            CloudRouteInvariantChecker.check(d.newState());
         }
 
         @Test

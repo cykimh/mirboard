@@ -228,6 +228,16 @@ public final class CloudRouteEngine {
                 t.pending = null;
                 t.fly(fly.tile(), flight.free());
             }
+            case CloudRouteAction.Sell sell -> {
+                if (!(pending instanceof Pending.AwaitSale sale)) {
+                    throw rejected(RejectionReason.WRONG_DECISION);
+                }
+                if (!sale.candidates().contains(sell.tile())) {
+                    throw rejected(RejectionReason.INVALID_TILE);
+                }
+                t.pending = null;
+                t.sell(sale, sell.tile());
+            }
             case CloudRouteAction.GiftBuild gift -> {
                 if (!(pending instanceof Pending.AwaitGift g)) {
                     throw rejected(RejectionReason.WRONG_DECISION);
@@ -307,6 +317,7 @@ public final class CloudRouteEngine {
                 legal.add(new CloudRouteAction.Skip());
             }
             case Pending.AwaitGift g -> g.candidates().forEach(tile -> legal.add(new CloudRouteAction.GiftBuild(tile)));
+            case Pending.AwaitSale sale -> sale.candidates().forEach(tile -> legal.add(new CloudRouteAction.Sell(tile)));
         }
         return legal;
     }
@@ -325,11 +336,32 @@ public final class CloudRouteEngine {
             case Pending.AwaitFestival __ -> new CloudRouteAction.Skip();
             case Pending.AwaitFlight __ -> new CloudRouteAction.Skip();
             // 선물은 건너뛸 수 없다 — 시간 초과면 가장 싼 후보(같으면 낮은 칸, 결정적).
+            // 매각은 예전 자동 순서(§10 — 싼 땅의 건물부터, 다음 땅) 한 단위.
+            case Pending.AwaitSale __ -> new CloudRouteAction.Sell(autoSaleTile(state, seat));
             case Pending.AwaitGift g -> new CloudRouteAction.GiftBuild(g.candidates().stream()
                     .min(java.util.Comparator.<Integer>comparingInt(tile -> Board.tile(tile).price())
                             .thenComparing(java.util.Comparator.naturalOrder()))
                     .orElseThrow());
         };
+    }
+
+    /** 자동 청산(§10)이 다음에 팔 칸 — 건물이 있는 땅 중 가장 싼 것, 없으면 가장 싼 땅(같으면 낮은 칸). 없으면 −1. */
+    public static int autoSaleTile(CloudRouteState state, int seat) {
+        int pick = -1;
+        for (boolean withBuilding : new boolean[] {true, false}) {
+            for (int tile = 0; tile < Board.SIZE; tile++) {
+                if (state.owners().get(tile) != seat || (withBuilding && state.levels().get(tile) == 0)) {
+                    continue;
+                }
+                if (pick < 0 || Board.tile(tile).price() < Board.tile(pick).price()) {
+                    pick = tile;
+                }
+            }
+            if (pick >= 0) {
+                return pick;
+            }
+        }
+        return pick;
     }
 
     // ---------- 내부 ----------
@@ -650,7 +682,17 @@ public final class CloudRouteEngine {
             boolean monopoly = owner[Board.partner(id)] == o;
             boolean fest = festival == id;
             int amount = Economy.toll(tile, level[id], monopoly, fest);
+            if (needsManualSale(seat, amount)) {
+                requestSale(new Pending.AwaitSale(amount, o, "TOLL", id, monopoly, fest, List.of()));
+                return;
+            }
             Payment payment = charge(seat, amount);
+            settleToll(seat, o, id, payment, monopoly, fest);
+        }
+
+        /** 통행료를 낸 뒤(§6.3) — 받기·방송, 파산이면 탈락, 아니면 인수 제안(§6.4). */
+        void settleToll(int seat, int o, int id, Payment payment, boolean monopoly, boolean fest) {
+            Tile tile = Board.tile(id);
             cash[o] += payment.paid();
             emit(new CloudRouteEvent.TollPaid(seat, o, id, payment.paid(), monopoly, fest, cash[seat], cash[o]));
             if (payment.bankrupt()) {
@@ -835,10 +877,63 @@ public final class CloudRouteEngine {
         // ----- 지불·청산·탈락 (§10 · §11) -----
 
         void payBank(int seat, int amount, MoneyReason reason) {
-            Payment payment = charge(seat, amount);
+            if (needsManualSale(seat, amount)) {
+                requestSale(new Pending.AwaitSale(amount, -1, reason.name(), -1, false, false, List.of()));
+                return;
+            }
+            settleBank(seat, reason, charge(seat, amount));
+        }
+
+        void settleBank(int seat, MoneyReason reason, Payment payment) {
             emit(new CloudRouteEvent.MoneyChanged(seat, -payment.paid(), reason, cash[seat]));
             if (payment.bankrupt()) {
                 eliminate(seat, Elimination.Reason.BANKRUPT, -1);
+            }
+        }
+
+        // ----- 수동 매각 (D-217) -----
+
+        /** 차례 좌석이 낼 돈이 모자라고 팔 것이 있으면 직접 고른다. 남의 차례에 내는 돈(섬 잔치)은 자동(§10). */
+        boolean needsManualSale(int seat, int amount) {
+            return seat == turnSeat && cash[seat] < amount && cheapest(seat, false) >= 0;
+        }
+
+        /** 후보를 지금 가진 땅으로 채워 매각 결정을 띄운다. */
+        void requestSale(Pending.AwaitSale owed) {
+            List<Integer> candidates = IntStream.range(0, Board.SIZE).filter(t -> owner[t] == turnSeat).boxed().toList();
+            setPending(new Pending.AwaitSale(owed.debt(), owed.creditor(), owed.reason(), owed.tile(), owed.monopoly(),
+                    owed.festival(), candidates));
+        }
+
+        /** 한 단위를 팔고, 다 모였거나 팔 것이 없으면 원래 지불을 마저 한다. 모자라면 다시 고른다. */
+        void sell(Pending.AwaitSale owed, int tileId) {
+            int seat = turnSeat;
+            Tile tile = Board.tile(tileId);
+            Sale sale;
+            if (level[tileId] > 0) {
+                level[tileId]--;
+                sale = new Sale(tileId, false, level[tileId], tile.buildCost() / 2);
+            } else {
+                owner[tileId] = -1;
+                sale = new Sale(tileId, true, 0, tile.price() / 2);
+            }
+            cash[seat] += sale.received();
+            emit(new CloudRouteEvent.AssetsLiquidated(seat, List.of(sale), cash[seat]));
+            if (sale.land() && festival == tileId) {
+                festival = -1;
+                emit(new CloudRouteEvent.FestivalCleared(tileId));
+            }
+            if (cash[seat] < owed.debt() && cheapest(seat, false) >= 0) {
+                requestSale(owed);
+                return;
+            }
+            int paid = Math.min(cash[seat], owed.debt());
+            cash[seat] -= paid;
+            Payment payment = new Payment(paid, paid < owed.debt());
+            if (owed.tile() >= 0) {
+                settleToll(seat, owed.creditor(), owed.tile(), payment, owed.monopoly(), owed.festival());
+            } else {
+                settleBank(seat, MoneyReason.valueOf(owed.reason()), payment);
             }
         }
 
@@ -934,6 +1029,9 @@ public final class CloudRouteEngine {
                 rollAgain = false;
             } else if (pending instanceof Pending.AwaitTakeover offer && owner[offer.tile()] != offer.owner()) {
                 // 인수 결정 중 그 땅 주인이 탈락했다 — 땅이 은행으로 갔으므로 결정은 사라진다(D-211).
+                pending = null;
+            } else if (pending instanceof Pending.AwaitSale owed && owed.creditor() == seat) {
+                // 매각 중 받을 사람이 탈락했다 — 땅이 은행으로 갔으므로 빚도 사라진다(D-217).
                 pending = null;
             }
             List<Integer> alive = aliveSeats();

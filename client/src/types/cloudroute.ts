@@ -27,7 +27,17 @@ export type CloudRoutePending =
   | { kind: 'TAKEOVER'; tile: number; owner: number; price: number }
   | { kind: 'FESTIVAL'; candidates: number[] }
   | { kind: 'FLIGHT'; candidates: number[]; free?: boolean }
-  | { kind: 'GIFT'; candidates: number[] };
+  | { kind: 'GIFT'; candidates: number[] }
+  | {
+      kind: 'SALE';
+      debt: number;
+      creditor: number;
+      reason: string;
+      tile: number;
+      monopoly: boolean;
+      festival: boolean;
+      candidates: number[];
+    };
 
 export interface CloudRouteSeatView {
   seat: number;
@@ -89,7 +99,8 @@ export type CloudRouteAction =
   | { '@action': 'TAKEOVER' }
   | { '@action': 'HOST_FESTIVAL'; tile: number }
   | { '@action': 'FLY'; tile: number }
-  | { '@action': 'GIFT_BUILD'; tile: number };
+  | { '@action': 'GIFT_BUILD'; tile: number }
+  | { '@action': 'SELL'; tile: number };
 
 // ---------- 공개 이벤트 payload (결과값) ----------
 

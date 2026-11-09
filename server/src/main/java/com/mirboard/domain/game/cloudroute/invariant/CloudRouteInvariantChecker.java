@@ -190,6 +190,13 @@ public final class CloudRouteInvariantChecker {
                     fail("festival candidates " + f);
                 }
             }
+            case Pending.AwaitSale sale -> {
+                List<Integer> owned = s.ownedTiles(seat);
+                if (owned.isEmpty() || !sale.candidates().equals(owned) || cash >= sale.debt()
+                        || (sale.creditor() >= 0 && (sale.creditor() == seat || !s.alive(sale.creditor())))) {
+                    fail("sale " + sale + " cash " + cash + " owned " + owned);
+                }
+            }
             case Pending.AwaitGift g -> {
                 if (g.candidates().isEmpty() || g.candidates().stream()
                         .anyMatch(t -> s.owners().get(t) != seat || s.levels().get(t) >= Economy.MAX_LEVEL - 1)) {

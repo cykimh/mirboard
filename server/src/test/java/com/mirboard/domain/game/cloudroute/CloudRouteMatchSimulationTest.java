@@ -292,6 +292,7 @@ class CloudRouteMatchSimulationTest {
                     .max(java.util.Comparator.comparingInt(t -> Board.tile(t).tolls().get(s.levels().get(t))))
                     .orElseThrow());
             case Pending.AwaitGift g -> new CloudRouteAction.GiftBuild(g.candidates().getFirst());
+            case Pending.AwaitSale __ -> new CloudRouteAction.Sell(CloudRouteEngine.autoSaleTile(s, seat));
             case Pending.AwaitFlight f -> f.candidates().stream()
                     .filter(t -> Board.isLand(t) && s.owners().get(t) < 0
                             && cash - (f.free() ? 0 : Economy.FLIGHT_FEE) - Board.tile(t).price() >= RESERVE)
