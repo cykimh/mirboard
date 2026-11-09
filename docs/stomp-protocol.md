@@ -451,7 +451,8 @@ winnerSeats, reason, causeSeat, winLine }`). **`privateHand` 는 없다** — �
 | `TAKEOVER` | — | `TAKEOVER` |
 | `HOST_FESTIVAL` | `tile`(후보 안) | `FESTIVAL` |
 | `FLY` | `tile`(후보 안) | `FLIGHT` |
-| `SKIP` | — | `BUILD`·`TAKEOVER`·`FESTIVAL`·`FLIGHT` |
+| `GIFT_BUILD` | `tile`(후보 안) | `GIFT`(D-216 등불 선물) |
+| `SKIP` | — | `BUILD`·`TAKEOVER`·`FESTIVAL`·`FLIGHT`(선물 `GIFT` 은 건너뛸 수 없다) |
 
 **서버 → 클라 (공개)** — 이벤트가 **전부 공개**다(숨길 손패가 없다). payload 는 결과값(뒤 현금 등):
 
@@ -470,7 +471,7 @@ winnerSeats, reason, causeSeat, winLine }`). **`privateHand` 는 없다** — �
 | `ASSETS_LIQUIDATED` | `{ seat, sales: [{ tile, land, levelAfter, received }], cash }` — 자동 청산(§10) |
 | `PLAYER_ELIMINATED` | `{ seat, reason: BANKRUPT·DESERTED, creditor, returnedTiles, cashForfeited }` |
 | `TURN_CHANGED` | `{ seat, round }` |
-| `DECISION_REQUIRED` | `{ seat, pending }` — 결정이 바뀔 때마다. `pending` 은 `kind` 판별자(`ROLL`·`WHIRLPOOL{canPay,canUseBuoy}`·`PURCHASE{tile,maxLevel}`·`BUILD{tile,minLevel,maxLevel}`·`TAKEOVER{tile,owner,price}`·`FESTIVAL{candidates}`·`FLIGHT{candidates}`) |
+| `DECISION_REQUIRED` | `{ seat, pending }` — 결정이 바뀔 때마다. `pending` 은 `kind` 판별자(`ROLL`·`WHIRLPOOL{canPay,canUseBuoy}`·`PURCHASE{tile,maxLevel}`·`BUILD{tile,minLevel,maxLevel}`·`TAKEOVER{tile,owner,price}`·`FESTIVAL{candidates}`·`FLIGHT{candidates,free}`·`GIFT{candidates}` — D-216: `free` 는 정류장 무료권) |
 | `MATCH_ENDED` | `{ result: { reason: LAST_STANDING·NO_HUMANS·ROUND_LIMIT, rounds, standings: [{seat, rank, totalAssets, cash, status}] } }` |
 
 **서버 → 클라 (비공개)**: `ERROR` 만. 고유 코드 `MATCH_OVER`·`PLAYER_ELIMINATED`·`NOT_YOUR_TURN`·`WRONG_DECISION`·

@@ -190,8 +190,14 @@ public final class CloudRouteInvariantChecker {
                     fail("festival candidates " + f);
                 }
             }
+            case Pending.AwaitGift g -> {
+                if (g.candidates().isEmpty() || g.candidates().stream()
+                        .anyMatch(t -> s.owners().get(t) != seat || s.levels().get(t) >= Economy.MAX_LEVEL - 1)) {
+                    fail("gift candidates " + g);
+                }
+            }
             case Pending.AwaitFlight f -> {
-                if (s.flewThisTurn() || cash < Economy.FLIGHT_FEE || f.candidates().contains(Board.STATION)
+                if (s.flewThisTurn() || (!f.free() && cash < Economy.FLIGHT_FEE) || f.candidates().contains(Board.STATION)
                         || f.candidates().size() != Board.SIZE - 1) {
                     fail("flight " + f + " cash " + cash + " flew " + s.flewThisTurn());
                 }

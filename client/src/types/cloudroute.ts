@@ -10,7 +10,9 @@ export type CloudRouteLetter =
   | 'INSPECTION'
   | 'ISLAND_FEAST'
   | 'WIND_SHARE'
-  | 'GUST';
+  | 'GUST'
+  | 'LANTERN_GIFT'
+  | 'FREE_FLIGHT';
 
 export type EliminationReason = 'BANKRUPT' | 'DESERTED';
 export type EndReason = 'LAST_STANDING' | 'NO_HUMANS' | 'ROUND_LIMIT';
@@ -24,7 +26,8 @@ export type CloudRoutePending =
   | { kind: 'BUILD'; tile: number; minLevel: number; maxLevel: number }
   | { kind: 'TAKEOVER'; tile: number; owner: number; price: number }
   | { kind: 'FESTIVAL'; candidates: number[] }
-  | { kind: 'FLIGHT'; candidates: number[] };
+  | { kind: 'FLIGHT'; candidates: number[]; free?: boolean }
+  | { kind: 'GIFT'; candidates: number[] };
 
 export interface CloudRouteSeatView {
   seat: number;
@@ -85,7 +88,8 @@ export type CloudRouteAction =
   | { '@action': 'SKIP' }
   | { '@action': 'TAKEOVER' }
   | { '@action': 'HOST_FESTIVAL'; tile: number }
-  | { '@action': 'FLY'; tile: number };
+  | { '@action': 'FLY'; tile: number }
+  | { '@action': 'GIFT_BUILD'; tile: number };
 
 // ---------- 공개 이벤트 payload (결과값) ----------
 

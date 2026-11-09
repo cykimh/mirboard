@@ -161,11 +161,17 @@ export function CloudRouteTable({
 
   // 축제·비행 결정 중에는 판의 후보 칸을 눌러 고른다.
   const pickable = new Set(
-    pending?.kind === 'FESTIVAL' || pending?.kind === 'FLIGHT' ? pending.candidates : [],
+    pending?.kind === 'FESTIVAL' || pending?.kind === 'FLIGHT' || pending?.kind === 'GIFT' ? pending.candidates : [],
   );
   const onTile = (tile: number) => {
     if (pickable.has(tile) && pending) {
-      send(pending.kind === 'FESTIVAL' ? { '@action': 'HOST_FESTIVAL', tile } : { '@action': 'FLY', tile });
+      send(
+        pending.kind === 'FESTIVAL'
+          ? { '@action': 'HOST_FESTIVAL', tile }
+          : pending.kind === 'GIFT'
+            ? { '@action': 'GIFT_BUILD', tile }
+            : { '@action': 'FLY', tile },
+      );
       return;
     }
     setSheetTile(tile);
@@ -634,10 +640,33 @@ function DecisionPanel({
             </div>
           </>
         );
+      case 'GIFT':
+        return (
+          <>
+            <p>등불 선물 — 1단계 무료로 올릴 내 땅을 판에서 누르세요(풍등탑은 선물로 세울 수 없어요).</p>
+            <div className="cr-panel-actions">
+              {pending.candidates.map((tile) => (
+                <button
+                  key={tile}
+                  type="button"
+                  className="cr-btn"
+                  disabled={disabled}
+                  onClick={() => send({ '@action': 'GIFT_BUILD', tile })}
+                >
+                  🎁 {TILES[tile].name}
+                </button>
+              ))}
+            </div>
+          </>
+        );
       case 'FLIGHT':
         return (
           <>
-            <p>50G 를 내고 날아갈 칸을 판에서 누르세요(출발 항구를 지나면 급여).</p>
+            <p>
+              {pending.free
+                ? '정류장 무료권 — 날아갈 칸을 판에서 누르세요(무료, 출발 항구를 지나면 급여).'
+                : '50G 를 내고 날아갈 칸을 판에서 누르세요(출발 항구를 지나면 급여).'}
+            </p>
             <div className="cr-panel-actions">
               <button type="button" className="cr-btn" disabled={disabled} onClick={() => send({ '@action': 'SKIP' })}>
                 안 날기
@@ -662,6 +691,7 @@ const PENDING_TEXT: Record<CloudRoutePending['kind'], string> = {
   TAKEOVER: '인수할지 고르는 중',
   FESTIVAL: '축제 땅 고르는 중',
   FLIGHT: '날아갈 곳 고르는 중',
+  GIFT: '선물할 땅 고르는 중',
 };
 
 function LevelPicker({

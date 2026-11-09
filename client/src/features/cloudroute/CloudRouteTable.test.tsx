@@ -104,6 +104,22 @@ describe('CloudRouteTable — 결정 패널 (D-213)', () => {
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'HOST_FESTIVAL', tile: 1 });
   });
 
+  it('등불 선물은 패널이나 판의 후보 칸으로 고른다', () => {
+    seed(tableOf({ tiles: tilesOf({ 4: [0, 1], 7: [0, 0] }), pending: { kind: 'GIFT', candidates: [4, 7] } }));
+    renderTable();
+    fireEvent.click(screen.getByRole('button', { name: '🎁 조개 모래톱' }));
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'GIFT_BUILD', tile: 4 });
+    fireEvent.click(within(screen.getByRole('group', { name: '판' })).getByRole('button', { name: /^버섯 숲길/ }));
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'GIFT_BUILD', tile: 7 });
+    expect(screen.queryByRole('button', { name: '건너뛰기' })).toBeNull();
+  });
+
+  it('무료권 비행은 비용 없이 고른다고 알린다', () => {
+    seed(tableOf({ pending: { kind: 'FLIGHT', candidates: [1, 2], free: true } }));
+    renderTable();
+    expect(screen.getByText(/정류장 무료권/)).toBeInTheDocument();
+  });
+
   it('남의 차례에는 무엇을 기다리는지만 보이고 버튼이 없다', () => {
     seed(tableOf({ turnSeat: 1, pending: { kind: 'PURCHASE', tile: 4, maxLevel: 2 } }));
     renderTable();

@@ -226,7 +226,17 @@ public final class CloudRouteEngine {
                     throw rejected(RejectionReason.INVALID_TILE);
                 }
                 t.pending = null;
-                t.fly(fly.tile());
+                t.fly(fly.tile(), flight.free());
+            }
+            case CloudRouteAction.GiftBuild gift -> {
+                if (!(pending instanceof Pending.AwaitGift g)) {
+                    throw rejected(RejectionReason.WRONG_DECISION);
+                }
+                if (!g.candidates().contains(gift.tile())) {
+                    throw rejected(RejectionReason.INVALID_TILE);
+                }
+                t.pending = null;
+                t.giftBuild(gift.tile());
             }
         }
         t.proceed();
@@ -296,6 +306,7 @@ public final class CloudRouteEngine {
                 f.candidates().forEach(tile -> legal.add(new CloudRouteAction.Fly(tile)));
                 legal.add(new CloudRouteAction.Skip());
             }
+            case Pending.AwaitGift g -> g.candidates().forEach(tile -> legal.add(new CloudRouteAction.GiftBuild(tile)));
         }
         return legal;
     }
@@ -313,6 +324,11 @@ public final class CloudRouteEngine {
             case Pending.AwaitTakeover __ -> new CloudRouteAction.Skip();
             case Pending.AwaitFestival __ -> new CloudRouteAction.Skip();
             case Pending.AwaitFlight __ -> new CloudRouteAction.Skip();
+            // 선물은 건너뛸 수 없다 — 시간 초과면 가장 싼 후보(같으면 낮은 칸, 결정적).
+            case Pending.AwaitGift g -> new CloudRouteAction.GiftBuild(g.candidates().stream()
+                    .min(java.util.Comparator.<Integer>comparingInt(tile -> Board.tile(tile).price())
+                            .thenComparing(java.util.Comparator.naturalOrder()))
+                    .orElseThrow());
         };
     }
 
@@ -701,16 +717,28 @@ public final class CloudRouteEngine {
             emit(new CloudRouteEvent.FestivalHosted(turnSeat, tileId));
         }
 
-        void fly(int tileId) {
+        void fly(int tileId, boolean free) {
             int seat = turnSeat;
-            if (cash[seat] < Economy.FLIGHT_FEE) {
-                throw rejected(RejectionReason.INSUFFICIENT_FUNDS);
+            if (!free) {
+                if (cash[seat] < Economy.FLIGHT_FEE) {
+                    throw rejected(RejectionReason.INSUFFICIENT_FUNDS);
+                }
+                cash[seat] -= Economy.FLIGHT_FEE;
+                emit(new CloudRouteEvent.MoneyChanged(seat, -Economy.FLIGHT_FEE, MoneyReason.FLIGHT, cash[seat]));
             }
-            cash[seat] -= Economy.FLIGHT_FEE;
-            emit(new CloudRouteEvent.MoneyChanged(seat, -Economy.FLIGHT_FEE, MoneyReason.FLIGHT, cash[seat]));
             flew = true;
             moveForward(seat, Board.distanceForward(pos[seat], tileId), MoveKind.FLY);
             land(seat, tileId);
+        }
+
+        /** 등불 선물(D-216) — 1단계 무료. */
+        void giftBuild(int tileId) {
+            int seat = turnSeat;
+            if (owner[tileId] != seat || level[tileId] >= Economy.MAX_LEVEL - 1) {
+                throw rejected(RejectionReason.INVALID_TILE);
+            }
+            level[tileId]++;
+            emit(new CloudRouteEvent.Built(seat, tileId, level[tileId], 0, cash[seat]));
         }
 
         // ----- 편지 (§9) -----
@@ -785,6 +813,21 @@ public final class CloudRouteEngine {
                 case GUST -> {
                     moveForward(seat, Economy.GUST_STEPS, MoveKind.LETTER);
                     land(seat, pos[seat]);
+                }
+                case LANTERN_GIFT -> {
+                    List<Integer> candidates = IntStream.range(0, Board.SIZE)
+                            .filter(t -> owner[t] == seat && level[t] < Economy.MAX_LEVEL - 1).boxed().toList();
+                    if (!candidates.isEmpty()) {
+                        setPending(new Pending.AwaitGift(candidates));
+                    }
+                }
+                case FREE_FLIGHT -> {
+                    moveForward(seat, Board.distanceForward(pos[seat], Board.STATION), MoveKind.LETTER);
+                    // 한 차례 비행 한 번(§6.6)은 무료권에도 같다 — 이미 날았으면 정류장에 도착만 한다.
+                    if (!flew) {
+                        setPending(new Pending.AwaitFlight(IntStream.range(0, Board.SIZE)
+                                .filter(t -> t != Board.STATION).boxed().toList(), true));
+                    }
                 }
             }
         }

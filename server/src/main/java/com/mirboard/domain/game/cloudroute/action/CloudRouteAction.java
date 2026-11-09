@@ -19,12 +19,13 @@ import com.mirboard.domain.game.core.GameAction;
         @JsonSubTypes.Type(value = CloudRouteAction.Skip.class, name = "SKIP"),
         @JsonSubTypes.Type(value = CloudRouteAction.Takeover.class, name = "TAKEOVER"),
         @JsonSubTypes.Type(value = CloudRouteAction.HostFestival.class, name = "HOST_FESTIVAL"),
-        @JsonSubTypes.Type(value = CloudRouteAction.Fly.class, name = "FLY")
+        @JsonSubTypes.Type(value = CloudRouteAction.Fly.class, name = "FLY"),
+        @JsonSubTypes.Type(value = CloudRouteAction.GiftBuild.class, name = "GIFT_BUILD")
 })
 public sealed interface CloudRouteAction extends GameAction
         permits CloudRouteAction.Roll, CloudRouteAction.PayEscape, CloudRouteAction.UseBuoy, CloudRouteAction.Buy,
                 CloudRouteAction.Decline, CloudRouteAction.Build, CloudRouteAction.Skip, CloudRouteAction.Takeover,
-                CloudRouteAction.HostFestival, CloudRouteAction.Fly {
+                CloudRouteAction.HostFestival, CloudRouteAction.Fly, CloudRouteAction.GiftBuild {
 
     /** 굴리기 — 보통 차례와 소용돌이 차례 모두(§4.1·§7.2). */
     record Roll() implements CloudRouteAction {
@@ -64,5 +65,9 @@ public sealed interface CloudRouteAction extends GameAction
 
     /** 바람 정류장에서 날기(§6.6). */
     record Fly(int tile) implements CloudRouteAction {
+    }
+
+    /** 등불 선물로 1단계 무료 건설(D-216). */
+    record GiftBuild(int tile) implements CloudRouteAction {
     }
 }

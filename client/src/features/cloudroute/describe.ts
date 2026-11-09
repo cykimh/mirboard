@@ -57,7 +57,7 @@ export function describe(entry: LogEntry, nameOf: (seat: number) => string): str
     }
     case 'BUILT': {
       const p = entry.payload as Built;
-      return `${nameOf(p.seat)} ${tile(p.tile)}에 ${LEVEL_NAME[p.level]} (${g(p.paid)})`;
+      return `${nameOf(p.seat)} ${tile(p.tile)}에 ${LEVEL_NAME[p.level]} (${p.paid === 0 ? '무료' : g(p.paid)})`;
     }
     case 'TOLL_PAID': {
       const p = entry.payload as TollPaid;

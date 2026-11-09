@@ -426,11 +426,50 @@ class CloudRouteEngineTest {
         }
 
         @Test
+        void a_lantern_gift_builds_one_free_level_on_a_land_below_the_shop() {
+            CloudRouteEngine e = engine(2, new ScriptedDice(1, 2));
+            CloudRouteState s = apply(e, table(2).own(0, 1, 2).own(0, 4, 1).own(0, 7, 0).deckTop(Letter.LANTERN_GIFT).build(),
+                    0, ROLL).newState();
+            assertThat(s.pending()).isEqualTo(new Pending.AwaitGift(List.of(4, 7))); // 상점(2)인 1번은 빠진다
+            assertThat(e.timeoutAction(s, 0)).isEqualTo(new CloudRouteAction.GiftBuild(4)); // 시간 초과면 가장 싼 땅
+            assertThat(e.legalActions(s, 0)).doesNotContain(new CloudRouteAction.Skip());
+            Result r = apply(e, s, 0, new CloudRouteAction.GiftBuild(7));
+            assertThat(of(r, CloudRouteEvent.Built.class)).containsExactly(new CloudRouteEvent.Built(0, 7, 1, 0, 1_500));
+            CloudRouteState fixed = s;
+            assertThat(rejection(() -> e.apply(fixed, 0, new CloudRouteAction.GiftBuild(1)))).isEqualTo(RejectionReason.INVALID_TILE);
+        }
+
+        @Test
+        void a_lantern_gift_without_a_land_does_nothing() {
+            Result r = draw(2, table(2), Letter.LANTERN_GIFT);
+            assertThat(r.newState().turnSeat()).isEqualTo(1);
+        }
+
+        @Test
+        void a_free_flight_ticket_moves_to_the_station_and_flies_without_paying() {
+            CloudRouteEngine e = engine(2, new ScriptedDice(1, 2));
+            CloudRouteState s = apply(e, table(2).cash(0, 10).deckTop(Letter.FREE_FLIGHT).build(), 0, ROLL).newState();
+            assertThat(s.seat(0).position()).isEqualTo(Board.STATION);
+            assertThat(((Pending.AwaitFlight) s.pending()).free()).isTrue();
+            Result r = apply(e, s, 0, new CloudRouteAction.Fly(1)); // 18 → 1, 출발을 지나 급여
+            assertThat(of(r, CloudRouteEvent.MoneyChanged.class)).isEmpty();
+            assertThat(r.newState().cash(0)).isEqualTo(210);
+        }
+
+        @Test
+        void a_free_flight_ticket_after_a_flight_only_moves() {
+            CloudRouteState s = table(2).flew().deckTop(Letter.FREE_FLIGHT).build();
+            Result r = apply(engine(2, new ScriptedDice(1, 2)), s, 0, ROLL);
+            assertThat(r.newState().seat(0).position()).isEqualTo(Board.STATION);
+            assertThat(r.newState().turnSeat()).isEqualTo(1);
+        }
+
+        @Test
         void an_empty_deck_reshuffles_the_discard() {
             Result r = apply(engine(2, new ScriptedDice(1, 2)), table(2).emptyDeck().build(), 0, ROLL);
             CloudRouteEvent.LetterDrawn drawn = of(r, CloudRouteEvent.LetterDrawn.class).getFirst();
             assertThat(drawn.reshuffled()).isTrue();
-            assertThat(drawn.deckCount()).isEqualTo(9);
+            assertThat(drawn.deckCount()).isEqualTo(Letter.values().length - 1);
         }
     }
 

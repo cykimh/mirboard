@@ -18,11 +18,12 @@ import java.util.List;
         @JsonSubTypes.Type(value = Pending.AwaitBuild.class, name = "BUILD"),
         @JsonSubTypes.Type(value = Pending.AwaitTakeover.class, name = "TAKEOVER"),
         @JsonSubTypes.Type(value = Pending.AwaitFestival.class, name = "FESTIVAL"),
-        @JsonSubTypes.Type(value = Pending.AwaitFlight.class, name = "FLIGHT")
+        @JsonSubTypes.Type(value = Pending.AwaitFlight.class, name = "FLIGHT"),
+        @JsonSubTypes.Type(value = Pending.AwaitGift.class, name = "GIFT")
 })
 public sealed interface Pending
         permits Pending.AwaitRoll, Pending.AwaitWhirlpool, Pending.AwaitPurchase, Pending.AwaitBuild,
-                Pending.AwaitTakeover, Pending.AwaitFestival, Pending.AwaitFlight {
+                Pending.AwaitTakeover, Pending.AwaitFestival, Pending.AwaitFlight, Pending.AwaitGift {
 
     /** 굴리기 (§4.1). */
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -57,10 +58,22 @@ public sealed interface Pending
         }
     }
 
-    /** 바람 정류장에서 날아갈 칸 고르기 (§6.6). */
+    /** 바람 정류장에서 날아갈 칸 고르기 (§6.6). @param free 정류장 무료권(D-216)이면 true — 비용 없음 */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record AwaitFlight(List<Integer> candidates) implements Pending {
+    record AwaitFlight(List<Integer> candidates, boolean free) implements Pending {
         public AwaitFlight {
+            candidates = List.copyOf(candidates);
+        }
+
+        public AwaitFlight(List<Integer> candidates) {
+            this(candidates, false);
+        }
+    }
+
+    /** 등불 선물(D-216) — 1단계 무료로 올릴 내 땅 고르기. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record AwaitGift(List<Integer> candidates) implements Pending {
+        public AwaitGift {
             candidates = List.copyOf(candidates);
         }
     }
