@@ -482,7 +482,8 @@ public class RoomService {
             log.info("Seats shuffled (RANDOM): roomId={} newOrder={}", roomId, shuffled);
         }
         events.publishEvent(new com.mirboard.domain.game.core.GameStartingEvent(
-                room.roomId(), room.gameType(), room.playerIds(), room.targetScore()));
+                room.roomId(), room.gameType(), room.playerIds(), room.targetScore(),
+                effectiveOptions(games.require(room.gameType()), room)));
         metrics.gameStarted(room.gameType());
         log.info("Game starting: roomId={} gameType={} players={}",
                 roomId, room.gameType(), room.playerIds());

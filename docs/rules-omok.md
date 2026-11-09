@@ -3,7 +3,7 @@
 본 문서는 Mirboard 오목 룰의 **단일 진실 공급원**이다(D-177). 코드(S1 순수 엔진)는 이 문서를 따르고, 어긋나면 코드를 고치거나
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 각 절 끝에 원카드 명세와 같은 표기(**코드:** / **테스트:** / **갭:**)로 코드 위치와 테스트를 붙였다. 경로는
 `server/src/{main,test}/java/com/mirboard/domain/game/omok/` 기준이고 위치는 메서드 이름으로 적는다(줄 번호는 코드가 바뀌면 바로 틀린다).
-순수 엔진은 S1 에서 붙었다. 포트 어댑터·저장·기록·봇은 S2·S3b 에서 붙으며, 아직 없는 것은 **코드(S3b 예정):** 로 적는다. 클라는 판정하지 않으며 서버가 보낸 결과(금수 자리 포함)를 표시만 한다.
+순수 엔진은 S1, 봇은 S2, 포트 어댑터·저장·라운드 시작·기록은 S3b 에서 붙었다(서버 경로 테스트는 **테스트(S3b):**). 클라는 판정하지 않으며 서버가 보낸 결과(금수 자리 포함)를 표시만 한다.
 
 > **출처와 우리가 정한 것.** 금수 정의는 렌주(국제 렌주 연맹 규칙)의 정의를 따른다. 렌주의 개막 규칙(스왑·5수 2개 제시)은
 > 쓰지 않는다. 원문이 답하지 않거나 갈리는 항목을 우리가 정한 것은 본문에 **[결정]** 으로 표시하고 §11 에 모았다.
@@ -34,7 +34,7 @@
 
 이하 "편"은 1:1 에서는 그 사람, 2:2 에서는 그 팀이다.
 
-**코드:** `OmokMode`(좌석 수) · `rules/TurnOrder`(`team`·`colorOf`·`next`) · **코드(S3b 예정):** 방 설정 값 → 모드·룰 해석
+**코드:** `OmokMode`(좌석 수) · `rules/TurnOrder`(`team`·`colorOf`·`next`) · 방 설정 값 → 모드·룰·봇 난이도 해석은 `OmokSettings.from`(모르는 값은 1:1·렌주·보통) · 정원·시작 인원은 `OmokGameDefinition.capacityFor`·`playersToStart`(모드의 좌석 수 — D-176) · **테스트(S3b):** `OmokGameDefinitionTest`, `OmokServerFlowIT.the_team_mode_setting_makes_a_four_seat_room_that_bots_finish`
 
 ## 3. 시작 — 색과 첫 차례
 
@@ -43,7 +43,7 @@
 3. 빈 판에서 흑이 먼저 둔다. **첫 수는 자유**다 — 천원(7,7) 고정 없음. **[결정]**
 4. 색은 매 판 새로 추첨한다 — 지난 판 결과(진 사람이 흑 등)를 보지 않는다. **[결정]**
 
-**코드:** `OmokEngine.startMatch(mode, rule, seatCount, blackTeam, firstSeat)`(추첨 결과를 인자로 받는 순수 함수 — 좌석 수가 모드와 다르거나 첫 수 좌석이 흑 팀이 아니면 `IllegalArgumentException`) · **코드(S3b 예정):** `lifecycle/OmokRoundStarter`(추첨) · **테스트:** `OmokEnginePlayTest`(`start_*` 2건)
+**코드:** `OmokEngine.startMatch(mode, rule, seatCount, blackTeam, firstSeat)`(추첨 결과를 인자로 받는 순수 함수 — 좌석 수가 모드와 다르거나 첫 수 좌석이 흑 팀이 아니면 `IllegalArgumentException`) · `lifecycle/OmokRoundStarter`(`SecureRandom` 추첨, 모드·룰은 시작 이벤트의 방 설정 — 좌석 수가 모드와 다르면 판을 만들지 않고 ERROR) · **테스트(S3b):** `OmokRoundStarterTest`(5건 — 네 가지 흑 팀/첫 수 조합이 다 나옴 포함) · **테스트:** `OmokEnginePlayTest`(`start_*` 2건)
 
 ## 4. 차례
 
@@ -169,7 +169,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 4. 같은 사람이 **연속 2번째** 시간 초과가 되면 자동 수를 두지 않고 **그 편이 진다**(사유 `TIMEOUT`, 원인 좌석 = 그 사람). 2:2 는 팀 패. **[결정]**
 5. 시간 초과 패는 탈주가 아니다.
 
-**코드:** `OmokEngine.timeoutAction`·`timeoutPoint` · `action/TimeoutPlace`(Jackson 미등록) · **테스트:** `OmokEngineTimeoutTest`(8건 — 천원·가까운 자리와 동률 순서·금수 건너뛰기·2연속 패·손으로 두면 리셋·2:2 사람별 계수·자동 수 5목 승리) · 클라가 못 만드는 것은 `OmokJsonRoundTripTest`
+**코드:** `OmokEngine.timeoutAction`·`timeoutPoint` · `action/TimeoutPlace`(Jackson 미등록) · **테스트:** `OmokEngineTimeoutTest`(8건 — 천원·가까운 자리와 동률 순서·금수 건너뛰기·2연속 패·손으로 두면 리셋·2:2 사람별 계수·자동 수 5목 승리) · 클라가 못 만드는 것은 `OmokJsonRoundTripTest` · **테스트(S3b):** `OmokServerFlowIT.an_idle_human_on_a_team_is_carried_once_then_loses_the_match_for_the_team`(실제 턴 타임아웃 1초로 자동 수 한 번 → 2번째에 팀 시간패)
 
 ## 9. 탈주
 
@@ -178,7 +178,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 - 이미 끝난 판의 나가기는 탈주가 아니다(`NOT_APPLICABLE`).
 - 탈주자만 탈주 수(`desert_count`)가 오른다. 2:2 에서 탈주하지 않은 팀원은 일반 패다.
 
-**코드:** `OmokEngine.desert`(`Desertion.ended` — 어댑터가 포트 `MATCH_ENDED`/`NOT_APPLICABLE` 로 옮긴다) · **테스트:** `OmokEngineDesertionTest`(3건)
+**코드:** `OmokEngine.desert`(`Desertion.ended` — 어댑터 `OmokGameEngine.desert` 가 포트 `MATCH_ENDED`/`NOT_APPLICABLE` 로 옮긴다) · **테스트:** `OmokEngineDesertionTest`(3건) · **테스트(S3b):** `OmokGameEngineTest.desertion_ends_the_match_saves_and_records`
 
 ## 10. 무승부와 종료
 
@@ -202,7 +202,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 
 **코드:** 종료 판정은 `OmokEngine.place`·`lose` · **테스트:** `OmokEnginePlayTest`(5목 1:1·2:2, 기권 2건, 무승부 2건 — 줄무늬 판으로 `BOARD_FULL`, 맨 윗줄
 `XXX_XX` 로 장목만 남긴 `NO_LEGAL_MOVE`) · 무작위 18,000판에서 `BOARD_FULL`·`NO_LEGAL_MOVE` 는 0건이었다(`OmokMatchSimulationTest`)
-**코드(S3b 예정):** `persistence/OmokMatchRecorder` · `persistence/OmokHeadToHead`
+**코드(S3b):** `persistence/OmokMatchRecorder`(`omok_match_results/participants`, 팀 평균 ELO `EloCalculator.applyMatch`, 무승부는 `UserGameStatsService.recordDraw`) · `persistence/OmokHeadToHead`(상대 팀만) · **테스트(S3b):** `OmokMatchRecorderIT`(6건 — 1:1 ELO ±20·색/팀 행, 2:2 팀 기권, 무승부 행만, 탈주, 봇 매치, 상대 전적), `infra.ws.OmokRecorderFailureTest`(기록 실패에도 방송·대기실 복귀)
 
 ## 11. 우리가 정한 것
 

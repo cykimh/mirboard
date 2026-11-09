@@ -395,4 +395,13 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 - `GameContext` 에 방 설정을 하나 더 실을 때(요트의 턴 제한 제안 등)는 레코드 끝에 붙이고 짧은 생성자를 남긴다(지금 5인자·2인자 생성자가 그 모양).
 - 검증: `RoomOptionTest`·`RoomServiceRoomOptionsTest`·`GameEngineProviderOptionsTest`(단위, 가짜 게임 `TeamModeTestGame` — 정원 2↔4,
   3명 시작 거절, 인원 초과 축소 거절, 선언한 옵션만 전달), `RoomOptionsIntegrationTest`(실 Redis·Lua).
+- **라운드 시작에도 같은 값(오목 S3b)**: `GameStartingEvent.options` — 라운드 스타터는 엔진이 아니라 시작 이벤트를 받으므로, `RoomService` 가
+  발행할 때 `effectiveOptions(def, room)` 를 싣는다(4인자 생성자는 빈 맵으로 남겼다). 오목 라운드 스타터가 모드·룰을 여기서 읽는다.
+
+### 비공개 뷰 없음 — 오목에서 실증 (D-175)
+
+§1 설계 판단 2 의 "요트는 empty" 가 오목에서 처음 실제 경로를 탔다. `OmokGameEngine.privateView` 는 늘 `Optional.empty()` 이고,
+`RoomController.resync` 의 `.orElse(null)` 로 `privateHand` 가 응답에서 빠진다(`OmokServerFlowIT.resync_carries_the_public_board_and_no_private_hand`).
+비공개 이벤트도 `ERROR` 뿐이라 게임 이벤트는 전부 순번을 쓴다. 포트 메서드는 하나도 늘지 않았다 — 오목이 쓴 포트 밖 변경은 D-176 확장 3건과
+시작 이벤트의 옵션 하나뿐이다(`grep -rni omok server/src/main/java/com/mirboard/infra` → 0건).
 

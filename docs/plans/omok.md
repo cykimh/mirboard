@@ -1,6 +1,6 @@
 # 오목 — 네 번째 게임 후보 — 기획
 
-> 상태: **설계 채택 · S0·S1·S2·S3a 완료** · 2026-11-09 · 결정 이력 `docs/decisions.md` D-175~D-180(§11 의 초안을 옮겼다)
+> 상태: **설계 채택 · S0·S1·S2·S3a·S3b 완료**(공개 전 — 기본 `DISABLED`) · 2026-11-09 · 결정 이력 `docs/decisions.md` D-175~D-180(§11 의 초안을 옮겼다)
 > 근거: `docs/game-port.md`(포트 계약) · 원카드 선례 `docs/plans/onecard.md`·`docs/rules-onecard.md`
 > 룰 정본은 `docs/rules-omok.md`(S0, D-177)다. 이 문서의 §2 는 그 입력이었다 — 어긋나면 정본이 이긴다.
 
@@ -147,7 +147,7 @@
 ```
 omok/
   OmokGameDefinition   @Component · ID "OMOK" · 2~4인(2 또는 4) · capacityFor/playersToStart · 상태는 설정
-                       (MIRBOARD_OMOK_STATUS, 기본 COMING_SOON → S5 에서 AVAILABLE) (S3b)
+                       (MIRBOARD_OMOK_STATUS, 기본 DISABLED → S5 에서 AVAILABLE) (S3b)
   OmokEngine           순수 룰 엔진 — 저장소·시계 없음, 모드·룰은 생성 인자 (S1)
   OmokGameEngine       포트 어댑터 — 상태 저장(Redis)·로컬 발행·봇 안전망 (S3b)
   OmokSettings         GameContext.options → 모드·룰·봇 난이도(모르는 값은 기본) (S3b — E3 뒤)
@@ -214,7 +214,7 @@ omok/
 
 ### 4.5 기록·랭킹
 
-- **V13**(착수 시점의 다음 번호): `omok_match_results`(room_id, finished_at, mode, rule, end_reason, winner_color nullable, moves_json — 기보) +
+- **마이그레이션**(번호는 관제가 정한다 — 파일 이름에만): `omok_match_results`(room_id, finished_at, mode, rule, end_reason, winner_color nullable, moves_json — 기보) +
   `omok_match_participants`(match_id, user_id, seat, team, color, is_win, is_draw, deserted). 기보를 남기면 나중에 "다시 보기"를 서버 변경 없이 붙일 수 있다.
 - **`OmokMatchRecorder`**: `OmokMatchCompleted` 리스너. ELO 는 1:1·2:2 모두 `EloCalculator.applyMatch`(팀 평균 — 1:1 은 한 명짜리 팀이라 일반
   ELO 와 같다). 봇·게스트가 끼면 ELO 미적용(`RatedMatchPolicy.eloApplies`). 탈주자는 `deserted`.
@@ -316,13 +316,13 @@ omok/
 | S1 ✅ | 순수 엔진: 판·줄 스캔·5목·룰 3종 금수·모드 2종 차례·상태·액션·이벤트·불변식 | S0 | 서버 신규 패키지 | 금수 고정 국면 ≥ 30, 시뮬레이션 모드 2 × 룰 3 × 3,000판 전부 종료·불변식, 판 가득 참 무승부 경로, 2연속 시간 초과 패(1:1·2:2) |
 | S2 ✅ | 봇 정책 3단계 + 강도 평가 + 시간 예산 | S1 | 서버(`bot/`) | 강도 표(§4.4) 충족, 어려움 p99 ≤ 150ms, 같은 국면 같은 수 |
 | S3a ✅ | 게임 중립 확장 E1~E3 + 설정 변경 규칙(`TOO_MANY_PLAYERS`) | S0 | 인프라·`domain.lobby`·`domain.game.core` | 세 게임 회귀 0, 가짜 게임 정의로 E2(정원 2↔4·3명 시작 거절)·E3(선언한 옵션만 전달) 단위·IT, `check.sh` 전체 |
-| S3b | 어댑터 + 정의(`COMING_SOON`) + 라운드 시작(색·첫 차례 추첨) + 기록기 V13 + 상대 전적 + 무승부 행 보장 | S2·S3a | 서버 | 봇 풀매치 IT(1:1·2:2), 시간 초과 1번 자동 한 수·2번 패 IT, 2:2 탈주 = 팀 패 IT, 기록 실패 격리(`*RecorderFailureTest` 에 오목 추가), resync `privateHand=null` IT, 공개 뷰 직렬화 테스트, 인프라 grep 0 |
+| S3b ✅ | 어댑터 + 정의(`DISABLED`) + 라운드 시작(색·첫 차례 추첨) + 기록기·마이그레이션 + 상대 전적 + 무승부 행 보장 | S2·S3a | 서버 | 봇 풀매치 IT(1:1·2:2), 시간 초과 1번 자동 한 수·2번 패 IT, 2:2 탈주 = 팀 패 IT, 기록 실패 격리(`*RecorderFailureTest` 에 오목 추가), resync `privateHand=null` IT, 공개 뷰 직렬화 테스트, 인프라 grep 0 |
 | S4 | 클라: 대기실 설정 3종 + 게임판 + 두 단계 확정·끌기 + 금수 표시 + 차례 띠 + 종료 화면 + 튜토리얼 | S3b | 클라 | Vitest(스토어·sink·picker 좌표 계산·금수 표시·설정 패널), 브라우저 실측: 데스크톱 + 모바일 375/390px 에서 1:1·2:2 봇과 한 판씩, 의도한 칸 20번 연속 성공 |
 | S5 | 공개 전환(기본 `AVAILABLE` + 운영 `fly.toml [env]` 확인 — D-168 "당분간 원카드만"과 같은 줄) → 문서 수치 → 배포 | S4 | 서버·클라·문서 | `check.sh` 전체, 운영 한 판(사람 대 봇·사람끼리 2:2) |
 
 - S1·S2 는 Docker 가 필요 없다. **S3a 는 오목 코드와 독립이라 S1 과 병행**할 수 있다(worktree 분리) — 다른 후보 게임이 같은 확장을 쓰면
   S3a 를 먼저 단독 병합한다.
-- S3b 병합 때는 `COMING_SOON` — 서버만 배포돼도 방을 만들 수 없다(`RoomService` 가 AVAILABLE 만 허용).
+- 공개 전에는 `DISABLED` — 단계마다 main 에 들어가도 카탈로그에 안 보이고 방도 만들 수 없다(관제 규칙, 2026-11-09).
 - 단계마다 Phase Gate(변경 요약 + 다음 진입 동의).
 
 ## 9. 위험과 후속
@@ -350,7 +350,7 @@ omok/
 | 2:2 기권 | 팀원 동의 없이 즉시 팀 패(확인 창만) |
 | 무승부 | ELO 변화 없음, 승패 증가 없이 기록 행만 남긴다 |
 
-미결 질문은 남아 있지 않다. S0·S1·S2·S3a 완료(2026-11-09) — 다음은 S3b(어댑터·기록·라운드 시작).
+미결 질문은 남아 있지 않다. S0~S3b 완료(2026-11-09) — 다음은 S4(클라 게임판·대기실 설정).
 
 ### S1 결과 (2026-11-09)
 
@@ -365,6 +365,22 @@ omok/
 
 - 별도 세션(브랜치 `claude/omok-s3a-room-options-563009`, 커밋 `333feef`)이 D-176 확장 3건을 만들었고 이 브랜치에 병합했다(`4d93775`).
   병합본 `./scripts/check.sh all` 통과 — 서버 1,640건(오목 93 포함, 건너뜀 5·실패 0), 클라 통과. 정본은 `docs/game-port.md` 확장 절.
+
+### S3b 결과 (2026-11-09)
+
+- 서버 배선: `OmokGameDefinition`(기본 `DISABLED` — 관제 규칙: 단계마다 main 에 들어가므로 완성 전엔 카탈로그에도 안 보인다) · `OmokSettings` ·
+  `OmokGameEngine`(비공개 뷰 empty, 엔진 타이머 없음, 탈주는 늘 매치 종료) · `OmokRoundStarter`(색·첫 수 추첨) · `OmokStateStore` ·
+  `OmokMatchRecorder`(팀 평균 ELO, 무승부는 행만) · `OmokHeadToHead`(상대 팀만) · 마이그레이션 `omok_match_results/participants`(번호는 관제 예약
+  — 파일 이름에만).
+- **공용 변경**(게임 밖 파일): ① `domain/game/core/GameStartingEvent` 에 `options`(4인자 생성자 유지) ② `domain/lobby/room/RoomService.onGameStart` 가
+  그 값을 싣는다 — 라운드 스타터는 엔진이 아니라 시작 이벤트를 받아 D-176 E3 만으로는 모드·룰이 닿지 않았다(D-176 S3b 보정) ③
+  `domain/game/scoring/UserGameStatsService.recordDraw` — 무승부에 승패를 올리지 않고 행만(매치 기록기 계약 2) ④ `application.yml` 의
+  `mirboard.omok.status`. 인프라 코드에 오목 이름 0건(`grep -rni omok server/src/main/java/com/mirboard/infra`).
+- 설계와 달라진 점: 봇 정책이 실패할 때의 안전망은 `timeoutAction`(시간 초과 자동 수 — 봇의 연속 시간 초과 수가 올라 두 번이면 봇이 진다)이 아니라
+  같은 자리에 보통 착수(`Place`)로 둔다.
+- 테스트: 단위 `OmokGameDefinitionTest` 6 · `OmokGameEngineTest` 8 · `OmokRoundStarterTest` 5 · `infra.ws.OmokRecorderFailureTest` 1, Docker
+  `OmokMatchRecorderIT` 6 · `infra.bot.OmokServerFlowIT` 4(봇 1:1 완주·2:2 설정 → 정원 4 → 봇 완주·사람 2:2 시간 초과 한 번 자동 수 → 두 번째 팀
+  시간패·resync 에 `privateHand` 없음).
 
 ### S2 결과 (2026-11-09)
 
