@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:** /
 **갭:**)로 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/cloudroute/` 기준, 위치는 메서드 이름으로 적는다.
 
-> **상태:** 채택(D-210) · S1 순수 엔진 구현(D-211, 2026-11-09) — 아래 §17 이 코드·테스트 위치다. 설계 배경은 `docs/plans/property-board.md`.
+> **상태:** 채택(D-210) · S1 순수 엔진(D-211) · S2 포트 어댑터·봇·기록(D-212, 카탈로그 숨김 `DISABLED`) — 2026-11-09. §17 이 코드·테스트 위치다. 설계 배경은 `docs/plans/property-board.md`.
 > **독창 게임.** 주사위·땅 구매·통행료 장르만 따르고 이름·판·칸·카드는 새로 만들었다(설계서 §2). 기존 게임의 규칙서를 출처로 삼지
 > 않으므로 모든 세부는 우리가 정한 것이다 — 설계서에서 바로 오지 않고 이 문서에서 처음 정한 항목은 **[결정]** 으로 표시하고 §15 에 모았다.
 > **[수치]** 는 S1 시뮬레이션으로 조정할 값이다(바꾸면 이 문서를 같이 고친다).
@@ -341,3 +341,19 @@
   실플레이 뒤에 다시 본다(상식 수는 봇 정책이 아니다).
 - **합계:** 구름항로 도메인 테스트 74건 — `CloudRouteEngineTest` 49 + `CloudRouteInvariantCheckerTest` 14 + `CloudRouteJsonRoundTripTest` 5 +
   `CloudRouteMatchSimulationTest` 6.
+
+## 18. 서버 배선 (S2, D-212)
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 카탈로그·팩토리 — ID `CLOUD_ROUTE`, 2~4인, 턴 제한 끔·15·30·60(기본 30), **기본 `DISABLED`**(`mirboard.cloudroute.status`) | `CloudRouteGameDefinition` | `CloudRouteGameDefinitionTest`(3건) |
+| 포트 어댑터 — 상태 I/O, 공개 뷰(편지 순서 제외 — §13), 비공개 뷰 empty, 엔진 타이머 없음, 봇 안전망, 기록 발행, 탈주 3치 | `CloudRouteGameEngine`, `state/CloudRouteStateMapper`, `persistence/CloudRouteStateStore`(`room:{id}:state`) | `CloudRouteGameEngineTest`(6건) |
+| 판 시작 — `GameStartingEvent` → 시작 상태 저장 → 봇 루프·턴 타이머 | `lifecycle/CloudRouteRoundStarter` | `lifecycle/CloudRouteRoundStarterTest`(3건) |
+| 봇 — 공개 뷰만, 안전 잔고 = 남의 최대 통행료의 15%, 끝 3라운드 인수 안 함 | `bot/CloudRouteBotPolicy`·`CloudRouteBotView` | `bot/CloudRouteBotPolicyTest`(7건 — 강도 1,000판 포함) |
+| 기록 — `cloudroute_match_results`·`_participants`, 개인전 ELO(점수 = 좌석 수 − 순위), 봇·게스트 판 ELO 제외, 상대 전적 | `persistence/CloudRouteMatchRecorder`·`CloudRouteHeadToHead`, `event/CloudRouteMatchCompleted` | `persistence/CloudRouteMatchRecorderIT`(4건, Docker) |
+| 기록 실패 격리 — 마지막 굴림이 DB 장애에도 방송·대기실 복귀 | 어댑터 `record` | `infra/ws/CloudRouteRecorderFailureTest`(1건) |
+| 봇 완주 — 2·3·4인 봇 방 + 손을 놓은 사람(턴 제한 1초) | 전 배선 | `infra/bot/CloudRouteBotMatchSimulationIT`(4건, Docker, 약 40초) |
+
+- **봇 강도** (1,000판, 좌석 0 이 휴리스틱): 무작위 상대 4인 0.777 · 1:1 0.832, "다 쓰는" 탐욕 상대 4인 0.259 · 1:1 0.503(실력이 같으면 0.25 · 0.5).
+- **설계 발견**: 총자산이 건물을 정가로 세고 건물이 바로 통행료를 벌어 **잔고를 남기는 것이 손해**다 — 처음 기준(최대 통행료만큼 남기기)은 탐욕에
+  4인 0.17 로 졌고, 잔고를 줄일수록 강해져 15% 에서 대등해졌다. "다 쓰기"가 우세 전략이면 판의 결정이 단조로워진다 — 설계서 §12 Q10(S4 조정 후보).

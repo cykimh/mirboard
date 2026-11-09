@@ -178,6 +178,15 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-212 (2026-11-09) — 구름항로 S2: 포트 어댑터·봇·기록(Flyway 새 마이그레이션)·라운드 시작, 카탈로그 숨김
+
+순수 엔진을 `CloudRouteGameEngine`(포트 어댑터 — 상태 Redis `room:{id}:state`, 공개 뷰, 매치 기록 로컬 발행)으로 감싸고
+`CloudRouteGameDefinition`(ID `CLOUD_ROUTE`, 2~4인, 턴 제한 끔·15·30·60 기본 30)으로 등록한다. **공개 상태 기본은 `DISABLED`**
+(`mirboard.cloudroute.status` — 관제 규칙: 완성 전 카탈로그 비노출). 포트 확장은 없다 — 비공개 뷰 empty, 엔진 타이머 없음, 결정마다 턴
+데드라인이 새로 걸린다. 봇 `CloudRouteBotPolicy` 는 편지 더미 순서를 뺀 공개 뷰만 보고 "안전 잔고"(200 과 판 위 남의 땅 최대 통행료 중 큰 값)를
+남기며 사고·짓고·인수한다(결정적, 예외·비합법이면 시간 초과 행동으로). 기록은 새 마이그레이션의 `cloudroute_match_results`·`_participants`(순위·총자산·
+파산·탈주), 개인전 ELO(점수 = 좌석 수 − 순위), 봇·게스트 판 ELO 제외 — 원카드 기록기와 같은 규칙, 실패는 진행으로 새지 않는다.
+
 ## D-211 (2026-11-09) — 구름항로 S1: 순수 엔진·불변식·시뮬레이션
 
 `domain.game.cloudroute` 에 저장소·시계 없는 순수 엔진(`CloudRouteEngine`)을 둔다 — 난수는 주입(주사위 `Dice`·셔플 `Random`),
