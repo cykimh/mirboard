@@ -5,7 +5,8 @@
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = rooms:open
--- ARGV    = roomId, hostId, name, gameType, capacity, createdAt, teamPolicy, fillWithBots, targetScore, turnSeconds, stake
+-- ARGV    = roomId, hostId, name, gameType, capacity, createdAt, teamPolicy, fillWithBots, targetScore, turnSeconds, stake,
+--           [field, value, ...]  -- D-176 — 맵 방 옵션(opt:<NAME>) 등 추가 해시 필드. 없으면 예전과 같다.
 --
 -- Returns 1 on success. Caller generates a fresh UUID for roomId so duplicates
 -- should not occur; we still refuse to clobber an existing room key.
@@ -40,6 +41,9 @@ redis.call('HSET', KEYS[1],
     'targetScore',  targetScore,
     'turnSeconds',  turnSeconds,
     'stake',        stake)
+if #ARGV > 11 then
+    redis.call('HSET', KEYS[1], unpack(ARGV, 12))
+end
 redis.call('EXPIRE', KEYS[1], ttl)
 
 redis.call('RPUSH', KEYS[2], hostId)
