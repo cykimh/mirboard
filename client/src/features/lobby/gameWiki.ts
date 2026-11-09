@@ -9,6 +9,8 @@ const GAME_WIKI_URL: Record<string, string> = {
   skull_king: 'https://boardgamegeek.com/boardgame/150145/skull-king',
   // 원카드는 한국식 하우스 룰 게임이라 영문 문서가 없다. 나무위키 '원카드' 문서(퍼센트 인코딩).
   one_card: 'https://namu.wiki/w/%EC%9B%90%EC%B9%B4%EB%93%9C',
+  // 오목은 렌주 금수를 쓰므로 렌주 규칙이 함께 있는 나무위키 '오목' 문서.
+  omok: 'https://namu.wiki/w/%EC%98%A4%EB%AA%A9',
 };
 
 export function gameWikiUrl(gameId: string): string | undefined {

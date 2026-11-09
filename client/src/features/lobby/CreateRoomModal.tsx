@@ -64,8 +64,11 @@ export function CreateRoomModal({
     try {
       // D-143 — 정원은 게임 최대 인원(대기실에서 방장이 지금 인원으로 시작한다). 인원 고정 게임(티츄)은 보내지 않는다.
       // D-161 — 턴 제한·목표 점수·판돈은 보내지 않는다(서버가 게임 선언 기본으로 열고 대기실에서 방장이 바꾼다).
+      // D-176 — 정원을 방 설정이 정하는 게임(값을 가진 방 옵션을 선언 — 오목의 1:1/2:2)도 보내지 않는다. 서버가 기본 설정의 정원으로 열고,
+      // 방장이 대기실에서 설정을 바꾸면 정원이 따라 바뀐다. 최대 인원을 보내면 기본 설정 정원(오목 1:1 = 2)을 넘어 거절된다.
+      const capacityBySettings = (game?.roomOptionChoices ?? []).length > 0;
       const room = await roomsApi.create(token, roomName.trim(), selectedGame.toUpperCase(), {
-        capacity: game && game.minPlayers < game.maxPlayers ? game.maxPlayers : undefined,
+        capacity: game && !capacityBySettings && game.minPlayers < game.maxPlayers ? game.maxPlayers : undefined,
       });
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
@@ -116,7 +119,9 @@ export function CreateRoomModal({
               <p className="text-sm text-muted-foreground">
                 {game.minPlayers === game.maxPlayers
                   ? `${game.minPlayers}명 — 모이면 대기실에서 방장이 시작해요`
-                  : `최소 ${game.minPlayers}명 · 최대 ${game.maxPlayers}명 — 대기실에서 방장이 시작해요`}
+                  : (game.roomOptionChoices ?? []).length > 0
+                    ? `${game.minPlayers}~${game.maxPlayers}명 — 대기실의 게임 설정(모드)이 정원을 정해요`
+                    : `최소 ${game.minPlayers}명 · 최대 ${game.maxPlayers}명 — 대기실에서 방장이 시작해요`}
               </p>
             </div>
           )}

@@ -8,7 +8,7 @@ import { headToHeadText } from '@/features/stats/headToHead';
 import { playerTiers } from '@/features/stats/playerTiers';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
-import { GameTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
+import { GameTable, OmokTable, OneCardTable, SkullKingTable, preloadGameTable } from '@/pages/gameTables';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { InviteLinkButton } from '@/features/lobby/InviteLinkButton';
 import { ParticipantCard } from '@/features/lobby/ParticipantCard';
@@ -50,7 +50,7 @@ import {
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
  * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
  */
-const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD']);
+const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'OMOK']);
 
 /**
  * D-133 — 첫 입장(`join-or-reconnect`)이 막힌 이유. 자리 없음은 관전을, 방 없음은 메인으로를 제안한다. 그 밖의 오류는
@@ -497,7 +497,9 @@ export function RoomPage() {
   const iAmHost = !!(room && user && room.hostId === user.userId);
   // D-106 정정 — 좌석 정책은 게임 중립(RANDOM 은 좌석 순서를 섞을 뿐)이라 숨기지 않는다.
   // 팀이 있는 게임에서만 "팀 배정"으로 부른다.
-  const seatPolicyLabel = roomOptions?.includes('TEAMS') ? '팀 배정' : '좌석 순서';
+  // D-176 — 팀전을 고를 수 있는 게임(TEAM_MODE)은 팀전일 때 "팀 배정"이다(좌석 0·2 대 1·3).
+  const seatPolicyLabel =
+    roomOptions?.includes('TEAMS') || room?.options?.TEAM_MODE === 'TEAMS_2V2' ? '팀 배정' : '좌석 순서';
   // D-135 — 방장 강제 종료는 게임판 머리 줄에서, 방장 말고 모두 봇인 판만(서버도 같은 조건 — HUMAN_PLAYERS_PRESENT). 강제 종료는
   // 기록을 남기지 않아 사람 판에서는 판 깨기가 된다. 예전 대기실 셸의 버튼은 게임 중에 셸이 그려지지 않아 보인 적이 없었다.
   const canAbortGame =
@@ -659,6 +661,8 @@ export function RoomPage() {
               raceButtonSize={room.raceButtonSize}
               raceButtonVisibility={room.raceButtonVisibility}
             />
+          ) : room.gameType === 'OMOK' ? (
+            <OmokTable {...board} />
           ) : (
             <SkullKingTable {...board} />
           )}
