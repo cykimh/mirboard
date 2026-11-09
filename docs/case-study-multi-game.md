@@ -128,7 +128,7 @@ private record Rung(Predicate<Context> applies, ToIntFunction<Context> pick) {}
 `SkullKingInvariantChecker` 를 통과 케이스뿐 아니라 **고의로 위반시킨 상태 8건**
 (+ 오탐 방지 통과 2건)으로 검출 능력 자체를 테스트했습니다.
 
-**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1495건 중 1253건(84%)이 Docker 불필요**합니다(D-165 시점, 부록 (6)).
+**여기 한 줄만 숫자를 씁니다** — 서버 테스트 **1825건 중 1567건(86%)이 Docker 불필요**합니다(D-200 시점, 부록 (6)).
 자랑이 아니라 §2 의 2계층 분리가 값을 냈다는 인과 증거입니다.
 
 `코드:` `skullking/trick/TrickResolver.java` · `skullking/invariant/SkullKingInvariantChecker.java` ·
@@ -304,6 +304,41 @@ D-103 / 머지 `95b4bc6`. 29파일 **+3,583/−62** — 기존 코드 수정이 
 
 ---
 
+## §9 네 번째 게임 — 한 차례가 여러 액션인 게임 (요트, D-181~D-183·D-200)
+
+**예상** — `multi-game.md` 는 처음부터 요트를 "포트가 티츄 모양으로 굳었는지 드러내는 게임"으로 남겨 두었고, §1 표에 깨질 곳 셋을
+적었습니다: 비공개 뷰 없음, 12칸을 채우면 종료, 합법 액션의 조합 폭발(주사위 고정 2⁵ × 남은 칸).
+
+**실제** — 셋 다 이미 포트에 들어 있었습니다. 비공개 뷰는 처음부터 `Optional`(포트 설계 판단 2), 종료 판정은 엔진 소유
+(판단 3), 합법 액션은 홀드와 기록이 별개 액션이라 곱이 아니라 합 — **최대 45개**였습니다. 깨진 것은 표에 없던 가정 하나입니다:
+**"액션 하나 = 차례 하나."** 진행 경로는 성공한 액션마다 턴 데드라인을 처음부터 다시 거는데, 요트의 한 차례는 굴림·홀드·기록이라
+홀드만 계속 바꿔도 30초 제한이 끝없이 늘어납니다.
+
+**후보와 배제**
+
+- 홀드 변경 횟수 상한 — 포트는 그대로지만 "30초 제한"이 실제로는 몇 배가 되고 설명할 수 없다.
+- 여러 입력을 한 액션에 싣기(포격 기획의 선택 — 이동을 발사에 싣는다) — 요트는 홀드를 실시간으로 보여 주기로 해(D-181, 기다림을
+  구경으로) 이 길이 막혔다.
+- **선택: `GameContext.turnSeconds`**(D-183) — 방의 턴 제한을 엔진에 넘기고, 엔진이 차례 시작 시각을 상태에 두어 원카드가 들여온 엔진
+  타이머(⑦)로 차례 전체 마감을 건다. 인프라 턴 데드라인(마지막 액션 + T)은 늘 더 늦어 폴백으로만 남는다.
+
+**결과** — 공용 서버 변경은 `GameContext` 필드 하나와 `GameEngineProvider` 의 인자 한 줄입니다(같은 날 들어온 오목의 `options` 뒤에
+붙였다 — D-176 이 "방 설정을 더 실을 때는 끝에 붙이고 짧은 생성자를 남긴다"고 적어 둔 그 모양). 인프라 코드는 0줄,
+`grep -rniE 'yacht|요트' …/infra` → **0건**. 클라는 `RoomPage` 분기 한 줄·지연 로딩 한 줄·튜토리얼·위키 한 항목·CSS 진입점이 전부이고
+`useStompRoom` 은 0줄입니다. 요트 도메인 2,170줄(부록 (8)).
+
+**대가 — 브라우저에서만 보인 것.** 단위 테스트는 다 통과했는데, 실제로 주사위 두 개를 빠르게 누르자 두 번째 `HOLD` 가 방 액션 락에
+걸려 `BUSY` 로 버려졌습니다. 한 차례 = 한 액션인 게임에서는 사람이 같은 차례에 연달아 보낼 일이 거의 없어 드러나지 않던 락 경합입니다.
+클라에서 풀었습니다 — 홀드는 마지막 탭 뒤 250ms 에 마스크 전체를 한 번 보내고, 굴리기는 지금 홀드를 실어 보내며(서버가 먼저 적용),
+`ROLL`·`SCORE` 가 `BUSY` 면 한 번 다시 보냅니다(D-200). 세 번째 게임이 인프라의 **시간 모델**을 고쳤다면, 네 번째 게임은 "차례"라는 낱말에
+숨은 **입력 모델**(한 차례에 몇 번 말할 수 있는가)을 드러냈습니다.
+
+`코드:` `domain/game/core/GameContext.java`(`turnSeconds`) · `domain/game/yacht/YachtGameEngine.java`(`timer`·`onTimer`) ·
+`client/src/features/yacht/YachtTable.tsx`(홀드 모아 보내기·BUSY 재전송) · `테스트:` `YachtGameEngineTest` · `YachtBotMatchSimulationIT`
+(손 놓은 사람이 차례 전체 타이머로 끝까지 — 1인 판 12.8초) · `YachtTable.test` · `결정:` D-181 · D-182 · D-183 · D-200
+
+---
+
 ## 부록 — 재현 명령
 
 ```bash
@@ -338,7 +373,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1495 skipped=5 failed=0 dockerfree=1253 (84%)   (D-165 시점 — D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
+# → tests=1825 skipped=5 failed=0 dockerfree=1567 (86%)   (D-200 시점 — 요트·오목·구름항로 도메인 포함. D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -346,13 +381,19 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8) — main 소스 줄 수
-for d in core tichu skullking onecard; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8·§9) — main 소스 줄 수
+for d in core tichu skullking onecard yacht; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 515 · tichu 6009 · skullking 3766 · onecard 2612, GameEngine.java 184   (D-131 시점)
+# → core 684 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170, GameEngine.java 184   (D-200 시점 — D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+
+# (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
+grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
+git diff --stat 5d36395^ 5d36395 -- server/src/main/java/com/mirboard/infra server/src/main/java/com/mirboard/domain/game/core
+git diff --name-only 26f011f^ 26f011f -- client/src | grep -vE 'features/yacht|types/yacht|20-yacht|yachtCss'
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·
 [rules-skullking.md](rules-skullking.md)(룰 ↔ 코드 1:1) ·
 [rules-onecard.md](rules-onecard.md) · [plans/onecard.md](plans/onecard.md)(세 번째 게임 설계·단계) ·
-[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131)
+[rules-yacht.md](rules-yacht.md) · [plans/yacht.md](plans/yacht.md)(네 번째 게임) ·
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-181 ~ D-183, D-200)

@@ -44,6 +44,8 @@ export const yachtRoomSink: RoomEventSink<YachtTableView, YachtPrivateView> = {
       const p = envelope.payload as ErrorPayload;
       // 홀드 토글이 빠를 때 서버와 한 박자 어긋나 나는 거절은 조용히 넘긴다 — 다음 DICE_HELD·DICE_ROLLED 가 맞춘다.
       if (p.code === 'HOLD_UNCHANGED') return;
+      // D-200 — 굴리기·기록이 방 락 경합으로 거절되면 한 번 다시 보낸다(게임판이 신호를 보고 보낸다). 두 번째도 BUSY 면 문구를 보인다.
+      if (p.code === 'BUSY' && useYachtStore.getState().noteBusy()) return;
       useYachtStore.getState().setError(errorText(p.code, p.message, ERROR_LABEL));
     }
   },

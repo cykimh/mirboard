@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
  * 없이 이 Bean 등록으로 인게임까지 연결된다.
  *
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.yacht.status} = 환경 변수 {@code MIRBOARD_YACHT_STATUS}, 기본
- * {@code DISABLED} — 단계마다 main 에 들어가므로 완성 전에는 카탈로그에도 보이지 않게 둔다(관제 규칙, 2026-11-09).
- * 테스트·로컬 확인은 설정으로 연다. 공개는 S5). 기본값은 {@code application.yml} 과 아래 {@code @Value}
+ * {@code AVAILABLE} — D-200 공개. 완성 전 단계에서는 {@code DISABLED} 였다). {@code COMING_SOON} 을 주면 카탈로그에 "준비 중"으로만
+ * 보이고 새 방을 만들 수 없다(진행 중인 판은 끝까지) — 운영의 되돌리기 손잡이다({@code docs/deploy.md}). 기본값은 {@code application.yml} 과 아래 {@code @Value}
  * 두 곳에 있고 같아야 한다. 방 옵션은 쓰지 않는다(목표 점수·팀·판돈 없음 — D-106 옵트인 기본).
  */
 @Component
@@ -36,7 +36,7 @@ public final class YachtGameDefinition implements GameDefinition {
     public YachtGameDefinition(YachtStateStore stateStore,
                                Clock clock,
                                ApplicationEventPublisher publisher,
-                               @Value("${mirboard.yacht.status:DISABLED}") GameStatus status) {
+                               @Value("${mirboard.yacht.status:AVAILABLE}") GameStatus status) {
         this.stateStore = stateStore;
         this.clock = clock;
         this.publisher = publisher;

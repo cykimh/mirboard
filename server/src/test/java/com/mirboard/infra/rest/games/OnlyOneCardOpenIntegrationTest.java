@@ -24,6 +24,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
+ * D-200 — 운영은 원카드·요트만 연다(D-168 은 원카드만이었다). 아래 설정은 운영 그대로이고 요트는 코드 기본값(공개)이다.
+ *
  * D-168 — 당분간 원카드만 연다(운영 `fly.toml` 의 `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS=COMING_SOON`). 그 설정이
  * 그대로 듣는지 고정한다 — 티츄·스컬킹은 카탈로그에 "준비 중"으로 원카드 뒤에 오고, 방은 만들 수 없다. 원카드는 그대로 만든다.
  */
@@ -58,20 +60,23 @@ class OnlyOneCardOpenIntegrationTest {
     ObjectMapper objectMapper;
 
     @Test
-    void tichu_and_skull_king_are_listed_as_coming_soon_after_one_card() throws Exception {
+    void tichu_and_skull_king_are_listed_as_coming_soon_after_the_open_games() throws Exception {
         String token = authenticate("onlyoc1");
 
         mockMvc.perform(get("/api/games").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.games.length()").value(3))
-                .andExpect(jsonPath("$.games[0].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games.length()").value(4))
+                // 열린 두 게임이 이름순(요트·원카드)으로 먼저, 닫힌 두 게임이 뒤에.
+                .andExpect(jsonPath("$.games[0].id").value("YACHT"))
                 .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[1].status").value("COMING_SOON"))
-                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"));
+                .andExpect(jsonPath("$.games[1].id").value("ONE_CARD"))
+                .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[2].status").value("COMING_SOON"))
+                .andExpect(jsonPath("$.games[3].status").value("COMING_SOON"));
     }
 
     @Test
-    void only_one_card_rooms_can_be_created() throws Exception {
+    void only_one_card_and_yacht_rooms_can_be_created() throws Exception {
         String token = authenticate("onlyoc2");
 
         for (String game : java.util.List.of("TICHU", "SKULL_KING")) {
@@ -82,11 +87,13 @@ class OnlyOneCardOpenIntegrationTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.error.code").value("GAME_NOT_AVAILABLE"));
         }
-        mockMvc.perform(post("/api/rooms")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("name", "원카드 방", "gameType", "ONE_CARD"))))
-                .andExpect(status().isCreated());
+        for (String game : java.util.List.of("ONE_CARD", "YACHT")) {
+            mockMvc.perform(post("/api/rooms")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(Map.of("name", "열린 방", "gameType", game))))
+                    .andExpect(status().isCreated());
+        }
     }
 
     private String authenticate(String username) throws Exception {

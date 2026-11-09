@@ -50,6 +50,7 @@ primary_region = "nrt"
   MIRBOARD_MESSAGING_GATEWAY = "redis"
   # D-168 — 당분간 원카드만(사용자 결정 2026-10-30). 티츄·스컬킹은 "준비 중" — 새 방만 막고 진행 중인 판은 끝까지 간다.
   # 다시 열기: 두 줄을 지우거나 AVAILABLE 로 바꾸고 배포.
+  # D-200 — 요트도 연다(원카드·요트). 요트 줄은 두지 않는다 — 코드 기본값이 AVAILABLE 이다(되돌리기는 MIRBOARD_YACHT_STATUS 시크릿, 런북 docs/deploy.md).
   MIRBOARD_TICHU_STATUS = "COMING_SOON"
   MIRBOARD_SKULLKING_STATUS = "COMING_SOON"
 

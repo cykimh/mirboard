@@ -35,6 +35,8 @@ export const SCORE_FLASH_MS = 1500;
  * 뒤 이만큼 기다렸다가 마스크 전체를 한 번 보낸다. 굴리기는 기다리지 않고 지금 홀드를 함께 실어 보낸다.
  */
 export const HOLD_SEND_DELAY_MS = 250;
+/** D-200 — BUSY 로 거절된 굴리기·기록을 다시 보내기까지. */
+export const BUSY_RETRY_DELAY_MS = 150;
 
 /** 좌석 색 — 점수표 열·좌석 띠·내 차례 테두리. */
 const SEAT_ACCENTS = ['#5b8def', '#e85d75', '#3fa45b', '#e0b32a'];
@@ -175,12 +177,30 @@ export function YachtTable({
     }, HOLD_SEND_DELAY_MS);
   };
 
+  // 굴리기·기록은 기억해 두었다가 BUSY 면 한 번 다시 보낸다(D-200).
+  const sendTracked = (action: Record<string, unknown>) => {
+    s.noteSent(action);
+    sendAction(action);
+  };
+  // 스토어는 모듈 전역이라 다시 마운트되면 지난 값이 남아 있다 — 값이 아니라 변화에만 반응한다(원카드 resyncNonce 와 같은 방어).
+  const retryNonce = s.retryNonce;
+  const handledRetryNonce = useRef(retryNonce);
+  useEffect(() => {
+    if (retryNonce === handledRetryNonce.current) return;
+    handledRetryNonce.current = retryNonce;
+    const timer = window.setTimeout(() => {
+      const { lastSent } = useYachtStore.getState();
+      if (lastSent) sendAction(lastSent.action);
+    }, BUSY_RETRY_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [retryNonce, sendAction]);
+
   // 굴림에 지금 홀드를 실어 보낸다 — 모으던 HOLD 는 보내지 않는다(서버가 굴림의 홀드를 먼저 적용하고 DICE_HELD 를 낸다, 룰 §4-2).
   const roll = () => {
     if (!canRoll) return;
     cancelHoldSend();
     const { rolls, held } = useYachtStore.getState();
-    sendAction(rolls === 0 ? { '@action': 'ROLL' } : { '@action': 'ROLL', held });
+    sendTracked(rolls === 0 ? { '@action': 'ROLL' } : { '@action': 'ROLL', held });
   };
 
   const score = (category: Category) => {
@@ -188,7 +208,7 @@ export function YachtTable({
     cancelHoldSend();
     const points = s.candidates[category];
     if (points === 0 && !window.confirm(`${CATEGORY_LABEL[category]} 칸에 0점으로 버릴까요?`)) return;
-    sendAction({ '@action': 'SCORE', category });
+    sendTracked({ '@action': 'SCORE', category });
   };
 
   const exit = () => {

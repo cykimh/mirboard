@@ -55,7 +55,22 @@ export interface YachtRoomState {
    * 보내고 `DICE_ROLLED` 가 권위 값을 준다).
    */
   ownSeat: number;
+  /**
+   * D-200 — 마지막으로 보낸 `ROLL`·`SCORE`. 방 락 경합으로 `BUSY` 가 오면 한 번만 다시 보낸다(`retryNonce` 가 신호). 서버가 그 결과
+   * 이벤트(`DICE_ROLLED`·`SCORED`·`TURN_CHANGED`)를 보내면 비운다.
+   */
+  lastSent: SentAction | null;
+  retryNonce: number;
 }
+
+export interface SentAction {
+  action: Record<string, unknown>;
+  at: number;
+  retried: boolean;
+}
+
+/** BUSY 를 그 액션의 것으로 보는 시간 — 그보다 늦은 BUSY 는 일반 오류로 보인다. */
+export const BUSY_RETRY_WINDOW_MS = 2000;
 
 export interface YachtActions {
   reset: (roomId: string) => void;
@@ -65,6 +80,9 @@ export interface YachtActions {
   /** 내 차례에 홀드를 미리 바꾼다(서버 확인 전) — 서버가 같은 값을 `DICE_HELD` 로 돌려준다. */
   setHeldLocal: (held: Held) => void;
   setOwnSeat: (seat: number) => void;
+  noteSent: (action: Record<string, unknown>) => void;
+  /** BUSY 를 받았다 — 다시 보낼 것이 있으면 신호를 올리고 true(오류를 보이지 않는다). */
+  noteBusy: () => boolean;
 }
 
 const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
@@ -83,6 +101,8 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   turnClock: null,
   errorMessage: null,
   ownSeat: -1,
+  lastSent: null,
+  retryNonce: 0,
 };
 
 function freshTurn(): Partial<YachtRoomState> {
@@ -146,6 +166,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         set({
           turnSeat: p.seat,
           round: p.round,
+          lastSent: null,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
         });
@@ -163,7 +184,14 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       case 'DICE_ROLLED': {
         const p = payload as DiceRolledPayload;
         if (p.seat !== state.turnSeat) return 'unhandled';
-        set({ dice: p.dice, held: p.held, rolls: p.rolls, candidates: p.candidates, rollNonce: state.rollNonce + 1 });
+        set({
+          dice: p.dice,
+          held: p.held,
+          rolls: p.rolls,
+          candidates: p.candidates,
+          rollNonce: state.rollNonce + 1,
+          lastSent: null,
+        });
         return 'applied';
       }
 
@@ -183,6 +211,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         set({
           seats,
           candidates: {},
+          lastSent: null,
           lastScore: {
             seat: p.seat,
             category: p.category,
@@ -222,5 +251,16 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
 
   setOwnSeat(seat) {
     set({ ownSeat: seat });
+  },
+
+  noteSent(action) {
+    set({ lastSent: { action, at: Date.now(), retried: false } });
+  },
+
+  noteBusy() {
+    const { lastSent, retryNonce } = get();
+    if (!lastSent || lastSent.retried || Date.now() - lastSent.at > BUSY_RETRY_WINDOW_MS) return false;
+    set({ lastSent: { ...lastSent, retried: true }, retryNonce: retryNonce + 1 });
+    return true;
   },
 }));

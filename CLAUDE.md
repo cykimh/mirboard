@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 현황
 
-**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 3종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131).
+**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 4종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131), 요트(1~4인 개인전 — 주사위 5개·12칸, 순차 진행·혼자 하기, D-181~D-183·D-200 공개).
 
 현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-172까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
-- **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
+- **서버** `server/` (Spring Boot 4 / Java 25, Gradle): 도메인 `domain.lobby`·`domain.game.{core,tichu,skullking,onecard,yacht,scoring}`, 인프라 `infra.{rest,ws,bot,messaging,metrics,config,web}`.
 - **클라이언트** `client/` (Vite + React 18 + TS, Zustand, @stomp/stompjs, Tailwind+shadcn).
 - **계약 문서(정본)**: `docs/api.md`(REST), `docs/stomp-protocol.md`(STOMP), `docs/redis-keys.md`(Redis), `docs/rules-tichu.md`(룰), `docs/game-port.md`(`GameEngine` 포트), `server/src/main/resources/db/migration/V*.sql`(Flyway V1~).
 - **현황 단일 진실원**: `docs/implementation-status.md`(기능별 ✅ 표). 이력 `docs/decisions.md`, 로드맵 `docs/plans/mvp-roadmap.md`.
@@ -115,7 +115,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 9.4.1 (wrapper), Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129, 요트 `.yt-` 20 번 part) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
@@ -148,6 +148,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - D-157: 버튼을 누른 뒤의 짧은 안내(마이크 오류·초대 링크 복사됨)는 **토스트**(`components/toast` — `showToast`, 앱에 `Toaster` 하나). 버튼 줄에 글을 끼우지 말 것.
 - D-156: 음성 대화를 **티츄·스컬킹에도**(공용 `features/voice/VoiceControls`·`voiceStatusOf`). 비밀번호는 **4~64자면 무엇이든**(`PasswordPolicy`).
 - D-170: **허브 서비스 토큰** — 허브 서버가 `/api/admin/**` 를 `Authorization: Bearer <서비스 토큰>` 으로 부르면 운영자 본인 userId(`mirboard.admin.service-user-id`, `admin_roles` 에 있어야 함)로 인증한다. `JwtAuthFilter` 안의 분기(상수 시간 비교, `/api/admin/` 밖·토큰 미설정이면 꺼짐). 값은 Fly secrets 로만 — `docs/deploy.md` "허브 서비스 토큰".
+- D-200: **요트 공개** — 운영은 원카드·요트(D-168 의 "원카드만"을 바꿈), 되돌리기 `MIRBOARD_YACHT_STATUS`. D-183 — **`GameContext.turnSeconds`**: 인프라 턴 데드라인은
+  액션마다 다시 걸리므로(한 차례 = 한 액션 가정) 한 차례가 여러 액션인 게임은 차례 시작 시각을 상태에 두고 엔진 타이머로 **차례 전체 마감**을 건다(요트 — 만기면
+  최고점 칸 자동 기록). 요트 클라는 `HOLD` 를 마지막 탭 뒤 250ms 에 모아 보내고 `ROLL` 에 홀드를 싣는다(탭마다 보내면 방 락 `BUSY`), `ROLL`·`SCORE` 의 `BUSY` 는 한 번 재전송.
+  요트 1인 판은 기록·전적을 남기지 않는다(D-181).
 - D-174: **방 종류 없음** — 방 만들기는 게임·이름만, 봇은 대기실에서 방장이 **[빈자리 봇으로 채우기]**(`POST /api/rooms/{id}/bots`, 정원까지·준비 없음)·**[봇 빼기]**(`DELETE …/bots`). 봇이 낀 판도 정상 종료면 **봇과 함께 대기실로**(`MatchProgressService` — `fillWithBots` 방만 FINISHED, 봇에겐 끊김 유예 없음). 봇만 남으면 방 소멸·방장은 사람에게(`RoomService.settleBotsAfterHumanChange`). 대기실 시작 줄은 문구 왼쪽·버튼 오른쪽, 참가자 카드 계급은 이름 왼쪽, 원카드! 버튼은 원형.
 - D-173: 원카드 **내 차례 빛은 경기장(`.oc-felt-myturn`) 테두리**(손패 칸·나 줄 빛 제거), **2인 Q 는 상대 차례**(한 번 더는 K·2인 J 만 — `TurnOrder.afterPlay`), 상대 좌석 손패는 **뒷면 최대 3장 뭉치 + "×N"**(`OneCardSeat`).
 - D-172: **Redis 구독 연결 하트비트** — `RedisMessageGateway` 가 `mirboard.messaging.redis-heartbeat`(기본 30s)마다 `mirboard:pubsub-heartbeat` 에 발행, 3번 연속 안 돌아오면 구독 재연결(프록시가 조용한 연결을 끊어도 STOMP 방송이 멈추지 않게).
@@ -244,6 +248,8 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.bot.*"       # 티츄 봇 정책·순수 시뮬레이션 (D-118, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·강도 평가 (D-119, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*Test"     # 원카드 엔진·어댑터·봇 (D-127/D-128, Docker 불필요)
+./gradlew :server:test --tests "com.mirboard.domain.game.yacht.*"            # 요트 점수 전수·엔진·시뮬레이션·어댑터·봇 (D-181~D-183, Docker 불필요, ~10s)
+./gradlew :server:test --tests "com.mirboard.infra.bot.YachtBotMatchSimulationIT"   # 요트 봇 판·차례 전체 타이머·1인 판 무기록 (Docker)
 ./gradlew :server:test --tests "com.mirboard.domain.game.cloudroute.*"   # 구름항로 엔진·불변식·시뮬레이션·어댑터·봇 강도 + 길이 통계 → server/build/cloudroute-sim-stats.txt (D-211·D-212, 기록기 IT 만 Docker)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.CloudRouteBotMatchSimulationIT"   # 구름항로 봇 완주 2·3·4인 + 손 놓은 사람 (D-212, Docker, ~40s)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
@@ -281,6 +287,7 @@ npm --prefix client run test
 npm --prefix client run e2e
 npm --prefix client run test -- authStore   # 특정 테스트만
 npm --prefix client run test -- onecard     # 원카드 게임판·스토어·튜토리얼 (D-129)
+npm --prefix client run test -- yacht       # 요트 게임판·스토어·튜토리얼·CSS 네임스페이스
 ```
 
 ## STOMP envelope 규약 (자주 참조됨)
@@ -306,14 +313,17 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128·D-129, D-131 공개): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
+  - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null)
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
   - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`, 순번 없음 — D-129), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
+  - 요트: `ERROR` 만(인프라가 거절 예외 코드로 — 엔진의 비공개 이벤트 0종)
 - 클라 → 서버 `/app/room/{roomId}/action`
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
   - 원카드: `PLAY_CARD`(7 은 `declaredSuit`), `DRAW`, `CALL_ONE_CARD`·`CATCH`(`raceId`). 봇 누름·창 만료는 서버의 엔진 타이머(D-128)
+  - 요트: `ROLL`(`held?`), `HOLD`(`held`), `SCORE`(`category`). 차례 만기 자동 기록은 서버의 엔진 타이머(D-183)
 
 전체 카탈로그: `docs/stomp-protocol.md`.
 
