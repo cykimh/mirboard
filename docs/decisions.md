@@ -178,6 +178,12 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 게임별 분리 결정이 선행이라 별건. ② 봇은 포트 기본(합법 균등 분포)으로 시작 — 휴리스틱은
 후속. ③ 카탈로그에 노출되지만 클라 게임판은 S6(D-103) — 직후 과제.
 
+## D-184 (2026-11-09) — 모든 게임 공개: 티츄·스컬킹 다시 열기, 새 게임은 게임판 완성 즉시
+
+사용자 결정("다 일단 바로 공개하자"). D-168 의 "당분간 원카드만"을 되돌려 운영 `fly.toml [env]` 의 `MIRBOARD_TICHU_STATUS`·`MIRBOARD_SKULLKING_STATUS
+= COMING_SOON` 두 줄을 지운다 — 운영에 게임 공개 상태 덮어쓰기를 두지 않고 모든 게임이 코드 기본값을 따른다. 새 게임(요트·오목·구름항로)은 관제가 단계마다
+main 에 넣는 동안 기본 `DISABLED` 로 숨겼다가, 클라 게임판이 완성되는 단계에서 기본값을 `AVAILABLE` 로 바꿔 바로 공개한다(요트 D-200). 씨앗포는 요트·오목 뒤 착수.
+
 ## D-212 (2026-11-09) — 구름항로 S2: 포트 어댑터·봇·기록(Flyway 새 마이그레이션)·라운드 시작, 카탈로그 숨김
 
 순수 엔진을 `CloudRouteGameEngine`(포트 어댑터 — 상태 Redis `room:{id}:state`, 공개 뷰, 매치 기록 로컬 발행)으로 감싸고
@@ -336,6 +342,7 @@ Fly 10월 청구가 $6.84 로 처음 $5 를 넘었다. 항상 켜진 `mirboard-d
 - 원카드처럼 공개 상태를 설정으로 연다: `mirboard.tichu.status`(`MIRBOARD_TICHU_STATUS`)·`mirboard.skullking.status`(`MIRBOARD_SKULLKING_STATUS`).
   - 코드 기본은 AVAILABLE 이라 테스트·로컬은 그대로다. 운영만 `fly.toml [env]` 에 `COMING_SOON` 을 둔다.
   - 다시 열 때는 두 줄을 지우거나 `AVAILABLE` 로 바꾸고 배포한다.
+*폐기 → D-184*: 티츄·스컬킹을 다시 열었다.
 
 ## D-167 (2026-10-30) — 계급 16단계: 그림이 여러 개인 계급 빼기
 
