@@ -404,6 +404,38 @@ candidates, turnRemainingMs, result }` — `phase` 는 `PLAYING`·`ENDED`, `scor
 
 ---
 
+## 오목 (gameType=OMOK, D-175)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** — 1:1 은 2, 2:2 는 4(팀 = `seat % 2`, 좌석 0·2 대 1·3). 룰 정본은
+`docs/rules-omok.md`. 완성(S5 공개) 전에는 `DISABLED` — 카탈로그에도 안 보인다(설정 `mirboard.omok.status`).
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `PLACE_STONE` | `x`, `y` (0..14) | 내 차례만. 흑 금수 자리는 `FORBIDDEN_MOVE` |
+| `RESIGN` | — | 차례와 무관. 2:2 는 팀 패 |
+
+시간 초과 자동 수(`TimeoutPlace`)는 서버 내부 액션이라 **클라가 보낼 수 없다** — Jackson 하위 타입에 등록돼 있지 않다.
+
+**서버 → 클라 (공개)** — 숨길 정보가 없어 **이벤트가 전부 공개**이고 모두 방 순번을 쓴다. payload 는 결과값이다:
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `MATCH_STARTED` | `{ firstSeat, seatColors }` | **타입만 정의 — 서버는 시작 때 보내지 않는다.** 시작 상태는 resync 로 |
+| `STONE_PLACED` | `{ seat, color, x, y, moveNumber, timedOut }` | `moveNumber` 는 1부터 — 같은 수를 두 번 받아도 같은 판. `timedOut` 은 시간 초과 자동 수 |
+| `TURN_CHANGED` | `{ seat, color, forbidden: [{x, y, kind}] }` | 착수마다 낸다(턴 카운트다운의 기준, D-131). 흑 차례면 그 판의 금수 자리 — `kind`: `DOUBLE_THREE`·`DOUBLE_FOUR`·`OVERLINE`(서버가 계산, 클라 판정 금지) |
+| `MATCH_ENDED` | `{ winnerColor, winnerSeats, reason, causeSeat, winLine, totalMoves }` | `reason`: `FIVE`·`RESIGN`·`TIMEOUT`·`DESERTED`·`BOARD_FULL`·`NO_LEGAL_MOVE`. 무승부면 `winnerColor` null·`winnerSeats` []. `causeSeat` 은 기권·시간패·탈주를 만든 좌석(그 밖 −1), `winLine` 은 5목일 때 5점 |
+
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 오목 고유 코드 `MATCH_OVER`·`NOT_YOUR_TURN`·`OUT_OF_BOARD`·`OCCUPIED`·`FORBIDDEN_MOVE`
+(금수 종류는 클라가 이미 받은 `forbidden` 목록에서 읽는다).
+
+**resync**: `tableView` = `{ mode, rule, seatColors, moves: [{seat, x, y, timedOut}], turnSeat, forbidden, timeouts, result }` —
+`moves` 는 수순 전체(짝수 번째가 흑), `timeouts` 는 좌석별 연속 시간 초과 수, `result` 는 `MATCH_ENDED` 와 같은 값(`{ winnerColor,
+winnerSeats, reason, causeSeat, winLine }`). **`privateHand` 는 없다** — 비공개 뷰가 없는 첫 게임이다(`docs/game-port.md` §1 설계 판단 2).
+
+---
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.

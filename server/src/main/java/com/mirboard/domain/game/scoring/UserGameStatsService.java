@@ -91,6 +91,15 @@ public class UserGameStatsService {
         repo.record(userId, gameType, newRating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
     }
 
+    /**
+     * 무승부 1건 — 승·패·탈주 수와 rating 을 바꾸지 않고 행만 남긴다(D-178). 매치 기록기 계약 2(비봇 참가자마다 행 — 게스트 정리가
+     * "매치를 끝낸 증거"로 쓴다)를 무승부에서도 지키려고. {@link #record} 의 win=false 는 패로 세므로 쓰지 않는다.
+     */
+    @Transactional
+    public void recordDraw(long userId, String gameType) {
+        repo.record(userId, gameType, null, 0, 0, 0);
+    }
+
     /** D-160 — 랭킹 탭 순서용 게임별 판수(많이 한 게임부터). */
     @Transactional(readOnly = true)
     public List<UserGameStatsRepository.GamePlays> playsByGame() {
