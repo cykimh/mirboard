@@ -11,7 +11,7 @@
 
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
-| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake` | 메타. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
+| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`, `raceButtonSize`, `raceButtonVisibility`, `opt:<NAME>` | 메타. `opt:<NAME>`(D-176)=값을 가진 방 옵션(`RoomOption.valued()` — `opt:TEAM_MODE` 등), 만들 때 게임이 선언한 옵션의 기본값을 쓰고 대기실 설정으로 바뀐다. 모르는 이름은 읽을 때 건너뛴다. D-176 — 옵션으로 정원이 바뀌면(`capacityFor`) `room_update_settings.lua` 가 `capacity` 도 같이 쓴다. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
 | `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함). D-136 — 봇과 연습 방(`fillWithBots=true`)은 `room_create.lua` 가 넣지 않는다 |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함). 원카드는 `OneCardState`(손패·뽑을 더미 순서·경쟁 창·봇 누름 포함 — 서버 전용, 1판 = 1매치라 `match:` 키 없음, D-128) | 직렬화 책임은 GameEngine. 원카드는 모르는 필드를 무시한다(`@JsonIgnoreProperties(ignoreUnknown)`, 롤백 안전) |
@@ -60,7 +60,7 @@
 ### `room_create.lua`
 입력: `KEYS = [room:{id}, room:{id}:players, rooms:open]`,
 `ARGV = [roomId, hostId, name, gameType, capacity, createdAt, teamPolicy,
-fillWithBots, targetScore, turnSeconds, stake]`.
+fillWithBots, targetScore, turnSeconds, stake, (field, value)...]` — D-176: 12번째부터는 추가 해시 필드 짝(맵 방 옵션 `opt:<NAME>`), 없으면 예전과 같다.
 
 방 메타 HASH + 호스트 `RPUSH` + `rooms:open` ZADD 를 한 덩어리로 생성(양쪽 EXPIRE 6h). D-136 — `fillWithBots="true"`(연습 방)면 ZADD 하지 않는다.
 UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` 시 `-10`(ROOM_ID_COLLISION).
@@ -100,6 +100,13 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4` → 아니면 앉은 사람 모두 `SADD ready`(상태 맞춤) +
 `HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. D-143 — 준비는 조건이 아니고 정원이 다 찼어도 이 길로 시작한다(예전 `-5`
 준비 안 됨·`-6` 정원 다 참은 없앴다). `room_join.lua` 와 같은 키를 원자적으로 다뤄 확인과 시작 사이에 입장이 끼지 않는다. 방장 확인은 자바가 먼저 한다.
+
+### `room_update_settings.lua` *(D-161, D-176)*
+입력: `KEYS = [room:{id}, room:{id}:players]`, `ARGV = [maxSeated, field1, value1, ...]`.
+
+처리: 방 없음 `-1`, status≠WAITING `-2`, `maxSeated ≥ 0` 이고 `LLEN players > maxSeated` 면 `-3`(TOO_MANY_PLAYERS — 아무것도 안 씀) → 아니면
+`HSET` 짝들 → `1`. 정원이 바뀌는 설정(D-176)만 `maxSeated` = 새 정원을 넘기고(`capacity` 필드도 짝에 들어 있다), 나머지는 `-1`(확인 안 함).
+`room_join.lua` 와 같은 해시의 `capacity` 를 원자적으로 다뤄 확인과 쓰기 사이에 입장이 끼지 않는다.
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players, rooms:open, room:{id}:ready,

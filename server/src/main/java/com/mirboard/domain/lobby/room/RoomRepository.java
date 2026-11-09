@@ -76,9 +76,16 @@ public class RoomRepository {
     public void create(String roomId, long hostUserId, String name, String gameType,
                        int capacity, long createdAt, TeamPolicy teamPolicy,
                        boolean fillWithBots, int targetScore, int turnSeconds, int stake) {
-        Long result = redis.execute(
-                createScript,
-                keysFor(roomId),
+        create(roomId, hostUserId, name, gameType, capacity, createdAt, teamPolicy, fillWithBots, targetScore,
+                turnSeconds, stake, Map.of());
+    }
+
+    /** D-176 — 맵 방 옵션({@code opt:<NAME>})을 같은 원자 구간에서 같이 쓴다(room_create.lua 의 뒤쪽 ARGV 짝). */
+    public void create(String roomId, long hostUserId, String name, String gameType,
+                       int capacity, long createdAt, TeamPolicy teamPolicy,
+                       boolean fillWithBots, int targetScore, int turnSeconds, int stake,
+                       Map<String, String> extraFields) {
+        List<String> args = new ArrayList<>(List.of(
                 roomId,
                 Long.toString(hostUserId),
                 name,
@@ -89,7 +96,12 @@ public class RoomRepository {
                 Boolean.toString(fillWithBots),
                 Integer.toString(targetScore),
                 Integer.toString(turnSeconds),
-                Integer.toString(stake));
+                Integer.toString(stake)));
+        extraFields.forEach((field, value) -> {
+            args.add(field);
+            args.add(value);
+        });
+        Long result = redis.execute(createScript, keysFor(roomId), args.toArray());
         if (result == null || result != 1L) {
             throw new IllegalStateException("room_create.lua returned unexpected: " + result);
         }
@@ -113,10 +125,23 @@ public class RoomRepository {
      * @return 1 = 썼다, -1 = 방 없음, -2 = 이미 시작/종료
      */
     public int updateSettings(String roomId, java.util.Map<String, String> fields) {
-        String[] args = fields.entrySet().stream()
-                .flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue()))
+        return updateSettings(roomId, fields, -1);
+    }
+
+    /**
+     * D-176 — 정원이 바뀌는 설정 쓰기. {@code maxSeated >= 0} 이면 같은 원자 구간에서 앉은 인원이 그 이하인지 확인하고, 넘으면 아무것도
+     * 쓰지 않는다 — 확인 뒤 누가 앉아 정원을 넘는 일이 없다({@code room_join.lua} 도 같은 해시의 capacity 를 원자적으로 본다).
+     *
+     * @param maxSeated 앉은 인원 상한(보통 새 정원), -1 = 확인 안 함
+     * @return 1 = 썼다, -1 = 방 없음, -2 = 이미 시작/종료, -3 = 앉은 인원이 상한보다 많다
+     */
+    public int updateSettings(String roomId, java.util.Map<String, String> fields, int maxSeated) {
+        String[] args = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of(Integer.toString(maxSeated)),
+                        fields.entrySet().stream().flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue())))
                 .toArray(String[]::new);
-        Long result = redis.execute(updateSettingsScript, List.of("room:" + roomId), (Object[]) args);
+        Long result = redis.execute(updateSettingsScript,
+                List.of("room:" + roomId, "room:" + roomId + ":players"), (Object[]) args);
         return (int) unwrap(result);
     }
 
@@ -293,6 +318,15 @@ public class RoomRepository {
         // D-165 — 없으면 NORMAL.
         String rawRaceVisibility = (String) hash.get("raceButtonVisibility");
         String raceButtonVisibility = rawRaceVisibility == null ? Room.DEFAULT_RACE_BUTTON_VISIBILITY : rawRaceVisibility;
+        // D-176 — 맵 옵션(opt:<NAME>). 모르는 이름(다른 버전이 쓴 필드)은 건너뛴다. 값 검증은 읽는 쪽 RoomOption.resolve 가 한다.
+        Map<com.mirboard.domain.game.core.RoomOption, String> options =
+                new java.util.EnumMap<>(com.mirboard.domain.game.core.RoomOption.class);
+        for (Map.Entry<Object, Object> e : hash.entrySet()) {
+            var option = com.mirboard.domain.game.core.RoomOption.fromHashField((String) e.getKey());
+            if (option != null) {
+                options.put(option, (String) e.getValue());
+            }
+        }
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -319,7 +353,8 @@ public class RoomRepository {
                 stake,
                 readyUserIds,
                 raceButtonSize,
-                raceButtonVisibility));
+                raceButtonVisibility,
+                options));
     }
 
     /**

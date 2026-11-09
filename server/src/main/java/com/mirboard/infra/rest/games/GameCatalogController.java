@@ -56,7 +56,8 @@ public class GameCatalogController {
             List<RoomOption> supportedRoomOptions,
             int defaultPlayers,
             int defaultTurnSeconds,
-            List<Integer> turnSecondsChoices) {
+            List<Integer> turnSecondsChoices,
+            List<RoomOptionChoices> roomOptionChoices) {
 
         static GameSummary of(GameDefinition d) {
             return new GameSummary(
@@ -70,7 +71,15 @@ public class GameCatalogController {
                     d.supportedRoomOptions().stream().sorted().toList(),
                     d.defaultPlayers(),
                     d.defaultTurnSeconds(),
-                    d.turnSecondsChoices());
+                    d.turnSecondsChoices(),
+                    // D-176 — 선언한 맵 옵션의 선택지·기본값. 대기실이 옵션 이름만 보고 줄을 그릴 수 있게(게임별 화면 코드 없이).
+                    d.supportedRoomOptions().stream().sorted().filter(RoomOption::valued)
+                            .map(o -> new RoomOptionChoices(o, o.choices(), o.defaultValue()))
+                            .toList());
         }
+    }
+
+    /** D-176 — 값을 가진 방 옵션 하나의 선택지(선언 순서)와 기본값. */
+    public record RoomOptionChoices(RoomOption option, List<String> values, String defaultValue) {
     }
 }

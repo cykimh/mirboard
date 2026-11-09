@@ -63,6 +63,23 @@ public interface GameDefinition {
         return java.util.List.of(0, 30, 60, 90);
     }
 
+    /**
+     * D-176 — 이 방 옵션일 때의 정원. <b>기본은 {@link #maxPlayers()}</b>(지금 동작). 방 만들기·대기실 복귀·설정 변경으로 정원을
+     * 정할 때 서버가 부른다. {@code options} 는 이 게임이 선언한 맵 옵션의 실제 값이다({@link RoomOption#resolve} — 선언한 옵션은
+     * 늘 값이 있다). {@code minPlayers()..maxPlayers()} 안이어야 한다. 예: 오목은 {@code TEAM_MODE} 에 따라 2 또는 4.
+     */
+    default int capacityFor(java.util.Map<RoomOption, String> options) {
+        return maxPlayers();
+    }
+
+    /**
+     * D-176 — 이 방 옵션일 때 방장이 시작할 수 있는 최소 인원. <b>기본은 {@link #minPlayers()}</b>(지금 동작). 방장 시작
+     * ({@code room_start_now.lua} 의 최소 인원 인자)이 이 값을 쓴다. 정원과 같게 돌려주면 "정확히 그 인원"이다(오목 2:2 는 4명만).
+     */
+    default int playersToStart(java.util.Map<RoomOption, String> options) {
+        return minPlayers();
+    }
+
     /** Phase 3 에서 게임 시작 시 호출. 현재는 미구현 게임이면 throws. */
     GameEngine newEngine(GameContext ctx);
 }
