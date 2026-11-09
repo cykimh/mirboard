@@ -137,6 +137,15 @@ button.oc-badge {
   background: var(--oc-felt-bg);
 }
 
+/* D-173 — 내 차례면 경기장 테두리가 내 색으로 맥박친다(D-160 의 손패 칸·나 줄 빛을 옮겼다). 움직임 줄이기면 멈춘 빛(17 끝). */
+.oc-felt-myturn {
+  border-color: var(--oc-accent);
+  box-shadow:
+    0 0 0 3px var(--oc-accent),
+    0 0 14px 2px var(--oc-accent);
+  animation: oc-turn-pulse 1.4s ease-in-out infinite;
+}
+
 .oc-felt-top,
 .oc-felt-bottom {
   display: flex;
@@ -362,24 +371,41 @@ button.oc-badge {
   font-weight: 600;
 }
 
-/* D-144 — 남은 손패는 숫자 대신 장수만큼 작은 뒷면을 겹쳐 놓는다(최대 19장 — 20장이면 파산). 칸이 좁으면 더 촘촘히 겹친다:
-   뒷면 사이 간격 = min(7px, (칸 폭 − 뒷면 폭) / (장수 − 1)). 칸 폭은 컨테이너 단위(cqw)로 읽는다. */
+/* D-173 — 남은 손패는 뒷면 최대 3장을 비스듬히 겹친 뭉치 + "×N"(가운데 이전 카드처럼). 좌석 폭이 장수와 무관하다. */
 .oc-seat-count {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 20px;
-  container-type: inline-size;
+  min-height: 21px;
 }
 
 .oc-seat-hand {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
-.oc-seat-hand-card {
-  box-sizing: border-box;
+/* 뭉치 칸은 늘 3장 크기(12 + 4 × 2 · 17 + 2 × 2) — 장수가 줄어도 "×N" 이 옆으로 움직이지 않는다. */
+.oc-seat-hand-stack {
+  position: relative;
   flex: none;
+  width: 20px;
+  height: 21px;
+}
+
+.oc-seat-hand-count {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-seat-hand-card {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  box-sizing: border-box;
   width: 12px;
   height: 17px;
   border-radius: 2px;
@@ -389,9 +415,14 @@ button.oc-badge {
   box-shadow: -1px 0 2px rgba(0, 0, 0, 0.35);
 }
 
-.oc-seat-hand-card + .oc-seat-hand-card {
-  margin-left: -6px;
-  margin-left: calc(min(7px, (100cqw - 12px) / max(var(--oc-hand-count) - 1, 1)) - 12px);
+.oc-seat-hand-card:nth-child(2) {
+  left: 4px;
+  top: 2px;
+}
+
+.oc-seat-hand-card:nth-child(3) {
+  left: 8px;
+  top: 0;
 }
 
 .oc-seat-one {
@@ -509,14 +540,6 @@ button.oc-badge {
   color: var(--color-text-muted);
 }
 
-/* D-151 — 10장을 넘는 좌석은 뒷면 10장 뒤에 줄임표. */
-.oc-seat-hand-more {
-  margin-left: 3px;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-  align-self: flex-end;
-}
 
 .oc-top {
   display: flex;
@@ -743,21 +766,6 @@ button.oc-card {
   background: var(--color-bg-surface);
 }
 
-.oc-me-turn {
-  box-shadow:
-    0 0 0 3px var(--oc-accent),
-    0 0 14px 2px var(--oc-accent);
-  animation: oc-turn-pulse 1.4s ease-in-out infinite;
-}
-
-/* D-160 — 내 차례면 손패 칸도 빛난다. */
-.oc-hand-myturn {
-  border-radius: 10px;
-  box-shadow:
-    0 0 0 3px var(--oc-accent),
-    0 0 14px 2px var(--oc-accent);
-  animation: oc-turn-pulse 1.4s ease-in-out infinite;
-}
 
 .oc-me-count {
   font-size: 13px;

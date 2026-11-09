@@ -160,20 +160,34 @@ describe('OneCardTable — 좌석', () => {
     expect(container.querySelector('[data-seat="2"]')!.textContent).not.toContain('1장!');
   });
 
-  it('상대 손패는 숫자 대신 장수만큼 작은 카드 뒷면으로 보이고, 장수는 보조기기로 읽힌다 (D-144)', () => {
-    seed({ seatCount: 3, mySeat: 0, seats: [seatOf(0), seatOf(1, { handCount: 7 }), seatOf(2, { handCount: 19 })] });
-    const { container } = renderTable({ playerIds: [100, 101, 102] });
+  it('상대 손패는 뒷면 최대 3장 뭉치 + "×N" 으로 보이고, 장수는 보조기기로도 읽힌다 (D-173)', () => {
+    seed({
+      seatCount: 4,
+      mySeat: 0,
+      seats: [seatOf(0), seatOf(1, { handCount: 7 }), seatOf(2, { handCount: 19 }), seatOf(3, { handCount: 2 })],
+    });
+    const { container } = renderTable({ playerIds: [100, 101, 102, 103] });
 
     const seven = container.querySelector('[data-seat="1"]') as HTMLElement;
-    expect(seven.querySelectorAll('.oc-seat-hand-card')).toHaveLength(7);
+    expect(seven.querySelectorAll('.oc-seat-hand-card')).toHaveLength(3);
+    expect(seven.querySelector('.oc-seat-hand-count')).toHaveTextContent('×7');
     expect(within(seven).getByRole('img', { name: '남은 손패 7장' })).toBeInTheDocument();
-    expect(seven.textContent).not.toMatch(/7\s*장/);
-    // D-151 — 10장을 넘으면 뒷면 10장 + 줄임표(…). 정확한 장수는 보조기기·마우스 오버로.
     const nineteen = container.querySelector('[data-seat="2"]') as HTMLElement;
-    expect(nineteen.querySelectorAll('.oc-seat-hand-card')).toHaveLength(10);
-    expect(nineteen.querySelector('.oc-seat-hand-more')).toHaveTextContent('…');
-    expect(within(nineteen).getByRole('img', { name: '남은 손패 19장' })).toBeInTheDocument();
-    expect(seven.querySelector('.oc-seat-hand-more')).toBeNull();
+    expect(nineteen.querySelectorAll('.oc-seat-hand-card')).toHaveLength(3);
+    expect(nineteen.querySelector('.oc-seat-hand-count')).toHaveTextContent('×19');
+    // 3장 미만이면 그 장수만큼만 쌓는다.
+    const two = container.querySelector('[data-seat="3"]') as HTMLElement;
+    expect(two.querySelectorAll('.oc-seat-hand-card')).toHaveLength(2);
+    expect(two.querySelector('.oc-seat-hand-count')).toHaveTextContent('×2');
+  });
+
+  it('손패가 없는 좌석(탈락)은 뭉치도 ×0 도 그리지 않는다 (D-173)', () => {
+    seed({ seatCount: 3, mySeat: 0, seats: [seatOf(0), seatOf(1, { handCount: 0, eliminated: 'BANKRUPT' }), seatOf(2)] });
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+
+    const out = container.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(out.querySelector('.oc-seat-hand-card')).toBeNull();
+    expect(out.querySelector('.oc-seat-hand-count')).toBeNull();
   });
 
   it('탈락한 좌석에는 사유를 단다', () => {
@@ -1185,13 +1199,22 @@ describe('OneCardTable — 차례 강조 (D-160)', () => {
     expect(within(seatEl(1)).queryByText('차례')).toBeNull();
   });
 
-  it('내 차례면 손패 칸이 강조되고, 아니면 강조가 없다', () => {
+  it('내 차례면 경기장 테두리가 강조되고(손패 칸·나 줄은 아님), 아니면 강조가 없다 (D-173)', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)] });
-    renderTable({ playerIds: [100, 101, 102] });
-    expect(screen.getByRole('region', { name: '내 손패' })).toHaveClass('oc-hand-myturn');
+    const { container } = renderTable({ playerIds: [100, 101, 102] });
+    const felt = screen.getByRole('group', { name: '좌석 배치' });
+    expect(felt).toHaveClass('oc-felt-myturn');
+    expect(screen.getByRole('region', { name: '내 손패' })).not.toHaveClass('oc-hand-myturn');
+    expect(container.querySelector('.oc-me')).not.toHaveClass('oc-me-turn');
 
     act(() => useOneCardStore.setState({ turnSeat: 1 }));
-    expect(screen.getByRole('region', { name: '내 손패' })).not.toHaveClass('oc-hand-myturn');
+    expect(felt).not.toHaveClass('oc-felt-myturn');
+  });
+
+  it('관전자에게는 경기장 강조가 없다 (D-173)', () => {
+    seed({ seatCount: 3, mySeat: -1, turnSeat: 0 });
+    renderTable({ playerIds: [100, 101, 102], spectator: true });
+    expect(screen.getByRole('group', { name: '좌석 배치' })).not.toHaveClass('oc-felt-myturn');
   });
 
   it('내 차례가 되는 순간 한 번 진동한다 — 효과음을 끄면 진동도 없다', () => {
@@ -1354,7 +1377,7 @@ describe('OneCardTable — 다음 차례 표시 (D-132)', () => {
     const { container } = renderTable({ roomFinished: true });
 
     expect(screen.queryByText('내 차례')).toBeNull();
-    expect(container.querySelector('.oc-me')).not.toHaveClass('oc-me-turn');
+    expect(container.querySelector('.oc-felt')).not.toHaveClass('oc-felt-myturn');
   });
 });
 

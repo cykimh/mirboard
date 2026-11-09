@@ -45,10 +45,11 @@ class TurnOrderTest {
     }
 
     @Test
-    void with_two_live_seats_jack_and_queen_also_give_another_turn() {
+    void with_two_live_seats_a_jack_gives_another_turn_but_a_queen_passes_to_the_other() {
+        // D-173 — 2인 Q 는 더 이상 한 번 더가 아니다. 방향만 뒤집히고 상대 차례다.
         IntPredicate twoLeft = seat -> seat == 0 || seat == 2;
         assertThat(TurnOrder.afterPlay(4, twoLeft, 0, +1, heart(PlayingCard.JACK))).isEqualTo(0);
-        assertThat(TurnOrder.afterPlay(4, twoLeft, 0, -1, heart(PlayingCard.QUEEN))).isEqualTo(0);
+        assertThat(TurnOrder.afterPlay(4, twoLeft, 0, -1, heart(PlayingCard.QUEEN))).isEqualTo(2);
     }
 
     @Test

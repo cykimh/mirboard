@@ -142,12 +142,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   IN_GAME, `rooms:open` 에 안 오름, 초대 없음). D-143 — 친구와 하기는 인원을 고르지 않는다(정원 = 게임 최대 인원). D-161 — 친구와 하기 모달은 방 종류·게임·이름만, 턴 제한·목표 점수·판돈·원카드! 버튼 크기(`RoomOption.RACE_BUTTON_SIZE`)는 대기실 `RoomSettingsPanel` → `PUT /api/rooms/{id}/settings`(방장, WAITING).
   사람이 최소 인원 이상이면 방장이 **"N명으로 시작"**(`POST /api/rooms/{id}/start`, `room_start_now.lua` — 정원을 현재 인원으로 줄이고 시작,
   정원이 다 차도 자동 시작 없음, 티츄도 같다). 봇과 연습만 봇 수를 정하려고 인원을 고른다.
-- D-160: 원카드 차례 강조(좌석 "차례" 표시·맥박, 내 차례면 손패 칸 빛·진동 1회), 원카드 손패 **최대 2줄**(`OneCardHand.handRows` — 8장까지 한 줄, 넘치면 겹침), 랭킹 탭은 **전체에서 많이 한 게임부터**(`GET /api/users/ranking/games`). 후속 묶음 B·C 계획은 `docs/plans/table-lobby-polish.md`.
+- D-160: 원카드 차례 강조(좌석 "차례" 표시·맥박, 내 차례면 진동 1회 — 빛은 D-173 로 경기장 테두리), 원카드 손패 **최대 2줄**(`OneCardHand.handRows` — 8장까지 한 줄, 넘치면 겹침), 랭킹 탭은 **전체에서 많이 한 게임부터**(`GET /api/users/ranking/games`). 후속 묶음 B·C 계획은 `docs/plans/table-lobby-polish.md`.
 - D-159: 음성 대화는 **한동안 끔**(`features/voice/voiceSwitch.VOICE_ENABLED = false` — 🎧·🎙 비활성 버튼, 다시 켤 땐 이 한 줄).
 - D-158: 연결 끊김 개선 — STOMP **하트비트 10초**(서버 `messageBrokerTaskScheduler`, 클라 두 소켓 + `discardWebsocketOnCommFailure`), JVM SerialGC·힙 55%·C1 만(`Dockerfile`), 탈주 유예 **180s**, 음성 동시 참여 **4명**(`MAX_VOICE_MEMBERS`).
 - D-157: 버튼을 누른 뒤의 짧은 안내(마이크 오류·초대 링크 복사됨)는 **토스트**(`components/toast` — `showToast`, 앱에 `Toaster` 하나). 버튼 줄에 글을 끼우지 말 것.
 - D-156: 음성 대화를 **티츄·스컬킹에도**(공용 `features/voice/VoiceControls`·`voiceStatusOf`). 비밀번호는 **4~64자면 무엇이든**(`PasswordPolicy`).
 - D-170: **허브 서비스 토큰** — 허브 서버가 `/api/admin/**` 를 `Authorization: Bearer <서비스 토큰>` 으로 부르면 운영자 본인 userId(`mirboard.admin.service-user-id`, `admin_roles` 에 있어야 함)로 인증한다. `JwtAuthFilter` 안의 분기(상수 시간 비교, `/api/admin/` 밖·토큰 미설정이면 꺼짐). 값은 Fly secrets 로만 — `docs/deploy.md` "허브 서비스 토큰".
+- D-173: 원카드 **내 차례 빛은 경기장(`.oc-felt-myturn`) 테두리**(손패 칸·나 줄 빛 제거), **2인 Q 는 상대 차례**(한 번 더는 K·2인 J 만 — `TurnOrder.afterPlay`), 상대 좌석 손패는 **뒷면 최대 3장 뭉치 + "×N"**(`OneCardSeat`).
 - D-172: **Redis 구독 연결 하트비트** — `RedisMessageGateway` 가 `mirboard.messaging.redis-heartbeat`(기본 30s)마다 `mirboard:pubsub-heartbeat` 에 발행, 3번 연속 안 돌아오면 구독 재연결(프록시가 조용한 연결을 끊어도 STOMP 방송이 멈추지 않게).
 - D-171: **운영 Redis 도 쓸 때만 켠다** — `ops/redis/fly.toml` `[[services]]` tcp 자동 정지 + Flycast 사설 주소, 앱은 `MIRBOARD_REDIS_HOST=mirboard-redis.flycast`(`.internal` 은 멈춘 Redis 를 못 깨운다). 배포·상태는 GitHub Actions `Redis` 워크플로(수동). `docs/deploy.md` "운영 Redis".
 - D-169: **운영 DB 는 sideinfra Supabase 의 `mirboard` 스키마**(Fly Postgres 비용 제거) — 스키마·역할 `mirboard_app` 은 sideinfra 마이그레이션, 테이블은 계속 Flyway. `MIRBOARD_DB_SCHEMA`(기본 `public`)가 Hikari `schema`·Flyway `schemas`·Hibernate `default_schema` 를 정한다(로컬·테스트는 public). 이전 절차 `ops/db/migrate-to-supabase.sh`, `docs/deploy.md` "운영 DB".

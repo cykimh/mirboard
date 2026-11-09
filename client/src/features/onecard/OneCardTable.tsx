@@ -400,7 +400,13 @@ export function OneCardTable({
       )}
 
       {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
-      <div className="oc-felt" role="group" aria-label="좌석 배치">
+      {/* D-173 — 내 차례면 경기장 테두리가 내 색으로 맥박친다(손패 칸·나 줄 대신 — 빛나는 곳은 한 곳). */}
+      <div
+        className={`oc-felt${myTurn ? ' oc-felt-myturn' : ''}`}
+        style={myTurn ? { ['--oc-accent' as string]: seatAccent(mySeat) } : undefined}
+        role="group"
+        aria-label="좌석 배치"
+      >
         {/* D-139 — 경기장 맨 위 상태 줄: 왼쪽 위 남은 턴 시간(경쟁 중·끝난 판·차례 없음이면 비움), 오른쪽 위 진행 방향(D-132 — 글리프는
             읽지 않고 글자로 읽는다, 좌석이 시계 방향으로 앉으므로 +1 이 시계 방향). */}
         <div className="oc-felt-status" role="group" aria-label="판 상태">
@@ -463,7 +469,7 @@ export function OneCardTable({
       {!spectator && mySeat >= 0 && (
         <>
           <div
-            className={`oc-me${myTurn ? ' oc-me-turn' : ''}`}
+            className="oc-me"
             style={{ ['--oc-accent' as string]: seatAccent(mySeat) }}
           >
             {tiers[playerIds[mySeat]] && <TierBadge tier={tiers[playerIds[mySeat]]} size={18} />}

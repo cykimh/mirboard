@@ -20,8 +20,8 @@ export function seatAccent(seat: number): string {
   return ACCENTS[((seat % ACCENTS.length) + ACCENTS.length) % ACCENTS.length];
 }
 
-/** D-151 — 좌석에 그리는 뒷면 최대 장수. 넘으면 줄임표(…) — 많을 때 장수를 하나하나 보는 의미가 없다. */
-export const SEAT_HAND_SHOWN_MAX = 10;
+/** D-173 — 좌석에 쌓아 그리는 뒷면 최대 장수. 장수는 옆의 "×N" 으로 읽는다(좌석 폭이 장수와 무관하다). */
+export const SEAT_HAND_STACK_MAX = 3;
 
 export const ELIMINATED_LABEL: Record<EliminationReason, string> = {
   BANKRUPT: '파산',
@@ -54,7 +54,7 @@ interface Props {
 }
 
 /**
- * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding, D-144 — 장수만큼 작은 뒷면). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
+ * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding, D-173 — 뒷면 뭉치 + ×N). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
  * 테이블(D-132)의 옆줄·윗줄에 놓인다 — 옆줄 칸은 좁아질 수 있어 이름은 말줄임하고 `title` 로 전체 이름을 보인다.
  */
 export function OneCardSeat({
@@ -138,20 +138,25 @@ export function OneCardSeat({
         )}
       </div>
 
-      {/* D-144 — 숫자 대신 장수만큼 작은 뒷면. 정확한 장수는 보조기기·마우스 오버로. */}
+      {/* D-173 — 뒷면 최대 3장 뭉치 + "×N"(가운데 이전 카드처럼 겹친다). 손패가 없으면(탈락) 그리지 않는다. */}
       <div className="oc-seat-count">
-        <span
-          className="oc-seat-hand"
-          role="img"
-          aria-label={`남은 손패 ${seat.handCount}장`}
-          title={`남은 손패 ${seat.handCount}장`}
-          style={{ ['--oc-hand-count' as string]: Math.min(seat.handCount, SEAT_HAND_SHOWN_MAX) }}
-        >
-          {Array.from({ length: Math.min(seat.handCount, SEAT_HAND_SHOWN_MAX) }, (_, i) => (
-            <span key={i} className="oc-seat-hand-card" />
-          ))}
-          {seat.handCount > SEAT_HAND_SHOWN_MAX && <span className="oc-seat-hand-more">…</span>}
-        </span>
+        {seat.handCount > 0 && (
+          <span
+            className="oc-seat-hand"
+            role="img"
+            aria-label={`남은 손패 ${seat.handCount}장`}
+            title={`남은 손패 ${seat.handCount}장`}
+          >
+            <span className="oc-seat-hand-stack" aria-hidden="true">
+              {Array.from({ length: Math.min(seat.handCount, SEAT_HAND_STACK_MAX) }, (_, i) => (
+                <span key={i} className="oc-seat-hand-card" />
+              ))}
+            </span>
+            <span className="oc-seat-hand-count" aria-hidden="true">
+              ×{seat.handCount}
+            </span>
+          </span>
+        )}
         {last && <span className="oc-seat-one">1장!</span>}
       </div>
 

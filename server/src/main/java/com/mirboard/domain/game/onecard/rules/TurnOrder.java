@@ -22,30 +22,16 @@ public final class TurnOrder {
 
     /**
      * 방금 낸 카드 다음의 차례 (§8.2). Q 는 방향을 이미 뒤집은 뒤의 {@code direction} 을 받는다.
-     * 살아 있는 사람이 2명이면 J·Q 도 "한 번 더"다 (§8.1).
+     * 살아 있는 사람이 2명이면 J 는 상대를 건너뛰어 저절로 "한 번 더"가 된다 (§8.1). Q 는 2명이어도 상대에게 넘긴다(D-173).
      */
     public static int afterPlay(int seatCount, IntPredicate alive, int seat, int direction, PlayingCard card) {
         if (card.isExtraTurn()) {
             return seat;
         }
-        boolean twoLeft = countAlive(seatCount, alive) == 2;
         if (card.isSkip()) {
             int skipped = nextAlive(seatCount, alive, seat, direction);
-            return twoLeft ? seat : nextAlive(seatCount, alive, skipped, direction);
-        }
-        if (card.isReverse() && twoLeft) {
-            return seat;
+            return nextAlive(seatCount, alive, skipped, direction);
         }
         return nextAlive(seatCount, alive, seat, direction);
-    }
-
-    private static int countAlive(int seatCount, IntPredicate alive) {
-        int count = 0;
-        for (int seat = 0; seat < seatCount; seat++) {
-            if (alive.test(seat)) {
-                count++;
-            }
-        }
-        return count;
     }
 }
