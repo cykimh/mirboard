@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.LongConsumer;
+import java.util.stream.IntStream;
 
 /**
  * D-119 — 봇 강도 평가용 <b>쌍대(paired) 하네스</b> (테스트 전용). 순수
@@ -32,7 +34,9 @@ final class BotMatchHarness {
 
     /** 좌석 하나에 앉히는 정책. */
     enum Policy {
-        /** D-119 휴리스틱 — 프로덕션 봇과 같은 경로({@code SkullKingBotView} → 정책). */
+        /** D-230 상대 모델 봇 — 프로덕션 봇과 같은 경로({@code SkullKingBotView} → 정책). */
+        MODEL,
+        /** D-119 휴리스틱 — D-230 이전의 프로덕션 봇("기존 봇"). */
         HEURISTIC,
         /** 포트 기본값과 같은 합법수 균등 분포 — D-119 이전의 봇. */
         RANDOM,
@@ -79,16 +83,17 @@ final class BotMatchHarness {
         double[] means = new double[matches];
         double share = 0;
         long hits = 0;
+        // 매치끼리 독립·결정적이라 병렬로 돌려도 결과가 같다 (집계는 매치 순서대로).
+        List<MatchOutcome> outcomes = IntStream.range(0, matches).parallel()
+                .mapToObj(m -> play(seatCount, base + 1000L * seatCount + m,
+                        seating(seatCount, m, focalCount, focal, others)))
+                .toList();
         for (int m = 0; m < matches; m++) {
-            Policy[] policies = new Policy[seatCount];
-            Arrays.fill(policies, others);
             Set<Integer> focalSeats = new HashSet<>();
             for (int j = 0; j < focalCount; j++) {
-                int seat = (m + j) % seatCount;
-                focalSeats.add(seat);
-                policies[seat] = focal;
+                focalSeats.add((m + j) % seatCount);
             }
-            MatchOutcome outcome = play(seatCount, base + 1000L * seatCount + m, policies);
+            MatchOutcome outcome = outcomes.get(m);
 
             double focalSum = 0;
             double otherSum = 0;
@@ -117,8 +122,26 @@ final class BotMatchHarness {
                 average(means), standardError(means), hitRate);
     }
 
+    /** 매치 {@code m} 의 좌석 배치 — 초점 좌석 {@code (m + j) % n}. */
+    static Policy[] seating(int seatCount, int m, int focalCount, Policy focal, Policy others) {
+        Policy[] policies = new Policy[seatCount];
+        Arrays.fill(policies, others);
+        for (int j = 0; j < focalCount; j++) {
+            policies[(m + j) % seatCount] = focal;
+        }
+        return policies;
+    }
+
     /** 10라운드 매치 하나를 완주시킨다. 대기 좌석이 여럿(입찰)이면 가장 낮은 좌석부터. */
     static MatchOutcome play(int seatCount, long seed, Policy[] policies) {
+        return play(seatCount, seed, policies, null);
+    }
+
+    /**
+     * @param modelNanos {@link Policy#MODEL} 결정마다 걸린 시간(ns)을 받는다 — null 이면 재지
+     *                   않는다. 결정 자체에는 영향이 없다(시간은 정책에 들어가지 않는다).
+     */
+    static MatchOutcome play(int seatCount, long seed, Policy[] policies, LongConsumer modelNanos) {
         List<Long> playerIds = new ArrayList<>();
         for (long i = 0; i < seatCount; i++) {
             playerIds.add(700L + i);
@@ -151,8 +174,17 @@ final class BotMatchHarness {
                     throw new AssertionError("좌석 " + seat + " 이 대기 중인데 합법 액션이 없다");
                 }
                 SkullKingAction action = switch (policies[seat]) {
-                    case HEURISTIC -> SkullKingBotPolicy.choose(
-                            SkullKingBotView.of(state, seat), legal);
+                    case MODEL -> {
+                        long started = System.nanoTime();
+                        SkullKingAction chosen = SkullKingBotPolicy.choose(
+                                SkullKingBotView.of(state, match, seat), legal);
+                        if (modelNanos != null) {
+                            modelNanos.accept(System.nanoTime() - started);
+                        }
+                        yield chosen;
+                    }
+                    case HEURISTIC -> OddsHeuristic.choose(
+                            SkullKingBotView.of(state, match, seat), legal);
                     case RANDOM -> legal.get(seatRandom[seat].nextInt(legal.size()));
                     case WEAKEST -> engine.timeoutAction(state, seat);
                 };

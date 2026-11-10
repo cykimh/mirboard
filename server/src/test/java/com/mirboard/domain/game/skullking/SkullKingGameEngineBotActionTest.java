@@ -1,6 +1,9 @@
 package com.mirboard.domain.game.skullking;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.core.GameContext;
@@ -8,15 +11,21 @@ import com.mirboard.domain.game.skullking.action.SkullKingAction;
 import com.mirboard.domain.game.skullking.bot.SkullKingBotPolicy;
 import com.mirboard.domain.game.skullking.bot.SkullKingBotView;
 import com.mirboard.domain.game.skullking.card.SkullCard;
+import com.mirboard.domain.game.skullking.persistence.SkullKingMatchStateStore;
+import com.mirboard.domain.game.skullking.scoring.RoundScore;
 import com.mirboard.domain.game.skullking.state.PlayerState;
 import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
 import com.mirboard.domain.game.skullking.state.SkullKingState;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-119 — 어댑터 배선. 봇은 휴리스틱 정책을 타고, 정책이 실패해도(예외·null·비합법)
+ * D-119·D-230 — 어댑터 배선. 봇은 휴리스틱 정책을 타고, 정책이 실패해도(예외·null·비합법)
  * 최약수 {@code timeoutAction} 으로 떨어져 방이 멈추지 않는다. 타임아웃·유령 경로는
  * 그대로 최약수다 (D-104). 저장소가 필요 없는 경로만 보므로 Docker 없이 돈다.
  */
@@ -25,8 +34,9 @@ class SkullKingGameEngineBotActionTest {
     private static final GameContext CONTEXT =
             new GameContext("bot-adapter", List.of(10L, 11L, 12L, 13L));
 
+    private final SkullKingMatchStateStore matchStore = mock(SkullKingMatchStateStore.class);
     private final SkullKingGameEngine engine =
-            new SkullKingGameEngine(CONTEXT, null, null, null, event -> { });
+            new SkullKingGameEngine(CONTEXT, null, matchStore, null, event -> { });
     private final SkullKingEngine rules = new SkullKingEngine(CONTEXT);
 
     private SkullKingState dealt(long seed) {
@@ -57,6 +67,30 @@ class SkullKingGameEngineBotActionTest {
                         .isEqualTo(expected);
             }
         }
+    }
+
+    @Test
+    void bot_view_carries_public_match_history() {
+        // D-230 — 지난 라운드 예측(ROUND_ENDED 로 공개)과 탈주 좌석(SEAT_DESERTED)만 뷰에 실린다.
+        Map<Integer, RoundScore> round1 = Map.of(
+                0, new RoundScore(1, 1, 20, 0), 1, new RoundScore(0, 0, 10, 0),
+                2, new RoundScore(0, 1, -10, 0), 3, new RoundScore(1, 0, -10, 0));
+        SkullKingMatchState match = new SkullKingMatchState(2, 1,
+                Map.of(0, 20, 1, 10, 2, -10, 3, -10), Set.of(2),
+                List.of(new SkullKingMatchState.CompletedRound(1, round1)), 1);
+        when(matchStore.load(any())).thenReturn(Optional.of(match));
+
+        SkullKingState state = rules.startRound(match, new Random(5L)).newState();
+        AtomicReference<SkullKingBotView> seen = new AtomicReference<>();
+        engine.chooseBotAction(state, 0, (view, legal) -> {
+            seen.set(view);
+            return legal.get(0);
+        });
+
+        assertThat(seen.get().pastBids()).containsExactly(List.of(1, 0, 0, 1));
+        assertThat(seen.get().deserted()).containsExactly(2);
+        assertThat(seen.get().bids()).as("입찰 중 — 이번 라운드 예측은 비공개")
+                .containsOnly(PlayerState.NO_BID);
     }
 
     @Test

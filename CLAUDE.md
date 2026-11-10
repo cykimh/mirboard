@@ -246,7 +246,8 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuGameEngine*Test"   # 포트 어댑터 (D-98)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.bot.*"       # 티츄 봇 정책·순수 시뮬레이션 (D-118, Docker 불필요)
-./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·강도 평가 (D-119, Docker 불필요)
+./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·규칙 거울·강도 평가 (D-119·D-230, Docker 불필요, ~15s)
+MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.skullking.bot.SkullKingBotEvaluationTest"   # 스컬킹 봇 대형 평가 표 → server/build/skullking-bot-strength.txt (~1m40s)
 ./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*Test"     # 원카드 엔진·어댑터·봇 (D-127/D-128, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.yacht.*"            # 요트 점수 전수·엔진·시뮬레이션·어댑터·봇 (D-181~D-183, Docker 불필요, ~10s)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.YachtBotMatchSimulationIT"   # 요트 봇 판·차례 전체 타이머·1인 판 무기록 (Docker)

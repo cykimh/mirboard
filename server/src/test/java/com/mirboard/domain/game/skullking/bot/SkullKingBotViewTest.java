@@ -19,7 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-119 — 봇 정보 경계. 정책이 볼 수 있는 것은 {@link SkullKingBotView} 뿐이고, 뷰는
+ * D-119·D-230 — 봇 정보 경계. 정책이 볼 수 있는 것은 {@link SkullKingBotView} 뿐이고, 뷰는
  * <b>공개 이벤트로 이미 공개된 정보</b>(본인 손패·본인 예측/승수·현재 트릭·이번 라운드에
  * 낸 카드)만 담는다. 남의 손패나 공개 전 예측이 다른 두 상태에서 뷰와 정책 출력이 같으면
  * 그 정보는 새지 않은 것이다.
@@ -82,6 +82,8 @@ class SkullKingBotViewTest {
         assertThat(view.ownBid()).isEqualTo(PlayerState.NO_BID);
         assertThat(view.currentTrick()).isEmpty();
         assertThat(view.seenCards()).as("입찰 단계엔 아직 공개된 카드가 없다").isEmpty();
+        assertThat(view.bids()).as("D-230 — 제출된 예측도 전원 제출 전엔 비공개")
+                .containsOnly(PlayerState.NO_BID);
         assertThat(view.unseenCards()).hasSize(Deck.SIZE - mine.size());
     }
 
@@ -111,6 +113,10 @@ class SkullKingBotViewTest {
         assertThat(view.ownTricksWon()).isZero();
         assertThat(view.currentTrick()).isEqualTo(second.played());
         assertThat(view.playersAfterMe()).as("좌석 0 이 트릭의 마지막 순번").isZero();
+        assertThat(view.bids()).as("D-230 — 플레이 중엔 공개된 예측").containsExactly(1, 2, 0, 0);
+        assertThat(view.tricksWon()).containsExactly(0, 1, 0, 0);
+        assertThat(view.completedTricks()).containsExactly(first);
+        assertThat(view.leadSeat()).isEqualTo(1);
     }
 
     @Test
