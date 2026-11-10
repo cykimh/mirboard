@@ -57,7 +57,8 @@ import {
 
 /**
  * D-120·D-129 — 종료 화면을 가진 게임. 이 세션이 IN_GAME→FINISHED 전이를 보면 게임판을 내리지 않고 결과를
- * 보여 준다. 두 게임판은 같은 props 계약(`roomFinished` 포함)을 따른다.
+ * 보여 준다. 이 게임판들은 같은 props 계약(`roomFinished` 포함)을 따른다. 티츄도 결과 화면을 유지하지만(D-240) props 가
+ * 달라 아래 별도 분기다.
  */
 const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY']);
 
@@ -624,8 +625,8 @@ export function RoomPage() {
   // IN_GAME — 게임판은 레거시 레이아웃이라 .app-shell 밖이다.
   // D-103: 게임 분기는 **이 한 곳**뿐이다. 각 게임판이 자기 소켓·sink 를 소유하므로
   // 다른 게임의 코드 경로는 실행조차 되지 않는다.
-  // D-120: 종료 화면을 가진 게임(스컬킹·원카드)은 이 세션에서 본 IN_GAME→FINISHED 직후에도
-  // 게임판을 유지한다(위 boardHeld). 티츄는 FINISHED(탈주·강제 종료)면 종료 카드, D-153 대기실 복귀면 유지한다.
+  // D-120: 종료 화면을 가진 게임(스컬킹·원카드 …)은 이 세션에서 본 IN_GAME→FINISHED 직후에도
+  // 게임판을 유지한다(위 boardHeld). D-240 — 티츄도 같다(아래 티츄 분기).
   // D-153 — 판이 끝나 대기실로 돌아온 방도 이 세션이 전이를 봤으면 결과 화면을 유지한다(세 게임 모두). [대기실로]가 유지를 푼다.
   const backInWaiting = boardHeld && room.status === 'WAITING';
   const roomFinished = room.status === 'FINISHED' || backInWaiting;
@@ -686,7 +687,8 @@ export function RoomPage() {
     );
   }
 
-  if (room.status === 'IN_GAME' || (room.gameType === 'TICHU' && backInWaiting)) {
+  // D-240 — 티츄도 전이를 본 게임판은 FINISHED(봇 판·탈주·강제 종료)·대기실 복귀 뒤에도 유지하고 `roomFinished` 를 넘긴다.
+  if (room.status === 'IN_GAME' || (room.gameType === 'TICHU' && boardHeld && roomFinished)) {
     return withLiveRegion(
       <main className="room-page">
         {notice}
@@ -707,6 +709,7 @@ export function RoomPage() {
             onAbort={onAbort}
             onKick={onKick}
             tiers={playerTiers(seats.playerIds, seats.botSeats, usernames, records)}
+            roomFinished={roomFinished}
             onBackToRoom={onBackToRoom}
           />
         </Suspense>

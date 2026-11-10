@@ -81,8 +81,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
-  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 스컬킹·원카드는 이
-  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129), 각
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 일곱 게임 모두 이
+  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129·D-240 티츄), 각
   게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
   판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
 - **좌석은 시계 방향 테이블 (D-132)**: 진행 +1 이 내 **왼쪽**이다. 가변 좌석 게임판(원카드·스컬킹)은
