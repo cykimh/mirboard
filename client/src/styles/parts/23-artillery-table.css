@@ -214,6 +214,64 @@ button.ar-badge {
   font-size: 11px;
 }
 
+/* D-225 — 2:2 팀: 좌석 칸 아래 테두리와 팀 이름 칩(팀 = 좌석 홀짝). 좌석 색(--ar-accent)은 그대로 둔다 — 포대 색과 같아야 하니까. */
+.ar-table {
+  --ar-team-0: #e0803a;
+  --ar-team-1: #3a86d6;
+}
+
+html.dark .ar-table {
+  --ar-team-0: #f0a061;
+  --ar-team-1: #6aa8ec;
+}
+
+.ar-seat-team0 {
+  border-bottom-color: var(--ar-team-0);
+}
+
+.ar-seat-team1 {
+  border-bottom-color: var(--ar-team-1);
+}
+
+.ar-team-chip {
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.ar-team-0 {
+  background: var(--ar-team-0);
+}
+
+.ar-team-1 {
+  background: var(--ar-team-1);
+}
+
+/* D-226 — 딜레이: 좌석은 가장 적은 화분과의 차이, 조작부는 이번 발에 쌓일 값. */
+.ar-seat-delay,
+.ar-delay-cost {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ar-delay-cost {
+  align-self: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+}
+
+.ar-queue {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ar-seat-kick {
   min-height: 32px;
   padding: 0 8px;

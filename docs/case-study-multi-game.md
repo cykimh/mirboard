@@ -427,8 +427,10 @@ p99 46.5ms · 최대 노드 88,356.
 
 비공개 뷰는 empty, 인프라 코드 0줄 — `grep -rni artillery …/infra` → **0건**. 서버 통합(`0666aeb`)의 게임 밖 변경은 `application.yml` 의 상태
 설정과 마이그레이션 `V16` 뿐이고, 클라(`666a26c`, 24파일 +2,991/−4)의 공용 파일은 `RoomPage`·지연 로딩·튜토리얼 목록·CSS 진입점입니다.
-`useStompRoom` 은 0줄. 씨앗포 도메인 2,654줄(S3) → S4(D-224 — 포대 3종 고르기·특수탄·아이템) 뒤 3,337줄(부록 (8)). S4 도 포트·인프라
-0줄이다 — 판 시작 "전원 동시 고르기 15초"는 인프라 턴 데드라인(고를 때마다 다시 걸림) 대신 같은 엔진 타이머로 마감을 걸었다.
+`useStompRoom` 은 0줄. 씨앗포 도메인 2,654줄(S3) → S4(D-224 — 포대 3종 고르기·특수탄·아이템) 뒤 3,337줄 → S5(D-225·D-226 — 2:2 팀전·포트리스식
+딜레이 차례) 뒤 3,756줄(부록 (8)). S4 도 포트·인프라 0줄이다 — 판 시작 "전원 동시 고르기 15초"는 인프라 턴 데드라인(고를 때마다 다시 걸림) 대신
+같은 엔진 타이머로 마감을 걸었다. S5 도 0줄 — 팀전은 오목이 만든 게임 중립 맵 옵션 `TEAM_MODE` 를 선언만 했고, 차례 규칙을 바꾼 딜레이는
+엔진 안의 "다음 차례 주인" 한 함수다(인프라는 `pendingSeats` 만 본다). 게임 밖 변경은 마이그레이션 `V18`(참가자 `team` 열)과 대기실 옵션 문구 한 줄.
 
 **봇도 같은 엔진으로.** 봇은 순수 엔진으로 후보 발사를 시뮬레이션하고(예산은 시간이 아니라 **시뮬레이션 900회** — 부하와 무관하게 같은 상태면
 같은 수, 오목 노드 상한과 같은 이유) 결정적 오차 ±2°·±2 를 얹습니다. 물리가 정수라 봇이 보는 결과가 곧 실제 결과입니다. 한 수 평균 2ms,
@@ -484,7 +486,7 @@ git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard 
 # (8) 포트 뒤 게임별 코드 규모(§8~§12) — main 소스 줄 수
 for d in core tichu skullking onecard yacht omok cloudroute artillery; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3337(D-224 시점, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756(D-226 시점, D-224 때 3337, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
 grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
@@ -505,8 +507,8 @@ grep -rniE 'artillery|씨앗포' server/src/main/java/com/mirboard/infra   # →
 git diff --name-status 0666aeb^ 0666aeb -- server/src/main | grep -v domain/game/artillery   # → application.yml · V16__artillery_match.sql
 git diff --stat 666a26c^ 666a26c -- client/src | tail -1   # → 24 files changed, 2991 insertions(+), 4 deletions(-)
 git diff --name-only 666a26c^ 666a26c -- client/src | grep -vE 'features/artillery|types/artillery|artillery-table|artilleryCss'
-./gradlew :server:test --tests 'com.mirboard.domain.game.artillery.*'   # → 씨앗포 도메인 71건(Docker 불필요 69 — Docker 는 ArtilleryMatchRecorderIT 만) + 서버 경로 IT 3(ArtilleryBotMatchSimulationIT)·기록 실패 격리 1   (D-224 시점 — S3 때 51 / 49)
-npm --prefix client run test -- artillery   # → 36건 (D-224 시점 — S3 때 26)
+./gradlew :server:test --tests 'com.mirboard.domain.game.artillery.*'   # → 씨앗포 도메인 90건(Docker 불필요 86 — Docker 는 ArtilleryMatchRecorderIT 만) + 서버 경로 IT 4(ArtilleryBotMatchSimulationIT)·기록 실패 격리 1   (D-226 시점 — D-224 때 71 / 69, S3 때 51 / 49)
+npm --prefix client run test -- artillery   # → 42건 (D-226 시점 — D-224 때 36, S3 때 26)
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·

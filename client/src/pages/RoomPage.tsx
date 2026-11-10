@@ -566,7 +566,8 @@ export function RoomPage() {
   const readyGuests = room ? guests.filter((id) => (room.readyUserIds ?? []).includes(id)).length : 0;
   const allGuestsReady = guests.length > 0 && readyGuests === guests.length;
   const iAmReady = !!(room && user && (room.readyUserIds ?? []).includes(user.userId));
-  const startMin = minPlayers ?? 1;
+  // D-225 — 2:2 팀전(TEAM_MODE)은 4명이 다 차야 시작한다(서버 `playersToStart` — 오목·씨앗포 같음). 게임 최소 인원은 개인전 기준이다.
+  const startMin = room?.options?.TEAM_MODE === 'TEAMS_2V2' ? 4 : (minPlayers ?? 1);
   // D-174 — 대기실 봇(방장만 채우고 뺀다). 판돈 방은 봇 금지(D-81).
   const botCount = room ? (room.botSeats ?? []).length : 0;
   const emptySeats = room ? room.capacity - room.playerIds.length : 0;
@@ -895,7 +896,7 @@ export function RoomPage() {
                     {iAmHost
                       ? canStart || minPlayers === null
                         ? `지금 ${room.playerCount}명 · 최대 ${room.capacity}명`
-                        : `${minPlayers}명 이상 모이면 시작할 수 있어요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`
+                        : `${startMin}명 이상 모이면 시작할 수 있어요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`
                       : `방장이 시작하면 게임이 시작돼요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`}
                   </p>
                   {iAmHost ? (

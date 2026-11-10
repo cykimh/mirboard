@@ -20,7 +20,8 @@ const RACE_VISIBILITY_LABEL: Record<RaceButtonVisibility, string> = {
  * 이름이 그대로 보인다 — 새 옵션이 화면에서 빠지지 않게 하려는 기본 경로다.
  */
 const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Record<string, string> }>> = {
-  TEAM_MODE: { label: '모드', values: { SOLO: '1:1', TEAMS_2V2: '2:2 팀전' } },
+  // D-225 — 개인전은 오목 1:1·씨앗포 2~4인 개인전을 함께 부르는 이름.
+  TEAM_MODE: { label: '모드', values: { SOLO: '개인전', TEAMS_2V2: '2:2 팀전' } },
   OMOK_RULE: {
     label: '룰',
     values: { RENJU: '렌주(흑 33·44·장목 금지)', DOUBLE_THREE_ONLY: '삼삼만 금지', FREESTYLE: '자유 오목(흑이 유리해요)' },

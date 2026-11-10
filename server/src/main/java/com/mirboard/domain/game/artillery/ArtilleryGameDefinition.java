@@ -5,9 +5,13 @@ import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.domain.game.core.RoomOption;
 import java.time.Clock;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -19,7 +23,10 @@ import org.springframework.stereotype.Component;
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.artillery.status} = 환경 변수 {@code MIRBOARD_ARTILLERY_STATUS}, 기본 {@code AVAILABLE}
  * — D-223 공개. 완성 전 단계(S1·S2)에서는 {@code DISABLED} 였다). {@code COMING_SOON} 이면 카탈로그에 "준비 중"으로만 보이고 새 방을 만들 수 없다
  * (진행 중인 판은 끝까지) — 운영의 되돌리기 손잡이다({@code docs/deploy.md}). 기본값은
- * {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다. 방 옵션은 쓰지 않는다(D-106 옵트인 기본).
+ * {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다.
+ *
+ * <p>방 설정은 하나(D-225): 모드({@code TEAM_MODE} — 개인전 2~4인 / 2:2 팀전 정확히 4인, 팀 = 좌석 홀짝). {@code TEAMS} 는 늘 팀인 게임의
+ * 라벨이라 쓰지 않는다 — 고를 수 있는 팀전은 오목처럼 {@code TEAM_MODE} 다(팀전이면 대기실 라벨이 "팀 배정").
  *
  * <p>엔진은 2~6인을 검증했지만 MVP 공개 상한은 4인이다(D-220 — 한 바퀴 대기 시간).
  */
@@ -60,7 +67,7 @@ public final class ArtilleryGameDefinition implements GameDefinition {
 
     @Override
     public String shortDescription() {
-        return "2~4인 포격 게임. 각도·힘·바람을 읽어 씨앗을 쏴 상대 화분을 구름 바다로 떨어뜨린다.";
+        return "2~4인 포격 게임(2:2 팀전도). 각도·힘·바람을 읽어 씨앗을 쏴 상대 화분을 구름 바다로 떨어뜨린다.";
     }
 
     @Override
@@ -77,6 +84,28 @@ public final class ArtilleryGameDefinition implements GameDefinition {
     @Override
     public GameStatus status() {
         return status;
+    }
+
+    @Override
+    public Set<RoomOption> supportedRoomOptions() {
+        return EnumSet.of(RoomOption.TEAM_MODE);
+    }
+
+    /** 정원은 두 모드 모두 4(개인전은 2명부터 시작, 팀전은 4명이 다 차야 시작). */
+    @Override
+    public int capacityFor(Map<RoomOption, String> options) {
+        return maxPlayers();
+    }
+
+    /** D-225 — 2:2 를 3명으로 시작하지 않는다. */
+    @Override
+    public int playersToStart(Map<RoomOption, String> options) {
+        return teamsOf(options) ? 4 : minPlayers();
+    }
+
+    /** 방 설정의 모드가 2:2 팀전인가. */
+    public static boolean teamsOf(Map<RoomOption, String> options) {
+        return options != null && "TEAMS_2V2".equals(options.get(RoomOption.TEAM_MODE));
     }
 
     @Override

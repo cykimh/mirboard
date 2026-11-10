@@ -6,6 +6,7 @@ import com.mirboard.domain.game.artillery.ArtilleryGameDefinition;
 import com.mirboard.domain.game.artillery.invariant.ArtilleryInvariantChecker;
 import com.mirboard.domain.game.artillery.persistence.ArtilleryStateStore;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
+import com.mirboard.domain.game.artillery.state.TurnOrder;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
@@ -13,11 +14,13 @@ import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import com.mirboard.domain.lobby.room.Room;
 import com.mirboard.domain.lobby.room.RoomService;
+import com.mirboard.domain.lobby.room.RoomSettingsUpdate;
 import com.mirboard.domain.lobby.room.RoomStatus;
 import com.mirboard.domain.lobby.room.TeamPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
@@ -83,6 +86,35 @@ class ArtilleryBotMatchSimulationIT {
         runAllBotMatch(4);
     }
 
+    /**
+     * D-225 — 대기실 설정 2:2 → 봇 채우기 → 시작: 팀전·딜레이 차례로 끝까지, 이긴 팀 둘(무승부면 0)이 기록되고 참가자 행에 팀이 남는다.
+     * 3명으로는 시작하지 않는다.
+     */
+    @Test
+    void four_bots_finish_a_two_vs_two_match() {
+        long hostBot = bots.getBotIds().get(1);
+        Room room = roomService.createRoom(hostBot, "ar-team", ArtilleryGameDefinition.ID, TeamPolicy.SEQUENTIAL, false,
+                RoomService.DEFAULT_TARGET_SCORE, 30, RoomService.DEFAULT_STAKE, null);
+        room = roomService.updateSettings(room.roomId(), hostBot,
+                new RoomSettingsUpdate(null, null, null, null, null, Map.of("TEAM_MODE", "TEAMS_2V2")));
+        assertThat(room.capacity()).as("2:2 정원").isEqualTo(4);
+        roomService.fillBots(room.roomId(), hostBot);
+        room = roomService.startNow(room.roomId(), hostBot);
+        assertThat(room.playerIds()).hasSize(4);
+
+        ArtilleryState ended = awaitEnded(room.roomId(), 120);
+        assertThat(ended.teams()).isTrue();
+        assertThat(ended.turnOrder()).isEqualTo(TurnOrder.DELAY);
+        assertThat(ended.result().teams()).isTrue();
+        assertThat(ended.result().winners()).hasSize(ended.result().draw() ? 0 : 2)
+                .allMatch(seat -> seat % 2 == ended.result().winnerTeam());
+        assertRecorded(room.roomId(), 4);
+        String roomId = room.roomId();
+        assertThat(jdbc.queryForList("SELECT p.team FROM artillery_match_participants p"
+                + " JOIN artillery_match_results r ON r.id = p.match_id WHERE r.room_id = ? ORDER BY p.seat",
+                Integer.class, roomId)).containsExactly(0, 1, 0, 1);
+    }
+
     /** 사람 호스트가 손을 놓으면 턴 시간 초과(1초, 넘김)로 진행된다 — 판은 끝나고 사람의 전적이 남는다(봇 판이라 ELO 제외). */
     @Test
     void an_idle_human_is_skipped_by_the_turn_timeout_until_the_match_ends() {
@@ -100,6 +132,7 @@ class ArtilleryBotMatchSimulationIT {
     }
 
     private void runAllBotMatch(int capacity) {
+        // 개인전도 딜레이 차례다(D-226).
         long hostBotId = bots.getBotIds().get(0);
         Room room = roomService.createRoom(hostBotId, "ar-bot-sim-" + capacity, ArtilleryGameDefinition.ID,
                 TeamPolicy.SEQUENTIAL, true, RoomService.DEFAULT_TARGET_SCORE, 30, RoomService.DEFAULT_STAKE, capacity);
@@ -107,6 +140,8 @@ class ArtilleryBotMatchSimulationIT {
         assertThat(room.playerIds()).hasSize(capacity);
         ArtilleryState ended = awaitEnded(room.roomId(), 120);
         assertThat(ended.botSeats()).hasSize(capacity);
+        assertThat(ended.teams()).isFalse();
+        assertThat(ended.turnOrder()).isEqualTo(TurnOrder.DELAY);
         assertRecorded(room.roomId(), capacity);
     }
 

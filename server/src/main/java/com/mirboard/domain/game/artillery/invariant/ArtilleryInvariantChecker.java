@@ -8,6 +8,7 @@ import com.mirboard.domain.game.artillery.rules.Shell;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
 import com.mirboard.domain.game.artillery.state.MatchResult;
 import com.mirboard.domain.game.artillery.state.Phase;
+import com.mirboard.domain.game.artillery.state.TurnOrder;
 import com.mirboard.domain.game.artillery.state.Unit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -80,6 +81,11 @@ public final class ArtilleryInvariantChecker {
             case AIMING -> {
                 if (s.turnSeat() < 0 || s.turnSeat() >= s.seatCount() || !s.unit(s.turnSeat()).alive()) {
                     v.add("AIMING turn seat not alive: " + s.turnSeat());
+                } else if (s.turnOrder() == TurnOrder.DELAY) {
+                    int min = s.aliveUnits().stream().mapToInt(Unit::delay).min().orElse(0);
+                    if (s.unit(s.turnSeat()).delay() != min) {
+                        v.add("AIMING seat " + s.turnSeat() + " delay " + s.unit(s.turnSeat()).delay() + " > min " + min);
+                    }
                 }
             }
             case RESOLVING -> {
@@ -100,11 +106,33 @@ public final class ArtilleryInvariantChecker {
                     if (seats.size() != s.seatCount()) {
                         v.add("placements cover " + seats.size() + " of " + s.seatCount() + " seats");
                     }
+                    if (r.teams() != s.teams()) {
+                        v.add("result teams " + r.teams() + " != state teams " + s.teams());
+                    }
+                    if (s.teams() && r.winners().stream().map(seat -> seat % 2).distinct().count() > 1) {
+                        v.add("team match with winners on both teams: " + r.winners());
+                    }
                 }
             }
         }
         if (s.phase() != Phase.ENDED && s.aliveUnits().size() <= 1) {
             v.add("not ended with " + s.aliveUnits().size() + " alive");
+        }
+        if (s.teams()) {
+            if (s.seatCount() < 4 || s.seatCount() % 2 != 0) {
+                v.add("teams with seat count " + s.seatCount());
+            }
+            if (s.phase() != Phase.ENDED && s.aliveUnits().stream().map(u -> u.seat() % 2).distinct().count() < 2) {
+                v.add("team match not ended with one team left");
+            }
+        }
+        for (Unit u : s.units()) {
+            if (u.delay() < 0) {
+                v.add("seat " + u.seat() + " negative delay " + u.delay());
+            }
+            if (s.turnOrder() == TurnOrder.SEAT && u.delay() != 0) {
+                v.add("seat " + u.seat() + " delay " + u.delay() + " under seat order");
+            }
         }
         if (s.turnNo() >= ArtilleryEngine.turnLimit(s.seatCount())) {
             v.add("turn " + s.turnNo() + " reached limit " + ArtilleryEngine.turnLimit(s.seatCount()));

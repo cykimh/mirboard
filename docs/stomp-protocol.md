@@ -493,10 +493,11 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 
 ---
 
-## 씨앗포 (gameType=ARTILLERY, D-220~D-224)
+## 씨앗포 (gameType=ARTILLERY, D-220~D-226)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~4, 엔진은 6까지). 룰 정본은 `docs/rules-artillery.md`, 설계
 `docs/plans/artillery.md`. 완성(S3 공개) 전에는 `DISABLED` — 카탈로그에도 안 보인다(설정 `mirboard.artillery.status`).
+방 설정 `TEAM_MODE`(D-225) 가 `TEAMS_2V2` 면 4인 2:2 팀전(팀 = 좌석 홀짝). 차례는 개인전·팀전 모두 **누적 딜레이가 가장 작은 포대**(D-226).
 
 **클라 → 서버 `@action`** — 차례당 하나(이동은 발사에 싣는다, D-220). 판 시작에는 고르기 단계(`PICKING`, D-224)가 있다:
 
@@ -512,11 +513,11 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 | --- | --- | --- |
 | `UNIT_PICKED` | `{ seat }` | 고르기 단계 — 그 좌석이 골랐다(**무엇을** 골랐는지는 없음, 다 고를 때까지 숨김) |
 | `UNITS_REVEALED` | `{ units: [UnitView] }` | 고르기 끝(마지막 선택·마감·탈주) — 전원의 `kind`·체력·특수탄·아이템. 바로 뒤에 첫 `TURN_CHANGED` |
-| `TURN_CHANGED` | `{ seat, turnNo, wind, cloudLevel }` | 차례 시작 — 연료는 그 포대 종류의 가득(`units[].fuel`). `wind` −10~10(양수 = 오른쪽) |
+| `TURN_CHANGED` | `{ seat, turnNo, wind, cloudLevel, delays, queue }` | 차례 시작 — 연료는 그 포대 종류의 가득(`units[].fuel`). `wind` −10~10(양수 = 오른쪽). `delays` 좌석 순 누적 딜레이, `queue` 앞으로의 차례 순서(살아 있는 좌석, 지금 차례 주인부터 — D-226) |
 | `SHOT_RESOLVED` | `{ report }` | 발사 대본 하나 — 아래. 이 뒤 `report.durationMs` 동안 **아무의 차례도 아니다**(연출 대기, 엔진 타이머) |
 | `TURN_SKIPPED` | `{ seat, reason }` | `SKIP`·`TIMEOUT`. 바로 뒤에 `TURN_CHANGED` |
 | `UNIT_ELIMINATED` | `{ seat, cause, cloudLevel }` | 발사 밖의 탈락 — `CLOUD_SEA`(구름 밀물)·`DESERTED`. 발사로 인한 탈락은 대본 안에 |
-| `MATCH_ENDED` | `{ reason, placements: [{seat, rank, hp, deserted}] }` | `reason`: `LAST_STANDING`·`ALL_DOWN`·`NO_HUMANS`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위. 판을 끝낸 발사면 `SHOT_RESOLVED` 바로 뒤(연출 대기 없음) |
+| `MATCH_ENDED` | `{ reason, placements: [{seat, rank, hp, deserted}], teams, winnerTeam }` | `reason`: `LAST_STANDING`·`ALL_DOWN`·`NO_HUMANS`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위. 팀전(`teams`)이면 이긴 팀(좌석 홀짝 0·1) 전원 1위·`winnerTeam`, 무승부면 `winnerTeam` null(D-225). 판을 끝낸 발사면 `SHOT_RESOLVED` 바로 뒤(연출 대기 없음) |
 
 `report` = `{ seat, angle, power, shell, item, wind, heal, move, stages, eliminated, units, durationMs }` (S4 — D-224 에서 `shot`·`damages`·`falls` 가 `stages` 로 들어갔다):
 
@@ -534,10 +535,11 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 **서버 → 클라 (비공개)**: `ERROR` 뿐 — 씨앗포 코드 `NOT_YOUR_TURN`(연출 대기 중·고르기 중 `PICK` 밖 액션·두 번째 `PICK` 포함)·`MATCH_OVER`·`OUT_OF_RANGE`·`NO_AMMO`(남의 특수탄 포함)·`NO_ITEM`·`INVALID_ACTION`.
 
 **resync**: `tableView` = `{ phase, seatCount, width, height, units: [UnitView], terrain, turnSeat, turnNo, wind, cloudLevel, suddenDeathTurn,
-fuel, resolveRemainingMs, pickRemainingMs, lastShot, result }` — `UnitView` = `{seat, x, footY, hp, pumpkins, alive, outCause, kind, picked, maxHp,
-fuel, special, specials, items}`(고르기 중엔 `kind`·`special` 이 null 이고 `picked` 만 보인다), `phase` 는 `PICKING`·`AIMING`·`RESOLVING`·`ENDED`,
+fuel, resolveRemainingMs, pickRemainingMs, lastShot, result, teams, turnOrder, queue, delays }` — `UnitView` = `{seat, x, footY, hp, pumpkins, alive, outCause, kind, picked, maxHp,
+fuel, special, specials, items, team, delay}`(`team` 팀전이면 좌석 홀짝·개인전이면 좌석, `delay` 누적 딜레이 — D-225·D-226; 고르기 중엔 `kind`·`special` 이 null 이고 `picked` 만 보인다), `phase` 는 `PICKING`·`AIMING`·`RESOLVING`·`ENDED`,
 `terrain` 은 640열 각각의 흙 구간 `[시작, 끝, 시작, 끝 …]`(위에서부터, 양끝 포함 — 약 15KB), `resolveRemainingMs`·`lastShot` 은 연출 대기
-중에만(다시 들어온 클라가 재생 중인 장면의 끝을 맞춘다), `pickRemainingMs` 는 고르기 중에만. **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다).
+중에만(다시 들어온 클라가 재생 중인 장면의 끝을 맞춘다), `pickRemainingMs` 는 고르기 중에만. `turnOrder` 는 `DELAY`(배포 전 판은 `SEAT`),
+`queue` 는 고르기·끝 밖에서 앞으로의 차례 순서, `delays` = `{ shells: {PEA: 100, …}, items: {…}, skip, fuelPerDelay }` 딜레이 표(화면 안내용 — 판정은 서버). **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다).
 `privateHand` 는 고르기 중 내가 골랐을 때만 `{ pickedKind }`, 그 밖에는 null.
 
 ---

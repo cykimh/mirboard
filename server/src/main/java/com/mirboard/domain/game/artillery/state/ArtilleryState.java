@@ -27,6 +27,8 @@ import java.util.List;
  * @param lastShot         마지막 발사 대본(resync 가 재생 중 화면을 맞출 때), 없으면 null
  * @param result           끝났으면 결과
  * @param pickUntil        PICKING 이 끝나는 시각(epoch ms), 아니면 0 (D-224)
+ * @param teams            2:2 팀전인가(D-225) — 팀 = 좌석 홀짝. D-225 이전 JSON 에는 없다(개인전).
+ * @param turnOrder        차례 규칙(D-226). D-226 이전 JSON 에는 없다 → {@link TurnOrder#SEAT}(그 판은 좌석 순서로 끝까지).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ArtilleryState(long seed,
@@ -44,12 +46,23 @@ public record ArtilleryState(long seed,
                              int eliminations,
                              ShotReport lastShot,
                              MatchResult result,
-                             long pickUntil) implements GameState {
+                             long pickUntil,
+                             boolean teams,
+                             TurnOrder turnOrder) implements GameState {
 
     public ArtilleryState {
         botSeats = botSeats == null ? List.of() : List.copyOf(botSeats);
         units = List.copyOf(units);
         craters = craters == null ? List.of() : List.copyOf(craters);
+        turnOrder = turnOrder == null ? TurnOrder.SEAT : turnOrder;
+    }
+
+    /** D-225 이전 모양(개인전·좌석 순서). */
+    public ArtilleryState(long seed, int seatCount, List<Integer> botSeats, List<Unit> units, List<Crater> craters,
+                          Phase phase, int turnSeat, int lastSeat, int turnNo, int wind, int cloudLevel,
+                          long resolveUntil, int eliminations, ShotReport lastShot, MatchResult result, long pickUntil) {
+        this(seed, seatCount, botSeats, units, craters, phase, turnSeat, lastSeat, turnNo, wind, cloudLevel,
+                resolveUntil, eliminations, lastShot, result, pickUntil, false, TurnOrder.SEAT);
     }
 
     /** S4 이전 모양(고르기 없음). */
@@ -72,6 +85,11 @@ public record ArtilleryState(long seed,
     @JsonIgnore
     public List<Unit> aliveUnits() {
         return units.stream().filter(Unit::alive).toList();
+    }
+
+    /** 팀 번호 — 팀전이면 좌석 홀짝, 개인전이면 좌석 자신(D-225). */
+    public int teamOf(int seat) {
+        return teams ? seat % 2 : seat;
     }
 
     @JsonIgnore
