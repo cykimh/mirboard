@@ -10,17 +10,22 @@ import type {
   TurnChangedPayload,
   TurnSkippedPayload,
   UnitEliminatedPayload,
+  UnitKind,
+  UnitPickedPayload,
+  UnitsRevealedPayload,
   UnitView,
 } from '@/types/artillery';
-import { carve, maskFromRuns, type Mask } from './terrain';
-import type { FrameUnit } from './replay';
+import { applyOp, maskFromRuns, type Mask } from './terrain';
+import { terrainOps, type FrameUnit } from './replay';
 
 /** 재생 중인 발사 — 게임판이 시작 시각부터 `frameAt` 으로 그린다. */
 export interface Replay {
   report: ShotReport;
   before: FrameUnit[];
-  /** 대본 이전 지형(폭발 순간까지 이걸 그린다). */
+  /** 대본 이전 지형 = {@code masks[0]}. */
   maskBefore: Mask;
+  /** {@code masks[k]} = 대본의 지형 연산을 앞에서 k 개 적용한 지형(재생이 씨앗이 내려앉는 대로 고른다). */
+  masks: Mask[];
   nonce: number;
 }
 
@@ -51,6 +56,9 @@ export interface ArtilleryRoomState {
   notice: { text: string; nonce: number } | null;
   /** 보낸 액션이 아직 답을 못 받았다(연타 방지). */
   pending: boolean;
+  /** 고르기 단계(D-224) — 남은 시간 기준점과 내가 고른 종류. */
+  pickClock: TurnClock | null;
+  myPick: UnitKind | null;
 }
 
 export interface ArtilleryActions {
@@ -61,6 +69,8 @@ export interface ArtilleryActions {
   setPending: (pending: boolean) => void;
   /** 재생을 끝까지 건너뛴다(탭이 숨었다 돌아옴·움직임 줄이기). */
   finishReplay: () => void;
+  /** 내가 고른 종류(보낸 직후 — 서버는 다 고를 때까지 남에게 숨긴다). */
+  setMyPick: (kind: UnitKind) => void;
 }
 
 const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
@@ -80,6 +90,8 @@ const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
   errorMessage: null,
   notice: null,
   pending: false,
+  pickClock: null,
+  myPick: null,
 };
 
 /**
@@ -111,6 +123,9 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
       result: t.result,
       replay: null,
       pending: false,
+      pickClock:
+        t.phase === 'PICKING' ? { since: Date.now(), remainingMs: t.pickRemainingMs ?? null } : null,
+      myPick: t.phase === 'PICKING' ? (snap.privateHand?.pickedKind ?? null) : null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
       turnClock:
@@ -136,9 +151,22 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
         return 'applied';
       }
 
+      case 'UNIT_PICKED': {
+        const p = payload as UnitPickedPayload;
+        set({ units: state.units.map((u) => (u.seat === p.seat ? { ...u, picked: true } : u)) });
+        return 'applied';
+      }
+
+      case 'UNITS_REVEALED': {
+        const p = payload as UnitsRevealedPayload;
+        set({ units: p.units, phase: 'AIMING', pickClock: null, myPick: null, pending: false });
+        return 'applied';
+      }
+
       case 'TURN_CHANGED': {
         const p = payload as TurnChangedPayload;
         set({
+          pickClock: null,
           phase: 'AIMING',
           turnSeat: p.seat,
           turnNo: p.turnNo,
@@ -158,15 +186,25 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
           footY: u.footY,
           hp: u.hp,
           alive: u.alive,
+          kind: u.kind,
+          maxHp: u.maxHp,
         }));
         const maskBefore = state.mask;
-        const crater = report.shot?.crater ?? null;
-        const mask = maskBefore && crater ? carve(maskBefore, crater.x, crater.y, crater.r) : maskBefore;
+        const masks: Mask[] = [];
+        if (maskBefore) {
+          masks.push(maskBefore);
+          for (const op of terrainOps(report)) masks.push(applyOp(masks[masks.length - 1], op));
+        }
+        const mask = masks.length > 0 ? masks[masks.length - 1] : maskBefore;
+        const fired = report.stages.length > 0;
         const outBy = new Map(report.eliminated.map((e) => [e.seat, e.cause]));
         const units = state.units.map((u) => {
           const after = report.units.find((x) => x.seat === u.seat);
           if (!after) return u;
-          const pumpkins = u.seat === report.seat && report.shell === 'PUMPKIN' && report.shot ? u.pumpkins - 1 : u.pumpkins;
+          const mine = u.seat === report.seat;
+          const pumpkins = mine && fired && report.shell === 'PUMPKIN' ? u.pumpkins - 1 : u.pumpkins;
+          const specials = mine && fired && report.shell === u.special ? u.specials - 1 : u.specials;
+          const items = mine && report.item ? u.items.filter((it) => it !== report.item) : u.items;
           return {
             ...u,
             x: after.x,
@@ -174,6 +212,8 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
             hp: after.hp,
             alive: after.alive,
             pumpkins: Math.max(0, pumpkins),
+            specials: Math.max(0, specials),
+            items,
             outCause: after.alive ? null : (outBy.get(u.seat) ?? u.outCause),
           };
         });
@@ -185,7 +225,7 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
           pending: false,
           turnClock: null,
           replay: maskBefore
-            ? { report, before, maskBefore, nonce: (state.replay?.nonce ?? 0) + 1 }
+            ? { report, before, maskBefore, masks, nonce: (state.replay?.nonce ?? 0) + 1 }
             : null,
         });
         return 'applied';
@@ -231,5 +271,9 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
 
   finishReplay() {
     set({ replay: null });
+  },
+
+  setMyPick(kind) {
+    set({ myPick: kind });
   },
 }));

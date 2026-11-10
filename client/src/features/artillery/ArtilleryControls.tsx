@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
-import type { Shell } from '@/types/artillery';
+import { ITEM_HINTS, ITEM_NAMES, SHELL_NAMES, type Item, type Shell } from '@/types/artillery';
+
+const ITEM_ICONS: Record<Item, string> = { WATERING_CAN: '💧', PINWHEEL: '🌀', TWIN_SEED: '🌱' };
 
 /** 힘 모으기 — 누르고 있는 동안 0→100→0 을 이 주기(ms)로 오간다. */
 export const CHARGE_PERIOD_MS = 2400;
@@ -17,8 +19,15 @@ interface Props {
   power: number;
   lastPower: number | null;
   shell: Shell;
-  pumpkins: number;
+  /** 고를 수 있는 탄과 남은 수(−1 = 무제한). 콩알·호박탄·내 유닛 특수탄. */
+  shells: { shell: Shell; count: number }[];
+  /** 남은 아이템과 이번 발에 끼운 것(한 차례 하나, D-224). */
+  items: Item[];
+  item: Item | null;
+  onItem: (item: Item | null) => void;
   fuelLeft: number;
+  /** 내 유닛의 연료 가득(새싹 100·도토리 70·민들레 130). */
+  fuelMax?: number;
   moveDx: number;
   enabled: boolean;
   onAngle: (angle: number) => void;
@@ -41,8 +50,12 @@ export function ArtilleryControls({
   power,
   lastPower,
   shell,
-  pumpkins,
+  shells,
+  items,
+  item,
+  onItem,
   fuelLeft,
+  fuelMax = 100,
   moveDx,
   enabled,
   onAngle,
@@ -146,8 +159,8 @@ export function ArtilleryControls({
         <button type="button" className="ar-btn" disabled={!enabled} aria-label="오른쪽으로 걷기(누르고 있기)" {...holdProps(1)}>
           ▶
         </button>
-        <span className="ar-fuel" title="이동 연료">
-          <span className="ar-fuel-bar" style={{ width: `${fuelLeft}%` }} />
+        <span className="ar-fuel" title={`이동 연료 ${fuelLeft}/${fuelMax}`}>
+          <span className="ar-fuel-bar" style={{ width: `${Math.round((100 * fuelLeft) / Math.max(1, fuelMax))}%` }} />
         </span>
         {moveDx !== 0 && (
           <button type="button" className="ar-btn ar-btn-small" disabled={!enabled} onClick={onResetMove}>
@@ -177,26 +190,40 @@ export function ArtilleryControls({
       </div>
       <div className="ar-row">
         <div className="ar-shells" role="radiogroup" aria-label="탄">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={shell === 'PEA'}
-            className={`ar-chip${shell === 'PEA' ? ' ar-chip-on' : ''}`}
-            disabled={!enabled}
-            onClick={() => onShell('PEA')}
-          >
-            콩알
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={shell === 'PUMPKIN'}
-            className={`ar-chip${shell === 'PUMPKIN' ? ' ar-chip-on' : ''}`}
-            disabled={!enabled || pumpkins <= 0}
-            onClick={() => onShell('PUMPKIN')}
-          >
-            호박탄 ×{pumpkins}
-          </button>
+          {shells.map(({ shell: sh, count }) => (
+            <button
+              key={sh}
+              type="button"
+              role="radio"
+              aria-checked={shell === sh}
+              className={`ar-chip${shell === sh ? ' ar-chip-on' : ''}`}
+              disabled={!enabled || count === 0}
+              onClick={() => onShell(sh)}
+            >
+              {SHELL_NAMES[sh]}
+              {count >= 0 ? ` ×${count}` : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="ar-row">
+        <div className="ar-items" role="group" aria-label="아이템 — 한 차례 하나">
+          {(['WATERING_CAN', 'PINWHEEL', 'TWIN_SEED'] as Item[]).map((it) => {
+            const left = items.includes(it);
+            return (
+              <button
+                key={it}
+                type="button"
+                aria-pressed={item === it}
+                className={`ar-chip ar-item${item === it ? ' ar-chip-on' : ''}`}
+                disabled={!enabled || !left}
+                title={`${ITEM_NAMES[it]} — ${ITEM_HINTS[it]}${left ? '' : ' (씀)'}`}
+                onClick={() => onItem(item === it ? null : it)}
+              >
+                {ITEM_ICONS[it]} {ITEM_NAMES[it]}
+              </button>
+            );
+          })}
         </div>
         <span className="ar-actions">
           <button type="button" className="ar-btn ar-btn-ghost" disabled={!enabled} onClick={onSkip}>

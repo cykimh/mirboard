@@ -2,35 +2,107 @@ package com.mirboard.domain.game.artillery.state;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.mirboard.domain.game.artillery.rules.Item;
+import com.mirboard.domain.game.artillery.rules.Shell;
+import com.mirboard.domain.game.artillery.rules.UnitKind;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 포대 하나 (`docs/rules-artillery.md` §3). 좌석마다 하나, 탈락해도 목록에 남는다({@link #out} 이 채워짐).
  *
  * @param pumpkins 남은 호박탄
  * @param out      탈락 정보, 살아 있으면 null
+ * @param kind     고른 포대 종류 — 고르기 단계에서 아직 안 골랐으면 null(D-224). S4 이전 상태의 JSON 에도 없으므로 물리는
+ *                 {@link #kindOrDefault()} 를 쓴다.
+ * @param specials 남은 고유 특수탄
+ * @param items    남은 아이템
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination out) {
+public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination out,
+                   UnitKind kind, int specials, List<Item> items) {
+
+    public Unit {
+        items = items == null ? List.of() : List.copyOf(items);
+    }
+
+    /** S4 이전 모양(새싹포, 특수탄·아이템 없음) — 테스트·구 상태. */
+    public Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination out) {
+        this(seat, x, footY, hp, pumpkins, out, UnitKind.SPROUT, 0, List.of());
+    }
 
     @JsonIgnore
     public boolean alive() {
         return out == null;
     }
 
+    @JsonIgnore
+    public UnitKind kindOrDefault() {
+        return kind == null ? UnitKind.SPROUT : kind;
+    }
+
+    @JsonIgnore
+    public int maxHp() {
+        return kindOrDefault().maxHp();
+    }
+
+    /** 이 탄의 남은 수 — −1 = 무제한, 다른 유닛의 특수탄은 0. */
+    public int ammo(Shell shell) {
+        if (shell.perMatch() < 0) {
+            return -1;
+        }
+        if (shell == Shell.PUMPKIN) {
+            return pumpkins;
+        }
+        return kindOrDefault().special() == shell ? specials : 0;
+    }
+
+    public boolean has(Item item) {
+        return items.contains(item);
+    }
+
     public Unit withPosition(int nx, int nfootY) {
-        return new Unit(seat, nx, nfootY, hp, pumpkins, out);
+        return new Unit(seat, nx, nfootY, hp, pumpkins, out, kind, specials, items);
     }
 
     public Unit withHp(int nhp) {
-        return new Unit(seat, x, footY, nhp, pumpkins, out);
+        return new Unit(seat, x, footY, nhp, pumpkins, out, kind, specials, items);
     }
 
     public Unit withPumpkins(int n) {
-        return new Unit(seat, x, footY, hp, n, out);
+        return new Unit(seat, x, footY, hp, n, out, kind, specials, items);
+    }
+
+    /** 쏜 탄 하나를 쓴다(콩알은 그대로). */
+    public Unit spend(Shell shell) {
+        if (shell == Shell.PUMPKIN) {
+            return withPumpkins(pumpkins - 1);
+        }
+        if (shell.special()) {
+            return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials - 1, items);
+        }
+        return this;
+    }
+
+    public Unit without(Item item) {
+        List<Item> left = new ArrayList<>(items);
+        left.remove(item);
+        return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials, left);
+    }
+
+    /** 고르기(아직 숨김 — 체력은 공개 때 채운다). */
+    public Unit picked(UnitKind k) {
+        return new Unit(seat, x, footY, hp, pumpkins, out, k, specials, items);
+    }
+
+    /** 고르기 끝 — 고른 종류의 체력·특수탄·아이템 묶음으로 채운다(D-224). */
+    public Unit equipped() {
+        UnitKind k = kindOrDefault();
+        return new Unit(seat, x, footY, k.maxHp(), pumpkins, out, k, Shell.SPECIAL_PER_MATCH, Item.starterKit());
     }
 
     public Unit eliminated(Elimination e) {
-        return new Unit(seat, x, footY, hp, pumpkins, e);
+        return new Unit(seat, x, footY, hp, pumpkins, e, kind, specials, items);
     }
 
     /**

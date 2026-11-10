@@ -5,7 +5,9 @@ import com.mirboard.domain.game.artillery.action.ArtilleryAction;
 import com.mirboard.domain.game.artillery.physics.Body;
 import com.mirboard.domain.game.artillery.physics.Fixed;
 import com.mirboard.domain.game.artillery.physics.SplitMix64;
+import com.mirboard.domain.game.artillery.rules.Item;
 import com.mirboard.domain.game.artillery.rules.Shell;
+import com.mirboard.domain.game.artillery.rules.UnitKind;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
 import com.mirboard.domain.game.artillery.state.ShotReport;
 import com.mirboard.domain.game.artillery.state.Unit;
@@ -22,11 +24,20 @@ import java.util.List;
  *
  * <p>탐색: (1) 표적 쪽 반원 거친 격자 → (2) 쓸 만한 수가 없으면 좌우 15·30칸 옮겨서 다시 → (3) 최고점 주변 세밀 격자. 점수 =
  * 적 피해 × 10 + 적 탈락 500 − 자기 피해 × 15 − 자기 탈락 5000 − 가장 가까운 적과 폭발점 거리(칸).
+ *
+ * <p>S4(D-224): 유닛은 시드로 고른다. 바람이 세고 맞힐 수가 없으면 바람개비를 끼워 거친 격자를 한 번 더 돌리고, 마지막에 찾은 조준 그대로
+ * 다른 탄(호박·고유 특수탄)·아이템(물뿌리개·겹씨앗)을 끼워 본다 — 아껴 쓰라고 탄·아이템마다 점수 비용을 뺀다(물뿌리개는 체력이 25 이상
+ * 깎였을 때, 겹씨앗은 한 발 더가 비용보다 많이 줄 때 쓰게 된다).
  */
 public final class ArtilleryBotPolicy {
 
     /** 한 수에 돌리는 시뮬레이션 상한. */
-    public static final int SIM_BUDGET = 900;
+    public static final int SIM_BUDGET = 1100;
+    /** 아껴 쓰는 비용(점수) — 호박탄·특수탄 한 발, 아이템 하나. */
+    static final int SHELL_COST = 60;
+    static final int ITEM_COST = 300;
+    /** 이 세기 이상 바람이면 바람개비 격자를 따로 돌려 본다. */
+    static final int STRONG_WIND = 6;
     /** "보통" 오차 — 각도 ±2°, 힘 ±2. */
     static final int ANGLE_ERROR = 2;
     static final int POWER_ERROR = 2;
@@ -35,6 +46,12 @@ public final class ArtilleryBotPolicy {
     private static final ArtilleryEngine SIM = new ArtilleryEngine();
 
     private ArtilleryBotPolicy() {
+    }
+
+    /** 고르기 (D-224) — 시드·좌석에서 정해진다. */
+    public static UnitKind pick(ArtilleryState state, int seat) {
+        UnitKind[] kinds = UnitKind.values();
+        return kinds[SplitMix64.below(state.seed(), 7000L + seat, kinds.length)];
     }
 
     public static ArtilleryAction choose(ArtilleryState state, int seat) {
@@ -47,17 +64,21 @@ public final class ArtilleryBotPolicy {
         boolean right = target.x() >= me.x();
         Shell shell = me.pumpkins() > 0 && target.hp() > Shell.PEA.maxDamage() ? Shell.PUMPKIN : Shell.PEA;
 
-        search.grid(0, right, 5, 4, shell);
+        search.grid(0, right, 5, 4, shell, null);
         if (search.bestScore < GOOD_ENOUGH) {
             for (int move : MOVES) {
-                search.grid(move, right, 10, 8, shell);
+                search.grid(move, right, 10, 8, shell, null);
             }
+        }
+        if (search.bestScore < GOOD_ENOUGH && Math.abs(state.wind()) >= STRONG_WIND && me.has(Item.PINWHEEL)) {
+            search.grid(0, right, 10, 8, shell, Item.PINWHEEL);
         }
         ArtilleryAction.Fire best = search.best;
         if (best == null) {
             return new ArtilleryAction.Skip();
         }
         search.refine(best);
+        search.variants(search.best);
         best = search.best;
 
         // 오차 (결정적)
@@ -66,7 +87,7 @@ public final class ArtilleryBotPolicy {
         int dp = (int) Long.remainderUnsigned(noise >>> 20, 2 * POWER_ERROR + 1) - POWER_ERROR;
         int angle = Math.clamp(best.angle() + da, 0, 180);
         int power = Math.clamp(best.power() + dp, 1, 100);
-        return new ArtilleryAction.Fire(best.moveDx(), angle, power, best.shell());
+        return new ArtilleryAction.Fire(best.moveDx(), angle, power, best.shell(), best.item());
     }
 
     /** 체력 낮은 적, 같으면 가까운 적. */
@@ -97,12 +118,38 @@ public final class ArtilleryBotPolicy {
             this.seat = seat;
         }
 
-        void grid(int move, boolean right, int angleStep, int powerStep, Shell shell) {
+        void grid(int move, boolean right, int angleStep, int powerStep, Shell shell, Item item) {
             int from = right ? angleStep : 90 + angleStep;
             int to = right ? 90 - angleStep : 180 - angleStep;
             for (int a = from; a <= to; a += angleStep) {
                 for (int p = 10; p <= 100; p += powerStep) {
-                    try_(new ArtilleryAction.Fire(move, a, p, shell));
+                    try_(new ArtilleryAction.Fire(move, a, p, shell, item));
+                }
+            }
+        }
+
+        /** 찾은 조준 그대로 다른 탄·아이템을 끼워 본다(같은 수를 다시 재지 않는다). */
+        void variants(ArtilleryAction.Fire around) {
+            Unit me = state.unit(seat);
+            List<Item> items = new ArrayList<>();
+            items.add(null);
+            for (Item it : me.items()) {
+                if (it != Item.PINWHEEL) {
+                    items.add(it);
+                }
+            }
+            if (around.item() == Item.PINWHEEL) {
+                items = List.of(Item.PINWHEEL);
+            }
+            for (Shell sh : Shell.values()) {
+                if (me.ammo(sh) == 0) {
+                    continue;
+                }
+                for (Item it : items) {
+                    if (sh == around.shell() && it == around.item()) {
+                        continue;
+                    }
+                    try_(new ArtilleryAction.Fire(around.moveDx(), around.angle(), around.power(), sh, it));
                 }
             }
         }
@@ -118,7 +165,7 @@ public final class ArtilleryBotPolicy {
                     if (a < 0 || a > 180 || p < 1 || p > 100) {
                         continue;
                     }
-                    try_(new ArtilleryAction.Fire(around.moveDx(), a, p, around.shell()));
+                    try_(new ArtilleryAction.Fire(around.moveDx(), a, p, around.shell(), around.item()));
                 }
             }
         }
@@ -129,11 +176,15 @@ public final class ArtilleryBotPolicy {
             }
             sims++;
             ArtilleryEngine.Result r = SIM.apply(state, seat, fire, 0);
-            int score = score(r.newState());
+            int score = score(r.newState()) - cost(fire);
             if (score > bestScore) {
                 bestScore = score;
                 best = fire;
             }
+        }
+
+        static int cost(ArtilleryAction.Fire fire) {
+            return (fire.shell() == Shell.PEA ? 0 : SHELL_COST) + (fire.item() == null ? 0 : ITEM_COST);
         }
 
         int score(ArtilleryState after) {
@@ -151,10 +202,17 @@ public final class ArtilleryBotPolicy {
                     score -= lost * 15 + (died ? 5000 : 0);
                 } else {
                     score += lost * 10 + (died ? 500 : 0);
-                    if (report != null && report.shot() != null && report.shot().crater() != null) {
-                        long dx = before.x() - report.shot().impactX();
-                        long dy = Body.centerY(before.footY()) - report.shot().impactY();
-                        nearest = Math.min(nearest, Fixed.isqrt(dx * dx + dy * dy));
+                    if (report != null) {
+                        for (ShotReport.Stage stage : report.stages()) {
+                            for (ShotReport.Shot shot : stage.shots()) {
+                                if (shot.crater() == null) {
+                                    continue;
+                                }
+                                long dx = before.x() - shot.impactX();
+                                long dy = Body.centerY(before.footY()) - shot.impactY();
+                                nearest = Math.min(nearest, Fixed.isqrt(dx * dx + dy * dy));
+                            }
+                        }
                     }
                 }
             }
@@ -167,14 +225,19 @@ public final class ArtilleryBotPolicy {
         Search s = new Search(state, seat);
         Unit target = pickTarget(state, seat);
         boolean right = target != null && target.x() >= state.unit(seat).x();
-        s.grid(0, right, 5, 4, Shell.PEA);
+        s.grid(0, right, 5, 4, Shell.PEA, null);
         if (s.bestScore < GOOD_ENOUGH) {
             for (int move : MOVES) {
-                s.grid(move, right, 10, 8, Shell.PEA);
+                s.grid(move, right, 10, 8, Shell.PEA, null);
             }
+        }
+        if (s.bestScore < GOOD_ENOUGH && Math.abs(state.wind()) >= STRONG_WIND
+                && state.unit(seat).has(Item.PINWHEEL)) {
+            s.grid(0, right, 10, 8, Shell.PEA, Item.PINWHEEL);
         }
         if (s.best != null) {
             s.refine(s.best);
+            s.variants(s.best);
         }
         return new ArrayList<>(List.of(s.sims, s.bestScore));
     }

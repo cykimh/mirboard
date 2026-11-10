@@ -487,40 +487,52 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 
 ---
 
-## 씨앗포 (gameType=ARTILLERY, D-220~D-222)
+## 씨앗포 (gameType=ARTILLERY, D-220~D-224)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~4, 엔진은 6까지). 룰 정본은 `docs/rules-artillery.md`, 설계
 `docs/plans/artillery.md`. 완성(S3 공개) 전에는 `DISABLED` — 카탈로그에도 안 보인다(설정 `mirboard.artillery.status`).
 
-**클라 → 서버 `@action`** — 차례당 하나(이동은 발사에 싣는다, D-220):
+**클라 → 서버 `@action`** — 차례당 하나(이동은 발사에 싣는다, D-220). 판 시작에는 고르기 단계(`PICKING`, D-224)가 있다:
 
 | @action | 추가 필드 | 비고 |
 | --- | --- | --- |
-| `FIRE` | `moveDx`(−100~100, 0 = 안 움직임) · `angle`(0~180, 0 = 오른쪽 · 90 = 위) · `power`(0~100) · `shell`(`PEA`·`PUMPKIN`, 생략하면 `PEA`) | 서버가 이동 → 탄도 → 폭발 → 낙하를 한 번에 계산한다 |
+| `PICK` | `unit`(`SPROUT`·`ACORN`·`DANDELION`) | 고르기 단계에서만, 좌석마다 한 번. 전원이 동시에 — 15초 안에 안 고르면 새싹포(엔진 타이머) |
+| `FIRE` | `moveDx`(−130~130, 0 = 안 움직임) · `angle`(0~180, 0 = 오른쪽 · 90 = 위) · `power`(0~100) · `shell`(`PEA`·`PUMPKIN`·내 고유 특수탄 `VINE`/`CHESTNUT`/`SPORE`, 생략하면 `PEA`) · `item`(`WATERING_CAN`·`PINWHEEL`·`TWIN_SEED`, 생략 가능 — 한 차례 하나) | 서버가 (물뿌리개) → 이동 → 탄도 → 폭발 → 낙하를 한 번에 계산한다(겹씨앗이면 탄도~낙하 한 번 더) |
 | `SKIP` | — | 차례 넘기기(시간 초과도 같다) |
 
 **서버 → 클라 (공개)** — 숨길 정보가 없어 전부 공개, 모두 방 순번을 쓴다. payload 는 결과값이다:
 
 | type | payload | 의미 |
 | --- | --- | --- |
-| `TURN_CHANGED` | `{ seat, turnNo, wind, cloudLevel }` | 차례 시작 — 연료는 늘 100. `wind` −10~10(양수 = 오른쪽). 시작 직후 첫 차례는 이벤트 없이 resync 로 |
+| `UNIT_PICKED` | `{ seat }` | 고르기 단계 — 그 좌석이 골랐다(**무엇을** 골랐는지는 없음, 다 고를 때까지 숨김) |
+| `UNITS_REVEALED` | `{ units: [UnitView] }` | 고르기 끝(마지막 선택·마감·탈주) — 전원의 `kind`·체력·특수탄·아이템. 바로 뒤에 첫 `TURN_CHANGED` |
+| `TURN_CHANGED` | `{ seat, turnNo, wind, cloudLevel }` | 차례 시작 — 연료는 그 포대 종류의 가득(`units[].fuel`). `wind` −10~10(양수 = 오른쪽) |
 | `SHOT_RESOLVED` | `{ report }` | 발사 대본 하나 — 아래. 이 뒤 `report.durationMs` 동안 **아무의 차례도 아니다**(연출 대기, 엔진 타이머) |
 | `TURN_SKIPPED` | `{ seat, reason }` | `SKIP`·`TIMEOUT`. 바로 뒤에 `TURN_CHANGED` |
 | `UNIT_ELIMINATED` | `{ seat, cause, cloudLevel }` | 발사 밖의 탈락 — `CLOUD_SEA`(구름 밀물)·`DESERTED`. 발사로 인한 탈락은 대본 안에 |
 | `MATCH_ENDED` | `{ reason, placements: [{seat, rank, hp, deserted}] }` | `reason`: `LAST_STANDING`·`ALL_DOWN`·`NO_HUMANS`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위. 판을 끝낸 발사면 `SHOT_RESOLVED` 바로 뒤(연출 대기 없음) |
 
-`report` = `{ seat, angle, power, shell, wind, move, shot, damages, falls, eliminated, units, durationMs }`:
+`report` = `{ seat, angle, power, shell, item, wind, heal, move, stages, eliminated, units, durationMs }` (S4 — D-224 에서 `shot`·`damages`·`falls` 가 `stages` 로 들어갔다):
 
+- `item` 은 쓴 아이템(없으면 null), `heal` = `{ amount, hpAfter }` 물뿌리개로 오른 체력(안 썼으면 null — 재생 시작에 바로 반영).
 - `move` = `{ path: [x, y, x, y …], toX, toY, fuelLeft, fall }` — 걸음마다 발 칸. 서버가 실제로 걸은 결과라 클라 미리보기와 다를 수 있다(서버가 이긴다). `fall` 은 걷다 떨어졌을 때만.
-- `shot` = `{ path: [x, y …], end, impactX, impactY, crater: {x, y, r} | null, hitSeat, ticks }` — `path` 는 포구부터 2틱(1/30초)마다 한 칸 좌표 + 끝점. `end`: `TERRAIN`·`UNIT`(직격 `hitSeat`)·`OUT`·`CLOUD`·`EXPIRED`. `crater` 가 있으면 클라가 그 원을 지형에서 지운다(서버와 같은 정수 원). 걷다 탈락하면 `shot` 은 null.
-- `damages` = `[{seat, amount, hpAfter, direct}]`, `falls` = `[{seat, x, fromY, toY, damage, hpAfter, intoCloud}]`, `eliminated` = `[{seat, cause}]`(`KNOCKED_OUT`·`CLOUD_SEA`), `units` = 해소 뒤 전체 `[{seat, x, footY, hp, alive}]`.
+- `stages` = 발 하나마다 `{ shots, damages, falls }` — 보통 1개, 겹씨앗이면 2개(두 번째는 첫 단계가 바꾼 지형·자리에서), 걷다 탈락하면 빈 목록.
+  - `shots` = `[{ path: [x, y …], end, impactX, impactY, crater, hitSeat, startTick, ticks }]` — `path` 는 출발점부터 2틱(1/30초)마다 한 칸 좌표 + 끝점,
+    `startTick` 은 단계 시작부터의 출발 틱, `ticks` 는 이 씨앗이 난 틱 수. `end`: `TERRAIN`·`UNIT`(직격 `hitSeat`)·`OUT`·`CLOUD`·`EXPIRED`·`SPLIT`.
+    홀씨탄은 `[갈라지기 전(SPLIT, crater 없음), 씨앗 셋(startTick = 갈라진 틱)]`.
+  - `crater` = `{ x, y, r, fill, spare }` | null — 지형 연산. `fill` 이 거짓이면 원을 지우고, 참(덩굴탄)이면 원을 채우되 `spare`(몸 중심 x, y …)
+    마다 반경 7 안은 비운다. 클라는 대본의 연산을 **단계 → 씨앗 순서대로** 서버와 같은 정수 원으로 적용한다.
+  - `damages` = `[{seat, amount, hpAfter, direct}]`(씨앗 피해의 합), `falls` = `[{seat, x, fromY, toY, damage, hpAfter, intoCloud}]`.
+- `eliminated` = `[{seat, cause}]`(`KNOCKED_OUT`·`CLOUD_SEA` — 두 단계여도 한 순간), `units` = 해소 뒤 전체 `[{seat, x, footY, hp, alive}]`.
 
-**서버 → 클라 (비공개)**: `ERROR` 뿐 — 씨앗포 코드 `NOT_YOUR_TURN`(연출 대기 중 포함)·`MATCH_OVER`·`OUT_OF_RANGE`·`NO_AMMO`·`INVALID_ACTION`.
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 씨앗포 코드 `NOT_YOUR_TURN`(연출 대기 중·고르기 중 `PICK` 밖 액션·두 번째 `PICK` 포함)·`MATCH_OVER`·`OUT_OF_RANGE`·`NO_AMMO`(남의 특수탄 포함)·`NO_ITEM`·`INVALID_ACTION`.
 
-**resync**: `tableView` = `{ phase, seatCount, width, height, units: [{seat, x, footY, hp, pumpkins, alive, outCause}], terrain, turnSeat,
-turnNo, wind, cloudLevel, suddenDeathTurn, fuel, resolveRemainingMs, lastShot, result }` — `phase` 는 `AIMING`·`RESOLVING`·`ENDED`,
+**resync**: `tableView` = `{ phase, seatCount, width, height, units: [UnitView], terrain, turnSeat, turnNo, wind, cloudLevel, suddenDeathTurn,
+fuel, resolveRemainingMs, pickRemainingMs, lastShot, result }` — `UnitView` = `{seat, x, footY, hp, pumpkins, alive, outCause, kind, picked, maxHp,
+fuel, special, specials, items}`(고르기 중엔 `kind`·`special` 이 null 이고 `picked` 만 보인다), `phase` 는 `PICKING`·`AIMING`·`RESOLVING`·`ENDED`,
 `terrain` 은 640열 각각의 흙 구간 `[시작, 끝, 시작, 끝 …]`(위에서부터, 양끝 포함 — 약 15KB), `resolveRemainingMs`·`lastShot` 은 연출 대기
-중에만(다시 들어온 클라가 재생 중인 장면의 끝을 맞춘다). **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다). `privateHand` 는 늘 null.
+중에만(다시 들어온 클라가 재생 중인 장면의 끝을 맞춘다), `pickRemainingMs` 는 고르기 중에만. **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다).
+`privateHand` 는 고르기 중 내가 골랐을 때만 `{ pickedKind }`, 그 밖에는 null.
 
 ---
 

@@ -426,6 +426,136 @@ button.ar-badge {
   opacity: 0.45;
 }
 
+.ar-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ar-item {
+  font-size: 12px;
+}
+
+.ar-seat-kind {
+  margin-right: 2px;
+}
+
+/* ── 포대 고르기 (D-224) ──────────────────────────────────────────── */
+.ar-picker {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated, var(--color-bg));
+}
+
+.ar-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ar-picker-title {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ar-picker-note {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* 늘 3열 — 휴대폰 세로에서도 카드가 쌓여 전장을 밀어내지 않게(이 파일엔 미디어 쿼리를 두지 않는다). */
+.ar-picker-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ar-pick-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ar-pick-card:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ar-pick-card-on,
+.ar-pick-card-on:disabled {
+  border-color: var(--ar-fire);
+  background: rgba(232, 97, 60, 0.12);
+  opacity: 1;
+}
+
+.ar-pick-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ar-pick-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ar-pick-blurb {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+.ar-pick-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 6px;
+  margin: 2px 0 0;
+  font-size: 11px;
+}
+
+.ar-pick-stats dt {
+  opacity: 0.7;
+}
+
+.ar-pick-stats dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-picker-seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.ar-picker-seats .ar-picked {
+  font-weight: 600;
+}
+
 .ar-actions {
   display: flex;
   flex-wrap: wrap;

@@ -28,7 +28,7 @@ public final class ArtilleryFixtures {
         units.set(u.seat(), u);
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
                 s.lastSeat(), s.turnNo(), s.wind(), s.cloudLevel(), s.resolveUntil(), s.eliminations(), s.lastShot(),
-                s.result());
+                s.result(), s.pickUntil());
     }
 
     /** 차례 주인이 {@code target} 을 직격하는 (각도, 힘)을 찾는다 — 없으면 null. */

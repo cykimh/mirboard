@@ -3,7 +3,7 @@ import type { GameTutorial, TutorialStep } from '@/features/tutorial/types';
 const LIST = { lineHeight: 1.7, paddingLeft: 18 } as const;
 
 /**
- * 씨앗포 튜토리얼 5단계. 콘텐츠 출처: `docs/rules-artillery.md`(요약). 룰을 바꾸면 같은 커밋으로 여기를 고친다 —
+ * 씨앗포 튜토리얼 6단계(S4 D-224 — 포대·특수탄·아이템 단계 추가). 콘텐츠 출처: `docs/rules-artillery.md`(요약). 룰을 바꾸면 같은 커밋으로 여기를 고친다 —
  * `artilleryTutorial.test` 가 핵심 수치를 붙잡고 있다.
  */
 export const ARTILLERY_TUTORIAL_STEPS: TutorialStep[] = [
@@ -45,7 +45,8 @@ export const ARTILLERY_TUTORIAL_STEPS: TutorialStep[] = [
     body: (
       <ul style={LIST}>
         <li>
-          ◀ ▶ 를 누르고 있으면 걷습니다. 연료는 차례마다 <strong>100</strong>, 한 칸에 1, 오르막은 높이만큼 더 듭니다.
+          ◀ ▶ 를 누르고 있으면 걷습니다. 연료는 차례마다 다시 차고(<strong>새싹포 100</strong>·도토리포 70·민들레포 130), 한
+          칸에 1, 오르막은 높이만큼 더 듭니다.
         </li>
         <li>3칸보다 높은 턱은 벽이라 못 넘어요. 낭떠러지 앞에서는 멈춥니다.</li>
         <li>이동은 발사와 함께 한 번에 서버로 갑니다 — 다른 사람에게는 쏘는 순간 걸어가는 모습이 보여요.</li>
@@ -65,6 +66,28 @@ export const ARTILLERY_TUTORIAL_STEPS: TutorialStep[] = [
         <li>
           땅이 패여 발밑이 비면 화분이 떨어집니다. <strong>20칸</strong>보다 높이 떨어지면 낙하 피해, 구름 바다까지 가면 탈락.
         </li>
+      </ul>
+    ),
+  },
+  {
+    title: '포대 고르기 · 특수탄 · 아이템',
+    source: '§3·§6.2·§6.4',
+    body: (
+      <ul style={LIST}>
+        <li>
+          판이 시작되면 모두 함께 <strong>15초</strong> 안에 포대를 고릅니다(안 고르면 새싹포). 남이 고른 건 다 고른 뒤에
+          공개돼요.
+        </li>
+        <li>
+          <strong>새싹포</strong> 체력 100·바람 100% — 덩굴탄은 맞은 자리에 <strong>흙 둔덕을 쌓아</strong> 엄폐물을 만듭니다.
+        </li>
+        <li>
+          <strong>도토리포</strong> 체력 120·바람 60% — 알밤탄은 피해는 작지만 <strong>큰 구멍</strong>으로 발밑을 꺼뜨립니다.
+        </li>
+        <li>
+          <strong>민들레포</strong> 체력 85·바람 140% — 홀씨탄은 꼭대기에서 <strong>세 갈래</strong>로 퍼집니다.
+        </li>
+        <li>특수탄은 한 판에 2발. 아이템은 모두 하나씩 — 💧물뿌리개(체력 +25)·🌀바람개비(이번 발 바람 무시)·🌱겹씨앗(같은 조준으로 한 발 더). 한 차례에 하나만 씁니다.</li>
       </ul>
     ),
   },

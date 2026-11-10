@@ -6,5 +6,7 @@ public enum RejectionReason {
     MATCH_OVER,
     OUT_OF_RANGE,
     NO_AMMO,
+    /** 없는(이미 쓴) 아이템 (D-224). */
+    NO_ITEM,
     INVALID_ACTION
 }
