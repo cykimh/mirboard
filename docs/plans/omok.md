@@ -291,7 +291,7 @@ omok/
   `OmokTable` · `OmokBoard`(SVG 하나 — 교차점 225개를 DOM 요소로 만들지 않고 좌표 계산으로 맞춘다) · `useStonePicker`(두 단계 확정·끌기) ·
   `OmokTurnStrip` · `OmokMatchEnd` · `types/omok.ts`.
 - `pages/gameTables` 에 지연 로딩 한 줄(D-141 — 정적 import 금지), `RoomPage` 의 IN_GAME 분기에 한 줄. 종료 뒤 게임판 유지(D-129 방식).
-- CSS: 신규 part `20-omok-table.css`, 접두 `.om-`. `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 box-sizing 을 스코프에서 명시.
+- CSS: 신규 part `21-omok-table.css`, 접두 `.om-`. `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 box-sizing 을 스코프에서 명시.
 - 좌석 줄·차례 띠에 계급(D-166 `tiers`)·채팅 한 줄(D-163 `useSeatChatLines`)·흑/백 표시.
 - 튜토리얼 `features/omok/tutorial`(규칙 + 2:2 차례 순서 + 금수 3종 그림 + "어디가 금수일까?" 퀴즈) + `gameTutorials.ts` 한 줄,
   토큰은 `bodyClassName: 'om-tokens'`. 위키 링크 `gameWiki.ts` 에 나무위키 오목·렌주 문서.
@@ -371,7 +371,7 @@ omok/
 - 클라 `features/omok/`: `omokStore`(순수 리듀서 — 비공개 뷰가 없어 내 좌석은 방 `playerIds` 에서) · `omokRoomSink`(비공개는 `ERROR` 뿐, 거절이면
   흐린 돌을 지운다) · `OmokBoard`(SVG 하나, 교차점은 좌표 계산) · `useStonePicker`(두 단계 확정·끌기 — 끄는 동안만 1.5칸 위, 누른 칸 안의 떨림은
   끌기가 아님, 마우스 한 번 클릭 설정) · `OmokTable`(차례 띠·카운트다운·[여기에 두기]·기권·종료 카드·수 번호 토글) · 튜토리얼 8단계(퀴즈
-  "어디가 금수일까?") · CSS `20-omok-table.css`(`.om-`, 미디어 0개).
+  "어디가 금수일까?") · CSS `21-omok-table.css`(`.om-`, 미디어 0개).
 - **공용 변경**(게임 밖 파일): `pages/gameTables`(지연 로딩 한 줄) · `pages/RoomPage`(IN_GAME 분기 한 줄, 종료 뒤 게임판 유지 목록에 OMOK, 좌석 정책
   라벨 — `TEAM_MODE` 가 2:2 면 "팀 배정") · `features/lobby/RoomSettingsPanel`(D-176 옵션 문구 표 채움, 봇 난이도는 봇이 앉은 방에서만) ·
   `features/lobby/CreateRoomModal`(아래 버그) · `features/tutorial/gameTutorials`·`features/lobby/gameWiki`(한 줄씩) · `styles/index.css`·`cssSources.ts`.

@@ -17,7 +17,7 @@ function selectorGroups(source: string): string[] {
   return groups;
 }
 
-describe('20-omok-table.css — 네임스페이스 격리', () => {
+describe('21-omok-table.css — 네임스페이스 격리', () => {
   const groups = selectorGroups(cssCode);
 
   it('선택자 그룹이 실제로 추출된다 (파서 자체 가드)', () => {
@@ -35,7 +35,7 @@ describe('20-omok-table.css — 네임스페이스 격리', () => {
 
   it('19 다음, 17-responsive 앞에 import 된다', () => {
     const oc = indexCssSource.indexOf("parts/19-onecard-table.css'");
-    const om = indexCssSource.indexOf("parts/20-omok-table.css'");
+    const om = indexCssSource.indexOf("parts/21-omok-table.css'");
     const responsive = indexCssSource.indexOf("parts/17-responsive.css'");
     expect(oc).toBeGreaterThan(-1);
     expect(om).toBeGreaterThan(oc);

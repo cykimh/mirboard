@@ -491,7 +491,7 @@
 - **기록**: `omok_match_results`·`omok_match_participants`(V15) + `user_game_stats`(OMOK — 팀 평균 ELO, 무승부는 `recordDraw` 로 행만), 상대 전적은
   상대 팀만.
 - **클라(D-180)**: `features/omok` — SVG 판 하나, 두 단계 확정 착수(누르면 미리보기·다시 누르거나 [여기에 두기], 끌면 손가락 1.5칸 위, 데스크톱은
-  한 번 클릭 설정), 차례 띠·카운트다운·기권·종료 카드·수 번호 토글, 튜토리얼 8단계 + 퀴즈 "어디가 금수일까?", CSS `20-omok-table.css`(`.om-`).
+  한 번 클릭 설정), 차례 띠·카운트다운·기권·종료 카드·수 번호 토글, 튜토리얼 8단계 + 퀴즈 "어디가 금수일까?", CSS `21-omok-table.css`(`.om-`).
   대기실 설정 패널이 모드·룰·봇 난이도(봇이 앉은 방에서만)를 그린다. 메인 카드는 "2·4인 플레이"(D-196 — 카탈로그 `playerCounts`). e2e `practice.e2e.ts` 에 오목 포함.
 - **공개(D-190)**: 기본 `AVAILABLE`(되돌리기는 시크릿 `MIRBOARD_OMOK_STATUS` — `docs/deploy.md`).
 - **테스트**: 오목 도메인 144건(Docker 불필요 138 — 시뮬레이션 18,000판·금수 국면 31건·봇 강도 듀플리케이트 포함) + 서버 경로 IT 4건(`OmokServerFlowIT`)·

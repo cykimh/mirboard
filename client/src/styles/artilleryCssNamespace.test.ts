@@ -29,7 +29,7 @@ function tokensOf(selector: string): Map<string, string> {
   return tokens;
 }
 
-describe('22-artillery-table.css — 네임스페이스 격리', () => {
+describe('23-artillery-table.css — 네임스페이스 격리', () => {
   const groups = selectorGroups(cssCode);
 
   it('선택자 그룹이 실제로 추출된다 (파서 자체 가드)', () => {
@@ -46,8 +46,8 @@ describe('22-artillery-table.css — 네임스페이스 격리', () => {
   });
 
   it('index.css 에서 21(구름항로) 다음, 17 앞에 import 된다', () => {
-    const i21 = indexCssSource.indexOf("'./parts/21-cloudroute-table.css'");
-    const i22 = indexCssSource.indexOf("'./parts/22-artillery-table.css'");
+    const i21 = indexCssSource.indexOf("'./parts/22-cloudroute-table.css'");
+    const i22 = indexCssSource.indexOf("'./parts/23-artillery-table.css'");
     const i17 = indexCssSource.indexOf("'./parts/17-responsive.css'");
     expect(i21).toBeGreaterThan(-1);
     expect(i22).toBeGreaterThan(i21);

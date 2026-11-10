@@ -384,7 +384,7 @@
 | 사건 줄 문장(화면·보조기기 같은 문장) | `describe.ts` | `board.test.ts` |
 | 게임판 — 좌석 줄·판·가운데(주사위·차례·편지·사건 줄)·결정 패널(§8 의 7가지)·칸 시트·결과 | `CloudRouteTable.tsx` | `CloudRouteTable.test.tsx`(16건) |
 | 튜토리얼 6단계 | `tutorial/cloudrouteTutorial.tsx` + `features/tutorial/gameTutorials.ts` 한 줄 | `cloudrouteTutorial.test.tsx`(핵심 수치) |
-| CSS `.cr-`·폭 미디어 0개 | `styles/parts/21-cloudroute-table.css` | `styles/cloudrouteCssNamespace.test.ts` |
+| CSS `.cr-`·폭 미디어 0개 | `styles/parts/22-cloudroute-table.css` | `styles/cloudrouteCssNamespace.test.ts` |
 
 - **브라우저 실측(2026-11-09, 375px·라이트/다크)**: 실제 서버(별도 스키마)에 게스트 + 봇 3으로 4인 판 — 판 한 화면, 가로 스크롤 없음,
   봇 구매·건설·풍등탑, 내 소용돌이 탈출(50G)·구매(천막 단계 선택)·칸 시트가 서버 이벤트대로 그려졌다.

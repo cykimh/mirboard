@@ -223,4 +223,4 @@ splitmix(seed, k):  z = seed + (k + 1) × 0x9E3779B97F4A7C15
 | 스토어(순수 리듀서)·sink | `artilleryStore.ts`·`artilleryRoomSink.ts` | `artilleryLogic.test.ts` |
 | Canvas 그리기·전장 | `draw.ts`·`ArtilleryField.tsx` | 브라우저 실측(데스크톱·375px) |
 | 조작부·게임판·결과·튜토리얼 | `ArtilleryControls.tsx`·`ArtilleryTable.tsx`·`ArtilleryMatchEnd.tsx`·`tutorial/` | `ArtilleryTable.test.tsx`·`artilleryTutorial.test.tsx`, e2e `practice.e2e.ts` |
-| CSS `.ar-` 네임스페이스 | `styles/parts/22-artillery-table.css` | `styles/artilleryCssNamespace.test.ts` |
+| CSS `.ar-` 네임스페이스 | `styles/parts/23-artillery-table.css` | `styles/artilleryCssNamespace.test.ts` |

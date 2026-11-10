@@ -13,9 +13,9 @@ function readCss(relative: string): string {
 export const skullkingCssSource = readCss('./parts/18-skullking-table.css');
 export const onecardCssSource = readCss('./parts/19-onecard-table.css');
 export const yachtCssSource = readCss('./parts/20-yacht-table.css');
-export const omokCssSource = readCss('./parts/20-omok-table.css');
-export const cloudrouteCssSource = readCss('./parts/21-cloudroute-table.css');
-export const artilleryCssSource = readCss('./parts/22-artillery-table.css');
+export const omokCssSource = readCss('./parts/21-omok-table.css');
+export const cloudrouteCssSource = readCss('./parts/22-cloudroute-table.css');
+export const artilleryCssSource = readCss('./parts/23-artillery-table.css');
 export const indexCssSource = readCss('./index.css');
 /** D-132 — 스컬킹 옆줄 손패 숨김이 맨 끝 블록인지 원문으로 본다. */
 export const responsiveCssSource = readCss('./parts/17-responsive.css');

@@ -23,7 +23,7 @@ function selectorGroups(source: string): string[] {
   return groups;
 }
 
-describe('21-cloudroute-table.css — 네임스페이스 격리', () => {
+describe('22-cloudroute-table.css — 네임스페이스 격리', () => {
   const groups = selectorGroups(cssCode);
 
   it('선택자 그룹이 실제로 추출된다 (파서 자체 가드)', () => {
@@ -82,7 +82,7 @@ function declared(selector: string, prop: string): string | undefined {
   return undefined;
 }
 
-describe('21-cloudroute-table.css — 판과 손가락', () => {
+describe('22-cloudroute-table.css — 판과 손가락', () => {
   it('판은 7×7 정사각 격자다 — 폭 미디어 없이 화면 폭을 따라 줄어든다', () => {
     expect(declared('.cr-board', 'grid-template-columns')).toBe('repeat(7, minmax(0, 1fr))');
     expect(declared('.cr-board', 'aspect-ratio')).toBe('1 / 1');
