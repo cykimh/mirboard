@@ -129,7 +129,11 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[4].displayName").value("요트"))
                 .andExpect(jsonPath("$.games[4].minPlayers").value(1))
                 .andExpect(jsonPath("$.games[4].maxPlayers").value(4))
-                .andExpect(jsonPath("$.games[4].supportedRoomOptions.length()").value(0))
+                // D-202 — 진행 방식(차례대로 / 모두 같이)
+                .andExpect(jsonPath("$.games[4].supportedRoomOptions.length()").value(1))
+                .andExpect(jsonPath("$.games[4].supportedRoomOptions[0]").value("TURN_MODE"))
+                .andExpect(jsonPath("$.games[4].roomOptionChoices[0].values").value(
+                        org.hamcrest.Matchers.contains("SEQUENTIAL", "SIMULTANEOUS")))
                 .andExpect(jsonPath("$.games[4].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[4].playerCounts").value(org.hamcrest.Matchers.contains(1, 2, 3, 4)))
                 .andExpect(jsonPath("$.games[4].defaultPlayers").value(4))
