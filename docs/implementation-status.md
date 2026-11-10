@@ -24,7 +24,7 @@
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼·턴 카운트다운 — D-131 공개, `MIRBOARD_ONECARD_STATUS` 로 되돌림) | ✅ | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127~D-131, §17) |
-| 5d | 요트 (순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
+| 5d | 요트 (개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
 | 5e | 오목 (15×15 — 1:1·2:2 팀전, 렌주·삼삼만 금지·자유 오목 금수, 봇 3단계, 휴대폰 두 단계 확정 착수, 기록·무승부 — 게임 중립 확장 3건 D-176, D-190 공개, `MIRBOARD_OMOK_STATUS` 로 되돌림) | ✅ | `domain.game.omok`, `client/src/features/omok`, `docs/rules-omok.md` (D-175~D-180·D-190, §19) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
@@ -464,13 +464,15 @@
 
 ## 18. 요트 (S0~S5, D-181~D-183·D-200)
 
-- **룰**: 주사위 5개·차례마다 최대 3번 굴림·12칸(상단 63 이상 +35, 풀 하우스에 5개 같음 인정), 1~4인 순차 진행, 혼자 하기 가능(기록 없음).
+- **룰**: 주사위 5개·차례마다 최대 3번 굴림·12칸(상단 63 이상 +35, 풀 하우스에 5개 같음 인정), 1~4인 순차 진행, 혼자 하기 가능(승패 없음 — 총점은 개인 최고 점수로, D-201).
   정본 `docs/rules-yacht.md`, 설계 `docs/plans/yacht.md`.
 - **포트**: `GameContext.turnSeconds`(D-183) — 한 차례가 여러 액션이라 엔진이 차례 시작 시각을 상태에 두고 엔진 타이머로 차례 전체 마감을 건다
   (만기면 최고점 칸 자동 기록). 인프라 코드 0줄, `grep -rniE 'yacht|요트' …/infra` 0건. 비공개 뷰 없음.
 - **봇**: 공개 정보만 보는 결정적 휴리스틱 — 주사위 묶음 252가지 점수를 미리 계산해 홀드 마스크 31개의 기대값을 전수로 본다. 1인 평균 177점
   (무작위 39 · 탐욕 78).
 - **기록**: `yacht_match_results`·`yacht_match_participants` + `user_game_stats`(YACHT), 상대 전적은 최종 순위.
+- **개인 최고 점수(D-201)**: 1인 판은 `yacht_solo_scores`(V17)에만, 최고 = 1인 판 + 끝까지 친 여럿 판 중 최고(게스트·봇 제외). 게임 중립 포트
+  `BestScoreSource` → `GET /api/users/{id}/stats` 의 `games[].bestScore`. 게임판 종료 화면("새 최고 기록!")·프로필·대기실 참가자 카드.
 - **클라**: `features/yacht` — 주사위 판(실시간 홀드·굴림), 점수표(차례 열 후보 점수, 내 차례면 칸 눌러 기록), 차례 카운트다운(`tableView.turnRemainingMs`),
   홀드 모아 보내기·`BUSY` 재전송(D-200), 튜토리얼 6단계 + 퀴즈. e2e `practice.e2e.ts` 에 요트 포함(데스크톱·휴대폰).
 - **테스트**: 요트 도메인 106건(점수 전수 7,776×12, 1~4인 시뮬레이션 각 2,000판) + Docker IT 5건(`YachtBotMatchSimulationIT`·`YachtRecorderFailureTest`),

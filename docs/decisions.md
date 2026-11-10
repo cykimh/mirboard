@@ -312,6 +312,14 @@ main 에 넣는 동안 기본 `DISABLED` 로 숨겼다가, 클라 게임판이 �
 `BETTING` 미지원). 포트 확장 없이 붙는다(엔진 타이머·비공개 뷰 불필요 — 숨길 것은 편지 더미 순서뿐). 설계 `docs/plans/property-board.md`,
 룰 정본 `docs/rules-cloudroute.md`.
 
+## D-201 (2026-11-10) — 요트 개인 최고 점수: 1인 판은 새 테이블 `yacht_solo_scores`(V17), 최고 = 끝까지 친 모든 요트 판
+
+사용자 결정. 혼자 끝까지 친 판(`FINISHED`)의 총점을 `yacht_solo_scores`(V17 — `users` 컬럼 아님, D-02)에 남긴다. 승패·레이팅·전적은 여전히 없다(D-181).
+"내 최고 점수"는 1인 판과 여럿 판(탈주하지 않고 `FINISHED` 로 끝난 판의 `yacht_match_participants.total_score`) 중 최고다. 게스트·봇은 쓰지도 보이지도 않는다
+(랭킹 제외와 같은 규칙 — 게스트가 쓰지 않으므로 게스트 정리 계약 2도 그대로다). 게임 중립 포트 `BestScoreSource`(상대 전적 `HeadToHeadSource` 와 같은 모양)로
+게임이 최고 점수를 내고 `GET /api/users/{id}/stats` 의 `games[].bestScore` 로 싣는다 — 최고 점수만 있는 게임(혼자만 한 요트)도 0승 0패 줄로 들어간다.
+보이는 곳은 게임판 종료 화면("내 최고 N점", 넘으면 "새 최고 기록!")·프로필 게임별 전적·대기실 참가자 카드.
+
 ## D-200 (2026-11-09) — 요트 공개(S5): 원카드와 함께 연다
 
 사용자 결정. 요트를 바로 공개한다 — 코드 기본값을 `DISABLED` 에서 `AVAILABLE` 로 바꿔 main 병합·배포와 함께 원카드 옆에 연다. 되돌리기는

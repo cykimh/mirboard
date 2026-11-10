@@ -20,6 +20,11 @@ describe('primaryGame (D-115 — 헤더 티어 배지의 기준 게임)', () => 
     expect(primaryGame([rec('SKULL_KING', 1, 0), rec('TICHU', 0, 1)])?.gameType).toBe('SKULL_KING');
   });
 
+  it('D-201 — 최고 점수만 있는 0승 0패 줄은 기준이 되지 않는다', () => {
+    expect(primaryGame([{ ...rec('YACHT', 0, 0), bestScore: 230 }])).toBeNull();
+    expect(primaryGame([{ ...rec('YACHT', 0, 0), bestScore: 230 }, rec('TICHU', 0, 1)])?.gameType).toBe('TICHU');
+  });
+
   it('한 판도 안 했으면 없음', () => {
     expect(primaryGame([])).toBeNull();
   });

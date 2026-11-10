@@ -12,15 +12,52 @@ interface Props {
   nameOf: (seat: number) => string;
   onExit?: () => void;
   onBackToRoom?: () => void;
+  /** D-201 — 판을 시작할 때의 내 최고 점수(`null` = 기록 없음, `undefined` = 모름·관전). */
+  previousBest?: number | null;
+  /** D-201 — 게스트는 최고 기록이 남지 않는다. */
+  guest?: boolean;
+}
+
+/**
+ * D-201 — 종료 화면의 최고 기록 한 줄. 끝까지 친 판(`FINISHED`)에서 탈주하지 않은 내 총점만 기록이 된다(서버 `YachtBestScore` 와 같은 셈).
+ */
+export function bestLine(
+  result: MatchResult,
+  mySeat: number,
+  previousBest: number | null | undefined,
+  guest: boolean,
+): { text: string; record: boolean } | null {
+  const mine = result.placements.find((p) => p.seat === mySeat);
+  if (!mine) return null;
+  if (guest) return { text: '게스트는 최고 기록이 남지 않아요.', record: false };
+  if (previousBest === undefined) return null;
+  const counts = result.reason === 'FINISHED' && !mine.deserted;
+  if (counts && (previousBest === null || mine.total > previousBest)) {
+    return {
+      text: previousBest === null ? `첫 최고 기록 ${mine.total}점!` : `새 최고 기록! (이전 ${previousBest}점)`,
+      record: true,
+    };
+  }
+  return previousBest === null ? null : { text: `내 최고 ${previousBest}점`, record: false };
 }
 
 /** 순위 카드 — 게임판을 유지한 채 보여 준다(D-120·D-153). 1인 판은 내 총점만. */
-export function YachtMatchEnd({ result, mySeat, nameOf, onExit, onBackToRoom }: Props) {
+export function YachtMatchEnd({
+  result,
+  mySeat,
+  nameOf,
+  onExit,
+  onBackToRoom,
+  previousBest,
+  guest = false,
+}: Props) {
   const solo = result.placements.length === 1;
+  const best = bestLine(result, mySeat, previousBest, guest);
   return (
     <section className="yt-end" aria-label="게임 결과">
       <h2 className="yt-end-title">{solo ? `총점 ${result.placements[0].total}점` : '결과'}</h2>
       <p className="yt-end-reason">{REASON_TEXT[result.reason]}</p>
+      {best && <p className={`yt-end-best${best.record ? ' yt-end-best-new' : ''}`}>{best.text}</p>}
       {!solo && (
         <ol className="yt-end-list">
           {result.placements.map((p) => (
@@ -35,7 +72,7 @@ export function YachtMatchEnd({ result, mySeat, nameOf, onExit, onBackToRoom }: 
           ))}
         </ol>
       )}
-      {solo && <p className="yt-end-note">혼자 한 판은 전적에 남지 않습니다.</p>}
+      {solo && <p className="yt-end-note">혼자 한 판은 승패 없이 최고 기록에만 남습니다.</p>}
       <div className="yt-end-actions">
         {onBackToRoom && (
           <button type="button" className="yt-roll" onClick={onBackToRoom}>

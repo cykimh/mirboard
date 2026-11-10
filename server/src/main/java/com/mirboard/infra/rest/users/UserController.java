@@ -1,12 +1,17 @@
 package com.mirboard.infra.rest.users;
 
 import com.mirboard.domain.game.core.GameRegistry;
+import com.mirboard.domain.game.scoring.BestScoreService;
 import com.mirboard.domain.game.scoring.HeadToHeadService;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,13 +39,15 @@ public class UserController {
     private final UserGameStatsService gameStats;
     private final GameRegistry games;
     private final HeadToHeadService headToHead;
+    private final BestScoreService bestScores;
 
     public UserController(UserRepository userRepo, UserGameStatsService gameStats, GameRegistry games,
-                          HeadToHeadService headToHead) {
+                          HeadToHeadService headToHead, BestScoreService bestScores) {
         this.userRepo = userRepo;
         this.gameStats = gameStats;
         this.games = games;
         this.headToHead = headToHead;
+        this.bestScores = bestScores;
     }
 
     @GetMapping("/{userId}/stats")
@@ -140,10 +147,22 @@ public class UserController {
 
     private UserStatsResponse toResponse(User u) {
         GameStats legacy = gameStats.get(u.getId(), LEGACY_GAME);
-        List<GameRecord> played = gameStats.playedGames(u.getId()).stream()
-                .map(g -> new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(g),
-                        g.winCount(), g.loseCount(), g.desertCount()))
-                .toList();
+        // D-201 — 최고 점수를 내는 게임은 그 값을 싣고, 최고 점수만 있는 게임(혼자만 한 요트)은 0승 0패 줄로 덧붙인다.
+        Map<String, Integer> best = bestScores.bestScores(u);
+        List<GameRecord> played = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (GameStats g : gameStats.playedGames(u.getId())) {
+            seen.add(g.gameType());
+            played.add(new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(g),
+                    g.winCount(), g.loseCount(), g.desertCount(), best.get(g.gameType())));
+        }
+        best.forEach((gameType, score) -> {
+            if (seen.add(gameType)) {
+                GameStats g = gameStats.get(u.getId(), gameType);
+                played.add(new GameRecord(gameType, g.rating(), gameStats.tierOf(g),
+                        g.winCount(), g.loseCount(), g.desertCount(), score));
+            }
+        });
         return new UserStatsResponse(
                 u.getId(),
                 u.getUsername(),
@@ -156,7 +175,7 @@ public class UserController {
     }
 
     /**
-     * @param games 한 판이라도 한 게임별 전적 (D-115). 최상위 필드는 TICHU 호환 값.
+     * @param games 한 판이라도 한 게임별 전적 (D-115) + 최고 점수만 있는 게임(D-201). 최상위 필드는 TICHU 호환 값.
      */
     public record UserStatsResponse(
             long userId,
@@ -169,12 +188,14 @@ public class UserController {
             List<GameRecord> games) {
     }
 
+    /** @param bestScore D-201 — 개인 최고 점수. 점수를 겨루는 게임(요트)만, 셀 판이 없거나 게스트면 null. */
     public record GameRecord(
             String gameType,
             int rating,
             String tier,
             int winCount,
             int loseCount,
-            int desertCount) {
+            int desertCount,
+            Integer bestScore) {
     }
 }

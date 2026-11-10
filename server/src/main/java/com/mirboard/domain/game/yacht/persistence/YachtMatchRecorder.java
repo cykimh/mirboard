@@ -11,6 +11,8 @@ import com.mirboard.domain.game.yacht.event.YachtMatchCompleted;
 import com.mirboard.domain.game.yacht.state.MatchResult;
 import com.mirboard.domain.game.yacht.state.MatchResult.Placement;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
+import com.mirboard.domain.lobby.auth.GuestPolicy;
+import com.mirboard.domain.lobby.auth.UserRepository;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,8 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 요트 매치 종료를 {@code yacht_match_results/participants} 에 적재하고 게임별 전적(YACHT 행)을 갱신한다 (S3). 원카드
  * 기록기와 같은 규칙: 봇·게스트가 낀 매치는 승패만, ELO 는 제외({@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
  *
- * <p><b>1인 매치는 아무것도 쓰지 않는다</b>(D-181) — 결과·참가자·전적 셋 중 일부만 쓰면 게스트 정리 계약(`docs/game-port.md`
- * "매치 기록기 계약" 2)이 깨지고, 상대 없는 판의 승패는 뜻이 없다. 1인 + 봇은 2인 이상 매치다.
+ * <p><b>1인 매치는 결과·참가자·전적을 쓰지 않는다</b>(D-181) — 셋 중 일부만 쓰면 게스트 정리 계약(`docs/game-port.md`
+ * "매치 기록기 계약" 2)이 깨지고, 상대 없는 판의 승패는 뜻이 없다. 1인 + 봇은 2인 이상 매치다. 대신 끝까지 친 판({@code FINISHED})의
+ * 총점만 개인 최고 점수용 {@code yacht_solo_scores} 에 남긴다(D-201) — 게스트·봇은 쓰지 않는다.
  *
  * <p>승리는 1위다 — 동순위면 모두(룰 §8.2). ELO 는 개인전 쌍대 방식({@link EloCalculator#applyFreeForAll})에 순위를 점수로
  * 넘긴다(점수 = 좌석 수 − 순위).
@@ -45,6 +48,7 @@ public class YachtMatchRecorder {
     private final UserGameStatsService stats;
     private final BotUserRegistry bots;
     private final RatedMatchPolicy ratedMatchPolicy;
+    private final UserRepository users;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -52,12 +56,14 @@ public class YachtMatchRecorder {
                               UserGameStatsService stats,
                               BotUserRegistry bots,
                               RatedMatchPolicy ratedMatchPolicy,
+                              UserRepository users,
                               ObjectMapper objectMapper,
                               Clock clock) {
         this.jdbc = jdbc;
         this.stats = stats;
         this.bots = bots;
         this.ratedMatchPolicy = ratedMatchPolicy;
+        this.users = users;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -68,8 +74,7 @@ public class YachtMatchRecorder {
         List<Long> playerIds = event.playerIds();
         MatchResult result = event.result();
         if (playerIds.size() < 2) {
-            log.info("Yacht solo match not recorded: room={} reason={} total={}", event.roomId(), result.reason(),
-                    result.placements().isEmpty() ? null : result.placements().get(0).total());
+            recordSolo(event);
             return;
         }
         Map<Integer, Placement> bySeat = new HashMap<>();
@@ -115,6 +120,21 @@ public class YachtMatchRecorder {
 
         log.info("Yacht match recorded: room={} matchId={} reason={} winners={} eloApplied={} ratings={}",
                 event.roomId(), matchId, result.reason(), winners, rated, newRatings);
+    }
+
+    /** D-201 — 혼자 끝까지 친 판의 총점만. 게스트·봇·중간에 끝난 판(나가기 등)은 남기지 않는다. */
+    private void recordSolo(YachtMatchCompleted event) {
+        MatchResult result = event.result();
+        Integer total = result.placements().isEmpty() ? null : result.placements().get(0).total();
+        long userId = event.playerIds().get(0);
+        boolean keep = result.reason() == MatchResult.EndReason.FINISHED && total != null
+                && !bots.isBot(userId) && !users.findById(userId).map(u -> GuestPolicy.isGuest(u.getUsername())).orElse(true);
+        if (keep) {
+            jdbc.update("INSERT INTO yacht_solo_scores (user_id, room_id, total_score, finished_at) VALUES (?, ?, ?, ?)",
+                    userId, event.roomId(), total, Timestamp.from(Instant.now(clock)));
+        }
+        log.info("Yacht solo match: room={} reason={} total={} bestScoreKept={}", event.roomId(), result.reason(), total,
+                keep);
     }
 
     private String payload(MatchResult result) {

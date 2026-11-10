@@ -23,6 +23,8 @@ import { YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
 import { BIG_CATEGORIES, CATEGORY_LABEL } from './yachtLabels';
 import { YACHT_TUTORIAL } from './tutorial/yachtTutorial';
+import { useYachtBest } from './useYachtBest';
+import { isGuestName } from '@/features/stats/playerTiers';
 
 /** 차례 카운트다운이 0 이 된 뒤 이만큼(+ 지터) 지나도 같은 차례면 한 번 다시 받는다(원카드 D-140 과 같은 복구). */
 export const STALE_TURN_GRACE_MS = 2000;
@@ -108,6 +110,9 @@ export function YachtTable({
   const canHold = myTurn && connected && s.rolls >= 1 && s.rolls < MAX_ROLLS;
   const canRoll = myTurn && connected && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
   const canScore = myTurn && connected && s.rolls >= 1;
+  // D-201 — 판 시작 때의 내 최고 점수(종료 화면이 "새 최고 기록!"을 가른다). 관전자·게스트는 묻지 않는다.
+  const guest = isGuestName(usernames[myUserId]);
+  const previousBest = useYachtBest(token, myUserId, !spectator && !guest);
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
@@ -391,7 +396,15 @@ export function YachtTable({
       />
 
       {s.result && (
-        <YachtMatchEnd result={s.result} mySeat={mySeat} nameOf={nameOf} onExit={onExit} onBackToRoom={onBackToRoom} />
+        <YachtMatchEnd
+          result={s.result}
+          mySeat={mySeat}
+          nameOf={nameOf}
+          onExit={onExit}
+          onBackToRoom={onBackToRoom}
+          previousBest={previousBest}
+          guest={guest}
+        />
       )}
 
       {roomFinished && !s.result && (

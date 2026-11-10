@@ -39,8 +39,8 @@ import org.testcontainers.utility.DockerImageName;
 
 /**
  * 요트 S3 완료 기준 — 정의 등록 → GameStartingEvent → 라운드 시작 → BotScheduler(휴리스틱) → 매치 종료 → 기록까지 전 배선.
- * 손을 놓은 사람은 <b>차례 전체 제한(엔진 타이머, D-183)</b>이 자동 기록으로 대신 진행해 끝까지 간다. 1인 판은 끝나도 아무것도
- * 기록하지 않고(D-181) 대기실로 돌아간다(D-153).
+ * 손을 놓은 사람은 <b>차례 전체 제한(엔진 타이머, D-183)</b>이 자동 기록으로 대신 진행해 끝까지 간다. 1인 판은 매치·전적을
+ * 기록하지 않고(D-181) 총점만 개인 최고 점수로 남긴 채(D-201) 대기실로 돌아간다(D-153).
  */
 @SpringBootTest
 @Testcontainers
@@ -102,7 +102,7 @@ class YachtBotMatchSimulationIT {
         assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
     }
 
-    /** D-181 — 혼자 하기: 방장 혼자 "1명으로 시작", 끝나면 기록 0행, 대기실로 돌아간다. */
+    /** D-181 — 혼자 하기: 방장 혼자 "1명으로 시작", 끝나면 매치 기록 0행(총점만 D-201 표에), 대기실로 돌아간다. */
     @Test
     void a_solo_match_ends_without_any_record_and_returns_to_the_waiting_room() {
         long human = newUser("yt_solo_");
@@ -123,6 +123,9 @@ class YachtBotMatchSimulationIT {
                 Integer.class, room.roomId())).isZero();
         GameStats soloStats = stats.get(human, YachtGameDefinition.ID);
         assertThat(soloStats.winCount() + soloStats.loseCount()).as("1인 판은 전적 없음").isZero();
+        // D-201 — 끝까지 친 1인 판의 총점만 개인 최고 점수용으로 남는다.
+        assertThat(jdbc.queryForObject("SELECT total_score FROM yacht_solo_scores WHERE room_id = ?",
+                Integer.class, room.roomId())).isEqualTo(ended.result().placements().get(0).total());
     }
 
     private long newUser(String prefix) {
