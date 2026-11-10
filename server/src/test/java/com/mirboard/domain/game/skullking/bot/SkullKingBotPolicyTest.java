@@ -12,20 +12,22 @@ import com.mirboard.domain.game.skullking.card.SkullSuit;
 import com.mirboard.domain.game.skullking.card.TigressMode;
 import com.mirboard.domain.game.skullking.state.PlayedCard;
 import com.mirboard.domain.game.skullking.state.PlayerState;
+import com.mirboard.domain.game.skullking.state.SkullKingMatchState;
 import com.mirboard.domain.game.skullking.state.SkullKingState;
 import com.mirboard.domain.game.skullking.state.TrickState;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-119 — 결정적 휴리스틱 정책. 시나리오는 "사람이라면 이렇게 둔다"가 분명한 국면만
- * 골랐고(가장 싼 승리 카드·가장 위험한 카드 털기·티그리스 선언), 전함수성(어떤 합법수
- * 집합에도 그 원소 하나를 돌려준다)을 따로 고정한다.
+ * D-230 — 상대 모델 봇. 시나리오는 표본과 무관하게 답이 분명한 국면만 고르고(이겨야 하면
+ * 이기는 수, 져야 하면 탈출·티그리스를 아끼는 수, 센 손패면 높은 예측), 전함수성·결정성을
+ * 무작위 국면에서 따로 고정한다. 강도는 {@link SkullKingBotStrengthTest}.
  */
 class SkullKingBotPolicyTest {
 
-    /** 합법수 계산은 상태만 본다 — 컨텍스트의 인원은 결과와 무관하다. */
     private static final SkullKingEngine RULES =
             new SkullKingEngine(new GameContext("bot-policy", List.of(1L, 2L)));
 
@@ -41,7 +43,6 @@ class SkullKingBotPolicyTest {
         return SkullCard.of(SkullSuit.BLACK, rank);
     }
 
-    /** 좌석 0 의 입찰 국면 — 남의 손패는 뷰에 안 들어가므로 비워 둔다. */
     private static SkullKingState.Bidding bidding(int seatCount, List<SkullCard> hand) {
         List<PlayerState> players = new ArrayList<>();
         for (int seat = 0; seat < seatCount; seat++) {
@@ -50,10 +51,7 @@ class SkullKingBotPolicyTest {
         return new SkullKingState.Bidding(hand.size(), players, 0);
     }
 
-    /**
-     * {@code seat} 차례의 플레이 국면. {@code trickCards} 는 그 직전 좌석들이 순서대로 낸
-     * 카드이고, 승수는 0 이라 남은 필요 승수 = {@code bid} 다.
-     */
+    /** {@code seat} 차례의 플레이 국면 — 남의 예측은 0, 승수 0. */
     private static SkullKingState.Playing playing(int seatCount, int seat, int bid,
                                                   List<SkullCard> hand,
                                                   List<SkullCard> trickCards) {
@@ -64,9 +62,8 @@ class SkullKingBotPolicyTest {
         }
         List<PlayerState> players = new ArrayList<>();
         for (int s = 0; s < seatCount; s++) {
-            players.add(s == seat
-                    ? new PlayerState(s, hand, bid, List.of())
-                    : new PlayerState(s, List.of(), 0, List.of()));
+            players.add(new PlayerState(s, s == seat ? hand : List.of(), s == seat ? bid : 0,
+                    List.of()));
         }
         return new SkullKingState.Playing(
                 Math.max(1, hand.size()), players, lead, new TrickState(lead, played));
@@ -89,94 +86,64 @@ class SkullKingBotPolicyTest {
     }
 
     @Test
-    void last_to_play_wins_as_cheaply_as_possible() {
-        SkullKingState state = playing(4, 3, 1,
-                List.of(green(13), green(14), SkullCard.pirate()),
-                List.of(green(10), green(12), green(5)));
-
-        assertThat(choose(state, 3))
-                .as("셋 다 확실히 이기면 가장 싼 카드 — 초록 14·해적은 아껴 둔다")
-                .isEqualTo(PlayCard.of(green(13)));
+    void must_win_now_declares_tigress_as_pirate() {
+        // 2인 · 남은 두 트릭을 다 이겨야 한다. 초록 2 는 초록 14 를 못 이긴다.
+        SkullKingState state = playing(2, 1, 2, List.of(SkullCard.tigress(), green(2)),
+                List.of(green(14)));
+        assertThat(choose(state, 1)).isEqualTo(PlayCard.tigress(TigressMode.PIRATE));
     }
 
     @Test
-    void at_bid_sheds_the_biggest_liability_safely() {
+    void at_bid_keeps_the_tigress_for_later() {
+        // 0 예측을 지켜야 한다 — 초록 2 로 지금 지면 다음 트릭은 티그리스 탈출 선언으로 확실히 진다.
+        SkullKingState state = playing(2, 1, 0, List.of(SkullCard.tigress(), green(2)),
+                List.of(green(14)));
+        assertThat(choose(state, 1)).isEqualTo(PlayCard.of(green(2)));
+    }
+
+    @Test
+    void at_bid_saves_the_escape_while_everything_loses() {
         SkullKingState state = playing(2, 1, 0,
                 List.of(SkullCard.mermaid(), black(14), SkullCard.escape()),
                 List.of(SkullCard.pirate()));
-
         assertThat(choose(state, 1))
-                .as("해적 아래서는 셋 다 진다 — 나중에 떠안기 가장 위험한 인어를 턴다")
-                .isEqualTo(PlayCard.of(SkullCard.mermaid()));
+                .as("해적 아래서는 셋 다 진다 — 확실히 지는 탈출은 나중을 위해 남긴다")
+                .isNotEqualTo(PlayCard.of(SkullCard.escape()));
     }
 
     @Test
-    void tigress_declaration_follows_need() {
-        List<SkullCard> trick = List.of(green(14));
-
-        assertThat(choose(playing(2, 1, 1, List.of(SkullCard.tigress(), green(2)), trick), 1))
-                .as("이겨야 하면 해적 선언")
-                .isEqualTo(PlayCard.tigress(TigressMode.PIRATE));
-        assertThat(choose(playing(2, 1, 0, List.of(SkullCard.tigress(), green(2)), trick), 1))
-                .as("져야 하면 티그리스는 보존하고 초록 2 로 진다")
-                .isEqualTo(PlayCard.of(green(2)));
-        assertThat(choose(playing(2, 1, 0, List.of(SkullCard.tigress()), trick), 1))
-                .as("티그리스뿐이면 탈출 선언")
-                .isEqualTo(PlayCard.tigress(TigressMode.ESCAPE));
+    void last_to_play_with_need_takes_the_trick() {
+        SkullKingState state = playing(4, 3, 1,
+                List.of(green(3), green(13), SkullCard.escape()),
+                List.of(green(10), green(12), green(5)));
+        assertThat(choose(state, 3)).isEqualTo(PlayCard.of(green(13)));
     }
 
     @Test
-    void leads_the_cheapest_likely_winner() {
-        SkullKingState state = playing(4, 0, 1,
-                List.of(SkullCard.skullKing(), SkullCard.pirate(), green(3)), List.of());
-
-        assertThat(choose(state, 0))
-                .as("스컬킹이 내 손에 있으니 해적 리드는 확실 — 스컬킹은 보존")
-                .isEqualTo(PlayCard.of(SkullCard.pirate()));
-    }
-
-    @Test
-    void is_total_when_only_escapes_or_tigress_remain() {
-        SkullKingState escapes = playing(4, 0, 1,
-                List.of(SkullCard.escape(), SkullCard.escape()), List.of());
-        assertThat(choose(escapes, 0)).isEqualTo(PlayCard.of(SkullCard.escape()));
-
-        SkullKingState beaten = playing(2, 1, 1,
-                List.of(SkullCard.tigress()), List.of(SkullCard.skullKing()));
-        assertThat(choose(beaten, 1))
-                .as("이길 수단이 없어도 반드시 하나를 낸다 — 버림 순서상 탈출 선언이 먼저")
-                .isEqualTo(PlayCard.tigress(TigressMode.ESCAPE));
-    }
-
-    @Test
-    void returns_an_element_of_legal_or_null() {
-        SkullKingState.Playing state = playing(3, 1, 1,
-                List.of(green(9), yellow(14), black(2), SkullCard.escape()),
-                List.of(green(5)));
-        SkullKingBotView view = SkullKingBotView.of(state, 1);
-
-        assertThat(SkullKingBotPolicy.choose(view, List.of())).isNull();
-
-        List<SkullKingAction> legal = RULES.legalActions(state, 1);
-        assertThat(legal)
-                .as("초록 리드 — follow 의무로 노랑 14·검정 2 는 빠진다")
-                .containsExactly(PlayCard.of(green(9)), PlayCard.of(SkullCard.escape()));
-        for (int bid = 0; bid <= 3; bid++) {
-            SkullKingState needing = playing(3, 1, bid,
-                    List.of(green(9), yellow(14), black(2), SkullCard.escape()),
-                    List.of(green(5)));
-            assertThat(choose(needing, 1)).isIn(legal);
+    void is_total_deterministic_and_legal_on_random_positions() {
+        Random random = new Random(230L);
+        for (int n = 2; n <= 8; n++) {
+            List<Long> ids = new ArrayList<>();
+            for (long i = 0; i < n; i++) {
+                ids.add(i + 1);
+            }
+            SkullKingEngine engine = new SkullKingEngine(new GameContext("policy", ids));
+            for (int round = 1; round <= SkullKingMatchState.TOTAL_ROUNDS; round += 3) {
+                SkullKingState state = engine.startRound(
+                        new SkullKingMatchState(round, 0, Map.of()), random).newState();
+                while (!engine.isRoundOver(state)) {
+                    int seat = engine.pendingSeats(state).get(0);
+                    List<SkullKingAction> legal = engine.legalActions(state, seat);
+                    SkullKingBotView view = SkullKingBotView.of(state, seat);
+                    SkullKingAction action = SkullKingBotPolicy.choose(view, legal);
+                    assertThat(legal).contains(action);
+                    assertThat(SkullKingBotPolicy.choose(view, legal))
+                            .as("같은 뷰면 같은 수 — 시간·외부 난수 없음").isEqualTo(action);
+                    state = engine.apply(state, seat, action).newState();
+                }
+            }
         }
-
-        SkullKingAction first = SkullKingBotPolicy.choose(view, legal);
-        assertThat(SkullKingBotPolicy.choose(view, legal))
-                .as("Random 을 쓰지 않는다 — 같은 입력이면 같은 액션")
-                .isEqualTo(first);
-
-        SkullKingBotView strong = SkullKingBotView.of(bidding(4, List.of(
-                SkullCard.skullKing(), SkullCard.pirate(), SkullCard.pirate())), 0);
-        assertThat(SkullKingBotPolicy.choose(strong, List.of(new PlaceBid(0), new PlaceBid(1))))
-                .as("목표 예측(3)이 합법수에 없으면 가장 가까운 합법 예측")
-                .isEqualTo(new PlaceBid(1));
+        assertThat(SkullKingBotPolicy.choose(
+                SkullKingBotView.of(bidding(2, List.of(green(1))), 0), List.of())).isNull();
     }
 }

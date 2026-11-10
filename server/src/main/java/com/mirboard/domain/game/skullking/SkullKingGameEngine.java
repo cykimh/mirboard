@@ -176,7 +176,7 @@ public final class SkullKingGameEngine implements GameEngine {
             return null;
         }
         try {
-            SkullKingAction chosen = policy.apply(SkullKingBotView.of(sk, seat), legal);
+            SkullKingAction chosen = policy.apply(SkullKingBotView.of(sk, matchState(), seat), legal);
             if (chosen != null && legal.contains(chosen)) {
                 return chosen;
             }
