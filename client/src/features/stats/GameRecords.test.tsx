@@ -20,6 +20,18 @@ describe('GameRecords (D-115 — 프로필 게임별 전적)', () => {
     expect(screen.getByText(/0승 2패 · 탈주 1/)).toBeTruthy();
   });
 
+  it('D-201 — 개인 최고 점수가 있으면 함께 보인다', () => {
+    render(
+      <GameRecords
+        records={[
+          { gameType: 'YACHT', rating: 1000, tier: 'MISSILE', winCount: 0, loseCount: 0, desertCount: 0, bestScore: 231 },
+        ]}
+        names={{ YACHT: '요트' }}
+      />,
+    );
+    expect(screen.getByText('최고 231점')).toBeTruthy();
+  });
+
   it('표시명을 모르면 게임 id 로 폴백', () => {
     render(
       <GameRecords

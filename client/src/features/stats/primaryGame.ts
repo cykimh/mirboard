@@ -7,6 +7,8 @@ import type { GameRecord } from '@/api/users';
 export function primaryGame(records: GameRecord[]): GameRecord | null {
   let best: GameRecord | null = null;
   for (const r of records) {
+    // D-201 — 최고 점수만 있는 줄(혼자만 한 요트, 0승 0패)은 계급 기준이 되지 않는다.
+    if (r.winCount + r.loseCount === 0) continue;
     if (!best || r.winCount + r.loseCount > best.winCount + best.loseCount) best = r;
   }
   return best;

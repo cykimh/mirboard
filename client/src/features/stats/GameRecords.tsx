@@ -21,6 +21,8 @@ export function GameRecords({ records, names }: Props) {
           <span className="text-sm text-muted-foreground">
             {r.winCount}승 {r.loseCount}패{r.desertCount > 0 && ` · 탈주 ${r.desertCount}`}
           </span>
+          {/* D-201 — 개인 최고 점수(요트). */}
+          {r.bestScore != null && <span className="text-sm font-medium">최고 {r.bestScore}점</span>}
         </li>
       ))}
     </ul>

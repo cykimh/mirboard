@@ -486,6 +486,17 @@ button.yt-badge {
   opacity: 0.85;
 }
 
+/* D-201 — 최고 기록 한 줄. 새 기록이면 강조. */
+.yt-end-best {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.yt-end-best-new {
+  color: #e0b32a;
+}
+
 .yt-end-list {
   margin: 0;
   padding: 0;

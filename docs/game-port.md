@@ -389,6 +389,9 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
   - 티츄: 상대 팀만 센다(내 팀 승패).
   - 스컬킹: 최종 점수로 센다.
   - 원카드: 최종 순위로 센다.
+- `BestScoreSource`(`domain.game.core`, D-201) — 점수를 겨루는 게임이 자기 기록에서 한 사람의 개인 최고 점수를 낸다. 같은 모양으로
+  `BestScoreService` 가 모으고(게스트·봇은 빈 결과) `GET /api/users/{id}/stats` 의 `games[].bestScore` 로 싣는다. 어떤 판을 셀지는 게임이
+  정한다 — 요트: 혼자 끝까지 친 판(`yacht_solo_scores`, 승패·전적은 없음) + 탈주 없이 `FINISHED` 로 끝난 여럿 판의 총점. 승패만 있는 게임은 두지 않는다.
 
 ### 방 설정이 엔진에 닿는다 — 게임 중립 확장 3건 (D-176)
 

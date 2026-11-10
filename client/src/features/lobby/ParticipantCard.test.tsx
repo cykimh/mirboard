@@ -34,4 +34,17 @@ describe('ParticipantCard — 계급은 이름 왼쪽 (D-174)', () => {
     expect(row.children).toHaveLength(1);
     expect(screen.getByText('첫 판')).toBeInTheDocument();
   });
+
+  it('D-201 — 최고 점수가 있으면 전적 아래에, 혼자만 해 봤으면 그 줄만', () => {
+    renderCard({ record: { ...RECORD, gameType: 'YACHT', bestScore: 245 } });
+    expect(screen.getByText('3승 2패')).toBeInTheDocument();
+    expect(screen.getByText('최고 245점')).toBeInTheDocument();
+  });
+
+  it('D-201 — 0승 0패 + 최고 점수(혼자만 한 요트)면 "첫 판"·승패 없이 최고만', () => {
+    renderCard({ record: { ...RECORD, gameType: 'YACHT', winCount: 0, loseCount: 0, bestScore: 199 } });
+    expect(screen.getByText('최고 199점')).toBeInTheDocument();
+    expect(screen.queryByText('첫 판')).toBeNull();
+    expect(screen.queryByText('0승 0패')).toBeNull();
+  });
 });

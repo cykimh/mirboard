@@ -226,7 +226,7 @@
 - D-154 — `turnSecondsChoices` 는 방 만들기의 턴 제한 선택지(초, 0 = 끔)를 게임이 선언한 것이다. 서버는 선택지 밖 값을 거절하지 않는다(화면 목록).
 - `status` 값: `AVAILABLE` (플레이 가능) / `COMING_SOON` (UI에서 비활성화 표시) /
   `DISABLED` (응답에서 제외).
-- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 네 게임이 모두 공개면(D-131·D-200) 스컬킹·요트·원카드·티츄(운영은 D-168 로 티츄·스컬킹이 `COMING_SOON` 이라 요트·원카드 뒤). 요트는 처음으로 `minPlayers` 1 — 방장 혼자 "1명으로 시작"할 수 있다(D-181, 1인 판은 기록 없음).
+- 정렬: `AVAILABLE` 우선, 그 안에서 displayName 가나다 순 — 네 게임이 모두 공개면(D-131·D-200) 스컬킹·요트·원카드·티츄(운영은 D-168 로 티츄·스컬킹이 `COMING_SOON` 이라 요트·원카드 뒤). 요트는 처음으로 `minPlayers` 1 — 방장 혼자 "1명으로 시작"할 수 있다(D-181, 1인 판은 승패·전적 없음 — 총점만 개인 최고 점수로, D-201).
 - `supportedRoomOptions`(D-106): 이 게임이 **실제로 쓰는** 방 설정. 값은
   `TARGET_SCORE`·`TEAMS`·`BETTING` 이고 enum 선언 순서로 정렬된다. 방 만들기 UI 와
   대기실은 여기 있는 것만 노출하고, 서버도 같은 집합으로 검증한다
@@ -433,7 +433,9 @@ schema constraint 유지.
     { "gameType": "TICHU", "rating": 1120, "tier": "SILVER",
       "winCount": 5, "loseCount": 3, "desertCount": 1 },
     { "gameType": "SKULL_KING", "rating": 985, "tier": "BRONZE",
-      "winCount": 0, "loseCount": 2, "desertCount": 0 }
+      "winCount": 0, "loseCount": 2, "desertCount": 0, "bestScore": null },
+    { "gameType": "YACHT", "rating": 1000, "tier": "MISSILE",
+      "winCount": 0, "loseCount": 0, "desertCount": 0, "bestScore": 231 }
   ]
 }
 ```
@@ -441,6 +443,10 @@ schema constraint 유지.
 **D-115 — 전적은 게임별이다.** `games[]` 는 한 판이라도 한 게임만 싣는다(저장소
 `user_game_stats`). 최상위 `winCount`~`desertCount`·`rating`·`tier` 는 D-115 이전 클라
 호환용으로 **TICHU 값**을 그대로 둔다(안 해 봤으면 기본값 1000/0/0/0).
+
+**D-201 — `bestScore`**: 개인 최고 점수. 점수를 겨루는 게임(`BestScoreSource` 를 둔 게임 — 지금은 요트)만 값이 있고 나머지·기록 없음·게스트·봇은
+`null`. 요트는 혼자 끝까지 친 판(`yacht_solo_scores`)과 탈주 없이 끝까지 친 여럿 판의 총점 중 최고다. 최고 점수만 있는 게임(혼자만 한 요트)도
+`games[]` 에 0승 0패 줄(기본 레이팅·계급)로 들어간다 — "한 판이라도 한 게임"에 혼자 한 판이 더해진 셈이다.
 
 `desertCount` (Phase 19#3, D-75): IN_GAME 탈주(명시 '나가기' / 끊김 후 유예
 미복귀) 누적. 게임행동 derived — D-02 위반 아님.

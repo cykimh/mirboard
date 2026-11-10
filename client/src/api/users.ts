@@ -27,6 +27,8 @@ export interface GameRecord {
   winCount: number;
   loseCount: number;
   desertCount: number;
+  /** D-201 — 개인 최고 점수(점수를 겨루는 게임만 — 요트). 셀 판이 없거나 게스트면 null. 이 값만 있는 게임은 0승 0패 줄이다. */
+  bestScore?: number | null;
 }
 
 /**

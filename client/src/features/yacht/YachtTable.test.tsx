@@ -22,6 +22,15 @@ vi.mock('@/ws/useStompRoom', () => ({
   }),
 }));
 
+// D-201 — 판 시작 때의 내 최고 점수(종료 화면의 "새 최고 기록!").
+const statsMock = vi.fn((_token: string, _userId: number) =>
+  Promise.resolve({ games: [{ gameType: 'YACHT', bestScore: 150 }] }),
+);
+vi.mock('@/api/users', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/users')>();
+  return { ...actual, usersApi: { ...actual.usersApi, stats: (t: string, id: number) => statsMock(t, id) } };
+});
+
 const NONE: Held = [false, false, false, false, false];
 const seat = (n: number, over: Partial<YachtSeatView> = {}): YachtSeatView => ({
   seat: n,
@@ -191,7 +200,7 @@ describe('YachtTable', () => {
     expect(within(card).getByText('98')).toBeInTheDocument();
   });
 
-  it('shows the result with ranks and a solo result without them', () => {
+  it('shows the result with ranks and a solo result without them', async () => {
     seed({
       phase: 'ENDED',
       turnSeat: -1,
@@ -218,7 +227,9 @@ describe('YachtTable', () => {
     });
     render(<YachtTable roomId="r-1" playerIds={[10]} myUserId={10} usernames={NAMES} />);
     expect(screen.getByText('총점 180점')).toBeInTheDocument();
-    expect(screen.getByText('혼자 한 판은 전적에 남지 않습니다.')).toBeInTheDocument();
+    expect(screen.getByText('혼자 한 판은 승패 없이 최고 기록에만 남습니다.')).toBeInTheDocument();
+    // D-201 — 시작 때 최고 150점 → 180점은 새 기록.
+    expect(await screen.findByText('새 최고 기록! (이전 150점)')).toBeInTheDocument();
   });
 
   it('counts down the whole turn and asks for a resync once when the turn seems stuck', () => {

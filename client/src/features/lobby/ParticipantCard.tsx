@@ -59,9 +59,14 @@ export function ParticipantCard({
       </div>
       {!bot && record !== undefined && (
         <div className="flex flex-col items-center gap-1">
-          {record ? (
+          {record && record.winCount + record.loseCount > 0 && (
             <span className="text-xs text-muted-foreground">{recordText(record)}</span>
-          ) : (
+          )}
+          {/* D-201 — 점수를 겨루는 게임(요트)의 개인 최고 점수. 혼자만 해 본 사람은 이 줄만 있다. */}
+          {record?.bestScore != null && (
+            <span className="text-xs text-muted-foreground">최고 {record.bestScore}점</span>
+          )}
+          {(!record || (record.winCount + record.loseCount === 0 && record.bestScore == null)) && (
             <span className="text-xs text-muted-foreground">첫 판</span>
           )}
         </div>
