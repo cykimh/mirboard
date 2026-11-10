@@ -3,6 +3,7 @@ package com.mirboard.domain.game.artillery.invariant;
 import com.mirboard.domain.game.artillery.ArtilleryEngine;
 import com.mirboard.domain.game.artillery.physics.Body;
 import com.mirboard.domain.game.artillery.physics.Terrain;
+import com.mirboard.domain.game.artillery.rules.Item;
 import com.mirboard.domain.game.artillery.rules.Shell;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
 import com.mirboard.domain.game.artillery.state.MatchResult;
@@ -32,11 +33,21 @@ public final class ArtilleryInvariantChecker {
             if (u.seat() != i) {
                 v.add("unit index " + i + " has seat " + u.seat());
             }
-            if (u.hp() < 0 || u.hp() > ArtilleryEngine.MAX_HP) {
-                v.add("seat " + i + " hp out of range: " + u.hp());
+            int maxHp = s.phase() == Phase.PICKING ? ArtilleryEngine.MAX_HP : u.maxHp();   // 고르기 중엔 자리 표시 체력
+            if (u.hp() < 0 || u.hp() > maxHp) {
+                v.add("seat " + i + " hp out of range: " + u.hp() + " max " + maxHp);
             }
             if (u.pumpkins() < 0 || u.pumpkins() > Shell.PUMPKIN.perMatch()) {
                 v.add("seat " + i + " pumpkins out of range: " + u.pumpkins());
+            }
+            if (u.specials() < 0 || u.specials() > Shell.SPECIAL_PER_MATCH) {
+                v.add("seat " + i + " specials out of range: " + u.specials());
+            }
+            if (u.items().size() != new HashSet<>(u.items()).size() || u.items().size() > Item.values().length) {
+                v.add("seat " + i + " items not a set: " + u.items());
+            }
+            if (s.phase() != Phase.PICKING && u.kind() == null) {
+                v.add("seat " + i + " without a unit kind after picking");
             }
             if (u.alive()) {
                 if (u.hp() == 0) {
@@ -53,6 +64,19 @@ public final class ArtilleryInvariantChecker {
             }
         }
         switch (s.phase()) {
+            case PICKING -> {
+                if (s.turnSeat() != -1 || s.turnNo() != 0 || !s.craters().isEmpty()) {
+                    v.add("PICKING after play started: turnSeat=" + s.turnSeat() + " turnNo=" + s.turnNo());
+                }
+                if (s.pickUntil() <= 0) {
+                    v.add("PICKING without pickUntil");
+                }
+                for (Unit u : s.units()) {
+                    if (!u.items().isEmpty() || u.specials() != 0) {
+                        v.add("seat " + u.seat() + " armed before reveal");
+                    }
+                }
+            }
             case AIMING -> {
                 if (s.turnSeat() < 0 || s.turnSeat() >= s.seatCount() || !s.unit(s.turnSeat()).alive()) {
                     v.add("AIMING turn seat not alive: " + s.turnSeat());

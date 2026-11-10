@@ -17,6 +17,8 @@
   border-radius: 10px;
   padding: 16px;
   background: linear-gradient(135deg, #3a1f14, #2a1410);
+  /* D-240 — 바탕이 테마와 무관하게 어두우니 글자도 고정(라이트 테마에서 최종 점수·종료 안내가 바탕에 묻혔다). */
+  color: #fbe9e7;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -103,6 +105,11 @@
   align-items: center;
   gap: 10px;
   margin-top: 8px;
+}
+
+/* D-240 — 버튼 바탕은 밝으니(base button) 패널 글자색을 물려받지 않게 어둡게 고정한다. */
+.match-ended .match-actions button {
+  color: #1a1a1f;
 }
 
 /* Phase 16(#3) — 매치 종료 후 메인 복귀. */

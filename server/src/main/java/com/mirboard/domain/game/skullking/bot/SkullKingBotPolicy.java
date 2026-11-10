@@ -4,46 +4,45 @@ import com.mirboard.domain.game.skullking.action.SkullKingAction;
 import com.mirboard.domain.game.skullking.action.SkullKingAction.PlaceBid;
 import com.mirboard.domain.game.skullking.action.SkullKingAction.PlayCard;
 import com.mirboard.domain.game.skullking.card.SkullCard;
-import com.mirboard.domain.game.skullking.card.SpecialKind;
 import com.mirboard.domain.game.skullking.card.TigressMode;
 import com.mirboard.domain.game.skullking.state.PlayedCard;
+import com.mirboard.domain.game.skullking.state.TrickResult;
+import java.util.Arrays;
 import java.util.List;
+import java.util.SplittableRandom;
 
 /**
- * D-119 — 스컬킹 봇 휴리스틱 (결정적, 전함수). D-102 보류 ② 의 균등 무작위 봇을 대체한다.
+ * D-230 — 스컬킹 봇: 상대 모델 위의 결정화 몬테카를로 (결정적, 전함수).
  *
- * <p><b>입찰</b>: 손패 카드별 "리드했을 때의 승률 × 리드 보정"을 합한 기대 승수를 반올림한다.
- * <br><b>플레이</b>: 남은 필요 승수가 있으면 "이길 만한 카드 중 가장 싼 것", 없으면 "질 만한
- * 카드 중 들고 있기 가장 위험한 것"을 낸다. 승률은 {@link TrickOdds} 가 낸다.
+ * <p>공개 정보에 맞게 남의 손패를 여러 번 뽑고(빈 수트 반영), 뽑은 패마다 후보 수를 하나씩
+ * 두고 남은 라운드를 {@link RoundSim} 의 굴리기 정책(= 상대 모델)으로 끝까지 굴려 <b>내 라운드
+ * 점수(보너스 포함)의 평균</b>이 가장 높은 후보를 낸다. 모든 후보가 같은 표본을 쓴다(공통 난수
+ * — 후보 사이 차이만 남는다).
+ * <ul>
+ *   <li><b>입찰</b>: 남의 예측은 비공개라 뽑은 손패의 어림 + 그 좌석의 예측 버릇으로 정한다
+ *       ({@link OpponentModel}). 후보 = 합법 예측 전부.</li>
+ *   <li><b>플레이</b>: 남의 예측·승수는 공개돼 있다. 표본마다 "그 손패로 그 예측을 했을 법한
+ *       정도"로 무게를 준다.</li>
+ * </ul>
  *
- * <p><b>전함수다.</b> 합법수가 비면 null, 1개면 그 원소를 즉시 돌려주고, 모든 분기는 비지
- * 않은 합법수 위의 최소/최대로 끝나므로 반환값은 항상 합법수의 원소다. {@code Random} 을
- * 쓰지 않으며 동률은 합법수 순서상 앞선 것으로 깬다. 그래도 정책이 실패하면 어댑터가
- * {@code timeoutAction} 으로 떨어진다 ({@code SkullKingGameEngine#chooseBotAction}).
+ * <p><b>결정적이다.</b> 표본 난수 시드는 뷰 내용(카드 코드·예측·좌석)에서만 만든다 — 시간·외부
+ * 난수 없음, enum 의 identity hashCode 없음. 예산은 시간이 아니라 시뮬레이션한 카드 수
+ * ({@link #BUDGET})라 서버 부하와 무관하게 같은 뷰면 같은 수다.
  *
- * <p>상수 5개는 무작위 상대를 기준으로 평가 시드와 다른 시드 계열에서 정했다. 손실 문턱
- * 스윕(0.15/0.25/0.35)에서 지표가 거의 평탄해 과적합 위험은 낮다. 사람 상대 강도는
- * 측정하지 않았다 (D-119).
+ * <p><b>전함수다.</b> 합법수가 비면 null, 1개면 그것. 반환값은 언제나 {@code legal} 의 원소이고
+ * 동률은 합법수 순서상 앞선 것. 그래도 정책이 실패하면 어댑터가 {@code timeoutAction} 으로
+ * 떨어진다 ({@code SkullKingGameEngine#chooseBotAction}).
  */
 public final class SkullKingBotPolicy {
 
-    /** 필요 승수가 남았을 때 "이길 만한" 카드의 승률 문턱 — 이 이상이면 가장 싼 것을 쓴다. */
-    static final double LIKELY_WIN = 0.6;
-
-    /** 이길 만한 카드가 없을 때 그래도 걸어 볼 최소 승률 — 이하면 이기기를 포기하고 버린다. */
-    static final double WORTH_A_TRY = 0.15;
-
-    /** 예측을 채웠을 때 "질 만한" 카드의 승률 문턱 — 이 중 가장 위험한 카드를 털어낸다. */
-    static final double LIKELY_LOSE = 0.2;
-
-    /**
-     * 입찰 리드 보정 — 비검정 색상 카드. 리드 승률은 내가 리드할 때(확률 1/n)만 그대로
-     * 통하고, 남이 리드하면 오프수트가 되어 지기 쉽다. 그 경우 남는 비율.
-     */
-    static final double FOLLOW_PLAIN = 0.3;
-
-    /** 입찰 리드 보정 — 검정. 으뜸패라 오프수트여도 이기므로 비검정보다 훨씬 덜 깎인다. */
-    static final double FOLLOW_BLACK = 0.75;
+    /** 한 수 결정에 시뮬레이션할 카드 수 상한 — 한 수 20ms 이하(D-230 실측)의 근거. */
+    static final int BUDGET = 30_000;
+    static final int MIN_WORLDS = 8;
+    static final int MAX_WORLDS = 256;
+    /** 플레이 중 표본 무게 — 공개 예측과 어림의 차이에 대한 정규분포 폭. */
+    static final double BID_SIGMA = 1.0;
+    /** 빈 수트를 지키며 패를 채우지 못하면 이만큼 다시 섞는다 — 그래도 안 되면 빈 수트를 무시. */
+    private static final int DEAL_RETRIES = 4;
 
     private SkullKingBotPolicy() {
     }
@@ -60,169 +59,299 @@ public final class SkullKingBotPolicy {
         if (legal.size() == 1) {
             return legal.get(0);
         }
-        return view.bidding() ? chooseBid(view, legal) : choosePlay(view, legal);
+        return new Search(view).best(legal);
     }
 
-    // ---------- 입찰 ----------
+    /** 한 번의 결정 — 표본·후보 점수 계산 상태. */
+    private static final class Search {
 
-    private static SkullKingAction chooseBid(SkullKingBotView view, List<SkullKingAction> legal) {
-        int n = view.seatCount();
-        List<SkullCard> pool = view.unseenCards();
-        double expected = 0;
-        for (SkullCard card : view.hand()) {
-            PlayedCard lead = card.is(SpecialKind.TIGRESS)
-                    ? PlayedCard.tigress(view.seat(), TigressMode.PIRATE)
-                    : PlayedCard.of(view.seat(), card);
-            expected += TrickOdds.winProbability(List.of(), lead, n - 1, pool)
-                    * leadFactor(card, n);
+        private final SkullKingBotView view;
+        private final int n;
+        private final int me;
+        private final int[] myHand;
+        /** 미공개 풀 (덱 순서). */
+        private final int[] pool;
+        /** [좌석][수트] — 그 수트가 없다고 공개적으로 드러났는가. */
+        private final boolean[][] void_;
+        /** 좌석별 이번 라운드에 이미 낸 카드 (손패 코드 — 티그리스는 59). */
+        private final int[][] playedBy;
+        private final int[] playedCount;
+        private final int[] handSizes;
+        private final double[] habit;
+        private final boolean[] ghost;
+        private final SplittableRandom random;
+
+        Search(SkullKingBotView view) {
+            this.view = view;
+            this.n = view.seatCount();
+            this.me = view.seat();
+            this.myHand = codes(view.hand());
+            this.pool = codes(view.unseenCards());
+            this.void_ = new boolean[n][4];
+            this.playedBy = new int[n][view.hand().size() + view.completedTricks().size() + 1];
+            this.playedCount = new int[n];
+            for (TrickResult trick : view.completedTricks()) {
+                observe(trick.cards());
+            }
+            observe(view.currentTrick());
+            this.handSizes = new int[n];
+            boolean[] playedNow = new boolean[n];
+            view.currentTrick().forEach(pc -> playedNow[pc.seat()] = true);
+            for (int s = 0; s < n; s++) {
+                handSizes[s] = myHand.length - (playedNow[s] && s != me ? 1 : 0);
+            }
+            this.habit = OpponentModel.habits(view.pastBids(), n);
+            this.ghost = new boolean[n];
+            view.deserted().forEach(s -> ghost[s] = true);
+            this.random = new SplittableRandom(seed(view, myHand));
         }
-        int target = Math.max(0, Math.min(view.hand().size(), (int) Math.floor(expected + 0.5)));
 
-        SkullKingAction best = legal.get(0);
-        int bestDistance = Integer.MAX_VALUE;
-        for (SkullKingAction action : legal) {
-            if (action instanceof PlaceBid bid && Math.abs(bid.bid() - target) < bestDistance) {
-                bestDistance = Math.abs(bid.bid() - target);
-                best = action;
+        /** 트릭 하나의 제출 순서로 빈 수트와 낸 카드를 기록한다. */
+        private void observe(List<PlayedCard> cards) {
+            int[] codes = new int[cards.size()];
+            for (int i = 0; i < cards.size(); i++) {
+                PlayedCard pc = cards.get(i);
+                int lead = CardCode.leadSuit(codes, i);
+                codes[i] = CardCode.played(pc);
+                int card = CardCode.of(pc.card());
+                if (lead >= 0 && CardCode.isSuit(card) && CardCode.suit(card) != lead) {
+                    void_[pc.seat()][lead] = true;
+                }
+                playedBy[pc.seat()][playedCount[pc.seat()]++] = card;
             }
         }
-        return best;
-    }
 
-    /** 리드 승률이 실제 기대 승수로 이어지는 비율. 특수 카드는 리드 여부와 무관하다. */
-    private static double leadFactor(SkullCard card, int seatCount) {
-        if (!card.isSuit()) {
-            return 1.0;
+        SkullKingAction best(List<SkullKingAction> legal) {
+            int candidates = legal.size();
+            RoundSim world = baseWorld();
+            RoundSim sim = new RoundSim(n, view.roundNumber(), myHand.length);
+            int[] index = new int[candidates];
+            int[] played = new int[candidates];
+            int[] bids = new int[candidates];
+            for (int c = 0; c < candidates; c++) {
+                switch (legal.get(c)) {
+                    case PlaceBid bid -> bids[c] = bid.bid();
+                    case PlayCard play -> {
+                        index[c] = indexOf(play.card());
+                        played[c] = play.declaredAs() == null
+                                ? CardCode.of(play.card())
+                                : (play.declaredAs() == TigressMode.PIRATE
+                                        ? CardCode.PIRATE : CardCode.ESCAPE);
+                    }
+                }
+            }
+
+            int perWorld = Math.max(1, candidates * world.remaining);
+            int worlds = Math.clamp(BUDGET / perWorld, MIN_WORLDS, MAX_WORLDS);
+            double[] total = new double[candidates];
+            for (int w = 0; w < worlds; w++) {
+                double weight = deal(world);
+                if (weight <= 0) {
+                    continue;
+                }
+                for (int c = 0; c < candidates; c++) {
+                    sim.copyFrom(world);
+                    if (view.bidding()) {
+                        sim.bid[me] = bids[c];
+                    } else {
+                        sim.play(me, index[c], played[c]);
+                    }
+                    sim.rollout();
+                    total[c] += weight * sim.score(me);
+                }
+            }
+            int pick = 0;
+            for (int c = 1; c < candidates; c++) {
+                if (total[c] > total[pick]) {
+                    pick = c;
+                }
+            }
+            return legal.get(pick);
         }
-        double kept = card.isTrump() ? FOLLOW_BLACK : FOLLOW_PLAIN;
-        return 1.0 / seatCount + (seatCount - 1.0) / seatCount * kept;
+
+        private int indexOf(SkullCard card) {
+            int code = CardCode.of(card);
+            for (int i = 0; i < myHand.length; i++) {
+                if (myHand[i] == code) {
+                    return i;
+                }
+            }
+            throw new IllegalArgumentException("legal action not in hand: " + card);
+        }
+
+        /** 공개된 부분 — 내 손패·예측·승수·지금까지의 보너스·진행 중 트릭. 남의 손패는 비어 있다. */
+        private RoundSim baseWorld() {
+            RoundSim world = new RoundSim(n, view.roundNumber(), myHand.length);
+            System.arraycopy(myHand, 0, world.hand[me], 0, myHand.length);
+            int remaining = 0;
+            for (int s = 0; s < n; s++) {
+                world.handLen[s] = s == me ? myHand.length : 0;
+                remaining += handSizes[s];
+                world.ghost[s] = ghost[s];
+                world.won[s] = view.tricksWon().get(s);
+                world.bid[s] = view.bidding() ? 0 : view.bids().get(s);
+            }
+            for (TrickResult trick : view.completedTricks()) {
+                int[] codes = new int[trick.cards().size()];
+                for (int i = 0; i < codes.length; i++) {
+                    codes[i] = CardCode.played(trick.cards().get(i));
+                }
+                world.bonus[trick.winnerSeat()] +=
+                        CardCode.bonus(codes, codes.length, CardCode.winner(codes, codes.length));
+            }
+            for (PlayedCard pc : view.currentTrick()) {
+                world.trick[world.trickLen] = CardCode.played(pc);
+                world.trickSeat[world.trickLen] = pc.seat();
+                world.trickLen++;
+            }
+            world.leader = view.leadSeat();
+            world.remaining = remaining;
+            return world;
+        }
+
+        /**
+         * 남의 손패를 새로 뽑아 {@code world} 에 채운다. 입찰 중이면 남의 예측도 어림해 넣는다.
+         *
+         * @return 표본 무게 — 플레이 중엔 공개 예측과의 부합도, 입찰 중엔 1
+         */
+        private double deal(RoundSim world) {
+            int[] shuffled = pool.clone();
+            for (int i = shuffled.length - 1; i > 0; i--) {
+                int j = random.nextInt(i + 1);
+                int t = shuffled[i];
+                shuffled[i] = shuffled[j];
+                shuffled[j] = t;
+            }
+            boolean[] taken = new boolean[shuffled.length];
+            boolean ok = false;
+            for (int attempt = 0; attempt <= DEAL_RETRIES && !ok; attempt++) {
+                ok = fill(world, shuffled, taken, attempt < DEAL_RETRIES);
+                if (!ok && attempt < DEAL_RETRIES) {
+                    Arrays.fill(taken, false);
+                    for (int i = shuffled.length - 1; i > 0; i--) {
+                        int j = random.nextInt(i + 1);
+                        int t = shuffled[i];
+                        shuffled[i] = shuffled[j];
+                        shuffled[j] = t;
+                    }
+                }
+            }
+
+            double weight = 1.0;
+            int[] full = new int[myHand.length + playedBy[0].length];
+            for (int s = 0; s < n; s++) {
+                if (s == me) {
+                    continue;
+                }
+                if (view.bidding()) {
+                    world.bid[s] = ghost[s] ? 0 : OpponentModel.predictBid(
+                            n, world.hand[s], world.handLen[s], habit[s], handSizes[s]);
+                } else if (!ghost[s]) {
+                    int len = world.handLen[s];
+                    System.arraycopy(world.hand[s], 0, full, 0, len);
+                    System.arraycopy(playedBy[s], 0, full, len, playedCount[s]);
+                    double gap = view.bids().get(s)
+                            - (OpponentModel.handValue(n, full, len + playedCount[s]) + habit[s]);
+                    weight *= StrictMath.exp(-gap * gap / (2 * BID_SIGMA * BID_SIGMA));
+                }
+            }
+            return weight;
+        }
+
+        /** 빈 수트가 많은 좌석부터 섞인 풀을 앞에서 훑어 채운다. 못 채우면 false. */
+        private boolean fill(RoundSim world, int[] shuffled, boolean[] taken, boolean respectVoids) {
+            for (int s : fillOrder()) {
+                int need = handSizes[s];
+                int len = 0;
+                for (int p = 0; p < shuffled.length && len < need; p++) {
+                    int card = shuffled[p];
+                    if (taken[p] || (respectVoids && CardCode.isSuit(card)
+                            && void_[s][CardCode.suit(card)])) {
+                        continue;
+                    }
+                    taken[p] = true;
+                    world.hand[s][len++] = card;
+                }
+                world.handLen[s] = len;
+                if (len < need) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private int[] fillOrder() {
+            int[] order = new int[n - 1];
+            int k = 0;
+            for (int s = 0; s < n; s++) {
+                if (s != me) {
+                    order[k++] = s;
+                }
+            }
+            // 삽입 정렬 — 빈 수트 수 내림차순, 같으면 좌석 순 (결정적).
+            for (int i = 1; i < order.length; i++) {
+                int x = order[i];
+                int j = i - 1;
+                while (j >= 0 && voids(order[j]) < voids(x)) {
+                    order[j + 1] = order[j];
+                    j--;
+                }
+                order[j + 1] = x;
+            }
+            return order;
+        }
+
+        private int voids(int seat) {
+            int count = 0;
+            for (boolean v : void_[seat]) {
+                count += v ? 1 : 0;
+            }
+            return count;
+        }
     }
 
-    // ---------- 플레이 ----------
+    private static int[] codes(List<SkullCard> cards) {
+        int[] codes = new int[cards.size()];
+        for (int i = 0; i < codes.length; i++) {
+            codes[i] = CardCode.of(cards.get(i));
+        }
+        return codes;
+    }
 
-    private static SkullKingAction choosePlay(SkullKingBotView view, List<SkullKingAction> legal) {
-        int need = view.ownBid() - view.ownTricksWon();
-        int after = view.playersAfterMe();
-        List<SkullCard> pool = view.unseenCards();
-
-        int size = legal.size();
-        PlayCard[] plays = new PlayCard[size];
-        double[] odds = new double[size];
-        for (int i = 0; i < size; i++) {
-            if (legal.get(i) instanceof PlayCard play) {
-                plays[i] = play;
-                odds[i] = TrickOdds.winProbability(view.currentTrick(),
-                        new PlayedCard(view.seat(), play.card(), play.declaredAs()), after, pool);
+    /** 뷰 내용만으로 만든 64비트 시드 (SplitMix64 섞기). */
+    private static long seed(SkullKingBotView view, int[] hand) {
+        long h = 0x5EEDL;
+        h = mix(h, view.seat());
+        h = mix(h, view.seatCount());
+        h = mix(h, view.roundNumber());
+        h = mix(h, view.bidding() ? 1 : 0);
+        h = mix(h, view.leadSeat());
+        for (int c : hand) {
+            h = mix(h, c);
+        }
+        for (TrickResult trick : view.completedTricks()) {
+            for (PlayedCard pc : trick.cards()) {
+                h = mix(h, pc.seat() * 64L + CardCode.played(pc));
             }
         }
-        int pick = need > 0 ? pickToWin(plays, odds) : pickToLose(plays, odds);
-        return pick >= 0 ? legal.get(pick) : legal.get(0);
-    }
-
-    /** 이겨야 한다: 확실한 것 중 가장 싼 것 → 가장 승산 있는 것 → 버림 순서상 가장 싼 것. */
-    private static int pickToWin(PlayCard[] plays, double[] odds) {
-        int pick = -1;
-        for (int i = 0; i < plays.length; i++) {
-            if (plays[i] != null && odds[i] >= LIKELY_WIN
-                    && (pick < 0 || spendCost(plays[i]) < spendCost(plays[pick]))) {
-                pick = i;
+        for (PlayedCard pc : view.currentTrick()) {
+            h = mix(h, 1000 + pc.seat() * 64L + CardCode.played(pc));
+        }
+        for (int b : view.bids()) {
+            h = mix(h, b);
+        }
+        for (List<Integer> round : view.pastBids()) {
+            for (int b : round) {
+                h = mix(h, 77 + b);
             }
         }
-        if (pick >= 0) {
-            return pick;
-        }
-        for (int i = 0; i < plays.length; i++) {
-            if (plays[i] != null && odds[i] > WORTH_A_TRY
-                    && (pick < 0 || odds[i] > odds[pick]
-                        || (odds[i] == odds[pick] && spendCost(plays[i]) < spendCost(plays[pick])))) {
-                pick = i;
-            }
-        }
-        if (pick >= 0) {
-            return pick;
-        }
-        // 승산이 없다 — 가장 싼 카드로 이번 트릭을 버린다. 탈출(예측을 채운 뒤 확실히 지는
-        // 수단)과 티그리스(선언을 골라 쓰는 카드)는 마지막까지 아낀다.
-        for (int i = 0; i < plays.length; i++) {
-            if (plays[i] != null && (pick < 0 || discardKey(plays[i]) < discardKey(plays[pick]))) {
-                pick = i;
-            }
-        }
-        return pick;
+        return h;
     }
 
-    /** 져야 한다: 질 만한 것 중 가장 위험한 것 → 없으면 승률이 가장 낮은 것. */
-    private static int pickToLose(PlayCard[] plays, double[] odds) {
-        int pick = -1;
-        for (int i = 0; i < plays.length; i++) {
-            if (plays[i] != null && odds[i] <= LIKELY_LOSE
-                    && (pick < 0 || liability(plays[i]) > liability(plays[pick]))) {
-                pick = i;
-            }
-        }
-        if (pick >= 0) {
-            return pick;
-        }
-        for (int i = 0; i < plays.length; i++) {
-            if (plays[i] != null
-                    && (pick < 0 || odds[i] < odds[pick]
-                        || (odds[i] == odds[pick] && liability(plays[i]) > liability(plays[pick])))) {
-                pick = i;
-            }
-        }
-        return pick;
-    }
-
-    // ---------- 카드 서열 ----------
-
-    private static boolean escapeLike(PlayCard play) {
-        return play.card().is(SpecialKind.ESCAPE) || play.declaredAs() == TigressMode.ESCAPE;
-    }
-
-    /**
-     * 이기는 데 쓰기 아까운 정도 — 탈출류 0 &lt; 비검정 100+r &lt; 검정 200+r &lt; 인어 300
-     * &lt; 해적 400 &lt; 티그리스(해적 선언) 450 &lt; 스컬킹 500. 티그리스가 해적보다 비싼
-     * 것은 선언을 고를 수 있는 유연성 때문이다.
-     */
-    static int spendCost(PlayCard play) {
-        if (escapeLike(play)) {
-            return 0;
-        }
-        SkullCard card = play.card();
-        if (card.isSuit()) {
-            return card.isTrump() ? 200 + card.rank() : 100 + card.rank();
-        }
-        return switch (card.special()) {
-            case MERMAID -> 300;
-            case PIRATE -> 400;
-            case TIGRESS -> 450;
-            case SKULL_KING -> 500;
-            case ESCAPE -> 0;   // 위에서 걸렸지만 switch 완전성
-        };
-    }
-
-    /**
-     * 손에 들고 있기 위험한 정도 — 나중에 원치 않는 트릭을 가져갈 위험. spendCost 와 같되
-     * 티그리스만 −1: 어느 선언이든 고를 수 있어 들고 있어도 위험하지 않으므로 털 대상에서
-     * 가장 뒤로 민다.
-     */
-    static int liability(PlayCard play) {
-        return play.card().is(SpecialKind.TIGRESS) ? -1 : spendCost(play);
-    }
-
-    /**
-     * 이길 수 없을 때 버리는 순서 — 일반·캐릭터 카드(spendCost 순) &lt; 탈출 &lt; 티그리스
-     * (탈출 선언 &lt; 해적 선언). 탈출은 예측을 채운 뒤 확실히 지는 데, 티그리스는 어느
-     * 쪽으로든 쓸 수 있어 가장 늦게 버린다. 그래도 [탈출, 탈출]·[티그리스]만 남으면 그중
-     * 하나를 반드시 낸다.
-     */
-    static int discardKey(PlayCard play) {
-        if (play.card().is(SpecialKind.TIGRESS)) {
-            return 2000 + (play.declaredAs() == TigressMode.ESCAPE ? 0 : 1);
-        }
-        if (play.card().is(SpecialKind.ESCAPE)) {
-            return 1000;
-        }
-        return spendCost(play);
+    private static long mix(long h, long value) {
+        long z = h + value * 0x9E3779B97F4A7C15L + 0x632BE59BD9B4E019L;
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
     }
 }

@@ -13,21 +13,33 @@ public final class Ballistics {
     public static final int SELF_GRACE_TICKS = 10;
 
     public enum End {
-        TERRAIN, UNIT, OUT, CLOUD, EXPIRED
+        TERRAIN, UNIT, OUT, CLOUD, EXPIRED,
+        /** 홀씨탄이 꼭대기에서 갈라짐 — {@link Trace#apex} 에서 씨앗 셋이 이어 난다(D-224). */
+        SPLIT
     }
 
     /** 표적 하나 — 살아 있는 포대의 몸 중심. */
     public record Target(int seat, int x, int footY) {
     }
 
+    /** 비행 중 한 순간(Q16 위치·속도와 발사부터 센 틱) — 갈라진 씨앗이 여기서 이어 난다. */
+    public record Launch(long x, long y, long vx, long vy, int tick) {
+    }
+
     /**
-     * @param path    2틱마다 한 점 + 끝점 (칸 x, y 를 이어 붙인 목록), 시작점(포구) 포함
+     * @param path    2틱마다 한 점 + 끝점 (칸 x, y 를 이어 붙인 목록), 시작점 포함
      * @param impactX 폭발 칸(TERRAIN·UNIT 일 때만 의미)
      * @param hitSeat 직격 좌석, 아니면 −1
+     * @param ticks   끝난 틱 — <b>발사부터</b> 센다(갈라진 씨앗도 부모의 발사 기준)
+     * @param apex    {@link End#SPLIT} 일 때 갈라진 순간, 아니면 null
      */
-    public record Trace(List<Integer> path, End end, int impactX, int impactY, int hitSeat, int ticks) {
+    public record Trace(List<Integer> path, End end, int impactX, int impactY, int hitSeat, int ticks, Launch apex) {
         public Trace {
             path = List.copyOf(path);
+        }
+
+        public Trace(List<Integer> path, End end, int impactX, int impactY, int hitSeat, int ticks) {
+            this(path, end, impactX, impactY, hitSeat, ticks, null);
         }
 
         public boolean exploded() {
@@ -38,26 +50,55 @@ public final class Ballistics {
     private Ballistics() {
     }
 
+    /** 바람 1 당 가속 × 유닛 바람 영향(%) — 0 쪽으로 버림(좌우 대칭). */
+    public static long windAccel(int wind, int windPercent) {
+        return (long) wind * Fixed.WIND_PER_UNIT * windPercent / 100;
+    }
+
+    /** 바람 영향 100%·갈라짐 없음(S1 규칙 그대로). */
     public static Trace fire(Terrain t, List<Target> targets, int shooterSeat, int shooterX, int shooterFootY,
                              int angle, int power, int wind, int cloudLevel) {
+        return fire(t, targets, shooterSeat, shooterX, shooterFootY, angle, power, windAccel(wind, 100), cloudLevel,
+                false);
+    }
+
+    /** 포구에서 쏜다. {@code split} 이면 꼭대기(세로 속도가 처음 0 이상이 된 틱의 끝)에서 {@link End#SPLIT} 로 멈춘다. */
+    public static Trace fire(Terrain t, List<Target> targets, int shooterSeat, int shooterX, int shooterFootY,
+                             int angle, int power, long windAccel, int cloudLevel, boolean split) {
         long x = Fixed.center(shooterX) + (long) Body.BARREL * Fixed.cos(angle);
         long y = Fixed.center(Body.centerY(shooterFootY)) - (long) Body.BARREL * Fixed.sin(angle);
         long v = power * Fixed.V_PER_POWER;
         long vx = (v * Fixed.cos(angle)) >> Fixed.SHIFT;
         long vy = -((v * Fixed.sin(angle)) >> Fixed.SHIFT);
-        long ax = wind * Fixed.WIND_PER_UNIT;
         int floor = Math.min(Fixed.HEIGHT, cloudLevel);
-
         List<Integer> path = new ArrayList<>();
         path.add(Fixed.cell(x));
         path.add(Fixed.cell(y));
-
         // 포구 칸 자체가 막혔으면 그 자리에서 터진다(포신이 벽에 박힘).
         Trace atMuzzle = check(t, targets, shooterSeat, x, y, 0, floor, path);
         if (atMuzzle != null) {
             return atMuzzle;
         }
-        for (int tick = 1; tick <= Fixed.MAX_TICKS; tick++) {
+        return fly(t, targets, shooterSeat, new Launch(x, y, vx, vy, 0), windAccel, cloudLevel, split, path);
+    }
+
+    /** 한 순간부터 이어 난다(갈라진 씨앗). 시작점은 이미 검사된 자리로 본다. */
+    public static Trace fly(Terrain t, List<Target> targets, int shooterSeat, Launch from, long windAccel,
+                            int cloudLevel) {
+        List<Integer> path = new ArrayList<>();
+        path.add(Fixed.cell(from.x()));
+        path.add(Fixed.cell(from.y()));
+        return fly(t, targets, shooterSeat, from, windAccel, cloudLevel, false, path);
+    }
+
+    private static Trace fly(Terrain t, List<Target> targets, int shooterSeat, Launch from, long ax, int cloudLevel,
+                             boolean split, List<Integer> path) {
+        long x = from.x();
+        long y = from.y();
+        long vx = from.vx();
+        long vy = from.vy();
+        int floor = Math.min(Fixed.HEIGHT, cloudLevel);
+        for (int tick = from.tick() + 1; tick <= Fixed.MAX_TICKS; tick++) {
             vx += ax;
             vy += Fixed.GRAVITY;
             long dx = vx;
@@ -73,9 +114,14 @@ public final class Ballistics {
             }
             x += dx;
             y += dy;
-            if (tick % 2 == 0) {
+            if ((tick - from.tick()) % 2 == 0) {
                 path.add(Fixed.cell(x));
                 path.add(Fixed.cell(y));
+            }
+            if (split && vy >= 0) {
+                addEnd(path, Fixed.cell(x), Fixed.cell(y));
+                return new Trace(path, End.SPLIT, Fixed.cell(x), Fixed.cell(y), -1, tick,
+                        new Launch(x, y, vx, vy, tick));
             }
         }
         addEnd(path, Fixed.cell(x), Fixed.cell(y));

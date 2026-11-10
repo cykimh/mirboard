@@ -10,6 +10,9 @@ import com.mirboard.domain.game.artillery.event.ArtilleryEvent;
 import com.mirboard.domain.game.artillery.event.ArtilleryMatchCompleted;
 import com.mirboard.domain.game.artillery.persistence.ArtilleryStateStore;
 import com.mirboard.domain.game.artillery.rules.Shell;
+import com.mirboard.domain.game.artillery.rules.UnitKind;
+import com.mirboard.domain.game.artillery.state.Phase;
+import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.artillery.state.ArtilleryPublicView;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
 import com.mirboard.domain.game.core.GameContext;
@@ -71,6 +74,34 @@ class ArtilleryGameEngineTest {
         String json = new ObjectMapper().writeValueAsString(view);
         assertThat(json).doesNotContain("\"seed\"").doesNotContain(Long.toString(waiting.seed()));
         assertThat(adapter(T0).privateView(waiting, 0)).isEmpty();
+    }
+
+    @Test
+    void picking_runs_on_the_engine_timer_hides_kinds_and_bots_pick_by_seed() {
+        ArtilleryState s = ArtilleryFixtures.ENGINE.startMatch(4L, 3, List.of(2), T0).newState();
+        ArtilleryGameEngine a = adapter(T0 + 5_000);
+        assertThat(a.pendingSeats(s)).containsExactly(0, 1, 2);
+        assertThat(a.timer(s)).contains(Duration.ofMillis(10_000));
+        assertThat(a.timeoutAction(s, 0)).isEqualTo(new ArtilleryAction.Pick(UnitKind.SPROUT));
+        GameAction bot = a.botAction(s, 2, new Random(1));
+        assertThat(bot).isInstanceOf(ArtilleryAction.Pick.class).isEqualTo(a.botAction(s, 2, new Random(2)));
+
+        ArtilleryState picked = (ArtilleryState) a.apply(s, 0, new ArtilleryAction.Pick(UnitKind.DANDELION)).newState();
+        assertThat(a.privateView(picked, 0)).contains(new ArtilleryGameEngine.ArtilleryPrivateView(UnitKind.DANDELION));
+        assertThat(a.privateView(picked, 1)).isEmpty();
+        ArtilleryPublicView view = (ArtilleryPublicView) a.publicView(picked);
+        assertThat(view.phase()).isEqualTo("PICKING");
+        assertThat(view.pickRemainingMs()).isEqualTo(10_000L);
+        assertThat(view.units()).allMatch(u -> u.kind() == null);
+
+        ArtilleryGameEngine late = adapter(T0 + ArtilleryEngine.PICK_MS);
+        assertThat(late.timer(picked)).contains(Duration.ZERO);
+        GameEngine.Result opened = late.onTimer(picked).orElseThrow();
+        ArtilleryState aiming = (ArtilleryState) opened.newState();
+        assertThat(aiming.phase()).isEqualTo(Phase.AIMING);
+        assertThat(aiming.unit(0).kind()).isEqualTo(UnitKind.DANDELION);
+        assertThat(aiming.unit(1).kind()).isEqualTo(UnitKind.SPROUT);
+        assertThat(late.privateView(aiming, 0)).isEmpty();
     }
 
     @Test

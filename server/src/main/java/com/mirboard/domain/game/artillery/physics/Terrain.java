@@ -66,6 +66,36 @@ public final class Terrain {
         }
     }
 
+    /**
+     * 원 채우기(덩굴탄 둔덕, §6.2 · D-224): {@code (x − cx)² + (y − cy)² ≤ r²} 인 칸을 흙으로 — 단 {@code spare} 의 점
+     * (x, y 를 이어 붙인 목록)마다 반경 {@code spareRadius} 안은 건드리지 않는다.
+     */
+    public void fill(int cx, int cy, int r, List<Integer> spare, int spareRadius) {
+        long rr = (long) r * r;
+        long sr = (long) spareRadius * spareRadius;
+        for (int y = Math.max(0, cy - r); y <= Math.min(H - 1, cy + r); y++) {
+            long dy = y - cy;
+            for (int x = Math.max(0, cx - r); x <= Math.min(W - 1, cx + r); x++) {
+                long dx = x - cx;
+                if (dx * dx + dy * dy > rr) {
+                    continue;
+                }
+                boolean spared = false;
+                for (int i = 0; i + 1 < spare.size(); i += 2) {
+                    long sx = x - spare.get(i);
+                    long sy = y - spare.get(i + 1);
+                    if (sx * sx + sy * sy <= sr) {
+                        spared = true;
+                        break;
+                    }
+                }
+                if (!spared) {
+                    set(x, y);
+                }
+            }
+        }
+    }
+
     /** 이 열에서 위에서부터 처음 만나는 흙의 y, 없으면 −1. */
     public int surface(int x) {
         for (int y = 0; y < H; y++) {

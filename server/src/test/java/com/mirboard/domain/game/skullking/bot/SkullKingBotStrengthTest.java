@@ -12,143 +12,153 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * D-119 — 봇 강도 평가 (필수 시뮬, Docker 불필요). {@link BotMatchHarness} 로 고정 시드
- * 매치를 돌려 "휴리스틱이 D-119 이전 봇(균등 무작위)을 확실히 이기는가"를 숫자로 강제한다.
+ * D-119·D-230 — 프로덕션 봇({@link Policy#MODEL}) 강도 평가 (필수 시뮬, Docker 불필요).
+ * {@link BotMatchHarness} 로 고정 시드 매치를 돌려 "2~8인 모두에서 기존 봇(D-119 휴리스틱)·
+ * 최약수 봇·무작위 봇을 이기는가"를 숫자로 강제한다.
  *
- * <p><b>하한은 실측 − 3·SE 이하</b>로 잡았다 — 시드가 고정이라 flaky 하지 않지만, 엔진
- * 판정·분배가 바뀌어 수치가 이동해도 실질 퇴행이 아니면 넘도록. 하한이 의미 있다는 것은
- * 대조군(같은 좌석·같은 패에 무작위·최약수 정책)이 같은 하한을 <b>못 넘는</b> 것으로
- * 보인다. 측정값은 INFO 로그로 남는다(D-119 기록의 출처).
+ * <p><b>하한은 실측 − 3·SE 이하</b>로 잡았다 — 시드가 고정이라 flaky 하지 않지만, 엔진 판정·
+ * 분배가 바뀌어 수치가 이동해도 실질 퇴행이 아니면 넘도록. 하한이 의미 있다는 것은 대조군이
+ * 같은 하한을 <b>못 넘는</b> 것으로 보인다 — 특히 8인 대 최약수는 기존 봇이 비겼던 국면이다.
+ * 측정값은 {@code [D-230]} INFO 로그로 남는다. 판 수를 늘린 표는
+ * {@link SkullKingBotEvaluationTest}(선택 실행).
  *
- * <p>시드: 평가 {@value #BASE} 계열. 상수 5개는 이와 다른 시드 계열로 정했고, 홀드아웃
- * 777 계열에서도 같은 하한을 넘는다 (D-119).
+ * <p>시드: 평가 {@value #BASE} 계열. 상수는 이와 다른 555 계열에서 정했다.
  */
 class SkullKingBotStrengthTest {
 
     private static final Logger log = LoggerFactory.getLogger(SkullKingBotStrengthTest.class);
 
     private static final long BASE = 20261003L;
+    private static final int MATCHES = 40;
+    private static final int MATCHES_SELF_PLAY = 10;
 
-    /** 1:무작위 · 2:무작위 공통 — 초점 평균 − 상대 평균 하한. 실측 최저 269 (SE 13~20). */
-    private static final double MIN_GAP = 150;
-    /** 1:무작위 승률 하한 (기준 1/n). 실측 0.92~1.00. */
-    private static final double MIN_SHARE = 0.75;
-    /** 2:무작위 진영 승률 하한. 실측 1.00. */
-    private static final double MIN_SIDE_SHARE = 0.9;
-    /** 자가대전 합산 예측 적중률 하한. 실측 0.650 (무작위 자가대전 약 0.20). */
-    private static final double MIN_SELF_PLAY_HIT_RATE = 0.5;
-    /** 대 최약수 봇 n별 점수 차 하한 — 8인이 대등(+1.6, SE 23)이라 실측 − 3SE 를 내림. */
-    private static final double MIN_GAP_VS_WEAKEST_PER_N = -75;
+    /** 대 기존 봇 n별 점수 차 하한. 실측(40판) +131~+242, 최저 n=2 +131 (SE 30). */
+    private static final double MIN_GAP_VS_HEURISTIC = 40;
+    /** 대 최약수 봇 n별 점수 차 하한 — D-119 봇은 8인에서 −13 (SE 17). 실측 최저 n=8 +265 (SE 29). */
+    private static final double MIN_GAP_VS_WEAKEST = 150;
+    /** 대 무작위 봇 n별 점수 차 하한. 실측 최저 n=3 +326 (SE 22). */
+    private static final double MIN_GAP_VS_RANDOM = 200;
+    /** 대 무작위 봇 승률 하한. 실측 0.925~0.975. */
+    private static final double MIN_SHARE_VS_RANDOM = 0.75;
+    /** 자가대전 합산 예측 적중률 하한. 실측 0.680 (D-119 휴리스틱 자가대전 0.650). */
+    private static final double MIN_SELF_PLAY_HIT_RATE = 0.55;
+    /** 한 수 결정 시간 p99 상한 (사용자 결정, D-230). 개발 맥북 실측 8인 p99 3.6ms·최대 4.4ms. */
+    private static final double MAX_P99_MILLIS = 20;
 
-    private static final int MATCHES = 50;
-    private static final int MATCHES_SMALL = 30;
+    /** 대 기존 봇 승률 하한 — 2인은 반을 넘어야 이긴 것이다. 실측 n=2 0.725, 그 밖 0.675~0.838. */
+    private static double minShareVsHeuristic(int n) {
+        return n == 2 ? 0.5 : 0.4;
+    }
 
     /** 같은 시나리오를 두 테스트가 쓰므로 한 번만 돌린다 (결정적이라 캐시가 안전). */
     private static final Map<String, Stat> CACHE = new ConcurrentHashMap<>();
 
     private static Stat stat(String scenario, int n, int matches, long base,
                              int focalCount, Policy focal, Policy others) {
-        return CACHE.computeIfAbsent(scenario + "/n=" + n, key -> {
+        return CACHE.computeIfAbsent(scenario + "/" + focal + "/n=" + n, key -> {
             Stat s = BotMatchHarness.run(n, matches, base, focalCount, focal, others);
-            log.info("[D-119] {} gap={} (SE {}) share={} mean={} (SE {}) hit={}",
+            log.info("[D-230] {} gap={} (SE {}) share={} mean={} (SE {}) hit={}",
                     key, fmt(s.gap()), fmt(s.gapSe()), fmt3(s.share()),
                     fmt(s.mean()), fmt(s.meanSe()), fmt3(s.hitRate()));
             return s;
         });
     }
 
-    /** 휴리스틱 1명 대 무작위 n−1명. */
-    private static Stat oneVsRandom(int n, Policy focal) {
-        return stat("1-vs-random/" + focal, n, MATCHES, BASE, 1, focal, Policy.RANDOM);
+    private static Stat oneVs(Policy others, int n, Policy focal) {
+        return stat("1-vs-" + others, n, MATCHES, BASE, 1, focal, others);
     }
 
     @Test
-    void one_heuristic_beats_random_bots() {
+    void beats_the_previous_bot_at_every_table_size() {
         SoftAssertions.assertSoftly(soft -> {
             for (int n = 2; n <= 8; n++) {
-                Stat s = oneVsRandom(n, Policy.HEURISTIC);
-                soft.assertThat(s.gap()).as("n=%d 점수 차", n).isGreaterThanOrEqualTo(MIN_GAP);
-                soft.assertThat(s.share()).as("n=%d 승률", n).isGreaterThanOrEqualTo(MIN_SHARE);
+                Stat s = oneVs(Policy.HEURISTIC, n, Policy.MODEL);
+                soft.assertThat(s.gap()).as("n=%d 대 기존 봇 점수 차", n)
+                        .isGreaterThanOrEqualTo(MIN_GAP_VS_HEURISTIC);
+                soft.assertThat(s.share()).as("n=%d 대 기존 봇 승률", n)
+                        .isGreaterThanOrEqualTo(minShareVsHeuristic(n));
+            }
+        });
+    }
+
+    @Test
+    void beats_weakest_bots_where_the_previous_bot_could_not() {
+        SoftAssertions.assertSoftly(soft -> {
+            for (int n = 2; n <= 8; n++) {
+                Stat s = oneVs(Policy.WEAKEST, n, Policy.MODEL);
+                soft.assertThat(s.gap()).as("n=%d 대 최약수 점수 차", n)
+                        .isGreaterThanOrEqualTo(MIN_GAP_VS_WEAKEST);
                 soft.assertThat(s.mean()).as("n=%d 평균 점수", n).isPositive();
             }
+            Stat previous = oneVs(Policy.WEAKEST, 8, Policy.HEURISTIC);
+            soft.assertThat(previous.gap())
+                    .as("대조군 — 8인 대 최약수에서 기존 봇은 하한을 못 넘는다 (%s)", previous)
+                    .isLessThan(MIN_GAP_VS_WEAKEST);
         });
     }
 
     @Test
-    void baseline_policies_in_the_same_seat_fail_the_bar() {
+    void beats_random_bots() {
         SoftAssertions.assertSoftly(soft -> {
             for (int n = 2; n <= 8; n++) {
-                Stat random = oneVsRandom(n, Policy.RANDOM);
-                Stat weakest = oneVsRandom(n, Policy.WEAKEST);
-                soft.assertThat(random.clears(MIN_GAP, MIN_SHARE))
-                        .as("n=%d 무작위 좌석은 하한을 못 넘어야 한다 (%s)", n, random)
-                        .isFalse();
-                soft.assertThat(weakest.clears(MIN_GAP, MIN_SHARE))
-                        .as("n=%d 최약수 좌석은 하한을 못 넘어야 한다 (%s)", n, weakest)
-                        .isFalse();
-
-                // 같은 시드 = 같은 패 — 그 좌석에 휴리스틱이 앉았을 때와 최약수가 앉았을 때.
-                double paired = oneVsRandom(n, Policy.HEURISTIC).mean() - weakest.mean();
-                soft.assertThat(paired)
-                        .as("n=%d 같은 패에서 휴리스틱 좌석 평균 − 최약수 좌석 평균", n)
-                        .isGreaterThanOrEqualTo(MIN_GAP);
+                Stat s = oneVs(Policy.RANDOM, n, Policy.MODEL);
+                soft.assertThat(s.gap()).as("n=%d 대 무작위 점수 차", n)
+                        .isGreaterThanOrEqualTo(MIN_GAP_VS_RANDOM);
+                soft.assertThat(s.share()).as("n=%d 대 무작위 승률", n)
+                        .isGreaterThanOrEqualTo(MIN_SHARE_VS_RANDOM);
             }
         });
     }
 
     @Test
-    void two_heuristics_beat_random_bots() {
+    void same_seat_baselines_fail_the_bar() {
         SoftAssertions.assertSoftly(soft -> {
-            for (int n : new int[] {4, 6, 8}) {
-                Stat s = stat("2-vs-random", n, MATCHES_SMALL, BASE + 50_000, 2,
-                        Policy.HEURISTIC, Policy.RANDOM);
-                soft.assertThat(s.share()).as("n=%d 휴리스틱 진영 승률", n)
-                        .isGreaterThanOrEqualTo(MIN_SIDE_SHARE);
-                soft.assertThat(s.gap()).as("n=%d 점수 차", n).isGreaterThanOrEqualTo(MIN_GAP);
+            for (int n = 2; n <= 8; n++) {
+                // 같은 시드 = 같은 패. 그 좌석에 기존 봇·최약수가 앉으면 대 기존 봇 하한을 못 넘는다.
+                Stat previous = oneVs(Policy.HEURISTIC, n, Policy.HEURISTIC);
+                Stat weakest = oneVs(Policy.HEURISTIC, n, Policy.WEAKEST);
+                soft.assertThat(previous.gap()).as("n=%d 기존 봇 좌석 (%s)", n, previous)
+                        .isLessThan(MIN_GAP_VS_HEURISTIC);
+                soft.assertThat(weakest.gap()).as("n=%d 최약수 좌석 (%s)", n, weakest)
+                        .isLessThan(MIN_GAP_VS_HEURISTIC);
             }
         });
     }
 
     @Test
-    void heuristic_self_play_is_calibrated() {
+    void self_play_is_calibrated() {
         double hits = 0;
         int seats = 0;
         SoftAssertions soft = new SoftAssertions();
         for (int n = 2; n <= 8; n++) {
-            Stat s = stat("self-play", n, MATCHES_SMALL, BASE + 90_000, n,
-                    Policy.HEURISTIC, Policy.HEURISTIC);
+            Stat s = stat("self-play", n, MATCHES_SELF_PLAY, BASE + 90_000, n,
+                    Policy.MODEL, Policy.MODEL);
             soft.assertThat(s.mean()).as("n=%d 자가대전 평균 점수", n).isPositive();
-            // n 마다 매치 수·라운드 수가 같으므로 좌석 수로 가중하면 전체 좌석-라운드 합산.
             hits += s.hitRate() * n;
             seats += n;
         }
         double hitRate = hits / seats;
-        log.info("[D-119] self-play aggregate hit={}", fmt3(hitRate));
+        log.info("[D-230] self-play aggregate hit={}", fmt3(hitRate));
         soft.assertThat(hitRate).as("자가대전 합산 예측 적중률")
                 .isGreaterThanOrEqualTo(MIN_SELF_PLAY_HIT_RATE);
         soft.assertAll();
     }
 
     @Test
-    void heuristic_is_not_exploited_by_weakest_bots() {
-        double gapSum = 0;
-        SoftAssertions soft = new SoftAssertions();
-        for (int n = 2; n <= 8; n++) {
-            Stat s = stat("1-vs-weakest", n, MATCHES, BASE + 130_000, 1,
-                    Policy.HEURISTIC, Policy.WEAKEST);
-            soft.assertThat(s.gap()).as("n=%d 대 최약수 점수 차", n)
-                    .isGreaterThanOrEqualTo(MIN_GAP_VS_WEAKEST_PER_N);
-            gapSum += s.gap();
+    void decisions_stay_under_the_time_cap() {
+        for (int n : new int[] {2, 8}) {
+            long[] nanos = SkullKingBotEvaluationTest.decisionNanos(n, 2);
+            double p99 = nanos[(int) (nanos.length * 0.99)] / 1e6;
+            log.info("[D-230] n={} decisions={} p50={}ms p99={}ms max={}ms", n, nanos.length,
+                    fmt3(nanos[nanos.length / 2] / 1e6), fmt3(p99),
+                    fmt3(nanos[nanos.length - 1] / 1e6));
+            assertThat(p99).as("n=%d 한 수 p99 (ms)", n).isLessThanOrEqualTo(MAX_P99_MILLIS);
         }
-        double pooled = gapSum / 7;
-        log.info("[D-119] 1-vs-weakest pooled gap={}", fmt(pooled));
-        soft.assertThat(pooled).as("n 합산 평균 점수 차").isGreaterThanOrEqualTo(MIN_GAP);
-        soft.assertAll();
     }
 
     @Test
     void harness_is_reproducible() {
-        Policy[] seats = {Policy.HEURISTIC, Policy.RANDOM, Policy.WEAKEST, Policy.RANDOM};
+        Policy[] seats = {Policy.MODEL, Policy.HEURISTIC, Policy.WEAKEST, Policy.RANDOM};
         BotMatchHarness.MatchOutcome first = BotMatchHarness.play(4, BASE, seats);
         BotMatchHarness.MatchOutcome again = BotMatchHarness.play(4, BASE, seats);
 

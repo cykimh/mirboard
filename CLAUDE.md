@@ -81,8 +81,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
-  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 스컬킹·원카드는 이
-  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129), 각
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 일곱 게임 모두 이
+  세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129·D-240 티츄), 각
   게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
   판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
 - **좌석은 시계 방향 테이블 (D-132)**: 진행 +1 이 내 **왼쪽**이다. 가변 좌석 게임판(원카드·스컬킹)은
@@ -246,7 +246,8 @@ gradle wrapper --gradle-version 8.10.2   # 또는 docker run gradle:8.10.2-jdk21
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuEngineRoundSimulationTest"
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.TichuGameEngine*Test"   # 포트 어댑터 (D-98)
 ./gradlew :server:test --tests "com.mirboard.domain.game.tichu.bot.*"       # 티츄 봇 정책·순수 시뮬레이션 (D-118, Docker 불필요)
-./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·강도 평가 (D-119, Docker 불필요)
+./gradlew :server:test --tests "com.mirboard.domain.game.skullking.bot.*"   # 스컬킹 봇 정책·규칙 거울·강도 평가 (D-119·D-230, Docker 불필요, ~15s)
+MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.skullking.bot.SkullKingBotEvaluationTest"   # 스컬킹 봇 대형 평가 표 → server/build/skullking-bot-strength.txt (~1m40s)
 ./gradlew :server:test --tests "com.mirboard.domain.game.onecard.*Test"     # 원카드 엔진·어댑터·봇 (D-127/D-128, Docker 불필요)
 ./gradlew :server:test --tests "com.mirboard.domain.game.yacht.*"            # 요트 점수 전수·엔진·시뮬레이션·어댑터·봇 (D-181~D-183, Docker 불필요, ~10s)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.YachtBotMatchSimulationIT"   # 요트 봇 판·차례 전체 타이머·1인 판 무기록 (Docker)

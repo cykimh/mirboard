@@ -14,13 +14,24 @@ import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { VoiceControls } from '@/features/voice/VoiceControls';
-import { FUEL, MAX_MOVE, type Shell, type ShotReport } from '@/types/artillery';
+import {
+  FUEL,
+  ITEM_NAMES,
+  MAX_MOVE,
+  SHELL_NAMES,
+  UNIT_KINDS,
+  type Item,
+  type Shell,
+  type ShotReport,
+  type UnitKind,
+} from '@/types/artillery';
 import { artilleryRoomSink } from './artilleryRoomSink';
 import { useArtilleryStore } from './artilleryStore';
 import { ArtilleryField } from './ArtilleryField';
 import { ArtilleryControls } from './ArtilleryControls';
 import { ArtilleryCountdown } from './ArtilleryCountdown';
 import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
+import { ArtilleryPicker, KIND_ICONS } from './ArtilleryPicker';
 import { seatColor } from './draw';
 import { walk } from './terrain';
 import { ARTILLERY_TUTORIAL } from './tutorial/artilleryTutorial';
@@ -45,15 +56,30 @@ interface Props {
 
 const OUT_LABEL: Record<string, string> = { KNOCKED_OUT: '시듦', CLOUD_SEA: '추락', DESERTED: '탈주' };
 
-/** 대본 → 한 줄 낭독("보라의 호박탄 — 민수 28 피해, 지수 추락"). */
+/** 대본 → 한 줄 낭독("보라의 호박탄 — 민수 28 피해, 지수 추락"). 아이템·회복·둔덕도 붙인다(D-224). */
 export function shotSummary(r: ShotReport, nameOf: (seat: number) => string): string {
   const parts: string[] = [];
-  for (const d of r.damages) parts.push(`${nameOf(d.seat)} ${d.amount} 피해${d.direct ? '(직격)' : ''}`);
-  for (const f of r.falls) if (!f.intoCloud && f.damage > 0) parts.push(`${nameOf(f.seat)} 낙하 ${f.damage}`);
+  const dealt = new Map<number, { amount: number; direct: boolean }>();
+  for (const st of r.stages) {
+    for (const d of st.damages) {
+      const prev = dealt.get(d.seat) ?? { amount: 0, direct: false };
+      dealt.set(d.seat, { amount: prev.amount + d.amount, direct: prev.direct || d.direct });
+    }
+  }
+  for (const [seat, d] of dealt) parts.push(`${nameOf(seat)} ${d.amount} 피해${d.direct ? '(직격)' : ''}`);
+  for (const st of r.stages) for (const f of st.falls) if (!f.intoCloud && f.damage > 0) parts.push(`${nameOf(f.seat)} 낙하 ${f.damage}`);
   for (const e of r.eliminated) parts.push(`${nameOf(e.seat)} ${OUT_LABEL[e.cause] ?? '탈락'}`);
-  const what = r.shot === null ? '발을 헛디뎠다' : r.shell === 'PUMPKIN' ? '호박탄' : '콩알';
-  const result = parts.length > 0 ? parts.join(', ') : r.shot?.end === 'OUT' ? '전장 밖으로' : r.shot?.end === 'CLOUD' ? '구름 속으로' : '빗나감';
-  return `${nameOf(r.seat)}의 ${what} — ${result}`;
+  const shots = r.stages.flatMap((st) => st.shots);
+  if (parts.length === 0 && shots.some((sh) => sh.crater?.fill)) parts.push('둔덕이 솟았다');
+  const fired = r.stages.length > 0;
+  const what = fired ? SHELL_NAMES[r.shell] : '발을 헛디뎠다';
+  const last = shots[shots.length - 1];
+  const result =
+    parts.length > 0 ? parts.join(', ') : last?.end === 'OUT' ? '전장 밖으로' : last?.end === 'CLOUD' ? '구름 속으로' : '빗나감';
+  const extra = [r.item ? ITEM_NAMES[r.item] : null, r.heal && r.heal.amount > 0 ? `체력 +${r.heal.amount}` : null]
+    .filter(Boolean)
+    .join(' ');
+  return `${nameOf(r.seat)}의 ${what}${extra ? ` (${extra})` : ''} — ${result}`;
 }
 
 /**
@@ -128,27 +154,43 @@ export function ArtilleryTable({
   };
   const [power, setPower] = useState(55);
   const [shell, setShell] = useState<Shell>('PEA');
+  const [item, setItem] = useState<Item | null>(null);
   const [moveDx, setMoveDx] = useState(0);
   const [lastPower, setLastPower] = useState<number | null>(null);
   const [lastAngles, setLastAngles] = useState<Record<number, number>>({});
   const turnKey = `${s.turnSeat}:${s.turnNo}`;
   useEffect(() => {
     setMoveDx(0);
+    setItem(null);
   }, [turnKey]);
+  const shells = useMemo(() => {
+    if (!me) return [{ shell: 'PEA' as Shell, count: -1 }];
+    const list: { shell: Shell; count: number }[] = [
+      { shell: 'PEA', count: -1 },
+      { shell: 'PUMPKIN', count: me.pumpkins },
+    ];
+    if (me.special) list.push({ shell: me.special, count: me.specials });
+    return list;
+  }, [me]);
   useEffect(() => {
-    if (me && me.pumpkins <= 0 && shell === 'PUMPKIN') setShell('PEA');
-  }, [me, shell]);
+    const left = shells.find((x) => x.shell === shell)?.count ?? 0;
+    if (left === 0) setShell('PEA');
+  }, [shells, shell]);
+  useEffect(() => {
+    if (me && item && !me.items.includes(item)) setItem(null);
+  }, [me, item]);
+  const myFuel = me?.fuel ?? FUEL;
 
   const preview = useMemo(() => {
     if (!me || !s.mask) return null;
-    return walk(s.mask, me.x, me.footY, moveDx, FUEL, s.cloudLevel);
-  }, [me, s.mask, moveDx, s.cloudLevel]);
+    return walk(s.mask, me.x, me.footY, moveDx, myFuel, s.cloudLevel);
+  }, [me, s.mask, moveDx, s.cloudLevel, myFuel]);
 
   const step = (dir: -1 | 1) => {
     if (!me || !s.mask) return false;
     const target = Math.max(-MAX_MOVE, Math.min(MAX_MOVE, moveDx + dir));
     if (target === moveDx) return false;
-    const p = walk(s.mask, me.x, me.footY, target, FUEL, s.cloudLevel);
+    const p = walk(s.mask, me.x, me.footY, target, myFuel, s.cloudLevel);
     if (p.dx !== target) return false;
     setMoveDx(target);
     return true;
@@ -186,7 +228,14 @@ export function ArtilleryTable({
   const fire = (p: number) => {
     if (!canAct || !preview) return;
     s.setPending(true);
-    sendAction({ '@action': 'FIRE', moveDx: preview.dx, angle, power: p, shell });
+    sendAction({ '@action': 'FIRE', moveDx: preview.dx, angle, power: p, shell, ...(item ? { item } : {}) });
+  };
+  const picking = s.phase === 'PICKING' && s.result === null && !roomFinished;
+  const canPick = picking && !spectator && mySeat >= 0 && connected && !!me?.alive && !me.picked && s.myPick === null;
+  const pick = (kind: UnitKind) => {
+    if (!canPick) return;
+    s.setMyPick(kind);
+    sendAction({ '@action': 'PICK', unit: kind });
   };
   const skip = () => {
     if (!canAct) return;
@@ -306,15 +355,27 @@ export function ArtilleryTable({
             >
               <span className="ar-seat-name">
                 {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
+                {u.kind && (
+                  <span className="ar-seat-kind" title={UNIT_KINDS[u.kind].name} aria-label={UNIT_KINDS[u.kind].name}>
+                    {KIND_ICONS[u.kind]}
+                  </span>
+                )}
                 {nameOf(u.seat)}
                 {u.seat === mySeat ? ' (나)' : ''}
               </span>
-              <span className="ar-seat-hp" aria-label={`체력 ${u.hp}`}>
-                <span className="ar-seat-hp-bar" style={{ width: `${u.alive ? u.hp : 0}%` }} />
+              <span className="ar-seat-hp" aria-label={`체력 ${u.hp}/${u.maxHp}`}>
+                <span
+                  className="ar-seat-hp-bar"
+                  style={{ width: `${u.alive ? Math.round((100 * u.hp) / Math.max(1, u.maxHp)) : 0}%` }}
+                />
               </span>
-              <span className="ar-seat-ammo" title="남은 호박탄">
-                🎃{u.pumpkins}
-              </span>
+              {!picking && (
+                <span className="ar-seat-ammo" title={`남은 호박탄${u.special ? `·${SHELL_NAMES[u.special]}` : ''}·아이템`}>
+                  🎃{u.pumpkins}
+                  {u.special ? ` ✦${u.specials}` : ''}
+                  {u.items.length > 0 ? ` 🎒${u.items.length}` : ''}
+                </span>
+              )}
               {isTurn && <span className="ar-seat-tag">차례</span>}
               {!u.alive && <span className="ar-seat-tag">{OUT_LABEL[u.outCause ?? ''] ?? '탈락'}</span>}
               {disconnected && u.alive && <span className="ar-seat-tag">끊김</span>}
@@ -339,12 +400,24 @@ export function ArtilleryTable({
         })}
       </ol>
 
+      {picking && (
+        <ArtilleryPicker
+          units={s.units}
+          mySeat={mySeat}
+          canPick={canPick}
+          myPick={s.myPick}
+          nameOf={nameOf}
+          onPick={pick}
+        />
+      )}
+
       <div className={`ar-stage${myTurn ? ' ar-stage-myturn' : ''}`}>
         <div className="ar-status">
           <span className="ar-badge ar-wind" aria-label={windText}>
             🍃 {windText}
           </span>
           {suddenDeath && <span className="ar-badge ar-badge-warn">☁ 구름이 차오른다</span>}
+          {picking && <span className="ar-badge">포대 고르는 중</span>}
           {!roomFinished && s.phase === 'AIMING' && turnSeat >= 0 && <ArtilleryCountdown turnSeconds={turnSeconds} />}
           {myTurn ? (
             <span className="ar-badge ar-badge-turn">내 차례</span>
@@ -375,8 +448,12 @@ export function ArtilleryTable({
           power={power}
           lastPower={lastPower}
           shell={shell}
-          pumpkins={me?.pumpkins ?? 0}
-          fuelLeft={preview?.fuelLeft ?? FUEL}
+          shells={shells}
+          items={me?.items ?? []}
+          item={item}
+          onItem={setItem}
+          fuelLeft={preview?.fuelLeft ?? myFuel}
+          fuelMax={myFuel}
           moveDx={moveDx}
           enabled={canAct}
           onAngle={setAngle}

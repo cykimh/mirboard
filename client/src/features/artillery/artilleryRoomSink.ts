@@ -14,7 +14,8 @@ const ERROR_LABEL: Record<string, string> = {
   NOT_YOUR_TURN: '아직 당신의 차례가 아닙니다.',
   MATCH_OVER: '이미 끝난 판입니다.',
   OUT_OF_RANGE: '각도·힘·이동 거리가 범위를 벗어났습니다.',
-  NO_AMMO: '호박탄이 남지 않았어요.',
+  NO_AMMO: '그 탄이 남지 않았어요.',
+  NO_ITEM: '그 아이템은 이미 썼어요.',
   INVALID_ACTION: '잘못된 요청입니다.',
 };
 

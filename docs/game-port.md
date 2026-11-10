@@ -370,7 +370,7 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
    클라 계약은 바뀌지 않았다. 알 수 없는 판별자는 `ERROR(INVALID_ACTION)`.
 3. **봇 정책은 포트 메서드 + 게임별 override 로 분리.** `botAction(state, seat, random)` 의
    기본 구현이 "합법 액션 균등 분포"다. 세 게임 모두 이를 결정적 휴리스틱으로 override 한다 —
-   티츄는 `HeuristicBotPolicy`(D-118), 스컬킹은 `SkullKingBotPolicy`(D-119), 원카드는 `OneCardBotPolicy`(D-128 — 경쟁 창의
+   티츄는 `HeuristicBotPolicy`(D-118), 스컬킹은 `SkullKingBotPolicy`(D-119 → D-230 상대 모델 몬테카를로 — 표본 시드를 뷰에서 만든다), 원카드는 `OneCardBotPolicy`(D-128 — 경쟁 창의
    누름은 정책이 아니라 창을 열 때 추첨한 반응 시간으로 엔진 타이머가 한다). 셋 다 공개 정보만
    보고 `random` 인자를 쓰지 않으므로 같은 상태면 같은 수다(`rules-tichu.md` §16 ·
    `rules-skullking.md` §16). 시드 `Random` 은 스케줄러가 계속 보유하므로 포트 기본 봇을 쓰는
