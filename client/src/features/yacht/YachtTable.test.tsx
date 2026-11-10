@@ -333,4 +333,23 @@ describe('YachtTable', () => {
     expect(screen.getByText('기록했어요 · 다른 사람을 기다리는 중')).toBeInTheDocument();
     expect(screen.getByText('기록함 ✓')).toBeInTheDocument();
   });
+
+  it('모두 같이: 주사위 줄이 없는 좌석도 줄 자리를 남겨 좌석 띠 높이가 바뀌지 않는다 — 차례대로면 자리가 없다', () => {
+    seed({
+      turnSeat: -1,
+      simultaneous: true,
+      turns: [
+        { seat: 0, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+        { seat: 1, dice: null, held: NONE, rolls: 0, pending: false, candidates: {} },
+      ],
+    });
+    const { container, unmount } = renderTable({ turnSeconds: 45 });
+    // 나(0)와 기록한 좌석(1) 모두 빈 줄 자리를 가진다.
+    expect(container.querySelectorAll('.yt-seat-dice-empty')).toHaveLength(2);
+    unmount();
+
+    seed();
+    const again = renderTable();
+    expect(again.container.querySelectorAll('.yt-seat-dice-empty')).toHaveLength(0);
+  });
 });

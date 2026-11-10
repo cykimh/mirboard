@@ -350,7 +350,13 @@ export function YachtTable({
               <span className="yt-seat-total">{seat.total}점</span>
               {isTurn && <span className="yt-seat-tag">차례</span>}
               {done && <span className="yt-seat-tag">기록함 ✓</span>}
-              {seatTurn?.pending && seat.seat !== mySeat && <SeatDice turn={seatTurn} />}
+              {seatTurn?.pending && seat.seat !== mySeat ? (
+                <SeatDice turn={seatTurn} />
+              ) : (
+                // 동시 진행에서는 주사위 줄 자리를 늘 비워 둔다 — 누가 기록해 줄이 사라질 때 좌석 띠 높이가 줄어 아래 주사위 판이
+                // 위로 밀리면 누르려던 [굴리기]가 빗나간다.
+                simultaneous && <span className="yt-seat-dice yt-seat-dice-empty" aria-hidden="true" />
+              )}
               {seat.deserted && <span className="yt-seat-tag">탈주</span>}
               {disconnected && !seat.deserted && <span className="yt-seat-tag">끊김</span>}
               {v === 'on' && <span aria-label="음성 참여 중">🎧</span>}
