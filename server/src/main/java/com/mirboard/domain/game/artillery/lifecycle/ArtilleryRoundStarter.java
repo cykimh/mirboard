@@ -76,13 +76,18 @@ public class ArtilleryRoundStarter {
                 botSeats.add(seat);
             }
         }
+        boolean teams = ArtilleryGameDefinition.teamsOf(event.options());
+        if (teams && seatCount != 4) {
+            log.warn("Artillery 2v2 needs 4 players, got {} — playing free-for-all room={}", seatCount, event.roomId());
+            teams = false;
+        }
         long seed = random.nextLong();
-        ArtilleryState state = definition.rules().startMatch(seed, seatCount, botSeats, definition.clock().millis())
-                .newState();
+        ArtilleryState state = definition.rules().startMatch(seed, seatCount, botSeats, definition.clock().millis(),
+                teams ? ArtilleryEngine.Setup.TEAMS : ArtilleryEngine.Setup.SOLO).newState();
         stateStore.save(event.roomId(), state);
 
-        log.info("Artillery match started: room={} seats={} bots={} phase={}",
-                event.roomId(), seatCount, botSeats, state.phaseName());
+        log.info("Artillery match started: room={} seats={} bots={} teams={} phase={}",
+                event.roomId(), seatCount, botSeats, teams, state.phaseName());
         botScheduler.scheduleBots(event.roomId());
         turnTimeout.onTurnAdvanced(event.roomId());
     }

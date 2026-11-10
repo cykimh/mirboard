@@ -2,6 +2,7 @@ import {
   FIELD_W,
   type ArtilleryPrivateView,
   type ArtilleryTableView,
+  type DelayTable,
   type ShotReport,
   type ShotStage,
   type ShotTrace,
@@ -31,6 +32,14 @@ export const unit = (seat: number, x: number, over: Partial<UnitView> = {}): Uni
   items: ['WATERING_CAN', 'PINWHEEL', 'TWIN_SEED'],
   ...over,
 });
+
+/** 서버 딜레이 표(D-226) 그대로. */
+export const DELAY_TABLE: DelayTable = {
+  shells: { PEA: 100, PUMPKIN: 130, VINE: 140, CHESTNUT: 140, SPORE: 140 },
+  items: { WATERING_CAN: 30, PINWHEEL: 30, TWIN_SEED: 60 },
+  skip: 80,
+  fuelPerDelay: 2,
+};
 
 export function view(over: Partial<ArtilleryTableView> = {}): ArtilleryTableView {
   return {

@@ -28,7 +28,17 @@ public final class ArtilleryFixtures {
         units.set(u.seat(), u);
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
                 s.lastSeat(), s.turnNo(), s.wind(), s.cloudLevel(), s.resolveUntil(), s.eliminations(), s.lastShot(),
-                s.result(), s.pickUntil());
+                s.result(), s.pickUntil(), s.teams(), s.turnOrder());
+    }
+
+    /** 2:2 팀전·딜레이 차례로 바로 시작(전원 새싹포). */
+    public static ArtilleryState startTeams(long seed, Integer... bots) {
+        return ENGINE.startMatch(seed, 4, List.of(bots), ArtilleryEngine.Setup.TEAMS).newState();
+    }
+
+    /** 개인전·딜레이 차례로 바로 시작(전원 새싹포). */
+    public static ArtilleryState startDelay(long seed, int seats, Integer... bots) {
+        return ENGINE.startMatch(seed, seats, List.of(bots), ArtilleryEngine.Setup.SOLO).newState();
     }
 
     /** 차례 주인이 {@code target} 을 직격하는 (각도, 힘)을 찾는다 — 없으면 null. */

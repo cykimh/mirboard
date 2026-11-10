@@ -82,6 +82,45 @@ class ArtilleryGoldenTest {
                 + Long.toHexString(ArtilleryEngine.terrainOf(s).hash());
     }
 
+    /**
+     * S5 (D-225·D-226) — 시드 20261111, 2:2 팀전·딜레이 차례, 유닛 고르기·특수탄·아이템·이동을 섞은 14발(차례 주인은 딜레이가 정한다).
+     */
+    static String playTeams() throws Exception {
+        long now = 1_000_000L;
+        ArtilleryState s = ENGINE.startMatch(20261111L, 4, List.of(), now, ArtilleryEngine.Setup.TEAMS).newState();
+        List<ArtilleryEvent> all = new ArrayList<>();
+        UnitKind[] kinds = {UnitKind.ACORN, UnitKind.DANDELION, UnitKind.SPROUT, UnitKind.ACORN};
+        for (int seat = 0; seat < 4; seat++) {
+            ArtilleryEngine.Result r = ENGINE.apply(s, seat, new ArtilleryAction.Pick(kinds[seat]), now);
+            all.addAll(r.events());
+            s = r.newState();
+        }
+        int[][] shots = {{0, 60, 55}, {10, 120, 60}, {-20, 45, 70}, {0, 135, 50}, {30, 70, 40}, {0, 100, 65},
+                {-10, 80, 75}, {0, 30, 45}, {5, 150, 55}, {0, 90, 35}, {-30, 65, 80}, {0, 110, 50}, {20, 50, 60},
+                {0, 125, 70}};
+        Item[] items = {null, Item.TWIN_SEED, null, Item.PINWHEEL, null, Item.WATERING_CAN, null, null, null, null,
+                Item.TWIN_SEED, null, null, null};
+        for (int i = 0; i < shots.length && !s.ended(); i++) {
+            Unit me = s.unit(s.turnSeat());
+            Shell shell = i % 3 == 0 && me.specials() > 0 ? me.kind().special() : Shell.PEA;
+            Item item = items[i] != null && me.has(items[i]) ? items[i] : null;
+            ArtilleryEngine.Result r = i == 7
+                    ? ENGINE.apply(s, s.turnSeat(), new ArtilleryAction.Skip(), now)
+                    : ENGINE.apply(s, s.turnSeat(),
+                            new ArtilleryAction.Fire(shots[i][0], shots[i][1], shots[i][2], shell, item), now);
+            all.addAll(r.events());
+            s = r.newState();
+            if (s.phase() == Phase.RESOLVING) {
+                now = s.resolveUntil();
+                r = ENGINE.expire(s, now);
+                all.addAll(r.events());
+                s = r.newState();
+            }
+        }
+        return JSON.writeValueAsString(s) + "\n" + JSON.writeValueAsString(all) + "\n"
+                + Long.toHexString(ArtilleryEngine.terrainOf(s).hash());
+    }
+
     private static String fnv(String text) {
         long h = 0xcbf29ce484222325L;
         for (byte b : text.getBytes(StandardCharsets.UTF_8)) {
@@ -95,6 +134,23 @@ class ArtilleryGoldenTest {
     void same_inputs_same_bits() throws Exception {
         assertThat(play()).isEqualTo(play());
         assertThat(playUnits()).isEqualTo(playUnits());
+        assertThat(playTeams()).isEqualTo(playTeams());
+    }
+
+    /**
+     * D-225·D-226 — 좌석 순서 규칙의 두 골든 판(S3·S4)은 물리가 비트 단위로 그대로다. 지문은 JSON 모양과 무관한 값(차례 주인·도착점·충돌점·
+     * 궤적 길이·피해·낙하·연출 시간·끝 지형 해시·포대)만 모은다 — {@code origin/main 037963e} 에서 같은 지문을 뽑아 대조해 고정했다.
+     */
+    @Test
+    void physics_fingerprint_unchanged_since_s4() {
+        assertThat(fnv(ArtilleryPhysicsPrint.print())).isEqualTo(PHYSICS_S4);
+    }
+
+    @Test
+    void pinned_hash_teams_and_delay() throws Exception {
+        String h = fnv(playTeams());
+        System.out.println("[artillery-golden-s5] " + h);
+        assertThat(h).isEqualTo(GOLDEN_S5);
     }
 
     @Test
@@ -129,9 +185,13 @@ class ArtilleryGoldenTest {
     }
 
     /**
+     * S5(D-225·D-226)에서 JSON 모양(딜레이·팀·차례 규칙)이 바뀌어 다시 고정했다 — 물리는 {@link #PHYSICS_S4}.
      * S4(D-224)에서 JSON 모양(유닛 종류·특수탄·아이템·대본 단계)이 바뀌어 다시 고정했다 — 물리는 그대로다(S3 판의 구멍·포대 위치·지형 해시
      * {@code 5ca69b141e21e61} 가 같음을 확인).
      */
-    static final String GOLDEN = "1d50ab49c9f0c45b";
-    static final String GOLDEN_S4 = "17e6582289b5958f";
+    static final String GOLDEN = "19476ca78c55962e";
+    static final String GOLDEN_S4 = "42c54860feba1244";
+    /** S5 에서 JSON 모양(유닛 딜레이·팀·차례 규칙·결과 팀)만 바뀌었다 — 물리는 {@link #PHYSICS_S4} 가 고정한다. */
+    static final String PHYSICS_S4 = "f0ad1953e7075a05";
+    static final String GOLDEN_S5 = "add4a39902c16e66";
 }

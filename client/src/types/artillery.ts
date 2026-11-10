@@ -63,6 +63,10 @@ export interface UnitView {
   special: Shell | null;
   specials: number;
   items: Item[];
+  /** 팀(D-225) — 팀전이면 좌석 홀짝(0·1), 개인전이면 좌석. 구 서버·픽스처면 없다. */
+  team?: number;
+  /** 누적 딜레이(D-226) — 가장 작은 살아 있는 포대가 다음 차례. */
+  delay?: number;
 }
 
 export interface Placement {
@@ -75,6 +79,20 @@ export interface Placement {
 export interface MatchResult {
   reason: 'LAST_STANDING' | 'ALL_DOWN' | 'NO_HUMANS';
   placements: Placement[];
+  /** 팀전 판(D-225). */
+  teams?: boolean;
+  /** 팀전에서 이긴 팀(0·1), 무승부·개인전이면 null. */
+  winnerTeam?: number | null;
+}
+
+export type TurnOrder = 'SEAT' | 'DELAY';
+
+/** 딜레이 표(D-226) — 서버 정본을 그대로 받는다. 화면의 "이번 차례 +N" 안내용(판정은 서버). */
+export interface DelayTable {
+  shells: Partial<Record<Shell, number>>;
+  items: Partial<Record<Item, number>>;
+  skip: number;
+  fuelPerDelay: number;
 }
 
 /** 지형 연산 — 구멍(지우기) 또는 덩굴탄 둔덕(fill, spare 의 몸 중심 반경 7 은 비움). */
@@ -151,6 +169,12 @@ export interface ArtilleryTableView {
   pickRemainingMs: number | null;
   lastShot: ShotReport | null;
   result: MatchResult | null;
+  /** 2:2 팀전(D-225). */
+  teams?: boolean;
+  turnOrder?: TurnOrder;
+  /** 앞으로의 차례 순서 — 살아 있는 좌석, 지금 차례 주인부터(D-226). */
+  queue?: number[];
+  delays?: DelayTable;
 }
 
 /** 비공개 뷰 — 고르기 단계의 내 선택뿐(D-224). */
@@ -171,6 +195,10 @@ export interface TurnChangedPayload {
   turnNo: number;
   wind: number;
   cloudLevel: number;
+  /** 좌석 순 누적 딜레이(D-226). */
+  delays?: number[];
+  /** 앞으로의 차례 순서(지금 차례 주인부터). */
+  queue?: number[];
 }
 
 export interface TurnSkippedPayload {

@@ -62,6 +62,14 @@ public enum Shell {
         return this == SPORE;
     }
 
+    /** 쏜 포대에 쌓이는 딜레이 (D-226) — 콩알 100 · 호박탄 130 · 고유 특수탄 140. */
+    public int delay() {
+        if (this == PEA) {
+            return 100;
+        }
+        return this == PUMPKIN ? 130 : 140;
+    }
+
     /** 폭발 피해 (§6.2): 직격이면 최대, 아니면 {@code 최대 × (R − d) / R} (d < R). */
     public int damageAt(int distance, boolean direct) {
         if (direct) {

@@ -126,13 +126,13 @@ describe('RoomSettingsPanel (D-161)', () => {
       );
 
       const mode = screen.getByRole('group', { name: '모드' });
-      expect(within(mode).getAllByRole('radio').map((r) => r.textContent)).toEqual(['1:1', '2:2 팀전']);
+      expect(within(mode).getAllByRole('radio').map((r) => r.textContent)).toEqual(['개인전', '2:2 팀전']);
       expect(within(mode).getByRole('radio', { name: '2:2 팀전' })).toHaveAttribute('aria-checked', 'true');
       // 저장값이 없는 옵션은 기본값이 골라져 있다.
       const bot = screen.getByRole('group', { name: '봇 난이도' });
       expect(within(bot).getByRole('radio', { name: '보통' })).toHaveAttribute('aria-checked', 'true');
 
-      fireEvent.click(within(mode).getByRole('radio', { name: '1:1' }));
+      fireEvent.click(within(mode).getByRole('radio', { name: '개인전' }));
       expect(onChange).toHaveBeenCalledWith({ options: { TEAM_MODE: 'SOLO' } });
     });
 

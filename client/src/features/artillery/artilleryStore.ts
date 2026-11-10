@@ -3,6 +3,7 @@ import type { ApplyEventResult, ResyncEnvelope } from '@/types/stomp';
 import type {
   ArtilleryPrivateView,
   ArtilleryTableView,
+  DelayTable,
   MatchEndedPayload,
   MatchResult,
   Phase,
@@ -59,6 +60,12 @@ export interface ArtilleryRoomState {
   /** 고르기 단계(D-224) — 남은 시간 기준점과 내가 고른 종류. */
   pickClock: TurnClock | null;
   myPick: UnitKind | null;
+  /** 2:2 팀전(D-225) — 팀 = 좌석 홀짝. */
+  teams: boolean;
+  /** 앞으로의 차례 순서(D-226) — 지금 차례 주인부터. */
+  queue: number[];
+  /** 딜레이 표(D-226) — 구 서버면 null(안내를 숨긴다). */
+  delayTable: DelayTable | null;
 }
 
 export interface ArtilleryActions {
@@ -92,6 +99,9 @@ const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
   pending: false,
   pickClock: null,
   myPick: null,
+  teams: false,
+  queue: [],
+  delayTable: null,
 };
 
 /**
@@ -121,6 +131,9 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
       cloudLevel: t.cloudLevel,
       suddenDeathTurn: t.suddenDeathTurn,
       result: t.result,
+      teams: t.teams ?? false,
+      queue: t.queue ?? [],
+      delayTable: t.delays ?? null,
       replay: null,
       pending: false,
       pickClock:
@@ -174,6 +187,10 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
           cloudLevel: p.cloudLevel,
           pending: false,
           turnClock: { since: Date.now(), remainingMs: null },
+          queue: p.queue ?? state.queue,
+          units: p.delays
+            ? state.units.map((u) => (p.delays && p.delays[u.seat] !== undefined ? { ...u, delay: p.delays[u.seat] } : u))
+            : state.units,
         });
         return 'applied';
       }

@@ -76,7 +76,7 @@
 | `SKIP` | 차례 넘기기 |
 
 3. `FIRE` 는 순서대로 해소한다: **(물뿌리개) → 이동(§5) → 탄도(§6.1) → 폭발(§6.2) → 낙하·탈락(§6.3)**, 겹씨앗이면 탄도~낙하를 한 번 더(§6.4). 해소가 끝나면 **연출 대기**(§9.2)에 들어가고, 대기가 끝나면 다음 차례.
-4. 다음 차례는 **좌석 +1**(좌석 수로 나눈 나머지) 중 살아 있는 첫 좌석이다(탈락자는 건너뛴다).
+4. 다음 차례는 **누적 딜레이가 가장 작은 살아 있는 포대**다(§4.2, D-226 — 그 전에는 좌석 +1).
 5. 시간 초과는 `SKIP` 과 같다(이동 없음). 턴 제한 '끔'은 없다 — 선택지 20·30·45·60초, 기본 30초(D-220).
 
 **거절**(상태 무변경, 비공개 `ERROR`):
@@ -88,6 +88,24 @@
 | `OUT_OF_RANGE` | `moveDx`·`angle`·`power` 가 범위 밖 |
 | `NO_AMMO` | 그 탄이 남지 않았음(남의 특수탄 포함) |
 | `NO_ITEM` | 그 아이템이 없음(이미 씀) |
+
+### 4.2 차례 순서 — 딜레이 (D-226)
+
+포트리스식이다. 포대마다 **누적 딜레이**가 있고, 차례가 끝날 때 그 차례 주인에게 쌓인다. 다음 차례는 살아 있는 포대 중 딜레이가
+가장 작은 포대 — 같으면 방금 차례였던 좌석 **다음부터 좌석 순서**(방금 쏜 좌석이 맨 뒤). 개인전·팀전 모두 같다.
+
+| 한 차례 | 딜레이 |
+| --- | --- |
+| 콩알 / 호박탄 / 고유 특수탄 | 100 / 130 / 140 |
+| 이동 | 쓴 연료 2칸마다 +1(나머지 버림 — 연료 = 포대 연료 − 남은 연료) |
+| 아이템 | +30 (겹씨앗은 한 발이 더 나가 +60) |
+| 넘기기·시간 초과 | 80 (발사 대신 — 이동·탄 없음) |
+
+- 판 시작(고르기 공개 뒤): 시드로 고른 첫 좌석부터 좌석 순서로 0·1·2… 를 깐다 — 첫 바퀴는 좌석 순서와 같다(팀전이면 팀이 번갈아).
+- 탈락한 포대는 순서에서 빠진다. 딜레이는 공개 정보다 — 공개 뷰에 포대별 `delay`, 앞으로의 순서 `queue`(지금 차례 주인부터),
+  딜레이 표 `delays` 를 싣고 `TURN_CHANGED` 에도 `delays`·`queue` 를 싣는다.
+- 상태의 `turnOrder` 가 `SEAT` 인 판(D-226 이전에 시작해 Redis 에 남은 판 — JSON 에 필드 없음)은 좌석 +1 로 끝까지 가고 딜레이를 쌓지 않는다.
+- 구름 밀물(§8)은 여전히 **차례 번호**로 센다 — 차례 상한도 그대로다.
 
 ## 5. 이동
 
@@ -203,6 +221,7 @@
   2. 탈락한 포대 — **늦게 탈락한 순**. 같은 순간 탈락하면 그 해소 **직전 체력**이 높은 쪽이 위, 같으면 동순위.
   3. 탈주자 — 맨 아래(동순위).
 - 사유: `LAST_STANDING`(생존 1) · `ALL_DOWN`(같은 순간 모두 탈락) · `NO_HUMANS`.
+- 2:2 팀전의 종료·순위는 §14.
 
 ## 10. 난수 (SplitMix64)
 
@@ -280,3 +299,31 @@ splitmix(seed, k):  z = seed + (k + 1) × 0x9E3779B97F4A7C15
 | 봇 — 시드 고르기·바람개비 격자·탄/아이템 변형(비용 차감) | `bot/ArtilleryBotPolicy` | `ArtilleryBotPolicyTest`(섞인 유닛 무작위 상대 60/60·유닛별 봇끼리 승률) |
 | 시뮬레이션(고르기·특수탄·아이템 섞음) | — | `ArtillerySimulationTest`(2~6인 × 200판) |
 | 클라 — 고르기 화면·탄/아이템 칩·단계 재생·포대 그림 | `ArtilleryPicker.tsx`·`ArtilleryControls.tsx`·`replay.ts`·`draw.ts` | `ArtilleryTable.test.tsx`·`artilleryLogic.test.ts`·`artilleryTutorial.test.tsx` |
+
+### S5 (D-225·D-226) — 2:2 팀전·딜레이 차례
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 판 설정(팀전·차례 규칙) | `ArtilleryEngine.Setup`, `state/TurnOrder`, 상태 `teams`·`turnOrder`, 포대 `delay` | `ArtilleryTeamsAndDelayTest` |
+| 딜레이 쌓기·다음 차례·순서 줄 | `ArtilleryEngine`(`pickNext`·`turnQueue`), `rules/Shell.delay`·`rules/Item.delay` | `ArtilleryTeamsAndDelayTest`, `ArtilleryGoldenTest`(S5 골든) |
+| 팀 종료·순위 | `ArtilleryEngine`(`teamOutcome`·`teamPlacements`), `state/MatchResult`(`teams`·`winnerTeam`) | `ArtilleryTeamsAndDelayTest` |
+| 좌석 순서 판의 물리 그대로 | — | `ArtilleryGoldenTest.physics_fingerprint_unchanged_since_s4`(main 037963e 와 같은 지문) |
+| 방 설정·시작 인원 | `ArtilleryGameDefinition`(`TEAM_MODE`·`playersToStart`), `lifecycle/ArtilleryRoundStarter` | `ArtilleryGameDefinitionTest`, `ArtilleryBotMatchSimulationIT`(2:2 봇 완주) |
+| 팀 기록·ELO·상대 전적 | `persistence/ArtilleryMatchRecorder`·`ArtilleryHeadToHead`, `V18__artillery_teams.sql` | `ArtilleryMatchRecorderIT` |
+| 봇 — 아군 겨냥 안 함·아군 피해 감점 | `bot/ArtilleryBotPolicy` | `ArtilleryTeamsAndDelayTest` |
+| 시뮬레이션 | — | `ArtillerySimulationTest`(개인전 2~6인 + 팀전 4·6인, 각 200판) |
+| 클라 — 팀 칩·딜레이·다음 차례·⏱ +N·팀 결과 | `delay.ts`·`ArtilleryTable.tsx`·`ArtilleryControls.tsx`·`ArtilleryMatchEnd.tsx` | `ArtilleryTable.test.tsx`·`artilleryLogic.test.ts` |
+
+## 14. 2:2 팀전 (S5, D-225)
+
+- 대기실 방 설정 **모드**(`TEAM_MODE` — 개인전 / 2:2 팀전)로 고른다. 2:2 는 **정확히 4명**(정원 4, 3명으로 시작 못 함). 엔진은 6인 3:3 도 검증한다.
+- **팀 = 좌석 홀짝**(좌석 0·2 대 1·3). 좌석 순서는 대기실 팀 배정(`teamPolicy`)이 정한다. 출발 자리는 개인전처럼 시드로 섞는다.
+- **아군 피해 있음** — 물리는 개인전과 같다(자기 피해도 그대로).
+- **종료**: 살아 있는 팀이 하나가 되면 그 팀 승(`LAST_STANDING`). 한 해소로 두 팀이 함께 전멸하면(`ALL_DOWN`) 그 마지막 순간 탈락한
+  포대들의 **탈락 직전 체력 합**이 큰 팀 승, 같으면 **무승부**. 사람이 있던 판에서 사람이 모두 탈락하면(`NO_HUMANS`) 살아 있는 포대 수 →
+  남은 체력 합 → 무승부.
+- **순위**: 이긴 팀 1위(동순위) → 진 팀 → 탈주자. 무승부면 탈주하지 않은 모두 1위이고 승자는 없다. 탈주자는 팀이 이겨도 패.
+- **기록**: ELO 는 팀 평균 방식(오목 2:2 와 같음). 이긴 팀의 탈주자는 상대 팀에 혼자 진 것으로 따로 잰다. 무승부는 ELO·승패 변화 없이
+  행만. 참가자 행 `team`(V18, 개인전 NULL) — 상대 전적은 상대 팀만 센다.
+- 봇은 같은 팀을 겨냥하지 않고 아군 피해를 자기 피해처럼 뺀다(아군 탈락 −3000).
+- 두 번째 겹씨앗 발은 한 팀만 남으면 나가지 않는다(개인전의 "한 명만 남으면"과 같은 규칙).
