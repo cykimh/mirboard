@@ -359,6 +359,77 @@ describe('GameTable — 매치 종료', () => {
   });
 });
 
+/**
+ * D-240 — 방이 끝났는데(봇 판 FINISHED·탈주·강제 종료) RoomPage 가 게임판을 유지하는 중. 결과 화면을 보이고, 손패·액션·모달·[내보내기]·
+ * [게임 종료]는 감춘다. 나가기 문구는 다른 게임과 같다 — [대기실로] 옆이면 "나가기", 혼자면 "메인으로"(판돈 방도).
+ */
+describe('GameTable — 끝난 방 (D-240)', () => {
+  const ended = {
+    winningTeam: 'A' as const,
+    finalScores: { A: 1000, B: 450 },
+    roundsPlayed: 6,
+    mvpUserId: null,
+    mvpStat: null,
+  };
+
+  it('봇 판이 끝나면(FINISHED) 결과를 보이고 [메인으로]만 — 판돈 방도 같은 문구', () => {
+    seed({ tableView: tableView({ phase: 'ROUND_END' }), privateHand: privateHand([]), matchEnded: ended });
+    const onExit = vi.fn();
+
+    const { container } = renderTable({ roomFinished: true, onExit, stake: 50 });
+
+    expect(container.querySelector('.match-ended')).toHaveTextContent('🏆 승리!');
+    expect(screen.queryByRole('button', { name: '대기실로' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '테이블 떠나기' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '메인으로' }));
+    expect(onExit).toHaveBeenCalled();
+  });
+
+  it('대기실로 돌아온 방이면 [대기실로] 옆은 "나가기"', () => {
+    seed({ tableView: tableView({ phase: 'ROUND_END' }), privateHand: privateHand([]), matchEnded: ended });
+    const onExit = vi.fn();
+
+    renderTable({ roomFinished: true, onExit, onBackToRoom: vi.fn() });
+
+    expect(screen.getByRole('button', { name: '대기실로' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    expect(onExit).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '메인으로' })).toBeNull();
+  });
+
+  it('결과가 없으면(강제 종료) "게임이 종료되었습니다." + [메인으로], 손패·내기 버튼·[게임 종료]·[내보내기]는 없다', () => {
+    seed({
+      tableView: tableView(),
+      privateHand: privateHand([card('JADE', 5), card('SWORD', 9)]),
+      disconnectedSeats: new Set([1]),
+    });
+    const onExit = vi.fn();
+    const onAbort = vi.fn();
+    const onKick = vi.fn();
+
+    const { container } = renderTable({ roomFinished: true, onExit, onAbort, onKick });
+
+    expect(screen.getByText('게임이 종료되었습니다.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '메인으로' }));
+    expect(onExit).toHaveBeenCalled();
+    expect(container.querySelector('.my-hand')).toBeNull();
+    expect(container.querySelector('.arena-seat-actions')).toBeNull();
+    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /내보내기/ })).toBeNull();
+  });
+
+  it('진행 중(roomFinished 아님)에는 종료 안내가 없다 — 대비', () => {
+    seed({ tableView: tableView(), privateHand: privateHand([card('JADE', 5)]), disconnectedSeats: new Set([1]) });
+
+    const { container } = renderTable({ onExit: vi.fn(), onAbort: vi.fn(), onKick: vi.fn() });
+
+    expect(screen.queryByText('게임이 종료되었습니다.')).toBeNull();
+    expect(container.querySelector('.my-hand')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '게임 종료' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument();
+  });
+});
+
 describe('GameTable — 헤더', () => {
   it('연습/턴제한/판돈/관전자 배지를 조건부로 렌더한다', () => {
     seed({ tableView: tableView(), privateHand: privateHand([]) });

@@ -143,7 +143,8 @@ export function MatchEndedPanel({
         )}
         {onExit && (
           <Button type="button" variant="outline" className="match-exit" onClick={onExit}>
-            {stake > 0 ? '테이블 떠나기' : '메인으로'}
+            {/* D-240 — 다른 게임과 같은 문구: [대기실로] 옆이면 나가기, 혼자면 메인으로(판돈 방도 같다). */}
+            {onBackToRoom ? '나가기' : '메인으로'}
           </Button>
         )}
       </div>

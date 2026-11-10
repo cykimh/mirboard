@@ -58,7 +58,14 @@ for (const game of GAMES) {
     await page.getByRole('button', { name: '게임 종료' }).click();
     await expect(page.getByRole('button', { name: '게임 종료' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: '나가기' }).first().click();
+    // D-240 — 티츄도 끝난 판의 게임판을 유지한다. 결과 없이 끝났으니(강제 종료) 게임판 위 안내 + [메인으로](머리 줄 [나가기]가 없다).
+    if (game.name === '티츄') {
+      await expect(page.locator(game.board)).toBeVisible();
+      await expect(page.getByText('게임이 종료되었습니다.')).toBeVisible();
+      await page.getByRole('button', { name: '메인으로' }).click();
+    } else {
+      await page.getByRole('button', { name: '나가기' }).first().click();
+    }
     await expect(page).toHaveURL(/\/games$/);
   });
 }

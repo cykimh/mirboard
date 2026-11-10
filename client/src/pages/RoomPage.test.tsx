@@ -345,17 +345,42 @@ describe('RoomPage — 종료 전이 후 게임판 유지 (D-120)', () => {
     expect(cloudRouteProps.at(-1)!.roomFinished).toBe(true);
   });
 
-  it('티츄 방은 기존대로 FINISHED 전이 시 종료 카드로 바뀐다', async () => {
+  // D-240 — 티츄도 봇 판(fillWithBots)이 끝나 FINISHED 를 받으면 결과 화면(게임판)을 유지한다. [대기실로]는 없다(대기실이 없다).
+  it('티츄도 봇 판이 끝나 FINISHED 를 받으면 게임판을 유지하고 roomFinished 를 넘긴다', async () => {
     loadGame.mockResolvedValue(game('TICHU', ['TARGET_SCORE', 'TEAMS', 'BETTING']));
-    renderRoom({ gameType: 'TICHU', status: 'IN_GAME' });
+    const botRoom = {
+      gameType: 'TICHU',
+      status: 'IN_GAME',
+      playerIds: [1, 900, 901, 902],
+      playerCount: 4,
+      botSeats: [1, 2, 3],
+      fillWithBots: true,
+    } as Partial<Room>;
+    renderRoom(botRoom);
     await screen.findByTestId('tichu-table');
+    expect(tichuProps.at(-1)!.roomFinished).toBe(false);
 
     act(() => {
-      metaCallback()({ ...ROOM, gameType: 'TICHU', status: 'FINISHED' } as Room);
+      metaCallback()({ ...ROOM, ...botRoom, status: 'FINISHED' } as Room);
     });
 
+    expect(screen.getByTestId('tichu-table')).toBeInTheDocument();
+    expect(screen.queryByText('게임이 종료되었습니다.')).toBeNull();
+    const last = tichuProps.at(-1)!;
+    expect(last.roomFinished).toBe(true);
+    expect(last.onBackToRoom).toBeUndefined();
+    expect(last.onExit).toBeTypeOf('function');
+    // 끝난 방에는 강제 종료가 없다(서버도 IN_GAME 만 받는다).
+    expect(last.onAbort).toBeUndefined();
+    expect(last.playerIds).toEqual([1, 900, 901, 902]);
+  });
+
+  it('티츄도 처음부터 FINISHED 로 들어오면(새로고침) 기존 종료 카드', async () => {
+    loadGame.mockResolvedValue(game('TICHU', ['TEAMS']));
+    renderRoom({ gameType: 'TICHU', status: 'FINISHED' });
+
+    expect(await screen.findByText('게임이 종료되었습니다.')).toBeInTheDocument();
     expect(screen.queryByTestId('tichu-table')).toBeNull();
-    expect(screen.getByText('게임이 종료되었습니다.')).toBeInTheDocument();
   });
 });
 
@@ -1373,7 +1398,7 @@ describe('RoomPage — 다음 판: 대기실 복귀 뒤 결과 화면 유지 (D-
     expect(screen.getByTestId(testId)).toBeInTheDocument();
     const back = props().at(-1)!.onBackToRoom as () => void;
     expect(back).toBeTypeOf('function');
-    if (gameType !== 'TICHU') expect(props().at(-1)!.roomFinished).toBe(true);
+    expect(props().at(-1)!.roomFinished).toBe(true);
 
     act(() => back());
 

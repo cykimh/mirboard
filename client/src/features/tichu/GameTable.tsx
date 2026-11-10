@@ -57,6 +57,11 @@ interface GameTableProps {
   tiers?: Record<number, Tier>;
   /** D-153 — 판이 끝나 방이 대기실로 돌아왔다(RoomPage 가 결과 화면을 유지하는 중). 매치 종료 화면의 [대기실로]가 부른다. */
   onBackToRoom?: () => void;
+  /**
+   * D-240 — 방이 끝났다(FINISHED 또는 대기실 복귀) — RoomPage 가 이 세션에서 본 전이 뒤 결과 화면을 유지하는 중. 손패·액션·모달·
+   * [내보내기]·[게임 종료]를 감추고, 결과(MATCH_ENDED)가 없으면(강제 종료) "게임이 종료되었습니다." + [메인으로]를 띄운다.
+   */
+  roomFinished?: boolean;
 }
 
 /**
@@ -83,6 +88,7 @@ export function GameTable({
   onKick,
   tiers,
   onBackToRoom,
+  roomFinished = false,
 }: GameTableProps) {
   const token = useAuthStore((s) => s.token);
   const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef } =
@@ -99,11 +105,13 @@ export function GameTable({
   const triggerEffect = useEffectStore((s) => s.trigger);
 
   const m = useGameTableModel({ playerIds, myUserId });
+  // D-240 — 끝난 방에서는 진행 중 단계로 그리지 않는다(카드·버튼·타이머·차례 알림이 끝난 방에 남지 않게).
+  const live = !roomFinished;
 
   const { arenaRef, centerTrickRef, fly } = useGameTableEffects({
     mySeat: m.mySeat,
     myTeam: m.myTeam,
-    myTurn: m.myTurn,
+    myTurn: live && m.myTurn,
     matchEnded: m.matchEnded,
     triggerEffect,
     playChime,
@@ -165,7 +173,7 @@ export function GameTable({
         chatOpen={chatOpen}
         onToggleChat={() => setChatOpen((v) => !v)}
         unreadCount={unreadCount}
-        onAbort={onAbort}
+        onAbort={live ? onAbort : undefined}
         voiceControls={
           <VoiceControls voice={voice} buttonClassName={buttonVariants({ variant: 'outline', size: 'sm' })} />
         }
@@ -177,19 +185,19 @@ export function GameTable({
         voiceOf={(uid) => voiceStatusOf(voice, uid)}
         mySeat={m.mySeat}
         myTeam={m.myTeam}
-        myTurn={m.myTurn}
+        myTurn={live && m.myTurn}
         usernames={usernames}
         botSeats={botSeats}
         stake={stake}
         chips={m.chips}
         disconnectedSeats={m.disconnectedSeats}
-        onKickSeat={onKick ? (seat) => onKick(playerIds[seat]) : undefined}
+        onKickSeat={onKick && live ? (seat) => onKick(playerIds[seat]) : undefined}
         tiers={tiers}
         spectator={spectator}
         turnSeconds={turnSeconds}
-        isInDealing={m.isInDealing}
-        isInPassing={m.isInPassing}
-        isInPlaying={m.isInPlaying}
+        isInDealing={live && m.isInDealing}
+        isInPassing={live && m.isInPassing}
+        isInPlaying={live && m.isInPlaying}
         arenaTint={m.arenaTint}
         cardAnimEnabled={cardAnimEnabled}
         fly={fly}
@@ -211,7 +219,7 @@ export function GameTable({
         usernames={usernames}
       />
 
-      {!spectator && (
+      {!spectator && live && (
         <MyHandPanel
           privateHand={m.privateHand}
           handCards={m.handCards}
@@ -245,7 +253,7 @@ export function GameTable({
         </p>
       )}
 
-      {m.lastReceived && m.lastReceived.length > 0 && (
+      {live && m.lastReceived && m.lastReceived.length > 0 && (
         <PassReceivedModal
           received={m.lastReceived}
           playerIds={playerIds}
@@ -255,14 +263,14 @@ export function GameTable({
       )}
 
       <MakeWishModal
-        open={m.pendingWishPlay !== null}
+        open={live && m.pendingWishPlay !== null}
         onConfirm={a.handleConfirmWishPlay}
         onSkipWish={a.handlePlayWithoutWish}
         onCancel={a.handleCancelWishPlay}
       />
 
       <GiveDragonTrickModal
-        open={m.mustGiveDragon}
+        open={live && m.mustGiveDragon}
         opponentSeats={opponentSeatsOf(m.mySeat)}
         onConfirm={a.handleGiveDragon}
       />
@@ -284,6 +292,18 @@ export function GameTable({
           onExit={onExit}
           onBackToRoom={onBackToRoom}
         />
+      ) : roomFinished ? (
+        // D-240 — 방은 끝났는데 매치 결과가 없다: 방장 강제 종료이거나 MATCH_ENDED 가 도착하기 직전의 찰나다(스컬킹·원카드와 같다).
+        <section className="match-ended tichu-finished-note" aria-label="게임 종료">
+          <p>게임이 종료되었습니다.</p>
+          {onExit && (
+            <div className="match-actions">
+              <Button type="button" variant="outline" className="match-exit" onClick={onExit}>
+                메인으로
+              </Button>
+            </div>
+          )}
+        </section>
       ) : (
         m.roundEnded && (
           <div className="round-ended">
