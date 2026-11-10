@@ -73,6 +73,57 @@ class ArtilleryBotPolicyTest {
         assertThat(botWins).isGreaterThanOrEqualTo(games * 9 / 10);
     }
 
+    /**
+     * S5 (D-225·D-226) — 2:2 팀전·딜레이 차례에서 봇 팀이 무작위 팀을 확실히 이기고, 봇은 아군에게 거의 피해를 주지 않는다(아군 피해 /
+     * 적 피해 비율을 찍는다).
+     */
+    @Test
+    void a_bot_team_beats_a_random_team_and_rarely_hurts_its_ally() {
+        Random random = new Random(2026_11_11L);
+        int games = 30;
+        int botWins = 0;
+        int allyDamage = 0;
+        int foeDamage = 0;
+        for (int g = 0; g < games; g++) {
+            int botTeam = g % 2;
+            ArtilleryState s = ENGINE.startMatch(random.nextLong(), 4, List.of(), ArtilleryEngine.Setup.TEAMS).newState();
+            long now = 0;
+            while (!s.ended()) {
+                if (s.phase() == Phase.RESOLVING) {
+                    now = s.resolveUntil();
+                    s = ENGINE.expire(s, now).newState();
+                    continue;
+                }
+                int seat = s.turnSeat();
+                boolean bot = seat % 2 == botTeam;
+                ArtilleryAction action = bot
+                        ? ArtilleryBotPolicy.choose(s, seat)
+                        : new ArtilleryAction.Fire(random.nextInt(61) - 30, random.nextInt(181),
+                                20 + random.nextInt(81), Shell.PEA);
+                ArtilleryState before = s;
+                s = ENGINE.apply(s, seat, action, now).newState();
+                if (bot) {
+                    for (int other = 0; other < 4; other++) {
+                        int lost = before.unit(other).hp() - s.unit(other).hp();
+                        if (other != seat && other % 2 == botTeam) {
+                            allyDamage += Math.max(0, lost);
+                        } else if (other % 2 != botTeam) {
+                            foeDamage += Math.max(0, lost);
+                        }
+                    }
+                }
+                assertThat(ArtilleryInvariantChecker.check(s)).isEmpty();
+            }
+            if (Integer.valueOf(botTeam).equals(s.result().winnerTeam())) {
+                botWins++;
+            }
+        }
+        System.out.printf("[artillery-bot-s5] 2v2 vs random team: %d/%d wins, ally damage %d vs foe damage %d%n",
+                botWins, games, allyDamage, foeDamage);
+        assertThat(botWins).isGreaterThanOrEqualTo(games * 9 / 10);
+        assertThat(allyDamage * 10).isLessThan(foeDamage);
+    }
+
     /** S4 (D-224) — 유닛을 섞어도 무작위보다 확실히 세고, 특수탄·아이템을 실제로 쓴다. 봇끼리 유닛별 승률도 찍는다(균형 참고). */
     @Test
     void with_units_and_items_the_bot_still_wins_and_spends_its_kit() {

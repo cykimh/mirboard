@@ -33,6 +33,7 @@ import { ArtilleryCountdown } from './ArtilleryCountdown';
 import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
 import { ArtilleryPicker, KIND_ICONS } from './ArtilleryPicker';
 import { seatColor } from './draw';
+import { minDelay, teamName, turnDelay } from './delay';
 import { walk } from './terrain';
 import { ARTILLERY_TUTORIAL } from './tutorial/artilleryTutorial';
 
@@ -257,6 +258,11 @@ export function ArtilleryTable({
     onExit();
   };
 
+  // D-226 — 딜레이: 좌석은 가장 작은 딜레이와의 차이, 조작부는 이번 발에 쌓일 값.
+  const baseDelay = minDelay(s.units);
+  const delayCost = myTurn && preview ? turnDelay(s.delayTable, shell, item, myFuel - preview.fuelLeft) : null;
+  const upcoming = s.phase === 'AIMING' || s.phase === 'RESOLVING' ? s.queue.filter((seat) => seat !== turnSeat).slice(0, 3) : [];
+
   const windText = s.wind === 0 ? '바람 없음' : `바람 ${s.wind < 0 ? '←' : '→'} ${Math.abs(s.wind)}`;
   const suddenDeath = s.turnNo >= s.suddenDeathTurn && s.suddenDeathTurn > 0;
 
@@ -265,7 +271,7 @@ export function ArtilleryTable({
       <header className="ar-header">
         <div className="ar-header-badges">
           <span className="ar-badge ar-badge-title">씨앗포</span>
-          <span className="ar-badge">{playerIds.length}인</span>
+          <span className="ar-badge">{s.teams ? '2:2 팀전' : `${playerIds.length}인`}</span>
           {practice && <span className="ar-badge">🤖 연습</span>}
           {spectatorCount > 0 && <span className="ar-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="ar-badge">관전 모드</span>}
@@ -350,7 +356,7 @@ export function ArtilleryTable({
           return (
             <li
               key={u.seat}
-              className={`ar-seat${isTurn ? ' ar-seat-turn' : ''}${u.alive ? '' : ' ar-seat-out'}`}
+              className={`ar-seat${isTurn ? ' ar-seat-turn' : ''}${u.alive ? '' : ' ar-seat-out'}${s.teams ? ` ar-seat-team${u.seat % 2}` : ''}`}
               style={{ ['--ar-accent' as string]: seatColor(u.seat) }}
             >
               <span className="ar-seat-name">
@@ -362,6 +368,7 @@ export function ArtilleryTable({
                 )}
                 {nameOf(u.seat)}
                 {u.seat === mySeat ? ' (나)' : ''}
+                {s.teams && <span className={`ar-team-chip ar-team-${u.seat % 2}`}>{teamName(u.seat % 2)}</span>}
               </span>
               <span className="ar-seat-hp" aria-label={`체력 ${u.hp}/${u.maxHp}`}>
                 <span
@@ -374,6 +381,11 @@ export function ArtilleryTable({
                   🎃{u.pumpkins}
                   {u.special ? ` ✦${u.specials}` : ''}
                   {u.items.length > 0 ? ` 🎒${u.items.length}` : ''}
+                </span>
+              )}
+              {!picking && u.alive && u.delay !== undefined && s.delayTable && (
+                <span className="ar-seat-delay" title={`딜레이 ${u.delay} — 가장 적은 화분이 다음 차례`}>
+                  ⏱{u.delay - baseDelay}
                 </span>
               )}
               {isTurn && <span className="ar-seat-tag">차례</span>}
@@ -425,6 +437,11 @@ export function ArtilleryTable({
             !roomFinished &&
             turnSeat >= 0 && <span className="ar-badge">{nameOf(turnSeat)} 조준 중</span>
           )}
+          {!roomFinished && !s.result && upcoming.length > 0 && (
+            <span className="ar-badge ar-queue" aria-label={`다음 차례 ${upcoming.map(nameOf).join(', ')}`}>
+              다음 {upcoming.map((seat) => (seat === mySeat ? '나' : nameOf(seat))).join(' › ')}
+            </span>
+          )}
         </div>
         <ArtilleryField
           mask={s.mask}
@@ -463,6 +480,8 @@ export function ArtilleryTable({
           onResetMove={() => setMoveDx(0)}
           onFire={fire}
           onSkip={skip}
+          delayCost={delayCost}
+          skipDelay={s.delayTable?.skip ?? null}
         />
       )}
 

@@ -5,7 +5,8 @@ import { chargePower, CHARGE_PERIOD_MS } from './ArtilleryControls';
 import { angleToward } from './ArtilleryField';
 import { canvasLabel, uiBoost } from './draw';
 import { useArtilleryStore } from './artilleryStore';
-import { flatRuns, hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
+import { DELAY_TABLE, flatRuns, hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
+import { minDelay, teamName, turnDelay } from './delay';
 
 describe('지형 마스크 (서버 Terrain 미러)', () => {
   it('런 → 마스크, 구멍은 서버와 같은 정수 원', () => {
@@ -262,3 +263,36 @@ describe('스토어 (순수 리듀서)', () => {
     expect(s.turnClock?.remainingMs).toBe(12_000);
   });
 });
+
+describe('딜레이·팀 (D-225·D-226)', () => {
+  it('이번 차례 딜레이 = 탄 + 쓴 연료/2(버림) + 아이템 — 서버 표 그대로', () => {
+    expect(turnDelay(DELAY_TABLE, 'PEA', null, 0)).toBe(100);
+    expect(turnDelay(DELAY_TABLE, 'PUMPKIN', null, 7)).toBe(133);
+    expect(turnDelay(DELAY_TABLE, 'SPORE', 'TWIN_SEED', 20)).toBe(210);
+    expect(turnDelay(DELAY_TABLE, 'PEA', 'PINWHEEL', 1)).toBe(130);
+    expect(turnDelay(null, 'PEA', null, 0)).toBeNull();
+  });
+
+  it('좌석 딜레이는 살아 있는 가장 작은 값 기준, 팀 이름은 좌석 홀짝', () => {
+    expect(minDelay([unit(0, 1, { delay: 300 }), unit(1, 2, { delay: 120, alive: false }), unit(2, 3, { delay: 200 })])).toBe(200);
+    expect(minDelay([unit(0, 1)])).toBe(0);
+    expect(teamName(0)).toBe('A팀');
+    expect(teamName(1)).toBe('B팀');
+  });
+
+  it('스냅샷이 팀·순서·딜레이 표를 담고, TURN_CHANGED 가 좌석 딜레이와 순서를 바꾼다', () => {
+    seedStore({ teams: true, queue: [0, 1], delays: DELAY_TABLE, units: [unit(0, 100, { delay: 0 }), unit(1, 500, { delay: 1 })] });
+    const st = useArtilleryStore.getState();
+    expect(st.teams).toBe(true);
+    expect(st.queue).toEqual([0, 1]);
+    expect(st.delayTable?.skip).toBe(80);
+    st.applyEvent({ type: 'TURN_CHANGED', payload: { seat: 1, turnNo: 1, wind: 0, cloudLevel: 360, delays: [100, 1], queue: [1, 0] } });
+    const after = useArtilleryStore.getState();
+    expect(after.units.map((u) => u.delay)).toEqual([100, 1]);
+    expect(after.queue).toEqual([1, 0]);
+    // 구 서버(딜레이 없음)면 그대로 둔다
+    after.applyEvent({ type: 'TURN_CHANGED', payload: { seat: 0, turnNo: 2, wind: 0, cloudLevel: 360 } });
+    expect(useArtilleryStore.getState().units.map((u) => u.delay)).toEqual([100, 1]);
+  });
+});
+

@@ -38,6 +38,9 @@ interface Props {
   onResetMove: () => void;
   onFire: (power: number) => void;
   onSkip: () => void;
+  /** D-226 — 이번 발에 쌓일 딜레이(모르면 null — 숨김)와 넘길 때의 딜레이. */
+  delayCost?: number | null;
+  skipDelay?: number | null;
 }
 
 /**
@@ -65,6 +68,8 @@ export function ArtilleryControls({
   onResetMove,
   onFire,
   onSkip,
+  delayCost = null,
+  skipDelay = null,
 }: Props) {
   // 이동 길게 누르기
   const moveTimer = useRef<number | null>(null);
@@ -226,7 +231,18 @@ export function ArtilleryControls({
           })}
         </div>
         <span className="ar-actions">
-          <button type="button" className="ar-btn ar-btn-ghost" disabled={!enabled} onClick={onSkip}>
+          {delayCost !== null && (
+            <span className="ar-delay-cost" title="이번 차례에 쌓일 딜레이 — 적게 쌓을수록 다음 차례가 빨리 온다">
+              ⏱ +{delayCost}
+            </span>
+          )}
+          <button
+            type="button"
+            className="ar-btn ar-btn-ghost"
+            disabled={!enabled}
+            onClick={onSkip}
+            title={skipDelay !== null ? `넘기기 — 딜레이 +${skipDelay}` : undefined}
+          >
             넘기기
           </button>
           <button

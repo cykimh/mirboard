@@ -4,7 +4,8 @@ import { ArtilleryTable, shotSummary } from './ArtilleryTable';
 import { useArtilleryStore } from './artilleryStore';
 import { artilleryRoomSink } from './artilleryRoomSink';
 import { useAuthStore } from '@/features/auth/authStore';
-import { hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
+import { DELAY_TABLE, hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
+import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
 
 const sendAction = vi.fn();
 let socketConnected = true;
@@ -187,5 +188,67 @@ describe('ArtilleryTable', () => {
         nameOf,
       ),
     ).toBe('보라의 덩굴탄 — 둔덕이 솟았다');
+  });
+
+  it('딜레이 — 좌석 ⏱ 는 가장 적은 화분과의 차이, 조작부 ⏱ +N 은 탄·아이템·걸음을 반영, 다음 차례 줄 (D-226)', () => {
+    seedStore({
+      delays: DELAY_TABLE,
+      queue: [0, 1],
+      units: [unit(0, 100, { delay: 40 }), unit(1, 500, { delay: 160 })],
+    });
+    renderTable();
+    expect(screen.getByText('⏱0')).toBeInTheDocument();
+    expect(screen.getByText('⏱120')).toBeInTheDocument();
+    expect(screen.getByText('⏱ +100')).toBeInTheDocument();
+    expect(screen.getByLabelText('다음 차례 민수')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: /호박탄/ }));
+    fireEvent.click(screen.getByRole('button', { name: /겹씨앗/ }));
+    for (let i = 0; i < 4; i++) {
+      fireEvent.keyDown(screen.getByRole('button', { name: '오른쪽으로 걷기(누르고 있기)' }), { key: 'Enter' });
+    }
+    expect(screen.getByText('⏱ +192')).toBeInTheDocument(); // 130 + 4/2 + 60
+  });
+
+  it('2:2 팀전 — 머리말·좌석에 팀 칩 (D-225)', () => {
+    seedStore({
+      teams: true,
+      seatCount: 4,
+      units: [unit(0, 100), unit(1, 250), unit(2, 400), unit(3, 550)],
+    });
+    renderTable({ playerIds: [10, 20, 30, 40], usernames: { 10: '보라', 20: '민수', 30: '지수', 40: '하늘' } });
+    expect(screen.getByText('2:2 팀전')).toBeInTheDocument();
+    expect(screen.getAllByText('A팀')).toHaveLength(2);
+    expect(screen.getAllByText('B팀')).toHaveLength(2);
+  });
+
+  it('팀전 결과 — 우리 팀 승·상대 팀 승·무승부, 줄마다 승/패와 팀 (D-225)', () => {
+    const nameOf = (seat: number) => ['보라', '민수', '지수', '하늘'][seat];
+    const placements = [
+      { seat: 0, rank: 1, hp: 40, deserted: false },
+      { seat: 2, rank: 1, hp: 0, deserted: false },
+      { seat: 1, rank: 3, hp: 0, deserted: false },
+      { seat: 3, rank: 3, hp: 0, deserted: false },
+    ];
+    const won = render(
+      <ArtilleryMatchEnd result={{ reason: 'LAST_STANDING', placements, teams: true, winnerTeam: 0 }} mySeat={2} nameOf={nameOf} />,
+    );
+    expect(screen.getByText('🌻 우리 팀이 이겼어요!')).toBeInTheDocument();
+    expect(screen.getAllByText('승')).toHaveLength(2);
+    expect(screen.getAllByText('패')).toHaveLength(2);
+    won.unmount();
+    const lost = render(
+      <ArtilleryMatchEnd result={{ reason: 'LAST_STANDING', placements, teams: true, winnerTeam: 0 }} mySeat={1} nameOf={nameOf} />,
+    );
+    expect(screen.getByText('A팀 승리')).toBeInTheDocument();
+    lost.unmount();
+    render(
+      <ArtilleryMatchEnd
+        result={{ reason: 'ALL_DOWN', placements: placements.map((p) => ({ ...p, rank: 1 })), teams: true, winnerTeam: null }}
+        mySeat={0}
+        nameOf={nameOf}
+      />,
+    );
+    expect(screen.getByText('무승부')).toBeInTheDocument();
+    expect(screen.getAllByText('무')).toHaveLength(4);
   });
 });
