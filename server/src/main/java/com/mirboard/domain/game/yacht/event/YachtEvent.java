@@ -29,6 +29,7 @@ import java.util.Map;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "@event")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = YachtEvent.TurnChanged.class, name = "TURN_CHANGED"),
+        @JsonSubTypes.Type(value = YachtEvent.RoundStarted.class, name = "ROUND_STARTED"),
         @JsonSubTypes.Type(value = YachtEvent.DiceHeld.class, name = "DICE_HELD"),
         @JsonSubTypes.Type(value = YachtEvent.DiceRolled.class, name = "DICE_ROLLED"),
         @JsonSubTypes.Type(value = YachtEvent.Scored.class, name = "SCORED"),
@@ -37,6 +38,7 @@ import java.util.Map;
 })
 public sealed interface YachtEvent extends GameEvent
         permits YachtEvent.TurnChanged,
+                YachtEvent.RoundStarted,
                 YachtEvent.DiceHeld,
                 YachtEvent.DiceRolled,
                 YachtEvent.Scored,
@@ -47,6 +49,7 @@ public sealed interface YachtEvent extends GameEvent
     default String envelopeType() {
         return switch (this) {
             case TurnChanged __ -> "TURN_CHANGED";
+            case RoundStarted __ -> "ROUND_STARTED";
             case DiceHeld __ -> "DICE_HELD";
             case DiceRolled __ -> "DICE_ROLLED";
             case Scored __ -> "SCORED";
@@ -61,6 +64,14 @@ public sealed interface YachtEvent extends GameEvent
      * @param turnSeconds 차례 전체 제한(초), 0 = 끔 (§6)
      */
     record TurnChanged(int seat, int round, int turnSeconds) implements YachtEvent {
+    }
+
+    /**
+     * D-202 — 동시 진행의 라운드 시작. 살아 있는 모두의 주사위가 비고 홀드가 풀린다(차례대로 진행의 {@link TurnChanged} 자리).
+     *
+     * @param turnSeconds 라운드 전체 제한(초), 0 = 끔
+     */
+    record RoundStarted(int round, int turnSeconds) implements YachtEvent {
     }
 
     record DiceHeld(int seat, HoldMask held) implements YachtEvent {

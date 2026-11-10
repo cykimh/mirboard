@@ -190,6 +190,35 @@ button.yt-badge {
   font-size: 11px;
 }
 
+/* D-202 — 동시 진행: 이번 라운드를 기록한 좌석은 흐리게, 남의 주사위는 작게. */
+.yt-seat-done {
+  opacity: 0.75;
+}
+
+.yt-seat-dice {
+  display: inline-flex;
+  gap: 2px;
+  flex-basis: 100%;
+}
+
+.yt-mini-die {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--yt-die-bg);
+  color: var(--yt-die-fg);
+  font-size: 14px;
+  line-height: 1;
+  box-sizing: border-box;
+  border-bottom: 2px solid transparent;
+}
+
+.yt-mini-die-held {
+  border-bottom-color: var(--yt-die-held);
+}
+
 .yt-seat-kick {
   min-height: 32px;
   padding: 0 8px;

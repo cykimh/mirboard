@@ -73,7 +73,24 @@ class YachtJsonRoundTripTest {
                 || k.toLowerCase().contains("next"));
         assertThat(keys).doesNotContain("full", "private", "upperSubtotal", "bonus", "total");
         assertThat(json.fieldNames()).toIterable().containsExactlyInAnyOrder(
-                "cards", "round", "turnSeat", "turn", "deserted", "actionCount", "result");
+                "cards", "round", "turnSeat", "turn", "deserted", "actionCount", "result", "simultaneous", "seatTurns");
+    }
+
+    /** D-202 — 동시 진행 상태가 그대로 돌고, 그 전 JSON(두 필드 없음)은 차례대로로 읽힌다. */
+    @Test
+    void a_simultaneous_state_round_trips_and_an_old_state_reads_as_sequential() throws Exception {
+        YachtEngine engine = YachtFixtures.simultaneousEngine(2, 45);
+        YachtState s = engine.start(YachtFixtures.T0).newState();
+        s = engine.apply(s, 1, YachtAction.Roll.plain(), () -> 3, YachtFixtures.T0).newState();
+        assertThat(roundTrip(s, YachtState.class)).isEqualTo(s);
+
+        com.fasterxml.jackson.databind.node.ObjectNode old = mapper.valueToTree(rich());
+        old.remove("simultaneous");
+        old.remove("seatTurns");
+        YachtState read = mapper.treeToValue(old, YachtState.class);
+        assertThat(read.simultaneous()).isFalse();
+        assertThat(read.seatTurns()).isEmpty();
+        assertThat(read).isEqualTo(rich());
     }
 
     private static void collectKeys(JsonNode node, List<String> keys) {
@@ -114,13 +131,14 @@ class YachtJsonRoundTripTest {
         Dice d = Dice.of(2, 2, 3, 3, 3);
         List<YachtEvent> events = List.of(
                 new YachtEvent.TurnChanged(1, 3, 45),
+                new YachtEvent.RoundStarted(4, 45),
                 new YachtEvent.DiceHeld(1, HoldMask.of(true, true, false, false, false)),
                 new YachtEvent.DiceRolled(1, d, HoldMask.NONE, 1, Scoring.candidates(Scorecard.EMPTY, d)),
                 new YachtEvent.Scored(1, Category.FULL_HOUSE, 13, 0, 0, 13, false),
                 new YachtEvent.PlayerEliminated(2, 40),
                 new YachtEvent.MatchEnded(EndReason.FINISHED, Ranking.placements(rich())));
         assertThat(events).extracting(YachtEvent::envelopeType).containsExactly(
-                "TURN_CHANGED", "DICE_HELD", "DICE_ROLLED", "SCORED", "PLAYER_ELIMINATED", "MATCH_ENDED");
+                "TURN_CHANGED", "ROUND_STARTED", "DICE_HELD", "DICE_ROLLED", "SCORED", "PLAYER_ELIMINATED", "MATCH_ENDED");
         for (YachtEvent e : events) {
             assertThat(e.isPrivate()).isFalse();
             assertThat(e.sequenced()).isTrue();

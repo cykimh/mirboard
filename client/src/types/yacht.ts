@@ -53,6 +53,17 @@ export interface YachtSeatView {
   deserted: boolean;
 }
 
+/** D-202 — 동시 진행의 좌석별 주사위(서버 `SeatTurnView`). */
+export interface YachtSeatTurn {
+  seat: number;
+  dice: Dice | null;
+  held: Held;
+  rolls: number;
+  /** 이번 라운드를 아직 기록하지 않았다. */
+  pending: boolean;
+  candidates: Partial<Record<Category, number>>;
+}
+
 /** resync `tableView`. */
 export interface YachtTableView {
   phase: 'PLAYING' | 'ENDED';
@@ -66,6 +77,9 @@ export interface YachtTableView {
   /** 차례 전체 마감까지(엔진 계산, D-183). 제한 끔·끝난 판이면 null. */
   turnRemainingMs: number | null;
   result: MatchResult | null;
+  /** D-202 — 동시 진행(라운드마다 모두 같이). 이때 `turnSeat` −1, 위 주사위는 비고 좌석별 주사위는 `turns`. 옛 서버면 없음. */
+  simultaneous?: boolean;
+  turns?: YachtSeatTurn[];
 }
 
 /** 요트에는 비공개 뷰가 없다(resync `privateHand` 는 늘 null). */
@@ -73,6 +87,12 @@ export type YachtPrivateView = never;
 
 export interface TurnChangedPayload {
   seat: number;
+  round: number;
+  turnSeconds: number;
+}
+
+/** D-202 — 동시 진행의 라운드 시작(살아 있는 모두의 주사위가 빈다). */
+export interface RoundStartedPayload {
   round: number;
   turnSeconds: number;
 }

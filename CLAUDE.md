@@ -313,7 +313,7 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128·D-129, D-131 공개): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
-  - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null)
+  - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `ROUND_STARTED`(D-202 동시 진행 — 방 옵션 `TURN_MODE`, 라운드마다 모두 같이·제한은 라운드 전체), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null)
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`

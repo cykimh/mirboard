@@ -47,6 +47,23 @@
 - **코드:** `YachtEngine.endTurn`(다음 좌석·라운드·종료 판정 한 곳).
 - **테스트:** `YachtEngineTurnTest`(`the_last_seat_of_a_round_starts_the_next_round_from_the_first_seat`·`the_last_score_of_round_12_finishes_the_match`·`a_solo_match_cycles_through_12_rounds_of_its_only_seat`).
 
+### 3.1 동시 진행 — "모두 같이" (D-202)
+
+대기실 방 설정 **진행 방식**(`RoomOption.TURN_MODE` — `SEQUENTIAL` 기본 / `SIMULTANEOUS`). 2인 이상일 때만 뜻이 있다(1인 판은 늘 차례대로).
+
+1. 라운드마다 **살아 있는 모두가 동시에** 한 차례를 한다 — 각자 자기 주사위(좌석별 `TurnState`)로 굴리고·고정하고·기록한다. 차례 순서는 없다.
+2. 이번 라운드를 기록한 좌석은 다음 라운드까지 기다린다(그 사이 액션은 `NOT_YOUR_TURN`). **모두 기록하면** 다음 라운드(`ROUND_STARTED`).
+3. 차례 제한(§6)은 **라운드 전체 하나**다 — 라운드 시작 + `turnSeconds`. 만기면 아직 기록하지 않은 사람 **모두**를 좌석 순으로 자동 기록하고
+   다음 라운드로 간다.
+4. 탈주(§7): 그 좌석의 주사위를 비우고 빠진다. 남은 사람이 이번 라운드를 다 기록했으면 바로 다음 라운드. 사람이 없으면 `NO_HUMANS`.
+5. 봇은 같은 라운드를 사람과 함께 둔다(인프라 봇 루프가 대기 좌석 ∩ 봇 좌석을 차례로). 동시 진행에서만 봇의 고정을 다음 굴림에 실어 한 액션으로 보낸다.
+6. 공개 뷰는 `simultaneous: true`, `turnSeat −1`, 좌석별 주사위 `turns[{seat, dice, held, rolls, pending, candidates}]`.
+
+- 불변식: 살아 있는 좌석의 채운 칸은 r 또는 r−1, 적어도 한 명은 아직(r−1), 이번 라운드를 한 좌석·탈주 좌석은 주사위가 비어 있다.
+- **코드:** `YachtEngine`(`simultaneous`·`nextRound`·`expire` 의 좌석 순 자동 기록), `YachtState.turnOf`·`pending`·`seatTurns`.
+- **테스트:** `YachtEngineSimultaneousTest`(9 — 2~4인 각 200판 봇 완주 포함), `YachtGameEngineTest`(봇 고정→굴림),
+  `infra/bot/YachtBotMatchSimulationIT.a_simultaneous_room_with_bots_and_an_idle_human_finishes_round_by_round`.
+
 ## 4. 한 차례
 
 차례는 `TURN_CHANGED` 로 시작한다. 그때 주사위는 비어 있고(굴린 횟수 0) 홀드는 모두 풀린다.
@@ -194,6 +211,7 @@
 | type | payload |
 | --- | --- |
 | `TURN_CHANGED` | 좌석, 라운드, 차례 제한(초, 0 = 끔) |
+| `ROUND_STARTED` | D-202 동시 진행의 라운드 시작 — 라운드, 라운드 제한(초) |
 | `DICE_HELD` | 좌석, `held`(5개) |
 | `DICE_ROLLED` | 좌석, 주사위 5개, `held`, 굴린 횟수, 후보 점수(빈 칸 → 점수) |
 | `SCORED` | 좌석, 칸, 점수, 그 좌석의 상단 소계·보너스·총점, `auto` |
@@ -288,4 +306,4 @@
 
 ## 12. 범위 밖 (v1)
 
-동시 진행(방 옵션 후보), 2~6인, 요트 추가 보너스·조커 규칙, 13칸 변형, 개인 최고 점수(1인 판 기록), 내기 칩, 하우스 룰 방 옵션.
+~~동시 진행~~(D-202 로 추가), 2~6인, 요트 추가 보너스·조커 규칙, 13칸 변형, ~~개인 최고 점수~~(D-201 로 추가), 내기 칩, 하우스 룰 방 옵션.

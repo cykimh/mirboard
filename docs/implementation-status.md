@@ -24,7 +24,7 @@
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼·턴 카운트다운 — D-131 공개, `MIRBOARD_ONECARD_STATUS` 로 되돌림) | ✅ | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127~D-131, §17) |
-| 5d | 요트 (개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
+| 5d | 요트 (동시 진행 D-202 · 개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
 | 5e | 오목 (15×15 — 1:1·2:2 팀전, 렌주·삼삼만 금지·자유 오목 금수, 봇 3단계, 휴대폰 두 단계 확정 착수, 기록·무승부 — 게임 중립 확장 3건 D-176, D-190 공개, `MIRBOARD_OMOK_STATUS` 로 되돌림) | ✅ | `domain.game.omok`, `client/src/features/omok`, `docs/rules-omok.md` (D-175~D-180·D-190, §19) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
@@ -473,6 +473,9 @@
 - **기록**: `yacht_match_results`·`yacht_match_participants` + `user_game_stats`(YACHT), 상대 전적은 최종 순위.
 - **개인 최고 점수(D-201)**: 1인 판은 `yacht_solo_scores`(V17)에만, 최고 = 1인 판 + 끝까지 친 여럿 판 중 최고(게스트·봇 제외). 게임 중립 포트
   `BestScoreSource` → `GET /api/users/{id}/stats` 의 `games[].bestScore`. 게임판 종료 화면("새 최고 기록!")·프로필·대기실 참가자 카드.
+- **동시 진행(D-202)**: 대기실 "진행 방식"(게임 중립 맵 옵션 `TURN_MODE`) — "모두 같이"면 라운드마다 모두 동시에 굴리고 전원 기록하면 다음 라운드
+  (`ROUND_STARTED`), 제한은 라운드 전체 하나(만기면 아직인 사람 모두 자동 기록). 인프라 무변경(포트가 여러 대기 좌석을 이미 지원). 게임판은 내 주사위를
+  가운데, 남의 주사위는 좌석 띠에 작게 실시간.
 - **클라**: `features/yacht` — 주사위 판(실시간 홀드·굴림), 점수표(차례 열 후보 점수, 내 차례면 칸 눌러 기록), 차례 카운트다운(`tableView.turnRemainingMs`),
   홀드 모아 보내기·`BUSY` 재전송(D-200), 튜토리얼 6단계 + 퀴즈. e2e `practice.e2e.ts` 에 요트 포함(데스크톱·휴대폰).
 - **테스트**: 요트 도메인 106건(점수 전수 7,776×12, 1~4인 시뮬레이션 각 2,000판) + Docker IT 5건(`YachtBotMatchSimulationIT`·`YachtRecorderFailureTest`),

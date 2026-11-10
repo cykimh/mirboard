@@ -10,9 +10,11 @@ import {
   type MatchEndedPayload,
   type MatchResult,
   type PlayerEliminatedPayload,
+  type RoundStartedPayload,
   type ScoredPayload,
   type TurnChangedPayload,
   type YachtPrivateView,
+  type YachtSeatTurn,
   type YachtSeatView,
   type YachtTableView,
 } from '@/types/yacht';
@@ -61,6 +63,12 @@ export interface YachtRoomState {
    */
   lastSent: SentAction | null;
   retryNonce: number;
+  /**
+   * D-202 — 동시 진행. 이때 `turnSeat` 는 −1 이고 좌석별 주사위는 `seatTurns` 에 있다. 위의 `dice`·`held`·`rolls`·`candidates` 는 늘
+   * <b>가운데 주사위 판</b>의 값이라 동시 진행이면 내 좌석(`ownSeat`) 것을 비춘다 — 게임판의 홀드·굴림 코드가 두 방식에서 같다.
+   */
+  simultaneous: boolean;
+  seatTurns: Record<number, YachtSeatTurn>;
 }
 
 export interface SentAction {
@@ -103,10 +111,27 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   ownSeat: -1,
   lastSent: null,
   retryNonce: 0,
+  simultaneous: false,
+  seatTurns: {},
 };
 
 function freshTurn(): Partial<YachtRoomState> {
   return { dice: null, held: NO_HOLD, rolls: 0, candidates: {} };
+}
+
+const emptySeatTurn = (seat: number, pending: boolean): YachtSeatTurn => ({
+  seat,
+  dice: null,
+  held: NO_HOLD,
+  rolls: 0,
+  pending,
+  candidates: {},
+});
+
+/** D-202 — 가운데 판에 비출 내 좌석 주사위(없으면 빈 판). */
+function ownTray(seatTurns: Record<number, YachtSeatTurn>, ownSeat: number): Partial<YachtRoomState> {
+  const t = seatTurns[ownSeat];
+  return t ? { dice: t.dice, held: t.held, rolls: t.rolls, candidates: t.candidates } : freshTurn();
 }
 
 /**
@@ -124,6 +149,9 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
 
   applySnapshot(snap) {
     const t = snap.tableView;
+    const simultaneous = t.simultaneous ?? false;
+    const seatTurns: Record<number, YachtSeatTurn> = {};
+    for (const turn of t.turns ?? []) seatTurns[turn.seat] = { ...turn, held: turn.held ?? NO_HOLD };
     set({
       phase: t.phase,
       seats: t.seats,
@@ -139,6 +167,9 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       errorMessage: null,
       // D-183 — 차례 기준 남은 시간은 엔진이 tableView 에 싣는다(바깥 turnRemainingMs 는 마지막 액션 기준이라 쓰지 않는다).
       turnClock: typeof t.turnRemainingMs === 'number' ? { since: Date.now(), remainingMs: t.turnRemainingMs } : null,
+      simultaneous,
+      seatTurns,
+      ...(simultaneous ? ownTray(seatTurns, get().ownSeat) : {}),
     });
   },
 
@@ -173,8 +204,31 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         return 'applied';
       }
 
+      case 'ROUND_STARTED': {
+        const p = payload as RoundStartedPayload;
+        const seatTurns: Record<number, YachtSeatTurn> = {};
+        for (const x of state.seats) seatTurns[x.seat] = emptySeatTurn(x.seat, !x.deserted);
+        set({
+          simultaneous: true,
+          turnSeat: -1,
+          round: p.round,
+          seatTurns,
+          lastSent: null,
+          ...freshTurn(),
+          turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
+        });
+        return 'applied';
+      }
+
       case 'DICE_HELD': {
         const p = payload as DiceHeldPayload;
+        if (state.simultaneous) {
+          const cur = state.seatTurns[p.seat];
+          if (!cur) return 'unhandled';
+          // 내 홀드는 화면이 기준이다(아래 순차와 같은 이유) — 남의 좌석만 반영.
+          if (p.seat !== state.ownSeat) set({ seatTurns: { ...state.seatTurns, [p.seat]: { ...cur, held: p.held } } });
+          return 'applied';
+        }
         if (p.seat !== state.turnSeat) return 'unhandled';
         // 내 차례의 홀드는 화면이 기준이다(위 ownSeat) — 메아리가 방금 누른 것을 되돌리지 않게.
         if (p.seat !== state.ownSeat) set({ held: p.held });
@@ -183,6 +237,31 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
 
       case 'DICE_ROLLED': {
         const p = payload as DiceRolledPayload;
+        if (state.simultaneous) {
+          const turn: YachtSeatTurn = {
+            seat: p.seat,
+            dice: p.dice,
+            held: p.held,
+            rolls: p.rolls,
+            pending: true,
+            candidates: p.candidates,
+          };
+          const seatTurns = { ...state.seatTurns, [p.seat]: turn };
+          if (p.seat !== state.ownSeat) {
+            set({ seatTurns });
+            return 'applied';
+          }
+          set({
+            seatTurns,
+            dice: p.dice,
+            held: p.held,
+            rolls: p.rolls,
+            candidates: p.candidates,
+            rollNonce: state.rollNonce + 1,
+            lastSent: null,
+          });
+          return 'applied';
+        }
         if (p.seat !== state.turnSeat) return 'unhandled';
         set({
           dice: p.dice,
@@ -208,10 +287,15 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
               }
             : x,
         );
+        const mine = !state.simultaneous || p.seat === state.ownSeat;
         set({
           seats,
-          candidates: {},
-          lastSent: null,
+          ...(state.simultaneous
+            ? { seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) } }
+            : {}),
+          // 동시 진행이면 남의 기록은 가운데 판(내 주사위)을 건드리지 않는다.
+          ...(mine ? { candidates: {}, lastSent: null } : {}),
+          ...(state.simultaneous && mine ? freshTurn() : {}),
           lastScore: {
             seat: p.seat,
             category: p.category,
@@ -226,13 +310,21 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       case 'PLAYER_ELIMINATED': {
         const p = payload as PlayerEliminatedPayload;
         const seats = state.seats.map((x) => (x.seat === p.seat ? { ...x, deserted: true, total: p.total } : x));
+        if (state.simultaneous) {
+          set({
+            seats,
+            seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) },
+            ...(p.seat === state.ownSeat ? freshTurn() : {}),
+          });
+          return 'applied';
+        }
         set({ seats, ...(p.seat === state.turnSeat ? freshTurn() : {}) });
         return 'applied';
       }
 
       case 'MATCH_ENDED': {
         const p = payload as MatchEndedPayload;
-        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), turnClock: null });
+        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), turnClock: null, seatTurns: {} });
         return 'applied';
       }
 
@@ -246,11 +338,14 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
   },
 
   setHeldLocal(held) {
-    set({ held });
+    const { simultaneous, seatTurns, ownSeat } = get();
+    const cur = seatTurns[ownSeat];
+    set(simultaneous && cur ? { held, seatTurns: { ...seatTurns, [ownSeat]: { ...cur, held } } } : { held });
   },
 
   setOwnSeat(seat) {
-    set({ ownSeat: seat });
+    const { simultaneous, seatTurns } = get();
+    set({ ownSeat: seat, ...(simultaneous ? ownTray(seatTurns, seat) : {}) });
   },
 
   noteSent(action) {

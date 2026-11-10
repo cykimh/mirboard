@@ -191,6 +191,7 @@ class YachtMatchSimulationTest {
                     rolls = 0;
                     candidates = Map.of();
                 }
+                case YachtEvent.RoundStarted r -> round = r.round(); // 이 재생기는 차례대로 판만 본다(D-202 동시 진행은 따로)
                 case YachtEvent.DiceHeld h -> held = h.held();
                 case YachtEvent.DiceRolled r -> {
                     dice = r.dice();
@@ -229,7 +230,7 @@ class YachtMatchSimulationTest {
                     .mapToObj(s -> new SeatView(s, Map.copyOf(scores.get(s)), upper[s], bonus[s], total[s], deserted[s]))
                     .toList();
             return new PublicView(result != null ? "ENDED" : "PLAYING", seats, round, turnSeat, dice, held, rolls,
-                    candidates, null, result);
+                    candidates, null, result, false, List.of());
         }
     }
 }

@@ -3,6 +3,7 @@ package com.mirboard.domain.game.yacht.bot;
 import com.mirboard.domain.game.yacht.dice.Dice;
 import com.mirboard.domain.game.yacht.dice.HoldMask;
 import com.mirboard.domain.game.yacht.score.Scorecard;
+import com.mirboard.domain.game.yacht.state.TurnState;
 import com.mirboard.domain.game.yacht.state.YachtState;
 
 /**
@@ -15,6 +16,7 @@ import com.mirboard.domain.game.yacht.state.YachtState;
 public record YachtBotView(Scorecard card, Dice dice, HoldMask held, int rolls) {
 
     public static YachtBotView of(YachtState state, int seat) {
-        return new YachtBotView(state.card(seat), state.turn().dice(), state.turn().held(), state.turn().rolls());
+        TurnState turn = state.turnOf(seat);
+        return new YachtBotView(state.card(seat), turn.dice(), turn.held(), turn.rolls());
     }
 }

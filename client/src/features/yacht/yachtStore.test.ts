@@ -148,4 +148,71 @@ describe('yachtRoomSink', () => {
     yachtRoomSink.applyPrivateEvent({ type: 'HAND_DEALT', payload: {} } as never);
     expect(useYachtStore.getState().errorMessage).toBeNull();
   });
+
+  describe('D-202 — 동시 진행', () => {
+    const NONE = [false, false, false, false, false] as [boolean, boolean, boolean, boolean, boolean];
+    const simTable = () =>
+      table({
+        turnSeat: -1,
+        simultaneous: true,
+        turns: [
+          { seat: 0, dice: [1, 2, 3, 4, 5], held: [true, false, false, false, false], rolls: 1, pending: true, candidates: { ONES: 1 } },
+          { seat: 1, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+        ],
+      });
+
+    it('snapshot mirrors my own seat into the center tray', () => {
+      useYachtStore.getState().setOwnSeat(0);
+      useYachtStore.getState().applySnapshot(snap(simTable()));
+      const st = useYachtStore.getState();
+      expect(st.simultaneous).toBe(true);
+      expect(st.dice).toEqual([1, 2, 3, 4, 5]);
+      expect(st.candidates).toEqual({ ONES: 1 });
+      useYachtStore.getState().setOwnSeat(1);
+      expect(useYachtStore.getState().dice).toBeNull();
+    });
+
+    it("another seat's roll and score update only that seat, mine moves the tray", () => {
+      useYachtStore.getState().setOwnSeat(0);
+      useYachtStore.getState().applySnapshot(snap(simTable()));
+      const before = useYachtStore.getState().rollNonce;
+      expect(
+        yachtRoomSink.applyEvent(
+          ev('DICE_ROLLED', { seat: 1, dice: [6, 6, 6, 6, 6], held: NONE, rolls: 1, candidates: { YACHT: 50 } }),
+        ),
+      ).toBe('applied');
+      let st = useYachtStore.getState();
+      expect(st.seatTurns[1].dice).toEqual([6, 6, 6, 6, 6]);
+      expect(st.dice).toEqual([1, 2, 3, 4, 5]);
+      expect(st.rollNonce).toBe(before);
+
+      yachtRoomSink.applyEvent(
+        ev('SCORED', { seat: 1, category: 'YACHT', points: 50, upperSubtotal: 0, bonus: 0, total: 50, auto: false }),
+      );
+      st = useYachtStore.getState();
+      expect(st.seatTurns[1].pending).toBe(false);
+      expect(st.dice).toEqual([1, 2, 3, 4, 5]);
+      expect(st.seats[1].total).toBe(50);
+
+      yachtRoomSink.applyEvent(
+        ev('DICE_ROLLED', { seat: 0, dice: [2, 2, 2, 2, 2], held: NONE, rolls: 2, candidates: { TWOS: 10 } }),
+      );
+      st = useYachtStore.getState();
+      expect(st.dice).toEqual([2, 2, 2, 2, 2]);
+      expect(st.rollNonce).toBe(before + 1);
+    });
+
+    it('a round start clears every tray and keeps deserters out', () => {
+      useYachtStore.getState().setOwnSeat(0);
+      useYachtStore.getState().applySnapshot(snap(simTable()));
+      yachtRoomSink.applyEvent(ev('PLAYER_ELIMINATED', { seat: 1, total: 0 }));
+      yachtRoomSink.applyEvent(ev('ROUND_STARTED', { round: 2, turnSeconds: 45 }));
+      const st = useYachtStore.getState();
+      expect(st.round).toBe(2);
+      expect(st.dice).toBeNull();
+      expect(st.seatTurns[0].pending).toBe(true);
+      expect(st.seatTurns[1].pending).toBe(false);
+      expect(st.turnClock?.remainingMs).toBeNull();
+    });
+  });
 });

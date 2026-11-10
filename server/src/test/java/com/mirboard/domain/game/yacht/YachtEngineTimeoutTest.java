@@ -90,13 +90,13 @@ class YachtEngineTimeoutTest {
     @Test
     void the_fallback_action_rolls_first_then_scores_the_best() {
         YachtState fresh = engine.start(T0).newState();
-        assertThat(engine.fallbackAction(fresh)).isEqualTo(YachtAction.Roll.plain());
+        assertThat(engine.fallbackAction(fresh, 0)).isEqualTo(YachtAction.Roll.plain());
         // 4 4 4 4 2 — 포 카드 18 = 초이스 18 동점 → 위 칸인 초이스
         YachtState rolled = withTurn(fresh, Dice.of(4, 4, 4, 4, 2), HoldMask.NONE, 1);
-        assertThat(engine.fallbackAction(rolled)).isEqualTo(new YachtAction.Score(Category.CHOICE));
+        assertThat(engine.fallbackAction(rolled, 0)).isEqualTo(new YachtAction.Score(Category.CHOICE));
         // 초이스를 쓴 뒤에는 포 카드
         YachtState choiceUsed = YachtFixtures.withCard(rolled, 0,
                 com.mirboard.domain.game.yacht.score.Scorecard.EMPTY.with(Category.CHOICE, 10));
-        assertThat(engine.fallbackAction(choiceUsed)).isEqualTo(new YachtAction.Score(Category.FOUR_OF_A_KIND));
+        assertThat(engine.fallbackAction(choiceUsed, 0)).isEqualTo(new YachtAction.Score(Category.FOUR_OF_A_KIND));
     }
 }

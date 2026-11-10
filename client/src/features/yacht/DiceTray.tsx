@@ -19,13 +19,27 @@ interface Props {
   onRoll?: () => void;
   /** 차례인 사람 이름(남의 차례 안내). */
   turnName: string | null;
+  /** D-202 — 굴리기 버튼이 없을 때의 안내를 바꾼다(동시 진행의 기다림). */
+  note?: string;
 }
 
 /**
  * 주사위 판(설계 §7.2). 홀드한 주사위는 아래로 내려앉고 테두리. 내 차례면 탭으로 홀드, 남의 차례면 보기만(DICE_HELD 실시간).
  * 실제 `<button>` 이라 키보드·보조기기로도 홀드한다. 굴리는 동안 홀드 안 한 주사위만 흔들린다.
  */
-export function DiceTray({ dice, held, rolls, rollNonce, canHold, canRoll, animate, onToggle, onRoll, turnName }: Props) {
+export function DiceTray({
+  dice,
+  held,
+  rolls,
+  rollNonce,
+  canHold,
+  canRoll,
+  animate,
+  onToggle,
+  onRoll,
+  turnName,
+  note,
+}: Props) {
   const [rolling, setRolling] = useState(false);
   useEffect(() => {
     if (rollNonce === 0 || !animate) return;
@@ -67,7 +81,7 @@ export function DiceTray({ dice, held, rolls, rollNonce, canHold, canRoll, anima
           </button>
         ) : (
           <span className="yt-tray-note">
-            {turnName ? `${turnName} 차례 · 굴림 ${rolls}/${MAX_ROLLS}` : '대기 중'}
+            {note ?? (turnName ? `${turnName} 차례 · 굴림 ${rolls}/${MAX_ROLLS}` : '대기 중')}
           </span>
         )}
       </div>

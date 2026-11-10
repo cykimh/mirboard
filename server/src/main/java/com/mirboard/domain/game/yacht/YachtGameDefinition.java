@@ -4,10 +4,13 @@ import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
+import com.mirboard.domain.game.core.RoomOption;
 import com.mirboard.domain.game.yacht.persistence.YachtStateStore;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,7 +23,7 @@ import org.springframework.stereotype.Component;
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.yacht.status} = 환경 변수 {@code MIRBOARD_YACHT_STATUS}, 기본
  * {@code AVAILABLE} — D-200 공개. 완성 전 단계에서는 {@code DISABLED} 였다). {@code COMING_SOON} 을 주면 카탈로그에 "준비 중"으로만
  * 보이고 새 방을 만들 수 없다(진행 중인 판은 끝까지) — 운영의 되돌리기 손잡이다({@code docs/deploy.md}). 기본값은 {@code application.yml} 과 아래 {@code @Value}
- * 두 곳에 있고 같아야 한다. 방 옵션은 쓰지 않는다(목표 점수·팀·판돈 없음 — D-106 옵트인 기본).
+ * 두 곳에 있고 같아야 한다. 방 옵션은 진행 방식 하나(D-202 — 목표 점수·팀·판돈 없음).
  */
 @Component
 public final class YachtGameDefinition implements GameDefinition {
@@ -86,6 +89,12 @@ public final class YachtGameDefinition implements GameDefinition {
     @Override
     public List<Integer> turnSecondsChoices() {
         return List.of(0, 20, 30, 45, 60);
+    }
+
+    /** D-202 — 진행 방식(차례대로 / 모두 같이)만. 목표 점수·팀·판돈은 없다. */
+    @Override
+    public Set<RoomOption> supportedRoomOptions() {
+        return EnumSet.of(RoomOption.TURN_MODE);
     }
 
     @Override

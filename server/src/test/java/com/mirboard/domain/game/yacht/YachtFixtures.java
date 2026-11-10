@@ -27,6 +27,13 @@ public final class YachtFixtures {
         return new YachtEngine(new GameContext("room-1", players, 0, 0, List.of(bots), Map.of(), turnSeconds));
     }
 
+    /** D-202 — 동시 진행(방 옵션 {@code TURN_MODE=SIMULTANEOUS}). */
+    public static YachtEngine simultaneousEngine(int seats, int turnSeconds, Integer... bots) {
+        List<Long> players = LongStream.rangeClosed(1, seats).boxed().toList();
+        return new YachtEngine(new GameContext("room-1", players, 0, 0, List.of(bots),
+                Map.of(com.mirboard.domain.game.core.RoomOption.TURN_MODE, "SIMULTANEOUS"), turnSeconds));
+    }
+
     public static YachtEngine engine(int seats, Integer... bots) {
         return timedEngine(seats, 0, bots);
     }

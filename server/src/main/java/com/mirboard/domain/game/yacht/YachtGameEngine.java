@@ -154,19 +154,30 @@ public final class YachtGameEngine implements GameEngine {
         try {
             YachtAction chosen = policy.apply(YachtBotView.of(state, seat));
             if (chosen != null && legal.contains(chosen)) {
-                return chosen;
+                return rules.simultaneous() ? carryHoldIntoRoll(chosen) : chosen;
             }
             log.error("Yacht bot policy returned a non-legal action, falling back: room={} seat={} action={}",
                     context.roomId(), seat, chosen);
         } catch (RuntimeException e) {
             log.error("Yacht bot policy failed, falling back: room={} seat={}", context.roomId(), seat, e);
         }
-        return rules.fallbackAction(state);
+        return rules.fallbackAction(state, seat);
+    }
+
+    /**
+     * D-202 — 동시 진행에서는 봇의 홀드를 다음 굴림에 실어 한 액션으로 보낸다(봇 간격은 그대로라 차례당 액션이 줄면 사람이 덜 기다린다).
+     * 홀드 뒤에는 정책이 늘 굴리므로 같은 결과다. 다 잡는 홀드는 굴릴 것이 없어 그대로 둔다(정책은 그런 홀드를 내지 않는다).
+     */
+    private static YachtAction carryHoldIntoRoll(YachtAction chosen) {
+        if (chosen instanceof YachtAction.Hold hold && !hold.held().all()) {
+            return new YachtAction.Roll(hold.held());
+        }
+        return chosen;
     }
 
     @Override
     public GameAction timeoutAction(GameState state, int seat) {
-        return rules.fallbackAction(yState(state));
+        return rules.fallbackAction(yState(state), seat);
     }
 
     // ---------- 엔진 타이머 — 차례 전체 제한 (D-183) ----------
@@ -181,7 +192,10 @@ public final class YachtGameEngine implements GameEngine {
         return Optional.of(Duration.ofMillis(Math.max(0L, remaining.getAsLong())));
     }
 
-    /** 만기 — (안 굴렸으면 한 번 굴리고) 점수가 가장 높은 빈 칸에 자동 기록(§6-2). 인프라가 락 안에서 만기를 다시 확인한 뒤 부른다. */
+    /**
+     * 만기 — (안 굴렸으면 한 번 굴리고) 점수가 가장 높은 빈 칸에 자동 기록(§6-2). 동시 진행이면 아직 안 한 사람 모두(D-202). 인프라가 락
+     * 안에서 만기를 다시 확인한 뒤 부른다.
+     */
     @Override
     public Optional<Result> onTimer(GameState state) {
         YachtState s = yState(state);
@@ -189,7 +203,7 @@ public final class YachtGameEngine implements GameEngine {
             return Optional.empty();
         }
         YachtEngine.Result result = rules.expire(s, roller, clock.millis());
-        log.info("Yacht turn expired: room={} seat={} round={}", context.roomId(), s.turnSeat(), s.round());
+        log.info("Yacht turn expired: room={} seats={} round={}", context.roomId(), s.pendingSeats(), s.round());
         return Optional.of(new Result(result.newState(), List.<GameEvent>copyOf(result.events())));
     }
 

@@ -385,6 +385,7 @@ D-200 부터 공개(`AVAILABLE`) — 되돌리기는 설정 `mirboard.yacht.stat
 | type | payload | 의미 |
 | --- | --- | --- |
 | `TURN_CHANGED` | `{ seat, round, turnSeconds }` | 차례 시작 — 주사위 비움·홀드 풀림. `turnSeconds` 는 차례 **전체** 제한(0 = 끔, D-183). 시작 직후 첫 차례는 이벤트 없이 resync 로 |
+| `ROUND_STARTED` | `{ round, turnSeconds }` | **D-202 동시 진행**의 라운드 시작 — 살아 있는 모두의 주사위가 빈다(차례대로 진행의 `TURN_CHANGED` 자리). `turnSeconds` 는 라운드 전체 제한 |
 | `DICE_HELD` | `{ seat, held }` | 홀드 실시간 공개(D-181) |
 | `DICE_ROLLED` | `{ seat, dice, held, rolls, candidates }` | `rolls` 1~3. `candidates` = 그 좌석의 빈 칸 → 지금 주사위 점수(0 포함, 서버 계산 — 클라는 점수를 계산하지 않는다) |
 | `SCORED` | `{ seat, category, points, upperSubtotal, bonus, total, auto }` | 기록 뒤 그 좌석의 소계·보너스·총점. `auto` 는 차례 제한 만기 자동 기록 |
@@ -397,6 +398,11 @@ D-200 부터 공개(`AVAILABLE`) — 되돌리기는 설정 `mirboard.yacht.stat
 - **차례 전체 제한(D-183).** 인프라 턴 데드라인은 액션마다 처음부터 다시 걸리므로 요트는 엔진 타이머로 "차례 시작 + `turnSeconds`" 에
   마감을 건다. 만기면 서버가 (안 굴렸으면 한 번 굴리고) 점수가 가장 높은 빈 칸에 기록한다 — `DICE_ROLLED`(필요하면) → `SCORED{auto:true}` →
   `TURN_CHANGED`. 그래서 resync 의 바깥 `turnRemainingMs`(마지막 액션 기준)는 요트에서 쓰지 말고 `tableView.turnRemainingMs`(차례 기준)를 쓴다.
+- **동시 진행(D-202, 방 옵션 `TURN_MODE=SIMULTANEOUS`).** 모두가 같은 라운드를 동시에 두므로 `DICE_*`·`SCORED` 가 좌석을 섞어 온다(`seat` 로
+  가른다). 다른 좌석이 아직이면 기록 뒤에 아무것도 없고, 마지막 사람이 기록하면 `ROUND_STARTED`. 만기는 아직인 사람 모두
+  `DICE_ROLLED`(필요하면)·`SCORED{auto:true}` 를 좌석 순으로 → `ROUND_STARTED`. resync `tableView` 에 `simultaneous: true`, `turnSeat: −1`,
+  위쪽 `dice`·`held`·`rolls`·`candidates` 는 비고 좌석별 주사위는 `turns: [{ seat, dice, held, rolls, pending, candidates }]`,
+  `turnRemainingMs` 는 라운드 기준. 차례대로 방은 `simultaneous: false`, `turns: []`.
 
 **resync**: `tableView` = `{ phase, seats: [{seat, scores, upperSubtotal, bonus, total, deserted}], round, turnSeat, dice, held, rolls,
 candidates, turnRemainingMs, result }` — `phase` 는 `PLAYING`·`ENDED`, `scores` 는 채운 칸만(칸 → 점수), `dice` 는 첫 굴림 전 null,

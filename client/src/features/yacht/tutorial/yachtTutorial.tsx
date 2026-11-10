@@ -92,6 +92,10 @@ export const YACHT_TUTORIAL_STEPS: TutorialStep[] = [
         <p>
           시간이 다 되면 서버가 (안 굴렸으면 한 번 굴리고) <strong>점수가 가장 높은 빈 칸</strong>에 자동으로 기록합니다.
         </p>
+        <p>
+          대기실에서 진행 방식을 <strong>모두 같이</strong>로 고르면 라운드마다 모두가 동시에 굴리고, 다 기록하면 다음
+          라운드로 갑니다. 시간 제한도 라운드 전체에 하나예요.
+        </p>
       </>
     ),
   },

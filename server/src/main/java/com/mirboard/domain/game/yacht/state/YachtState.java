@@ -24,6 +24,9 @@ import java.util.stream.IntStream;
  * @param deserted    탈주한 좌석(오름차순)
  * @param actionCount 성공한 액션 수(§8.1 상한)
  * @param result      끝났으면 결과, 아니면 null
+ * @param simultaneous D-202 — 동시 진행(라운드마다 모두 같이 굴림). 이때 {@code turnSeat} 는 −1, {@code turn} 은 주사위 없이 <b>라운드
+ *                    시계</b>(시작 시각만 — 차례 전체 제한의 기준)이고, 좌석별 주사위는 {@code seatTurns} 에 있다
+ * @param seatTurns   D-202 — 동시 진행의 좌석별 주사위(좌석 수만큼). 이번 라운드를 기록한 좌석·탈주 좌석은 빈 주사위. 차례대로면 빈 목록
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -33,7 +36,9 @@ public record YachtState(List<Scorecard> cards,
                          TurnState turn,
                          List<Integer> deserted,
                          int actionCount,
-                         MatchResult result) implements GameState {
+                         MatchResult result,
+                         boolean simultaneous,
+                         List<TurnState> seatTurns) implements GameState {
 
     public static final int ROUNDS = Category.values().length;
 
@@ -41,6 +46,53 @@ public record YachtState(List<Scorecard> cards,
         cards = List.copyOf(cards);
         deserted = deserted == null ? List.of() : deserted.stream().sorted().distinct().toList();
         turn = turn == null ? TurnState.none() : turn;
+        // 옛 JSON(D-202 이전)은 차례대로다.
+        seatTurns = seatTurns == null ? List.of() : List.copyOf(seatTurns);
+    }
+
+    /** 차례대로 진행 상태(D-202 이전 모양). */
+    public YachtState(List<Scorecard> cards, int round, int turnSeat, TurnState turn, List<Integer> deserted,
+                      int actionCount, MatchResult result) {
+        this(cards, round, turnSeat, turn, deserted, actionCount, result, false, List.of());
+    }
+
+    /** 이 좌석의 지금 주사위. 차례대로면 차례인 좌석만 실제 값, 나머지는 빈 주사위. */
+    public TurnState turnOf(int seat) {
+        if (simultaneous) {
+            return seat >= 0 && seat < seatTurns.size() ? seatTurns.get(seat) : TurnState.none();
+        }
+        return seat == turnSeat ? turn : TurnState.none();
+    }
+
+    /** 이 좌석이 지금 둘 차례인가 — 동시 진행이면 이번 라운드를 아직 기록하지 않은 살아 있는 좌석 모두. */
+    public boolean pending(int seat) {
+        if (ended() || seat < 0 || seat >= seatCount() || !alive(seat)) {
+            return false;
+        }
+        return simultaneous ? card(seat).filledCount() < round : seat == turnSeat;
+    }
+
+    /** 지금 둘 수 있는 좌석(오름차순). */
+    public List<Integer> pendingSeats() {
+        return IntStream.range(0, seatCount()).filter(this::pending).boxed().toList();
+    }
+
+    public YachtState withCards(List<Scorecard> nextCards) {
+        return new YachtState(nextCards, round, turnSeat, turn, deserted, actionCount, result, simultaneous, seatTurns);
+    }
+
+    public YachtState withActionCount(int count) {
+        return new YachtState(cards, round, turnSeat, turn, deserted, count, result, simultaneous, seatTurns);
+    }
+
+    /** 이 좌석의 주사위를 바꾼다 — 차례대로면 {@code turn}, 동시 진행이면 {@code seatTurns[seat]}. */
+    public YachtState withTurnOf(int seat, TurnState next) {
+        if (!simultaneous) {
+            return new YachtState(cards, round, turnSeat, next, deserted, actionCount, result, false, seatTurns);
+        }
+        List<TurnState> turns = new java.util.ArrayList<>(seatTurns);
+        turns.set(seat, next);
+        return new YachtState(cards, round, turnSeat, turn, deserted, actionCount, result, true, turns);
     }
 
     public int seatCount() {

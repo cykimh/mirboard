@@ -65,19 +65,43 @@ public final class YachtInvariantChecker {
     }
 
     private static void checkTurn(YachtState state, List<String> v) {
-        TurnState turn = state.turn();
+        checkTurn(state.turn(), "turn", v);
+        if (state.simultaneous()) {
+            if (state.seatTurns().size() != state.seatCount()) {
+                v.add("seat turns size " + state.seatTurns().size() + " != seats " + state.seatCount());
+                return;
+            }
+            if (state.turn().rolls() != 0) {
+                v.add("simultaneous round clock has dice");
+            }
+            for (int s = 0; s < state.seatCount(); s++) {
+                checkTurn(state.seatTurns().get(s), "seat " + s, v);
+                if (!state.pending(s) && state.seatTurns().get(s).rolls() != 0) {
+                    v.add("seat " + s + " keeps dice while not pending");
+                }
+            }
+        } else if (!state.seatTurns().isEmpty()) {
+            v.add("sequential match with seat turns");
+        }
+    }
+
+    private static void checkTurn(TurnState turn, String label, List<String> v) {
         if (turn.rolls() < 0 || turn.rolls() > TurnState.MAX_ROLLS) {
-            v.add("rolls out of range: " + turn.rolls());
+            v.add(label + " rolls out of range: " + turn.rolls());
         }
         if ((turn.dice() == null) != (turn.rolls() == 0)) {
-            v.add("dice present iff rolled: dice=" + turn.dice() + " rolls=" + turn.rolls());
+            v.add(label + " dice present iff rolled: dice=" + turn.dice() + " rolls=" + turn.rolls());
         }
         if (turn.rolls() == 0 && !turn.held().none()) {
-            v.add("held before first roll");
+            v.add(label + " held before first roll");
         }
     }
 
     private static void checkOpen(YachtState state, Set<Integer> botSeats, List<String> v) {
+        if (state.simultaneous()) {
+            checkOpenSimultaneous(state, botSeats, v);
+            return;
+        }
         int seat = state.turnSeat();
         if (seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
             v.add("turn seat not alive: " + seat);
@@ -100,11 +124,36 @@ public final class YachtInvariantChecker {
         }
     }
 
+    /** D-202 — 동시 진행: 살아 있는 좌석은 이번 라운드를 했거나(round) 아직(round − 1), 적어도 한 명은 아직이다. */
+    private static void checkOpenSimultaneous(YachtState state, Set<Integer> botSeats, List<String> v) {
+        if (state.turnSeat() != -1) {
+            v.add("simultaneous match has turn seat " + state.turnSeat());
+        }
+        if (state.round() < 1 || state.round() > YachtState.ROUNDS) {
+            v.add("round out of range: " + state.round());
+        }
+        for (int s : state.aliveSeats()) {
+            int filled = state.card(s).filledCount();
+            if (filled != state.round() && filled != state.round() - 1) {
+                v.add("seat " + s + " filled " + filled + " in round " + state.round());
+            }
+        }
+        if (state.pendingSeats().isEmpty()) {
+            v.add("open simultaneous round with nobody pending");
+        }
+        if (state.aliveSeats().stream().allMatch(botSeats::contains)) {
+            v.add("open match without a living human");
+        }
+        if (state.actionCount() >= state.actionLimit()) {
+            v.add("open match at action limit");
+        }
+    }
+
     private static void checkEnded(YachtState state, Set<Integer> botSeats, List<String> v) {
         if (state.turnSeat() != -1) {
             v.add("ended match has turn seat " + state.turnSeat());
         }
-        if (state.turn().dice() != null) {
+        if (state.turn().dice() != null || state.seatTurns().stream().anyMatch(t -> t.dice() != null)) {
             v.add("ended match keeps dice");
         }
         EndReason reason = state.result().reason();

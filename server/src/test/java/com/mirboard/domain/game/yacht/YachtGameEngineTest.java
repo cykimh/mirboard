@@ -171,4 +171,21 @@ class YachtGameEngineTest {
         assertThat(a.desert(1, 11L, new ArrayList<>())).isEqualTo(DesertOutcome.NOT_APPLICABLE);
         verify(store, never()).save(any(), any());
     }
+
+    /** D-202 — 동시 진행에서는 봇의 홀드를 굴림에 실어 한 액션으로(차례대로는 그대로 홀드). */
+    @Test
+    void in_simultaneous_play_a_bot_hold_is_carried_into_the_roll() {
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(T0), ZoneOffset.UTC);
+        YachtGameEngine simultaneous = new YachtGameEngine(new GameContext("r1", PLAYERS, 0, 0, List.of(1),
+                Map.of(com.mirboard.domain.game.core.RoomOption.TURN_MODE, "SIMULTANEOUS"), 45), store, clock,
+                new Random(5), publisher);
+        YachtEngine rules = YachtFixtures.simultaneousEngine(2, 45, 1);
+        YachtState s = rules.start(T0).newState();
+        s = rules.apply(s, 1, YachtAction.Roll.plain(), () -> 2, T0).newState();
+        HoldMask mask = HoldMask.of(true, false, false, false, false);
+        assertThat(simultaneous.chooseBotAction(s, 1, v -> new YachtAction.Hold(mask)))
+                .isEqualTo(new YachtAction.Roll(mask));
+        assertThat(simultaneous.pendingSeats(s)).containsExactly(0, 1);
+        assertThat(simultaneous.timeoutAction(s, 1)).isEqualTo(new YachtAction.Score(Category.YACHT));
+    }
 }

@@ -302,4 +302,35 @@ describe('YachtTable', () => {
     renderTable();
     expect(screen.getByRole('button', { name: /굴리기/ })).toBeDisabled();
   });
+
+  it('D-202 — 모두 같이: 내 주사위는 가운데에서 굴리고, 남의 주사위는 좌석 띠에 작게, 기록했으면 기다림', () => {
+    seed({
+      turnSeat: -1,
+      simultaneous: true,
+      turns: [
+        { seat: 0, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+        { seat: 1, dice: [6, 6, 5, 5, 1], held: [true, true, false, false, false], rolls: 1, pending: true, candidates: {} },
+      ],
+    });
+    const { unmount } = renderTable({ turnSeconds: 45 });
+    expect(screen.getByText('모두 같이')).toBeInTheDocument();
+    expect(screen.getByText('내 차례')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '주사위 6, 6, 5, 5, 1 · 굴림 1/3' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /굴리기/ }));
+    expect(sendAction).toHaveBeenCalledWith(expect.objectContaining({ '@action': 'ROLL' }));
+    unmount();
+
+    seed({
+      turnSeat: -1,
+      simultaneous: true,
+      turns: [
+        { seat: 0, dice: null, held: NONE, rolls: 0, pending: false, candidates: {} },
+        { seat: 1, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+      ],
+    });
+    renderTable({ turnSeconds: 45 });
+    expect(screen.queryByText('내 차례')).toBeNull();
+    expect(screen.getByText('기록했어요 · 다른 사람을 기다리는 중')).toBeInTheDocument();
+    expect(screen.getByText('기록함 ✓')).toBeInTheDocument();
+  });
 });

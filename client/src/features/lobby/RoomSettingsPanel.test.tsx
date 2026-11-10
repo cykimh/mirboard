@@ -151,6 +151,19 @@ describe('RoomSettingsPanel (D-161)', () => {
       expect(onChange).toHaveBeenCalledWith({ options: { MATCH_LENGTH: 'LONG' } });
     });
 
+    it('D-202 — 진행 방식은 차례대로·모두 같이로 보이고, 고르면 options 로 보낸다', () => {
+      const onChange = vi.fn();
+      const yacht: GameSummary = {
+        ...game('YACHT', ['TURN_MODE']),
+        roomOptionChoices: [{ option: 'TURN_MODE', values: ['SEQUENTIAL', 'SIMULTANEOUS'], defaultValue: 'SEQUENTIAL' }],
+      };
+      render(<RoomSettingsPanel room={room({ gameType: 'YACHT' })} game={yacht} canEdit onChange={onChange} />);
+      const mode = screen.getByRole('group', { name: '진행 방식' });
+      expect(within(mode).getAllByRole('radio').map((r) => r.textContent)).toEqual(['차례대로', '모두 같이']);
+      fireEvent.click(within(mode).getByRole('radio', { name: '모두 같이' }));
+      expect(onChange).toHaveBeenCalledWith({ options: { TURN_MODE: 'SIMULTANEOUS' } });
+    });
+
     it('선언하지 않은 옵션은 선택지가 실려 와도 그리지 않는다', () => {
       render(
         <RoomSettingsPanel

@@ -25,7 +25,7 @@ class YachtGameDefinitionTest {
         assertThat(def.defaultPlayers()).isEqualTo(4);
         assertThat(def.defaultTurnSeconds()).isEqualTo(45);
         assertThat(def.turnSecondsChoices()).containsExactly(0, 20, 30, 45, 60).contains(def.defaultTurnSeconds());
-        assertThat(def.supportedRoomOptions()).isEmpty();
+        assertThat(def.supportedRoomOptions()).containsExactly(com.mirboard.domain.game.core.RoomOption.TURN_MODE); // D-202
         assertThat(def.status()).isEqualTo(GameStatus.COMING_SOON);
         assertThat(def.displayName()).doesNotContainIgnoringCase("yahtzee");
     }

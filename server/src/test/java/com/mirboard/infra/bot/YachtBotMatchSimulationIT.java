@@ -19,6 +19,8 @@ import com.mirboard.domain.lobby.room.TeamPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Map;
+import com.mirboard.domain.lobby.room.RoomSettingsUpdate;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -100,6 +102,32 @@ class YachtBotMatchSimulationIT {
         GameStats humanStats = stats.get(human, YachtGameDefinition.ID);
         assertThat(humanStats.winCount() + humanStats.loseCount()).as("사람 전적 1판").isEqualTo(1);
         assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
+    }
+
+    /**
+     * D-202 — 동시 진행: 대기실 설정 {@code TURN_MODE=SIMULTANEOUS} → 봇 채우기 → 방장 시작. 봇 둘은 같은 라운드를 함께 두고, 손 놓은
+     * 사람은 라운드 전체 제한(1초)이 자동 기록한다 — 판은 끝나고 모두 12칸.
+     */
+    @Test
+    void a_simultaneous_room_with_bots_and_an_idle_human_finishes_round_by_round() {
+        long human = newUser("yt_sim_");
+        Room room = roomService.createRoom(human, "yt-sim", YachtGameDefinition.ID, TeamPolicy.SEQUENTIAL, false,
+                RoomService.DEFAULT_TARGET_SCORE, /*turnSeconds*/ 1, RoomService.DEFAULT_STAKE, null);
+        roomService.updateSettings(room.roomId(), human,
+                new RoomSettingsUpdate(null, null, null, null, null, Map.of("TURN_MODE", "SIMULTANEOUS")));
+        roomService.fillBots(room.roomId(), human);
+        Room started = roomService.startNow(room.roomId(), human);
+        assertThat(started.playerIds()).hasSize(4);
+
+        Awaitility.await("첫 라운드").atMost(10, TimeUnit.SECONDS).pollInterval(Duration.ofMillis(50))
+                .until(() -> stateStore.load(room.roomId()).isPresent());
+        assertThat(stateStore.load(room.roomId()).orElseThrow().simultaneous()).isTrue();
+
+        YachtState ended = awaitEnded(room.roomId(), 90, Set.of(1, 2, 3));
+        assertThat(ended.simultaneous()).isTrue();
+        assertThat(ended.result().reason()).isEqualTo(EndReason.FINISHED);
+        assertThat(ended.cards()).allMatch(c -> c.isFull());
+        assertRecorded(room.roomId(), 4);
     }
 
     /** D-181 — 혼자 하기: 방장 혼자 "1명으로 시작", 끝나면 매치 기록 0행(총점만 D-201 표에), 대기실로 돌아간다. */

@@ -217,7 +217,7 @@
   ]
 }
 ```
-- D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`·D-215 `MATCH_LENGTH`)의 선택지와 기본값이다
+- D-176 — `roomOptionChoices` 는 게임이 선언한 **값을 가진 방 옵션**(`TEAM_MODE`·`OMOK_RULE`·`BOT_LEVEL`·D-215 `MATCH_LENGTH`·D-202 `TURN_MODE`)의 선택지와 기본값이다
   (`[{ "option": "TEAM_MODE", "values": ["SOLO", "TEAMS_2V2"], "defaultValue": "SOLO" }]`, enum 선언 순서). 세 게임은 빈 배열이다.
   대기실은 이것만 보고 설정 줄을 그린다. 방의 값은 Room 의 `options`.
 - D-196 — `playerCounts` 는 **할 수 있는 인원**(오름차순, 중복 없음)이다. 게임이 선언한 맵 옵션의 값 조합마다 시작 인원(`playersToStart`)~정원

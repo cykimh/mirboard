@@ -23,6 +23,7 @@ import { YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
 import { BIG_CATEGORIES, CATEGORY_LABEL } from './yachtLabels';
 import { YACHT_TUTORIAL } from './tutorial/yachtTutorial';
+import { SeatDice } from './SeatDice';
 import { useYachtBest } from './useYachtBest';
 import { isGuestName } from '@/features/stats/playerTiers';
 
@@ -106,7 +107,10 @@ export function YachtTable({
   const me = s.seats.find((x) => x.seat === mySeat) ?? null;
   const iAmOut = me?.deserted ?? false;
   const turnSeat = roomFinished ? -1 : s.turnSeat;
-  const myTurn = !spectator && mySeat >= 0 && !iAmOut && s.result === null && turnSeat === mySeat;
+  // D-202 — 동시 진행이면 "내 차례" = 이번 라운드를 아직 기록하지 않음. 가운데 판(s.dice 등)은 스토어가 내 좌석 것을 비춘다.
+  const simultaneous = s.simultaneous && !roomFinished;
+  const myPending = simultaneous ? (s.seatTurns[mySeat]?.pending ?? false) : turnSeat === mySeat;
+  const myTurn = !spectator && mySeat >= 0 && !iAmOut && s.result === null && myPending;
   const canHold = myTurn && connected && s.rolls >= 1 && s.rolls < MAX_ROLLS;
   const canRoll = myTurn && connected && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
   const canScore = myTurn && connected && s.rolls >= 1;
@@ -142,7 +146,7 @@ export function YachtTable({
   // 멈춘 차례 복구 — 카운트다운 0 + 유예 + 지터 뒤에도 같은 차례(좌석·라운드·굴림 수)면 한 번 권위 스냅샷을 다시 받는다.
   const turnClock = s.turnClock;
   const turnKey = `${s.turnSeat}:${s.round}`;
-  const counting = !roomFinished && turnSeat >= 0 && turnSeconds > 0 && turnClock !== null;
+  const counting = !roomFinished && (turnSeat >= 0 || simultaneous) && turnSeconds > 0 && turnClock !== null;
   useEffect(() => {
     if (!counting || turnClock === null) return;
     const fullTurnMs = turnSeconds * 1000;
@@ -242,7 +246,12 @@ export function YachtTable({
           <span className="yt-badge">{seatCount}인</span>
           <span className="yt-badge">라운드 {Math.min(s.round, 12)}/12</span>
           {practice && <span className="yt-badge">🤖 연습</span>}
-          {turnSeconds > 0 && <span className="yt-badge">차례 {turnSeconds}초</span>}
+          {s.simultaneous && <span className="yt-badge">모두 같이</span>}
+          {turnSeconds > 0 && (
+            <span className="yt-badge">
+              {s.simultaneous ? '라운드' : '차례'} {turnSeconds}초
+            </span>
+          )}
           {spectatorCount > 0 && <span className="yt-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="yt-badge">관전 모드</span>}
           <span className="yt-badge">{connected ? '● 연결' : '○ 끊김'}</span>
@@ -322,12 +331,15 @@ export function YachtTable({
         {s.seats.map((seat) => {
           const uid = playerIds[seat.seat];
           const isTurn = seat.seat === turnSeat;
+          // D-202 — 동시 진행: 남의 주사위를 좌석 띠에 작게 실시간으로, 이번 라운드를 기록했으면 "기록함".
+          const seatTurn = simultaneous ? s.seatTurns[seat.seat] : undefined;
+          const done = simultaneous && !seat.deserted && seatTurn !== undefined && !seatTurn.pending;
           const disconnected = s.disconnectedSeats.has(seat.seat);
           const v = voiceStatusOf(voice, uid);
           return (
             <li
               key={seat.seat}
-              className={`yt-seat${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}`}
+              className={`yt-seat${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}${done ? ' yt-seat-done' : ''}`}
               style={{ ['--yt-accent' as string]: seatAccent(seat.seat) }}
             >
               <span className="yt-seat-name">
@@ -337,6 +349,8 @@ export function YachtTable({
               </span>
               <span className="yt-seat-total">{seat.total}점</span>
               {isTurn && <span className="yt-seat-tag">차례</span>}
+              {done && <span className="yt-seat-tag">기록함 ✓</span>}
+              {seatTurn?.pending && seat.seat !== mySeat && <SeatDice turn={seatTurn} />}
               {seat.deserted && <span className="yt-seat-tag">탈주</span>}
               {disconnected && !seat.deserted && <span className="yt-seat-tag">끊김</span>}
               {v === 'on' && <span aria-label="음성 참여 중">🎧</span>}
@@ -365,7 +379,7 @@ export function YachtTable({
         style={myTurn ? { ['--yt-accent' as string]: seatAccent(mySeat) } : undefined}
       >
         <div className="yt-felt-status">
-          {!roomFinished && turnSeat >= 0 && <YachtTurnCountdown turnSeconds={turnSeconds} />}
+          {!roomFinished && (turnSeat >= 0 || simultaneous) && <YachtTurnCountdown turnSeconds={turnSeconds} />}
           {myTurn && <span className="yt-badge yt-badge-turn">내 차례</span>}
           {flash && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
             <span className="yt-badge yt-celebrate">🎉 {CATEGORY_LABEL[flash.category]}!</span>
@@ -382,12 +396,13 @@ export function YachtTable({
           onToggle={toggleHold}
           onRoll={myTurn ? roll : undefined}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
+          note={simultaneous && !myTurn ? (mySeat >= 0 && !iAmOut ? '기록했어요 · 다른 사람을 기다리는 중' : '모두 같이 굴리는 중') : undefined}
         />
       </div>
 
       <YachtScorecard
         seats={s.seats}
-        turnSeat={turnSeat}
+        turnSeat={simultaneous ? (myTurn ? mySeat : -1) : turnSeat}
         mySeat={mySeat}
         candidates={s.candidates}
         nameOf={nameOf}

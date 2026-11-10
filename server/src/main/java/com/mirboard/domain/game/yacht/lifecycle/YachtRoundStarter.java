@@ -7,6 +7,7 @@ import com.mirboard.domain.game.yacht.YachtGameDefinition;
 import com.mirboard.domain.game.yacht.persistence.YachtStateStore;
 import com.mirboard.domain.game.yacht.state.YachtState;
 import java.time.Clock;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -49,12 +50,13 @@ public class YachtRoundStarter {
             log.warn("Yacht needs 1~4 players, got {} — skipping room={}", seatCount, event.roomId());
             return;
         }
-        // 시작에는 차례 제한·봇 좌석이 필요 없다 — 시작 시각만 쓴다(마감은 어댑터가 방 설정으로 계산).
-        YachtEngine engine = new YachtEngine(new GameContext(event.roomId(), event.playerIds()));
+        // 시작에는 차례 제한·봇 좌석이 필요 없다 — 시작 시각만 쓴다(마감은 어댑터가 방 설정으로 계산). 진행 방식(D-202)은 옵션으로.
+        YachtEngine engine = new YachtEngine(new GameContext(event.roomId(), event.playerIds(), 0, 0, List.of(),
+                event.options()));
         YachtState state = engine.start(clock.millis()).newState();
         stateStore.save(event.roomId(), state);
 
-        log.info("Yacht match started: room={} seats={}", event.roomId(), seatCount);
+        log.info("Yacht match started: room={} seats={} simultaneous={}", event.roomId(), seatCount, state.simultaneous());
         botScheduler.scheduleBots(event.roomId());
         turnTimeout.onTurnAdvanced(event.roomId());
     }
