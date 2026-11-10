@@ -1142,6 +1142,15 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
     expect(screen.getByText('2명 이상 모이면 시작할 수 있어요 (지금 1명 · 최대 6명)')).toBeInTheDocument();
   });
 
+  // D-225 — 2:2 팀전은 게임 최소 인원(개인전 2)이 아니라 4명이 다 차야 시작한다(서버 playersToStart 와 같다).
+  it('2:2 팀전이면 4명이 다 차야 시작할 수 있다고 알린다', async () => {
+    loadGame.mockResolvedValue(oneCard);
+    renderRoom(waiting({ playerIds: [1, 2, 3], playerCount: 3, capacity: 4, options: { TEAM_MODE: 'TEAMS_2V2' } }));
+
+    expect(await screen.findByRole('button', { name: '3명으로 시작' })).toBeDisabled();
+    expect(screen.getByText('4명 이상 모이면 시작할 수 있어요 (지금 3명 · 최대 4명)')).toBeInTheDocument();
+  });
+
   it('정원이 다 차도 저절로 시작하지 않고 방장 버튼으로 시작한다', async () => {
     loadGame.mockResolvedValue(oneCard);
     renderRoom(waiting({ capacity: 3 }));

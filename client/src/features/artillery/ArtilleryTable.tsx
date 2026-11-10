@@ -261,7 +261,11 @@ export function ArtilleryTable({
   // D-226 — 딜레이: 좌석은 가장 작은 딜레이와의 차이, 조작부는 이번 발에 쌓일 값.
   const baseDelay = minDelay(s.units);
   const delayCost = myTurn && preview ? turnDelay(s.delayTable, shell, item, myFuel - preview.fuelLeft) : null;
-  const upcoming = s.phase === 'AIMING' || s.phase === 'RESOLVING' ? s.queue.filter((seat) => seat !== turnSeat).slice(0, 3) : [];
+  // 순서·좌석 ⏱ 는 차례가 열린 동안만 — 연출 대기 중에는 쏜 사람의 딜레이가 다음 TURN_CHANGED 에야 오기 때문이다.
+  const aiming = s.phase === 'AIMING' && turnSeat >= 0;
+  const upcoming = aiming
+    ? s.queue.filter((seat) => seat !== turnSeat && s.units[seat]?.alive).slice(0, 3)
+    : [];
 
   const windText = s.wind === 0 ? '바람 없음' : `바람 ${s.wind < 0 ? '←' : '→'} ${Math.abs(s.wind)}`;
   const suddenDeath = s.turnNo >= s.suddenDeathTurn && s.suddenDeathTurn > 0;
@@ -366,9 +370,9 @@ export function ArtilleryTable({
                     {KIND_ICONS[u.kind]}
                   </span>
                 )}
+                {s.teams && <span className={`ar-team-chip ar-team-${u.seat % 2}`}>{teamName(u.seat % 2)}</span>}
                 {nameOf(u.seat)}
                 {u.seat === mySeat ? ' (나)' : ''}
-                {s.teams && <span className={`ar-team-chip ar-team-${u.seat % 2}`}>{teamName(u.seat % 2)}</span>}
               </span>
               <span className="ar-seat-hp" aria-label={`체력 ${u.hp}/${u.maxHp}`}>
                 <span
@@ -383,7 +387,7 @@ export function ArtilleryTable({
                   {u.items.length > 0 ? ` 🎒${u.items.length}` : ''}
                 </span>
               )}
-              {!picking && u.alive && u.delay !== undefined && s.delayTable && (
+              {aiming && u.alive && u.delay !== undefined && s.delayTable && (
                 <span className="ar-seat-delay" title={`딜레이 ${u.delay} — 가장 적은 화분이 다음 차례`}>
                   ⏱{u.delay - baseDelay}
                 </span>
