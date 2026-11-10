@@ -50,8 +50,19 @@ public sealed interface ArtilleryEvent extends GameEvent
         };
     }
 
-    /** 차례 시작 (§4-1). 연료는 늘 가득(100)이라 싣지 않는다. */
-    record TurnChanged(int seat, int turnNo, int wind, int cloudLevel) implements ArtilleryEvent {
+    /**
+     * 차례 시작 (§4-1). 연료는 늘 가득이라 싣지 않는다. D-226 — 좌석 순 누적 딜레이와 앞으로의 차례 순서(지금 차례 주인부터)를 싣는다.
+     */
+    record TurnChanged(int seat, int turnNo, int wind, int cloudLevel, List<Integer> delays, List<Integer> queue)
+            implements ArtilleryEvent {
+        public TurnChanged {
+            delays = delays == null ? List.of() : List.copyOf(delays);
+            queue = queue == null ? List.of() : List.copyOf(queue);
+        }
+
+        public TurnChanged(int seat, int turnNo, int wind, int cloudLevel) {
+            this(seat, turnNo, wind, cloudLevel, List.of(), List.of());
+        }
     }
 
     /** 발사 해소 — 대본 하나 (§6). */
@@ -79,9 +90,15 @@ public sealed interface ArtilleryEvent extends GameEvent
         }
     }
 
-    record MatchEnded(MatchResult.EndReason reason, List<MatchResult.Placement> placements) implements ArtilleryEvent {
+    /** D-225 — 팀전이면 {@code teams} 와 이긴 팀({@code winnerTeam}, 무승부면 null). */
+    record MatchEnded(MatchResult.EndReason reason, List<MatchResult.Placement> placements, boolean teams,
+                      Integer winnerTeam) implements ArtilleryEvent {
         public MatchEnded {
             placements = List.copyOf(placements);
+        }
+
+        public MatchEnded(MatchResult.EndReason reason, List<MatchResult.Placement> placements) {
+            this(reason, placements, false, null);
         }
     }
 }

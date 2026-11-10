@@ -15,6 +15,11 @@ public enum Item {
 
     public static final int HEAL = 25;
 
+    /** 쓴 포대에 더 쌓이는 딜레이 (D-226) — 30, 겹씨앗은 한 발이 더 나가 60. */
+    public int delay() {
+        return this == TWIN_SEED ? 60 : 30;
+    }
+
     /** 판 시작 묶음. */
     public static List<Item> starterKit() {
         return List.of(values());

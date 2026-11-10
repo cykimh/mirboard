@@ -100,12 +100,14 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[1].defaultTurnSeconds").value(0))
                 // D-154 — 턴 제한 선택지도 게임이 선언한다. 기본은 끔·30·60·90.
                 .andExpect(jsonPath("$.games[1].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 30, 60, 90)))
-                // D-220~D-223 — 씨앗포: 2~4인(엔진은 6), 방 옵션 없음, 턴 30초, '끔' 없는 선택지 20·30·45·60.
+                // D-220~D-223 — 씨앗포: 2~4인(엔진은 6), 턴 30초, '끔' 없는 선택지 20·30·45·60. D-225 — 방 옵션은 모드(2:2 팀전) 하나.
                 .andExpect(jsonPath("$.games[2].id").value("ARTILLERY"))
                 .andExpect(jsonPath("$.games[2].displayName").value("씨앗포"))
                 .andExpect(jsonPath("$.games[2].minPlayers").value(2))
                 .andExpect(jsonPath("$.games[2].maxPlayers").value(4))
-                .andExpect(jsonPath("$.games[2].supportedRoomOptions.length()").value(0))
+                .andExpect(jsonPath("$.games[2].supportedRoomOptions").value(org.hamcrest.Matchers.contains("TEAM_MODE")))
+                .andExpect(jsonPath("$.games[2].roomOptionChoices[0].values").value(
+                        org.hamcrest.Matchers.contains("SOLO", "TEAMS_2V2")))
                 .andExpect(jsonPath("$.games[2].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[2].playerCounts").value(org.hamcrest.Matchers.contains(2, 3, 4)))
                 .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))

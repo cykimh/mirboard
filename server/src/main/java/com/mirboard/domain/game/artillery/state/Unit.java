@@ -17,13 +17,20 @@ import java.util.List;
  *                 {@link #kindOrDefault()} 를 쓴다.
  * @param specials 남은 고유 특수탄
  * @param items    남은 아이템
+ * @param delay    누적 딜레이(D-226) — 가장 작은 살아 있는 포대가 다음 차례. D-226 이전 JSON 에는 없다(0).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination out,
-                   UnitKind kind, int specials, List<Item> items) {
+                   UnitKind kind, int specials, List<Item> items, int delay) {
 
     public Unit {
         items = items == null ? List.of() : List.copyOf(items);
+    }
+
+    /** D-226 이전 모양(딜레이 0). */
+    public Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination out,
+                UnitKind kind, int specials, List<Item> items) {
+        this(seat, x, footY, hp, pumpkins, out, kind, specials, items, 0);
     }
 
     /** S4 이전 모양(새싹포, 특수탄·아이템 없음) — 테스트·구 상태. */
@@ -62,15 +69,15 @@ public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination
     }
 
     public Unit withPosition(int nx, int nfootY) {
-        return new Unit(seat, nx, nfootY, hp, pumpkins, out, kind, specials, items);
+        return new Unit(seat, nx, nfootY, hp, pumpkins, out, kind, specials, items, delay);
     }
 
     public Unit withHp(int nhp) {
-        return new Unit(seat, x, footY, nhp, pumpkins, out, kind, specials, items);
+        return new Unit(seat, x, footY, nhp, pumpkins, out, kind, specials, items, delay);
     }
 
     public Unit withPumpkins(int n) {
-        return new Unit(seat, x, footY, hp, n, out, kind, specials, items);
+        return new Unit(seat, x, footY, hp, n, out, kind, specials, items, delay);
     }
 
     /** 쏜 탄 하나를 쓴다(콩알은 그대로). */
@@ -79,7 +86,7 @@ public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination
             return withPumpkins(pumpkins - 1);
         }
         if (shell.special()) {
-            return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials - 1, items);
+            return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials - 1, items, delay);
         }
         return this;
     }
@@ -87,22 +94,27 @@ public record Unit(int seat, int x, int footY, int hp, int pumpkins, Elimination
     public Unit without(Item item) {
         List<Item> left = new ArrayList<>(items);
         left.remove(item);
-        return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials, left);
+        return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials, left, delay);
     }
 
     /** 고르기(아직 숨김 — 체력은 공개 때 채운다). */
     public Unit picked(UnitKind k) {
-        return new Unit(seat, x, footY, hp, pumpkins, out, k, specials, items);
+        return new Unit(seat, x, footY, hp, pumpkins, out, k, specials, items, delay);
     }
 
     /** 고르기 끝 — 고른 종류의 체력·특수탄·아이템 묶음으로 채운다(D-224). */
     public Unit equipped() {
         UnitKind k = kindOrDefault();
-        return new Unit(seat, x, footY, k.maxHp(), pumpkins, out, k, Shell.SPECIAL_PER_MATCH, Item.starterKit());
+        return new Unit(seat, x, footY, k.maxHp(), pumpkins, out, k, Shell.SPECIAL_PER_MATCH, Item.starterKit(), delay);
+    }
+
+    /** 딜레이를 바꾼다 (D-226). */
+    public Unit withDelay(int d) {
+        return new Unit(seat, x, footY, hp, pumpkins, out, kind, specials, items, d);
     }
 
     public Unit eliminated(Elimination e) {
-        return new Unit(seat, x, footY, hp, pumpkins, e, kind, specials, items);
+        return new Unit(seat, x, footY, hp, pumpkins, e, kind, specials, items, delay);
     }
 
     /**

@@ -17,21 +17,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * 무작위 행동 시뮬레이션 (`docs/rules-artillery.md` §12): 2~6인 각 200판(합 1,000판)이 전부 차례 상한 안에서 끝나고, 매 전이 뒤
  * 불변식이 지켜진다. 무작위 발사·이동·넘김에 가끔 탈주를 섞는다. S4(D-224)부터 고르기 단계·유닛 3종·특수탄·아이템도 섞는다.
+ * S5(D-225·D-226)부터 지금 규칙(딜레이 차례)으로 돌고, 2:2·3:3 팀전도 200판씩 돈다.
  */
 class ArtillerySimulationTest {
 
     private static final ArtilleryEngine ENGINE = new ArtilleryEngine();
     private static final int GAMES = 200;
 
-    @ParameterizedTest
-    @ValueSource(ints = {2, 3, 4, 5, 6})
-    void random_matches_all_end_within_the_turn_limit_and_keep_invariants(int seats) {
-        Random random = new Random(20261109L + seats);
+    @ParameterizedTest(name = "seats={0} teams={1}")
+    @CsvSource({"2,false", "3,false", "4,false", "5,false", "6,false", "4,true", "6,true"})
+    void random_matches_all_end_within_the_turn_limit_and_keep_invariants(int seats, boolean teams) {
+        Random random = new Random(20261109L + seats + (teams ? 100 : 0));
+        ArtilleryEngine.Setup setup = teams ? ArtilleryEngine.Setup.TEAMS : ArtilleryEngine.Setup.SOLO;
+        int[] teamWins = new int[3];   // 팀 0 · 팀 1 · 무승부
         Map<MatchResult.EndReason, Integer> reasons = new EnumMap<>(MatchResult.EndReason.class);
         long fireNanos = 0;
         int fires = 0;
@@ -42,7 +45,7 @@ class ArtillerySimulationTest {
         for (int game = 0; game < GAMES; game++) {
             long now = 1_000_000L;
             // S4 (D-224) — 고르기 단계부터: 몇 명은 고르고 나머지는 시간 초과(새싹포)
-            ArtilleryState s = ENGINE.startMatch(random.nextLong(), seats, List.of(), now).newState();
+            ArtilleryState s = ENGINE.startMatch(random.nextLong(), seats, List.of(), now, setup).newState();
             assertInvariants(s, game);
             for (int seat = 0; seat < seats; seat++) {
                 if (random.nextInt(4) > 0) {
@@ -113,10 +116,13 @@ class ArtillerySimulationTest {
             totalTurns += s.turnNo() + 1;
             assertThat(s.turnNo()).isLessThan(ArtilleryEngine.turnLimit(seats));
             reasons.merge(s.result().reason(), 1, Integer::sum);
+            if (teams) {
+                teamWins[s.result().winnerTeam() == null ? 2 : s.result().winnerTeam()]++;
+            }
         }
-        System.out.printf("[artillery-sim] seats=%d games=%d avgTurns=%.1f reasons=%s avgFire=%.3fms kinds=%s items=%d specials=%d%n",
-                seats, GAMES, totalTurns / (double) GAMES, reasons, fireNanos / 1e6 / Math.max(1, fires), kinds,
-                items, specials);
+        System.out.printf("[artillery-sim] seats=%d teams=%b games=%d avgTurns=%.1f reasons=%s avgFire=%.3fms kinds=%s items=%d specials=%d teamWins=%s%n",
+                seats, teams, GAMES, totalTurns / (double) GAMES, reasons, fireNanos / 1e6 / Math.max(1, fires), kinds,
+                items, specials, java.util.Arrays.toString(teamWins));
     }
 
     private static void assertInvariants(ArtilleryState s, int game) {

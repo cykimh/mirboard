@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** D-222 — 씨앗포 매치 종료가 매치 기록(V16) + 게임별 전적(승패·개인전 ELO·탈주) + 상대 전적으로 남는지. */
+/** D-222·D-225 — 씨앗포 매치 종료가 매치 기록(V16) + 게임별 전적(승패·개인전 ELO·탈주) + 상대 전적으로 남는지. */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -93,6 +93,55 @@ class ArtilleryMatchRecorderIT {
         assertThat(ar(b).winCount()).isEqualTo(1);
         assertThat(ar(c).desertCount()).isEqualTo(1);
         assertThat(headToHead.against(b)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(a, c);
+    }
+
+    /** D-225 — 2:2 팀전: 팀 평균 ELO, 이긴 팀의 탈주자는 혼자 진 것으로, 참가자 행에 팀(V18), 상대 전적은 상대 팀만. */
+    @Test
+    void a_team_match_records_team_elo_team_column_and_head_to_head_only_against_the_other_team() {
+        long a = human();
+        long b = human();
+        long c = human();
+        long d = human();
+        String room = UUID.randomUUID().toString();
+        // 좌석 0·2 = 팀 0(이김, 좌석 2 는 탈주), 좌석 1·3 = 팀 1.
+        publisher.publishEvent(new ArtilleryMatchCompleted(room, List.of(a, b, c, d), new MatchResult(
+                EndReason.LAST_STANDING, List.of(new Placement(0, 1, 40, false), new Placement(1, 2, 0, false),
+                new Placement(3, 2, 0, false), new Placement(2, 4, 70, true)), true, 0)));
+
+        assertThat(jdbc.queryForList(
+                "SELECT p.team, p.final_rank, p.is_win, p.deserted FROM artillery_match_participants p"
+                        + " JOIN artillery_match_results r ON r.id = p.match_id WHERE r.room_id = ? ORDER BY p.seat", room))
+                .extracting(r -> r.get("team") + "/" + r.get("final_rank") + "/" + r.get("is_win") + "/" + r.get("deserted"))
+                .containsExactly("0/1/true/false", "1/2/false/false", "0/4/false/true", "1/2/false/false");
+        assertThat(ar(a).rating()).isEqualTo(1020);
+        assertThat(ar(b).rating()).isEqualTo(980);
+        assertThat(ar(d).rating()).isEqualTo(980);
+        assertThat(ar(c).rating()).isEqualTo(980);   // 이긴 팀이지만 탈주 — 상대 팀에 혼자 졌다
+        assertThat(ar(c).desertCount()).isEqualTo(1);
+        assertThat(ar(c).winCount()).isZero();
+        assertThat(ar(a).winCount()).isEqualTo(1);
+        // 같은 팀원(a↔c, b↔d)은 상대 전적에 없다.
+        assertThat(headToHead.against(a)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(b, d);
+        assertThat(headToHead.against(b)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(a, c);
+    }
+
+    /** D-225 — 팀전 무승부: ELO·승패 변화 없이 행만, 상대 전적은 무승부. */
+    @Test
+    void a_team_draw_changes_no_rating_and_counts_as_a_draw() {
+        long a = human();
+        long b = human();
+        long c = human();
+        long d = human();
+        String room = UUID.randomUUID().toString();
+        publisher.publishEvent(new ArtilleryMatchCompleted(room, List.of(a, b, c, d), new MatchResult(
+                EndReason.ALL_DOWN, List.of(new Placement(0, 1, 0, false), new Placement(1, 1, 0, false),
+                new Placement(2, 1, 0, false), new Placement(3, 1, 0, false)), true, null)));
+        for (long u : List.of(a, b, c, d)) {
+            assertThat(ar(u).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+            assertThat(ar(u).winCount()).isZero();
+            assertThat(ar(u).loseCount()).isZero();
+        }
+        assertThat(headToHead.against(a)).allMatch(r -> r.draws() == 1 && r.wins() == 0 && r.losses() == 0);
     }
 
     @Test

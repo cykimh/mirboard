@@ -28,6 +28,9 @@ import java.util.List;
  * <p>S4(D-224): 유닛은 시드로 고른다. 바람이 세고 맞힐 수가 없으면 바람개비를 끼워 거친 격자를 한 번 더 돌리고, 마지막에 찾은 조준 그대로
  * 다른 탄(호박·고유 특수탄)·아이템(물뿌리개·겹씨앗)을 끼워 본다 — 아껴 쓰라고 탄·아이템마다 점수 비용을 뺀다(물뿌리개는 체력이 25 이상
  * 깎였을 때, 겹씨앗은 한 발 더가 비용보다 많이 줄 때 쓰게 된다).
+ *
+ * <p>2:2 팀전(D-225): 같은 팀은 겨냥하지 않고, 아군 피해는 자기 피해처럼 뺀다(아군 탈락 −3000). 딜레이(D-226)는 점수에 넣지 않는다 — 비싼
+ * 탄·아이템의 점수 비용이 이미 아껴 쓰게 한다.
  */
 public final class ArtilleryBotPolicy {
 
@@ -36,6 +39,8 @@ public final class ArtilleryBotPolicy {
     /** 아껴 쓰는 비용(점수) — 호박탄·특수탄 한 발, 아이템 하나. */
     static final int SHELL_COST = 60;
     static final int ITEM_COST = 300;
+    /** 아군 탈락 비용 (D-225). */
+    static final int ALLY_DOWN_COST = 3000;
     /** 이 세기 이상 바람이면 바람개비 격자를 따로 돌려 본다. */
     static final int STRONG_WIND = 6;
     /** "보통" 오차 — 각도 ±2°, 힘 ±2. */
@@ -90,12 +95,12 @@ public final class ArtilleryBotPolicy {
         return new ArtilleryAction.Fire(best.moveDx(), angle, power, best.shell(), best.item());
     }
 
-    /** 체력 낮은 적, 같으면 가까운 적. */
+    /** 체력 낮은 적, 같으면 가까운 적. 팀전이면 같은 팀은 적이 아니다. */
     static Unit pickTarget(ArtilleryState state, int seat) {
         Unit me = state.unit(seat);
         Unit best = null;
         for (Unit u : state.units()) {
-            if (!u.alive() || u.seat() == seat) {
+            if (!u.alive() || state.teamOf(u.seat()) == state.teamOf(seat)) {
                 continue;
             }
             if (best == null || u.hp() < best.hp()
@@ -200,6 +205,8 @@ public final class ArtilleryBotPolicy {
                 boolean died = !now.alive();
                 if (before.seat() == seat) {
                     score -= lost * 15 + (died ? 5000 : 0);
+                } else if (state.teamOf(before.seat()) == state.teamOf(seat)) {
+                    score -= lost * 15 + (died ? ALLY_DOWN_COST : 0);
                 } else {
                     score += lost * 10 + (died ? 500 : 0);
                     if (report != null) {

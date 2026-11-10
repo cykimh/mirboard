@@ -21,6 +21,7 @@ import com.mirboard.domain.game.artillery.state.Crater;
 import com.mirboard.domain.game.artillery.state.MatchResult;
 import com.mirboard.domain.game.artillery.state.Phase;
 import com.mirboard.domain.game.artillery.state.ShotReport;
+import com.mirboard.domain.game.artillery.state.TurnOrder;
 import com.mirboard.domain.game.artillery.state.Unit;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +38,9 @@ import java.util.OptionalLong;
  *
  * <p>판은 고르기 단계 {@code PICKING}(D-224)으로 시작한다 — 전원이 동시에 유닛을 고르고, 다 고르거나 15초가 지나면
  * ({@link #expire}) 공개하고 첫 차례를 연다.
+ *
+ * <p>D-225·D-226: 판은 {@link Setup} 으로 시작한다 — 2:2 팀전(팀 = 좌석 홀짝, 한 팀만 남으면 끝)과 차례 규칙(포트리스식 딜레이). 인자에
+ * {@code Setup} 이 없는 옛 {@code startMatch} 들은 개인전·좌석 순서(D-226 이전 규칙)다 — 기존 테스트·골든이 그 규칙의 물리를 고정한다.
  */
 public final class ArtilleryEngine {
 
@@ -53,6 +57,10 @@ public final class ArtilleryEngine {
     public static final long MAX_RESOLVE_MS = 18_000;
     /** 고르기 단계 길이 (D-224). */
     public static final long PICK_MS = 15_000;
+    /** 넘김·시간 초과의 딜레이 (D-226). */
+    public static final int SKIP_DELAY = 80;
+    /** 쓴 이동 연료 이만큼마다 딜레이 +1 (D-226). */
+    public static final int FUEL_PER_DELAY = 2;
 
     private final long minResolveMs;
     private final long maxResolveMs;
@@ -77,6 +85,25 @@ public final class ArtilleryEngine {
         }
     }
 
+    /**
+     * 판 설정 (D-225·D-226).
+     *
+     * @param teams     2:2 팀전(팀 = 좌석 홀짝) — 4·6인만
+     * @param turnOrder 차례 규칙
+     */
+    public record Setup(boolean teams, TurnOrder turnOrder) {
+        /** D-226 이전 규칙 — 개인전·좌석 순서(옛 테스트·골든). */
+        public static final Setup LEGACY = new Setup(false, TurnOrder.SEAT);
+        /** 지금 개인전. */
+        public static final Setup SOLO = new Setup(false, TurnOrder.DELAY);
+        /** 지금 2:2 팀전. */
+        public static final Setup TEAMS = new Setup(true, TurnOrder.DELAY);
+
+        public Setup {
+            turnOrder = turnOrder == null ? TurnOrder.DELAY : turnOrder;
+        }
+    }
+
     public enum DesertOutcome {
         NOT_APPLICABLE, MATCH_CONTINUES, MATCH_ENDED
     }
@@ -90,17 +117,27 @@ public final class ArtilleryEngine {
     // ---------- 시작 ----------
 
     /** 맵 생성 → 출발 자리 배정 → 고르기 단계 (§9.1, D-224). 고르기가 끝나는 시각은 {@code nowMillis + PICK_MS}. */
-    public Result startMatch(long seed, int seatCount, List<Integer> botSeats, long nowMillis) {
-        ArtilleryState s = placed(seed, seatCount, botSeats, Phase.PICKING, nowMillis + PICK_MS);
+    public Result startMatch(long seed, int seatCount, List<Integer> botSeats, long nowMillis, Setup setup) {
+        ArtilleryState s = placed(seed, seatCount, botSeats, Phase.PICKING, nowMillis + PICK_MS, setup);
         return new Result(s, List.of());
     }
 
-    /** 고르기 없이 바로 첫 차례 — 종류를 미리 정한 판(테스트·시뮬레이션). */
+    /** 고르기 단계로 시작 — 개인전·좌석 순서(D-226 이전 규칙, 옛 테스트). */
+    public Result startMatch(long seed, int seatCount, List<Integer> botSeats, long nowMillis) {
+        return startMatch(seed, seatCount, botSeats, nowMillis, Setup.LEGACY);
+    }
+
+    /** 고르기 없이 바로 첫 차례 — 종류를 미리 정한 판(테스트·시뮬레이션). 개인전·좌석 순서. */
     public Result startMatch(long seed, int seatCount, List<Integer> botSeats, List<UnitKind> kinds) {
+        return startMatch(seed, seatCount, botSeats, kinds, Setup.LEGACY);
+    }
+
+    /** 고르기 없이 바로 첫 차례 — 종류를 미리 정한 판(테스트·시뮬레이션). */
+    public Result startMatch(long seed, int seatCount, List<Integer> botSeats, List<UnitKind> kinds, Setup setup) {
         if (kinds.size() != seatCount) {
             throw new IllegalArgumentException("kinds size " + kinds.size() + " != seats " + seatCount);
         }
-        ArtilleryState s = placed(seed, seatCount, botSeats, Phase.PICKING, 0);
+        ArtilleryState s = placed(seed, seatCount, botSeats, Phase.PICKING, 0, setup);
         List<Unit> units = new ArrayList<>(s.units());
         for (int i = 0; i < seatCount; i++) {
             units.set(i, units.get(i).picked(kinds.get(i)));
@@ -112,16 +149,25 @@ public final class ArtilleryEngine {
 
     /** 전원 새싹포로 바로 시작(S1~S3 의 규칙 그대로 — 기존 테스트). */
     public Result startMatch(long seed, int seatCount, List<Integer> botSeats) {
+        return startMatch(seed, seatCount, botSeats, Setup.LEGACY);
+    }
+
+    /** 전원 새싹포로 바로 시작. */
+    public Result startMatch(long seed, int seatCount, List<Integer> botSeats, Setup setup) {
         List<UnitKind> kinds = new ArrayList<>();
         for (int i = 0; i < seatCount; i++) {
             kinds.add(UnitKind.SPROUT);
         }
-        return startMatch(seed, seatCount, botSeats, kinds);
+        return startMatch(seed, seatCount, botSeats, kinds, setup);
     }
 
-    private ArtilleryState placed(long seed, int seatCount, List<Integer> botSeats, Phase phase, long pickUntil) {
+    private ArtilleryState placed(long seed, int seatCount, List<Integer> botSeats, Phase phase, long pickUntil,
+                                  Setup setup) {
         if (seatCount < MIN_PLAYERS || seatCount > MAX_PLAYERS) {
             throw new IllegalArgumentException("seat count out of range: " + seatCount);
+        }
+        if (setup.teams() && (seatCount < 4 || seatCount % 2 != 0)) {
+            throw new IllegalArgumentException("teams need an even seat count >= 4: " + seatCount);
         }
         MapGenerator.GeneratedMap map = TerrainCache.base(seed, seatCount);
         int[] order = new int[seatCount];
@@ -141,21 +187,29 @@ public final class ArtilleryEngine {
                     null, 0, List.of()));
         }
         return new ArtilleryState(seed, seatCount, botSeats, units, List.of(), phase,
-                -1, -1, 0, 0, Fixed.HEIGHT, 0, 0, null, null, pickUntil);
+                -1, -1, 0, 0, Fixed.HEIGHT, 0, 0, null, null, pickUntil, setup.teams(), setup.turnOrder());
     }
 
-    /** 고르기 끝 (D-224): 안 고른 좌석은 새싹포, 전원 무장 → 공개 이벤트 → 첫 차례(시드로 고른 좌석). */
+    /**
+     * 고르기 끝 (D-224): 안 고른 좌석은 새싹포, 전원 무장 → 공개 이벤트 → 첫 차례(시드로 고른 좌석). 딜레이 규칙(D-226)이면 첫 좌석부터
+     * 좌석 순서로 딜레이 0·1·2… 를 깐다 — 첫 바퀴는 좌석 순서와 같다(팀전이면 팀이 번갈아).
+     */
     private ArtilleryState reveal(ArtilleryState s, List<ArtilleryEvent> events) {
+        int first = SplitMix64.below(s.seed(), 6000, s.seatCount());
         List<Unit> units = new ArrayList<>(s.units());
         for (int i = 0; i < units.size(); i++) {
             Unit u = units.get(i);
-            units.set(i, (u.kind() == null ? u.picked(UnitKind.SPROUT) : u).equipped());
+            u = (u.kind() == null ? u.picked(UnitKind.SPROUT) : u).equipped();
+            if (s.turnOrder() == TurnOrder.DELAY) {
+                u = u.withDelay(Math.floorMod(i - first, s.seatCount()));
+            }
+            units.set(i, u);
         }
-        int first = SplitMix64.below(s.seed(), 6000, s.seatCount());
         ArtilleryState armed = new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(),
-                Phase.AIMING, -1, first, 0, 0, s.cloudLevel(), 0, s.eliminations(), null, null, 0L);
+                Phase.AIMING, -1, first, 0, 0, s.cloudLevel(), 0, s.eliminations(), null, null, 0L, s.teams(),
+                s.turnOrder());
         events.add(new ArtilleryEvent.UnitsRevealed(
-                units.stream().map(u -> ArtilleryPublicView.UnitView.of(u, false)).toList()));
+                units.stream().map(u -> ArtilleryPublicView.UnitView.of(s, u, false)).toList()));
         return beginTurn(armed, first, 0, events);
     }
 
@@ -394,7 +448,8 @@ public final class ArtilleryEngine {
         long stageTicks = 0;
         for (int v = 0; v < volleys; v++) {
             Unit me = units.get(seat);
-            if (!me.alive() || units.stream().filter(Unit::alive).count() < 2 && v > 0) {
+            if (!me.alive() || units.stream().filter(Unit::alive).map(u -> state.teamOf(u.seat())).distinct().count() < 2
+                    && v > 0) {
                 break;
             }
             if (v == 0) {
@@ -407,6 +462,12 @@ public final class ArtilleryEngine {
             knockOut(state, units, order, hpBefore, eliminated);
         }
         int eliminations = eliminated.isEmpty() ? state.eliminations() : order;
+        if (state.turnOrder() == TurnOrder.DELAY) {
+            int fuelUsed = kind.fuel() - walk.fuelLeft();
+            int cost = fire.shell().delay() + fuelUsed / FUEL_PER_DELAY + (fire.item() == null ? 0 : fire.item().delay());
+            Unit u = units.get(seat);
+            units.set(seat, u.withDelay(u.delay() + cost));
+        }
 
         long ticks = (long) walk.steps() * WALK_TICKS_PER_STEP + walkFallTicks + stageTicks;
         long durationMs = Math.clamp(ticks * 1000 / 60, minResolveMs, maxResolveMs);
@@ -552,16 +613,21 @@ public final class ArtilleryEngine {
     private Result skip(ArtilleryState state, int seat, ArtilleryEvent.TurnSkipped.Reason reason) {
         List<ArtilleryEvent> events = new ArrayList<>();
         events.add(new ArtilleryEvent.TurnSkipped(seat, reason));
-        ArtilleryState s = copy(state, state.units(), state.craters(), state.phase(), state.turnSeat(), seat,
+        List<Unit> units = state.units();
+        if (state.turnOrder() == TurnOrder.DELAY) {
+            units = new ArrayList<>(units);
+            units.set(seat, units.get(seat).withDelay(units.get(seat).delay() + SKIP_DELAY));
+        }
+        ArtilleryState s = copy(state, units, state.craters(), state.phase(), state.turnSeat(), seat,
                 state.turnNo(), state.wind(), state.cloudLevel(), 0, state.eliminations(), state.lastShot());
         return new Result(nextTurn(s, events), events);
     }
 
     // ---------- 차례 ----------
 
-    /** lastSeat 다음 살아 있는 좌석으로 차례 번호 +1. */
+    /** 다음 차례 주인({@link #pickNext})으로 차례 번호 +1. */
     private ArtilleryState nextTurn(ArtilleryState state, List<ArtilleryEvent> events) {
-        int next = nextAlive(state.units(), state.lastSeat(), false);
+        int next = pickNext(state.turnOrder(), state.units(), state.lastSeat());
         if (next < 0) {
             ArtilleryState ended = maybeEnd(state, events);
             if (ended != null) {
@@ -600,10 +666,67 @@ public final class ArtilleryEngine {
         if (ended != null) {
             return ended;
         }
-        int seat = units.get(candidate).alive() ? candidate : nextAlive(units, candidate, false);
+        int seat = units.get(candidate).alive() ? candidate
+                : state.turnOrder() == TurnOrder.DELAY ? pickNext(TurnOrder.DELAY, units, state.lastSeat())
+                : nextAlive(units, candidate, false);
         s = copy(s, units, s.craters(), Phase.AIMING, seat, seat, turnNo, wind, cloud, 0, eliminations, null);
-        events.add(new ArtilleryEvent.TurnChanged(seat, turnNo, wind, cloud));
+        events.add(new ArtilleryEvent.TurnChanged(seat, turnNo, wind, cloud,
+                units.stream().map(Unit::delay).toList(), turnQueue(s)));
         return s;
+    }
+
+    /**
+     * 다음 차례 주인. 좌석 순서면 {@code lastSeat} 다음 살아 있는 좌석, 딜레이(D-226)면 딜레이가 가장 작은 살아 있는 좌석 — 같으면
+     * {@code lastSeat} 다음부터 좌석 순서(방금 쏜 좌석이 맨 뒤). 살아 있는 좌석이 없으면 −1.
+     */
+    private static int pickNext(TurnOrder order, List<Unit> units, int lastSeat) {
+        if (order != TurnOrder.DELAY) {
+            return nextAlive(units, lastSeat, false);
+        }
+        int n = units.size();
+        int best = -1;
+        for (int i = 1; i <= n; i++) {
+            int s = Math.floorMod(lastSeat + i, n);
+            Unit u = units.get(s);
+            if (u.alive() && (best < 0 || u.delay() < units.get(best).delay())) {
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * 앞으로의 차례 순서 (D-226) — 살아 있는 좌석을 지금 차례 주인부터(딜레이 규칙이면 딜레이 → 좌석 순서, 좌석 규칙이면 좌석 순서로).
+     * 화면의 "다음 차례" 줄이다. 차례 주인이 없으면(연출 대기·끝) 다음에 고를 좌석부터.
+     */
+    public static List<Integer> turnQueue(ArtilleryState state) {
+        List<Unit> units = state.units();
+        int n = units.size();
+        int anchor = state.turnSeat() >= 0 ? Math.floorMod(state.turnSeat() - 1, n) : state.lastSeat();
+        if (anchor < 0) {
+            anchor = n - 1;
+        }
+        List<Integer> order = new ArrayList<>();
+        for (int i = 1; i <= n; i++) {
+            int s = Math.floorMod(anchor + i, n);
+            if (units.get(s).alive()) {
+                order.add(s);
+            }
+        }
+        if (state.turnOrder() == TurnOrder.DELAY) {
+            if (state.turnSeat() >= 0) {
+                int head = state.turnSeat();
+                List<Integer> rest = new ArrayList<>(order);
+                rest.remove(Integer.valueOf(head));
+                rest.sort(Comparator.comparingInt(s -> units.get(s).delay()));   // 안정 정렬 — 좌석 순서가 동률 가르기
+                order = new ArrayList<>();
+                order.add(head);
+                order.addAll(rest);
+            } else {
+                order.sort(Comparator.comparingInt(s -> units.get(s).delay()));
+            }
+        }
+        return order;
     }
 
     private static int nextAlive(List<Unit> units, int from, boolean inclusive) {
@@ -621,6 +744,9 @@ public final class ArtilleryEngine {
 
     /** 끝났으면 ENDED 상태(이벤트 추가), 아니면 null. */
     private ArtilleryState maybeEnd(ArtilleryState state, List<ArtilleryEvent> events) {
+        if (state.teams()) {
+            return maybeEndTeams(state, events);
+        }
         List<Unit> alive = state.aliveUnits();
         MatchResult.EndReason reason;
         if (alive.size() == 1) {
@@ -634,11 +760,76 @@ public final class ArtilleryEngine {
         } else {
             return null;
         }
-        MatchResult result = new MatchResult(reason, placements(state.units()));
-        events.add(new ArtilleryEvent.MatchEnded(reason, result.placements()));
+        return ended(state, new MatchResult(reason, placements(state.units())), events);
+    }
+
+    private static ArtilleryState ended(ArtilleryState state, MatchResult result, List<ArtilleryEvent> events) {
+        events.add(new ArtilleryEvent.MatchEnded(result.reason(), result.placements(), result.teams(),
+                result.winnerTeam()));
         return new ArtilleryState(state.seed(), state.seatCount(), state.botSeats(), state.units(), state.craters(),
                 Phase.ENDED, -1, state.lastSeat(), state.turnNo(), state.wind(), state.cloudLevel(), 0,
-                state.eliminations(), state.lastShot(), result);
+                state.eliminations(), state.lastShot(), result, state.pickUntil(), state.teams(), state.turnOrder());
+    }
+
+    /**
+     * 팀전 종료 (D-225): 살아 있는 팀이 하나면 그 팀 승. 둘 다 전멸하면 마지막 탈락 순간의 <b>탈락 직전 체력 합</b>(먼저 탈락한 팀원은 그
+     * 순간 체력이 없으니 0)이 큰 팀 승, 같으면 무승부. 사람이 있던 판에서 사람이 모두 탈락하면 살아 있는 수 → 남은 체력 합 → 무승부.
+     */
+    private ArtilleryState maybeEndTeams(ArtilleryState state, List<ArtilleryEvent> events) {
+        MatchResult result = teamOutcome(state);
+        return result == null ? null : ended(state, result, events);
+    }
+
+    /** 팀전 결과 — 아직 안 끝났으면 null. */
+    static MatchResult teamOutcome(ArtilleryState state) {
+        List<Unit> alive = state.aliveUnits();
+        long teamsAlive = alive.stream().map(u -> state.teamOf(u.seat())).distinct().count();
+        MatchResult.EndReason reason;
+        Integer winner;
+        if (teamsAlive == 1) {
+            reason = MatchResult.EndReason.LAST_STANDING;
+            winner = state.teamOf(alive.getFirst().seat());
+        } else if (teamsAlive == 0) {
+            reason = MatchResult.EndReason.ALL_DOWN;
+            int[] sum = new int[2];
+            for (Unit u : state.units()) {
+                if (u.out().order() == state.eliminations()) {
+                    sum[state.teamOf(u.seat())] += u.out().hpBefore();
+                }
+            }
+            winner = sum[0] == sum[1] ? null : sum[0] > sum[1] ? 0 : 1;
+        } else if (state.botSeats().size() < state.seatCount()
+                && alive.stream().allMatch(u -> state.botSeats().contains(u.seat()))) {
+            reason = MatchResult.EndReason.NO_HUMANS;
+            int[] count = new int[2];
+            int[] hp = new int[2];
+            for (Unit u : alive) {
+                count[state.teamOf(u.seat())]++;
+                hp[state.teamOf(u.seat())] += u.hp();
+            }
+            winner = count[0] != count[1] ? (count[0] > count[1] ? 0 : 1)
+                    : hp[0] != hp[1] ? (hp[0] > hp[1] ? 0 : 1) : null;
+        } else {
+            return null;
+        }
+        return new MatchResult(reason, teamPlacements(state.units(), winner), true, winner);
+    }
+
+    /** 팀 순위 (D-225): 이긴 팀(무승부면 모두) → 진 팀 → 탈주자. 같은 묶음은 동순위. */
+    static List<MatchResult.Placement> teamPlacements(List<Unit> units, Integer winner) {
+        int[] group = new int[units.size()];
+        for (Unit u : units) {
+            boolean deserted = !u.alive() && u.out().cause() == Unit.Cause.DESERTED;
+            group[u.seat()] = deserted ? 2 : winner == null || u.seat() % 2 == winner ? 0 : 1;
+        }
+        List<MatchResult.Placement> placements = new ArrayList<>();
+        for (Unit u : units) {
+            int mine = group[u.seat()];
+            int rank = 1 + (int) Arrays.stream(group).filter(g -> g < mine).count();
+            placements.add(new MatchResult.Placement(u.seat(), rank, u.hp(), mine == 2));
+        }
+        placements.sort(Comparator.comparingInt(MatchResult.Placement::rank).thenComparingInt(MatchResult.Placement::seat));
+        return placements;
     }
 
     static List<MatchResult.Placement> placements(List<Unit> units) {
@@ -670,13 +861,14 @@ public final class ArtilleryEngine {
     private static ArtilleryState withUnits(ArtilleryState s, List<Unit> units) {
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
                 s.lastSeat(), s.turnNo(), s.wind(), s.cloudLevel(), s.resolveUntil(), s.eliminations(), s.lastShot(),
-                s.result(), s.pickUntil());
+                s.result(), s.pickUntil(), s.teams(), s.turnOrder());
     }
 
     private static ArtilleryState copy(ArtilleryState s, List<Unit> units, List<Crater> craters, Phase phase,
                                        int turnSeat, int lastSeat, int turnNo, int wind, int cloud, long resolveUntil,
                                        int eliminations, ShotReport lastShot) {
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, craters, phase, turnSeat, lastSeat,
-                turnNo, wind, cloud, resolveUntil, eliminations, lastShot, s.result(), s.pickUntil());
+                turnNo, wind, cloud, resolveUntil, eliminations, lastShot, s.result(), s.pickUntil(), s.teams(),
+                s.turnOrder());
     }
 }
