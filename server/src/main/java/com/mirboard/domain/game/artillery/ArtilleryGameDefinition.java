@@ -95,7 +95,11 @@ public final class ArtilleryGameDefinition implements GameDefinition {
         return new ArtilleryGameEngine(ctx, rules, stateStore, clock, publisher);
     }
 
-    /** 라운드 시작이 같은 연출 상한으로 시작하도록. */
+    /** 라운드 시작이 고르기 마감을 같은 시계로 정하도록 (D-224). */
+    public Clock clock() {
+        return clock;
+    }
+
     public ArtilleryEngine rules() {
         return rules;
     }

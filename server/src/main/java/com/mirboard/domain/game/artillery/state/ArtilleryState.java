@@ -26,6 +26,7 @@ import java.util.List;
  * @param eliminations     지금까지 탈락 순간 수(다음 탈락 번호)
  * @param lastShot         마지막 발사 대본(resync 가 재생 중 화면을 맞출 때), 없으면 null
  * @param result           끝났으면 결과
+ * @param pickUntil        PICKING 이 끝나는 시각(epoch ms), 아니면 0 (D-224)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ArtilleryState(long seed,
@@ -42,12 +43,21 @@ public record ArtilleryState(long seed,
                              long resolveUntil,
                              int eliminations,
                              ShotReport lastShot,
-                             MatchResult result) implements GameState {
+                             MatchResult result,
+                             long pickUntil) implements GameState {
 
     public ArtilleryState {
         botSeats = botSeats == null ? List.of() : List.copyOf(botSeats);
         units = List.copyOf(units);
         craters = craters == null ? List.of() : List.copyOf(craters);
+    }
+
+    /** S4 이전 모양(고르기 없음). */
+    public ArtilleryState(long seed, int seatCount, List<Integer> botSeats, List<Unit> units, List<Crater> craters,
+                          Phase phase, int turnSeat, int lastSeat, int turnNo, int wind, int cloudLevel,
+                          long resolveUntil, int eliminations, ShotReport lastShot, MatchResult result) {
+        this(seed, seatCount, botSeats, units, craters, phase, turnSeat, lastSeat, turnNo, wind, cloudLevel,
+                resolveUntil, eliminations, lastShot, result, 0L);
     }
 
     @JsonIgnore

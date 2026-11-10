@@ -8,6 +8,8 @@ import com.mirboard.domain.game.artillery.persistence.ArtilleryStateStore;
 import com.mirboard.domain.game.artillery.state.ArtilleryPublicView;
 import com.mirboard.domain.game.artillery.state.ArtilleryState;
 import com.mirboard.domain.game.artillery.state.MatchResult;
+import com.mirboard.domain.game.artillery.state.Phase;
+import com.mirboard.domain.game.artillery.rules.UnitKind;
 import com.mirboard.domain.game.core.GameAction;
 import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.core.GameEngine;
@@ -30,7 +32,8 @@ import org.springframework.context.ApplicationEventPublisher;
  *
  * <p><b>포트 변경이 없다</b>(D-220). 차례당 액션이 하나(이동은 {@code FIRE} 에 실음)라 인프라 턴 데드라인으로 충분하고
  * {@code GameContext.turnSeconds} 는 쓰지 않는다. 발사 뒤 연출 대기({@code RESOLVING})만 포트 ⑦ 엔진 타이머로 건다 — 그동안
- * {@code pendingSeats} 가 비어 봇 루프·턴 타이머가 끼어들지 않는다(원카드 경쟁 창과 같은 모양). 비공개 뷰는 없다.
+ * {@code pendingSeats} 가 비어 봇 루프·턴 타이머가 끼어들지 않는다(원카드 경쟁 창과 같은 모양). 판 시작 고르기 단계(D-224)의 15초도
+ * 같은 엔진 타이머다 — 인프라 턴 데드라인은 고를 때마다 다시 걸리기 때문이다. 비공개 뷰는 고르기 단계의 내 선택뿐이다.
  */
 public final class ArtilleryGameEngine implements GameEngine {
 
@@ -117,9 +120,18 @@ public final class ArtilleryGameEngine implements GameEngine {
         return ArtilleryPublicView.of(s, remaining.isPresent() ? remaining.getAsLong() : null);
     }
 
+    /** 고르기 단계에서 내가 고른 종류만(남에게는 숨긴다, D-224). 그 밖에는 숨길 것이 없다. */
     @Override
     public Optional<Object> privateView(GameState state, int seat) {
-        return Optional.empty();
+        ArtilleryState s = aState(state);
+        if (s.phase() != Phase.PICKING || seat < 0 || seat >= s.seatCount() || s.unit(seat).kind() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ArtilleryPrivateView(s.unit(seat).kind()));
+    }
+
+    /** 비공개 뷰 — 고르기 단계의 내 선택. */
+    public record ArtilleryPrivateView(UnitKind pickedKind) {
     }
 
     // ---------- 봇 / 타임아웃 ----------
@@ -141,6 +153,9 @@ public final class ArtilleryGameEngine implements GameEngine {
         if (!rules.pendingSeats(state).contains(seat)) {
             return null;
         }
+        if (state.phase() == Phase.PICKING) {
+            return new ArtilleryAction.Pick(ArtilleryBotPolicy.pick(state, seat));
+        }
         try {
             ArtilleryAction chosen = policy.apply(state, seat);
             if (chosen instanceof ArtilleryAction.Skip
@@ -155,9 +170,12 @@ public final class ArtilleryGameEngine implements GameEngine {
         return new ArtilleryAction.Skip();
     }
 
-    /** 시간 초과 = 넘김(룰 §4-5). */
+    /** 시간 초과 = 넘김(룰 §4-5). 고르기 단계면 새싹포(엔진 타이머가 보통 먼저 끝낸다 — 폴백). */
     @Override
     public GameAction timeoutAction(GameState state, int seat) {
+        if (aState(state).phase() == Phase.PICKING) {
+            return new ArtilleryAction.Pick(UnitKind.SPROUT);
+        }
         return new ArtilleryAction.Skip();
     }
 

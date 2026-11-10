@@ -33,7 +33,9 @@ class ArtilleryEngineTest {
         assertThat(s.turnNo()).isZero();
         assertThat(s.units()).hasSize(4).allMatch(u -> u.hp() == 100 && u.pumpkins() == 2 && u.alive());
         assertThat(s.units().stream().map(Unit::x).distinct()).hasSize(4);
-        assertThat(r.events()).singleElement().isInstanceOf(ArtilleryEvent.TurnChanged.class);
+        assertThat(r.events()).hasSize(2);
+        assertThat(r.events().get(0)).isInstanceOf(ArtilleryEvent.UnitsRevealed.class);
+        assertThat(r.events().get(1)).isInstanceOf(ArtilleryEvent.TurnChanged.class);
         assertThat(ENGINE.pendingSeats(s)).containsExactly(s.turnSeat());
         assertThat(ArtilleryInvariantChecker.check(s)).isEmpty();
     }
@@ -49,7 +51,7 @@ class ArtilleryEngineTest {
                 .isEqualTo(RejectionReason.NOT_YOUR_TURN);
         assertThatThrownBy(() -> ENGINE.apply(s, me, new ArtilleryAction.Fire(0, 181, 50, Shell.PEA), NOW))
                 .extracting(e -> ((ArtilleryActionRejectedException) e).reason()).isEqualTo(RejectionReason.OUT_OF_RANGE);
-        assertThatThrownBy(() -> ENGINE.apply(s, me, new ArtilleryAction.Fire(101, 45, 50, Shell.PEA), NOW))
+        assertThatThrownBy(() -> ENGINE.apply(s, me, new ArtilleryAction.Fire(131, 45, 50, Shell.PEA), NOW))
                 .extracting(e -> ((ArtilleryActionRejectedException) e).reason()).isEqualTo(RejectionReason.OUT_OF_RANGE);
         ArtilleryState empty = withUnit(s, s.unit(me).withPumpkins(0));
         assertThatThrownBy(() -> ENGINE.apply(empty, me, new ArtilleryAction.Fire(0, 45, 50, Shell.PUMPKIN), NOW))
@@ -122,7 +124,7 @@ class ArtilleryEngineTest {
         assertThat(r.events()).hasSize(2);
         assertThat(r.events().get(1)).isInstanceOf(ArtilleryEvent.MatchEnded.class);
         var report = ((ArtilleryEvent.ShotResolved) r.events().get(0)).report();
-        assertThat(report.damages()).anyMatch(d -> d.seat() == foe && d.direct() && d.hpAfter() == 0);
+        assertThat(report.stages().getFirst().damages()).anyMatch(d -> d.seat() == foe && d.direct() && d.hpAfter() == 0);
         assertThat(report.eliminated()).anyMatch(e -> e.seat() == foe);
         assertThat(ArtilleryInvariantChecker.check(end)).isEmpty();
     }
@@ -213,7 +215,8 @@ class ArtilleryEngineTest {
     @Test
     void legal_actions_are_a_sample_only_for_the_turn_owner() {
         ArtilleryState s = start(7L, 2);
-        assertThat(ENGINE.legalActions(s, s.turnSeat())).hasSize(13 * 10 * 2 + 1);
+        // 각도 13 × 힘 10 × (콩알·호박·덩굴 + 콩알에 아이템 셋) + 넘김 (D-224)
+        assertThat(ENGINE.legalActions(s, s.turnSeat())).hasSize(13 * 10 * 6 + 1);
         assertThat(ENGINE.legalActions(s, 1 - s.turnSeat())).isEmpty();
     }
 }
