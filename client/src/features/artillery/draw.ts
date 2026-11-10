@@ -1,4 +1,4 @@
-import { FIELD_H, FIELD_W } from '@/types/artillery';
+import { FIELD_H, FIELD_W, type Shell } from '@/types/artillery';
 import type { Mask } from './terrain';
 import type { Frame, FrameUnit } from './replay';
 
@@ -157,53 +157,47 @@ export function drawScene(ctx: CanvasRenderingContext2D, scale: number, s: Scene
     const top = u.footY - 15 * boost.unit - fs * 0.6;
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(u.x - barW / 2, top + fs * 0.4, barW, barH);
-    ctx.fillStyle = u.hp > 50 ? '#5ccf6a' : u.hp > 25 ? '#f2c14b' : '#ef5a4c';
-    ctx.fillRect(u.x - barW / 2, top + fs * 0.4, (barW * Math.max(0, u.hp)) / 100, barH);
+    const ratio = Math.max(0, Math.min(1, u.hp / (u.maxHp ?? 100)));
+    ctx.fillStyle = ratio > 0.5 ? '#5ccf6a' : ratio > 0.25 ? '#f2c14b' : '#ef5a4c';
+    ctx.fillRect(u.x - barW / 2, top + fs * 0.4, barW * ratio, barH);
     ctx.fillStyle = s.palette.label;
     ctx.fillText(canvasLabel(s.names[u.seat] ?? '', u.seat === s.mySeat, fs > 10), u.x, top);
   }
 
-  // 날아가는 씨앗
+  // 날아가는 씨앗들
   const f = s.frame;
   if (f) {
-    if (f.trail.length >= 4) {
+    for (const trail of f.trails) {
+      if (trail.length < 4) continue;
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(f.trail[0] + 0.5, f.trail[1] + 0.5);
-      for (let i = 2; i < f.trail.length; i += 2) ctx.lineTo(f.trail[i] + 0.5, f.trail[i + 1] + 0.5);
+      ctx.moveTo(trail[0] + 0.5, trail[1] + 0.5);
+      for (let i = 2; i < trail.length; i += 2) ctx.lineTo(trail[i] + 0.5, trail[i + 1] + 0.5);
       ctx.stroke();
     }
-    if (f.shell) {
-      if (f.shell.y < 0) {
+    for (const sh of f.shells) {
+      if (sh.y < 0) {
         // 하늘 위로 나간 씨앗 — 위쪽 가장자리에 위치 표시
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(f.shell.x, 2);
-        ctx.lineTo(f.shell.x - 4, 9);
-        ctx.lineTo(f.shell.x + 4, 9);
+        ctx.moveTo(sh.x, 2);
+        ctx.lineTo(sh.x - 4, 9);
+        ctx.lineTo(sh.x + 4, 9);
         ctx.closePath();
         ctx.fill();
       } else {
-        ctx.fillStyle = '#5a3a1e';
-        ctx.beginPath();
-        ctx.ellipse(f.shell.x + 0.5, f.shell.y + 0.5, 2.6, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#c99a5b';
-        ctx.beginPath();
-        ctx.arc(f.shell.x - 0.3, f.shell.y - 0.2, 0.9, 0, Math.PI * 2);
-        ctx.fill();
+        drawSeed(ctx, sh.x + 0.5, sh.y + 0.5, sh.shell);
       }
     }
-    if (f.explosion) {
-      const e = f.explosion;
+    for (const e of f.explosions) {
       const r = e.r * (0.45 + 0.9 * e.t);
       ctx.globalAlpha = Math.max(0, 1 - e.t);
-      ctx.fillStyle = '#ffd166';
+      ctx.fillStyle = e.fill ? '#9bd77a' : '#ffd166';
       ctx.beginPath();
       ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = '#ff8c42';
+      ctx.fillStyle = e.fill ? '#5f9e45' : '#ff8c42';
       ctx.beginPath();
       ctx.arc(e.x, e.y, r * 0.6, 0, Math.PI * 2);
       ctx.fill();
@@ -214,6 +208,58 @@ export function drawScene(ctx: CanvasRenderingContext2D, scale: number, s: Scene
   // 구름 바다(맨 앞 — 빠지는 것을 덮는다)
   drawClouds(ctx, s.cloudLevel, s.palette, s.time);
   ctx.restore();
+}
+
+/** 탄마다 다른 씨앗 그림(직접 그린 도형). */
+function drawSeed(ctx: CanvasRenderingContext2D, x: number, y: number, shell: Shell) {
+  switch (shell) {
+    case 'PUMPKIN':
+      ctx.fillStyle = '#e9852a';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 3.2, 2.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4f7a2a';
+      ctx.fillRect(x - 0.4, y - 3.6, 0.9, 1.4);
+      return;
+    case 'VINE':
+      ctx.fillStyle = '#4f9a3a';
+      ctx.beginPath();
+      ctx.arc(x, y, 2.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2f6b22';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(x + 1.6, y - 1.6, 1.4, Math.PI * 0.6, Math.PI * 1.9);
+      ctx.stroke();
+      return;
+    case 'CHESTNUT':
+      ctx.fillStyle = '#7a4a24';
+      ctx.beginPath();
+      ctx.arc(x, y, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d9b48a';
+      ctx.fillRect(x - 2.2, y + 1.5, 4.4, 1.2);
+      return;
+    case 'SPORE':
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#8a6a3a';
+      ctx.beginPath();
+      ctx.arc(x, y + 1.2, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    default:
+      ctx.fillStyle = '#5a3a1e';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 2.6, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c99a5b';
+      ctx.beginPath();
+      ctx.arc(x - 0.8, y - 0.7, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+  }
 }
 
 function drawPot(ctx: CanvasRenderingContext2D, x: number, footY: number, color: string) {
@@ -256,18 +302,53 @@ function drawUnit(
   ctx.moveTo(cx, cy + 1);
   ctx.lineTo(cx + Math.cos(rad) * 10, cy - Math.sin(rad) * 10);
   ctx.stroke();
-  // 잎 둘
-  ctx.fillStyle = '#58b05a';
-  for (const side of [-1, 1]) {
+  const tipX = cx + Math.cos(rad) * 10;
+  const tipY = cy - Math.sin(rad) * 10;
+  if (u.kind === 'ACORN') {
+    // 도토리포 — 넓적한 잎 하나와 도토리 깍정이를 쓴 포구
+    ctx.fillStyle = '#7aa83f';
     ctx.beginPath();
-    ctx.ellipse(cx + side * 2.6, cy - 0.6, 2.4, 1.1, side * 0.5, 0, Math.PI * 2);
+    ctx.ellipse(cx - 2.8, cy - 0.2, 3, 1.5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a8703a';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6b4423';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY - 0.7, 2.3, Math.PI, Math.PI * 2);
+    ctx.fill();
+  } else if (u.kind === 'DANDELION') {
+    // 민들레포 — 가는 잎 셋과 하얀 솜털 포구
+    ctx.strokeStyle = '#6cbf4f';
+    ctx.lineWidth = 0.9;
+    for (const side of [-1, 0, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 1);
+      ctx.lineTo(cx + side * 4, cy - 2 - (side === 0 ? 1 : 0));
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // 새싹포 — 잎 둘과 꽃봉오리 포구
+    ctx.fillStyle = '#58b05a';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(cx + side * 2.6, cy - 0.6, 2.4, 1.1, side * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 1.7, 0, Math.PI * 2);
     ctx.fill();
   }
-  // 꽃봉오리(포구)
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(cx + Math.cos(rad) * 10, cy - Math.sin(rad) * 10, 1.7, 0, Math.PI * 2);
-  ctx.fill();
   drawPot(ctx, u.x, u.footY, color);
   if (isTurn) {
     const bob = Math.sin(time / 180) * 1.2;

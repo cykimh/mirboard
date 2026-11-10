@@ -8,7 +8,7 @@ describe('씨앗포 튜토리얼', () => {
     expect(ARTILLERY_TUTORIAL.seenKey).toBe('mirboard.tutorial.artillery.seen.v1');
   });
 
-  it('핵심 수치를 말한다 — 2~4명·연료 100·탄 30/45·2발·20칸·10번씩', () => {
+  it('핵심 수치를 말한다 — 2~4명·연료·탄 30/45·2발·20칸·10번씩·포대 3종·아이템', () => {
     const { container } = render(
       <div>
         {ARTILLERY_TUTORIAL_STEPS.map((s) => (
@@ -17,7 +17,24 @@ describe('씨앗포 튜토리얼', () => {
       </div>,
     );
     const text = container.textContent ?? '';
-    for (const needle of ['2~4명', '−10~10', '100', '최대 30', '최대 45', '한 판에 2발', '20칸', '10번씩', '넘어갑니다']) {
+    for (const needle of [
+      '2~4명',
+      '−10~10',
+      '새싹포 100',
+      '최대 30',
+      '최대 45',
+      '한 판에 2발',
+      '20칸',
+      '10번씩',
+      '넘어갑니다',
+      // S4 (D-224)
+      '15초',
+      '체력 120',
+      '체력 85',
+      '세 갈래',
+      '흙 둔덕을 쌓아',
+      '체력 +25',
+    ]) {
       expect(text, needle).toContain(needle);
     }
   });

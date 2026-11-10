@@ -1,4 +1,4 @@
-import { FIELD_H, FIELD_W } from '@/types/artillery';
+import { FIELD_H, FIELD_W, type Crater } from '@/types/artillery';
 
 /**
  * 지형 마스크(640×360, 1 = 흙). 서버가 정본이다 — resync 의 열 단위 런으로 만들고, 발사 대본의 구멍을 서버와 같은 정수 원으로 지운다
@@ -35,6 +35,39 @@ export function carve(mask: Mask, cx: number, cy: number, r: number): Mask {
     }
   }
   return next;
+}
+
+/** 둔덕이 비워 두는 몸 둘레 반경 — 서버 `Crater.SPARE_RADIUS`. */
+export const SPARE_RADIUS = 7;
+
+/** 원 채우기(덩굴탄 둔덕) — `spare` 의 점(x, y …)마다 반경 7 안은 건드리지 않는다(새 마스크). 서버 `Terrain.fill` 미러. */
+export function fill(mask: Mask, cx: number, cy: number, r: number, spare: number[] = []): Mask {
+  const next = new Uint8Array(mask);
+  const rr = r * r;
+  const sr = SPARE_RADIUS * SPARE_RADIUS;
+  for (let y = Math.max(0, cy - r); y <= Math.min(FIELD_H - 1, cy + r); y++) {
+    const dy = y - cy;
+    for (let x = Math.max(0, cx - r); x <= Math.min(FIELD_W - 1, cx + r); x++) {
+      const dx = x - cx;
+      if (dx * dx + dy * dy > rr) continue;
+      let spared = false;
+      for (let i = 0; i + 1 < spare.length; i += 2) {
+        const sx = x - spare[i];
+        const sy = y - spare[i + 1];
+        if (sx * sx + sy * sy <= sr) {
+          spared = true;
+          break;
+        }
+      }
+      if (!spared) next[y * FIELD_W + x] = 1;
+    }
+  }
+  return next;
+}
+
+/** 지형 연산 하나(구멍 또는 둔덕). */
+export function applyOp(mask: Mask, op: Crater): Mask {
+  return op.fill ? fill(mask, op.x, op.y, op.r, op.spare ?? []) : carve(mask, op.x, op.y, op.r);
 }
 
 const FOOT_HALF = 2;

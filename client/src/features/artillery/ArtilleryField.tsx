@@ -75,14 +75,23 @@ export function ArtilleryField({
   const hasCanvas = typeof document !== 'undefined' && typeof ImageData !== 'undefined';
 
   const terrainNow = useMemo(() => (mask && hasCanvas ? safeCanvas(mask) : null), [mask, hasCanvas]);
-  const terrainBefore = useMemo(
-    () => (replay && hasCanvas ? safeCanvas(replay.maskBefore) : null),
-    [replay, hasCanvas],
-  );
+  // 재생 중 지형 — 연산 k 개를 적용한 그림을 필요할 때 한 번씩 만든다(홀씨·겹씨앗은 구멍이 여럿, D-224).
+  const replayTerrains = useRef<{ nonce: number; images: (CanvasImageSource | null | undefined)[] }>({ nonce: -1, images: [] });
+  const terrainAt = (r: Replay, k: number): CanvasImageSource | null => {
+    if (!hasCanvas) return null;
+    if (replayTerrains.current.nonce !== r.nonce) replayTerrains.current = { nonce: r.nonce, images: [] };
+    const idx = Math.min(k, r.masks.length - 1);
+    if (idx < 0) return null;
+    const cached = replayTerrains.current.images[idx];
+    if (cached !== undefined) return cached;
+    const made = safeCanvas(r.masks[idx]);
+    replayTerrains.current.images[idx] = made;
+    return made;
+  };
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, terrainBefore });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, terrainBefore };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow };
 
   const render = (now: number) => {
     const canvas = canvasRef.current;
@@ -105,7 +114,7 @@ export function ArtilleryField({
       : L.units.map((u) => (L.aim && u.seat === L.aim.seat ? { ...u, x: L.aim.x, footY: L.aim.footY } : u));
     const ghostFrom = L.aim ? L.units.find((u) => u.seat === L.aim!.seat) : undefined;
     drawScene(ctx, (w * dpr) / FIELD_W, {
-      terrain: frame && !frame.craterApplied ? L.terrainBefore : L.terrainNow,
+      terrain: frame && L.replay && !frame.done ? terrainAt(L.replay, frame.opsApplied) : L.terrainNow,
       units: drawUnits,
       angles: aimAngles,
       turnSeat: L.turnSeat,
