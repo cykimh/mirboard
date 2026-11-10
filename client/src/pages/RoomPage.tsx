@@ -257,19 +257,21 @@ export function RoomPage() {
 
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
+  function applyRoomMeta(r: Room) {
+    // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
+    const prev = roomRef.current;
+    // D-153 — 판이 끝나 대기실(WAITING)로 돌아온 것도 같은 유지 — 결과를 보고 [대기실로]로 넘어간다.
+    if (prev?.status === 'IN_GAME' && (r.status === 'FINISHED' || r.status === 'WAITING')) {
+      setHeldSeats({ playerIds: prev.playerIds, botSeats: prev.botSeats ?? [] });
+    }
+    roomRef.current = r;
+    setRoom(r);
+  }
+
   useRoomMeta(
     roomId,
     token,
-    (r) => {
-      // 두 setState 는 한 렌더로 묶인다 — 게임판이 언마운트됐다 다시 붙지 않는다.
-      const prev = roomRef.current;
-      // D-153 — 판이 끝나 대기실(WAITING)로 돌아온 것도 같은 유지 — 결과를 보고 [대기실로]로 넘어간다.
-      if (prev?.status === 'IN_GAME' && (r.status === 'FINISHED' || r.status === 'WAITING')) {
-        setHeldSeats({ playerIds: prev.playerIds, botSeats: prev.botSeats ?? [] });
-      }
-      roomRef.current = r;
-      setRoom(r);
-    },
+    applyRoomMeta,
     () => setError('방이 종료되었습니다.'),
     resyncWaitingRoom,
   );
@@ -501,6 +503,18 @@ export function RoomPage() {
       await roomsApi.abort(token, roomId);
     } catch (err) {
       if (err instanceof ApiError) setError(errorText(err, '게임을 끝내지 못했어요'));
+      return;
+    }
+    // 종료 알림(방 메타 소켓)은 판이 막 열려 구독이 붙기 전이면 지나가 버린다 — 성공했으면 방 상태를 한 번 직접 읽어 맞춘다.
+    // 알림이 먼저 왔으면 같은 상태를 다시 넣을 뿐이다. 실패는 조용히 넘긴다(다음 알림·재동기화에 맡긴다).
+    const requested = roomId;
+    try {
+      const r = await roomsApi.get(token, requested);
+      if (roomIdRef.current === requested && roomRef.current?.status === 'IN_GAME' && r.status !== 'IN_GAME') {
+        applyRoomMeta(r);
+      }
+    } catch {
+      // 무시
     }
   }
 

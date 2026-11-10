@@ -45,6 +45,7 @@ vi.mock('@/api/rooms', () => ({
     setReady: vi.fn(),
     updateTeamPolicy: vi.fn(),
     abort: vi.fn(),
+    get: vi.fn(),
     stopSpectating: vi.fn(),
     startNow: vi.fn(),
     join: vi.fn(),
@@ -1077,6 +1078,26 @@ describe('RoomPage — 게임판 강제 종료 (D-135)', () => {
       await onAbort();
     });
     expect(roomsApi.abort).toHaveBeenCalledWith('tok', 'r1');
+    confirm.mockRestore();
+  });
+
+  it('강제 종료가 성공하면 방 상태를 다시 읽어 끝난 판으로 맞춘다 — 종료 알림이 구독 전에 지나가도', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    loadGame.mockResolvedValue(game('ONE_CARD', []));
+    const started = botGame('ONE_CARD');
+    renderRoom(started);
+    await screen.findByTestId('onecard-table');
+    const onAbort = oneCardProps.at(-1)!.onAbort as () => Promise<void>;
+    vi.mocked(roomsApi.abort).mockResolvedValueOnce(undefined);
+    vi.mocked(roomsApi.get).mockResolvedValueOnce({ ...ROOM, ...started, status: 'FINISHED' } as Room);
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    await act(async () => {
+      await onAbort();
+    });
+
+    expect(roomsApi.get).toHaveBeenCalledWith('tok', 'r1');
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
     confirm.mockRestore();
   });
 
