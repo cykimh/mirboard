@@ -124,3 +124,24 @@ D-185 시안 B. 시트(`skins/clay/`, 1024×473, 약 139KB, `pxPerCell` 6)는 **
 `unitScale`·`smooth`·`shakeCells`·`terrainCanvas`·`drawEffects`·`drawCelebration`·`drawWind`, `drawSky(ctx, p, time, wind)`,
 `Palette.night`(CSS `--ar-night`), `SkinUnit.team`·`cheer`, `SkinLabel.seat`·`color`·`team`·`isTurn`·`time`. 전부 선택이라 도형·`doodle` 스킨은
 그대로 돈다. 하늘 색은 `.ar-field-clay` 가 `--ar-sky-*` 를 덮어쓴다(전장 요소에 `ar-field-{스킨 id}` 클래스가 붙는다).
+
+## clay 연출 층 — D-254 (2차 고도화)
+
+clay 스킨 위에 얹는 층이다. `skins/clayFx.ts` 의 **`CLAY_FX`** 하나로 켜고 끈다(`false` = D-252 연출 그대로 — 꼬리 0.9초, 구멍 크기 흔들림).
+
+| 무엇 | 어디 | 메모 |
+| --- | --- | --- |
+| 탄마다 다른 꼬리, 바람에 휨 | `clayFx.drawTrail` | 콩알 구슬 · 호박 덩이 · 덩굴 리본+잎 · 알밤 가시 · 홀씨 솜털. 오래된 마디일수록 `wind × age²` 만큼 밀린다 |
+| 다층 폭발 | `clayFx` `impact` | 섬광 → 흙 튐(14줄) → 클레이 파편(≤16) → 연기 고리(10) → 그을음(테두리 24방향 중 흙이 남은 곳, 약 2.7초 잔상) |
+| 파편 물리 | `debris.ts` (순수 함수) | 착탄 때 한 번 계산(덩어리 × 120틱 경로). 지금 화면의 마스크를 읽어 튀고(반발 0.38) 굴러 멈춘다. 그릴 때는 보간만 |
+| 특수탄 | `clayFx` `vine`·`chestnut`·`spore`·`pumpkin` | 덩굴손이 말리며 자라 꽃이 핌 / 밤송이 가시가 뻗었다 들어감 + 묵직한 고리 / 솜털 씨앗이 떠올라 바람을 탐 / 속살이 튀고 씨가 팔랑 |
+| 피해 비례 흔들림 | `effects.shakeAt(…, damageAmp)` | 스킨 선택 항목 `shakeDamageCells`(30 피해 = 4칸, 상한 2.4배). 구멍 몫 `shakeCells` 는 1.4 로 줄였다 |
+| 피격 | `clayFx.hitSquash` · 이름표 | 탁 눌렸다 출렁(창 400ms 뒤에도 1.1초까지 스킨이 이어 그림), 숫자는 통통 튀고 피해가 클수록 크고 붉다, 체력바는 깎인 만큼 0.42초 깜빡이며 머물다 줄어든다 |
+| 바람 | `clayFx.drawMotes` | 꽃가루·홀씨·꽃잎 10 + 2×세기(≤30). 흐른 거리를 쌓아 바람이 바뀌어도 자리가 튀지 않는다 |
+| 쓰러짐 | `clayFx.fallenPose` · 사건 `fallen` | 기우뚱 → 벌렁 → 통 → 잎 시듦. 대본에서 사라진 뒤(`until`)에도 꼬리 동안 누워 있다가 1.5초에 퐁 + 시든 잎 |
+| 승리 | `clayFx.drawCelebration` | 겹꽃·고리·버들 세 모양(동시 ≤5발 × 28), 이긴 포대 쪽에서 쏘아 올림, 전장 색종이 40 |
+
+- **재생 길이·조작 시점은 그대로다.** 사건 시각은 전부 대본 안이고, 꼬리(`fxTailMs` = 3초)는 재생이 끝난 뒤 화면에서만 돈다(다음 대본이 오면 바로 바뀐다).
+- 입자 상한은 `CLAY_FX_CAPS`. 작은 화면에서는 포대 보정 배율만큼 입자도 키운다(자리·경로는 그대로).
+- 스킨 계약에 늘어난 선택 항목: `shakeDamageCells`, `fxTailMs`, `drawTrail` 의 `shell·wind·time` 인자, `SkinFx.mask·seatColor·angles·unitScale·teams·time`, `SkinCelebration.ui`. 도형·doodle 스킨은 쓰지 않는다.
+- 스크린샷: `docs/design/artillery/shots/d254-*.jpg`.
