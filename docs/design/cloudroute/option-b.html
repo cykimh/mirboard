@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>구름항로 시안 B — 바람 항해도</title>
+<!-- D-185 디자인 시안. 앱 코드와 무관한 단독 파일(외부 의존 없음). 그림은 전부 SVG·CSS. -->
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:14px/1.45 var(--font);overflow-x:hidden;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+.lab{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;background:#14161aee;color:#eee;font:12px/1.3 system-ui,sans-serif}
+.lab b{margin-right:auto;font-size:13px}
+.lab button,.lab a{border:1px solid #fff4;background:#ffffff14;color:#eee;border-radius:6px;padding:5px 9px;text-decoration:none;min-height:30px}
+.lab button[aria-pressed=true],.lab a[aria-current]{background:#fff;color:#111}
+.lab .go{background:#ffd34d;color:#111;border-color:#ffd34d;font-weight:700}
+.lab .row{display:flex;flex-wrap:wrap;gap:6px;flex-basis:100%}
+#chips{display:contents}
+.note{max-width:1000px;margin:10px auto 30px;padding:0 14px;font:12px/1.5 system-ui,sans-serif;opacity:.75}
+.frame{margin:14px auto;max-width:1000px;padding:0 12px}
+.frame[data-view=phone]{width:375px;max-width:100%;padding:0;outline:6px solid #8885;outline-offset:2px}
+.cr{container:cr/inline-size;position:relative;overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:10px}
+.hd{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hd .ttl{margin-right:auto}
+.badge{padding:3px 9px;font-size:12px;white-space:nowrap;background:none;border:1px solid currentColor}
+button.badge{min-height:32px}
+.lay{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px;align-items:start}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.seats{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.seat{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1px 8px;padding:8px 10px;min-width:0}
+.seat .av{grid-row:1/3;width:34px;height:34px;display:block}
+.seat .av svg,.rbox .av svg{width:100%;height:100%;display:block;overflow:visible}
+.seat .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .nm small{font-weight:400;opacity:.7}
+.seat .cash{font-variant-numeric:tabular-nums}
+.seat .sub{grid-column:2/4;font-size:11px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tag{font-style:normal;font-weight:700;margin-left:auto}
+.board{container:bd/inline-size;position:relative;aspect-ratio:1;display:grid;grid-template:repeat(7,minmax(0,1fr))/repeat(7,minmax(0,1fr));gap:3px}
+.bg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.bg svg{width:100%;height:100%;display:block}
+.tile{position:relative;z-index:1;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;overflow:hidden;padding:4% 2% 0;text-align:center}
+.tile .no{display:none}
+.tile .art{width:42%;flex:none}
+.tile svg{display:block;width:100%;overflow:visible}
+.tile .nm{font-size:clamp(7.5px,1.72cqw,11.5px);line-height:1.12;word-break:keep-all;letter-spacing:-.03em;margin-top:2%}
+.tile .pr{font-size:clamp(7px,1.45cqw,10px);font-variant-numeric:tabular-nums}
+.tile .bld{position:absolute;right:3%;top:3%;width:32%;display:none}
+.tile.own .bld{display:block}
+.tile .fst{position:absolute;left:3%;top:3%;width:24%;display:none}
+.tile.fest .fst{display:block}
+.spin{transform-box:view-box;transform-origin:50% 41.7%;animation:spin 9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.center{grid-area:2/2/7/7;z-index:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4cqw;padding:3cqw;min-width:0}
+.dice{display:flex;gap:3cqw}
+.die{width:12cqw;max-width:66px;min-width:38px;aspect-ratio:1;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:15%;gap:5%;place-items:center}
+.die i{width:78%;aspect-ratio:1;border-radius:50%;background:currentColor;opacity:0}
+.die i.on{opacity:1}
+.turnline{margin:0;font-size:clamp(12px,2.7cqw,17px);text-align:center}
+.log{list-style:none;margin:0;padding:0;width:100%;font-size:clamp(10px,2.05cqw,13px);text-align:center;display:grid;gap:2px}
+.log li:nth-child(2){opacity:.7}.log li:nth-child(n+3){opacity:.5}
+.deck{position:absolute;right:3cqw;bottom:3cqw;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:clamp(9px,1.7cqw,11px)}
+.deck .dk{width:7cqw;min-width:24px;aspect-ratio:5/7;display:block}
+.deck svg,.card svg{display:block;width:100%;height:100%}
+.route{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;opacity:0;fill:none}
+.route.on{opacity:1}
+.tokens,.fxl{position:absolute;inset:0;z-index:4;pointer-events:none}
+.fxl{z-index:7}
+.tok{position:absolute;width:7.4cqw;min-width:21px;aspect-ratio:1;transform:translate(-50%,-50%);transition:left var(--hop) var(--hopease,ease),top var(--hop) var(--hopease,ease)}
+.tok>span{display:block;width:100%;height:100%}
+.tok svg{width:100%;height:100%;overflow:visible;display:block}
+.tok.flying{z-index:5;transition:none}
+.tok.gone{display:none}
+.cardwrap{position:absolute;inset:0;z-index:6;display:grid;place-items:center;pointer-events:none;perspective:900px;visibility:hidden}
+.cardwrap.show{visibility:visible}
+.card{position:relative;width:36cqw;min-width:128px;max-width:230px;aspect-ratio:5/7;transform-style:preserve-3d}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.face.front{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5%;padding:8%;text-align:center}
+.card.flip{transform:rotateY(180deg)}
+.front .ca{width:46%;display:block}
+.front .ck{font-size:clamp(9px,1.9cqw,12px);letter-spacing:.12em}
+.front .cn{font-size:clamp(14px,3.3cqw,21px)}
+.front .ce{font-size:clamp(11px,2.2cqw,14px)}
+.fx{position:absolute;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+.coin,.p{position:absolute;left:0;top:0;width:18px;height:18px;margin:-9px;display:block}
+.coin svg,.p svg{width:100%;height:100%;display:block;overflow:visible}
+.pop{position:absolute;z-index:8;left:50%;top:-4px;white-space:nowrap;font-weight:800;font-size:13px;pointer-events:none;animation:pop 1.4s ease-out forwards}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,8px) scale(.7)}18%{opacity:1;transform:translate(-50%,-8px) scale(1.12)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-30px)}}
+.panel{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:150px}
+.panel h3{margin:0;font-size:15px}
+.panel h3 small{font-weight:400;font-size:11px}
+.panel p{margin:0;font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.btn{min-height:44px;padding:8px 14px;flex:1 1 auto}
+.btn small{display:block;font-size:10px;font-weight:400}
+.lv{display:flex;gap:6px}
+.lv button{flex:1;min-height:44px;display:flex;flex-direction:column;align-items:center;font-size:11px;padding:5px 2px;min-width:0}
+.lv svg{width:26px;height:26px;overflow:visible}
+.result{position:absolute;inset:0;z-index:30;display:grid;place-items:start center;padding:70px 14px 14px}
+.result[hidden]{display:none}
+.rbox{width:min(400px,100%);padding:18px;animation:rin .5s cubic-bezier(.2,1.3,.4,1)}
+@keyframes rin{from{opacity:0;transform:translateY(20px) scale(.92)}}
+.rbox h2{margin:2px 0}.rbox p{margin:0}
+.rbox ol{list-style:none;margin:12px 0;padding:0;display:grid;gap:6px}
+.rbox li{display:grid;grid-template-columns:22px 30px 1fr auto;gap:8px;align-items:center;padding:6px 8px}
+.rbox .av{width:30px;height:30px;display:block}
+.rbox li b{font-variant-numeric:tabular-nums}
+@container cr (max-width:700px){
+ .cr{padding:8px;gap:8px}
+ .lay{grid-template-columns:minmax(0,1fr);gap:8px}
+ .side{display:contents}
+ .seats{order:-1;grid-template-columns:1fr 1fr;gap:6px}
+ .seat{padding:6px 8px;gap:0 6px}
+ .seat .av{width:26px;height:26px}
+ .seat .sub span:nth-child(2){display:none}
+ .hd .badge:nth-child(4),.hd .badge:nth-child(5){display:none}
+}
+@container bd (max-width:470px){.tile .pr{display:none}.log li:nth-child(n+3){display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+[data-motion=reduce] *,[data-motion=reduce] *::before,[data-motion=reduce] *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}
+
+/* ───────── 시안 B — 바람 항해도 ───────── */
+:root{--font:"Iowan Old Style","Palatino Linotype",Palatino,"Nanum Myeongjo","AppleMyungjo","Batang",Georgia,serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,"D2Coding",monospace;
+--page:#ddd0b3;--paper:#f2e9d3;--ink:#1c2c44;--line:#1c2c4426;--red:#a8321b;--teal:#1b6461;
+--s0:#1a57a0;--s1:#a8321b;--s2:#2a6f3a;--s3:#855600;
+--moss:#7da35a;--shell:#d98d9c;--mushroom:#c07a3c;--windmill:#7f9db8;--glass:#4aa9b5;--star_apple:#c9504a;--lava:#8f3f2c;--crown:#8a6bb8;--sp:#b9a36a;
+--hop:.2s;--hopease:linear}
+:root[data-theme=dark]{--page:#081425;--paper:#0f2746;--ink:#dbe9fb;--line:#dbe9fb24;--red:#ff9273;--teal:#74d6cf;
+--s0:#74b6ff;--s1:#ff9273;--s2:#84d98f;--s3:#ffca5c;
+--moss:#8fc46a;--shell:#f0a3b3;--mushroom:#e0975a;--windmill:#a3c1dc;--glass:#6fd0dc;--star_apple:#f0736c;--lava:#d87a62;--crown:#b598e6;--sp:#c9b06a}
+.cr{background:linear-gradient(var(--line) 1px,transparent 1px) 0 0/100% 26px,linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/26px 100%,var(--paper);border:1px solid var(--ink);box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 5px var(--ink);padding:16px}
+.badge{font-family:var(--mono);font-size:11px;letter-spacing:.04em;background:var(--paper);border:1px solid var(--ink)}
+.badge.ttl{font-family:var(--font);font-size:17px;font-weight:700;font-style:italic;letter-spacing:.14em;border:0;border-bottom:3px double var(--ink);background:none;padding:0 2px 2px}
+.seat{background:var(--paper);border:1px solid var(--ink);border-left:7px solid var(--c)}
+.seat .cash,.seat .sub{font-family:var(--mono)}
+.seat .cash{font-size:15px}
+.seat.turn{box-shadow:3px 3px 0 var(--ink)}
+.seat.turn .nm::before{content:"▶ ";color:var(--red)}
+.seat .av .pl{transform-box:view-box;transform-origin:50% 50%;transform:rotate(-28deg)}
+.tag{border:1px solid var(--ink);padding:0 6px;font-family:var(--font);background:var(--paper)}
+.seat.out{color:color-mix(in srgb,var(--ink) 60%,var(--paper))}
+.seat.out .tag{display:none}
+.seat.out::after{content:"파산 · 항로 폐쇄";position:absolute;right:8px;top:50%;transform:translateY(-50%) rotate(-7deg);border:2px solid var(--red);color:var(--red);padding:1px 8px;font-weight:800;font-size:12px;letter-spacing:.12em;background:var(--paper)}
+.seat.fx-out::after{animation:b-stamp-s .5s ease-out}
+.seat.fx-got{animation:b-thump .35s ease-out}
+@keyframes b-stamp-s{0%{opacity:0;transform:translateY(-50%) rotate(-7deg) scale(2.8)}60%{opacity:1;transform:translateY(-50%) rotate(-7deg) scale(.94)}}
+@keyframes b-thump{40%{transform:translate(2px,2px)}}
+.board{gap:0;background:var(--paper);border:2px solid var(--ink);outline:1px solid var(--ink);outline-offset:3px;margin:4px}
+.rose{animation:b-needle 9s ease-in-out infinite alternate}
+@keyframes b-needle{from{transform:rotate(-4deg)}to{transform:rotate(5deg)}}
+.tile{--isl:var(--sp);background:var(--paper);border:.5px solid var(--ink);padding-top:15%}
+.tile::before{content:"";position:absolute;inset:0 0 auto 0;height:12%;background:repeating-linear-gradient(-45deg,var(--isl) 0 2px,transparent 2px 4px),color-mix(in srgb,var(--isl) 40%,var(--paper));border-bottom:1px solid var(--ink)}
+.k-sp::before{background:var(--ink)}
+.i-moss{--isl:var(--moss)}.i-shell{--isl:var(--shell)}.i-mushroom{--isl:var(--mushroom)}.i-windmill{--isl:var(--windmill)}.i-glass{--isl:var(--glass)}.i-star_apple{--isl:var(--star_apple)}.i-lava{--isl:var(--lava)}.i-crown{--isl:var(--crown)}
+.tile .no{display:block;position:absolute;left:4%;bottom:2%;font:clamp(6px,1.2cqw,8.5px) var(--mono);opacity:.75}
+.tile .art{width:38%}
+.art .f{fill:color-mix(in srgb,var(--isl) 45%,var(--paper));stroke:var(--ink);stroke-width:1.1;stroke-linejoin:round}
+.art .a{fill:var(--ink)}
+.art .d{fill:var(--paper);stroke:var(--ink);stroke-width:.8}
+.art .l{fill:none;stroke:var(--ink);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+.tile .nm{font-weight:700}
+.tile .pr{font-family:var(--mono)}
+.tile.own{outline:.5cqw solid var(--o);outline-offset:-.5cqw;background:linear-gradient(135deg,transparent 86%,var(--o) 86%),color-mix(in srgb,var(--o) 9%,var(--paper))}
+.tile.mono .nm{text-decoration:underline double var(--o);text-underline-offset:2px}
+.lv{--o:var(--s0)}
+.bf{fill:color-mix(in srgb,var(--o) 30%,var(--paper));stroke:var(--o);stroke-width:1.6;stroke-linejoin:round}
+.ba{fill:var(--o);stroke:var(--o);stroke-width:1.6;stroke-linejoin:round}
+.bw{fill:var(--o)}
+.bd{fill:var(--o);stroke:var(--o);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tile .bld{top:13%;width:30%;background:var(--paper);border-radius:50%}
+.tile .fst{top:14%}
+.fst .f{fill:var(--red);stroke:var(--ink);stroke-width:1}.fst .l{fill:none;stroke:var(--ink);stroke-width:1.1}
+.turnline{font-style:italic;border-bottom:1px solid var(--ink);padding:0 10px 2px}
+.turnline b{font-family:var(--mono);font-style:normal}
+.log{font-family:var(--mono);font-size:clamp(9.5px,1.85cqw,12px)}
+.log li::before{content:"· "}
+.die{background:var(--paper);border:1.5px solid var(--ink);border-radius:3px;box-shadow:inset 0 0 0 3px var(--paper),inset 0 0 0 4px var(--ink),3px 3px 0 var(--ink);color:var(--ink)}
+.die i{border-radius:0;transform:rotate(45deg);width:62%}
+.die.rolling{animation:b-flap .18s linear infinite}
+.die+.die.rolling{animation-delay:.09s}
+.die.landed{animation:b-land .35s ease-out}
+@keyframes b-flap{0%{transform:perspective(220px) rotateX(0)}49%{transform:perspective(220px) rotateX(-88deg)}51%{transform:perspective(220px) rotateX(88deg)}100%{transform:perspective(220px) rotateX(0)}}
+@keyframes b-land{0%{transform:scale(1.3);box-shadow:inset 0 0 0 3px var(--paper),inset 0 0 0 4px var(--ink),9px 9px 0 var(--line)}60%{transform:scale(.97)}}
+.deck{font-family:var(--mono)}
+.deck .dk{border:1px solid var(--ink);box-shadow:2px 2px 0 var(--paper),3px 3px 0 var(--ink)}
+.tok .pl{transform-box:view-box;transform-origin:50% 50%;transform:rotate(var(--hdg,180deg));transition:transform .15s}
+.tok>span{transition:transform .3s}
+.tok.arrive>span{animation:b-thump .3s}
+.tok.flying>span{transform:scale(1.7);filter:drop-shadow(6px 10px 0 var(--line))}
+.tok.fx-out>span{animation:b-out 1.2s ease-in forwards}
+@keyframes b-out{to{transform:rotate(760deg) scale(0);opacity:.2}}
+.route path{stroke:var(--red);stroke-width:2;stroke-dasharray:2.5 1.8}
+.route.on path{animation:b-march 1.5s linear}
+@keyframes b-march{from{stroke-dashoffset:26}to{stroke-dashoffset:0}}
+.tile.pass{animation:b-pass .6s ease-out}
+.tile.landed{animation:b-pass .9s ease-out}
+@keyframes b-pass{0%{background-color:color-mix(in srgb,var(--ink) 28%,var(--paper))}}
+.tile.fx-claim,.tile.fx-toll,.tile.fx-release,.tile.fx-mono{z-index:3;overflow:visible}
+.tile.fx-claim::after,.tile.fx-toll::after,.tile.fx-release::after,.tile.fx-mono::after{content:"매입";position:absolute;inset:26% 4%;display:grid;place-items:center;border:.6cqw double var(--red);color:var(--red);background:color-mix(in srgb,var(--paper) 82%,transparent);font-weight:800;font-size:clamp(9px,2.3cqw,15px);letter-spacing:.14em;transform:rotate(-13deg);animation:b-stamp 1.3s ease-out forwards}
+.tile.fx-toll::after{content:"통행료"}
+.tile.fx-release::after{content:"말소";animation-duration:.5s}
+.tile.fx-mono::after{content:"독점";border-color:var(--teal);color:var(--teal)}
+@keyframes b-stamp{0%{opacity:0;transform:rotate(-13deg) scale(2.8)}16%{opacity:1;transform:rotate(-13deg) scale(.93)}24%{transform:rotate(-13deg) scale(1)}78%{opacity:1}100%{opacity:0;transform:rotate(-13deg)}}
+.fx-build path,.fx-build rect{stroke-dasharray:1;animation:b-draw .95s ease-out both}
+.fx-build .bw{animation:b-ink .95s ease-out both}
+@keyframes b-draw{0%{stroke-dashoffset:1;fill-opacity:0}70%{stroke-dashoffset:0;fill-opacity:0}100%{stroke-dashoffset:0;fill-opacity:1}}
+@keyframes b-ink{0%,70%{opacity:0}}
+.tile.fx-target{animation:b-target .4s steps(2) 3}
+@keyframes b-target{50%{outline:.6cqw dashed var(--red);outline-offset:-.6cqw}}
+.pop{font-family:var(--mono);background:var(--paper);border:1px solid currentColor;padding:1px 7px}
+.pop.gain{color:var(--teal)}.pop.loss{color:var(--red)}
+.face{border:1px solid var(--ink);box-shadow:5px 5px 0 var(--line)}
+.face.front{transform:rotateX(180deg);background:repeating-linear-gradient(transparent 0 21px,var(--line) 21px 22px),var(--paper);color:var(--ink)}
+.card.flip{transform:rotateX(180deg)}
+.card{transition:transform .5s cubic-bezier(.5,0,.3,1)}
+.cardwrap.show .card{animation:b-cardin .5s cubic-bezier(.2,.8,.3,1)}
+@keyframes b-cardin{from{transform:translateX(-70cqw) rotate(-12deg)}}
+.front .ck{font-family:var(--mono);border:1px solid var(--red);color:var(--red);padding:1px 8px}
+.front .ce{font-family:var(--mono)}
+.panel{background:var(--paper);border:1px solid var(--ink);box-shadow:4px 4px 0 var(--line)}
+.panel h3{border-bottom:1px solid var(--ink);padding-bottom:4px;font-size:16px}
+.btn{border:1.5px solid var(--ink);border-radius:2px;background:var(--paper);font-weight:700;box-shadow:3px 3px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+.btn.main{background:var(--ink);color:var(--paper);box-shadow:3px 3px 0 var(--red)}
+.btn:active,.btn.pressed{transform:translate(3px,3px);box-shadow:none}
+.lv button{border:1px solid var(--ink);border-radius:0;background:var(--paper);font-family:var(--mono)}
+.lv button.on{box-shadow:inset 0 0 0 2px var(--red);background:color-mix(in srgb,var(--red) 10%,var(--paper))}
+.result{background:color-mix(in srgb,var(--paper) 86%,transparent)}
+.rbox{background:var(--paper);border:1px solid var(--ink);box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 5px var(--ink),6px 6px 0 var(--line);padding:24px}
+.rbox .rk{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--red)}
+.rbox h2{font-style:italic;font-size:28px;border-bottom:3px double var(--ink);padding-bottom:6px}
+.rbox .rr{font-family:var(--mono);font-size:12px;margin-top:8px}
+.rbox ol{gap:0}
+.rbox li{border-bottom:1px dashed var(--ink);border-left:6px solid var(--c);font-family:var(--mono)}
+.rbox li .nm{font-family:var(--font);font-weight:700}
+.rbox li.me{background:color-mix(in srgb,var(--c) 12%,var(--paper))}
+.rbox li.bk b{color:var(--red)}
+.rbox .av .pl{transform-box:view-box;transform-origin:50% 50%;transform:rotate(-28deg)}
+@container cr (max-width:700px){.seat .cash{font-size:13px}.seat.turn .nm::before{content:none}.seat{border-left-width:5px}.cr{padding:10px}}
+
+</style>
+</head>
+<body class="opt-b">
+<nav class="lab" aria-label="시안 조작"><b>구름항로 시안 B — 바람 항해도</b><a href="option-a.html">A</a><a href="option-b.html" aria-current="page">B</a><a href="option-c.html">C</a>
+<button type="button" id="bTheme"></button><button type="button" id="bView"></button><button type="button" id="bMotion" aria-pressed="false">연출 줄이기</button>
+<div class="row"><button type="button" class="go" id="bGo">🎲 주사위</button><span id="chips"></span><button type="button" id="bReset">↺ 처음</button></div></nav>
+<div class="frame" id="frame" data-view="desk"><div id="app"></div></div>
+<p class="note">[🎲 주사위]를 누를 때마다 다음 차례가 재생됩니다 — 구입·건설 → 통행료 → 바람 편지 → 비행 → 파산 → 결과 화면. 이름표 버튼으로 그 연출만 바로 볼 수 있습니다.</p>
+<script>
+/* 시안 B — 바람 항해도: 잉크 선·해칭·도장으로 그린 옛 항로 지도, 종이비행기 말 */
+(()=>{
+const m=(d,c='var(--ink)')=>`<svg viewBox="0 0 18 18"><path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"/></svg>`;
+const dot=(r,c='var(--ink)')=>`<svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="${r}" fill="${c}"/></svg>`;
+const rose='<svg viewBox="0 0 18 18"><path d="M9 1l1.8 6.2L17 9l-6.2 1.8L9 17l-1.8-6.2L1 9l6.2-1.8Z" fill="var(--red)" stroke="var(--ink)" stroke-width=".8"/></svg>';
+window.THEME={
+dieIcon:'◈',kicker:'항해 일지 — 제 20 라운드 마감',
+ms:{roll:720,hop:200,coin:650,claim:900,build:950,cardIn:500,cardFlip:500,fly:1500,out:1200},arc:.3,rise:0,fall:0,
+token:s=>`<svg viewBox="0 0 32 32"><g class="pl"><path d="M3 8l27 8L3 24l5-8Z" fill="var(--c)" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 16h22" stroke="var(--ink)" stroke-width="1.1"/><path d="M8 16l-2 5 6-3.4" fill="var(--paper)" stroke="var(--ink)" stroke-width="1" stroke-linejoin="round"/></g><g class="nb"><circle cx="25.5" cy="25.5" r="6" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.1"/><text x="25.5" y="28.4" text-anchor="middle" font-size="8.5" font-family="ui-monospace,Menlo,Consolas,monospace" font-weight="700" fill="var(--ink)">${s+1}</text></g></svg>`,
+bg:`<svg viewBox="0 0 700 700" preserveAspectRatio="none"><g fill="none" stroke="var(--ink)" opacity=".2"><ellipse cx="240" cy="250" rx="125" ry="72"/><ellipse cx="240" cy="250" rx="88" ry="46"/><ellipse cx="240" cy="250" rx="50" ry="23"/><ellipse cx="475" cy="465" rx="112" ry="80"/><ellipse cx="475" cy="465" rx="72" ry="48"/><ellipse cx="475" cy="465" rx="34" ry="20"/><path d="M115 520Q250 390 350 470T588 215" stroke-dasharray="7 7"/></g><g transform="translate(350 350)" opacity=".2"><g class="rose"><circle r="150" fill="none" stroke="var(--ink)" stroke-dasharray="2 7"/><circle r="122" fill="none" stroke="var(--ink)"/><path d="M-86-86L8 0 86 86-8 0ZM86-86L0 8-86 86 0-8Z" fill="none" stroke="var(--ink)"/><path d="M0-142L15 0 0 142-15 0Z" fill="var(--ink)"/><path d="M-142 0L0-15 142 0 0 15Z" fill="var(--paper)" stroke="var(--ink)"/></g><text y="-160" text-anchor="middle" font-size="24" font-family="Georgia,serif" fill="var(--ink)">N</text></g></svg>`,
+cardBack:'<svg viewBox="0 0 50 70" preserveAspectRatio="none"><defs><pattern id="bst" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="9" height="9" fill="var(--paper)"/><rect width="3" height="9" fill="var(--red)"/><rect x="4.5" width="3" height="9" fill="var(--teal)"/></pattern></defs><rect width="50" height="70" fill="url(#bst)"/><rect x="4" y="4" width="42" height="62" fill="var(--paper)" stroke="var(--ink)" stroke-width=".7"/><circle cx="25" cy="35" r="13" fill="none" stroke="var(--ink)" stroke-width="1" stroke-dasharray="1.6 1.6"/><circle cx="25" cy="35" r="9.5" fill="none" stroke="var(--ink)" stroke-width=".8"/><path d="M25 26.5l2.3 8.5-2.3 8.5-2.3-8.5Z" fill="var(--red)"/><path d="M16.5 35l8.5-2.3 8.5 2.3-8.5 2.3Z" fill="var(--ink)"/></svg>',
+cardArt:'<svg viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"><path d="M30 4L12 14" stroke-dasharray="2 3"/><path d="M36 3l1.8 4.3 4.6.4-3.5 3 1 4.5L36 12.8l-3.9 2.4 1-4.5-3.5-3 4.6-.4Z" fill="var(--red)"/><path d="M7 24a17 12 0 0 1 34 0Z" fill="color-mix(in srgb,var(--s3) 35%,var(--paper))"/><path d="M7 24h34v18H7Z" fill="var(--paper)"/><path d="M11 28v10M15 28v10M33 28v10M37 28v10" stroke-width=".8"/><rect x="20.5" y="20.5" width="7" height="9" fill="var(--paper)"/></svg>',
+coin:'<svg viewBox="0 0 18 18"><rect x="1" y="3.5" width="16" height="11" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="2 1"/><text x="9" y="12.2" text-anchor="middle" font-size="8" font-family="ui-monospace,Menlo,Consolas,monospace" font-weight="700" fill="var(--red)">G</text></svg>',
+burst:{buy:[dot(3,'var(--red)'),dot(2,'var(--red)'),dot(1.5,'var(--red)'),dot(2.5,'var(--red)'),dot(1.5),dot(2)],
+build:Array(6).fill(m('M9 3v12M3 9h12')),out:Array(8).fill(m('M4 4l10 10M14 4L4 14','var(--red)')),win:Array(12).fill(rose)}};
+})();
+
+(()=>{
+const T=window.THEME,$=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const TILES=[['출발 항구','START'],['이끼 나루','MOSS',60],['이끼 언덕','MOSS',60],['바람 편지','LETTER'],['조개 모래톱','SHELL',80],['조개 시장','SHELL',80],['소용돌이','WHIRLPOOL'],['버섯 숲길','MUSHROOM',100],['버섯 마을','MUSHROOM',100],['세관','CUSTOMS'],['풍차 들판','WINDMILL',120],['풍차 방앗간','WINDMILL',120],['등불 축제','FESTIVAL'],['유리 공방','GLASS',150],['유리 다리','GLASS',150],['바람 편지','LETTER'],['별사과 과수원','STAR_APPLE',170],['별사과 장터','STAR_APPLE',170],['바람 정류장','STATION'],['용암 온천','LAVA',200],['용암 대장간','LAVA',200],['바람 편지','LETTER'],['구름왕관 정원','CROWN',240],['구름왕관 성채','CROWN',240]];
+const TOLL={60:[10,40,80,170],80:[20,50,110,220],100:[20,60,140,280],120:[20,70,170,340],150:[30,90,210,420],170:[30,100,240,480],200:[40,120,280,560],240:[50,140,340,670]};
+const LV=['땅만','천막','상점','풍등탑'],NAMES=['하늘','보리','도토리','미르봇'];
+/* 칸 그림(모티프) — 모양은 공통, 칠·선은 시안 CSS 가 정한다: f 본체 · a 강조 · d 밝은 무늬 · l 선 */
+const MOTIF={
+MOSS:'<path class="f" d="M2 19Q5 8 12 8T22 19Z"/><path class="l" d="M7 13v-3M12 12V7.5M17 13v-3"/><circle class="a" cx="12" cy="5.5" r="1.6"/>',
+SHELL:'<path class="f" d="M12 20L3 11A9 9 0 0 1 21 11Z"/><path class="l" d="M12 20V3.5M12 20L6.5 5.5M12 20L17.5 5.5"/>',
+MUSHROOM:'<path class="a" d="M10 12h4l1 8.5H9Z"/><path class="f" d="M3 13A9 8.5 0 0 1 21 13Z"/><circle class="d" cx="9" cy="9" r="1.4"/><circle class="d" cx="14.5" cy="8" r="1.7"/>',
+WINDMILL:'<path class="a" d="M9.5 21.5L11 11h2l1.5 10.5Z"/><g class="spin"><path class="f" d="M12 10L10 2h4ZM12 10L20 8v4ZM12 10L14 18h-4ZM12 10L4 12V8Z"/></g><circle class="d" cx="12" cy="10" r="1.3"/>',
+GLASS:'<path class="f" d="M12 2L20 9L12 22L4 9Z"/><path class="l" d="M4 9h16M12 2L9 9l3 13l3-13Z"/>',
+STAR_APPLE:'<circle class="f" cx="12" cy="13.5" r="7.5"/><path class="d" d="M12 9l1.2 3.1 3.3.2-2.6 2 .9 3.2L12 15.7 9.2 17.5l.9-3.2-2.6-2 3.3-.2Z"/><path class="a" d="M12 6q1-4 5-4q0 4-5 4Z"/>',
+LAVA:'<path class="f" d="M2 21L8 8h8l6 13Z"/><path class="a" d="M8 8h8l-1.5 4-2-2-2 3-1.5-3Z"/><circle class="a" cx="12" cy="4" r="1.5"/>',
+CROWN:'<path class="f" d="M4.5 16L3 6l5 4 4-7 4 7 5-4-1.5 10Z"/><path class="d" d="M2 20a3 3 0 0 1 4-3 4 4 0 0 1 7-1 3.5 3.5 0 0 1 6 1 3 3 0 0 1 3 3Z"/>',
+START:'<path class="f" d="M3 14h18l-3 6.5H6Z"/><path class="l" d="M12 14V3"/><path class="a" d="M12 3l7 4-7 4Z"/>',
+LETTER:'<rect class="f" x="3" y="6" width="18" height="13" rx="2"/><path class="l" d="M3.5 8l8.5 6 8.5-6"/>',
+WHIRLPOOL:'<path class="l" d="M10 12a2 2 0 1 0 4 0a4 4 0 1 0-8 0a6 6 0 1 0 12 0a8 8 0 1 0-16 0"/>',
+CUSTOMS:'<path class="f" d="M4 21V9l8-5 8 5v12h-5v-7H9v7Z"/><circle class="a" cx="12" cy="9.5" r="2"/>',
+FESTIVAL:'<path class="l" d="M12 2v3M12 19v3"/><rect class="f" x="6" y="5" width="12" height="14" rx="5"/><path class="l" d="M10 5.5v13M14 5.5v13"/>',
+STATION:'<path class="l" d="M5 22V3"/><path class="f" d="M5 4l14 2.5v5L5 14Z"/><path class="l" d="M10 5v8.2M15 5.8v6.4"/>'};
+/* 건물 단계 0 깃발 · 1 천막 · 2 상점 · 3 풍등탑 — bf 본체(주인 색) · ba 지붕·등 · bw 창 · bd 선 */
+const BLD=['<path class="bd" pathLength="1" d="M7 22V3"/><path class="bf" pathLength="1" d="M7 4l12 4-12 4Z"/>',
+'<path class="bf" pathLength="1" d="M3 21L12 6l9 15Z"/><path class="bw" d="M10 21l2-7 2 7Z"/><path class="bd" pathLength="1" d="M12 6V2l4 1.5-4 1.5"/>',
+'<path class="bf" pathLength="1" d="M4 22V11h16v11Z"/><path class="ba" pathLength="1" d="M2 11l3-6h14l3 6Z"/><path class="bw" d="M10 22v-6h4v6Z"/>',
+'<path class="bf" pathLength="1" d="M8 23l1.5-11h5L16 23Z"/><rect class="ba" pathLength="1" x="6.5" y="3" width="11" height="9" rx="3.5"/><path class="bw" d="M10 5.5h4v4h-4Z"/><path class="bd" pathLength="1" d="M12 3V1"/>'];
+const bld=l=>`<svg viewBox="0 0 24 24">${BLD[l]}</svg>`;
+const grid=t=>t<=6?{r:6,c:6-t}:t<=12?{r:12-t,c:0}:t<=18?{r:0,c:t-12}:{r:t-18,c:6};
+let S,busy=false,FAST=false,step=0;
+const root=document.documentElement;
+const reduced=()=>root.dataset.motion==='reduce'||matchMedia('(prefers-reduced-motion: reduce)').matches;
+const quiet=()=>FAST||reduced();
+const wait=ms=>FAST?Promise.resolve():new Promise(r=>setTimeout(r,reduced()?Math.min(ms,150):ms));
+const g=n=>n.toLocaleString('en-US')+'G';
+function init(){S={pos:[23,3,9,12],cash:[640,480,910,720],own:{1:[1,1],2:[1,2],4:[0,0],7:[2,1],10:[0,2],13:[0,3],14:[3,1],16:[2,3],20:[3,2],22:[1,0]},fest:16,turn:0,out:[0,0,0,0],deck:7}}
+init();
+$('#app').innerHTML=`<div class="cr" id="cr">
+<header class="hd"><span class="badge ttl">구름항로</span><span class="badge">4인</span><span class="badge">라운드 9/20</span><span class="badge">턴 30초</span><span class="badge">● 연결</span><button class="badge" type="button">규칙</button></header>
+<div class="lay"><div class="board" id="bd" role="group" aria-label="판"><div class="bg" aria-hidden="true">${T.bg}</div>
+${TILES.map((t,i)=>{const p=grid(i);return `<div class="tile" data-i="${i}" style="grid-area:${p.r+1}/${p.c+1}"></div>`}).join('')}
+<div class="center"><div class="dice" id="dice">${`<span class="die">${'<i></i>'.repeat(9)}</span>`.repeat(2)}</div><p class="turnline" id="tl"></p><ul class="log" id="log" aria-label="방금 일어난 일"></ul><div class="deck"><span class="dk">${T.cardBack}</span><b id="dkn"></b></div></div>
+<svg class="route" id="route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path pathLength="100" vector-effect="non-scaling-stroke"/></svg>
+<div class="tokens" id="toks"></div><div class="fxl" id="bfx"></div>
+<div class="cardwrap" id="cw"><div class="card" id="card"><div class="face back">${T.cardBack}</div><div class="face front"></div></div></div></div>
+<aside class="side"><ol class="seats" id="seats" aria-label="좌석"></ol><section class="panel" id="panel" aria-label="결정"></section></aside></div>
+<div class="fx" id="fx" aria-hidden="true"></div><div class="result" id="res" hidden></div></div>`;
+const cr=$('#cr'),board=$('#bd'),tiles=$$('.tile'),fx=$('#fx'),bfx=$('#bfx'),res=$('#res');let toks=[];
+const mono=i=>{const o=S.own[i];if(!o)return false;const j=TILES.findIndex((t,k)=>k!==i&&t[1]===TILES[i][1]);return !!S.own[j]&&S.own[j][0]===o[0]};
+const toll=i=>Math.round(TOLL[TILES[i][2]][S.own[i][1]]*(mono(i)?1.5:1)*(S.fest===i?2:1));
+const assets=s=>S.cash[s]+Object.entries(S.own).reduce((a,[i,o])=>a+(o[0]===s?TILES[i][2]*(1+o[1]/2):0),0);
+const lands=s=>Object.values(S.own).filter(o=>o[0]===s).length;
+function drawTile(i){const el=tiles[i],[nm,k,p]=TILES[i],o=S.own[i];
+ el.className=`tile k-${p?'land':'sp'} i-${k.toLowerCase()}${o?` own o${o[0]} l${o[1]}`:''}${S.fest===i?' fest':''}${mono(i)?' mono':''}`;
+ el.style.setProperty('--o',o?`var(--s${o[0]})`:'transparent');
+ el.setAttribute('aria-label',nm+(o?` — ${NAMES[o[0]]} 땅, ${LV[o[1]]}`:''));
+ el.innerHTML=`<span class="no">${String(i).padStart(2,'0')}</span><span class="art"><svg viewBox="0 0 24 24">${MOTIF[k]}</svg></span><span class="nm">${nm}</span>`+(p?`<span class="pr">${o?'통행 '+toll(i):p}G</span><span class="bld">${o?bld(o[1]):''}</span><span class="fst"><svg viewBox="0 0 24 24">${MOTIF.FESTIVAL}</svg></span>`:'')}
+function drawSeats(){$('#seats').innerHTML=NAMES.map((n,s)=>`<li class="seat s${s}${S.turn===s&&!S.out[s]?' turn':''}${S.out[s]?' out':''}" style="--c:var(--s${s})"><span class="av">${T.token(s)}</span><span class="nm">${n}${s===0?' <small>(나)</small>':''}</span><b class="cash" id="cash${s}">${S.out[s]?'—':g(S.cash[s])}</b><span class="sub">${S.out[s]?'<em class="tag bad">파산</em>':`<span>땅 ${lands(s)}</span><span>자산 ${g(assets(s))}</span>`}${S.turn===s&&!S.out[s]?'<em class="tag">차례</em>':''}</span></li>`).join('')}
+function face(d,n){const on={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[n];[...d.children].forEach((c,i)=>c.classList.toggle('on',on.includes(i)));d.dataset.n=n}
+function ctr(i){const t=tiles[i];return{x:(t.offsetLeft+t.offsetWidth/2)/board.clientWidth*100,y:(t.offsetTop+t.offsetHeight*.38)/board.clientHeight*100}}
+function place(s,solo){const same=[0,1,2,3].filter(k=>S.pos[k]===S.pos[s]&&!S.out[k]),n=solo?1:same.length,k=solo?0:same.indexOf(s),c=ctr(S.pos[s]);
+ toks[s].style.left=c.x+(k-(n-1)/2)*4.4+'%';toks[s].style.top=c.y+'%'}
+const placeAll=()=>[0,1,2,3].forEach(s=>place(s));
+function drawToks(){$('#toks').innerHTML=NAMES.map((n,s)=>`<div class="tok s${s}" style="--c:var(--s${s})" aria-label="${n} 말"><span>${T.token(s)}</span></div>`).join('');toks=$$('.tok');toks.forEach(t=>t.style.transition='none');placeAll();void board.offsetWidth;toks.forEach(t=>t.style.transition='')}
+function drawAll(){tiles.forEach((_,i)=>drawTile(i));drawSeats();drawToks();$$('.die').forEach((d,i)=>face(d,[5,2][i]));$('#tl').innerHTML=`${NAMES[S.turn]} 차례`;$('#dkn').textContent=`편지 ${S.deck}`;
+ $('#log').innerHTML='<li><b>미르봇</b> 용암 대장간에 상점 건설</li><li><b>도토리</b> 등불 축제 — 별사과 과수원 ×2</li>'}
+function fxc(el,c,ms=1600){if(FAST||!el)return;el.classList.remove(c);void el.offsetWidth;el.classList.add(c);setTimeout(()=>el.classList.remove(c),ms)}
+function pt(el){const R=cr.getBoundingClientRect(),a=el.getBoundingClientRect();return{x:a.left+a.width/2-R.left,y:a.top+a.height/2-R.top}}
+function pop(el,txt,cls){if(FAST)return;const p=document.createElement('span');p.className='pop '+cls;p.textContent=txt;el.append(p);setTimeout(()=>p.remove(),1500)}
+function popAt(i,txt,cls){if(FAST)return;const c=ctr(i),p=document.createElement('span');p.className='pop '+cls;p.textContent=txt;p.style.left=Math.min(80,Math.max(20,c.x))+'%';p.style.top=Math.max(8,c.y-8)+'%';bfx.append(p);setTimeout(()=>p.remove(),1500)}
+function log(h){const l=$('#log');l.insertAdjacentHTML('afterbegin',`<li>${h}</li>`);while(l.children.length>3)l.lastChild.remove()}
+function money(s,d){const from=S.cash[s];S.cash[s]+=d;const el=$('#cash'+s);if(quiet()){el.textContent=g(S.cash[s]);return}
+ pop($('.seat.s'+s),(d>0?'+':'−')+g(Math.abs(d)),d>0?'gain':'loss');const t0=performance.now();
+ (function f(t){const k=Math.min(1,(t-t0)/500);el.textContent=g(Math.round(from+d*k));if(k<1)requestAnimationFrame(f)})(t0)}
+function coins(from,to,n){if(quiet())return Promise.resolve();const a=pt(from),b=pt(to),D=T.ms.coin;
+ for(let i=0;i<n;i++){const c=document.createElement('span');c.className='coin';c.innerHTML=T.coin;fx.append(c);
+  const mx=(a.x+b.x)/2+(Math.random()-.5)*70*T.arc,my=Math.min(a.y,b.y)-(30+Math.random()*50)*T.arc;
+  c.animate([{transform:`translate(${a.x}px,${a.y}px) scale(.3)`,opacity:0},{opacity:1,offset:.12},{transform:`translate(${mx}px,${my}px) scale(1.15) rotate(${180*T.arc}deg)`,opacity:1,offset:.5},{transform:`translate(${b.x}px,${b.y}px) scale(.55) rotate(${360*T.arc}deg)`,opacity:.9}],{duration:D,delay:i*80,easing:'ease-in-out',fill:'both'}).onfinish=()=>c.remove()}
+ setTimeout(()=>fxc(to,'fx-got',700),D);return wait(D+n*80)}
+function burst(p,kind){if(quiet())return;(T.burst[kind]||[]).forEach(h=>{const e=document.createElement('span');e.className='p p-'+kind;e.innerHTML=h;fx.append(e);
+ const an=Math.random()*6.283,d=24+Math.random()*56,r=(Math.random()-.5)*400*T.arc,up=T.rise;
+ e.animate([{transform:`translate(${p.x}px,${p.y}px) scale(.2)`,opacity:1},{transform:`translate(${p.x+Math.cos(an)*d}px,${p.y+Math.sin(an)*d-up*.6}px) scale(1) rotate(${r}deg)`,opacity:1,offset:.55},{transform:`translate(${p.x+Math.cos(an)*d*1.25}px,${p.y+Math.sin(an)*d*1.25-up*1.6+T.fall}px) scale(.5) rotate(${r*1.6}deg)`,opacity:0}],{duration:800+Math.random()*500,easing:'cubic-bezier(.2,.7,.3,1)',fill:'both'}).onfinish=()=>e.remove()})}
+function setTurn(s){S.turn=s;drawSeats();$('#tl').innerHTML=`${NAMES[s]} 차례`}
+function panel(h){$('#panel').innerHTML=h}
+const goBtn=()=>`<div class="acts"><button class="btn main" data-go type="button">${T.dieIcon} 주사위 굴리기${step<STEPS.length?` <small>다음: ${STEPS[step].name}</small>`:' <small>처음부터 다시</small>'}</button></div>`;
+const panelWait=h=>panel(`<h3>${NAMES[S.turn]} 차례</h3><p>${h}</p>`);
+function panelBuy(i){const[nm,,p]=TILES[i];panel(`<h3>${nm} <small>조개섬 · 땅값 ${p}G</small></h3><p>살까요? 건물도 함께 지을 수 있어요.</p><div class="lv" role="radiogroup" aria-label="건설 단계">${[0,1,2].map(l=>`<button type="button" class="${l?'':'on'}" data-c="${p+l*p/2}">${bld(l)}<span>${LV[l]}</span><b>${p+l*p/2}G</b></button>`).join('')}</div><div class="acts"><button class="btn" type="button">안 산다</button><button class="btn main" type="button" id="buy">산다 · ${p}G</button></div>`)}
+function press(el){if(!el||FAST)return;if(el.parentNode.classList.contains('lv')){$$('.lv button').forEach(b=>b.classList.toggle('on',b===el));$('#buy').textContent=`산다 · ${el.dataset.c}G`}fxc(el,'pressed',300)}
+async function roll(a,b){const d=$$('.die');if(!quiet()){d.forEach(x=>x.classList.add('rolling'));const iv=setInterval(()=>d.forEach(x=>face(x,1+Math.random()*6|0)),90);await wait(T.ms.roll);clearInterval(iv);d.forEach(x=>x.classList.remove('rolling'))}
+ face(d[0],a);face(d[1],b);d.forEach(x=>fxc(x,'landed',600));$('#tl').innerHTML=`${NAMES[S.turn]} — <b>${a} + ${b} = ${a+b}칸</b>`;await wait(480)}
+async function move(s,n){const el=toks[s];for(let k=0;k<n;k++){const a=grid(S.pos[s]);S.pos[s]=(S.pos[s]+1)%24;const b=grid(S.pos[s]);
+  el.style.setProperty('--hdg',Math.atan2(b.r-a.r,b.c-a.c)*180/Math.PI+'deg');
+  if(S.pos[s]===0){money(s,200);popAt(0,'급여 +200G','gain');log(`<b>${NAMES[s]}</b> 출발 항구 통과 — 급여 200G`)}
+  if(quiet())continue;place(s,true);fxc(el,'hop',T.ms.hop);fxc(tiles[S.pos[s]],'pass',900);await wait(T.ms.hop)}
+ placeAll();fxc(el,'arrive',600);fxc(tiles[S.pos[s]],'landed',900);await wait(350)}
+async function claim(i,s){S.own[i]=[s,0];drawTile(i);fxc(tiles[i],'fx-claim');burst(pt(tiles[i]),'buy');await wait(T.ms.claim)}
+async function build(i,l){S.own[i][1]=l;drawTile(i);fxc($('.bld',tiles[i]),'fx-build');fxc(tiles[i],'fx-built');burst(pt(tiles[i]),'build');await wait(T.ms.build)}
+async function card(n,e){const c=$('#card');$('.front',c).innerHTML=`<span class="ck">바람 편지</span><span class="ca">${T.cardArt}</span><b class="cn">${n}</b><span class="ce">${e}</span>`;S.deck--;$('#dkn').textContent=`편지 ${S.deck}`;
+ if(FAST)return;$('#cw').classList.add('show');await wait(T.ms.cardIn);c.classList.add('flip');await wait(T.ms.cardFlip+1100)}
+function hideCard(){$('#cw').classList.remove('show');$('#card').classList.remove('flip')}
+async function fly(s,to){const el=toks[s],a=ctr(S.pos[s]),b=ctr(to),mx=50+((a.x+b.x)/2-50)*.05,my=50+((a.y+b.y)/2-50)*.05,rt=$('#route');
+ S.pos[s]=to;if(!quiet()){rt.firstElementChild.setAttribute('d',`M${a.x} ${a.y}Q${mx} ${my} ${b.x} ${b.y}`);fxc(rt,'on',T.ms.fly+500);el.classList.add('flying');el.style.setProperty('--hdg','135deg');
+  const kf=[];for(let i=0;i<=24;i++){const t=i/24,u=1-t;kf.push({left:u*u*a.x+2*u*t*mx+t*t*b.x+'%',top:u*u*a.y+2*u*t*my+t*t*b.y+'%'})}
+  await el.animate(kf,{duration:T.ms.fly,easing:'ease-in-out'}).finished;el.classList.remove('flying')}
+ placeAll();fxc(el,'arrive',600);fxc(tiles[to],'landed',900);await wait(300)}
+async function bankrupt(s){S.out[s]=1;if(!quiet()){toks[s].classList.add('fx-out');fxc($('.seat.s'+s),'fx-out',1500);burst(pt(toks[s]),'out');await wait(T.ms.out)}
+ for(const i of Object.keys(S.own).filter(i=>S.own[i][0]===s)){if(!quiet()){fxc(tiles[i],'fx-release',500);await wait(380)}delete S.own[i];drawTile(+i)}
+ toks[s].classList.add('gone');drawSeats()}
+function result(){const rk=[0,1,2,3].map(s=>({s,a:S.out[s]?-1:assets(s)})).sort((x,y)=>y.a-x.a);
+ res.innerHTML=`<div class="rbox" role="dialog" aria-label="판 종료"><p class="rk">${T.kicker}</p><h2>${NAMES[rk[0].s]} 승리!</h2><p class="rr">라운드 상한 도달 — 자산 순위</p><ol>${rk.map((x,i)=>`<li class="${x.s?'':'me'}${x.a<0?' bk':''}" style="--c:var(--s${x.s})"><span class="rn">${i+1}</span><span class="av">${T.token(x.s)}</span><span class="nm">${NAMES[x.s]}${x.s?'':' (나)'}</span><b>${x.a<0?'파산':g(x.a)}</b></li>`).join('')}</ol><div class="acts"><button class="btn" type="button" data-close>판 다시 보기</button><button class="btn main" type="button" data-close>대기실로</button></div></div>`;
+ res.hidden=false;if(!quiet()){const p={x:cr.clientWidth/2,y:Math.min(cr.clientHeight/2,260)};burst(p,'win');setTimeout(()=>burst({x:p.x-90,y:p.y+40},'win'),350);setTimeout(()=>burst({x:p.x+90,y:p.y+30},'win'),650)}}
+const STEPS=[
+{name:'구입·건설',run:async()=>{setTurn(0);panel(`<h3>내 차례</h3><p>주사위를 굴려 항로를 따라가요.</p>`);await roll(2,4);await move(0,6);
+ panelBuy(5);await wait(1000);press($('.lv button:nth-child(2)'));await wait(600);press($('#buy'));await wait(300);
+ money(0,-120);await claim(5,0);await build(5,1);drawTile(4);fxc(tiles[4],'fx-mono');fxc(tiles[5],'fx-mono');popAt(5,'조개섬 독점 ×1.5','gain');
+ log('<b>하늘</b> 조개 시장 구입 + 천막 · 조개섬 독점');panelWait('조개 시장을 사고 천막을 지었어요. 조개섬 두 칸이 모두 내 땅 — 통행료 ×1.5');await wait(700)}},
+{name:'통행료',run:async()=>{setTurn(1);panelWait('주사위를 굴리는 중…');await wait(350);await roll(3,4);await move(1,7);
+ fxc(tiles[10],'fx-toll');popAt(10,'통행료 170G','loss');panelWait('보리가 내 <b>풍차 들판</b>(상점)에 도착 — 통행료 170G 를 받아요.');await wait(600);
+ money(1,-170);await coins(toks[1],$('.seat.s0'),6);money(0,170);log('<b>보리</b> → <b>하늘</b> 통행료 170G');await wait(600)}},
+{name:'바람 편지',run:async()=>{setTurn(2);panelWait('주사위를 굴리는 중…');await wait(350);await roll(2,4);await move(2,6);panelWait('도토리가 <b>바람 편지</b>를 한 장 뽑아요.');
+ await card('별똥별 상자','120G 를 받는다');await coins($('#card'),$('.seat.s2'),5);money(2,120);hideCard();log('<b>도토리</b> 바람 편지 — 별똥별 상자 +120G');await wait(600)}},
+{name:'비행',run:async()=>{setTurn(3);panelWait('주사위를 굴리는 중…');await wait(350);await roll(1,5);await move(3,6);
+ panelWait('미르봇이 <b>바람 정류장</b>에서 50G 를 내고 날아갈 칸을 골라요.');await wait(600);money(3,-50);fxc(tiles[23],'fx-target');await wait(600);await fly(3,23);
+ log('<b>미르봇</b> 바람 정류장 → 구름왕관 성채 (−50G)');await wait(500)}},
+{name:'파산',run:async()=>{setTurn(1);panelWait('주사위를 굴리는 중…');await wait(350);await roll(2,4);await move(1,6);
+ fxc(tiles[16],'fx-toll');popAt(16,'통행료 960G','loss');panelWait('보리가 <b>별사과 과수원</b>(풍등탑 · 축제 ×2)에 도착 — 960G 를 낼 수 없어요.');await wait(900);
+ const c=S.cash[1];money(1,-c);await coins(toks[1],$('.seat.s2'),8);money(2,c);await bankrupt(1);log('<b>보리</b> 파산 — 땅 3곳이 주인 없는 땅으로');panelWait('보리가 파산했어요. 보리의 땅은 다시 살 수 있어요.');await wait(500)}},
+{name:'결과 화면',run:async()=>{result()}}];
+function idle(){$$('#panel [data-go]').forEach(b=>b.parentNode.remove());$('#panel').insertAdjacentHTML('beforeend',goBtn());$('#bGo').innerHTML=step<STEPS.length?`🎲 주사위 — ${STEPS[step].name}`:'↺ 처음으로';
+ $$('#chips button').forEach((b,i)=>b.setAttribute('aria-pressed',i===step-1))}
+function reset(){init();step=0;res.hidden=true;hideCard();drawAll();panel('<h3>내 차례</h3><p>주사위를 굴려 항로를 따라가요.</p>');idle()}
+async function next(){if(busy)return;if(step>=STEPS.length){reset();return}busy=true;cr.classList.add('busy');await STEPS[step++].run();busy=false;cr.classList.remove('busy');idle()}
+async function goto(i){if(busy)return;busy=true;init();res.hidden=true;hideCard();FAST=true;for(let j=0;j<i;j++)await STEPS[j].run();FAST=false;const o=S.out.slice();drawAll();o.forEach((x,s)=>x&&toks[s].classList.add('gone'));step=i;busy=false;next()}
+$('#chips').innerHTML=STEPS.map((s,i)=>`<button type="button" data-i="${i}">${s.name}</button>`).join('');
+$('#chips').onclick=e=>{const b=e.target.closest('button');if(b)goto(+b.dataset.i)};
+$('#bGo').onclick=next;$('#bReset').onclick=()=>{if(!busy)reset()};
+cr.addEventListener('click',e=>{if(e.target.closest('[data-go]'))next();if(e.target.closest('[data-close]'))res.hidden=true});
+root.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+const tb=$('#bTheme'),vb=$('#bView'),mb=$('#bMotion'),fr=$('#frame');
+const sync=()=>{tb.textContent=root.dataset.theme==='dark'?'라이트로':'다크로';vb.textContent=fr.dataset.view==='phone'?'데스크톱 폭':'375px 폭';mb.setAttribute('aria-pressed',root.dataset.motion==='reduce')};
+tb.onclick=()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';sync()};
+vb.onclick=()=>{fr.dataset.view=fr.dataset.view==='phone'?'desk':'phone';sync();requestAnimationFrame(placeAll)};
+mb.onclick=()=>{root.dataset.motion=root.dataset.motion==='reduce'?'':'reduce';sync()};
+addEventListener('resize',placeAll);sync();reset();
+})();
+
+</script>
+</body>
+</html>
