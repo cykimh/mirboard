@@ -196,6 +196,16 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 `GameSummary.playerCounts` 로 싣는다(가산 필드 — 기존 필드·다섯 게임 값은 그대로, 카탈로그 IT 로 고정). 클라는 이어지면 "2~4인", 끊기면
 "2·4인"(`features/lobby/playerCountLabel`), 필드가 없으면 min~max. 관제 승인. 계약 `docs/api.md` 카탈로그.
 
+## D-227 (2026-11-10) — 씨앗포 그림 = 바꿔 끼우는 스킨 (`ArtillerySkin`, 스프라이트 시트, 씨앗포만)
+
+게임판의 그림·애니메이션을 룰·재생과 떼어 `features/artillery/skins` 의 `ArtillerySkin`(하늘·구름·흙, 포대 종류 × 상태, 씨앗, 폭발·둔덕,
+이름표·체력바, 팔레트)으로 옮긴다(사용자 결정 — 스프라이트 시트, 씨앗포만·공용 틀 아님, S6 실시간 이동이 이 위에 얹힌다). 포대 상태
+(대기·조준·발사 반동·피격·쓰러짐)는 스킨 밖 순수 함수 `unitPose` 가 대본·재생 시각에서 정하고 스킨은 그리기만 한다 — 연출은 서버 대본
+시간(`replayLengthMs`) 안에서 겹쳐 그릴 뿐 맞는 범위·물리·차례는 그대로다. `vectorSkin` 은 지금 그림을 그대로 옮긴 것이고 `spriteSkin` 은
+`client/public/artillery/skins/{이름}/atlas.png` + `atlas.json`(프레임 사각형·기준점 = 발·프레임 길이 ms)을 읽는다 — 임시 시트는 직접 그린
+도트(`scripts/generate-artillery-sprites.mjs`), 형식은 `docs/artillery-skins.md`. 고르기는 `skins/index.ts` 의 상수 하나(기본 `vector` — 임시
+그림이 지금 그림보다 낫지 않아 진짜 그림이 오면 바꾼다), 시트를 못 읽었거나 읽는 중이면 `vectorSkin` 으로 그린다. 서버·포트 변경 없음.
+
 ## D-226 (2026-11-10) — 씨앗포 차례 = 포트리스식 딜레이 (개인전·팀전 모두)
 
 차례가 좌석 순서가 아니라 **누적 딜레이가 가장 작은 살아 있는 포대**에게 간다(사용자 결정 — 포트리스처럼). 한 차례가 끝나면 그 포대에
