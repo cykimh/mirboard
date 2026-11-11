@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FIELD_H, FIELD_W } from '@/types/artillery';
 import type { Mask } from './terrain';
 import { frameAt, replayLengthMs, type FrameUnit } from './replay';
@@ -36,6 +36,10 @@ interface Props {
   wind?: number;
   teams?: boolean;
   winners?: readonly number[] | null;
+  /** D-253 — 위쪽 하늘 여백(칸, 세로 화면). 그림만이다 — 물리·끌어 조준 좌표는 그대로. */
+  headroom?: number;
+  /** D-253 — 전장 위에 겹치는 HUD(바람·남은 시간·내 탄과 아이템 칩). */
+  children?: ReactNode;
 }
 
 /** 테마 색(CSS 변수 — 라이트/다크)을 읽는다. 변수가 없으면 스킨의 기본 색. */
@@ -82,6 +86,8 @@ export function ArtilleryField({
   wind,
   teams = false,
   winners = null,
+  headroom = 0,
+  children,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -117,8 +123,8 @@ export function ArtilleryField({
   const posesRef = useRef<PoseState[]>([]);
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom };
   // 대본 연출(D-252) — 사건은 대본마다 한 번 뽑고, 재생이 끝나도 꼬리가 사라질 때까지 시계를 둔다(조작은 막지 않는다).
   const fxRef = useRef<{ nonce: number; events: FxEvent[]; startedAt: number; endMs: number } | null>(null);
   const fxArg = useRef<{ events: readonly FxEvent[]; nowMs: number }>({ events: [], nowMs: 0 });
@@ -236,6 +242,7 @@ export function ArtilleryField({
       teams: L.teams,
       fx,
       celebrate,
+      headroom: L.headroom,
     }, w / FIELD_W, L.skin);
     return done;
   };
@@ -250,7 +257,7 @@ export function ArtilleryField({
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       sizeRef.current = { w, dpr };
       canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(((w * FIELD_H) / FIELD_W) * dpr);
+      canvas.height = Math.round(((w * (FIELD_H + latest.current.headroom)) / FIELD_W) * dpr);
       render(performance.now());
     };
     resize();
@@ -259,7 +266,7 @@ export function ArtilleryField({
     ro.observe(wrap);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [headroom]);
 
   // 재생 루프 — 대본이 오면 시작, 끝나면 멈춘다. 차례 표시 화살표도 움직이게 늘 한 장씩은 그린다.
   const replayStart = useRef<number | null>(null);
@@ -332,7 +339,7 @@ export function ArtilleryField({
     const rect = e.currentTarget.getBoundingClientRect();
     return {
       x: ((e.clientX - rect.left) / rect.width) * FIELD_W,
-      y: ((e.clientY - rect.top) / rect.height) * FIELD_H,
+      y: ((e.clientY - rect.top) / rect.height) * (FIELD_H + headroom) - headroom,
     };
   };
   const aimFrom = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -342,7 +349,11 @@ export function ArtilleryField({
   };
 
   return (
-    <div className={`ar-field ar-field-${skin.id.replace(/[^a-z0-9]+/gi, '-')}`} ref={wrapRef}>
+    <div
+      className={`ar-field ar-field-${skin.id.replace(/[^a-z0-9]+/gi, '-')}`}
+      ref={wrapRef}
+      style={headroom > 0 ? { aspectRatio: `${FIELD_W} / ${FIELD_H + headroom}` } : undefined}
+    >
       <canvas
         ref={canvasRef}
         className={`ar-canvas${aim && onAimAngle ? ' ar-canvas-aiming' : ''}`}
@@ -364,6 +375,7 @@ export function ArtilleryField({
           dragging.current = false;
         }}
       />
+      {children}
     </div>
   );
 }

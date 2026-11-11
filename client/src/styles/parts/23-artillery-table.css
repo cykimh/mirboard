@@ -31,6 +31,9 @@
   gap: 8px;
   padding: 10px;
   min-height: 100vh;
+  /* 폭을 못박는다 — 부모가 flex 열이고 margin auto 라 늘이기가 꺼져, 한 줄 좌석 띠(D-253)가 내용 폭만큼 판을 넓히지 않게. */
+  width: 100%;
+  min-width: 0;
   max-width: 960px;
   margin: 0 auto;
 }
@@ -123,7 +126,7 @@ button.ar-badge {
   padding: 4px;
   border-radius: 10px;
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated, var(--color-bg));
+  background: var(--color-bg-surface);
 }
 
 .ar-reaction-palette button {
@@ -160,26 +163,36 @@ button.ar-badge {
 
 /* ── 좌석 띠 ──────────────────────────────────────────────────────── */
 .ar-seats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  /* D-253 — 한 줄 고정 높이: 차례·태그·채팅이 바뀌어도 아래 전장이 움직이지 않는다(넘치면 옆으로 민다). 체력은 전장 안 이름표에. */
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 6px;
+  height: 40px;
   margin: 0;
-  padding: 0;
+  padding: 0 2px;
   list-style: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
 .ar-seat {
   position: relative;
+  flex: 0 1 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px 6px;
-  padding: 6px 8px;
+  gap: 5px;
+  height: 34px;
+  min-width: 0;
+  padding: 0 8px;
   border-radius: 10px;
   border: 2px solid transparent;
   border-left: 4px solid var(--ar-accent);
-  background: var(--color-bg-elevated, var(--color-bg));
-  font-size: 13px;
+  background: var(--color-bg-surface);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .ar-seat-turn {
@@ -202,19 +215,11 @@ button.ar-badge {
   white-space: nowrap;
 }
 
-.ar-seat-hp {
-  position: relative;
-  flex: 1 1 48px;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(127, 127, 127, 0.25);
+/* 이름은 짧게 자른다 — 전체 이름은 칸의 aria-label·전장 이름표에. */
+.ar-seat-label {
+  max-width: 7em;
   overflow: hidden;
-}
-
-.ar-seat-hp-bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: #5ccf6a;
+  text-overflow: ellipsis;
 }
 
 .ar-seat-ammo {
@@ -288,7 +293,7 @@ html.dark .ar-table {
 }
 
 .ar-seat-kick {
-  min-height: 32px;
+  min-height: 28px;
   padding: 0 8px;
   border-radius: 8px;
   border: 1px solid var(--color-border);
@@ -299,41 +304,48 @@ html.dark .ar-table {
 }
 
 .ar-seat-chat {
-  flex-basis: 100%;
+  /* 칸 아래 말풍선 — 띠 높이를 바꾸지 않게 겹친다. */
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 7;
+  max-width: 220px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  opacity: 0.85;
+  pointer-events: none;
 }
 
 .ar-seat-reaction {
   position: absolute;
-  top: -10px;
-  right: 6px;
+  top: 2px;
+  right: 2px;
+  z-index: 7;
   font-size: 20px;
+  pointer-events: none;
 }
 
 /* ── 전장 ─────────────────────────────────────────────────────────── */
 .ar-stage {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 14px;
-  border: 2px solid var(--color-border);
 }
 
-.ar-stage-myturn {
-  border-color: var(--ar-fire);
-  box-shadow: 0 0 0 3px rgba(232, 97, 60, 0.18);
-}
-
-.ar-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+/* 내 차례 — 전장 테두리 안쪽 빛(레이아웃은 그대로). */
+.ar-stage-myturn .ar-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 3px var(--ar-fire);
+  pointer-events: none;
 }
 
 .ar-wind {
@@ -390,37 +402,176 @@ html.dark .ar-field-clay {
   cursor: crosshair;
 }
 
-/* ── 조작부 ───────────────────────────────────────────────────────── */
-.ar-controls {
-  display: flex;
-  flex-direction: column;
+/* ── 조작부 (D-253) — 왼손 조이스틱 + 오른손 발사 단추 ─────────────────── */
+.ar-pad {
+  --ar-stick: 128px;
+  --ar-fire-size: 104px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
   gap: 8px;
-  padding: 8px;
-  border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated, var(--color-bg));
+  padding: 8px 12px;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.ar-row {
+.ar-pad-left,
+.ar-pad-right {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
 }
 
-.ar-label {
-  font-size: 13px;
-  font-weight: 600;
-  min-width: 28px;
+.ar-pad-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.ar-value {
-  min-width: 40px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.ar-stick {
+  position: relative;
+  width: var(--ar-stick);
+  height: var(--ar-stick);
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background:
+    radial-gradient(circle, rgba(127, 127, 127, 0.08) 0 40%, rgba(127, 127, 127, 0.18) 41% 100%);
+  touch-action: none;
+  cursor: grab;
+}
+
+.ar-stick-active {
+  border-color: var(--ar-fire);
+  cursor: grabbing;
+}
+
+.ar-stick-off {
+  opacity: 0.45;
+}
+
+.ar-stick-arrow {
+  position: absolute;
+  font-size: 11px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.ar-stick-up {
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ar-stick-down {
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ar-stick-left {
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ar-stick-right {
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ar-stick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54%;
+  height: 54%;
+  border-radius: 50%;
+  background: var(--color-bg-surface);
+  border: 2px solid var(--ar-fire);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  font-size: 14px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.ar-fire {
+  position: relative;
+  width: var(--ar-fire-size);
+  height: var(--ar-fire-size);
+  border-radius: 50%;
+  border: none;
+  background: var(--ar-fire);
+  color: #fff;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.ar-fire:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ar-fire-charging {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* 힘 고리 — --ar-power(0~100)만큼 채운다. */
+.ar-fire-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(#ffd23f calc(var(--ar-power) * 1%), rgba(127, 127, 127, 0.25) 0);
+  -webkit-mask: radial-gradient(circle, transparent 61%, #000 62%);
+  mask: radial-gradient(circle, transparent 61%, #000 62%);
+  pointer-events: none;
+}
+
+/* 지난 힘 눈금 */
+.ar-fire-last {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 3px;
+  height: 12px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--color-text-primary);
+  transform-origin: 1.5px calc(var(--ar-fire-size) / 2 + 8px);
+  transform: rotate(calc(var(--ar-last) * 3.6deg));
+  pointer-events: none;
+}
+
+.ar-fire-label {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ar-fire-label small {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.ar-skip {
+  min-height: 44px;
+  font-size: 13px;
 }
 
 .ar-btn {
@@ -450,12 +601,6 @@ html.dark .ar-field-clay {
   border-style: dashed;
 }
 
-.ar-btn-charge {
-  border-color: var(--ar-fire);
-  color: var(--ar-fire);
-  font-weight: 700;
-}
-
 .ar-btn-fire {
   border-color: var(--ar-fire);
   background: var(--ar-fire);
@@ -465,7 +610,7 @@ html.dark .ar-field-clay {
 
 .ar-fuel {
   position: relative;
-  width: 64px;
+  width: 96px;
   height: 8px;
   border-radius: 4px;
   background: rgba(127, 127, 127, 0.25);
@@ -478,48 +623,30 @@ html.dark .ar-field-clay {
   background: #e0a323;
 }
 
-.ar-power {
-  position: relative;
-  flex: 1 1 160px;
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-}
-
-.ar-power input {
-  width: 100%;
-  accent-color: var(--ar-fire);
-}
-
-.ar-power-last {
-  position: absolute;
-  top: 6px;
-  width: 2px;
-  height: 10px;
-  margin-left: -1px;
-  background: var(--ar-fire);
-  pointer-events: none;
-}
-
 .ar-shells {
   display: flex;
   gap: 6px;
 }
 
 .ar-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 44px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--color-border);
-  background: transparent;
+  background: var(--ar-hud-bg);
   color: inherit;
   font-size: 13px;
   cursor: pointer;
 }
 
 .ar-chip-on {
-  border-color: var(--ar-fire);
-  background: rgba(232, 97, 60, 0.14);
+  border: 2px solid var(--ar-fire);
+  background: var(--ar-hud-bg-strong);
   font-weight: 700;
 }
 
@@ -534,7 +661,8 @@ html.dark .ar-field-clay {
 }
 
 .ar-item {
-  font-size: 12px;
+  padding: 0;
+  font-size: 18px;
 }
 
 .ar-seat-kind {
@@ -550,7 +678,7 @@ html.dark .ar-field-clay {
   padding: 12px;
   border-radius: 16px;
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated, var(--color-bg));
+  background: var(--color-bg-surface);
 }
 
 .ar-picker-head {
@@ -657,13 +785,6 @@ html.dark .ar-field-clay {
   font-weight: 600;
 }
 
-.ar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-left: auto;
-}
-
 /* ── 결과 ─────────────────────────────────────────────────────────── */
 .ar-end {
   display: flex;
@@ -672,7 +793,7 @@ html.dark .ar-field-clay {
   padding: 12px;
   border-radius: 16px;
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated, var(--color-bg));
+  background: var(--color-bg-surface);
 }
 
 .ar-end-title {
@@ -738,4 +859,328 @@ html.dark .ar-field-clay {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ══ D-253 — 전장 안 HUD·배치(세로·가로·넓은 화면) ═══════════════════════════════════════
+ * 배치는 JS(`useArtilleryLayout` — matchMedia orientation)가 루트에 `.ar-layout-{landscape|portrait|wide}` 로 단다. 이 파일엔 미디어 쿼리가 없다.
+ * 차례가 바뀌어도 전장이 움직이지 않게: 전장 위·안의 것은 전부 겹치고(HUD·오류·끊김 띠), 전장 밖 흐름엔 고정 높이 좌석 띠·전장·조작부만.
+ */
+.ar-table {
+  --ar-hud-bg: rgba(255, 255, 255, 0.82);
+  --ar-hud-bg-strong: rgba(255, 255, 255, 0.96);
+  --ar-hud-text: #1d2a36;
+}
+
+html.dark .ar-table {
+  --ar-hud-bg: rgba(22, 26, 40, 0.78);
+  --ar-hud-bg-strong: rgba(30, 36, 56, 0.95);
+  --ar-hud-text: #f3f6fb;
+}
+
+.ar-reconnect {
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  right: 10px;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.ar-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  color: var(--ar-hud-text);
+}
+
+.ar-hud > * {
+  pointer-events: auto;
+}
+
+.ar-hud-tl,
+.ar-hud-tr {
+  position: absolute;
+  top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 58%;
+  pointer-events: none;
+}
+
+.ar-hud-tl {
+  left: 6px;
+}
+
+.ar-hud-tr {
+  right: 6px;
+  justify-content: flex-end;
+}
+
+.ar-hud-tr .ar-badge,
+.ar-hud-badge {
+  border-color: transparent;
+  background: var(--ar-hud-bg);
+  color: var(--ar-hud-text);
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.ar-hud .ar-badge-turn {
+  border-color: var(--ar-fire);
+  color: var(--ar-fire);
+}
+
+.ar-hud .ar-countdown-urgent {
+  border-color: #ef5a4c;
+  color: #ef5a4c;
+}
+
+.ar-hud .ar-error {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  background: var(--ar-hud-bg-strong);
+  color: var(--ar-hud-text);
+}
+
+/* 내 탄·아이템 칩 — 전장 아래쪽 가운데(구름 바다 위). */
+.ar-loadout {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-width: calc(100% - 12px);
+}
+
+.ar-loadout .ar-shells,
+.ar-loadout .ar-items {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.ar-loadout .ar-chip {
+  white-space: nowrap;
+  border-color: transparent;
+  color: var(--ar-hud-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ar-loadout .ar-chip-on {
+  border-color: var(--ar-fire);
+}
+
+.ar-loadout .ar-chip:not(.ar-chip-on) .ar-chip-name {
+  display: none;
+}
+
+.ar-chip-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 세로 안내 — 전장 아래, 한 번 닫으면 끝. */
+.ar-rotate-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 4px 4px 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  font-size: 13px;
+}
+
+.ar-rotate-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── 세로: 전장이 화면 폭 전체(조상 여백을 무시하고 끝에서 끝까지) ── */
+.ar-layout-portrait {
+  gap: 6px;
+  padding: 6px 10px 10px;
+}
+
+.ar-layout-portrait .ar-stage {
+  margin-inline: calc(50% - 50vw);
+}
+
+.ar-layout-portrait .ar-field {
+  border-radius: 0;
+}
+
+.ar-layout-portrait .ar-field-clay {
+  margin: 3px 0 6px;
+  width: 100%;
+  border-radius: 0;
+  box-shadow:
+    0 -3px 0 0 #22304a,
+    0 3px 0 0 #22304a;
+}
+
+html.dark .ar-layout-portrait .ar-field-clay {
+  box-shadow:
+    0 -3px 0 0 #8d95d6,
+    0 3px 0 0 #8d95d6;
+}
+
+.ar-layout-portrait .ar-pad {
+  padding: 4px 6px;
+}
+
+/* ── 가로 휴대폰: 게임판이 화면을 덮고 전장은 높이에 꽉, 나머지는 위·양옆에 겹친다 ── */
+.ar-layout-landscape {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  max-width: none;
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: var(--color-bg-base);
+}
+
+.ar-layout-landscape .ar-header {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  z-index: 8;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  pointer-events: none;
+}
+
+.ar-layout-landscape .ar-header > * {
+  pointer-events: auto;
+}
+
+/* 머리말의 글 배지(제목·인원·연결)는 접는다 — 단추만 남긴다. */
+.ar-layout-landscape .ar-header span.ar-badge {
+  display: none;
+}
+
+.ar-layout-landscape .ar-header .ar-badge {
+  border-color: transparent;
+  background: var(--ar-hud-bg);
+  color: var(--ar-hud-text);
+}
+
+.ar-layout-landscape .ar-seats {
+  position: absolute;
+  top: 3px;
+  left: 8px;
+  z-index: 7;
+  max-width: 52%;
+}
+
+.ar-layout-landscape .ar-seat {
+  background: var(--ar-hud-bg);
+  color: var(--ar-hud-text);
+}
+
+.ar-layout-landscape .ar-stage {
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.ar-layout-landscape .ar-field {
+  width: auto;
+  height: min(100%, 56.25vw);
+  max-width: 100%;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+
+.ar-layout-landscape .ar-field-clay {
+  box-shadow:
+    -3px 0 0 0 #22304a,
+    3px 0 0 0 #22304a;
+}
+
+html.dark .ar-layout-landscape .ar-field-clay {
+  box-shadow:
+    -3px 0 0 0 #8d95d6,
+    3px 0 0 0 #8d95d6;
+}
+
+/* 좌석 띠·머리말 줄 아래로 HUD 윗줄을 내린다. */
+.ar-layout-landscape .ar-hud-tl,
+.ar-layout-landscape .ar-hud-tr {
+  top: 46px;
+}
+
+.ar-layout-landscape .ar-pad {
+  --ar-stick: 124px;
+  --ar-fire-size: 96px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 14px 12px;
+  pointer-events: none;
+}
+
+.ar-layout-landscape .ar-pad > * {
+  pointer-events: auto;
+}
+
+.ar-layout-landscape .ar-pad-mid {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--ar-fire-size) + 26px);
+  flex-direction: row;
+}
+
+.ar-layout-landscape .ar-pad-mid .ar-delay-cost,
+.ar-layout-landscape .ar-skip {
+  background: var(--ar-hud-bg);
+  color: var(--ar-hud-text);
+}
+
+.ar-layout-landscape .ar-stick {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.18) 0 40%, rgba(255, 255, 255, 0.34) 41% 100%);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.ar-layout-landscape .ar-fuel {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.ar-layout-landscape .ar-picker,
+.ar-layout-landscape .ar-end {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 9;
+  width: min(600px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.ar-layout-landscape .ar-end {
+  background: var(--color-bg-surface);
 }

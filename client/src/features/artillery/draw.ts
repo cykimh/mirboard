@@ -57,6 +57,11 @@ export interface Scene {
   fx?: { events: readonly FxEvent[]; nowMs: number } | null;
   /** 승리 축포 — 이긴 좌석과 시작부터 지난 시간. */
   celebrate?: { seats: readonly number[]; elapsedMs: number } | null;
+  /**
+   * D-253 — 전장 위 하늘 여백(칸, 세로 화면). 그림만 아래로 밀고 위는 하늘 윗색으로 채운다 — 물리·판정 좌표는 그대로(0 = 전장 윗변),
+   * 여백 안의 씨앗은 그대로 그린다.
+   */
+  headroom?: number;
 }
 
 /**
@@ -110,6 +115,13 @@ export function drawScene(
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+  const head = Math.max(0, s.headroom ?? 0);
+  if (head > 0) {
+    // 하늘 윗색으로 여백을 칠하고 전장을 아래로 — 스킨의 하늘은 0~FIELD_H 그대로(늘리지 않아 해·구름이 찌그러지지 않는다).
+    ctx.fillStyle = s.palette.skyTop;
+    ctx.fillRect(0, 0, W, head + 1);
+    ctx.translate(0, head);
+  }
   skin.drawSky(ctx, s.palette, s.time, s.wind ?? 0);
 
   // 화면 흔들림(D-252) — 하늘·구름 바다는 그대로 두고 전장만 흔든다.
@@ -209,13 +221,14 @@ export function drawScene(
   if (f) {
     for (const trail of f.trails) skin.drawTrail(ctx, trail);
     for (const sh of f.shells) {
-      if (sh.y < 0) {
+      if (sh.y < -head) {
         // 하늘 위로 나간 씨앗 — 위쪽 가장자리에 위치 표시
+        const top = -head;
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(sh.x, 2);
-        ctx.lineTo(sh.x - 4, 9);
-        ctx.lineTo(sh.x + 4, 9);
+        ctx.moveTo(sh.x, top + 2);
+        ctx.lineTo(sh.x - 4, top + 9);
+        ctx.lineTo(sh.x + 4, top + 9);
         ctx.closePath();
         ctx.fill();
       } else {
