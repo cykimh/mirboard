@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="ko" data-mode="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>씨앗포 시안 A — 수채 그림책 정원</title>
+<!-- 생성 파일: docs/design/artillery/src/ 의 shell.html + engine.js + theme-a.js 를 build.mjs 가 합친다. 외부 의존 없음. -->
+<style>
+:root{--bg:#f6efe0;--fg:#3f332d;--muted:#7d6c5e;--card:#fffaf0;--line:#d9cbb4;--accent:#b9573c;--btnfg:#fffaf0;--radius:14px 18px 12px 20px;--font:"Iowan Old Style","Palatino Linotype",Palatino,"Nanum Myeongjo","AppleMyungjo",Georgia,serif;--hfont:var(--font)}
+[data-mode=dark]{--bg:#262338;--fg:#f1e9dc;--muted:#aaa2b8;--card:#312d47;--line:#4a4563;--accent:#eb9a7c;--btnfg:#262338}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--font);overflow-x:hidden}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 64px}
+h1{font:700 26px/1.2 var(--hfont);margin:4px 0 6px;text-wrap:balance}
+h2{font:700 17px/1.3 var(--hfont);margin:34px 0 4px}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0}
+.lede{color:var(--muted);margin:0 0 10px;max-width:62ch}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}
+nav a{color:var(--fg);text-decoration:none;border:1.5px solid var(--line);border-radius:999px;padding:3px 12px;font-size:13px}
+nav a[aria-current]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;background:var(--bg);border-bottom:1.5px solid var(--line)}
+button{font:inherit;min-height:38px;cursor:pointer;border-radius:var(--radius);padding:6px 12px;background:transparent;border:1.5px solid var(--line);color:var(--fg)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.fire{background:var(--accent);color:var(--btnfg);border-color:var(--accent);font-weight:700;padding:6px 20px}
+button.fire:disabled{opacity:.55;cursor:default}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{padding:4px 10px;min-height:34px;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.opt{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.opt input[type=range]{width:96px;accent-color:var(--accent)}
+.opt output{min-width:2.4em;font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%}
+.stage{border-radius:14px;overflow:hidden;border:1.5px solid var(--line);background:var(--card)}
+.field{aspect-ratio:16/9}
+.seats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
+.seat{border-left:4px solid var(--c);border-bottom:2px solid var(--t);background:var(--bg);border-radius:8px;padding:4px 8px;font-size:12.5px;min-width:0;line-height:1.35}
+.seat b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat span{color:var(--muted);white-space:nowrap}
+.seat.turn{outline:2px solid var(--c);outline-offset:-1px}
+.seat.out{opacity:.45}
+.phone{width:min(375px,100%);margin:0 auto;border-radius:24px}
+.phone .seats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ctl{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;padding:0 8px 10px;font-size:12.5px}
+.ctl i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden;font-style:normal}
+.ctl i u{display:block;height:100%;background:var(--accent)}
+.sheet{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:6px;align-items:center}
+.sheet .hd{font-size:12px;color:var(--muted);text-align:center}
+.sheet .rh{font-size:12px;font-weight:700;max-width:3.4em;line-height:1.25}
+figure{margin:0;min-width:0}
+figcaption{font-size:11.5px;color:var(--muted);text-align:center;margin-top:2px}
+figure canvas{border-radius:8px;border:1px solid var(--line)}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.strip .wide{grid-column:span 2}
+.notes{padding-left:18px;margin:0}
+.notes li{margin:2px 0}
+.sw{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.sw span{font-size:11.5px;padding:18px 8px 4px;border-radius:8px;border:1px solid var(--line);min-width:72px;font-variant-numeric:tabular-nums}
+@media(max-width:520px){h1{font-size:21px}.bar{gap:6px;position:static}.opt input[type=range]{width:72px}}
+</style>
+</head>
+<body>
+<main>
+<p class="eyebrow">씨앗포 디자인 시안 A · D-185 D1</p>
+<h1>시안 A — 수채 그림책 정원</h1>
+<p class="lede">따뜻한 종이 위에 번진 물감과 세피아 잉크 선. 칠이 선에서 살짝 어긋나고, 흙 가장자리에 물감이 고인다. 폭발은 물감 얼룩과 꽃잎, 바람은 깃발 리본과 민들레 홀씨 — 조용하고 다정한 분위기.</p>
+<nav aria-label="시안">
+<a href="option-a.html" aria-current="page">A 수채 그림책</a><a href="option-b.html" >B 말랑 클레이</a><a href="option-c.html" >C 해 질 녘 실루엣</a>
+</nav>
+<div class="bar">
+<button class="fire" data-fire>발사</button>
+<div class="seg" id="shells" role="group" aria-label="씨앗탄"></div>
+<label class="opt">바람 <input id="wind" type="range" min="-10" max="10" value="4"><output id="windOut">+4</output></label>
+<button id="mode" aria-pressed="false">밤(다크)</button>
+<label class="opt"><input id="rm" type="checkbox"> 연출 줄이기</label>
+<button id="reset">처음으로</button>
+</div>
+
+<h2>4인 판 한 장면 — 데스크톱</h2>
+<p class="sub">2:2 팀전(좌석 홀짝), 내 차례. [발사] = 조준 → 반동 → 비행 → 착탄 → 피격(체력 0 이면 쓰러짐). 물리는 흉내만 낸다.</p>
+<div class="stage"><canvas id="cvD" class="field"></canvas><div class="seats" data-seats></div></div>
+
+<h2>휴대폰 375px</h2>
+<p class="sub">전장 폭 약 340px — 포대·이름표는 앱의 작은 화면 보정(<code>uiBoost</code>)과 같은 배율로 키웠다.</p>
+<div class="stage phone"><canvas id="cvM" class="field"></canvas><div class="seats" data-seats></div>
+<div class="ctl"><span>각도<i><u style="width:32%"></u></i></span><span>힘<i><u style="width:67%"></u></i></span><button class="fire" data-fire>발사</button></div></div>
+
+<h2>캐릭터 시트 — 포대 3종 × 상태 5가지</h2>
+<p class="sub">D-227 시트의 <code>unit.{종류}.{상태}</code> 15칸에 그대로 대응한다. 반동·피격·쓰러짐은 되풀이 재생.</p>
+<div class="sheet" id="sheet"></div>
+
+<h2>씨앗탄 5종 · 폭발 · 둔덕 · 궤적 · 체력바 · 바람</h2>
+<div class="strip" id="strip"></div>
+
+<h2>팔레트</h2>
+<div class="sw" id="sw"></div>
+
+<h2>움직임 연출</h2>
+<ul class="notes" id="notes"></ul>
+</main>
+<script>
+// @name 시안 A — 수채 그림책 정원
+// @lede 따뜻한 종이 위에 번진 물감과 세피아 잉크 선. 칠이 선에서 살짝 어긋나고, 흙 가장자리에 물감이 고인다. 폭발은 물감 얼룩과 꽃잎, 바람은 깃발 리본과 민들레 홀씨 — 조용하고 다정한 분위기.
+
+(function () {
+  'use strict';
+  const SERIF = '"Iowan Old Style","Palatino Linotype",Palatino,"Nanum Myeongjo","AppleMyungjo",Georgia,serif';
+  const HP = ['#7fb46a', '#e2b458', '#d9705e'];
+  const P = () => THEME.pal[E.S.mode];
+  const al = (ctx, a, fn) => { ctx.save(); ctx.globalAlpha *= a; fn(); ctx.restore(); };
+  const line = (ctx, x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+  /** 수채 칠 — 칠은 선에서 살짝 어긋나게, 그 위에 잉크 선. */
+  function wash(ctx, path, fill, a) {
+    ctx.save(); ctx.translate(0.35, 0.25); ctx.globalAlpha *= a === undefined ? 0.82 : a; ctx.fillStyle = fill; path(); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = P().ink; ctx.lineWidth = 0.45; ctx.lineJoin = ctx.lineCap = 'round'; path(); ctx.stroke();
+  }
+  function leaf(ctx, ang, len, wid, fill) {
+    ctx.save(); ctx.rotate(ang);
+    wash(ctx, () => { ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(len * 0.45, -wid, len, 0); ctx.quadraticCurveTo(len * 0.45, wid, 0, 0); }, fill, 0.85);
+    ctx.lineWidth = 0.3; line(ctx, 0.5, 0, len * 0.8, 0);
+    ctx.restore();
+  }
+  function blob(ctx, x, y, rx, ry, c) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${c[3]})`); g.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+    ctx.fillStyle = g; ctx.fillRect(-rx, -rx, rx * 2, rx * 2); ctx.restore();
+  }
+  let grain = null;
+  function grainPattern(ctx) {
+    if (!grain) {
+      grain = document.createElement('canvas'); grain.width = grain.height = 64;
+      const g = grain.getContext('2d'), img = g.createImageData(64, 64);
+      for (let i = 0; i < 4096; i++) { const v = E.h(i, 91); img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v > 0.5 ? 255 : 60; img.data[i * 4 + 3] = Math.abs(v - 0.5) * 16; }
+      g.putImageData(img, 0, 0);
+    }
+    return ctx.createPattern(grain, 'repeat');
+  }
+  function muzzle(ctx, kind, color, x) {
+    if (kind === 'ACORN') {
+      wash(ctx, () => { ctx.beginPath(); ctx.ellipse(x + 0.9, 0, 2.3, 1.9, 0, 0, 7); }, '#d9a868');
+      wash(ctx, () => { ctx.beginPath(); ctx.arc(x - 0.1, 0, 2.3, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); }, '#8a5a36', 0.9);
+    } else if (kind === 'DANDELION') {
+      ctx.strokeStyle = P().ink; ctx.lineWidth = 0.3;
+      al(ctx, 0.6, () => { for (let i = 0; i < 10; i++) line(ctx, x + 0.6, 0, x + 0.6 + Math.cos(i * 0.63) * 3.3, Math.sin(i * 0.63) * 3.3); });
+      wash(ctx, () => { ctx.beginPath(); ctx.arc(x + 0.6, 0, 2.4, 0, 7); }, '#fffdf6', 0.85);
+      ctx.fillStyle = color; E.disc(ctx, x + 0.6, 0, 0.8);
+    } else {
+      ctx.save(); ctx.translate(x - 1.6, 0); leaf(ctx, -2.3, 2.3, 0.8, '#7fb46a'); leaf(ctx, 2.3, 2.3, 0.8, '#7fb46a'); ctx.restore();
+      wash(ctx, () => { ctx.beginPath(); ctx.moveTo(x - 1.8, 0); ctx.quadraticCurveTo(x - 0.4, -2.5, x + 2.7, 0); ctx.quadraticCurveTo(x - 0.4, 2.5, x - 1.8, 0); }, color, 0.8);
+    }
+  }
+  function face(ctx, U) {
+    const e = U.o.eyes, ink = P().ink, fx = e === 'focus' ? 0.5 : 0;
+    ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = 0.4; ctx.lineCap = 'round';
+    for (const sx of [-1.7, 1.9]) {
+      const x = sx + fx, y = -3.4;
+      if (e === 'open' || e === 'focus') E.disc(ctx, x, y, e === 'focus' ? 0.64 : 0.55);
+      else if (e === 'shut') { ctx.beginPath(); ctx.arc(x, y + 0.2, 0.6, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
+      else { line(ctx, x - 0.5, y - 0.5, x + 0.5, y + 0.5); line(ctx, x + 0.5, y - 0.5, x - 0.5, y + 0.5); }
+    }
+    ctx.fillStyle = 'rgba(232,120,120,.38)';
+    for (const sx of [-3.2, 3.4]) { ctx.beginPath(); ctx.ellipse(sx, -2.3, 0.9, 0.55, 0, 0, 7); ctx.fill(); }
+    ctx.beginPath();
+    if (U.pose === 'hit' || U.pose === 'down') ctx.arc(0.1 + fx, -1.9, 0.45, 0, 7); else ctx.arc(0.1 + fx, -2.5, 0.7, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+  }
+
+  window.THEME = {
+    id: 'a', lift: 16, smooth: true, shake: 2.2,
+    pal: {
+      light: { skyTop: '#b9dcec', skyBot: '#fbf2dc', cloud: '#fffdf6', cloudEdge: '#bcd0d8', label: '#3f332d', ink: '#4a3b34', paper: '#fbf2dc', sun: '#f7d98a', far: '#9fb9c9', stem: '#6fa85e', wash1: [244, 170, 160, 0.22], wash2: [250, 220, 140, 0.26], grass: [143, 191, 122], grassD: [104, 158, 104], soil: [219, 166, 128], soilD: [176, 121, 92] },
+      dark: { skyTop: '#27305a', skyBot: '#7a6690', cloud: '#e4def0', cloudEdge: '#8f88ad', label: '#f6eee0', ink: '#2a2233', paper: '#3a3555', sun: '#f3ecd0', far: '#5a5a8c', stem: '#5d9470', wash1: [150, 120, 200, 0.25], wash2: [240, 160, 150, 0.18], grass: [102, 150, 120], grassD: [70, 112, 100], soil: [168, 124, 118], soilD: [118, 84, 92] },
+    },
+    swatch: [['skyTop', '하늘'], ['skyBot', '종이'], ['grass', '풀'], ['grassD', '풀 그늘'], ['soil', '겉흙'], ['soilD', '속흙'], ['ink', '잉크 선'], ['cloud', '구름'], ['label', '글자']],
+    notes: [
+      '<b>대기</b> — 잎이 천천히 흔들리고 가끔 눈을 깜빡인다(1.04초 주기, 좌석마다 어긋남).',
+      '<b>조준</b> — 눈동자가 포신 쪽으로 쏠리고 포신이 ±1.4° 떨린다. 차례 주인 뒤에 노란 물감 번짐.',
+      '<b>발사 반동</b>(200ms) — 포신이 2칸 물러났다 돌아오고 화분이 살짝 눌린다. 포구에서 종이빛 연기 5개 + 좌석 색 꽃잎.',
+      '<b>탄 궤적</b> — 잉크 점선(오래된 점일수록 흐림) + 옅은 종이빛 붓 자국. 씨앗은 돌면서 난다.',
+      '<b>착탄</b>(0.6초) — 물감 얼룩 10개가 번지고 잉크 고리가 퍼진다. 흙 물방울이 튀고 꽃잎이 바람을 타고 떨어진다. 화면 흔들림은 약하게(2칸).',
+      '<b>둔덕</b> — 초록 얼룩이 번지고 꼭대기에 잎 두 장이 돋는다.',
+      '<b>피격</b>(400ms) — 화분이 종이빛으로 두 번 번쩍, 좌우로 떨고, 머리 위 잉크 놀람 표시. 피해 숫자는 물감 얼룩 위에서 떠오른다.',
+      '<b>쓰러짐</b>(0.7초) — 잎이 시들어 누렇게 처지고 줄기가 고개를 숙인다. 화분이 앞으로 기운 뒤 흐려진다.',
+      '<b>바람</b> — 위쪽 깃대의 리본 길이·방향·펄럭임 + 숫자. 하늘에 민들레 홀씨가 바람 세기만큼 흘러간다.',
+      '<b>연출 줄이기</b> — 흔들림·입자·깜빡임·대기 움직임 끔, 번쩍임은 한 번의 옅은 덧칠로.',
+    ],
+    soil(x, y, d, e, under, p) {
+      const n = E.vn(x, y, 22) * 0.6 + E.vn(x + 40, y + 11, 7) * 0.4;
+      const gT = 3 + Math.round(E.vn(x, 7, 9) * 3);
+      const c = d <= gT ? E.mix(p.grass, p.grassD, (d - 1) / gT) : E.mix(p.soil, p.soilD, Math.min(1, (d - gT) / 40) * 0.7 + n * 0.3);
+      let k = (n - 0.5) * 26;
+      if (e === 1) k -= 38; else if (e === 2) k -= 14;
+      if (E.h(x, y) > 0.93) k += 14;
+      return [c[0] + k, c[1] + k, c[2] + k];
+    },
+    above(x, y, dist, p) {
+      const v = E.h(x, 3);
+      return dist === 1 && v > 0.62 ? [p.grassD[0], p.grassD[1], p.grassD[2], 210] : dist === 2 && v > 0.9 ? [p.grassD[0], p.grassD[1], p.grassD[2], 150] : null;
+    },
+    sky(ctx, p, t, w) {
+      const g = ctx.createLinearGradient(0, 0, 0, 360);
+      g.addColorStop(0, p.skyTop); g.addColorStop(0.75, p.skyBot);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 360);
+      blob(ctx, 150 + Math.sin(t / 9000) * 12, 95, 170, 80, p.wash1); blob(ctx, 470, 70, 200, 90, p.wash2); blob(ctx, 330, 255, 260, 70, p.wash1);
+      ctx.fillStyle = p.sun; al(ctx, 0.5, () => E.disc(ctx, 528, 64, 24)); al(ctx, 0.22, () => E.disc(ctx, 528, 64, 33));
+      ctx.fillStyle = p.far;
+      for (const [x, y, rw] of [[70, 120, 46], [300, 84, 30], [606, 150, 52]]) {
+        const dx = Math.sin(t / 7000 + x) * 3;
+        al(ctx, 0.45, () => { ctx.beginPath(); ctx.moveTo(x - rw + dx, y); ctx.quadraticCurveTo(x + dx, y - rw * 0.25, x + rw + dx, y); ctx.quadraticCurveTo(x + dx, y + rw * 0.9, x - rw + dx, y); ctx.fill(); });
+      }
+      ctx.fillStyle = p.cloud;
+      for (let i = 0; i < 5; i++) {
+        const x = (((i * 151 + 40 + t * 0.004 * (1 + w * 0.25)) % 760) + 760) % 760 - 60, y = 36 + ((i * 27) % 110);
+        al(ctx, 0.6, () => { E.disc(ctx, x, y, 11); E.disc(ctx, x + 12, y + 2, 9); E.disc(ctx, x - 11, y + 3, 8); });
+      }
+      ctx.strokeStyle = p.label; ctx.lineWidth = 0.3;
+      al(ctx, 0.45, () => {
+        for (let i = 0; i < 8; i++) {
+          const x = (((i * 83 + t * 0.012 * w) % 660) + 660) % 660 - 10, y = 50 + ((i * 47) % 150) + Math.sin(t / 800 + i * 2) * 5;
+          ctx.beginPath(); ctx.moveTo(x, y + 2.4); ctx.lineTo(x, y);
+          for (let k = -2; k <= 2; k++) { ctx.moveTo(x, y); ctx.lineTo(x + k * 0.9, y - 1.7 + Math.abs(k) * 0.3); }
+          ctx.stroke();
+        }
+      });
+      ctx.fillStyle = grainPattern(ctx); ctx.fillRect(0, 0, 640, 360);
+    },
+    clouds(ctx, level, p, t) {
+      const path = (dy, ph, sp) => { ctx.beginPath(); ctx.moveTo(0, 362); for (let x = 0; x <= 640; x += 4) ctx.lineTo(x, level + dy - Math.abs(Math.sin(x / 17 + ph + t / sp / 6)) * 5 - Math.sin(x / 53 + t / sp) * 2); ctx.lineTo(640, 362); ctx.closePath(); };
+      ctx.fillStyle = p.cloudEdge; al(ctx, 0.55, () => { path(-7, 0, 1400); ctx.fill(); });
+      ctx.fillStyle = p.cloud; al(ctx, 0.95, () => { path(-3, 2, 900); ctx.fill(); });
+      ctx.strokeStyle = p.ink; ctx.lineWidth = 0.5; al(ctx, 0.3, () => { path(-3, 2, 900); ctx.stroke(); });
+    },
+    under(ctx, U, isTurn) {
+      if (isTurn) blob(ctx, 0, -6, 17, 15, [250, 214, 120, 0.6]);
+    },
+    barrel(ctx, U) {
+      const p = P();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = p.ink; ctx.lineWidth = 2.6; line(ctx, 0, 0, 9.2, 0);
+      ctx.strokeStyle = p.stem; ctx.lineWidth = 1.8; line(ctx, 0, 0, 9.2, 0);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 0.5; line(ctx, 1, -0.45, 8, -0.45);
+      muzzle(ctx, U.kind, U.color, 10);
+    },
+    body(ctx, U) {
+      const o = U.o, p = P(), w = o.wilt;
+      const green = E.css(E.mix([127, 180, 106], [186, 160, 94], w));
+      const pot = () => { ctx.beginPath(); ctx.moveTo(-3.9, 0); ctx.quadraticCurveTo(0, 0.5, 3.9, 0); ctx.lineTo(5.2, -6); ctx.lineTo(-5.2, -6); ctx.closePath(); };
+      const rim = () => E.rr(ctx, -6, -7.7, 12, 2, 0.9);
+      ctx.save();
+      ctx.rotate(w * 0.3);
+      ctx.scale(1 + o.sq * 0.08, 1 - o.sq * 0.1);
+      ctx.save();
+      ctx.translate(0, -7.2 - o.bob * 0.35 * (1 - w)); ctx.rotate(o.sway * 0.05);
+      const R = -0.7 + 1.3 * w, L = -Math.PI + 0.7 - 1.3 * w;
+      if (U.kind === 'ACORN') { leaf(ctx, L + 0.2, 6.6, 3.4, green); leaf(ctx, R - 0.2, 4, 1.8, green); }
+      else if (U.kind === 'DANDELION') { leaf(ctx, L + 0.3, 7, 1.1, green); leaf(ctx, L - 0.35, 5, 1, green); leaf(ctx, R + 0.3, 7, 1.1, green); }
+      else { leaf(ctx, L, 6, 2.2, green); leaf(ctx, R, 6, 2.2, green); }
+      ctx.restore();
+      if (U.pose === 'down') {
+        const ex = 4 + 3 * w, ey = -15 + 7 * w;
+        ctx.strokeStyle = p.ink; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+        const stem = () => { ctx.beginPath(); ctx.moveTo(0, -7); ctx.quadraticCurveTo(1.5, -13, ex, ey); ctx.stroke(); };
+        stem(); ctx.strokeStyle = green; ctx.lineWidth = 1.4; stem();
+        ctx.save(); ctx.translate(ex, ey); ctx.rotate(0.9 * w); ctx.scale(0.8, 0.8); muzzle(ctx, U.kind, U.color, 1.5); ctx.restore();
+      }
+      ctx.fillStyle = '#fff8ea'; pot(); ctx.fill();
+      wash(ctx, pot, U.color, 0.72);
+      ctx.fillStyle = p.ink; al(ctx, 0.14, () => { ctx.beginPath(); ctx.moveTo(1.5, 0.2); ctx.lineTo(3.9, 0); ctx.lineTo(5.2, -6); ctx.lineTo(3, -6); ctx.closePath(); ctx.fill(); });
+      ctx.fillStyle = '#fff8ea'; rim(); ctx.fill();
+      wash(ctx, rim, U.color, 0.86);
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 0.45; line(ctx, -4.6, -7, -1.5, -7);
+      face(ctx, U);
+      if (o.flash) {
+        ctx.fillStyle = '#fffaf0'; al(ctx, o.flash * 0.75, () => { pot(); ctx.fill(); rim(); ctx.fill(); });
+        ctx.strokeStyle = '#c4523c'; ctx.lineWidth = 0.5;
+        for (const a of [-2.2, -1.57, -0.94]) line(ctx, Math.cos(a) * 9, -4 + Math.sin(a) * 9, Math.cos(a) * 12, -4 + Math.sin(a) * 12);
+      }
+      ctx.restore();
+    },
+    turn(ctx, U) {
+      const y = U.top - 1 + Math.sin(U.time / 260) * 1;
+      wash(ctx, () => { ctx.beginPath(); ctx.moveTo(0, y + 3.6); ctx.quadraticCurveTo(-3.4, y + 0.4, -2.4, y - 1); ctx.quadraticCurveTo(0, y - 2, 2.4, y - 1); ctx.quadraticCurveTo(3.4, y + 0.4, 0, y + 3.6); }, U.color, 0.85);
+    },
+    trail(ctx, pts, p) {
+      const n = pts.length / 2;
+      if (n < 2) return;
+      ctx.save(); ctx.lineCap = ctx.lineJoin = 'round';
+      ctx.strokeStyle = p.paper; ctx.globalAlpha = 0.4; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 1; i < n; i++) ctx.lineTo(pts[i * 2], pts[i * 2 + 1]); ctx.stroke();
+      ctx.fillStyle = p.label;
+      for (let i = 0; i < n; i++) { ctx.globalAlpha = 0.14 + 0.5 * (i / n); E.disc(ctx, pts[i * 2], pts[i * 2 + 1], 0.45 + 0.3 * (i / n)); }
+      ctx.restore();
+    },
+    seed(ctx, x, y, shell, rot, p) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+      if (shell === 'PUMPKIN') {
+        wash(ctx, () => { ctx.beginPath(); ctx.ellipse(0, 0, 3.3, 2.7, 0, 0, 7); }, '#ee9a4a');
+        ctx.lineWidth = 0.3; ctx.beginPath(); ctx.ellipse(0, 0, 1.3, 2.6, 0, 0, 7); ctx.stroke();
+        ctx.fillStyle = '#6f9a4e'; ctx.fillRect(-0.5, -3.7, 1, 1.4);
+      } else if (shell === 'VINE') {
+        wash(ctx, () => { ctx.beginPath(); ctx.arc(0, 0, 2.3, 0, 7); }, '#5f9e58');
+        ctx.strokeStyle = '#3d7a44'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.arc(2.2, -2, 1.5, Math.PI * 0.6, Math.PI * 2.1); ctx.stroke();
+      } else if (shell === 'CHESTNUT') {
+        ctx.strokeStyle = p.ink; ctx.lineWidth = 0.4;
+        for (let i = 0; i < 9; i++) line(ctx, Math.cos(i * 0.7) * 3, Math.sin(i * 0.7) * 3, Math.cos(i * 0.7) * 4.4, Math.sin(i * 0.7) * 4.4);
+        wash(ctx, () => { ctx.beginPath(); ctx.arc(0, 0, 3.3, 0, 7); }, '#8a5636', 0.9);
+        ctx.fillStyle = '#e2c49a'; ctx.beginPath(); ctx.ellipse(0, 1.9, 2.2, 0.9, 0, 0, 7); ctx.fill();
+      } else if (shell === 'SPORE') {
+        ctx.strokeStyle = p.label; ctx.lineWidth = 0.3;
+        for (let i = 0; i < 8; i++) line(ctx, 0, 0, Math.cos(i * 0.785) * 2.8, Math.sin(i * 0.785) * 2.8);
+        wash(ctx, () => { ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, 7); }, '#fffdf6', 0.9);
+        ctx.fillStyle = '#8a6a3a'; E.disc(ctx, 0, 0, 0.6);
+      } else {
+        wash(ctx, () => { ctx.beginPath(); ctx.ellipse(0, 0, 2.6, 2.1, 0, 0, 7); }, '#a9c46a');
+        ctx.fillStyle = 'rgba(255,255,255,.6)'; E.disc(ctx, -0.8, -0.7, 0.7);
+      }
+      ctx.restore();
+    },
+    boom(ctx, e, p) {
+      const k = E.ease(e.t), a = Math.max(0, 1 - e.t);
+      const cols = e.fill ? ['#9ccf85', '#6fae6a', '#cfe6a8'] : ['#f0c070', '#e58a6a', '#f7e3a6'];
+      ctx.save(); ctx.translate(e.x, e.y);
+      for (let i = 0; i < 10; i++) {
+        const an = i * 2.39 + E.h(i, 7) * 1.2, dist = e.r * (0.15 + 0.6 * E.h(i, 3)) * k, rad = e.r * (0.28 + 0.3 * E.h(i, 5)) * (0.5 + 0.5 * k);
+        ctx.globalAlpha = a * 0.5; ctx.fillStyle = cols[i % 3];
+        E.disc(ctx, Math.cos(an) * dist, Math.sin(an) * dist * (e.fill ? 0.7 : 1), rad);
+      }
+      ctx.globalAlpha = a * 0.55; ctx.strokeStyle = p.ink; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(0, 0, e.r * (0.35 + 0.7 * k), 0, 7); ctx.stroke();
+      ctx.fillStyle = p.ink;
+      for (let i = 0; i < 12; i++) { const an = i * 0.52 + 0.3, d = e.r * (0.9 + 0.5 * E.h(i, 11)) * k; ctx.globalAlpha = a * 0.6; E.disc(ctx, Math.cos(an) * d, Math.sin(an) * d, 0.35 + 0.5 * E.h(i, 2)); }
+      if (e.fill) {
+        ctx.globalAlpha = Math.min(1, a * 2); ctx.translate(0, -e.r * 0.6 * k);
+        leaf(ctx, -Math.PI / 2 - 0.6, e.r * 0.5 * k, e.r * 0.18, '#7fb46a'); leaf(ctx, -Math.PI / 2 + 0.6, e.r * 0.5 * k, e.r * 0.18, '#7fb46a');
+      }
+      ctx.restore();
+    },
+    particle(ctx, q, k, p) {
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+      ctx.globalAlpha = Math.min(1, k * 1.6) * (q.kind === 'puff' ? 0.55 : 0.85); ctx.fillStyle = q.color;
+      if (q.kind === 'petal') { ctx.beginPath(); ctx.ellipse(0, 0, q.size, q.size * 0.5, 0, 0, 7); ctx.fill(); }
+      else if (q.kind === 'puff') E.disc(ctx, 0, 0, q.size * (1.6 - k));
+      else { E.disc(ctx, 0, 0, q.size); ctx.globalAlpha *= 0.6; ctx.strokeStyle = p.ink; ctx.lineWidth = 0.25; ctx.stroke(); }
+      ctx.restore();
+    },
+    fx: {
+      muzzle(x, y, ang, color) {
+        const r = (ang * Math.PI) / 180, c = Math.cos(r), s = -Math.sin(r);
+        for (let i = 0; i < 5; i++) E.emit('puff', x + c * i, y + s * i, { vx: c * (0.5 + i * 0.25), vy: s * (0.5 + i * 0.25) - 0.1, life: 20 + i * 3, size: 1.2 + i * 0.3, color: '#fffaf0', drag: 0.92 });
+        for (let i = 0; i < 4; i++) E.emit('petal', x, y, { vx: c * 1.5 + Math.random() - 0.5, vy: s * 1.5 + Math.random() - 0.5, g: 0.02, life: 50, size: 1.3, color, vr: 0.2, drag: 0.96, w: 1 });
+      },
+      impact(x, y, r, fill) {
+        const n = Math.round(r * 1.2);
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI * (0.1 + 0.8 * Math.random()), v = 0.8 + Math.random() * 2.2;
+          E.emit('drop', x + (Math.random() - 0.5) * r, y, { vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 0.07, life: 40 + Math.random() * 30, size: 0.6 + Math.random() * 1.1, color: fill ? '#7fb46a' : i % 3 ? '#c98f6c' : '#8fbf7a' });
+        }
+        for (let i = 0; i < 10; i++) E.emit('petal', x, y - 2, { vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 2, g: 0.015, life: 90, size: 1.4, color: i % 2 ? '#f6c1c1' : '#fffaf0', vr: (Math.random() - 0.5) * 0.4, drag: 0.95, w: 1 });
+      },
+      split(x, y) { for (let i = 0; i < 6; i++) E.emit('puff', x, y, { vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5, life: 22, size: 1, color: '#fffaf0', drag: 0.9 }); },
+    },
+    label(ctx, l, p) {
+      const fs = l.fs, top = l.footY - THEME.lift * l.unitScale - fs * 0.6, bw = fs * 2.6, by = top + fs * 0.6;
+      ctx.font = `600 ${fs}px ${SERIF}`;
+      ctx.lineJoin = 'round'; ctx.strokeStyle = p.paper; ctx.lineWidth = fs * 0.3;
+      al(ctx, 0.85, () => ctx.strokeText(l.text, l.x, top));
+      ctx.fillStyle = p.label; ctx.fillText(l.text, l.x, top);
+      const ratio = Math.max(0, Math.min(1, l.hp / l.maxHp));
+      ctx.lineCap = 'round'; ctx.lineWidth = fs * 0.36;
+      ctx.strokeStyle = p.paper; line(ctx, l.x - bw / 2, by, l.x + bw / 2, by);
+      ctx.strokeStyle = p.label; al(ctx, 0.25, () => line(ctx, l.x - bw / 2, by, l.x + bw / 2, by));
+      if (ratio > 0) { ctx.strokeStyle = E.hpColor(ratio, HP); line(ctx, l.x - bw / 2, by, l.x - bw / 2 + bw * ratio, by); }
+      ctx.fillStyle = l.color; E.disc(ctx, l.x - bw / 2 - fs * 0.5, by, fs * 0.2);
+    },
+    dmg(ctx, x, y, amt, t, fs, p) {
+      ctx.save();
+      ctx.globalAlpha = t < 0.7 ? 1 : Math.max(0, 1 - (t - 0.7) / 0.3);
+      const yy = y - E.ease(t) * 8;
+      ctx.font = `700 ${fs}px ${SERIF}`; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(229,138,106,.4)'; E.disc(ctx, x, yy - fs * 0.32, fs * 0.85);
+      ctx.lineWidth = fs * 0.25; ctx.strokeStyle = p.paper; ctx.lineJoin = 'round'; ctx.strokeText('−' + amt, x, yy);
+      ctx.fillStyle = E.S.mode === 'dark' ? '#ffb39c' : '#b3402b'; ctx.fillText('−' + amt, x, yy);
+      ctx.restore();
+    },
+    wind(ctx, w, p, t) {
+      const dir = Math.sign(w), len = Math.abs(w) * 4.2;
+      ctx.save(); ctx.lineCap = ctx.lineJoin = 'round';
+      ctx.strokeStyle = p.label; ctx.fillStyle = p.label; ctx.lineWidth = 0.7;
+      line(ctx, 0, 1, 0, 14); E.disc(ctx, 0, 1, 0.9);
+      if (w) {
+        const yAt = (i) => 3 + Math.sin(i / 5 - t / 220) * 1.3 * (i / len);
+        const path = () => {
+          ctx.beginPath(); ctx.moveTo(0, 3);
+          for (let i = 0; i <= len; i += 2) ctx.lineTo(dir * i, yAt(i));
+          ctx.lineTo(dir * (len - 3), yAt(len) + 1.7);
+          for (let i = len; i >= 0; i -= 2) ctx.lineTo(dir * i, yAt(i) + 3.4);
+          ctx.closePath();
+        };
+        ctx.fillStyle = '#e58a6a'; al(ctx, 0.9, () => { path(); ctx.fill(); });
+        ctx.lineWidth = 0.4; path(); ctx.stroke();
+      }
+      ctx.fillStyle = p.label; ctx.font = `700 7px ${SERIF}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.lineWidth = 2; ctx.strokeStyle = p.paper; al(ctx, 0.8, () => ctx.strokeText(String(Math.abs(w)), -(dir || 1) * 7, 12));
+      ctx.fillText(String(Math.abs(w)), -(dir || 1) * 7, 12);
+      ctx.restore();
+    },
+  };
+})();
+
+</script>
+<script>
+// 씨앗포 시안 공통 엔진 — 장면·흉내 물리·연출 타임라인. 그림은 전부 THEME(시안별 파일)이 그린다.
+// 앱의 스킨 계약(ArtillerySkin, D-227)과 같은 모양으로 나눴다: 하늘·흙·포대 몸·포신·씨앗·폭발·이름표.
+// 좌표는 전장 칸(640×360), 포대 기준점은 발(화분 바닥 가운데), 몸은 오른쪽을 보고 그린 뒤 뒤집는다.
+(function () {
+  'use strict';
+  const T = window.THEME;
+  const W = 640, H = 360, TICK = 1000 / 60, G = 0.046875;
+  const SEATC = ['#e8613c', '#3f7fd9', '#9a5bd0', '#e0a323'];
+  const TEAMC = ['#e0803a', '#3a86d6'];
+  const SHELL = {
+    PEA: { n: '콩알', r: 14, R: 18, dmg: 30, ang: 58 },
+    PUMPKIN: { n: '호박탄', r: 24, R: 30, dmg: 45, ang: 50 },
+    VINE: { n: '덩굴탄', r: 16, R: 18, dmg: 15, ang: 66, fill: true },
+    CHESTNUT: { n: '알밤탄', r: 34, R: 30, dmg: 25, ang: 62 },
+    SPORE: { n: '홀씨탄', r: 10, R: 14, dmg: 16, ang: 70, split: true },
+  };
+  const KIND = { SPROUT: { n: '새싹포', hp: 100 }, ACORN: { n: '도토리포', hp: 120 }, DANDELION: { n: '민들레포', hp: 85 } };
+  const POSES = [['idle', '대기'], ['aim', '조준'], ['recoil', '반동'], ['hit', '피격'], ['down', '쓰러짐']];
+  const $ = (s) => document.querySelector(s);
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const S = { mode: 'light', rm: mq.matches, shell: 'PEA', wind: 4 };
+
+  // ── 도우미(시안 파일이 E.* 로 쓴다) ─────────────────────────────────
+  function h(x, y) {
+    let n = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+  function vn(x, y, s) {
+    const gx = Math.floor(x / s), gy = Math.floor(y / s);
+    let fx = x / s - gx, fy = y / s - gy;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    const a = h(gx, gy), b = h(gx + 1, gy), c = h(gx, gy + 1), d = h(gx + 1, gy + 1);
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  }
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const ease = (t) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+  const back = (t) => { t = Math.max(0, Math.min(1, t)); const c = 2.2; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+  function rr(ctx, x, y, w, hh, r) {
+    r = Math.min(r, w / 2, hh / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + hh - r); ctx.quadraticCurveTo(x + w, y + hh, x + w - r, y + hh);
+    ctx.lineTo(x + r, y + hh); ctx.quadraticCurveTo(x, y + hh, x, y + hh - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  const disc = (ctx, x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  const parts = [];
+  function emit(kind, x, y, o) {
+    if (S.rm || parts.length > 420) return;
+    parts.push(Object.assign({ kind, x, y, vx: 0, vy: 0, g: 0, life: 30, max: (o && o.life) || 30, size: 1, rot: 0, vr: 0, color: '#fff', drag: 1, w: 0 }, o));
+  }
+  const hpColor = (ratio, cols) => (ratio > 0.5 ? cols[0] : ratio > 0.25 ? cols[1] : cols[2]);
+  const css = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a === undefined ? 1 : a})`;
+  const E = (window.E = { W, H, h, vn, mix, css, ease, back, rr, disc, emit, hpColor, S, SEATC });
+
+  // ── 지형 ────────────────────────────────────────────────────────────
+  let mask, terr;
+  function genMask() {
+    mask = new Uint8Array(W * H);
+    for (const [cx, hw, top, dep] of [[150, 125, 212, 70], [486, 132, 198, 76], [318, 36, 150, 30]]) {
+      for (let x = cx - hw; x <= cx + hw; x++) {
+        if (x < 0 || x >= W) continue;
+        const u = (x - cx) / hw;
+        const t = Math.round(top - 18 * (1 - u * u) + (vn(x, cx, 28) - 0.5) * 14 + (vn(x, cx + 9, 9) - 0.5) * 5);
+        const b = Math.round(top + dep * (1 - u * u));
+        for (let y = t; y <= b; y++) if (y >= 0 && y < H) mask[y * W + x] = 1;
+      }
+    }
+  }
+  /** 마스크 → 흙 그림. 앱의 terrainImage(mask) 와 같은 일 — 칸마다 THEME.soil 이 색을 정한다. */
+  function paint(m, w, hh, plain) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = hh;
+    const g = c.getContext('2d');
+    const img = g.createImageData(w, hh);
+    const d = img.data, P = T.pal[S.mode];
+    const e = new Uint8Array(w * hh);
+    for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!m[i]) continue;
+      e[i] = (x > 0 && !m[i - 1]) || (x < w - 1 && !m[i + 1]) || (y > 0 && !m[i - w]) || (y < hh - 1 && !m[i + w]) ? 1 : 3;
+    }
+    for (let y = 1; y < hh - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (e[i] === 3 && (e[i - 1] === 1 || e[i + 1] === 1 || e[i - w] === 1 || e[i + w] === 1)) e[i] = 2;
+    }
+    for (let x = 0; x < w; x++) {
+      let depth = 0;
+      for (let y = 0; y < hh; y++) {
+        const i = y * w + x;
+        let col = null, a = 255;
+        if (m[i]) {
+          depth++;
+          col = T.soil(x, y, depth, e[i], y < hh - 1 && !m[i + w], P);
+        } else {
+          depth = 0;
+          if (T.above && !plain) {
+            const dist = y + 1 < hh && m[i + w] ? 1 : y + 2 < hh && m[i + 2 * w] ? 2 : y + 3 < hh && m[i + 3 * w] ? 3 : 0;
+            if (dist) { col = T.above(x, y, dist, P); if (col) a = col[3]; }
+          }
+        }
+        if (!col) continue;
+        d[i * 4] = Math.max(0, Math.min(255, col[0]));
+        d[i * 4 + 1] = Math.max(0, Math.min(255, col[1]));
+        d[i * 4 + 2] = Math.max(0, Math.min(255, col[2]));
+        d[i * 4 + 3] = a;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+  const repaint = () => { terr = paint(mask, W, H); };
+  function blast(cx, cy, r, fill) {
+    for (let y = Math.max(0, cy - r); y <= Math.min(H - 1, cy + r); y++) for (let x = Math.max(0, cx - r); x <= Math.min(W - 1, cx + r); x++) {
+      if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+      if (!fill) { mask[y * W + x] = 0; continue; }
+      let free = true;
+      for (const u of units) if (u.alive && (x - u.x) ** 2 + (y - (u.footY - 5)) ** 2 <= 49) free = false;
+      if (free) mask[y * W + x] = 1;
+    }
+  }
+  const foot = (x) => { for (let y = 0; y < H; y++) if (mask[y * W + x]) return y - 1; return H; };
+  const supported = (u) => { if (u.footY + 1 >= H) return false; for (let dx = -2; dx <= 2; dx++) if (mask[(u.footY + 1) * W + u.x + dx]) return true; return false; };
+
+  // ── 판 상태 ─────────────────────────────────────────────────────────
+  let units = [], seeds = [], trails = [], booms = [], dmgs = [], impacts = [];
+  let phase = 'idle', phT = 0, clock = 0, tickAcc = 0, shake = 0, plan = null, seatSig = '';
+  const cloudLevel = 344;
+  function mk(seat, x, kind, name, hp) {
+    return { seat, x, footY: foot(x), kind, name, hp, shown: hp, maxHp: KIND[kind].hp, alive: true, angle: x < W / 2 ? 45 : 135, hitAt: -1e9, recoilAt: -1e9, downAt: -1, fade: 1, fell: 0, color: SEATC[seat] };
+  }
+  function reset() {
+    genMask();
+    units = [mk(0, 95, 'SPROUT', '나', 100), mk(1, 430, 'ACORN', '도토리단', 58), mk(2, 205, 'DANDELION', '솜털이', 85), mk(3, 548, 'SPROUT', '봇 새싹', 44)];
+    seeds = []; trails = []; booms = []; dmgs = []; parts.length = 0; phase = 'idle'; shake = 0;
+    repaint();
+  }
+  const foes = () => units.filter((u) => u.alive && u.hp > 0 && u.seat % 2 === 1);
+
+  function step(s, shooter) {
+    s.vx += s.ax; s.vy += G;
+    const nx = s.x + s.vx, ny = s.y + s.vy;
+    const n = Math.floor(Math.max(Math.abs(s.vx), Math.abs(s.vy))) + 1;
+    for (let k = 1; k <= n; k++) {
+      const px = s.x + ((nx - s.x) * k) / n, py = s.y + ((ny - s.y) * k) / n;
+      const cx = Math.floor(px), cy = Math.floor(py);
+      if (cx < 0 || cx >= W) return { type: 'out' };
+      if (cy >= Math.min(H, cloudLevel)) return { type: 'cloud', x: cx, y: cy };
+      for (const u of units) {
+        if (!u.alive || (u === shooter && s.age < 10)) continue;
+        if ((cx - u.x) ** 2 + (cy - (u.footY - 5)) ** 2 <= 36) return { type: 'unit', x: cx, y: cy, u };
+      }
+      if (cy >= 0 && mask[cy * W + cx]) return { type: 'soil', x: cx, y: cy };
+    }
+    s.x = nx; s.y = ny;
+    return null;
+  }
+  function launch(sh, angle, power) {
+    const rad = (angle * Math.PI) / 180, v = power * 0.0625;
+    return { x: sh.x + 0.5 + Math.cos(rad) * 10, y: sh.footY - 4.5 - Math.sin(rad) * 10, vx: v * Math.cos(rad), vy: -v * Math.sin(rad), ax: (S.wind * 46) / 65536, age: 0, rot: 0 };
+  }
+  /** 흉내: 정해 둔 각도에서 표적에 가장 가까이 떨어지는 힘을 찾는다(진짜 게임에서는 사람이 정한다). */
+  function solve(sh, tg, shell) {
+    let angle = SHELL[shell].ang;
+    if (tg.x < sh.x) angle = 180 - angle;
+    let best = null;
+    for (let p = 30; p <= 100; p += 0.25) {
+      const s = launch(sh, angle, p);
+      let r = null;
+      for (s.age = 1; s.age < 900 && !r; s.age++) r = step(s, sh);
+      if (!r || !r.x) continue;
+      const d = r.type === 'unit' && r.u === tg ? 0 : Math.hypot(r.x - tg.x, r.y - (tg.footY - 5)) + (r.type === 'unit' ? 500 : 0);
+      if (!best || d < best.d) best = { d, p };
+    }
+    return { angle, power: best ? best.p : 60 };
+  }
+  function fire() {
+    if (phase !== 'idle') return;
+    if (!foes().length) { reset(); return; }
+    const sh = units[0], tg = foes()[0];
+    plan = solve(sh, tg, S.shell);
+    sh.aimFrom = sh.angle; trails = [];
+    phase = 'aim'; phT = clock;
+  }
+  function startFlight() {
+    const sh = units[0];
+    sh.angle = plan.angle; sh.recoilAt = clock;
+    const s = launch(sh, plan.angle, plan.power);
+    s.shell = S.shell; s.live = true; s.trail = [s.x, s.y];
+    seeds = [s]; trails = [s.trail]; impacts = [];
+    T.fx.muzzle(s.x, s.y, plan.angle, sh.color);
+    phase = 'flight'; phT = clock; tickAcc = 0;
+  }
+  function tickFlight() {
+    const sh = units[0];
+    for (const s of seeds.slice()) {
+      if (!s.live) continue;
+      s.age++; s.rot += 0.12;
+      const r = step(s, sh);
+      if (s.age % 2 === 0 || r) s.trail.push(r && r.x !== undefined ? r.x : s.x, r && r.y !== undefined ? r.y : s.y);
+      if (r) { s.live = false; if (r.type === 'soil' || r.type === 'unit') impacts.push(r); continue; }
+      if (SHELL[s.shell].split && !s.child && s.vy >= 0) {
+        s.live = false;
+        for (const dv of [-0.75, 0, 0.75]) {
+          const c = Object.assign({}, s, { vx: s.vx + dv, live: true, child: true, trail: [s.x, s.y] });
+          seeds.push(c); trails.push(c.trail);
+        }
+        T.fx.split(s.x, s.y);
+      }
+    }
+    if (!seeds.some((s) => s.live)) detonate();
+  }
+  function detonate() {
+    const spec = SHELL[S.shell], sum = new Map();
+    for (const im of impacts) {
+      blast(im.x, im.y, spec.r, spec.fill);
+      booms.push({ x: im.x, y: im.y, r: spec.r, t0: clock, fill: !!spec.fill, shell: S.shell });
+      T.fx.impact(im.x, im.y, spec.r, !!spec.fill);
+      shake = Math.max(shake, (T.shake * spec.r) / 14);
+      for (const u of units) {
+        if (!u.alive || u.hp <= 0) continue;
+        const d = Math.floor(Math.hypot(u.x - im.x, u.footY - 5 - im.y));
+        const amt = im.u === u ? spec.dmg : d < spec.R ? Math.floor((spec.dmg * (spec.R - d)) / spec.R) : 0;
+        if (amt > 0) sum.set(u, (sum.get(u) || 0) + amt);
+      }
+    }
+    for (const [u, amt] of sum) hurt(u, amt);
+    if (impacts.length) repaint();
+    phase = 'boom'; phT = clock;
+  }
+  function hurt(u, amt) {
+    u.hp = Math.max(0, u.hp - amt); u.hitAt = clock;
+    dmgs.push({ u, amt, t0: clock });
+    if (u.hp <= 0) u.downAt = clock;
+  }
+  function tickFall() {
+    let moving = false;
+    for (const u of units) {
+      if (!u.alive || supported(u)) continue;
+      u.footY++; u.fell++; moving = true;
+      if (u.footY >= cloudLevel) { u.alive = false; u.hp = 0; T.fx.impact(u.x, cloudLevel, 8, true); }
+    }
+    if (moving) return;
+    for (const u of units) { if (u.alive && u.fell > 20 && u.hp > 0) hurt(u, Math.floor((u.fell - 20) / 2)); u.fell = 0; }
+    phase = 'settle'; phT = clock;
+  }
+  function update(dt) {
+    clock += dt;
+    shake *= Math.pow(0.86, dt / TICK);
+    if (shake < 0.05) shake = 0;
+    for (const u of units) u.shown += (u.hp - u.shown) * Math.min(1, dt / 160);
+    if (phase === 'aim') {
+      const k = S.rm ? 1 : (clock - phT) / 450, sh = units[0];
+      sh.angle = sh.aimFrom + (plan.angle - sh.aimFrom) * ease(k);
+      if (k >= 1) startFlight();
+    } else if (phase === 'flight') {
+      tickAcc += dt / TICK;
+      while (tickAcc >= 1 && phase === 'flight') { tickAcc--; tickFlight(); }
+    } else if (phase === 'boom') {
+      if (clock - phT >= 600) { phase = 'fall'; tickAcc = 0; }
+    } else if (phase === 'fall') {
+      tickAcc += dt / TICK;
+      while (tickAcc >= 1 && phase === 'fall') { tickAcc--; tickFall(); }
+    } else if (phase === 'settle') {
+      let pending = false;
+      for (const u of units) {
+        if (!u.alive || u.hp > 0) continue;
+        if (u.downAt < 0) u.downAt = clock;
+        const el = clock - u.downAt;
+        u.fade = el > 1300 ? Math.max(0, 1 - (el - 1300) / 400) : 1;
+        if (el > 1700) u.alive = false; else pending = true;
+      }
+      if (!pending && clock - phT > 300) { phase = 'idle'; trails = []; seeds = []; }
+    }
+    booms = booms.filter((b) => clock - b.t0 < 600);
+    dmgs = dmgs.filter((d) => clock - d.t0 < 1000);
+    const k = dt / TICK;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= k;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      p.vy += p.g * k; p.vx += p.w * S.wind * 0.0012 * k;
+      p.vx *= 1 - (1 - p.drag) * k; p.vy *= 1 - (1 - p.drag) * k;
+      p.x += p.vx * k; p.y += p.vy * k; p.rot += p.vr * k;
+    }
+  }
+
+  // ── 포대 상태(앱 unitPose.ts 와 같은 우선순위·길이) ─────────────────
+  function poseOf(u) {
+    if (u.hp <= 0 && u.downAt >= 0) return ['down', clock - u.downAt];
+    if (clock - u.hitAt < 400) return ['hit', clock - u.hitAt];
+    if (clock - u.recoilAt < 200) return ['recoil', clock - u.recoilAt];
+    const loop = (S.rm ? 0 : clock) + u.seat * 137;
+    return [u.seat === 0 && (phase === 'idle' || phase === 'aim') ? 'aim' : 'idle', loop];
+  }
+  /** 상태 → 움직임 값. 시안은 이 값에 자기 과장 정도를 곱해 쓴다. */
+  function motion(pose, el) {
+    const o = { bob: 0, sway: 0, back: 0, sq: 0, flash: 0, jx: 0, wilt: 0, eyes: 'open', wig: 0 };
+    if (pose === 'idle') { o.bob = Math.sin((el / 1040) * Math.PI * 2); o.sway = Math.sin(el / 900); o.eyes = el % 3200 < 140 && !S.rm ? 'shut' : 'open'; }
+    else if (pose === 'aim') { o.bob = Math.sin((el / 520) * Math.PI * 2) * 0.5; o.wig = Math.sin(el / 300) * 1.4; o.eyes = 'focus'; }
+    else if (pose === 'recoil') { const k = 1 - Math.min(1, el / 200); o.back = k * k; o.sq = k; o.eyes = 'shut'; }
+    else if (pose === 'hit') { const k = 1 - Math.min(1, el / 400); o.flash = el < 110 ? 1 : el < 240 && (Math.floor(el / 55) & 1) ? 0.6 : 0; o.jx = Math.sin(el / 22) * 1.6 * k; o.sq = -k; o.eyes = 'x'; }
+    else { const k = Math.min(1, el / 700); o.wilt = 1 - (1 - k) * (1 - k); o.eyes = 'x'; }
+    if (S.rm) { o.jx = 0; o.sq = 0; if (pose === 'hit') o.flash = el < 240 ? 0.6 : 0; if (pose === 'recoil') o.back = 0.5; if (pose === 'down') o.wilt = 1; }
+    return o;
+  }
+  const U = { kind: 'SPROUT', color: '', seat: 0, pose: 'idle', el: 0, o: null, time: 0, top: 0, angle: 0 };
+  function drawUnit(ctx, u, pose, el, scale, isTurn, top) {
+    const o = motion(pose, el);
+    U.kind = u.kind; U.color = u.color; U.seat = u.seat; U.pose = pose; U.el = el; U.o = o; U.time = S.rm ? 0 : clock; U.top = top; U.angle = u.angle;
+    ctx.save();
+    ctx.translate(u.x + 0.5 + o.jx, u.footY + 1);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = u.fade;
+    if (T.under) T.under(ctx, U, isTurn);
+    if (pose !== 'down') {
+      ctx.save();
+      ctx.translate(0, -5.5);
+      ctx.rotate((-(u.angle + o.wig) * Math.PI) / 180);
+      ctx.translate(-o.back * 2, 0);
+      T.barrel(ctx, U);
+      ctx.restore();
+    }
+    ctx.save();
+    if (u.angle > 90) ctx.scale(-1, 1);
+    T.body(ctx, U);
+    ctx.restore();
+    if (isTurn && pose !== 'down') T.turn(ctx, U);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 장면 그리기(앱 drawScene 과 같은 순서) ──────────────────────────
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  function fit(c) {
+    const w = Math.round(c.clientWidth * dpr), hh = Math.round(c.clientHeight * dpr);
+    if (w && hh && (c.width !== w || c.height !== hh)) { c.width = w; c.height = hh; }
+    return c.getContext('2d');
+  }
+  function drawField(c) {
+    if (!c.clientWidth) return;
+    const ctx = fit(c), sc = c.width / W, cpc = c.clientWidth / W, P = T.pal[S.mode], amb = S.rm ? 0 : clock;
+    const boost = Math.min(1.6, Math.max(1, 0.75 / cpc)), fs = Math.max(7, 11 / cpc), ui = Math.max(1, 0.85 / cpc);
+    ctx.setTransform(sc, 0, 0, sc, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    T.sky(ctx, P, amb, S.wind);
+    ctx.save();
+    if (shake && !S.rm) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    ctx.imageSmoothingEnabled = !!T.smooth;
+    ctx.drawImage(terr, 0, 0, W, H);
+    const top = -(T.lift * boost + fs * 1.7) / boost;
+    for (const u of units) {
+      if (!u.alive) continue;
+      const [pose, el] = poseOf(u);
+      drawUnit(ctx, u, pose, el, boost, u.seat === 0 && phase === 'idle', top);
+    }
+    const me = units[0];
+    if (phase === 'idle' && me.alive) {
+      const rad = (me.angle * Math.PI) / 180, cx = me.x + 0.5, cy = me.footY - 4.5;
+      ctx.strokeStyle = me.color; ctx.lineWidth = 1.2; ctx.setLineDash([2.5, 2.5]);
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(rad) * 13 * boost, cy - Math.sin(rad) * 13 * boost); ctx.lineTo(cx + Math.cos(rad) * 40, cy - Math.sin(rad) * 40); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    for (const u of units) {
+      if (!u.alive) continue;
+      ctx.globalAlpha = u.fade;
+      const text = u.seat === 0 ? (fs > 10 ? '나' : '새싹이 (나)') : fs > 10 && [...u.name].length > 6 ? [...u.name].slice(0, 5).join('') + '…' : u.name;
+      T.label(ctx, { x: u.x + 0.5, footY: u.footY, text, hp: u.shown, maxHp: u.maxHp, fs, unitScale: boost, color: u.color, team: TEAMC[u.seat % 2] }, P);
+    }
+    ctx.globalAlpha = 1;
+    for (const tr of trails) T.trail(ctx, tr, P);
+    for (const s of seeds) {
+      if (!s.live) continue;
+      if (s.y < 0) { ctx.fillStyle = P.label; ctx.beginPath(); ctx.moveTo(s.x, 2); ctx.lineTo(s.x - 4, 9); ctx.lineTo(s.x + 4, 9); ctx.fill(); }
+      else T.seed(ctx, s.x, s.y, s.shell, S.rm ? 0 : s.rot, P);
+    }
+    for (const b of booms) T.boom(ctx, { x: b.x, y: b.y, r: b.r, t: (clock - b.t0) / 600, fill: b.fill }, P);
+    for (const p of parts) T.particle(ctx, p, p.life / p.max, P);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    for (const d of dmgs) T.dmg(ctx, d.u.x + 0.5, d.u.footY - T.lift * boost - fs * 2.3, d.amt, (clock - d.t0) / 1000, fs * 1.15, P);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    T.clouds(ctx, cloudLevel, P, amb);
+    ctx.save(); ctx.translate(W / 2, 6 * ui); ctx.scale(ui, ui);
+    T.wind(ctx, S.wind, P, amb);
+    ctx.restore();
+  }
+
+  // ── 작은 그림(캐릭터 시트·견본) ─────────────────────────────────────
+  const minis = [];
+  let grounds = {};
+  function mini(host, wc, hc, draw, cap, cls) {
+    const f = document.createElement('figure'), c = document.createElement('canvas');
+    c.style.aspectRatio = wc + '/' + hc;
+    if (cls) f.className = cls;
+    f.append(c);
+    if (cap) { const fc = document.createElement('figcaption'); fc.textContent = cap; f.append(fc); }
+    host.append(f);
+    minis.push({ c, wc, hc, draw });
+  }
+  function backdrop(ctx, wc, hc, P, ground) {
+    const g = ctx.createLinearGradient(0, 0, 0, hc);
+    g.addColorStop(0, P.skyTop); g.addColorStop(1, P.skyBot);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, wc, hc);
+    if (!ground) return;
+    const key = wc + 'x' + hc;
+    if (!grounds[key]) {
+      const m = new Uint8Array(wc * hc);
+      for (let x = 0; x < wc; x++) for (let y = hc - ground + Math.round(Math.sin(x / 5) * 0.6); y < hc; y++) m[y * wc + x] = 1;
+      grounds[key] = paint(m, wc, hc, true);
+    }
+    ctx.imageSmoothingEnabled = !!T.smooth;
+    ctx.drawImage(grounds[key], 0, 0, wc, hc);
+  }
+  function drawMinis() {
+    const P = T.pal[S.mode], amb = S.rm ? 0 : clock;
+    for (const m of minis) {
+      if (!m.c.clientWidth) continue;
+      const ctx = fit(m.c), sc = m.c.width / m.wc;
+      ctx.setTransform(sc, 0, 0, sc, 0, 0);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      m.draw(ctx, P, amb);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  function buildSheet() {
+    const sheet = $('#sheet');
+    sheet.append(document.createElement('span'));
+    for (const [, n] of POSES) { const s = document.createElement('span'); s.className = 'hd'; s.textContent = n; sheet.append(s); }
+    Object.keys(KIND).forEach((kind, row) => {
+      const rh = document.createElement('span'); rh.className = 'rh'; rh.textContent = KIND[kind].n; sheet.append(rh);
+      for (const [pose] of POSES) {
+        const u = { x: 12, footY: 23, kind, color: SEATC[row], seat: row, angle: 40, fade: 1 };
+        mini(sheet, 30, 30, (ctx, P, amb) => {
+          backdrop(ctx, 30, 30, P, 6);
+          let p = pose, el = amb + row * 137;
+          if (pose === 'recoil') { el = S.rm ? 60 : clock % 1300; if (el >= 200) { p = 'aim'; el = amb; } }
+          else if (pose === 'hit') { el = S.rm ? 150 : clock % 1500; if (el >= 400) { p = 'idle'; el = amb; } }
+          else if (pose === 'down') { el = S.rm ? 2000 : clock % 3400; if (el >= 3000) { p = 'idle'; el = amb; } }
+          drawUnit(ctx, u, p, el, 1, false, -20);
+        });
+      }
+    });
+  }
+  function buildStrip() {
+    const strip = $('#strip');
+    for (const k of Object.keys(SHELL)) mini(strip, 22, 16, (ctx, P, amb) => { backdrop(ctx, 22, 16, P, 0); T.seed(ctx, 11, 8, k, amb / 260, P); }, SHELL[k].n);
+    const loop = (fill) => (ctx, P) => {
+      backdrop(ctx, 48, 40, P, 12);
+      const t = S.rm ? 0.35 : (clock % 1500) / 600;
+      if (t < 1) T.boom(ctx, { x: 24, y: 27, r: 12, t, fill }, P);
+    };
+    mini(strip, 48, 40, loop(false), '폭발 (0.6초)');
+    mini(strip, 48, 40, loop(true), '둔덕 — 덩굴탄');
+    mini(strip, 96, 40, (ctx, P, amb) => {
+      backdrop(ctx, 96, 40, P, 0);
+      const n = S.rm ? 30 : 6 + (Math.floor(clock / 33) % 40), pts = [];
+      for (let i = 0; i <= Math.min(n, 34); i++) pts.push(8 + i * 2.4, 34 - i * 2.1 + i * i * 0.062);
+      T.trail(ctx, pts, P);
+      T.seed(ctx, pts[pts.length - 2], pts[pts.length - 1], 'PEA', amb / 200, P);
+    }, '궤적·꼬리', 'wide');
+    [[100, '체력 100%'], [45, '체력 45%'], [18, '체력 18%']].forEach(([hp, cap], i) => mini(strip, 48, 24, (ctx, P) => {
+      backdrop(ctx, 48, 24, P, 0);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      T.label(ctx, { x: 24, footY: T.lift + 19, text: ['새싹이 (나)', '도토리단', '솜털이'][i], hp, maxHp: 100, fs: 7.5, unitScale: 1, color: SEATC[i], team: TEAMC[i % 2] }, P);
+    }, cap));
+    for (const w of [4, -9, 0]) mini(strip, 96, 26, (ctx, P, amb) => { backdrop(ctx, 96, 26, P, 0); ctx.save(); ctx.translate(48, 5); T.wind(ctx, w, P, amb); ctx.restore(); }, '바람 ' + (w > 0 ? '+' : '') + w, 'wide');
+  }
+
+  // ── 화면 뼈대 ───────────────────────────────────────────────────────
+  function seatsHtml() {
+    const sig = units.map((u) => u.hp + (u.alive ? 'a' : 'x')).join() + phase;
+    if (sig === seatSig) return;
+    seatSig = sig;
+    const html = units.map((u) => `<div class="seat${u.seat === 0 && phase === 'idle' ? ' turn' : ''}${u.alive && u.hp > 0 ? '' : ' out'}" style="--c:${u.color};--t:${TEAMC[u.seat % 2]}"><b>${u.name}</b><span>${KIND[u.kind].n} · ${u.alive ? u.hp : 0}/${u.maxHp}</span></div>`).join('');
+    document.querySelectorAll('[data-seats]').forEach((el) => { el.innerHTML = html; });
+    document.querySelectorAll('[data-fire]').forEach((b) => { b.disabled = phase !== 'idle'; b.textContent = foes().length ? '발사' : '처음으로'; });
+  }
+  function setMode(m) {
+    S.mode = m; document.documentElement.dataset.mode = m;
+    $('#mode').setAttribute('aria-pressed', String(m === 'dark')); $('#mode').textContent = m === 'dark' ? '낮(라이트)' : '밤(다크)';
+    grounds = {}; repaint(); swatches();
+  }
+  function swatches() {
+    const P = T.pal[S.mode];
+    $('#sw').innerHTML = T.swatch.map(([k, n]) => { const v = Array.isArray(P[k]) ? `rgb(${P[k].join(',')})` : P[k]; return `<span style="background:linear-gradient(${v},${v}) top/100% 14px no-repeat">${n}</span>`; }).join('');
+  }
+  function init() {
+    reset();
+    const shells = $('#shells');
+    for (const k of Object.keys(SHELL)) {
+      const b = document.createElement('button');
+      b.textContent = SHELL[k].n; b.setAttribute('aria-pressed', String(k === S.shell));
+      b.onclick = () => { S.shell = k; shells.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); };
+      shells.append(b);
+    }
+    document.querySelectorAll('[data-fire]').forEach((b) => { b.onclick = fire; });
+    $('#reset').onclick = reset;
+    $('#mode').onclick = () => setMode(S.mode === 'dark' ? 'light' : 'dark');
+    $('#rm').checked = S.rm;
+    $('#rm').onchange = (e) => { S.rm = e.target.checked; parts.length = 0; };
+    mq.addEventListener('change', (e) => { S.rm = e.matches; $('#rm').checked = S.rm; });
+    $('#wind').oninput = (e) => { S.wind = Number(e.target.value); $('#windOut').textContent = (S.wind > 0 ? '+' : '') + S.wind; };
+    $('#notes').innerHTML = T.notes.map((n) => `<li>${n}</li>`).join('');
+    buildSheet(); buildStrip(); swatches();
+    let last = 0;
+    const cvD = $('#cvD'), cvM = $('#cvM');
+    const frame = (ts) => {
+      update(Math.min(50, last ? ts - last : 16)); last = ts;
+      drawField(cvD); drawField(cvM); drawMinis(); seatsHtml();
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+    window.__artillery = { fire, reset, setMode, setShell: (k) => { S.shell = k; }, setRm: (v) => { S.rm = v; }, step: (ms) => { for (let t = 0; t < ms; t += 16) update(16); drawField(cvD); drawField(cvM); drawMinis(); seatsHtml(); }, state: () => ({ phase, units: units.map((u) => ({ seat: u.seat, hp: u.hp, alive: u.alive })), parts: parts.length }) };
+  }
+  init();
+})();
+
+</script>
+</body>
+</html>

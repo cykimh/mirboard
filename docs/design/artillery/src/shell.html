@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko" data-mode="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>씨앗포 {{NAME}}</title>
+<!-- 생성 파일: docs/design/artillery/src/ 의 shell.html + engine.js + theme-{{ID}}.js 를 build.mjs 가 합친다. 외부 의존 없음. -->
+<style>
+{{THEME_CSS}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--font);overflow-x:hidden}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 64px}
+h1{font:700 26px/1.2 var(--hfont);margin:4px 0 6px;text-wrap:balance}
+h2{font:700 17px/1.3 var(--hfont);margin:34px 0 4px}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0}
+.lede{color:var(--muted);margin:0 0 10px;max-width:62ch}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px}
+nav a{color:var(--fg);text-decoration:none;border:1.5px solid var(--line);border-radius:999px;padding:3px 12px;font-size:13px}
+nav a[aria-current]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 0;background:var(--bg);border-bottom:1.5px solid var(--line)}
+button{font:inherit;min-height:38px;cursor:pointer;border-radius:var(--radius);padding:6px 12px;background:transparent;border:1.5px solid var(--line);color:var(--fg)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.fire{background:var(--accent);color:var(--btnfg);border-color:var(--accent);font-weight:700;padding:6px 20px}
+button.fire:disabled{opacity:.55;cursor:default}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{padding:4px 10px;min-height:34px;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.opt{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.opt input[type=range]{width:96px;accent-color:var(--accent)}
+.opt output{min-width:2.4em;font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%}
+.stage{border-radius:14px;overflow:hidden;border:1.5px solid var(--line);background:var(--card)}
+.field{aspect-ratio:16/9}
+.seats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
+.seat{border-left:4px solid var(--c);border-bottom:2px solid var(--t);background:var(--bg);border-radius:8px;padding:4px 8px;font-size:12.5px;min-width:0;line-height:1.35}
+.seat b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat span{color:var(--muted);white-space:nowrap}
+.seat.turn{outline:2px solid var(--c);outline-offset:-1px}
+.seat.out{opacity:.45}
+.phone{width:min(375px,100%);margin:0 auto;border-radius:24px}
+.phone .seats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ctl{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;padding:0 8px 10px;font-size:12.5px}
+.ctl i{display:block;height:8px;border-radius:99px;background:var(--line);overflow:hidden;font-style:normal}
+.ctl i u{display:block;height:100%;background:var(--accent)}
+.sheet{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:6px;align-items:center}
+.sheet .hd{font-size:12px;color:var(--muted);text-align:center}
+.sheet .rh{font-size:12px;font-weight:700;max-width:3.4em;line-height:1.25}
+figure{margin:0;min-width:0}
+figcaption{font-size:11.5px;color:var(--muted);text-align:center;margin-top:2px}
+figure canvas{border-radius:8px;border:1px solid var(--line)}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.strip .wide{grid-column:span 2}
+.notes{padding-left:18px;margin:0}
+.notes li{margin:2px 0}
+.sw{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.sw span{font-size:11.5px;padding:18px 8px 4px;border-radius:8px;border:1px solid var(--line);min-width:72px;font-variant-numeric:tabular-nums}
+@media(max-width:520px){h1{font-size:21px}.bar{gap:6px;position:static}.opt input[type=range]{width:72px}}
+</style>
+</head>
+<body>
+<main>
+<p class="eyebrow">씨앗포 디자인 시안 {{LETTER}} · D-185 D1</p>
+<h1>{{NAME}}</h1>
+<p class="lede">{{LEDE}}</p>
+<nav aria-label="시안">
+<a href="option-a.html" {{CUR_A}}>A 수채 그림책</a><a href="option-b.html" {{CUR_B}}>B 말랑 클레이</a><a href="option-c.html" {{CUR_C}}>C 해 질 녘 실루엣</a>
+</nav>
+<div class="bar">
+<button class="fire" data-fire>발사</button>
+<div class="seg" id="shells" role="group" aria-label="씨앗탄"></div>
+<label class="opt">바람 <input id="wind" type="range" min="-10" max="10" value="4"><output id="windOut">+4</output></label>
+<button id="mode" aria-pressed="false">밤(다크)</button>
+<label class="opt"><input id="rm" type="checkbox"> 연출 줄이기</label>
+<button id="reset">처음으로</button>
+</div>
+
+<h2>4인 판 한 장면 — 데스크톱</h2>
+<p class="sub">2:2 팀전(좌석 홀짝), 내 차례. [발사] = 조준 → 반동 → 비행 → 착탄 → 피격(체력 0 이면 쓰러짐). 물리는 흉내만 낸다.</p>
+<div class="stage"><canvas id="cvD" class="field"></canvas><div class="seats" data-seats></div></div>
+
+<h2>휴대폰 375px</h2>
+<p class="sub">전장 폭 약 340px — 포대·이름표는 앱의 작은 화면 보정(<code>uiBoost</code>)과 같은 배율로 키웠다.</p>
+<div class="stage phone"><canvas id="cvM" class="field"></canvas><div class="seats" data-seats></div>
+<div class="ctl"><span>각도<i><u style="width:32%"></u></i></span><span>힘<i><u style="width:67%"></u></i></span><button class="fire" data-fire>발사</button></div></div>
+
+<h2>캐릭터 시트 — 포대 3종 × 상태 5가지</h2>
+<p class="sub">D-227 시트의 <code>unit.{종류}.{상태}</code> 15칸에 그대로 대응한다. 반동·피격·쓰러짐은 되풀이 재생.</p>
+<div class="sheet" id="sheet"></div>
+
+<h2>씨앗탄 5종 · 폭발 · 둔덕 · 궤적 · 체력바 · 바람</h2>
+<div class="strip" id="strip"></div>
+
+<h2>팔레트</h2>
+<div class="sw" id="sw"></div>
+
+<h2>움직임 연출</h2>
+<ul class="notes" id="notes"></ul>
+</main>
+<script>
+{{THEME_JS}}
+</script>
+<script>
+{{ENGINE_JS}}
+</script>
+</body>
+</html>
