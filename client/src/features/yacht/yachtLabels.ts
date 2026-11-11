@@ -42,5 +42,28 @@ export const UPPER_FACE: Partial<Record<Category, number>> = {
   SIXES: 6,
 };
 
-/** 큰 칸 — 기록하면 짧은 축하 효과. */
-export const BIG_CATEGORIES: ReadonlySet<Category> = new Set(['YACHT', 'LARGE_STRAIGHT']);
+/** 큰 칸 — 기록하면 짧은 축하 효과(상태 줄 배지 — 연출을 꺼도 남는다). */
+export const BIG_CATEGORIES: ReadonlySet<Category> = new Set(['YACHT', 'LARGE_STRAIGHT', 'FULL_HOUSE']);
+/** D-204 — 중간 크기 축하(주사위 다섯 개가 놓이는 현수막). 요트는 따로 큰 축하. */
+export const MID_CATEGORIES: ReadonlySet<Category> = new Set(['LARGE_STRAIGHT', 'FULL_HOUSE']);
+
+/**
+ * D-204 — 축하 현수막에 그릴 주사위 순서. 화면이 기억한 마지막 굴림이 그 족보가 맞을 때만 돌려준다(점수 계산이 아니라 그림 확인 —
+ * 시간 초과 자동 기록처럼 기억한 굴림이 낡았을 수 있다). 스트레이트는 오름차순, 풀 하우스는 3개 묶음 먼저.
+ */
+export function celebrationDice(category: Category, dice: readonly number[] | null | undefined): number[] | null {
+  if (!dice || dice.length !== 5) return null;
+  const sorted = [...dice].sort((a, b) => a - b);
+  const counts = new Map<number, number>();
+  for (const d of sorted) counts.set(d, (counts.get(d) ?? 0) + 1);
+  if (category === 'YACHT') return counts.size === 1 ? sorted : null;
+  if (category === 'LARGE_STRAIGHT') {
+    return counts.size === 5 && sorted[4] - sorted[0] === 4 ? sorted : null;
+  }
+  if (category === 'FULL_HOUSE') {
+    if (counts.size === 1) return sorted;
+    if (counts.size !== 2 || ![...counts.values()].includes(3)) return null;
+    return [...sorted].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a - b);
+  }
+  return null;
+}

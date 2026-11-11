@@ -261,7 +261,17 @@
   .yt-theme-salon .yt-seat-total-bump,
   .yt-theme-salon .yt-cell-flash,
   .yt-theme-salon .yt-cell-flash .yt-num,
-  .yt-theme-salon .yt-end {
+  .yt-theme-salon .yt-end,
+  .yt-theme-salon .yt-felt-cheer,
+  .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
+  .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
+  .yt-theme-salon .yt-mini-die-rolling,
+  .yt-theme-salon .yt-cell-bonus-new,
+  .yt-theme-salon .yt-cell-bonus-new .yt-num,
+  .yt-theme-salon .yt-cell-bonus-new::after,
+  .yt-theme-salon .yt-end-reveal .yt-end-row,
+  .yt-theme-salon .yt-end-reveal .yt-end-first::after,
+  .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title {
     animation: none;
   }
 
@@ -274,8 +284,13 @@
     transition: none;
   }
 
+  /* D-204 — 컵·착지 고리·잠김 빛도 끈다(눈·고정 테만 바로 바뀐다). */
   .yt-theme-salon .yt-fx,
   .yt-theme-salon .yt-chip,
+  .yt-theme-salon .yt-cup,
+  .yt-theme-salon .yt-die-impact,
+  .yt-theme-salon .yt-die-sheen,
+  .yt-theme-salon .yt-die-lockring,
   .yt-burst {
     display: none;
   }

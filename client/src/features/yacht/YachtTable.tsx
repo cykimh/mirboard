@@ -22,7 +22,8 @@ import { DiceTray } from './DiceTray';
 import { YachtScorecard } from './YachtScorecard';
 import { YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
-import { BIG_CATEGORIES, CATEGORY_LABEL } from './yachtLabels';
+import { BIG_CATEGORIES, CATEGORY_LABEL, MID_CATEGORIES, celebrationDice } from './yachtLabels';
+import { YachtDie } from './YachtDie';
 import { YACHT_TUTORIAL } from './tutorial/yachtTutorial';
 import { SeatDice } from './SeatDice';
 import { useYachtBest } from './useYachtBest';
@@ -47,11 +48,54 @@ export const HOLD_SEND_DELAY_MS = 250;
 export const BUSY_RETRY_DELAY_MS = 150;
 
 /** D-203 — 요트 칸 기록 축하(금빛 훑기·현수막·금가루)가 떠 있는 시간. 조작을 막지 않는다. */
-export const YACHT_PARTY_MS = 2400;
-/** 칩이 칸에 닿는 시점(칩 비행 길이) — 칸의 금박·불티가 이때 시작한다. CSS `yt-salon-chip` 길이와 같다. */
-export const CHIP_FLIGHT_MS = 360;
-/** 칩 뒤를 따르는 잔상 수. */
+export const YACHT_PARTY_MS = 2600;
+/** D-204 — 중간 축하(라지 스트레이트·풀 하우스 현수막, 상단 보너스 명패)가 떠 있는 시간. */
+export const MID_PARTY_MS = 1800;
+/** 점수 숫자가 칸에 닿는 시점(비행 길이) — 칸의 금박·불티가 이때 시작한다. CSS `yt-salon-chip` 길이와 같다(D-204 — 숫자가 읽히게 조금 길게). */
+export const CHIP_FLIGHT_MS = 480;
+/** 숫자 뒤를 따르는 잔상 수. */
 const CHIP_GHOSTS = 3;
+/** D-204 — 샴페인 기포·금 띠 조각 수(요트 축하, CSS transform 만). */
+const BUBBLES = 16;
+const STREAMERS = 8;
+
+/** D-204 — 샴페인 잔(직접 그린 SVG, 요트 현수막 양옆에서 부딪힌다). */
+function Coupe() {
+  return (
+    <svg viewBox="0 0 40 56" focusable="false">
+      <path d="M5 6 H35 Q35 26 20 28 Q5 26 5 6 Z" fill="rgba(255,246,208,.16)" stroke="#f6e2a4" strokeWidth="2" />
+      <path d="M8 13 H32 Q31 24 20 25.5 Q9 24 8 13 Z" fill="#f3d27a" fillOpacity=".85" />
+      <path d="M20 28 V48 M10 51 H30" fill="none" stroke="#f6e2a4" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="15" cy="18" r="1.4" fill="#fff" />
+      <circle cx="23" cy="20.5" r="1" fill="#fff" />
+      <circle cx="25" cy="15.5" r="1.2" fill="#fff" />
+    </svg>
+  );
+}
+
+/** D-204 — 펠트 위 모서리에서 풀려 내려오는 금 리본. */
+function Ribbon() {
+  return (
+    <svg viewBox="0 0 80 170" focusable="false">
+      <path
+        d="M4 -4 C44 22 4 52 36 78 S28 132 62 166"
+        pathLength={1}
+        fill="none"
+        stroke="#b8892f"
+        strokeWidth="9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4 -4 C44 22 4 52 36 78 S28 132 62 166"
+        pathLength={1}
+        fill="none"
+        stroke="#f6e2a4"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 interface ChipFlight {
   id: number;
@@ -62,12 +106,23 @@ interface ChipFlight {
   /** 칸 한가운데(뷰포트 좌표) — 꽂히는 불티 자리. */
   hitX: number;
   hitY: number;
+  points: number;
 }
 
 interface Party {
   nonce: number;
+  /** 요트 = 큰 축하, mid = 라지 스트레이트·풀 하우스, bonus = 상단 63 보너스가 처음 붙음. */
+  kind: 'yacht' | 'mid' | 'bonus';
+  category: Category;
   seat: number;
   points: number;
+  /** 현수막에 놓을 주사위(mid) — 기억한 굴림이 족보와 안 맞으면 null. */
+  dice: number[] | null;
+  /** 펠트가 화면 밖이라 축하 층을 화면에 띄운다. */
+  float: boolean;
+  /** bonus — 보너스 칸 한가운데(뷰포트 좌표). */
+  cellX: number;
+  cellY: number;
   /** 펠트 한가운데(뷰포트 좌표) — 금가루가 터지는 자리. */
   x: number;
   y: number;
@@ -189,6 +244,7 @@ export function YachtTable({
           dy: b.top + b.height / 2 - r.top - y,
           hitX: b.left + b.width / 2,
           hitY: b.top + b.height / 2,
+          points: last.points,
         });
       }
     }
@@ -201,24 +257,59 @@ export function YachtTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.lastScore]);
 
-  // D-203 — 본 축하는 요트 칸에 점수를 적을 때(5개가 같게 멈춘 순간은 주사위 반짝임만).
+  // D-204 — 좌석마다 마지막 굴림을 화면이 기억한다(기록하면 스토어의 주사위는 바로 비므로 축하 현수막이 이것을 쓴다). 그림용일 뿐이다.
+  const seenDice = useRef<Record<number, number[]>>({});
+  if (s.simultaneous) {
+    for (const t of Object.values(s.seatTurns)) if (t.dice) seenDice.current[t.seat] = t.dice;
+  } else if (s.dice && s.turnSeat >= 0) {
+    seenDice.current[s.turnSeat] = s.dice;
+  }
+  // D-204 — 좌석마다 직전 상단 보너스. 0 에서 처음 붙는 기록만 축하한다(처음 그릴 때·다시 받을 때는 모름 = 축하 없음).
+  const seenBonus = useRef<Record<number, number>>({});
+
+  // D-203 — 본 축하는 요트 칸에 점수를 적을 때(5개가 같게 멈춘 순간은 주사위 반짝임만). D-204 — 라지 스트레이트·풀 하우스는 중간 축하,
+  // 상단 보너스가 처음 붙는 기록은 보너스 축하(위 칸 기록이라 족보 축하와 겹치지 않는다).
   const feltRef = useRef<HTMLDivElement>(null);
   const [party, setParty] = useState<Party | null>(null);
   useEffect(() => {
     const last = s.lastScore;
-    if (!last || last.category !== 'YACHT' || last.points <= 0) return;
+    if (!last) return;
+    const seatNow = useYachtStore.getState().seats.find((x) => x.seat === last.seat);
+    const bonusNew = seenBonus.current[last.seat] === 0 && (seatNow?.bonus ?? 0) > 0;
+    const kind: Party['kind'] | null =
+      last.points > 0 && last.category === 'YACHT'
+        ? 'yacht'
+        : last.points > 0 && MID_CATEGORIES.has(last.category)
+          ? 'mid'
+          : bonusNew
+            ? 'bonus'
+            : null;
+    if (!kind) return;
     const f = feltRef.current?.getBoundingClientRect();
+    const cell = rootRef.current?.querySelector(`[data-yt-bonus="${last.seat}"]`)?.getBoundingClientRect();
+    // 펠트 한가운데가 화면 안에 있나 — 아니면 화면 위쪽에 띄운다.
+    const float = f ? f.top + f.height / 2 < 0 || f.top + f.height / 2 > window.innerHeight : false;
     setParty({
       nonce: last.nonce,
+      kind,
+      float,
+      category: last.category,
       seat: last.seat,
-      points: last.points,
-      x: f ? f.left + f.width / 2 : window.innerWidth / 2,
-      y: f ? f.top + f.height * 0.45 : window.innerHeight / 3,
-      width: f ? f.width : window.innerWidth,
+      points: kind === 'bonus' ? (seatNow?.bonus ?? 0) : last.points,
+      dice: kind === 'mid' ? celebrationDice(last.category, seenDice.current[last.seat]) : null,
+      cellX: cell ? cell.left + cell.width / 2 : 0,
+      cellY: cell ? cell.top + cell.height / 2 : 0,
+      x: f && !float ? f.left + f.width / 2 : window.innerWidth / 2,
+      y: f && !float ? f.top + f.height * 0.45 : window.innerHeight * 0.3,
+      width: f && !float ? f.width : window.innerWidth,
     });
-    const timer = window.setTimeout(() => setParty(null), YACHT_PARTY_MS);
+    const timer = window.setTimeout(() => setParty(null), kind === 'yacht' ? YACHT_PARTY_MS : MID_PARTY_MS);
     return () => window.clearTimeout(timer);
   }, [s.lastScore]);
+  // 위 효과가 직전 값을 읽은 뒤에 갱신한다(같은 커밋에서 선언 순서대로 돈다).
+  useEffect(() => {
+    for (const x of s.seats) seenBonus.current[x.seat] = x.bonus;
+  }, [s.seats]);
 
   // D-203 — 차례 조명: 펠트 위 등불이 차례인 좌석 명패 쪽으로 옮겨 간다(동시 진행·판 끝은 가운데).
   const [lampX, setLampX] = useState(0);
@@ -326,9 +417,99 @@ export function YachtTable({
     onExit();
   };
 
+  const bonusParty = party?.kind === 'bonus' ? party : null;
   const announcement = flash
-    ? `${nameOf(flash.seat)} ${CATEGORY_LABEL[flash.category]} ${flash.points}점${flash.auto ? ' (시간 초과 자동 기록)' : ''}`
+    ? `${nameOf(flash.seat)} ${CATEGORY_LABEL[flash.category]} ${flash.points}점${flash.auto ? ' (시간 초과 자동 기록)' : ''}${bonusParty ? ` · 상단 보너스 +${bonusParty.points}` : ''}`
     : '';
+  const fx = salonTheme && animate ? party : null;
+  const partyName = party ? (party.seat === mySeat ? '나' : nameOf(party.seat)) : '';
+
+  // D-204 — 축하 층. 펠트가 화면에 보이면 펠트 안에, 휴대폰에서 점수표 아래쪽을 누르느라 펠트가 화면 밖이면 화면 위쪽에 띄운다
+  // (`yt-fx-float` — 스크롤을 건드리지 않는다, 조작을 막지 않는다).
+  const fxLayer = (
+    <>
+        {fx && fx.kind === 'yacht' && (
+          <div className={`yt-fx yt-fx-yacht${fx.float ? ' yt-fx-float' : ''}`} key={fx.nonce} aria-hidden="true">
+            <span className="yt-fx-rays" />
+            <span className="yt-fx-flash" />
+            <span className="yt-fx-sweep" />
+            {/* D-204 — 샴페인 기포가 아래에서 올라오고, 금 리본이 두 모서리에서 풀리고, 금 띠 조각이 흩날린다. */}
+            <span className="yt-fx-bubbles">
+              {Array.from({ length: BUBBLES }, (_, i) => (
+                <i
+                  key={i}
+                  style={
+                    {
+                      left: `${(i * 37 + 9) % 96}%`,
+                      '--yt-b-size': `${5 + ((i * 7) % 9)}px`,
+                      '--yt-b-delay': `${i * 75}ms`,
+                      '--yt-b-dur': `${1300 + (i % 5) * 160}ms`,
+                      '--yt-b-drift': `${((i * 13) % 31) - 15}px`,
+                    } as CSSProperties
+                  }
+                />
+              ))}
+            </span>
+            <span className="yt-fx-ribbon yt-fx-ribbon-l">
+              <Ribbon />
+            </span>
+            <span className="yt-fx-ribbon yt-fx-ribbon-r">
+              <Ribbon />
+            </span>
+            <span className="yt-fx-streamers">
+              {Array.from({ length: STREAMERS }, (_, i) => (
+                <i
+                  key={i}
+                  style={
+                    {
+                      left: `${6 + i * 12.5}%`,
+                      '--yt-st-delay': `${120 + ((i * 5) % 8) * 70}ms`,
+                      '--yt-st-turn': `${i % 2 === 0 ? 540 : -460}deg`,
+                      '--yt-st-drift': `${((i * 17) % 41) - 20}px`,
+                    } as CSSProperties
+                  }
+                />
+              ))}
+            </span>
+            {/* 현수막은 clip-path 로 펼쳐지므로 잔은 그 밖(위)에 둔다. */}
+            <span className="yt-fx-coupes">
+              <span className="yt-fx-coupe yt-fx-coupe-l">
+                <Coupe />
+              </span>
+              <span className="yt-fx-coupe yt-fx-coupe-r">
+                <Coupe />
+              </span>
+            </span>
+            <div className="yt-fx-banner">
+              <b>요트</b>
+              <i>
+                {partyName} · {fx.points}점
+              </i>
+            </div>
+          </div>
+        )}
+        {fx && fx.kind !== 'yacht' && (
+          <div className={`yt-fx yt-fx-${fx.kind}${fx.float ? ' yt-fx-float' : ''}`} key={fx.nonce} aria-hidden="true">
+            <span className="yt-fx-sweep" />
+            <div className="yt-fx-banner yt-fx-banner-mid">
+              <b>{fx.kind === 'bonus' ? '상단 보너스' : CATEGORY_LABEL[fx.category]}</b>
+              {fx.dice && (
+                <span className={`yt-fx-dice${fx.category === 'LARGE_STRAIGHT' ? ' yt-fx-dice-stair' : ' yt-fx-dice-house'}`}>
+                  {fx.dice.map((d, i) => (
+                    <span key={i} className="yt-fx-die" style={{ ['--yt-i' as string]: i } as CSSProperties}>
+                      <YachtDie face={d} mini />
+                    </span>
+                  ))}
+                </span>
+              )}
+              <i>
+                {partyName} · {fx.kind === 'bonus' ? `+${fx.points}` : `${fx.points}점`}
+              </i>
+            </div>
+          </div>
+        )}
+    </>
+  );
 
   return (
     <div className={`yt-table${yachtThemeClass}`} ref={rootRef}>
@@ -401,7 +582,7 @@ export function YachtTable({
               {isTurn && <span className="yt-seat-tag yt-seat-tag-turn">차례</span>}
               {done && <span className="yt-seat-tag">기록함 ✓</span>}
               {seatTurn?.pending && seat.seat !== mySeat ? (
-                <SeatDice turn={seatTurn} />
+                <SeatDice turn={seatTurn} animate={animate} />
               ) : (
                 // 동시 진행에서는 주사위 줄 자리를 늘 비워 둔다 — 누가 기록해 줄이 사라질 때 좌석 띠 높이가 줄어 아래 주사위 판이
                 // 위로 밀리면 누르려던 [굴리기]가 빗나간다.
@@ -432,7 +613,7 @@ export function YachtTable({
 
       <div
         ref={feltRef}
-        className={`yt-felt${myTurn ? ' yt-felt-myturn' : ''}${salonTheme && animate && party ? ' yt-felt-party' : ''}`}
+        className={`yt-felt${myTurn ? ' yt-felt-myturn' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
         style={myTurn ? { ['--yt-accent' as string]: seatAccent(mySeat) } : undefined}
       >
         {salonTheme && (
@@ -448,6 +629,7 @@ export function YachtTable({
           {flash && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
             <span className="yt-badge yt-celebrate">🎉 {CATEGORY_LABEL[flash.category]}!</span>
           )}
+          {bonusParty && <span className="yt-badge yt-celebrate">보너스 +{bonusParty.points}!</span>}
           {!roomFinished && s.result === null && (turnSeat >= 0 || myTurn) && (
             <span className="yt-rolls" aria-hidden="true" title={`굴림 ${s.rolls}/${MAX_ROLLS}`}>
               {Array.from({ length: MAX_ROLLS }, (_, i) => (
@@ -456,19 +638,7 @@ export function YachtTable({
             </span>
           )}
         </div>
-        {salonTheme && animate && party && (
-          <div className="yt-fx" key={party.nonce} aria-hidden="true">
-            <span className="yt-fx-rays" />
-            <span className="yt-fx-flash" />
-            <span className="yt-fx-sweep" />
-            <div className="yt-fx-banner">
-              <b>요트</b>
-              <i>
-                {party.seat === mySeat ? '나' : nameOf(party.seat)} · {party.points}점
-              </i>
-            </div>
-          </div>
-        )}
+        {fx && !fx.float && fxLayer}
         <DiceTray
           dice={s.dice}
           held={s.held}
@@ -500,6 +670,7 @@ export function YachtTable({
         nameOf={nameOf}
         onScore={canScore ? score : undefined}
         lastScore={flash}
+        bonusSeat={bonusParty ? bonusParty.seat : null}
       />
 
       {s.result && (
@@ -525,6 +696,8 @@ export function YachtTable({
         </section>
       )}
 
+      {fx && fx.float && fxLayer}
+
       {chip &&
         Array.from({ length: CHIP_GHOSTS + 1 }, (_, k) => (
           <span
@@ -537,22 +710,31 @@ export function YachtTable({
                 top: chip.y,
                 '--yt-dx': `${chip.dx}px`,
                 '--yt-dy': `${chip.dy}px`,
-                animationDelay: `${k * 28}ms`,
+                animationDelay: `${k * 32}ms`,
                 opacity: k > 0 ? 0.5 - k * 0.12 : undefined,
               } as CSSProperties
             }
-          />
+          >
+            {/* D-204 — 날아가는 것은 점수 숫자다(황동 원반 위). 잔상은 빛만. */}
+            {k === 0 && <b>{chip.points}</b>}
+          </span>
         ))}
-      {/* 칩이 꽂히는 자리의 불티 — 요트 축하 때는 큰 폭발이 대신한다. */}
-      {chip && !party && (
+      {/* 숫자가 꽂히는 자리의 불티 — 요트 축하 때는 큰 폭발이 대신한다. */}
+      {chip && party?.kind !== 'yacht' && (
         <GoldBurst key={`hit:${chip.id}`} x={chip.hitX} y={chip.hitY} count={14} power={0.38} delayMs={CHIP_FLIGHT_MS - 40} />
       )}
-      {salonTheme && animate && party && (
+      {fx && fx.kind === 'yacht' && (
         <>
-          <GoldBurst key={`p0:${party.nonce}`} x={party.x} y={party.y} count={150} />
-          <GoldBurst key={`p1:${party.nonce}`} x={party.x - party.width * 0.3} y={party.y + 10} count={45} power={0.7} delayMs={260} />
-          <GoldBurst key={`p2:${party.nonce}`} x={party.x + party.width * 0.3} y={party.y + 10} count={45} power={0.7} delayMs={460} />
+          <GoldBurst key={`p0:${fx.nonce}`} x={fx.x} y={fx.y} count={150} />
+          <GoldBurst key={`p1:${fx.nonce}`} x={fx.x - fx.width * 0.3} y={fx.y + 10} count={45} power={0.7} delayMs={260} />
+          <GoldBurst key={`p2:${fx.nonce}`} x={fx.x + fx.width * 0.3} y={fx.y + 10} count={45} power={0.7} delayMs={460} />
+          <GoldBurst key={`p3:${fx.nonce}`} x={fx.x} y={fx.y - 6} count={70} power={0.85} delayMs={900} />
         </>
+      )}
+      {/* 현수막 글자를 가리지 않게 조금 아래에서. */}
+      {fx && fx.kind === 'mid' && <GoldBurst key={`m:${fx.nonce}`} x={fx.x} y={fx.y + 48} count={56} power={0.6} delayMs={120} />}
+      {fx && fx.kind === 'bonus' && fx.cellX > 0 && (
+        <GoldBurst key={`b:${fx.nonce}`} x={fx.cellX} y={fx.cellY} count={36} power={0.5} delayMs={CHIP_FLIGHT_MS + 260} />
       )}
 
       <div className="yt-sr-only" aria-live="polite" aria-atomic="true">

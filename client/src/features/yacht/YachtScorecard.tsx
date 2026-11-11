@@ -13,6 +13,8 @@ interface Props {
   /** 내 차례이고 1번 이상 굴렸으면 빈 칸을 눌러 기록한다. */
   onScore?: (category: Category) => void;
   lastScore: LastScore | null;
+  /** D-204 — 방금 상단 보너스가 붙은 좌석(잠깐). 보너스 칸에 도장이 찍힌다. */
+  bonusSeat?: number | null;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * (구경꾼도 "어디 넣을까"를 같이 본다). 내 차례면 그 칸이 버튼이다. D-203 — 내 열은 `yt-cell-me`(옅은 황동 물),
  * 적힌 칸은 `data-yt-cell`(황동 칩이 날아와 꽂힐 자리).
  */
-export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, onScore, lastScore }: Props) {
+export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, onScore, lastScore, bonusSeat = null }: Props) {
   const cell = (seat: YachtSeatView, c: Category) => {
     const written = seat.scores[c];
     const isTurn = seat.seat === turnSeat;
@@ -109,8 +111,12 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
               보너스
             </th>
             {seats.map((s) => (
-              <td key={s.seat} className={`yt-cell${s.seat === mySeat ? ' yt-cell-me' : ''}${s.bonus > 0 ? ' yt-cell-bonus' : ''}`}>
-                {s.bonus > 0 ? `+${s.bonus}` : '-'}
+              <td
+                key={s.seat}
+                className={`yt-cell${s.seat === mySeat ? ' yt-cell-me' : ''}${s.bonus > 0 ? ' yt-cell-bonus' : ''}${bonusSeat === s.seat && s.bonus > 0 ? ' yt-cell-bonus-new' : ''}`}
+                data-yt-bonus={s.seat}
+              >
+                {s.bonus > 0 ? <span className="yt-num">+{s.bonus}</span> : '-'}
               </td>
             ))}
           </tr>

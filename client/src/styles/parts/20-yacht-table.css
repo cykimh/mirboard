@@ -672,6 +672,10 @@ button.yt-badge {
 
 .yt-seat-chip,
 .yt-die-shadow,
+.yt-die-impact,
+.yt-die-sheen,
+.yt-die-lockring,
+.yt-cup,
 .yt-lamp,
 .yt-fx,
 .yt-chip {
@@ -837,7 +841,7 @@ html.dark .yt-theme-salon {
 }
 
 .yt-theme-salon .yt-seat-total-bump {
-  animation: yt-salon-bump 0.6s ease-out 0.32s backwards;
+  animation: yt-salon-bump 0.6s ease-out 0.44s backwards;
 }
 
 @keyframes yt-salon-bump {
@@ -1006,36 +1010,56 @@ html.dark .yt-theme-salon {
   opacity: 1;
 }
 
-/* 요트 축하 — 펠트가 짧게 울린다(내 차례 맥박과 같이 돌 수 있게 두 벌). */
+/* 요트 축하 — 펠트가 짧게 울리며 카메라가 살짝 당겨졌다 돌아온다(D-204, 내 차례 맥박과 같이 돌 수 있게 두 벌). */
 .yt-theme-salon .yt-felt-party {
-  animation: yt-salon-shake 0.5s cubic-bezier(0.3, 0, 0.3, 1) 0.05s;
+  animation: yt-salon-shake 1.7s cubic-bezier(0.3, 0, 0.3, 1) 0.05s;
 }
 
 .yt-theme-salon .yt-felt-myturn.yt-felt-party {
   animation:
-    yt-salon-shake 0.5s cubic-bezier(0.3, 0, 0.3, 1) 0.05s,
+    yt-salon-shake 1.7s cubic-bezier(0.3, 0, 0.3, 1) 0.05s,
     yt-salon-turn 2.2s ease-in-out infinite;
+}
+
+/* 중간 축하(라지 스트레이트·풀 하우스·상단 보너스) — 펠트가 한 번 가볍게 부푼다. */
+.yt-theme-salon .yt-felt-cheer {
+  animation: yt-salon-cheer 0.55s ease-out 0.05s;
+}
+
+.yt-theme-salon .yt-felt-myturn.yt-felt-cheer {
+  animation:
+    yt-salon-cheer 0.55s ease-out 0.05s,
+    yt-salon-turn 2.2s ease-in-out infinite;
+}
+
+@keyframes yt-salon-cheer {
+  35% {
+    transform: scale(1.014);
+  }
 }
 
 @keyframes yt-salon-shake {
   0%,
   100% {
-    transform: translate(0, 0);
+    transform: translate(0, 0) scale(1);
   }
-  12% {
-    transform: translate(-4px, 2px) rotate(-0.4deg);
+  4% {
+    transform: translate(-4px, 2px) rotate(-0.4deg) scale(1.006);
   }
-  28% {
-    transform: translate(4px, -2px) rotate(0.4deg);
+  9% {
+    transform: translate(4px, -2px) rotate(0.4deg) scale(1.012);
   }
-  44% {
-    transform: translate(-3px, -1px) rotate(-0.25deg);
+  14% {
+    transform: translate(-3px, -1px) rotate(-0.25deg) scale(1.018);
   }
-  60% {
-    transform: translate(2px, 1px) rotate(0.15deg);
+  19% {
+    transform: translate(2px, 1px) rotate(0.15deg) scale(1.022);
   }
-  78% {
-    transform: translate(-1px, 0);
+  26% {
+    transform: translate(0, 0) scale(1.026);
+  }
+  72% {
+    transform: translate(0, 0) scale(1.026);
   }
 }
 
@@ -1106,9 +1130,10 @@ html.dark .yt-theme-salon {
 
 /* 상아 주사위 — 버튼은 자리만 잡고 그림(.yt-die-face)이 움직인다. */
 .yt-theme-salon .yt-dice {
-  --yt-throw: min(42vw, 190px);
   --yt-die-size: clamp(50px, 14.4vw, 68px);
-  gap: clamp(6px, 2vw, 13px);
+  --yt-gap: clamp(6px, 2vw, 13px);
+  --yt-step: calc(var(--yt-die-size) + var(--yt-gap));
+  gap: var(--yt-gap);
 }
 
 .yt-theme-salon .yt-die {
@@ -1202,11 +1227,17 @@ html.dark .yt-theme-salon {
   }
 }
 
-/* 굴림 — 오른쪽 레일 너머에서 정육면체가 던져져 구르며 날아와 바닥에 닿고(58%), 한 번 튀고(72%), 잔 튐(93%) 뒤 멈춘다.
- * 주사위마다 40ms 엇갈려 4 × 40 + 440 = 600ms(`ROLL_ANIMATION_MS`) 안에 모두 멈춘다. 움직임은 transform·opacity 뿐(GPU).
- * 이동·튐은 그림 상자(.yt-die-face), 회전은 정육면체(.yt-cube), 펠트에 닿는 그림자는 .yt-die-shadow 가 따로 맡는다. */
+/* 굴림(D-204) — 가죽 컵이 판 오른쪽 위에서 기울며 정육면체를 쏟는다. 주사위는 컵 주둥이에서 떨어져 바닥에 닿고(42%), 크게 한 번
+ * 튀고(58%), 다시 닿아(72%) 작게 한 번 더 튄 뒤(84%) 멈춘다. 착지 순서(`--yt-o`)마다 45ms 엇갈려 4 × 45 + 500 = 680ms
+ * (`ROLL_ANIMATION_MS`) 안에 모두 멈춘다. 움직임은 transform·opacity 뿐(GPU). 이동·튐·눌림은 그림 상자(.yt-die-face), 회전은
+ * 정육면체(.yt-cube — 0 으로 돌아오면 앞면 = 서버 눈), 펠트에 닿는 그림자는 .yt-die-shadow, 착지 고리는 .yt-die-impact 가 맡는다. */
 .yt-theme-salon .yt-die-rolling {
   animation: none;
+}
+
+.yt-theme-salon .yt-die {
+  --yt-from-x: calc((4 - var(--yt-i, 0)) * var(--yt-step) + var(--yt-die-size) * 0.2);
+  --yt-from-y: calc(var(--yt-die-size) * -1);
 }
 
 .yt-theme-salon .yt-die-shadow {
@@ -1237,70 +1268,214 @@ html.dark .yt-theme-salon {
 .yt-theme-salon .yt-die-rolling .yt-die-face {
   filter: none;
   perspective: 340px;
-  animation: yt-salon-throw 440ms linear backwards;
-  animation-delay: calc(var(--yt-i, 0) * 40ms);
+  animation: yt-salon-throw 500ms linear backwards;
+  animation-delay: calc(var(--yt-o, var(--yt-i, 0)) * 45ms);
   will-change: transform;
 }
 
 .yt-theme-salon .yt-die-rolling .yt-die-shadow {
-  animation: yt-salon-shadow 440ms linear backwards;
-  animation-delay: calc(var(--yt-i, 0) * 40ms);
+  animation: yt-salon-shadow 500ms linear backwards;
+  animation-delay: calc(var(--yt-o, var(--yt-i, 0)) * 45ms);
 }
 
 @keyframes yt-salon-throw {
   0% {
-    transform: translate(var(--yt-throw, 170px), -38px) scale(0.82);
+    transform: translate(var(--yt-from-x, 170px), var(--yt-from-y, -60px)) scale(0.5);
     opacity: 0;
-    animation-timing-function: cubic-bezier(0.3, 0, 0.75, 0.6);
+    animation-timing-function: cubic-bezier(0.35, 0, 0.85, 0.7);
   }
-  12% {
+  10% {
     opacity: 1;
   }
+  42% {
+    transform: translate(15%, 3%) scale(1.08, 0.89);
+    animation-timing-function: cubic-bezier(0.15, 0.7, 0.4, 1);
+  }
   58% {
-    transform: translate(-12px, 2px) scale(1.04, 0.95);
-    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+    transform: translate(4%, -32%) scale(0.98, 1.03);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.85, 0.55);
   }
   72% {
-    transform: translate(3px, -13px) scale(1);
-    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.5);
+    transform: translate(-4%, 2%) scale(1.05, 0.94);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
   }
-  86% {
-    transform: translate(0, 1px) scale(1.02, 0.98);
-    animation-timing-function: ease-out;
-  }
-  93% {
-    transform: translate(0, -3px) scale(1);
+  84% {
+    transform: translate(-1%, -10%) scale(1);
     animation-timing-function: ease-in;
+  }
+  94% {
+    transform: translate(0, 1%) scale(1.02, 0.98);
+    animation-timing-function: ease-out;
   }
   100% {
     transform: translate(0, 0) scale(1);
   }
 }
 
+/* 그림자 — 주사위가 높이 뜨면 작고 옅게, 닿으면 크고 짙게. 닿는 순간마다 옆으로 살짝 퍼졌다 돌아온다(흔들림). */
 @keyframes yt-salon-shadow {
   0% {
-    transform: translate(var(--yt-throw, 170px), 4px) scale(0.5);
+    transform: translate(var(--yt-from-x, 170px), 6px) scale(0.35);
     opacity: 0;
   }
-  58% {
-    transform: translate(-12px, 0) scale(1.05);
+  42% {
+    transform: translate(15%, 0) scale(1.14, 1.05);
     opacity: 1;
+  }
+  58% {
+    transform: translate(4%, 4px) scale(0.62);
+    opacity: 0.45;
   }
   72% {
-    transform: translate(3px, 3px) scale(0.72);
-    opacity: 0.55;
-  }
-  86% {
-    transform: translate(0, 0) scale(1.02);
+    transform: translate(-4%, 0) scale(1.1, 1.02);
     opacity: 1;
   }
-  93% {
-    transform: translate(0, 1px) scale(0.92);
-    opacity: 0.85;
+  84% {
+    transform: translate(-1%, 2px) scale(0.86);
+    opacity: 0.8;
+  }
+  94% {
+    transform: translate(0, 0) scale(1.05, 1);
+    opacity: 1;
   }
   100% {
     transform: translate(0, 0) scale(1);
     opacity: 1;
+  }
+}
+
+/* 착지 고리 — 처음 바닥에 닿는 순간(42%) 펠트 위로 옅은 고리가 퍼진다. */
+.yt-theme-salon .yt-die-impact {
+  display: block;
+  position: absolute;
+  z-index: 0;
+  left: -14%;
+  right: -14%;
+  bottom: -20%;
+  height: 36%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 240, 190, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-impact 500ms linear backwards;
+  animation-delay: calc(var(--yt-o, var(--yt-i, 0)) * 45ms);
+}
+
+@keyframes yt-salon-impact {
+  0%,
+  41% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  44% {
+    transform: scale(0.45);
+    opacity: 0.9;
+  }
+  78%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* 가죽 컵 — 다섯 번째 주사위 위에서 기울어 들어와 쏟고 물러난다(꾸밈, 조작을 막지 않는다). */
+.yt-theme-salon .yt-cup {
+  display: block;
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--yt-die-size) * -1.3);
+  left: calc(50% + var(--yt-step) * 2 - var(--yt-die-size) * 0.3);
+  width: calc(var(--yt-die-size) * 1.05);
+  transform-origin: 50% 35%;
+  filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+  animation: yt-salon-cup 620ms ease-out forwards;
+}
+
+.yt-theme-salon .yt-cup svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes yt-salon-cup {
+  0% {
+    transform: translate(40%, -45%) rotate(-25deg);
+    opacity: 0;
+  }
+  16% {
+    transform: translate(0, 0) rotate(-118deg);
+    opacity: 1;
+  }
+  28% {
+    transform: translate(-3%, 4%) rotate(-136deg);
+  }
+  40% {
+    transform: translate(0, 0) rotate(-122deg);
+  }
+  52% {
+    transform: translate(-2%, 2%) rotate(-130deg);
+  }
+  72% {
+    transform: translate(8%, -8%) rotate(-104deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(45%, -55%) rotate(-35deg);
+    opacity: 0;
+  }
+}
+
+/* 고정한 주사위 — 고정하는 순간과 굴릴 때마다 제자리에서 금빛이 한 번 훑고 황동 고리가 퍼진다(잠김). */
+.yt-theme-salon .yt-die-sheen {
+  display: block;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 21%;
+  pointer-events: none;
+}
+
+.yt-theme-salon .yt-die-sheen::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 46%;
+  background: linear-gradient(100deg, transparent, rgba(255, 246, 208, 0.92) 50%, transparent);
+  transform: translateX(-140%) skewX(-16deg);
+  animation: yt-salon-lock-sheen 0.5s ease-out 0.05s;
+}
+
+@keyframes yt-salon-lock-sheen {
+  0% {
+    transform: translateX(-140%) skewX(-16deg);
+  }
+  100% {
+    transform: translateX(340%) skewX(-16deg);
+  }
+}
+
+.yt-theme-salon .yt-die-lockring {
+  display: block;
+  position: absolute;
+  inset: -3px;
+  border: 2px solid #f6e2a4;
+  border-radius: 24%;
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-lock-ring 0.5s ease-out;
+}
+
+@keyframes yt-salon-lock-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
   }
 }
 
@@ -1309,13 +1484,17 @@ html.dark .yt-theme-salon {
   position: relative;
   transform-style: preserve-3d;
   transform: translateZ(calc(var(--yt-die-size) / -2));
-  animation: yt-salon-tumble 440ms linear backwards;
-  animation-delay: calc(var(--yt-i, 0) * 40ms);
+  animation: yt-salon-tumble 500ms linear backwards;
+  animation-delay: calc(var(--yt-o, var(--yt-i, 0)) * 45ms);
   will-change: transform;
 }
 
 .yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube {
   animation-name: yt-salon-tumble-b;
+}
+
+.yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube {
+  animation-name: yt-salon-tumble-c;
 }
 
 .yt-theme-salon .yt-die-rolling .yt-cube-side {
@@ -1351,21 +1530,27 @@ html.dark .yt-theme-salon {
   transform: rotateX(-90deg) translateZ(calc(var(--yt-die-size) / 2));
 }
 
+/* 회전 세 벌 — 떨어지는 동안 빠르게 돌고, 닿을 때마다 반대로 꺾이며 잦아든다(축과 방향이 주사위마다 다르다). */
 @keyframes yt-salon-tumble {
   0% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-560deg) rotateY(430deg) rotateZ(40deg);
-    animation-timing-function: cubic-bezier(0.15, 0.4, 0.5, 1);
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-610deg) rotateY(430deg) rotateZ(50deg);
+    animation-timing-function: cubic-bezier(0.2, 0.3, 0.6, 0.9);
   }
-  58% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-34deg) rotateY(28deg) rotateZ(6deg);
+  42% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-58deg) rotateY(44deg) rotateZ(10deg);
     animation-timing-function: ease-out;
   }
-  72% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(12deg) rotateY(-10deg) rotateZ(-3deg);
+  58% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(20deg) rotateY(-18deg) rotateZ(-5deg);
     animation-timing-function: ease-in-out;
   }
-  86% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-4deg) rotateY(3deg) rotateZ(0deg);
+  72% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-9deg) rotateY(7deg) rotateZ(2deg);
+    animation-timing-function: ease-out;
+  }
+  84% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(4deg) rotateY(-3deg) rotateZ(0deg);
+    animation-timing-function: ease-in-out;
   }
   100% {
     transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
@@ -1374,19 +1559,50 @@ html.dark .yt-theme-salon {
 
 @keyframes yt-salon-tumble-b {
   0% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(470deg) rotateY(-610deg) rotateZ(-55deg);
-    animation-timing-function: cubic-bezier(0.15, 0.4, 0.5, 1);
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(470deg) rotateY(-640deg) rotateZ(-60deg);
+    animation-timing-function: cubic-bezier(0.2, 0.3, 0.6, 0.9);
   }
-  58% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(30deg) rotateY(-36deg) rotateZ(-8deg);
+  42% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(48deg) rotateY(-56deg) rotateZ(-12deg);
     animation-timing-function: ease-out;
   }
-  72% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-10deg) rotateY(13deg) rotateZ(4deg);
+  58% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-17deg) rotateY(22deg) rotateZ(6deg);
     animation-timing-function: ease-in-out;
   }
-  86% {
-    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(3deg) rotateY(-4deg) rotateZ(0deg);
+  72% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(8deg) rotateY(-9deg) rotateZ(-2deg);
+    animation-timing-function: ease-out;
+  }
+  84% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-3deg) rotateY(4deg) rotateZ(0deg);
+    animation-timing-function: ease-in-out;
+  }
+  100% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+}
+
+@keyframes yt-salon-tumble-c {
+  0% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-380deg) rotateY(-520deg) rotateZ(90deg);
+    animation-timing-function: cubic-bezier(0.2, 0.3, 0.6, 0.9);
+  }
+  42% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-40deg) rotateY(-50deg) rotateZ(16deg);
+    animation-timing-function: ease-out;
+  }
+  58% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(14deg) rotateY(20deg) rotateZ(-7deg);
+    animation-timing-function: ease-in-out;
+  }
+  72% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-7deg) rotateY(-8deg) rotateZ(3deg);
+    animation-timing-function: ease-out;
+  }
+  84% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(3deg) rotateY(3deg) rotateZ(0deg);
+    animation-timing-function: ease-in-out;
   }
   100% {
     transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
@@ -1653,13 +1869,13 @@ html.dark .yt-theme-salon {
   box-shadow: none;
 }
 
-/* 기록 — 칩이 닿는 순간(0.32s) 칸에 금박이 훑고 숫자가 찍힌다. */
+/* 기록 — 숫자가 닿는 순간(0.44s) 칸에 금박이 훑고 숫자가 새겨진다. */
 .yt-theme-salon .yt-cell-flash {
   background-image: linear-gradient(100deg, transparent 30%, rgba(246, 226, 164, 0.75) 50%, transparent 70%);
   background-size: 300% 100%;
   background-position: -60% 0;
   background-repeat: no-repeat;
-  animation: yt-salon-leaf 1.15s ease-out 0.32s backwards;
+  animation: yt-salon-leaf 1.15s ease-out 0.44s backwards;
 }
 
 @keyframes yt-salon-leaf {
@@ -1675,7 +1891,7 @@ html.dark .yt-theme-salon {
 .yt-theme-salon .yt-cell-flash .yt-num {
   color: var(--yt-s-brass-ink);
   font-weight: 700;
-  animation: yt-salon-emboss 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.32s backwards;
+  animation: yt-salon-emboss 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.44s backwards;
 }
 
 @keyframes yt-salon-emboss {
@@ -1689,21 +1905,32 @@ html.dark .yt-theme-salon {
   }
 }
 
-/* 황동 칩 — 주사위 자리에서 칸으로 포물선. 게임판 루트 좌표, 조작을 막지 않는다. */
+/* 점수 숫자(D-204) — 황동 원반에 실린 숫자가 주사위 자리에서 칸으로 포물선. 게임판 루트 좌표, 조작을 막지 않는다. */
 .yt-theme-salon .yt-chip {
-  display: block;
+  display: grid;
+  place-items: center;
   position: absolute;
   z-index: 20;
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid #7a5c1c;
-  background:
-    radial-gradient(circle, transparent 0 5.5px, #7a5c1c 5.5px 6.5px, transparent 6.5px),
-    radial-gradient(circle at 35% 30%, #f7e6ae, #d6b25e 60%, #8f6f2c);
-  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at 35% 30%, #fff3c9, #e3c26e 58%, #a8842f);
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(255, 226, 140, 0.7),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.35);
   pointer-events: none;
-  animation: yt-salon-chip 0.36s ease-in-out forwards;
+  animation: yt-salon-chip 0.48s cubic-bezier(0.4, 0, 0.5, 1) forwards;
+}
+
+.yt-theme-salon .yt-chip b {
+  color: #2a1d05;
+  font-family: var(--yt-s-serif);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .yt-theme-salon .yt-chip-ghost {
@@ -1729,7 +1956,7 @@ html.dark .yt-theme-salon {
   border: 2px solid var(--yt-s-brass);
   opacity: 0;
   pointer-events: none;
-  animation: yt-salon-ring 0.55s ease-out 0.32s;
+  animation: yt-salon-ring 0.55s ease-out 0.44s;
 }
 
 @keyframes yt-salon-ring {
@@ -1745,15 +1972,15 @@ html.dark .yt-theme-salon {
 
 @keyframes yt-salon-chip {
   0% {
-    transform: translate(-50%, -50%) scale(0.6);
+    transform: translate(-50%, -50%) scale(0.5);
     opacity: 0;
   }
-  20% {
-    transform: translate(calc(-50% + var(--yt-dx) * 0.15), calc(-50% + var(--yt-dy) * 0.15 - 18px)) scale(1.15);
+  22% {
+    transform: translate(calc(-50% + var(--yt-dx) * 0.1), calc(-50% + var(--yt-dy) * 0.1 - 26px)) scale(1.45);
     opacity: 1;
   }
   60% {
-    transform: translate(calc(-50% + var(--yt-dx) * 0.6), calc(-50% + var(--yt-dy) * 0.6 - 34px)) scale(1.1);
+    transform: translate(calc(-50% + var(--yt-dx) * 0.6), calc(-50% + var(--yt-dy) * 0.6 - 36px)) scale(1.15);
     opacity: 1;
   }
   92% {
@@ -1919,6 +2146,332 @@ html.dark .yt-theme-salon {
   }
 }
 
+/* ── D-204 요트 큰 축하의 덧붙임: 샴페인 기포 · 금 리본 · 금 띠 조각 · 잔 부딪힘 ── */
+.yt-theme-salon .yt-fx-bubbles,
+.yt-theme-salon .yt-fx-streamers {
+  position: absolute;
+  inset: 0;
+}
+
+.yt-theme-salon .yt-fx-bubbles i {
+  position: absolute;
+  bottom: -16px;
+  width: var(--yt-b-size, 8px);
+  height: var(--yt-b-size, 8px);
+  border: 1px solid rgba(255, 246, 208, 0.85);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.9), rgba(255, 236, 170, 0.25) 45%, transparent 70%);
+  opacity: 0;
+  animation: yt-salon-bubble var(--yt-b-dur, 1.4s) ease-in var(--yt-b-delay, 0ms) forwards;
+}
+
+@keyframes yt-salon-bubble {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(var(--yt-b-drift, 8px), -100px) scale(1);
+  }
+  82% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(calc(var(--yt-b-drift, 8px) * -0.6), -230px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.yt-theme-salon .yt-fx-ribbon {
+  position: absolute;
+  top: 0;
+  width: clamp(40px, 13%, 76px);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+  animation: yt-salon-ribbon-fade 2.6s ease forwards;
+}
+
+.yt-theme-salon .yt-fx-ribbon-l {
+  left: 3%;
+}
+
+.yt-theme-salon .yt-fx-ribbon-r {
+  right: 3%;
+  scale: -1 1;
+}
+
+.yt-theme-salon .yt-fx-ribbon svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.yt-theme-salon .yt-fx-ribbon path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: yt-salon-ribbon 0.9s cubic-bezier(0.3, 0.8, 0.4, 1) 0.15s forwards;
+}
+
+@keyframes yt-salon-ribbon {
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes yt-salon-ribbon-fade {
+  0%,
+  78% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.yt-theme-salon .yt-fx-streamers i {
+  position: absolute;
+  top: -20px;
+  width: 5px;
+  height: 16px;
+  border-radius: 1px;
+  background: linear-gradient(#fff6d0, #d6b25e 60%, #a8842f);
+  opacity: 0;
+  animation: yt-salon-streamer 1.7s cubic-bezier(0.3, 0.2, 0.6, 1) var(--yt-st-delay, 0ms) forwards;
+}
+
+@keyframes yt-salon-streamer {
+  0% {
+    transform: translate(0, 0) rotate(0deg) rotateX(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--yt-st-drift, 10px), 260px) rotate(var(--yt-st-turn, 360deg)) rotateX(720deg);
+    opacity: 0;
+  }
+}
+
+/* 샴페인 잔 두 개 — 현수막 위에서 마주 기울어 한 번 부딪힌다. */
+.yt-theme-salon .yt-fx-coupes {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 70px);
+  width: 0;
+  height: 0;
+  animation: yt-salon-ribbon-fade 2.6s ease forwards;
+}
+
+.yt-theme-salon .yt-fx-coupe {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  transform-origin: 50% 90%;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+.yt-theme-salon .yt-fx-coupe svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.yt-theme-salon .yt-fx-coupe-l {
+  left: -25px;
+  animation: yt-salon-clink-l 1.1s cubic-bezier(0.3, 0.9, 0.4, 1) 0.25s backwards;
+  transform: rotate(16deg);
+}
+
+.yt-theme-salon .yt-fx-coupe-r {
+  left: 1px;
+  animation: yt-salon-clink-r 1.1s cubic-bezier(0.3, 0.9, 0.4, 1) 0.25s backwards;
+  transform: rotate(-16deg);
+}
+
+@keyframes yt-salon-clink-l {
+  0% {
+    transform: translate(-26px, 10px) rotate(-12deg);
+    opacity: 0;
+  }
+  40% {
+    transform: translate(2px, 0) rotate(24deg);
+    opacity: 1;
+  }
+  58% {
+    transform: translate(-3px, 0) rotate(10deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(16deg);
+  }
+}
+
+@keyframes yt-salon-clink-r {
+  0% {
+    transform: translate(26px, 10px) rotate(12deg);
+    opacity: 0;
+  }
+  40% {
+    transform: translate(-2px, 0) rotate(-24deg);
+    opacity: 1;
+  }
+  58% {
+    transform: translate(3px, 0) rotate(-10deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-16deg);
+  }
+}
+
+/* 펠트가 화면 밖일 때(휴대폰에서 점수표 아래쪽을 누를 때) — 축하 층을 화면에 띄우고 현수막은 위쪽 3분의 1 에. */
+.yt-theme-salon .yt-fx-float {
+  position: fixed;
+  z-index: 30;
+}
+
+.yt-theme-salon .yt-fx-float .yt-fx-banner {
+  top: 30%;
+}
+
+.yt-theme-salon .yt-fx-float .yt-fx-coupes {
+  top: calc(30% - 70px);
+}
+
+.yt-theme-salon .yt-fx-float .yt-fx-rays {
+  top: 30%;
+}
+
+.yt-theme-salon .yt-fx-float .yt-fx-flash {
+  background: radial-gradient(60% 40% at 50% 30%, rgba(255, 246, 208, 0.7), rgba(255, 226, 140, 0.2) 55%, transparent 75%);
+}
+
+/* ── D-204 중간 축하: 작은 현수막 + 그 족보의 주사위 다섯 개가 차례로 놓인다 ── */
+.yt-theme-salon .yt-fx-banner-mid {
+  padding: 7px 22px 8px;
+  animation-duration: 1.8s;
+}
+
+.yt-theme-salon .yt-fx-banner-mid b {
+  margin-right: -0.22em;
+  font-size: 19px;
+  letter-spacing: 0.22em;
+  animation-duration: 1.2s;
+  animation-delay: 0.15s;
+}
+
+.yt-theme-salon .yt-fx-dice {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  margin: 7px 0 6px;
+}
+
+.yt-theme-salon .yt-fx-die {
+  display: block;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.5));
+  animation: yt-salon-fxdie 0.34s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+  animation-delay: calc(0.22s + var(--yt-i, 0) * 70ms);
+}
+
+.yt-theme-salon .yt-fx-die svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 스트레이트는 계단처럼 오른쪽으로 올라가고, 풀 하우스는 3개 묶음과 2개 묶음 사이를 띄운다. */
+.yt-theme-salon .yt-fx-dice-stair .yt-fx-die {
+  translate: 0 calc((2 - var(--yt-i, 0)) * 3px);
+}
+
+.yt-theme-salon .yt-fx-dice-house .yt-fx-die:nth-child(4) {
+  margin-left: 9px;
+}
+
+@keyframes yt-salon-fxdie {
+  0% {
+    transform: translateY(-16px) scale(0.4) rotate(-40deg);
+    opacity: 0;
+  }
+}
+
+/* ── D-204 상단 보너스: 보너스 칸에 +35 도장이 찍히고 고리·금박이 따른다(숫자 비행이 끝난 뒤) ── */
+.yt-theme-salon .yt-cell-bonus-new {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(246, 226, 164, 0.8) 50%, transparent 70%);
+  background-size: 300% 100%;
+  background-position: -60% 0;
+  background-repeat: no-repeat;
+  animation: yt-salon-leaf 1.2s ease-out 0.74s backwards;
+}
+
+.yt-theme-salon .yt-cell-bonus-new .yt-num {
+  display: inline-block;
+  color: var(--yt-s-brass-ink);
+  font-weight: 700;
+  animation: yt-salon-stamp 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) 0.74s backwards;
+}
+
+@keyframes yt-salon-stamp {
+  0% {
+    transform: scale(1.9) rotate(-14deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(0.9) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.yt-theme-salon .yt-cell-bonus-new::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--yt-s-brass);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-ring 0.6s ease-out 0.86s 2;
+}
+
+/* ── D-204 동시 진행 좌석 띠: 남의 굴림을 작은 주사위가 가볍게 따라 구른다(4 × 30 + 340 = 460ms) ── */
+.yt-theme-salon .yt-mini-die-rolling {
+  animation: yt-salon-mini-roll 340ms cubic-bezier(0.3, 0.6, 0.4, 1) backwards;
+  animation-delay: calc(var(--yt-i, 0) * 30ms);
+}
+
+@keyframes yt-salon-mini-roll {
+  0% {
+    transform: translateY(-9px) rotate(-200deg) scale(0.7);
+    opacity: 0.2;
+  }
+  55% {
+    transform: translateY(1px) rotate(12deg) scale(1.06, 0.92);
+    opacity: 1;
+  }
+  78% {
+    transform: translateY(-3px) rotate(-4deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
 /* 결과 — 장부 한 장 */
 .yt-theme-salon .yt-end {
   gap: 10px;
@@ -1939,6 +2492,69 @@ html.dark .yt-theme-salon {
   0% {
     opacity: 0;
     transform: translateY(8px);
+  }
+}
+
+/* D-204 — 순위 줄이 꼴찌부터 차례로 뒤집힌다(`--yt-r` = 아래에서 몇 번째). 마지막에 뒤집힌 1위 줄은 금빛이 두 번 훑는다. */
+.yt-theme-salon .yt-end-reveal .yt-end-list {
+  perspective: 700px;
+}
+
+.yt-theme-salon .yt-end-reveal .yt-end-row {
+  transform-origin: 50% 0;
+  backface-visibility: hidden;
+  animation: yt-salon-flip 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+  animation-delay: calc(350ms + var(--yt-r, 0) * 240ms);
+}
+
+@keyframes yt-salon-flip {
+  0% {
+    transform: rotateX(-92deg);
+    opacity: 0;
+  }
+  60% {
+    transform: rotateX(14deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+.yt-theme-salon .yt-end-reveal .yt-end-first {
+  position: relative;
+  overflow: hidden;
+}
+
+.yt-theme-salon .yt-end-reveal .yt-end-first::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgba(246, 226, 164, 0.75) 50%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-shimmer 0.9s ease-out calc(830ms + var(--yt-r, 0) * 240ms) 2;
+}
+
+/* 1인 판 총점 — 작게 시작해 살짝 넘쳤다 자리 잡는다(카드 폭을 넘지 않게 — 넘치면 휴대폰 화면이 가로로 밀린다). */
+.yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title {
+  animation: yt-salon-title-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) 0.3s backwards;
+}
+
+@keyframes yt-salon-title-in {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
