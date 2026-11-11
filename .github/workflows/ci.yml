@@ -145,7 +145,8 @@ jobs:
       - name: Install client deps + Chromium
         run: |
           npm --prefix client ci
-          npx --prefix client playwright install --with-deps chromium
+          # 러너의 apt 미러가 가끔 실패한다 — 그때는 시스템 패키지 없이 브라우저만 받는다(ubuntu 이미지에 의존 라이브러리가 이미 있다).
+          npx --prefix client playwright install --with-deps chromium || npx --prefix client playwright install chromium
 
       - name: E2E (guest → 세 게임 봇과 연습)
         working-directory: client
