@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
@@ -256,40 +257,30 @@ export function OmokTable({
 
   return (
     <div className={`om-table ${OMOK_TOKENS_CLASS}`}>
-      <header className="om-header">
-        <div className="om-header-badges">
+      <header className="om-header gm-header">
+        <div className="om-header-badges gm-header-info">
           <span className="om-badge om-badge-title">오목</span>
-          {s.mode && <span className="om-badge">{s.mode === 'TEAMS_2V2' ? '2:2 팀전' : '1:1'}</span>}
           {s.rule && <span className="om-badge">{RULE_LABEL[s.rule]}</span>}
-          {practice && <span className="om-badge">🤖 혼자 연습</span>}
           {spectator && <span className="om-badge">👀 관전 중</span>}
-          {spectatorCount > 0 && <span className="om-badge">관전 {spectatorCount}</span>}
         </div>
-        <div className="om-header-actions">
-          <button type="button" className="om-badge" onClick={rules.show}>
-            규칙
-          </button>
+        <div className="om-header-actions gm-header-actions">
           <button type="button" className="om-badge" onClick={() => setChatOpen((v) => !v)} aria-pressed={chatOpen}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
-          <button type="button" className="om-badge" onClick={toggleMute} aria-pressed={!muted}>
-            {muted ? '🔇' : '🔔'}
-          </button>
-          {!spectator && mySeat >= 0 && s.result === null && !roomFinished && (
-            <button type="button" className="om-badge" onClick={resign}>
-              기권
-            </button>
-          )}
-          {onAbort && (
-            <button type="button" className="om-badge" onClick={onAbort}>
-              게임 종료
-            </button>
-          )}
-          {onExit && (
-            <button type="button" className="om-badge" onClick={exit}>
-              나가기
-            </button>
-          )}
+          {/* D-186 — 방 정보·설정·규칙·기권·게임 종료·나가기는 ⋮ 메뉴로(머리 줄 한 줄 고정). */}
+          <GameMenu
+            triggerClassName="om-badge"
+            info={[
+              s.mode && (s.mode === 'TEAMS_2V2' ? '2:2 팀전' : '1:1'),
+              practice && '봇과 연습',
+              spectatorCount > 0 && `관전 ${spectatorCount}명`,
+            ]}
+            sound={{ muted, onToggle: toggleMute }}
+            onRules={rules.show}
+            onResign={!spectator && mySeat >= 0 && s.result === null && !roomFinished ? resign : undefined}
+            onAbort={onAbort}
+            onExit={onExit ? exit : undefined}
+          />
         </div>
       </header>
 

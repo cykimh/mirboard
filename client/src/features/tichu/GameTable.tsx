@@ -22,10 +22,11 @@ import { MatchEndedPanel } from './MatchEndedPanel';
 import { MyHandPanel } from './MyHandPanel';
 import { GameTableHeader } from './GameTableHeader';
 import { TableArena } from './TableArena';
-import { buttonVariants } from '@/components/ui/button';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
-import { VoiceControls } from '@/features/voice/VoiceControls';
 import { RoundHistoryModal } from './RoundHistoryModal';
+import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
+import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
+import { TICHU_TUTORIAL } from './tutorial/tichuTutorial';
 
 interface GameTableProps {
   roomId: string;
@@ -104,6 +105,9 @@ export function GameTable({
   const toggleCardAnim = useCardAnimStore((s) => s.toggle);
   const triggerEffect = useEffectStore((s) => s.trigger);
 
+  // D-186 — ⋮ 메뉴의 '규칙 보기'(자동 노출 없음 — D-154).
+  const rules = useTutorialGate(TICHU_TUTORIAL.seenKey, false);
+
   const m = useGameTableModel({ playerIds, myUserId });
   // D-240 — 끝난 방에서는 진행 중 단계로 그리지 않는다(카드·버튼·타이머·차례 알림이 끝난 방에 남지 않게).
   const live = !roomFinished;
@@ -141,6 +145,21 @@ export function GameTable({
     setPendingWishPlay: m.setPendingWishPlay,
   });
 
+  // D-186 — 진행 중 나가기는 되돌릴 수 없는 탈주다 — 티츄는 팀전이라 곧 판이 끝나고 우리 팀이 진다(D-75).
+  // 관전자·매치 종료 뒤·방 종료 뒤(D-240)는 잃을 것이 없어 묻지 않는다.
+  const exit = () => {
+    if (!onExit) return;
+    if (
+      !spectator &&
+      live &&
+      !m.matchEnded &&
+      !window.confirm('게임 중에 나가면 탈주로 처리되어 우리 팀이 집니다. 나가시겠습니까?')
+    ) {
+      return;
+    }
+    onExit();
+  };
+
   const tableView = m.tableView;
   if (!tableView) {
     return <p>{t('common.loading')}</p>;
@@ -174,9 +193,9 @@ export function GameTable({
         onToggleChat={() => setChatOpen((v) => !v)}
         unreadCount={unreadCount}
         onAbort={live ? onAbort : undefined}
-        voiceControls={
-          <VoiceControls voice={voice} buttonClassName={buttonVariants({ variant: 'outline', size: 'sm' })} />
-        }
+        onExit={onExit ? exit : undefined}
+        onRules={rules.show}
+        voice={voice}
       />
 
       <TableArena
@@ -210,6 +229,7 @@ export function GameTable({
         onOpenRoundHistory={() => setRoundHistoryOpen(true)}
       />
 
+      <TutorialDialog tutorial={TICHU_TUTORIAL} open={rules.open} onClose={rules.close} />
       <RoundHistoryModal
         open={roundHistoryOpen}
         onOpenChange={setRoundHistoryOpen}

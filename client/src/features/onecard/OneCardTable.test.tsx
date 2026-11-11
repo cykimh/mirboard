@@ -1,3 +1,4 @@
+import { openGameMenu, queryMenuItem, getMenuItem, clickMenuItem, menuInfoText } from '@/test/gameMenu';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -851,7 +852,7 @@ describe('OneCardTable — 종료·나가기', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderTable({ playerIds: [100, 101, 102], onExit });
 
-    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    clickMenuItem('나가기');
     expect(confirm).toHaveBeenCalled();
     expect(onExit).not.toHaveBeenCalled();
   });
@@ -862,7 +863,7 @@ describe('OneCardTable — 종료·나가기', () => {
     const confirm = vi.spyOn(window, 'confirm');
     renderTable({ playerIds: [100, 101, 102], onExit });
 
-    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    clickMenuItem('나가기');
     expect(confirm).not.toHaveBeenCalled();
     expect(onExit).toHaveBeenCalledTimes(1);
   });
@@ -882,7 +883,7 @@ describe('OneCardTable — 종료·나가기', () => {
     seed({ seatCount: 3, mySeat: 0 });
     renderTable({ playerIds: [100, 101, 102] });
 
-    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    clickMenuItem('규칙 보기');
     expect(screen.getByText('원카드에 오신 걸 환영합니다')).toBeInTheDocument();
   });
 });
@@ -1226,7 +1227,7 @@ describe('OneCardTable — 차례 강조 (D-160)', () => {
     expect(vibrate).toHaveBeenCalledTimes(1);
 
     act(() => useOneCardStore.setState({ turnSeat: 1 }));
-    fireEvent.click(screen.getByRole('button', { name: '효과음' }));
+    clickMenuItem('효과음');
     act(() => useOneCardStore.setState({ turnSeat: 0 }));
     expect(vibrate).toHaveBeenCalledTimes(1);
   });
@@ -1388,7 +1389,7 @@ describe('OneCardTable — 강제 종료 (D-135)', () => {
     const onAbort = vi.fn();
     renderTable({ onAbort });
 
-    fireEvent.click(screen.getByRole('button', { name: '게임 종료' }));
+    clickMenuItem('게임 종료');
     expect(onAbort).toHaveBeenCalledTimes(1);
   });
 
@@ -1396,31 +1397,31 @@ describe('OneCardTable — 강제 종료 (D-135)', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
 
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
   });
 
   it('방이 이미 끝났으면 버튼이 없다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable({ onAbort: vi.fn(), roomFinished: true });
 
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
   });
 });
 
-/** D-136 — 봇과 연습 방은 머리 줄에 "🤖 혼자 연습"(티츄 배너와 같은 문구). RoomPage 가 방의 fillWithBots 로 넘긴다. */
+/** D-136 — 봇과 연습 방 표시. D-186 부터 머리 줄이 아니라 ⋮ 메뉴의 방 정보 줄에 "봇과 연습". */
 describe('OneCardTable — 혼자 연습 표시 (D-136)', () => {
-  it('practice 면 머리 줄에 "🤖 혼자 연습"', () => {
+  it('practice 면 메뉴 방 정보에 "봇과 연습"', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable({ practice: true });
 
-    expect(screen.getByText('🤖 혼자 연습')).toBeInTheDocument();
+    expect(menuInfoText()).toContain('봇과 연습');
   });
 
   it('친구와 하기 방에는 없다', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
     renderTable();
 
-    expect(screen.queryByText(/혼자 연습/)).toBeNull();
+    expect(menuInfoText()).not.toContain('봇과 연습');
   });
 });
 
@@ -1687,8 +1688,7 @@ describe('OneCardTable — 효과음·이모지 (D-154)', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
     renderTable({ playerIds: [100, 101, 102] });
 
-    fireEvent.click(screen.getByRole('button', { name: '이모지 반응' }));
-    fireEvent.click(screen.getByRole('button', { name: '👍' }));
+    clickMenuItem('반응 👍');
 
     expect(sendReaction).toHaveBeenCalledWith('👍');
   });
@@ -1706,17 +1706,17 @@ describe('OneCardTable — 효과음·이모지 (D-154)', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
     renderTable({ playerIds: [100, 101, 102] });
 
-    const sound = screen.getByRole('button', { name: '효과음' });
-    expect(sound).toHaveAttribute('aria-pressed', 'true');
+    const sound = getMenuItem('효과음');
+    expect(sound).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(sound);
-    expect(screen.getByRole('button', { name: '효과음' })).toHaveAttribute('aria-pressed', 'false');
+    expect(getMenuItem('효과음')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('관전자에게는 이모지 버튼이 없다', () => {
     seed({ seatCount: 3, mySeat: -1, turnSeat: 1 });
     renderTable({ playerIds: [100, 101, 102], myUserId: 999, spectator: true });
 
-    expect(screen.queryByRole('button', { name: '이모지 반응' })).toBeNull();
+    expect(within(openGameMenu()).queryByRole('group', { name: '이모지 반응' })).toBeNull();
   });
 });
 
@@ -1746,18 +1746,18 @@ describe('OneCardTable — 음성 대화 (D-155)', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
     renderTable({ playerIds: [100, 101, 102] });
 
-    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    expect(getMenuItem('마이크')).toBeDisabled();
+    clickMenuItem('음성 대화');
 
     expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
-    expect(screen.getByRole('button', { name: '음성 대화' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '마이크' })).toBeEnabled();
+    expect(getMenuItem('음성 대화')).toHaveAttribute('aria-checked', 'true');
+    expect(getMenuItem('마이크')).toBeEnabled();
   });
 
   it('참여한 사람의 좌석에 🎧 가 붙는다', async () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
     const { container } = renderTable({ playerIds: [100, 101, 102] });
-    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    clickMenuItem('음성 대화');
 
     await act(async () => {
       voiceHandler!({ type: 'JOIN', from: 102, data: null });

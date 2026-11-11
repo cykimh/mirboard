@@ -64,5 +64,7 @@
 @import './parts/22-cloudroute-table.css';
 /* 씨앗포 게임판(D-223) — `.ar-` 접두 전용, 같은 규칙(공용 클래스 재정의 금지, 폭 미디어 0개). */
 @import './parts/23-artillery-table.css';
+/* 게임판 ⋮ 메뉴·한 줄 머리 줄(D-186) — `.gm-` 접두 전용, 게임판 CSS 뒤(머리 줄 줄바꿈을 이긴다)·17 앞, 폭 미디어 0개. */
+@import './parts/24-game-menu.css';
 /* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
 @import './parts/17-responsive.css';

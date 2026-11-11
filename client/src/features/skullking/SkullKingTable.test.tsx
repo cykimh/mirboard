@@ -1,3 +1,4 @@
+import { queryMenuItem, getMenuItem, clickMenuItem, menuInfoText } from '@/test/gameMenu';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SkullKingTable } from './SkullKingTable';
@@ -326,7 +327,7 @@ describe('칩/판돈은 스컬킹에 없다', () => {
 
 describe('나가기 확인 (D-110)', () => {
   // 탈주는 되돌릴 수 없다(유령 좌석 자동조종, D-104) — 진행 중인 플레이어만 확인을 거친다.
-  const exitButton = () => screen.getByRole('button', { name: '나가기' });
+  const exitButton = () => getMenuItem('나가기');
 
   it('진행 중인 플레이어가 확인을 취소하면 나가지 않는다', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -490,9 +491,8 @@ describe('점수표 모달 (D-120)', () => {
     seedRound4Bidding();
     renderTable();
 
-    const button = screen.getByRole('button', { name: '점수표' });
-    expect(button).toHaveAttribute('aria-haspopup', 'dialog');
-    fireEvent.click(button);
+    // D-186 — 점수표는 ⋮ 메뉴의 보기 항목.
+    clickMenuItem('점수표');
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('table').textContent).toContain('R3');
@@ -573,7 +573,7 @@ describe('roomFinished — 종료 전이 후에도 유지된 게임판 (D-120)',
     seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING' });
     renderTable({ roomFinished: true, onExit });
 
-    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+    clickMenuItem('나가기');
 
     expect(confirm).not.toHaveBeenCalled();
     expect(onExit).toHaveBeenCalledOnce();
@@ -590,7 +590,7 @@ describe('규칙 버튼 (D-121)', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
     renderTable();
 
-    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    clickMenuItem('규칙 보기');
 
     expect(
       screen.getByRole('heading', { name: '스컬킹에 오신 걸 환영합니다' }),
@@ -612,7 +612,7 @@ describe('규칙 버튼 (D-121)', () => {
     seed({ seatCount: 4, mySeat: -1, phase: 'PLAYING' });
     renderTable({ spectator: true });
 
-    fireEvent.click(screen.getByRole('button', { name: '규칙' }));
+    clickMenuItem('규칙 보기');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
@@ -850,7 +850,7 @@ describe('강제 종료 (D-135)', () => {
     const onAbort = vi.fn();
     renderTable({ onAbort });
 
-    fireEvent.click(screen.getByRole('button', { name: '게임 종료' }));
+    clickMenuItem('게임 종료');
     expect(onAbort).toHaveBeenCalledTimes(1);
   });
 
@@ -858,31 +858,31 @@ describe('강제 종료 (D-135)', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
     renderTable();
 
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
   });
 
   it('방이 이미 끝났으면 버튼이 없다', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
     renderTable({ onAbort: vi.fn(), roomFinished: true });
 
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
   });
 });
 
-/** D-136 — 봇과 연습 방은 머리 줄에 "🤖 혼자 연습"(티츄 배너와 같은 문구). RoomPage 가 방의 fillWithBots 로 넘긴다. */
+/** D-136 — 봇과 연습 방 표시. D-186 부터 머리 줄이 아니라 ⋮ 메뉴의 방 정보 줄에 "봇과 연습". */
 describe('혼자 연습 표시 (D-136)', () => {
-  it('practice 면 머리 줄에 "🤖 혼자 연습"', () => {
+  it('practice 면 메뉴 방 정보에 "봇과 연습"', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
     renderTable({ practice: true });
 
-    expect(screen.getByText('🤖 혼자 연습')).toBeInTheDocument();
+    expect(menuInfoText()).toContain('봇과 연습');
   });
 
   it('친구와 하기 방에는 없다', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'PLAYING', currentTurnSeat: 1 });
     renderTable();
 
-    expect(screen.queryByText(/혼자 연습/)).toBeNull();
+    expect(menuInfoText()).not.toContain('봇과 연습');
   });
 });
 
@@ -943,8 +943,8 @@ describe('음성 대화 (D-156)', () => {
     seed({ seatCount: 4, mySeat: 0, phase: 'BIDDING', hand: [suit('GREEN', 5)] });
     const { container } = renderTable();
 
-    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    expect(getMenuItem('마이크')).toBeDisabled();
+    clickMenuItem('음성 대화');
     expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
 
     await act(async () => {

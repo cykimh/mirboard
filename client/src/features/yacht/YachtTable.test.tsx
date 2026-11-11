@@ -1,3 +1,4 @@
+import { closeGameMenu, menuInfoText } from '@/test/gameMenu';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BUSY_RETRY_DELAY_MS, HOLD_SEND_DELAY_MS, YachtTable, STALE_TURN_GRACE_MS, STALE_TURN_JITTER_MS } from './YachtTable';
@@ -313,7 +314,9 @@ describe('YachtTable', () => {
       ],
     });
     const { unmount } = renderTable({ turnSeconds: 45 });
-    expect(screen.getByText('모두 같이')).toBeInTheDocument();
+    // D-186 — 진행 방식은 ⋮ 메뉴의 방 정보 줄에.
+    expect(menuInfoText()).toContain('모두 같이');
+    closeGameMenu();
     expect(screen.getByText('내 차례')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '주사위 6, 6, 5, 5, 1 · 굴림 1/3' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /굴리기/ }));

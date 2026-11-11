@@ -5,16 +5,16 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { GameMenu } from '@/components/GameMenu';
 import { seatMinWidth, tableLayout, type TableSide } from '@/components/seatOrder';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
-import { REACTIONS, useLiveReactions } from '@/features/chat/reactionStore';
+import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
-import { VoiceControls } from '@/features/voice/VoiceControls';
 import { cardKey, type OneCardCard } from '@/types/onecard';
 import type { RaceButtonSize, RaceButtonVisibility } from '@/types/api';
 import { onecardRoomSink } from './onecardRoomSink';
@@ -123,7 +123,6 @@ export function OneCardTable({
   const [chatOpen, setChatOpen] = useState(false);
   // D-154 — 티츄처럼 효과음(내 차례 알림음) 켜기/끄기와 이모지 반응.
   const { muted, toggleMute, playChime } = useSfx();
-  const [reactionOpen, setReactionOpen] = useState(false);
   const liveReactions = useLiveReactions();
   // D-163 — 보낸 사람 좌석(나는 "(나)" 줄) 위에 최근 채팅 한 줄.
   const chatLines = useSeatChatLines(playerIds);
@@ -313,79 +312,32 @@ export function OneCardTable({
 
   return (
     <div ref={tableRef} className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
-      <header className="oc-header">
-        <div className="oc-header-badges">
+      <header className="oc-header gm-header">
+        <div className="oc-header-badges gm-header-info">
           <span className="oc-badge oc-badge-title">원카드</span>
-          <span className="oc-badge">{seatCount}인</span>
-          {practice && <span className="oc-badge">🤖 혼자 연습</span>}
-          {turnSeconds > 0 && <span className="oc-badge">턴 {turnSeconds}초</span>}
-          {spectatorCount > 0 && <span className="oc-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="oc-badge">관전 모드</span>}
-          <span className="oc-badge">{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
-        <div className="oc-header-badges">
-          <button
-            type="button"
-            className="oc-badge"
-            onClick={toggleMute}
-            aria-label="효과음"
-            aria-pressed={!muted}
-            title={muted ? '효과음 켜기' : '효과음 끄기'}
-          >
-            {muted ? '🔇' : '🔊'}
-          </button>
-          <VoiceControls voice={voice} buttonClassName="oc-badge" />
-          {!spectator && (
-            <span className="oc-reaction-bar">
-              <button
-                type="button"
-                className="oc-badge"
-                onClick={() => setReactionOpen((v) => !v)}
-                aria-label="이모지 반응"
-                aria-expanded={reactionOpen}
-                title="이모지 반응"
-              >
-                😀
-              </button>
-              {reactionOpen && (
-                <span className="oc-reaction-palette">
-                  {REACTIONS.map((e) => (
-                    <button
-                      type="button"
-                      key={e}
-                      onClick={() => {
-                        sendReaction(e);
-                        setReactionOpen(false);
-                      }}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </span>
-              )}
-            </span>
-          )}
+        <div className="oc-header-badges gm-header-actions">
           <button type="button" className="oc-badge" onClick={() => setChatOpen((v) => !v)}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
-          <button
-            type="button"
-            className="oc-badge"
-            onClick={rules.show}
-            title="게임 방법 다시 보기 — 턴 타이머는 계속 흐릅니다"
-          >
-            규칙
-          </button>
-          {onAbort && !roomFinished && (
-            <button type="button" className="oc-badge" onClick={onAbort}>
-              게임 종료
-            </button>
-          )}
-          {onExit && (
-            <button type="button" className="oc-badge" onClick={exit}>
-              나가기
-            </button>
-          )}
+          {/* D-186 — 방 정보·설정·규칙·반응·게임 종료·나가기는 ⋮ 메뉴로(머리 줄 한 줄 고정). */}
+          <GameMenu
+            triggerClassName="oc-badge"
+            info={[
+              `${seatCount}인`,
+              practice && '봇과 연습',
+              turnSeconds > 0 && `턴 ${turnSeconds}초`,
+              spectatorCount > 0 && `관전 ${spectatorCount}명`,
+              connected ? '연결됨' : '연결 끊김',
+            ]}
+            sound={{ muted, onToggle: toggleMute }}
+            onRules={rules.show}
+            onReaction={spectator ? undefined : sendReaction}
+            voice={voice}
+            onAbort={onAbort && !roomFinished ? onAbort : undefined}
+            onExit={onExit ? exit : undefined}
+          />
         </div>
       </header>
 

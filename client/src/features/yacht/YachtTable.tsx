@@ -5,15 +5,15 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
-import { REACTIONS, useLiveReactions } from '@/features/chat/reactionStore';
+import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
-import { VoiceControls } from '@/features/voice/VoiceControls';
 import { MAX_ROLLS, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
 import { useYachtStore } from './yachtStore';
@@ -120,7 +120,6 @@ export function YachtTable({
     useStompRoom(roomId, token, yachtRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
   const { muted, toggleMute, playChime } = useSfx();
-  const [reactionOpen, setReactionOpen] = useState(false);
   const liveReactions = useLiveReactions();
   const chatLines = useSeatChatLines(playerIds);
   const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
@@ -332,79 +331,34 @@ export function YachtTable({
 
   return (
     <div className={`yt-table${yachtThemeClass}`} ref={rootRef}>
-      <header className="yt-header">
-        <div className="yt-header-badges">
+      <header className="yt-header gm-header">
+        <div className="yt-header-badges gm-header-info">
           <span className="yt-badge yt-badge-title">요트</span>
-          <span className="yt-badge">{seatCount}인</span>
           <span className="yt-badge">라운드 {Math.min(s.round, 12)}/12</span>
-          {practice && <span className="yt-badge">🤖 연습</span>}
-          {s.simultaneous && <span className="yt-badge">모두 같이</span>}
-          {turnSeconds > 0 && (
-            <span className="yt-badge">
-              {s.simultaneous ? '라운드' : '차례'} {turnSeconds}초
-            </span>
-          )}
-          {spectatorCount > 0 && <span className="yt-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="yt-badge">관전 모드</span>}
-          <span className="yt-badge">{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
-        <div className="yt-header-badges">
-          <button
-            type="button"
-            className="yt-badge"
-            onClick={toggleMute}
-            aria-label="효과음"
-            aria-pressed={!muted}
-            title={muted ? '효과음 켜기' : '효과음 끄기'}
-          >
-            {muted ? '🔇' : '🔊'}
-          </button>
-          <VoiceControls voice={voice} buttonClassName="yt-badge" />
-          {!spectator && (
-            <span className="yt-reaction-bar">
-              <button
-                type="button"
-                className="yt-badge"
-                onClick={() => setReactionOpen((v) => !v)}
-                aria-label="이모지 반응"
-                aria-expanded={reactionOpen}
-              >
-                😀
-              </button>
-              {reactionOpen && (
-                <span className="yt-reaction-palette">
-                  {REACTIONS.map((e) => (
-                    <button
-                      type="button"
-                      key={e}
-                      onClick={() => {
-                        sendReaction(e);
-                        setReactionOpen(false);
-                      }}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </span>
-              )}
-            </span>
-          )}
+        <div className="yt-header-badges gm-header-actions">
           <button type="button" className="yt-badge" onClick={() => setChatOpen((v) => !v)}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
-          <button type="button" className="yt-badge" onClick={rules.show} title="게임 방법 — 차례 시간은 계속 흐릅니다">
-            규칙
-          </button>
-          {onAbort && !roomFinished && (
-            <button type="button" className="yt-badge" onClick={onAbort}>
-              게임 종료
-            </button>
-          )}
-          {onExit && (
-            <button type="button" className="yt-badge" onClick={exit}>
-              나가기
-            </button>
-          )}
+          {/* D-186 — 방 정보·설정·규칙·반응·게임 종료·나가기는 ⋮ 메뉴로(머리 줄 한 줄 고정). */}
+          <GameMenu
+            triggerClassName="yt-badge"
+            info={[
+              `${seatCount}인`,
+              practice && '봇과 연습',
+              s.simultaneous && '모두 같이',
+              turnSeconds > 0 && `${s.simultaneous ? '라운드' : '차례'} ${turnSeconds}초`,
+              spectatorCount > 0 && `관전 ${spectatorCount}명`,
+              connected ? '연결됨' : '연결 끊김',
+            ]}
+            sound={{ muted, onToggle: toggleMute }}
+            onRules={rules.show}
+            onReaction={spectator ? undefined : sendReaction}
+            voice={voice}
+            onAbort={onAbort && !roomFinished ? onAbort : undefined}
+            onExit={onExit ? exit : undefined}
+          />
         </div>
       </header>
 

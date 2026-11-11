@@ -188,6 +188,14 @@
   }
 }
 
+/* D-186 — 머리 줄 채팅·⋮ 버튼도 44px 하한(요트·오목·구름항로·씨앗포 알약은 ~26px). 터치 기기에서만. */
+@media (pointer: coarse) {
+  .gm-header .gm-header-actions > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* D-160·D-173 — 원카드 차례 맥박(좌석·경기장)은 움직임 줄이기 설정이면 멈춘다(빛은 남는다). 19 는 미디어 0개 규칙이라 여기 둔다. */
 @media (prefers-reduced-motion: reduce) {
   .oc-seat-turn,
@@ -389,6 +397,78 @@
   .cr-table *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* D-186 — 휴대폰 경기장 확대·고정(티츄·스컬킹·원카드·요트·구름항로). 머리 줄이 한 줄(⋮ 메뉴)로 줄어든 만큼 경기장을 키운다.
+   높이는 100dvh 기준이라 주소창 때문에 실제 보이는 높이가 작은 휴대폰에서는 예전 최소값으로 돌아간다(그보다 작아지지 않는다).
+   좌우 여백도 줄여 폭이 정하는 경기장(구름항로 정사각 판·요트 주사위 줄)을 키운다. 기준 실측(375×812) — 머리 줄 81~151 → 44px.
+   ① 스컬킹 천은 입찰(트릭 없음 212px)↔플레이(트릭 레일 344px)에서 높이가 뛰어 아래 "나" 줄·손패가 밀렸다 — 플레이 높이 이상을 최소로.
+   ② 원카드 "나" 줄·요트 차례 상태 줄은 한 줄 고정(넘치면 이름 말줄임) — "공격받는 중 +N"·남은 시간이 붙을 때 줄이 늘지 않게.
+   ③ 스컬킹 가운데 행만 늘어나게(1fr) — 맨 끝 D-132 블록(≤560px)보다 앞이라 `.sk-table` 접두로 특이도를 올린다. */
+@media (max-width: 480px) {
+  #root:has(> .room-page) {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .sk-table,
+  .oc-table,
+  .yt-table,
+  .cr-table,
+  .cr-table.cr-storybook {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .table-arena {
+    box-sizing: border-box;
+    min-height: max(394px, calc(100dvh - 338px));
+  }
+
+  .oc-felt {
+    box-sizing: border-box;
+    min-height: max(412px, calc(100dvh - 320px));
+  }
+
+  .oc-me {
+    flex-wrap: nowrap;
+    min-height: 34px;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+
+  .oc-me > strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .oc-me > .oc-badge {
+    flex-shrink: 0;
+  }
+
+  .sk-table .sk-felt {
+    box-sizing: border-box;
+    min-height: max(360px, calc(100dvh - 372px));
+    grid-template-rows: auto auto 1fr auto;
+  }
+
+  .sk-me {
+    box-sizing: border-box;
+    min-height: 64px;
+  }
+
+  .yt-felt {
+    box-sizing: border-box;
+    min-height: max(207px, calc(100dvh - 533px));
+    justify-content: center;
+  }
+
+  .yt-felt-status {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    white-space: nowrap;
   }
 }
 
