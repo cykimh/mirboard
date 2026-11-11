@@ -7,6 +7,7 @@ import {
 } from '@/types/onecard';
 import { canPlay, drawCount, isSuitChange, sortForDisplay } from './onecardRules';
 import { OneCardCardChip } from './OneCardCardChip';
+import { SUIT_CLASS } from './OneCardFace';
 
 const SUITS: OneCardSuit[] = ['SPADE', 'HEART', 'DIAMOND', 'CLUB'];
 
@@ -122,7 +123,7 @@ export function OneCardHand({
               <button
                 key={suit}
                 type="button"
-                className={`oc-suit-opt${suit === 'HEART' || suit === 'DIAMOND' ? ' oc-suit-red' : ''}${
+                className={`oc-suit-opt ${SUIT_CLASS[suit]}${suit === 'HEART' || suit === 'DIAMOND' ? ' oc-suit-red' : ''}${
                   suitChoice === suit ? ' selected' : ''
                 }`}
                 aria-pressed={suitChoice === suit}

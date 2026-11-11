@@ -1,4 +1,6 @@
 import { SUIT_SYMBOL, cardLabel, rankLabel, type OneCardCard } from '@/types/onecard';
+import { OneCardFace, SUIT_CLASS } from './OneCardFace';
+import { neonTheme } from './oneCardTheme';
 
 interface Props {
   card: OneCardCard;
@@ -20,7 +22,7 @@ export function toneOf(card: OneCardCard): string {
 }
 
 /**
- * 원카드 카드 한 장 — 이미지 없이 무늬 기호와 숫자로 그린다(D-129). `.card-chip` 공용 CSS 로 크기·모서리·그림자를
+ * 원카드 카드 한 장 — 기본 모습은 이미지 없이 무늬 기호와 숫자(D-129), 네온 파티 테마(D-260)는 SVG 그림 면(`OneCardFace`). `.card-chip` 공용 CSS 로 크기·모서리·그림자를
  * 받고, 색과 배치만 `.oc-card*` 가 정한다.
  */
 export function OneCardCardChip({
@@ -35,6 +37,7 @@ export function OneCardCardChip({
     'card-chip',
     'oc-card',
     toneOf(card),
+    card.suit ? SUIT_CLASS[card.suit] : '',
     compact ? 'oc-card-compact' : '',
     selected ? 'oc-card-selected' : '',
     dimmed ? 'oc-card-dimmed' : '',
@@ -43,7 +46,10 @@ export function OneCardCardChip({
     .join(' ');
   const label = cardLabel(card);
 
-  const body = card.joker ? (
+  // D-260 — 네온 파티 테마는 직접 그린 SVG 그림 면, 기본 모습은 기호와 숫자.
+  const body = neonTheme ? (
+    <OneCardFace card={card} />
+  ) : card.joker ? (
     <>
       <span className="oc-card-joker-mark" aria-hidden>
         ★

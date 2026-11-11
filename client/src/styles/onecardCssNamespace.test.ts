@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indexCssSource, onecardCssSource } from './cssSources';
+import { indexCssSource, onecardCssSource, responsiveCssSource } from './cssSources';
 
 /**
  * `.oc-` 네임스페이스 규칙을 기계로 강제한다 (D-129, 스컬킹 `skullkingCssNamespace.test` 와 같은 규칙).
@@ -311,6 +311,118 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
     expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'text-overflow')).toBe('ellipsis');
     expect(lastDeclared('.oc-felt .oc-center-info .oc-badge', 'max-width')).toBe('100%');
     expect(lastDeclared('.oc-felt .oc-center-info', 'flex-wrap')).toBe('nowrap');
+  });
+});
+
+/**
+ * D-260 — 네온 파티 테마 층. 꾸밈은 전부 `.oc-theme-neon` 아래(또는 테마에서만 그려지는 조각 `.oc-fx*`·`.oc-party*`·`.oc-face`)라
+ * `oneCardTheme.ts` 한 줄로 꺼진다. 경쟁 버튼의 위치·크기·찾기 난이도는 테마가 건드리지 않는다.
+ */
+describe('19-onecard-table.css — 네온 파티 테마 (D-260)', () => {
+  const KEYFRAMES = /@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g;
+  const groups = selectorGroups(cssCode).flatMap((g) => g.split(',').map((one) => one.replace(/\s+/g, ' ').trim()));
+  const neonStart = onecardCssSource.indexOf('네온 파티 테마 (D-260');
+  // 구역 머리 주석의 끝(`*/`)부터 — 주석을 걷어 낸 원문.
+  const neonSource = onecardCssSource
+    .slice(onecardCssSource.indexOf('*/', neonStart) + 2)
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('테마 구역이 기본 규칙 뒤(파일 끝)에 온다', () => {
+    expect(neonStart).toBeGreaterThan(onecardCssSource.indexOf('.oc-tokens {'));
+  });
+
+  it('다크·라이트 토큰을 따로 두고, 포털(칩·연습 버튼)이 쓰는 토큰을 다시 푼다', () => {
+    const dark = tokensOf('.oc-theme-neon');
+    const light = tokensOf('html:not(.dark) .oc-theme-neon');
+    for (const t of ['--oc-card-bg', '--oc-joker-black-bg', '--oc-joker-color-bg', '--oc-race-call', '--oc-race-catch']) {
+      expect(dark.get(t), `다크 ${t}`).toBeTruthy();
+    }
+    for (const t of [
+      '--oc-card-bg',
+      '--oc-felt-bg',
+      '--oc-suit-spade',
+      '--oc-suit-heart',
+      '--oc-suit-diamond',
+      '--oc-suit-club',
+      '--oc-face-ink',
+    ]) {
+      expect(light.get(t), `라이트 ${t}`).toBeTruthy();
+      expect(light.get(t), t).not.toBe(dark.get(t));
+    }
+  });
+
+  it('무늬 넷이 서로 다른 색이다', () => {
+    const dark = tokensOf('.oc-theme-neon');
+    const suits = ['spade', 'heart', 'diamond', 'club'];
+    expect(new Set(suits.map((s) => dark.get(`--oc-suit-${s}`))).size).toBe(4);
+    for (const s of suits) {
+      expect(declared(`.oc-theme-neon .oc-s-${s}`, 'color')).toBe(`var(--oc-suit-${s})`);
+    }
+  });
+
+  it('테마 구역의 선택자는 테마 클래스 아래이거나 테마에서만 그려지는 조각이다', () => {
+    const neonGroups = selectorGroups(neonSource.replace(KEYFRAMES, ''))
+      .flatMap((g) => g.split(','))
+      .map((one) => one.replace(/\s+/g, ' ').trim());
+    expect(neonGroups.length).toBeGreaterThan(60);
+    const offenders = neonGroups.filter(
+      (one) => !/\.oc-theme-neon|\.oc-fx|\.oc-party|\.oc-face|\.oc-fly-fan-card/.test(one),
+    );
+    expect(offenders, `테마 밖으로 새는 선택자: ${offenders.join(' | ')}`).toEqual([]);
+  });
+
+  it('경쟁 버튼 — 빛·깜빡임은 찾기 난이도 보통일 때만, 위치·크기·투명도는 건드리지 않는다', () => {
+    const raceRules = groups.filter((one) => one.includes('.oc-theme-neon') && /\.oc-race-(btn|call|catch)/.test(one));
+    expect(raceRules.length).toBeGreaterThan(0);
+    for (const one of raceRules) {
+      expect(one, one).toContain('.oc-race-vis-normal');
+      for (const prop of ['left', 'top', 'width', 'height', 'max-width', 'opacity', 'transform', 'display']) {
+        expect(declared(one, prop), `${one} { ${prop} }`).toBeUndefined();
+      }
+    }
+    // 깜빡임 키프레임은 밝기만 — 투명도·위치를 움직이지 않는다.
+    const flicker = /@keyframes oc-neon-flicker\s*\{([\s\S]*?)\n\}/.exec(neonSource)?.[1] ?? '';
+    expect(flicker).toContain('brightness');
+    expect(flicker).not.toMatch(/opacity|transform/);
+  });
+
+  it('내 차례 빛(D-173)은 경기장 테두리에 남는다 — 네온은 ::after 의 opacity 로 숨 쉰다', () => {
+    expect(declared('.oc-theme-neon .oc-felt-myturn', 'border-color')).toBe('var(--oc-accent)');
+    expect(declared('.oc-theme-neon .oc-felt-myturn::after', 'animation')).toContain('oc-neon-breathe');
+  });
+
+  it('탈락 좌석은 흑백이다', () => {
+    expect(declared('.oc-theme-neon .oc-seat-out', 'filter')).toBe('grayscale(1)');
+  });
+
+  it('연출 키프레임은 transform·opacity·filter 만 움직인다 — 레이아웃을 흔들지 않는다', () => {
+    const frames = [...neonSource.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)];
+    expect(frames.length).toBeGreaterThan(15);
+    for (const [, name, body] of frames) {
+      const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]);
+      const bad = props.filter((prop) => !['transform', 'opacity', 'filter'].includes(prop));
+      expect(bad, `${name}: ${bad.join(', ')}`).toEqual([]);
+    }
+  });
+
+  it('연출 조각은 누를 수 없다 — 조작을 막지 않는다', () => {
+    expect(declared('.oc-fx', 'pointer-events')).toBe('none');
+    expect(declared('.oc-party', 'pointer-events')).toBe('none');
+  });
+
+  it('움직임 줄이기면 깜빡임을 멈추고 조각을 그리지 않는다 (17 의 .oc- 블록)', () => {
+    const block =
+      /D-260[\s\S]*?@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}\n/.exec(responsiveCssSource)?.[1] ?? '';
+    for (const sel of [
+      '.oc-theme-neon .oc-felt::before',
+      '.oc-theme-neon .oc-felt-myturn::after',
+      '.oc-fx',
+      '.oc-party',
+    ]) {
+      expect(block, sel).toContain(sel);
+    }
+    expect(block).toMatch(/animation:\s*none/);
+    expect(block).toMatch(/display:\s*none/);
   });
 });
 
