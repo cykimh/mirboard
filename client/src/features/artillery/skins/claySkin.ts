@@ -6,6 +6,8 @@ import { barrelAnim, explosionAnim, progressFrameIndex, seedAnim, unitAnim, type
 import type { SpriteSource } from './spriteSkin';
 import type { ArtillerySkin, Palette, SkinCelebration, SkinFx, SkinLabel, SkinUnit } from './types';
 import { paintSoil, VECTOR_SOIL } from './vectorSkin';
+import { back, clamp01, CONFETTI, disc, ease, ell, FONT, hash, mod, NAVY, rr, star, TAU } from './clayKit';
+import { CLAY_FX, CLAY_FX_TAIL_MS, createClayFx, fallenPose, HIT_WOBBLE_MS, hitSquash } from './clayFx';
 
 /**
  * "말랑 클레이 장난감" 스킨 (D-252, 시안 B). 화분 몸(표정)·잎·포신·씨앗·폭발·둔덕은 시트(`skins/clay/atlas.png`)에서 가져오고,
@@ -17,14 +19,10 @@ import { paintSoil, VECTOR_SOIL } from './vectorSkin';
  */
 export const CLAY_UNIT_SCALE = 1.25;
 const CLAY_PALETTE: Palette = { skyTop: '#4fbdf0', skyBottom: '#c4ecff', cloud: '#ffffff', cloudEdge: '#9fd0ea', label: '#22304a' };
-const NAVY = '#22304a';
-const FONT = '"Arial Rounded MT Bold","Jua","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif';
 const TEAM_COLORS = ['#e0803a', '#3a86d6'];
 const HP_COLORS = ['#4fd45a', '#ffc23a', '#ff5a4c'];
-const CONFETTI = ['#ffd23a', '#ff5a3c', '#3f7fd9', '#ffffff', '#4fd45a', '#d94f8a'];
 const SOIL_BITS = ['#b0683c', '#884c2c', '#74d44a', '#d28e5e'];
 const MOUND_BITS = ['#5fd15a', '#2a9a4a', '#b6e04a', '#7ddc4a'];
-const TAU = Math.PI * 2;
 const W = FIELD_W;
 const H = FIELD_H;
 
@@ -37,59 +35,9 @@ const defaultCanvas: CanvasFactory = (w, h) => {
   return c;
 };
 
-/** 결정적 난수 0~1. */
-function hash(a: number, b: number): number {
-  let n = (Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263)) | 0;
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
-}
-const clamp01 = (t: number) => (t < 0 ? 0 : t > 1 ? 1 : t);
-const ease = (t: number) => 1 - Math.pow(1 - clamp01(t), 3);
-/** 살짝 넘쳤다 돌아오는 튕김. */
-const back = (t: number) => {
-  const u = clamp01(t) - 1;
-  return 1 + 3.2 * u * u * u + 2.2 * u * u;
-};
-const mod = (v: number, m: number) => ((v % m) + m) % m;
-
-function disc(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
-function ell(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rot = 0) {
-  ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, rot, 0, TAU);
-  ctx.fill();
-}
-function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  r = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-/** 뾰족 별(변환 없이 꼭짓점을 직접 찍는다). */
-function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, points: number, inner: number, rot: number) {
-  ctx.beginPath();
-  for (let i = 0; i < points * 2; i++) {
-    const a = rot + (i * Math.PI) / points;
-    const q = i % 2 ? r * inner : r;
-    ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
 /** 상태 → 움직임 값(고쳐 쓰는 객체 하나). */
-const M = { bob: 0, sway: 0, back: 0, sq: 0, flash: 0, jx: 0, wilt: 0, blink: false };
+const M = { bob: 0, sway: 0, back: 0, sq: 0, flash: 0, jx: 0, wilt: 0, blink: false, lift: 0, leaf: 0 };
+const FALL = { tilt: 0, lift: 0, wilt: 0 };
 function motion(pose: string, el: number, still: boolean) {
   M.bob = 0;
   M.sway = 0;
@@ -99,6 +47,8 @@ function motion(pose: string, el: number, still: boolean) {
   M.jx = 0;
   M.wilt = 0;
   M.blink = false;
+  M.lift = 0;
+  M.leaf = 0;
   if (pose === 'idle') {
     if (!still) {
       M.bob = Math.sin((el / 1040) * TAU);
@@ -117,12 +67,26 @@ function motion(pose: string, el: number, still: boolean) {
   } else if (pose === 'hit') {
     const k = 1 - Math.min(1, el / 400);
     M.flash = el < 110 ? 1 : el < 240 && (Math.floor(el / 55) & 1) === 1 ? 0.6 : 0;
-    M.jx = Math.sin(el / 22) * 1.6 * k;
-    // 납작하게 눌렸다가 길쭉하게 튕겨 오른다
-    M.sq = el < 90 ? 0.9 * (1 - el / 90) - 0.2 : -k * Math.cos(el / 60) * 0.9;
+    if (CLAY_FX) {
+      // D-254 — 깊게 찌그러졌다 출렁이며 돌아온다(창이 끝난 뒤에도 `drawUnit` 이 이어 그린다)
+      M.jx = Math.sin(el / 22) * 2 * Math.exp(-el / 160);
+      M.sq = hitSquash(el);
+    } else {
+      M.jx = Math.sin(el / 22) * 1.6 * k;
+      // 납작하게 눌렸다가 길쭉하게 튕겨 오른다
+      M.sq = el < 90 ? 0.9 * (1 - el / 90) - 0.2 : -k * Math.cos(el / 60) * 0.9;
+    }
+  } else if (CLAY_FX) {
+    // D-254 — 기우뚱 → 벌렁 → 통 → 잎이 시든다
+    fallenPose(still ? 1e6 : el, FALL);
+    M.wilt = FALL.tilt;
+    M.lift = FALL.lift;
+    M.leaf = FALL.wilt;
   } else {
     const k = still ? 1 : Math.min(1, el / 380);
     M.wilt = 1 - (1 - k) * (1 - k);
+    M.leaf = M.wilt;
+    M.lift = still ? 0 : Math.max(0, Math.sin(clamp01((el - 380) / 220) * Math.PI)) * 1.6;
   }
 }
 
@@ -130,6 +94,8 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
   const ppc = atlas.pxPerCell;
   const K = 1 / ppc;
   const lift = atlas.labelLift;
+  /** D-254 연출 층 — 아래에서 포대·사건 그리기를 넘겨 만든다(`CLAY_FX` 가 꺼져 있으면 null = D-252 그대로). */
+  let fxLayer: ReturnType<typeof createClayFx> | null = null;
   const opt = (key: string): SpriteAnim | null => atlas.anims.get(key) ?? null;
   const flashAnim = opt('flash');
   /** 큰 화면이면 흙·하늘을 2배로 그려 둔다(휴대폰은 전장 폭이 640 장치 픽셀 남짓이라 1배면 충분). */
@@ -194,6 +160,8 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
   const walkDir = new Float64Array(8);
   const fallAt = new Float64Array(8).fill(-1e9);
   const landAt = new Float64Array(8).fill(-1e9);
+  /** 마지막으로 맞은 시각(화면 시계) — 피격 창이 끝난 뒤 출렁임을 잇는다(D-254). */
+  const hitAt = new Float64Array(8).fill(-1e9);
 
   const drawUnit = (ctx: CanvasRenderingContext2D, s: SkinUnit) => {
     const pose = s.pose.pose;
@@ -218,6 +186,10 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
       } else if (s.time - fallAt[i] < 60 && s.time - fallAt[i] > 20) {
         landAt[i] = s.time;
         fallAt[i] = -1e9;
+      }
+      if (CLAY_FX) {
+        if (pose === 'hit') hitAt[i] = s.time - el;
+        else if (pose !== 'down' && s.time - hitAt[i] < HIT_WOBBLE_MS) sq += hitSquash(s.time - hitAt[i]);
       }
       if (pose === 'idle' || pose === 'aim') {
         if (s.time - walkAt[i] < 150) {
@@ -287,7 +259,7 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
     if (left) ctx.scale(-1, 1);
     const w = M.wilt;
     // 쓰러짐 — 옆으로 넘어가 한 번 통 튄다
-    const bounce = pose === 'down' && !still ? Math.max(0, Math.sin(clamp01((el - 380) / 220) * Math.PI)) * 1.6 : 0;
+    const bounce = pose === 'down' ? M.lift : 0;
     ctx.translate(4.5 * w, -bounce - hop);
     ctx.rotate(w * 1.45 + tilt * (left ? -1 : 1));
     ctx.translate(-4.5 * w, 0);
@@ -298,9 +270,9 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
       ctx.translate(0, -7.6);
       ctx.rotate(M.sway * 0.07);
       // 잎은 귀처럼 까딱 — 시들면 아래로 접힌다
-      const fold = 1 - 1.75 * w + (pose === 'hit' ? -0.5 * (1 - Math.min(1, el / 400)) : 0) + (pose === 'recoil' ? M.back * 0.3 : 0);
+      const fold = 1 - (CLAY_FX && pose === 'down' ? 0.45 * Math.max(0, w) + 1.3 * M.leaf : 1.75 * w) + (pose === 'hit' ? -0.5 * (1 - Math.min(1, el / 400)) : 0) + (pose === 'recoil' ? M.back * 0.3 : 0);
       ctx.scale(1, fold);
-      blit(ctx, leaves, w > 0.55 && leaves.frames.length > 1 ? 1 : 0, null);
+      blit(ctx, leaves, (CLAY_FX ? M.leaf > 0.3 : w > 0.55) && leaves.frames.length > 1 ? 1 : 0, null);
       ctx.restore();
     }
     if (pose === 'down') {
@@ -331,7 +303,19 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
       }
       ctx.stroke();
     }
-    if (pose === 'down' && !still && el > 160) {
+    if (CLAY_FX && pose === 'down' && !still && el >= 560 && el < 900) {
+      // 벌렁 넘어진 자리에서 먼지가 폴싹
+      const k = (el - 560) / 340;
+      const side = left ? -1 : 1;
+      ctx.fillStyle = '#f0e2cc';
+      ctx.globalAlpha = 0.6 * (1 - k);
+      for (let i = 0; i < 5; i++) {
+        const d = (i - 1) * 3.2 + side * 5;
+        disc(ctx, d + Math.sign(d || 1) * k * 4, 0.2 - k * (1.5 + (i % 2) * 1.6), 1.5 + k * 2.2);
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (pose === 'down' && !still && el > (CLAY_FX ? 620 : 160)) {
       // 머리 위를 도는 별 셋
       const a0 = el / 190;
       for (let i = 0; i < 3; i++) {
@@ -497,34 +481,37 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    // 흩날리는 꽃잎(밤에는 반딧불) — 바람을 탄다
-    for (let i = 0; i < 14; i++) {
-      const h1 = hash(i, 11);
-      const h2 = hash(i, 12);
-      const x = mod(h1 * 700 + time * (0.006 + h2 * 0.008 + wind * 0.0045), 700) - 30;
-      const y = mod(h2 * 380 + time * (0.005 + h1 * 0.006), 380) - 10 + Math.sin(time / 700 + i * 2.1) * 7;
-      if (night) {
-        const glow = time > 0 ? 0.5 + 0.5 * Math.sin(time / 330 + i * 2.3) : 0.8;
-        ctx.fillStyle = '#fff6a8';
-        ctx.globalAlpha = 0.16 * glow;
-        disc(ctx, x, y, 3.2);
-        ctx.globalAlpha = 0.5 + 0.5 * glow;
-        disc(ctx, x, y, 0.9);
-      } else if (i % 3 === 0) {
-        // 민들레 홀씨
-        ctx.globalAlpha = 0.85;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 0.4;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - wind * 0.12, y + 2.6);
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        disc(ctx, x, y, 1.15);
-      } else {
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = i % 3 === 1 ? '#ffb7cf' : '#fff2f6';
-        ell(ctx, x, y, 1.9, 0.95, time / 380 + i * 1.9 + h1 * 6);
+    // 흩날리는 꽃잎(밤에는 반딧불) — 바람을 탄다. D-254 — 바람 세기만큼 많이·빨리 흐른다.
+    if (fxLayer) fxLayer.drawMotes(ctx, night, time, wind);
+    else {
+      for (let i = 0; i < 14; i++) {
+        const h1 = hash(i, 11);
+        const h2 = hash(i, 12);
+        const x = mod(h1 * 700 + time * (0.006 + h2 * 0.008 + wind * 0.0045), 700) - 30;
+        const y = mod(h2 * 380 + time * (0.005 + h1 * 0.006), 380) - 10 + Math.sin(time / 700 + i * 2.1) * 7;
+        if (night) {
+          const glow = time > 0 ? 0.5 + 0.5 * Math.sin(time / 330 + i * 2.3) : 0.8;
+          ctx.fillStyle = '#fff6a8';
+          ctx.globalAlpha = 0.16 * glow;
+          disc(ctx, x, y, 3.2);
+          ctx.globalAlpha = 0.5 + 0.5 * glow;
+          disc(ctx, x, y, 0.9);
+        } else if (i % 3 === 0) {
+          // 민들레 홀씨
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.4;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - wind * 0.12, y + 2.6);
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          disc(ctx, x, y, 1.15);
+        } else {
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = i % 3 === 1 ? '#ffb7cf' : '#fff2f6';
+          ell(ctx, x, y, 1.9, 0.95, time / 380 + i * 1.9 + h1 * 6);
+        }
       }
     }
     ctx.globalAlpha = 1;
@@ -911,12 +898,9 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
     ctx.globalAlpha = 1;
   };
 
-  const drawEffects = (ctx: CanvasRenderingContext2D, fx: SkinFx) => {
-    ctx.lineCap = 'round';
-    for (const e of fx.events) {
-      const age = fx.nowMs - e.at;
-      if (age < 0 || age > 1200) continue;
-      const a = age / TICK_MS;
+  /** 사건 하나의 입자(숫자 빼고) — {@code a} = 사건부터 지난 틱. */
+  const drawEvent = (ctx: CanvasRenderingContext2D, e: FxEvent, a: number, fx: SkinFx) => {
+    {
       if (e.kind === 'impact') {
         if (e.fill) {
           clods(ctx, e, a, Math.min(14, 5 + Math.round(e.r * 0.5)), MOUND_BITS);
@@ -1026,6 +1010,15 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
         }
       }
     }
+  };
+
+  const drawEffects = (ctx: CanvasRenderingContext2D, fx: SkinFx) => {
+    ctx.lineCap = 'round';
+    for (const e of fx.events) {
+      const age = fx.nowMs - e.at;
+      if (age < 0 || age > 1200) continue;
+      drawEvent(ctx, e, age / TICK_MS, fx);
+    }
     // 숫자는 입자 위에
     for (const e of fx.events) {
       const age = fx.nowMs - e.at;
@@ -1105,6 +1098,9 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
   // ── 이름표 ──────────────────────────────────────────────────────────
   const shown = new Float64Array(8).fill(-1);
   const shownAt = new Float64Array(8);
+  /** D-254 — 체력이 깎인 시각과 그때의 목표 체력(잔상이 잠깐 머문 뒤 줄어든다). */
+  const dropAt = new Float64Array(8).fill(-1e9);
+  const dropTo = new Float64Array(8).fill(-1);
   const widths = new Map<string, number>();
   let labelFontKey = 0;
   let labelFont = '';
@@ -1144,18 +1140,30 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
     ctx.fillText(l.text, cx + fs * 0.3, top);
     // 체력 — 깎일 때 스르르 줄고, 방금 깎인 만큼은 흰색으로 남았다 사라진다
     let hp = l.hp;
+    let since = 1e9;
     const seat = l.seat ?? -1;
     const time = l.time ?? 0;
     if (seat >= 0 && time > 0) {
       const i = seat & 7;
-      if (shown[i] < 0 || time - shownAt[i] > 2000 || shown[i] < l.hp) shown[i] = l.hp;
-      else shown[i] += (l.hp - shown[i]) * Math.min(1, (time - shownAt[i]) / 170);
+      if (shown[i] < 0 || time - shownAt[i] > 2000 || shown[i] < l.hp) {
+        shown[i] = l.hp;
+        dropTo[i] = l.hp;
+      } else if (fxLayer) {
+        if (l.hp < dropTo[i]) {
+          dropAt[i] = time;
+          dropTo[i] = l.hp;
+        }
+        since = time - dropAt[i];
+        // 깎인 만큼이 잠깐 깜빡이며 머물다가 스르르 줄어든다
+        if (since > 420) shown[i] += (l.hp - shown[i]) * Math.min(1, (time - shownAt[i]) / 220);
+      } else shown[i] += (l.hp - shown[i]) * Math.min(1, (time - shownAt[i]) / 170);
       shownAt[i] = time;
       hp = shown[i];
     }
     const bw = fs * 2.9;
     const bh = fs * 0.52;
-    const bx = cx - bw / 2;
+    // 맞은 순간 막대가 덜덜 떤다
+    const bx = cx - bw / 2 + (since < 260 ? Math.sin(since / 18) * 1.1 * (1 - since / 260) : 0);
     const byy = top + fs * 0.45;
     const ratio = clamp01(l.hp / l.maxHp);
     const lag = clamp01(hp / l.maxHp);
@@ -1166,7 +1174,7 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
     rr(ctx, bx, byy, bw, bh, bh / 2);
     ctx.fill();
     if (lag > ratio + 0.005) {
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = since < 420 && (Math.floor(since / 70) & 1) === 1 ? '#ff9a8a' : '#ffffff';
       rr(ctx, bx, byy, Math.max(bh, bw * lag), bh, bh / 2);
       ctx.fill();
     }
@@ -1259,12 +1267,17 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
     ctx.restore();
   };
 
+  if (CLAY_FX) fxLayer = createClayFx({ lift, unitScale: CLAY_UNIT_SCALE, drawUnit, baseEvent: drawEvent });
+  const layer = fxLayer;
+
   return {
     id,
     fallbackPalette: CLAY_PALETTE,
     unitScale: CLAY_UNIT_SCALE,
     smooth: true,
-    shakeCells: 3.2,
+    // D-254 — 구멍 몫은 줄이고 피해량에 비례해 흔든다(30 피해 = 4칸). 꼬리는 파편·그을음·쓰러진 포대가 사라질 때까지.
+    shakeCells: layer ? 1.4 : 3.2,
+    ...(layer ? { shakeDamageCells: 4, fxTailMs: CLAY_FX_TAIL_MS } : {}),
     terrainImage: (mask) => paintSoil(mask, atlas.soil ?? VECTOR_SOIL),
     terrainCanvas,
     drawSky,
@@ -1276,12 +1289,12 @@ export function createClaySkin(id: string, atlas: SpriteAtlas, src: SpriteSource
       blit(ctx, unitAnim(atlas, kind, 'idle'), 0, color);
       ctx.restore();
     },
-    drawTrail,
+    drawTrail: layer ? layer.drawTrail : drawTrail,
     drawSeed,
     drawExplosion,
     drawLabel,
-    drawEffects,
-    drawCelebration,
+    drawEffects: layer ? layer.drawEffects : drawEffects,
+    drawCelebration: layer ? layer.drawCelebration : drawCelebration,
     drawWind,
   };
 }

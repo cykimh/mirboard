@@ -123,8 +123,8 @@ export function ArtilleryField({
   const posesRef = useRef<PoseState[]>([]);
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom, mask });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners, headroom, mask };
   // 대본 연출(D-252) — 사건은 대본마다 한 번 뽑고, 재생이 끝나도 꼬리가 사라질 때까지 시계를 둔다(조작은 막지 않는다).
   const fxRef = useRef<{ nonce: number; events: FxEvent[]; startedAt: number; endMs: number } | null>(null);
   const fxArg = useRef<{ events: readonly FxEvent[]; nowMs: number }>({ events: [], nowMs: 0 });
@@ -241,6 +241,8 @@ export function ArtilleryField({
       wind: L.wind,
       teams: L.teams,
       fx,
+      // 파편이 부딪힐 땅 — 지금 그리는 지형과 같은 마스크(D-254).
+      mask: frame && L.replay && !frame.done ? (L.replay.masks[Math.min(frame.opsApplied, L.replay.masks.length - 1)] ?? null) : L.mask,
       celebrate,
       headroom: L.headroom,
     }, w / FIELD_W, L.skin);
@@ -284,7 +286,7 @@ export function ArtilleryField({
     }
     replayStart.current = performance.now();
     const events = fxScript(replay.report, replay.before);
-    fxRef.current = { nonce: replay.nonce, events, startedAt: replayStart.current, endMs: fxEndMs(events) };
+    fxRef.current = { nonce: replay.nonce, events, startedAt: replayStart.current, endMs: fxEndMs(events, latest.current.skin.fxTailMs) };
     let raf = 0;
     const step = (now: number) => {
       if (render(now)) {

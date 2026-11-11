@@ -55,6 +55,8 @@ export interface Scene {
   teams?: boolean;
   /** 대본 연출 사건과 재생 시작부터 지난 시간(재생 뒤 꼬리 포함). */
   fx?: { events: readonly FxEvent[]; nowMs: number } | null;
+  /** D-254 — 지금 그리는 지형의 마스크(파편이 부딪힐 땅 — 스킨이 읽기만 한다). */
+  mask?: Mask | null;
   /** 승리 축포 — 이긴 좌석과 시작부터 지난 시간. */
   celebrate?: { seats: readonly number[]; elapsedMs: number } | null;
   /**
@@ -127,7 +129,7 @@ export function drawScene(
   // 화면 흔들림(D-252) — 하늘·구름 바다는 그대로 두고 전장만 흔든다.
   ctx.save();
   if (skin.shakeCells && s.fx) {
-    shakeAt(s.fx.events, s.fx.nowMs, skin.shakeCells, shakeOut);
+    shakeAt(s.fx.events, s.fx.nowMs, skin.shakeCells, shakeOut, skin.shakeDamageCells ?? 0);
     if (shakeOut.x !== 0 || shakeOut.y !== 0) ctx.translate(shakeOut.x, shakeOut.y);
   }
 
@@ -219,7 +221,8 @@ export function drawScene(
   // 날아가는 씨앗들
   const f = s.frame;
   if (f) {
-    for (const trail of f.trails) skin.drawTrail(ctx, trail);
+    // 꼬리와 씨앗은 같은 순서로 쌓인다(`frameAt`) — 탄 종류·바람을 같이 넘긴다(D-254).
+    for (let i = 0; i < f.trails.length; i++) skin.drawTrail(ctx, f.trails[i], f.shells[i]?.shell, s.wind ?? 0, s.time);
     for (const sh of f.shells) {
       if (sh.y < -head) {
         // 하늘 위로 나간 씨앗 — 위쪽 가장자리에 위치 표시
@@ -242,12 +245,19 @@ export function drawScene(
     fxArg.nowMs = s.fx.nowMs;
     fxArg.fontSize = fs;
     fxArg.wind = s.wind ?? 0;
+    fxArg.mask = s.mask ?? null;
+    fxArg.seatColor = seatColor;
+    fxArg.angles = s.angles;
+    fxArg.unitScale = unitScale;
+    fxArg.teams = s.teams === true;
+    fxArg.time = s.time;
     skin.drawEffects(ctx, fxArg);
   }
   ctx.restore();
   if (s.celebrate && skin.drawCelebration) {
     celebrationArg.elapsedMs = s.celebrate.elapsedMs;
     celebrationArg.winners.length = 0;
+    celebrationArg.ui = boost.unit;
     for (const u of s.units) if (u.alive && s.celebrate.seats.includes(u.seat)) celebrationArg.winners.push(u.x, u.footY);
     skin.drawCelebration(ctx, celebrationArg);
   }

@@ -78,6 +78,14 @@ export interface SkinFx {
   /** 글씨 크기(칸) — 피해 숫자. */
   fontSize: number;
   wind: number;
+  /** 아래는 D-254 — 지금 화면의 지형(파편이 부딪힐 땅, 읽기만), 좌석 색·포신 각도·포대 배율(쓰러진 포대를 꼬리에서 이어 그린다). */
+  mask?: Mask | null;
+  seatColor?: (seat: number) => string;
+  angles?: Record<number, number>;
+  unitScale?: number;
+  teams?: boolean;
+  /** 화면 시계(ms). */
+  time?: number;
 }
 
 /** 승리 축포(D-252) — 이긴 포대들의 발 자리와 시작부터 지난 시간. */
@@ -85,6 +93,8 @@ export interface SkinCelebration {
   elapsedMs: number;
   /** [x, footY, …] */
   winners: number[];
+  /** D-254 — 작은 화면 보정 배율(`uiBoost().unit`) — 불꽃·색종이를 같이 키운다. */
+  ui?: number;
 }
 
 export interface ArtillerySkin {
@@ -103,6 +113,10 @@ export interface ArtillerySkin {
   readonly smooth?: boolean;
   /** 선택(D-252) — 착탄 때 화면 흔들림 크기(칸, 콩알 기준). 없으면 흔들지 않는다. */
   readonly shakeCells?: number;
+  /** 선택(D-254) — 피해량에 비례하는 흔들림(칸, 30 피해 기준). `shakeCells` 에 더한다. */
+  readonly shakeDamageCells?: number;
+  /** 선택(D-254) — 재생 뒤 연출 꼬리 길이(ms). 없으면 `FX_TAIL_MS`. 조작을 막지 않는 화면 전용 시간이다. */
+  readonly fxTailMs?: number;
   /** {@code time}·{@code wind} 는 D-252 부터 — 떠가는 구름·바람 줄·꽃잎. */
   drawSky(ctx: CanvasRenderingContext2D, p: Palette, time?: number, wind?: number): void;
   /** 구름 바다 — 맨 앞에 그려 빠지는 포대를 덮는다. */
@@ -110,7 +124,8 @@ export interface ArtillerySkin {
   drawUnit(ctx: CanvasRenderingContext2D, u: SkinUnit): void;
   /** 이동 미리보기의 원래 자리(투명도는 장면이 건다). */
   drawGhost(ctx: CanvasRenderingContext2D, x: number, footY: number, color: string, kind: UnitKind | null | undefined): void;
-  drawTrail(ctx: CanvasRenderingContext2D, trail: number[]): void;
+  /** {@code shell}·{@code wind}·{@code time} 은 D-254 부터 — 탄마다 다른 꼬리, 바람에 휘는 꼬리. */
+  drawTrail(ctx: CanvasRenderingContext2D, trail: number[], shell?: Shell, wind?: number, time?: number): void;
   /** 씨앗 중심 (x, y). */
   drawSeed(ctx: CanvasRenderingContext2D, x: number, y: number, shell: Shell, time: number): void;
   /** 폭발(`e.fill` 이면 둔덕이 솟는 그림). */
