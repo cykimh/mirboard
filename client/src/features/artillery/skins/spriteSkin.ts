@@ -142,7 +142,11 @@ export function createSpriteSkin(id: string, atlas: SpriteAtlas, src: SpriteSour
  * 시트 읽기 — `{base}atlas.json` → 그 안의 `image` → 프레임이 시트 안에 있는지 확인. 어느 단계든 실패하면 거절(부르는 쪽이 도형 스킨으로
  * 대체한다).
  */
-export async function loadSpriteSkin(id: string, base: string): Promise<ArtillerySkin> {
+export async function loadSpriteSkin(
+  id: string,
+  base: string,
+  create: (id: string, atlas: SpriteAtlas, src: SpriteSource) => ArtillerySkin = createSpriteSkin,
+): Promise<ArtillerySkin> {
   const res = await fetch(`${base}atlas.json`, { cache: 'force-cache' });
   if (!res.ok) throw new Error(`atlas.json ${res.status}`);
   const json: unknown = await res.json();
@@ -155,5 +159,5 @@ export async function loadSpriteSkin(id: string, base: string): Promise<Artiller
     img.src = `${base}${first.image}`;
   });
   const atlas = parseAtlas(json, { w: img.naturalWidth, h: img.naturalHeight });
-  return createSpriteSkin(id, atlas, { image: img, width: img.naturalWidth, height: img.naturalHeight });
+  return create(id, atlas, { image: img, width: img.naturalWidth, height: img.naturalHeight });
 }

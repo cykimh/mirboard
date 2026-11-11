@@ -264,6 +264,18 @@ export function ArtilleryTable({
     ? s.queue.filter((seat) => seat !== turnSeat && s.units[seat]?.alive).slice(0, 3)
     : [];
 
+  // D-252 — 결과가 나오면 이긴 포대가 뛰고 축포가 터진다(스킨 연출).
+  const result = s.result;
+  const winners = useMemo(() => {
+    if (!result) return null;
+    const list = result.teams
+      ? result.winnerTeam === null || result.winnerTeam === undefined
+        ? []
+        : result.placements.filter((p) => p.seat % 2 === result.winnerTeam && !p.deserted).map((p) => p.seat)
+      : result.placements.filter((p) => p.rank === 1 && !p.deserted).map((p) => p.seat);
+    return list.length > 0 ? list : null;
+  }, [result]);
+
   const windText = s.wind === 0 ? '바람 없음' : `바람 ${s.wind < 0 ? '←' : '→'} ${Math.abs(s.wind)}`;
   const suddenDeath = s.turnNo >= s.suddenDeathTurn && s.suddenDeathTurn > 0;
 
@@ -468,6 +480,9 @@ export function ArtilleryTable({
           onAimAngle={canAct ? setAngle : undefined}
           onReplayDone={s.finishReplay}
           reducedMotion={reducedMotion}
+          wind={s.wind}
+          teams={s.teams}
+          winners={s.replay ? null : winners}
         />
       </div>
 

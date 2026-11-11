@@ -356,6 +356,34 @@ html.dark .ar-table {
   touch-action: manipulation;
 }
 
+/* D-252 — 말랑 클레이 스킨: 원색 하늘과 장난감 상자 테두리(그림자는 레이아웃을 건드리지 않게 box-shadow 로). Canvas 가 이 변수들을 읽는다. */
+.ar-field-clay {
+  --ar-sky-top: #4fbdf0;
+  --ar-sky-bottom: #c4ecff;
+  --ar-cloud: #ffffff;
+  --ar-cloud-edge: #9fd0ea;
+  --ar-label: #22304a;
+  --ar-night: 0;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px #22304a,
+    0 5px 0 3px #22304a;
+  margin: 3px 3px 8px;
+  width: auto;
+}
+
+html.dark .ar-field-clay {
+  --ar-sky-top: #232a66;
+  --ar-sky-bottom: #6a58b0;
+  --ar-cloud: #d7dcff;
+  --ar-cloud-edge: #8d8fd0;
+  --ar-label: #ffffff;
+  --ar-night: 1;
+  box-shadow:
+    0 0 0 3px #8d95d6,
+    0 5px 0 3px #8d95d6;
+}
+
 /* 내 차례에는 끌어서 조준 — 스크롤·확대가 끼지 않게. */
 .ar-canvas-aiming {
   touch-action: none;

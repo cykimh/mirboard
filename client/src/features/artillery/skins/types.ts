@@ -2,6 +2,7 @@ import type { Shell, UnitKind } from '@/types/artillery';
 import type { Mask } from '../terrain';
 import type { FrameExplosion } from '../replay';
 import type { PoseState } from '../unitPose';
+import type { FxEvent } from '../effects';
 
 /**
  * 씨앗포 스킨 계약 (D-227). 좌표는 모두 **전장 칸**(640×360) — 화면 배율은 `drawScene` 이 미리 걸어 둔다. 스킨은 그리기만 한다:
@@ -15,6 +16,8 @@ export interface Palette {
   cloud: string;
   cloudEdge: string;
   label: string;
+  /** 밤 하늘(다크 테마)인가 — CSS 변수 `--ar-night`(D-252). 없으면 낮. */
+  night?: boolean;
 }
 
 /** 흙 단면 색(풀 → 겉흙 → 속흙, RGB). */
@@ -41,8 +44,12 @@ export interface SkinUnit {
   pose: PoseState;
   /** 작은 화면 보정 배율(`uiBoost().unit`) — 기준점을 중심으로 키운다. */
   scale: number;
-  /** 화면 시계(ms). */
+  /** 화면 시계(ms). 움직임 줄이기면 0 — 대기 몸짓이 멈춘다(D-252). */
   time: number;
+  /** 팀전이면 팀(0·1), 아니면 null(D-252 — 팀 아우라). */
+  team?: number | null;
+  /** 이긴 포대 — 결과 화면에서 폴짝 뛴다(D-252). */
+  cheer?: boolean;
 }
 
 /** 이름표·체력바. */
@@ -56,6 +63,28 @@ export interface SkinLabel {
   fontSize: number;
   /** 포대 보정 배율 — 이름표 높이를 같이 올린다. */
   unitScale: number;
+  /** 아래는 D-252 — 장면이 늘 채우지만, 쓰지 않는 스킨이 많아 선택 항목이다. */
+  seat?: number;
+  color?: string;
+  team?: number | null;
+  isTurn?: boolean;
+  time?: number;
+}
+
+/** 대본 연출(D-252) — 사건 목록(`effects.ts`)과 재생 시작부터 지난 시간. 재생이 끝난 뒤에도 꼬리(`FX_TAIL_MS`) 동안 불린다. */
+export interface SkinFx {
+  events: readonly FxEvent[];
+  nowMs: number;
+  /** 글씨 크기(칸) — 피해 숫자. */
+  fontSize: number;
+  wind: number;
+}
+
+/** 승리 축포(D-252) — 이긴 포대들의 발 자리와 시작부터 지난 시간. */
+export interface SkinCelebration {
+  elapsedMs: number;
+  /** [x, footY, …] */
+  winners: number[];
 }
 
 export interface ArtillerySkin {
@@ -64,7 +93,18 @@ export interface ArtillerySkin {
   readonly fallbackPalette: Palette;
   /** 마스크 → 640×360 흙 그림(마스크가 바뀔 때만 불린다). */
   terrainImage(mask: Mask): ImageData;
-  drawSky(ctx: CanvasRenderingContext2D, p: Palette): void;
+  /**
+   * 선택(D-252) — 흙 그림을 캔버스로 직접(전장보다 촘촘해도 된다, 640×360칸에 맞춰 늘려 그린다). null 이면 {@link terrainImage}.
+   */
+  terrainCanvas?(mask: Mask): CanvasImageSource | null;
+  /** 선택(D-252) — 포대 그림 배율(맞는 범위·물리는 그대로, 그림·이름표 높이·조준 안내 시작점만). 기본 1. */
+  readonly unitScale?: number;
+  /** 선택(D-252) — 흙·시트를 매끄럽게 늘려 그린다(기본은 점 그대로). */
+  readonly smooth?: boolean;
+  /** 선택(D-252) — 착탄 때 화면 흔들림 크기(칸, 콩알 기준). 없으면 흔들지 않는다. */
+  readonly shakeCells?: number;
+  /** {@code time}·{@code wind} 는 D-252 부터 — 떠가는 구름·바람 줄·꽃잎. */
+  drawSky(ctx: CanvasRenderingContext2D, p: Palette, time?: number, wind?: number): void;
   /** 구름 바다 — 맨 앞에 그려 빠지는 포대를 덮는다. */
   drawClouds(ctx: CanvasRenderingContext2D, level: number, p: Palette, time: number): void;
   drawUnit(ctx: CanvasRenderingContext2D, u: SkinUnit): void;
@@ -76,4 +116,10 @@ export interface ArtillerySkin {
   /** 폭발(`e.fill` 이면 둔덕이 솟는 그림). */
   drawExplosion(ctx: CanvasRenderingContext2D, e: FrameExplosion): void;
   drawLabel(ctx: CanvasRenderingContext2D, l: SkinLabel, p: Palette): void;
+  /** 선택(D-252) — 입자·섬광·피해 숫자. 포대·씨앗 위, 구름 바다 아래. */
+  drawEffects?(ctx: CanvasRenderingContext2D, fx: SkinFx): void;
+  /** 선택(D-252) — 승리 축포. */
+  drawCelebration?(ctx: CanvasRenderingContext2D, c: SkinCelebration): void;
+  /** 선택(D-252) — 전장 위 바람 표시(위 가운데 원점, {@code ui} = 작은 화면 보정 배율). */
+  drawWind?(ctx: CanvasRenderingContext2D, wind: number, time: number, ui: number): void;
 }

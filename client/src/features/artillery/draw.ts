@@ -2,7 +2,8 @@ import { FIELD_H, FIELD_W } from '@/types/artillery';
 import type { Mask } from './terrain';
 import type { Frame, FrameUnit } from './replay';
 import { poseAt, type PoseState } from './unitPose';
-import type { ArtillerySkin, Palette, SkinLabel, SkinUnit } from './skins/types';
+import type { ArtillerySkin, Palette, SkinCelebration, SkinFx, SkinLabel, SkinUnit } from './skins/types';
+import { shakeAt, type FxEvent } from './effects';
 import { paintSoil, VECTOR_SOIL, vectorSkin } from './skins/vectorSkin';
 
 export type { Palette } from './skins/types';
@@ -48,6 +49,14 @@ export interface Scene {
    * 포대 상태 — {@code units} 와 같은 순서(`unitPose.poseAt` 결과). 없으면 재생 밖 규칙(차례 주인 = 조준, 나머지 대기)으로 정한다.
    */
   poses?: PoseState[];
+  /** 아래는 D-252 — 쓰는 스킨만 본다. 바람(하늘·바람개비). */
+  wind?: number;
+  /** 2:2 팀전 — 팀 = 좌석 홀짝. */
+  teams?: boolean;
+  /** 대본 연출 사건과 재생 시작부터 지난 시간(재생 뒤 꼬리 포함). */
+  fx?: { events: readonly FxEvent[]; nowMs: number } | null;
+  /** 승리 축포 — 이긴 좌석과 시작부터 지난 시간. */
+  celebrate?: { seats: readonly number[]; elapsedMs: number } | null;
 }
 
 /**
@@ -83,6 +92,9 @@ const unitArg: SkinUnit = {
   time: 0,
 };
 const labelArg: SkinLabel = { x: 0, footY: 0, text: '', hp: 0, maxHp: 100, fontSize: 11, unitScale: 1 };
+const fxArg: SkinFx = { events: [], nowMs: 0, fontSize: 11, wind: 0 };
+const celebrationArg: SkinCelebration = { elapsedMs: 0, winners: [] };
+const shakeOut = { x: 0, y: 0 };
 const fallbackPose: PoseState = { pose: 'idle', elapsedMs: 0 };
 
 /** 한 장면을 그린다. {@code scale} = 화면 픽셀 / 칸, {@code cssPerCell} = CSS 픽셀 / 칸. */
@@ -98,13 +110,21 @@ export function drawScene(
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  skin.drawSky(ctx, s.palette);
+  skin.drawSky(ctx, s.palette, s.time, s.wind ?? 0);
+
+  // 화면 흔들림(D-252) — 하늘·구름 바다는 그대로 두고 전장만 흔든다.
+  ctx.save();
+  if (skin.shakeCells && s.fx) {
+    shakeAt(s.fx.events, s.fx.nowMs, skin.shakeCells, shakeOut);
+    if (shakeOut.x !== 0 || shakeOut.y !== 0) ctx.translate(shakeOut.x, shakeOut.y);
+  }
 
   // 지형
-  if (s.terrain) {
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(s.terrain, 0, 0, W, FIELD_H);
-  }
+  ctx.imageSmoothingEnabled = skin.smooth === true;
+  if (s.terrain) ctx.drawImage(s.terrain, 0, 0, W, FIELD_H);
+  // 포대 그림 배율(D-252) — 스킨이 정하면 그림·이름표 높이·조준 안내 시작점이 같이 커진다(맞는 범위는 그대로).
+  const unitScale = boost.unit * (skin.unitScale ?? 1);
+  const cheering = s.celebrate ? s.celebrate.seats : null;
 
   // 포대
   for (let i = 0; i < s.units.length; i++) {
@@ -118,8 +138,10 @@ export function drawScene(
     unitArg.color = seatColor(u.seat);
     unitArg.isTurn = u.seat === s.turnSeat;
     unitArg.pose = s.poses?.[i] ?? poseAt(u, null, null, s.turnSeat, s.time, fallbackPose);
-    unitArg.scale = boost.unit;
+    unitArg.scale = unitScale;
     unitArg.time = s.time;
+    unitArg.team = s.teams ? u.seat % 2 : null;
+    unitArg.cheer = cheering !== null && cheering.includes(u.seat);
     skin.drawUnit(ctx, unitArg);
   }
   if (s.ghost && s.aim) {
@@ -136,9 +158,20 @@ export function drawScene(
     if (u) {
       const rad = (s.aim.angle * Math.PI) / 180;
       const cx = u.x + 0.5;
-      const cy = u.footY - 5 + 0.5;
-      const from = 11;
+      const cy = skin.unitScale ? u.footY + 1 - 5.5 * unitScale : u.footY - 5 + 0.5;
+      const from = skin.unitScale ? 14.5 * unitScale : 11;
       const len = from + 8 + s.aim.power * 0.32;
+      if (skin.unitScale) {
+        // 밝은 하늘에서도 보이게 흰 밑줄
+        ctx.strokeStyle = 'rgba(255,255,255,.85)';
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([2.5, 2.5]);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(rad) * from, cy - Math.sin(rad) * from);
+        ctx.lineTo(cx + Math.cos(rad) * len, cy - Math.sin(rad) * len);
+        ctx.stroke();
+      }
       ctx.strokeStyle = seatColor(s.aim.seat);
       ctx.lineWidth = 1.2;
       ctx.setLineDash([2.5, 2.5]);
@@ -162,7 +195,12 @@ export function drawScene(
     labelArg.hp = u.hp;
     labelArg.maxHp = u.maxHp ?? 100;
     labelArg.fontSize = fs;
-    labelArg.unitScale = boost.unit;
+    labelArg.unitScale = unitScale;
+    labelArg.seat = u.seat;
+    labelArg.color = seatColor(u.seat);
+    labelArg.team = s.teams ? u.seat % 2 : null;
+    labelArg.isTurn = u.seat === s.turnSeat;
+    labelArg.time = s.time;
     skin.drawLabel(ctx, labelArg, s.palette);
   }
 
@@ -186,8 +224,23 @@ export function drawScene(
     }
     for (const e of f.explosions) skin.drawExplosion(ctx, e);
   }
+  if (s.fx && skin.drawEffects) {
+    fxArg.events = s.fx.events;
+    fxArg.nowMs = s.fx.nowMs;
+    fxArg.fontSize = fs;
+    fxArg.wind = s.wind ?? 0;
+    skin.drawEffects(ctx, fxArg);
+  }
+  ctx.restore();
+  if (s.celebrate && skin.drawCelebration) {
+    celebrationArg.elapsedMs = s.celebrate.elapsedMs;
+    celebrationArg.winners.length = 0;
+    for (const u of s.units) if (u.alive && s.celebrate.seats.includes(u.seat)) celebrationArg.winners.push(u.x, u.footY);
+    skin.drawCelebration(ctx, celebrationArg);
+  }
 
   // 구름 바다(맨 앞 — 빠지는 것을 덮는다)
   skin.drawClouds(ctx, s.cloudLevel, s.palette, s.time);
+  if (skin.drawWind && s.wind !== undefined) skin.drawWind(ctx, s.wind, s.time, Math.max(1, 0.85 / Math.max(0.01, cssPerCell)));
   ctx.restore();
 }

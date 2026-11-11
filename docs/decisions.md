@@ -217,6 +217,20 @@ D-185 의 오목 시안 셋(결·먹·별자리) 가운데 사용자가 **A "결
 `GameSummary.playerCounts` 로 싣는다(가산 필드 — 기존 필드·다섯 게임 값은 그대로, 카탈로그 IT 로 고정). 클라는 이어지면 "2~4인", 끊기면
 "2·4인"(`features/lobby/playerCountLabel`), 필드가 없으면 min~max. 관제 승인. 계약 `docs/api.md` 카탈로그.
 
+## D-252 (2026-11-11) — 씨앗포 그림 = 시안 B "말랑 클레이 장난감" (스킨 `clay`, 기본 스킨)
+
+D-185 D2 에서 사용자가 씨앗포 시안 B 를 골랐다(D3 구현). D-227 스킨 층 위에 세 번째 스킨 `clay` 를 얹고 `ACTIVE_SKIN` 기본값을 `clay` 로 바꾼다
+(시트를 받는 동안·실패하면 도형 스킨 — 되돌리기는 그 한 줄). 화분 몸(표정 5종)·잎·포신·씨앗 5종·폭발·둔덕은 시트
+(`client/public/artillery/skins/clay/atlas.png`+`atlas.json`, 형식 v1 그대로 + clay 전용 묶음 `leaves.*`·`droop.*`·`flash`)로 굽고 — 생성기
+`scripts/generate-artillery-clay.mjs` 가 저장소의 Playwright 크로미움으로 `scripts/artillery-clay/art.js`(Canvas 그림 코드)를 돌려 뽑는다 —
+눌림·튕김·넘어짐 같은 움직임과 하늘·구름 바다·흙 질감·구슬 줄 궤적·이름표·입자·바람개비는 스킨 코드(`skins/claySkin.ts`)가 그린다.
+스킨 계약은 **선택 항목만** 늘린다: 포대 그림 배율 `unitScale`(관제 결정 1.25배 — 맞는 범위·물리는 그대로), 매끄러운 확대 `smooth`,
+고해상도 흙 `terrainCanvas`, 화면 흔들림 `shakeCells`, 대본 연출 `drawEffects`(입자·피해 숫자), 바람 표시 `drawWind`, `drawSky` 의 시계·바람 인자,
+이름표의 좌석·팀·차례. 도형·doodle 스킨은 이 항목이 없어 한 픽셀도 달라지지 않는다. 연출 사건(포구·착탄·갈라짐·피해 숫자·구름 풍덩)은 스킨 밖
+순수 함수 `effects.ts` 가 대본에서 뽑고 입자는 사건 시각의 닫힌 식으로 그린다(상태·할당 없음, 상한 고정). 재생 길이는 그대로 서버 대본
+(`replayLengthMs`) — 입자·숫자의 꼬리는 재생이 끝난 뒤 조작을 막지 않고 화면에서만 0.9초 안에 사라진다. 움직임 줄이기면 재생 자체를 건너뛰므로
+입자·흔들림이 없고 대기 몸짓도 멈춘다. 그림은 전부 새로 그린 것이다(다른 게임의 그림을 본뜨지 않음). 문서 `docs/artillery-skins.md`.
+
 ## D-251 (2026-11-11) — 씨앗포 S6b 클라: 걷기는 250ms 박자로 하나씩 확정, 남의 걸음·포신은 따라 그린다
 
 S6a 서버 위에 클라를 붙였다. 걷기는 `liveMove`(순수)·`useLiveMove` 가 방향이 같은 걸음을 조각으로 모아 250ms 박자에 `MOVE` 하나씩 보내고(내 `UNIT_MOVED`·
