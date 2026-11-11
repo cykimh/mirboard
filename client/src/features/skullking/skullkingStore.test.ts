@@ -204,6 +204,22 @@ describe('트릭 진행', () => {
     expect(store().seats.find((s) => s.seat === 0)!.handCount).toBe(2);
   });
 
+  it('내가 낸 카드는 손패에서 한 장만 빠진다', () => {
+    const before = store().hand;
+    const played = before[0];
+    store().applyEvent(ev('CARD_PLAYED', { seat: 2, card: played, declaredAs: null }, 13));
+
+    expect(store().hand).toHaveLength(before.length - 1);
+    expect(store().hand).toEqual(before.slice(1));
+  });
+
+  it('남이 낸 카드는 내 손패를 건드리지 않는다', () => {
+    const before = store().hand;
+    store().applyEvent(ev('CARD_PLAYED', { seat: 0, card: before[0], declaredAs: null }, 13));
+
+    expect(store().hand).toEqual(before);
+  });
+
   it('내가 낸 카드면 선택 상태를 비운다', () => {
     store().selectCard(1);
     store().setTigressDeclaration('PIRATE');

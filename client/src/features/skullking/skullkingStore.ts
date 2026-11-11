@@ -189,6 +189,14 @@ function patchSeat(
   return seats.map((s) => (s.seat === seat ? { ...s, ...patch } : s));
 }
 
+/** 같은 카드(무늬·숫자·특수 종류) 한 장만 뺀다 — 같은 종류 특수 카드가 여러 장이어도 하나만. */
+function withoutCard(hand: SkullCard[], card: SkullCard): SkullCard[] {
+  const i = hand.findIndex(
+    (c) => c.suit === card.suit && c.rank === card.rank && c.special === card.special,
+  );
+  return i < 0 ? hand : [...hand.slice(0, i), ...hand.slice(i + 1)];
+}
+
 export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
   (set, get) => ({
     ...INITIAL,
@@ -349,8 +357,10 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
                 (state.seats.find((s) => s.seat === p.seat)?.handCount ?? 0) - 1,
               ),
             }),
+            // 내가 낸 카드는 손패에서 바로 뺀다 — 서버는 라운드 시작 HAND_DEALT 말고 손패를 다시 보내지 않아,
+            // 빼지 않으면 다음 resync 까지 낸 카드가 손패에 남는다(다시 누르면 CARD_NOT_OWNED).
             ...(p.seat === state.mySeat
-              ? { selectedIndex: null, tigressDeclaration: null }
+              ? { selectedIndex: null, tigressDeclaration: null, hand: withoutCard(state.hand, p.card) }
               : {}),
           });
           return 'applied';
