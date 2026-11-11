@@ -22,7 +22,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * 무작위 행동 시뮬레이션 (`docs/rules-artillery.md` §12): 2~6인 각 200판(합 1,000판)이 전부 차례 상한 안에서 끝나고, 매 전이 뒤
  * 불변식이 지켜진다. 무작위 발사·이동·넘김에 가끔 탈주를 섞는다. S4(D-224)부터 고르기 단계·유닛 3종·특수탄·아이템도 섞는다.
- * S5(D-225·D-226)부터 지금 규칙(딜레이 차례)으로 돌고, 2:2·3:3 팀전도 200판씩 돈다.
+ * S5(D-225·D-226)부터 지금 규칙(딜레이 차례)으로 돌고, 2:2·3:3 팀전도 200판씩 돈다. S6a(D-228)부터 차례의 3분의 1 은 쏘기·넘기기 전에
+ * {@code MOVE} 조각을 1~3번 보낸다(걷다 떨어져 차례가 끝나기도 한다).
  */
 class ArtillerySimulationTest {
 
@@ -41,6 +42,8 @@ class ArtillerySimulationTest {
         int totalTurns = 0;
         int items = 0;
         int specials = 0;
+        int moves = 0;
+        int moveFalls = 0;
         Map<UnitKind, Integer> kinds = new EnumMap<>(UnitKind.class);
         for (int game = 0; game < GAMES; game++) {
             long now = 1_000_000L;
@@ -74,6 +77,29 @@ class ArtillerySimulationTest {
                     s = ENGINE.desert(s, seat).newState();
                 } else {
                     int seat = s.turnSeat();
+                    if (random.nextInt(3) == 0) {
+                        // S6a — 걷기 확정 조각. 떨어져 차례가 끝나면 다음 바퀴로.
+                        int pieces = 1 + random.nextInt(3);
+                        for (int k = 0; k < pieces && s.phase() == Phase.AIMING; k++) {
+                            int dx = (random.nextBoolean() ? 1 : -1) * (1 + random.nextInt(30));
+                            try {
+                                ArtilleryEngine.Result mr = ENGINE.apply(s, seat, new ArtilleryAction.Move(dx), now);
+                                ArtilleryEvent.UnitMoved um = (ArtilleryEvent.UnitMoved) mr.events().getFirst();
+                                moves++;
+                                if (um.fall() != null) {
+                                    moveFalls++;
+                                }
+                                s = mr.newState();
+                                assertInvariants(s, game);
+                            } catch (com.mirboard.domain.game.artillery.action.ArtilleryActionRejectedException e) {
+                                assertThat(e.reason()).isEqualTo(
+                                        com.mirboard.domain.game.artillery.action.RejectionReason.CANNOT_MOVE);
+                            }
+                        }
+                        if (s.phase() != Phase.AIMING) {
+                            continue;
+                        }
+                    }
                     ArtilleryAction action;
                     int roll = random.nextInt(100);
                     if (roll < 8) {
@@ -120,9 +146,10 @@ class ArtillerySimulationTest {
                 teamWins[s.result().winnerTeam() == null ? 2 : s.result().winnerTeam()]++;
             }
         }
-        System.out.printf("[artillery-sim] seats=%d teams=%b games=%d avgTurns=%.1f reasons=%s avgFire=%.3fms kinds=%s items=%d specials=%d teamWins=%s%n",
+        System.out.printf("[artillery-sim] seats=%d teams=%b games=%d avgTurns=%.1f reasons=%s avgFire=%.3fms kinds=%s items=%d specials=%d teamWins=%s moves=%d moveFalls=%d%n",
                 seats, teams, GAMES, totalTurns / (double) GAMES, reasons, fireNanos / 1e6 / Math.max(1, fires), kinds,
-                items, specials, java.util.Arrays.toString(teamWins));
+                items, specials, java.util.Arrays.toString(teamWins), moves, moveFalls);
+        assertThat(moves).isPositive();
     }
 
     private static void assertInvariants(ArtilleryState s, int game) {

@@ -134,6 +134,18 @@ public final class ArtilleryInvariantChecker {
                 v.add("seat " + u.seat() + " delay " + u.delay() + " under seat order");
             }
         }
+        // D-228 — 차례 시계·MOVE 연료는 AIMING 에만 있고, 연료는 차례 안에서 줄기만 한다(쓴 양이 포대 연료를 넘지 않음).
+        if (s.phase() == Phase.AIMING) {
+            int fuel = s.turnSeat() >= 0 && s.turnSeat() < s.seatCount() ? s.unit(s.turnSeat()).kindOrDefault().fuel() : 0;
+            if (s.moveFuelUsed() < 0 || s.moveFuelUsed() > fuel) {
+                v.add("AIMING move fuel used " + s.moveFuelUsed() + " outside 0.." + fuel);
+            }
+            if (s.turnStartedAt() < 0) {
+                v.add("AIMING negative turnStartedAt " + s.turnStartedAt());
+            }
+        } else if (s.turnStartedAt() != 0 || s.moveFuelUsed() != 0) {
+            v.add(s.phase() + " with turn clock " + s.turnStartedAt() + " / move fuel " + s.moveFuelUsed());
+        }
         if (s.turnNo() >= ArtilleryEngine.turnLimit(s.seatCount())) {
             v.add("turn " + s.turnNo() + " reached limit " + ArtilleryEngine.turnLimit(s.seatCount()));
         }

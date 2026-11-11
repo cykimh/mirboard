@@ -28,7 +28,7 @@ public final class ArtilleryFixtures {
         units.set(u.seat(), u);
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
                 s.lastSeat(), s.turnNo(), s.wind(), s.cloudLevel(), s.resolveUntil(), s.eliminations(), s.lastShot(),
-                s.result(), s.pickUntil(), s.teams(), s.turnOrder());
+                s.result(), s.pickUntil(), s.teams(), s.turnOrder(), s.turnStartedAt(), s.moveFuelUsed());
     }
 
     /** 2:2 팀전·딜레이 차례로 바로 시작(전원 새싹포). */

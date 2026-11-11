@@ -1,6 +1,6 @@
 # 씨앗포 S6 — 실시간 이동·조준 공유 (설계)
 
-> 상태: **설계(D-228·D-229)** · 작성 2026-11-11 · 코드 없음 · 상위 기획 `docs/plans/artillery.md` §9 S6 행 · 룰 정본 `docs/rules-artillery.md`
+> 상태: **S6a 서버·포트 구현 완료(D-250, 2026-11-11 — §10)**, S6b 클라 대기(스킨 층 D-227 뒤) · 설계 D-228·D-229 · 상위 기획 `docs/plans/artillery.md` §9 S6 행 · 룰 정본 `docs/rules-artillery.md`
 > 포트 정본 `docs/game-port.md` · STOMP 정본 `docs/stomp-protocol.md`
 > 단계: **S6a 서버·포트**(지금 바로 가능) → **S6b 클라**(스킨 층 D-227 이 main 에 들어간 뒤). 관제 세션이 단계마다 검증해 main 에 넣는다.
 
@@ -261,3 +261,16 @@ default Optional<GameEvent> preview(GameState state, int seat, GameAction input)
 4. 조준은 상태에 넣지 않고 2초 유지 프레임으로 resync 뒤를 메운다(§6.5).
 5. `game-action` 버킷을 10초 30 → 60 으로(모든 게임에 느슨해짐, §6.3).
 6. 미리보기 입력은 `actionType()` 의 한 갈래로 역직렬화한다(새 seam 없음, §5.1-5).
+
+## 10. S6a 구현 결과 (D-250)
+
+설계대로 넣었고, 구체화한 것만 적는다(이유는 D-250).
+
+- 연료는 상태의 **`moveFuelUsed`**(이번 차례에 `MOVE` 로 쓴 양)다 — §4.2 의 "상태의 `fuel`". 공개 뷰 `fuel` 은 남은 연료(포대 연료 − 쓴 양).
+- 시계 없이 연 판(테스트 진입점)은 `turnStartedAt` 0 → 엔진 마감 없음. §4.4 불변식은 "AIMING 밖이면 0, 쓴 연료 0~포대 연료"로 넣고 `> 0` 은 IT 로.
+- `MOVE` 로 탈락하면 `UNIT_MOVED.eliminated` 로만 알린다(별도 `UNIT_ELIMINATED` 없음). 연출 대기 `lastShot` 은 null — **S6b 클라는 대본 없는
+  `RESOLVING` 을 처리해야 한다**(재생 없이 대기만).
+- `PREVIEW` 입력은 모르는 필드 무시(힘을 실은 프레임도 각도·탄은 쓴다). 서버는 `/preview` 를 락 없이 처리하므로 같은 순간의 `MOVE` 와 겹친다 — 테스트
+  IT 에서 첫 `MOVE` 가 공개 직후 `BUSY` 를 받는 것을 봤다(앞 전이가 락을 쥔 채 방송) — §6.2 의 "`BUSY` 면 한 번 다시"가 실제로 필요하다.
+- 테스트: `ArtilleryMoveTest`·`ArtilleryTurnClockTest`·`ArtilleryPreviewTest`·`core/GameEnginePreviewDefaultTest`·`infra.ws.GamePreviewControllerTest`·
+  `RateLimitRoutingTest` 추가 2건·`ArtilleryGoldenTest`(두 필드를 빼면 S5 바이트 그대로)·`ArtillerySimulationTest`(MOVE 조각)·`infra.ws.ArtilleryLiveMoveIT`(Docker).

@@ -30,8 +30,12 @@ import org.springframework.context.ApplicationEventPublisher;
  * 씨앗포의 {@link GameEngine} 포트 어댑터 (S2, D-222). 방 하나에 대응하는 per-room 인스턴스로 {@link ArtilleryGameDefinition#newEngine}
  * 이 만든다. 순수 룰 엔진 {@link ArtilleryEngine}(S1)을 감싸 상태 I/O·시계·뷰·봇·매치 기록 발행을 붙인다(D-98 2계층).
  *
- * <p><b>포트 변경이 없다</b>(D-220). 차례당 액션이 하나(이동은 {@code FIRE} 에 실음)라 인프라 턴 데드라인으로 충분하고
- * {@code GameContext.turnSeconds} 는 쓰지 않는다. 발사 뒤 연출 대기({@code RESOLVING})만 포트 ⑦ 엔진 타이머로 건다 — 그동안
+ * <p>D-228: 차례 주인이 {@code MOVE} 를 여러 번 보낼 수 있어 차례가 여러 액션이 됐다 — 인프라 턴 데드라인은 액션마다 다시 걸리므로
+ * 요트(D-183)처럼 차례 시작 시각을 상태에 두고 {@code GameContext.turnSeconds} 로 <b>차례 전체 마감</b>을 포트 ⑦ 엔진 타이머로 건다
+ * (만기 = 시간 초과 넘김). 인프라 턴 데드라인(마지막 액션 + T)은 늘 더 늦어 폴백으로만 남는다. D-229: 조준 미리보기는 포트 ⑧
+ * {@link #preview} 로만 — 상태를 바꾸지 않는다.
+ *
+ * <p>발사 뒤 연출 대기({@code RESOLVING})도 포트 ⑦ 엔진 타이머로 건다 — 그동안
  * {@code pendingSeats} 가 비어 봇 루프·턴 타이머가 끼어들지 않는다(원카드 경쟁 창과 같은 모양). 판 시작 고르기 단계(D-224)의 15초도
  * 같은 엔진 타이머다 — 인프라 턴 데드라인은 고를 때마다 다시 걸리기 때문이다. 비공개 뷰는 고르기 단계의 내 선택뿐이다.
  */
@@ -116,8 +120,11 @@ public final class ArtilleryGameEngine implements GameEngine {
     @Override
     public Object publicView(GameState state) {
         ArtilleryState s = aState(state);
-        OptionalLong remaining = rules.remainingMillis(s, clock.millis());
-        return ArtilleryPublicView.of(s, remaining.isPresent() ? remaining.getAsLong() : null);
+        long now = clock.millis();
+        OptionalLong remaining = rules.remainingMillis(s, now);
+        OptionalLong turnLeft = rules.turnRemainingMillis(s, now, context.turnSeconds());
+        return ArtilleryPublicView.of(s, remaining.isPresent() ? remaining.getAsLong() : null,
+                turnLeft.isPresent() ? turnLeft.getAsLong() : null);
     }
 
     /** 고르기 단계에서 내가 고른 종류만(남에게는 숨긴다, D-224). 그 밖에는 숨길 것이 없다. */
@@ -179,25 +186,50 @@ public final class ArtilleryGameEngine implements GameEngine {
         return new ArtilleryAction.Skip();
     }
 
-    // ---------- 엔진 타이머 — 연출 대기 (룰 §9.2) ----------
+    // ---------- 엔진 타이머 — 연출 대기 (룰 §9.2)·고르기 (D-224)·차례 전체 마감 (D-228) ----------
 
     @Override
     public Optional<Duration> timer(GameState state) {
-        OptionalLong remaining = rules.remainingMillis(aState(state), clock.millis());
+        ArtilleryState s = aState(state);
+        long now = clock.millis();
+        OptionalLong remaining = s.phase() == Phase.AIMING
+                ? rules.turnRemainingMillis(s, now, context.turnSeconds())
+                : rules.remainingMillis(s, now);
         if (remaining.isEmpty()) {
             return Optional.empty();
         }
         return Optional.of(Duration.ofMillis(Math.max(0L, remaining.getAsLong())));
     }
 
-    /** 대기 끝 → 다음 차례. 인프라가 락 안에서 만기를 다시 확인한 뒤 부른다. */
+    /**
+     * 대기 끝 → 다음 차례, 고르기 끝 → 공개, 차례 마감 → 시간 초과 넘김(D-228). 인프라가 락 안에서 만기를 다시 확인한 뒤 부른다.
+     */
     @Override
     public Optional<Result> onTimer(GameState state) {
-        ArtilleryEngine.Result r = rules.expire(aState(state), clock.millis());
+        ArtilleryState s = aState(state);
+        long now = clock.millis();
+        ArtilleryEngine.Result r;
+        if (s.phase() == Phase.AIMING) {
+            // 차례 시계가 없으면(제한 없음·D-228 이전 판) 엔진 타이머도 없다 — 시간 초과는 인프라 턴 데드라인 몫.
+            r = rules.turnRemainingMillis(s, now, context.turnSeconds()).isPresent() ? rules.timeout(s, now) : null;
+        } else {
+            r = rules.expire(s, now);
+        }
         if (r == null) {
             return Optional.empty();
         }
         return Optional.of(new Result(r.newState(), List.<GameEvent>copyOf(r.events())));
+    }
+
+    // ---------- 조준 미리보기 (D-229) ----------
+
+    /** 포트 ⑧ — 씨앗포 미리보기 입력만, 차례 주인·범위 검사는 순수 엔진. 그 밖의 입력은 없음. */
+    @Override
+    public Optional<GameEvent> preview(GameState state, int seat, GameAction input) {
+        if (!(state instanceof ArtilleryState s) || !(input instanceof ArtilleryAction.Preview p)) {
+            return Optional.empty();
+        }
+        return rules.preview(s, seat, p).map(GameEvent.class::cast);
     }
 
     // ---------- 매치 진행 ----------
@@ -219,7 +251,7 @@ public final class ArtilleryGameEngine implements GameEngine {
         if (state == null) {
             return DesertOutcome.NOT_APPLICABLE;
         }
-        ArtilleryEngine.Desertion d = rules.desert(state, seat);
+        ArtilleryEngine.Desertion d = rules.desert(state, seat, clock.millis());
         switch (d.outcome()) {
             case NOT_APPLICABLE -> {
                 return DesertOutcome.NOT_APPLICABLE;

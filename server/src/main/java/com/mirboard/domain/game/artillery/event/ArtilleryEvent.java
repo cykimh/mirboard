@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.mirboard.domain.game.artillery.rules.Shell;
 import com.mirboard.domain.game.artillery.state.ArtilleryPublicView;
 import com.mirboard.domain.game.artillery.state.MatchResult;
 import com.mirboard.domain.game.artillery.state.ShotReport;
@@ -26,7 +27,9 @@ import java.util.List;
         @JsonSubTypes.Type(value = ArtilleryEvent.UnitEliminated.class, name = "UNIT_ELIMINATED"),
         @JsonSubTypes.Type(value = ArtilleryEvent.MatchEnded.class, name = "MATCH_ENDED"),
         @JsonSubTypes.Type(value = ArtilleryEvent.UnitPicked.class, name = "UNIT_PICKED"),
-        @JsonSubTypes.Type(value = ArtilleryEvent.UnitsRevealed.class, name = "UNITS_REVEALED")
+        @JsonSubTypes.Type(value = ArtilleryEvent.UnitsRevealed.class, name = "UNITS_REVEALED"),
+        @JsonSubTypes.Type(value = ArtilleryEvent.UnitMoved.class, name = "UNIT_MOVED"),
+        @JsonSubTypes.Type(value = ArtilleryEvent.AimPreview.class, name = "AIM_PREVIEW")
 })
 public sealed interface ArtilleryEvent extends GameEvent
         permits ArtilleryEvent.TurnChanged,
@@ -35,7 +38,9 @@ public sealed interface ArtilleryEvent extends GameEvent
                 ArtilleryEvent.UnitEliminated,
                 ArtilleryEvent.MatchEnded,
                 ArtilleryEvent.UnitPicked,
-                ArtilleryEvent.UnitsRevealed {
+                ArtilleryEvent.UnitsRevealed,
+                ArtilleryEvent.UnitMoved,
+                ArtilleryEvent.AimPreview {
 
     @Override
     default String envelopeType() {
@@ -47,6 +52,8 @@ public sealed interface ArtilleryEvent extends GameEvent
             case MatchEnded __ -> "MATCH_ENDED";
             case UnitPicked __ -> "UNIT_PICKED";
             case UnitsRevealed __ -> "UNITS_REVEALED";
+            case UnitMoved __ -> "UNIT_MOVED";
+            case AimPreview __ -> "AIM_PREVIEW";
         };
     }
 
@@ -87,6 +94,37 @@ public sealed interface ArtilleryEvent extends GameEvent
     record UnitsRevealed(List<ArtilleryPublicView.UnitView> units) implements ArtilleryEvent {
         public UnitsRevealed {
             units = List.copyOf(units);
+        }
+    }
+
+    /**
+     * 걷기 확정 (D-228) — 공개·순번 있음(상태가 바뀐다). 결과값이라 하나 빠져도 다음 것이 맞춘다.
+     *
+     * @param turn       차례 번호
+     * @param path       걸음마다 도착 칸 [x, footY, …] (출발점 제외)
+     * @param fuelLeft   남은 연료
+     * @param fall       걷다 떨어졌으면 그 낙하, 아니면 null
+     * @param hpAfter    걷기 뒤 체력
+     * @param eliminated 이 걷기로 탈락했으면 그 까닭(차례가 끝난다), 아니면 null
+     */
+    record UnitMoved(int seat, int turn, List<Integer> path, int toX, int toY, int fuelLeft, ShotReport.Fall fall,
+                     int hpAfter, Unit.Cause eliminated) implements ArtilleryEvent {
+        public UnitMoved {
+            path = path == null ? List.of() : List.copyOf(path);
+        }
+    }
+
+    /**
+     * 조준 미리보기 (D-229) — 공개·<b>순번 없음</b>(상태를 바꾸지 않는다, 빠져도 다음 프레임이 덮는다). 힘은 싣지 않는다.
+     *
+     * @param turn  차례 번호 — 받는 쪽이 지금 차례가 아닌 프레임을 버린다
+     * @param shell 지금 쏠 수 있는 탄일 때만, 아니면 null
+     * @param n     보낸 쪽 번호 — 받는 쪽이 지금까지 본 최대보다 클 때만 쓴다
+     */
+    record AimPreview(int seat, int turn, int angle, Shell shell, int n) implements ArtilleryEvent {
+        @Override
+        public boolean sequenced() {
+            return false;
         }
     }
 

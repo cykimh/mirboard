@@ -50,6 +50,7 @@
 | APP   | `/app/room/{roomId}/chat` | 클라→서버 | `{ message }` (≤500자, 참가자·관전자만) |
 | APP   | `/app/room/{roomId}/reaction` | 클라→서버 | `{ emoji }` (서버 화이트리스트 8종) |
 | APP   | `/app/room/{roomId}/action` | 클라→서버 | 게임 액션 (아래 `@action` 판별) |
+| APP   | `/app/room/{roomId}/preview` | 클라→서버 | 상태를 바꾸지 않는 미리보기 (D-229 — 포트 ⑧, 지금은 씨앗포 `PREVIEW`만). 받아들일 수 없는 프레임은 조용히 버리고(ERROR 없음), 게임이 걸러 준 **순번 없는** 공개 이벤트만 `/topic/room/{roomId}` 로. 락·턴 시계와 무관, 버킷 `game-preview` |
 
 ## Envelope (서버 → 클라 공통)
 
@@ -493,21 +494,29 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 
 ---
 
-## 씨앗포 (gameType=ARTILLERY, D-220~D-226)
+## 씨앗포 (gameType=ARTILLERY, D-220~D-229)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~4, 엔진은 6까지). 룰 정본은 `docs/rules-artillery.md`, 설계
 `docs/plans/artillery.md`. 완성(S3 공개) 전에는 `DISABLED` — 카탈로그에도 안 보인다(설정 `mirboard.artillery.status`).
 방 설정 `TEAM_MODE`(D-225) 가 `TEAMS_2V2` 면 4인 2:2 팀전(팀 = 좌석 홀짝). 차례는 개인전·팀전 모두 **누적 딜레이가 가장 작은 포대**(D-226).
 
-**클라 → 서버 `@action`** — 차례당 하나(이동은 발사에 싣는다, D-220). 판 시작에는 고르기 단계(`PICKING`, D-224)가 있다:
+**클라 → 서버 `@action`** — 차례 주인은 `MOVE` 를 여러 번 보낸 뒤 `FIRE`·`SKIP` 하나로 차례를 끝낸다(D-228 — 걸으면 바로 확정. `FIRE.moveDx`
+도 그대로 — 봇·옛 클라는 `FIRE` 하나로 걷고 쏜다). 서버는 같은 세션의 프레임 순서를 보장하지 않으므로 클라는 `MOVE` 를 **한 번에 하나만**
+보내고(내 좌석의 `UNIT_MOVED`·`ERROR` 가 와야 다음), `FIRE` 도 응답 안 온 `MOVE` 뒤에 보낸다. `BUSY` 면 한 번 다시 보낸다. 판 시작에는 고르기
+단계(`PICKING`, D-224)가 있다:
 
 | @action | 추가 필드 | 비고 |
 | --- | --- | --- |
 | `PICK` | `unit`(`SPROUT`·`ACORN`·`DANDELION`) | 고르기 단계에서만, 좌석마다 한 번. 전원이 동시에 — 15초 안에 안 고르면 새싹포(엔진 타이머) |
 | `FIRE` | `moveDx`(−130~130, 0 = 안 움직임) · `angle`(0~180, 0 = 오른쪽 · 90 = 위) · `power`(0~100) · `shell`(`PEA`·`PUMPKIN`·내 고유 특수탄 `VINE`/`CHESTNUT`/`SPORE`, 생략하면 `PEA`) · `item`(`WATERING_CAN`·`PINWHEEL`·`TWIN_SEED`, 생략 가능 — 한 차례 하나) | 서버가 (물뿌리개) → 이동 → 탄도 → 폭발 → 낙하를 한 번에 계산한다(겹씨앗이면 탄도~낙하 한 번 더) |
-| `SKIP` | — | 차례 넘기기(시간 초과도 같다) |
+| `MOVE` | `dx`(−130~130, 0 아님) | D-228 — 그 자리에서 걷고 확정(`UNIT_MOVED`). 한 걸음도 못 가면 `CANNOT_MOVE`. 차례는 계속(걷다 탈락하면 끝) |
+| `SKIP` | — | 차례 넘기기(시간 초과도 같다). 딜레이 80 + 이번 차례 `MOVE` 로 쓴 연료의 이동 딜레이 |
 
-**서버 → 클라 (공개)** — 숨길 정보가 없어 전부 공개, 모두 방 순번을 쓴다. payload 는 결과값이다:
+**클라 → 서버 미리보기**(`/app/room/{roomId}/preview`, D-229 — 액션 아님): `{ "@action": "PREVIEW", angle, shell, n }` — 포신 각도 0~180, 고른 탄
+(생략 가능), `n` 은 그 차례 안에서 1씩 올리는 번호. **힘은 필드가 없다**(실어 보내도 버린다). 차례 주인·`AIMING` 일 때만 `AIM_PREVIEW` 가 나가고
+그 밖은 조용히 버린다. `/action` 으로 보내면 `INVALID_ACTION`. 클라 계획: 바뀌었을 때 250ms 마다 + 2초마다 유지(resync 뒤를 메운다).
+
+**서버 → 클라 (공개)** — 숨길 정보가 없어 전부 공개, `AIM_PREVIEW` 말고는 모두 방 순번을 쓴다. payload 는 결과값이다:
 
 | type | payload | 의미 |
 | --- | --- | --- |
@@ -515,7 +524,9 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 | `UNITS_REVEALED` | `{ units: [UnitView] }` | 고르기 끝(마지막 선택·마감·탈주) — 전원의 `kind`·체력·특수탄·아이템. 바로 뒤에 첫 `TURN_CHANGED` |
 | `TURN_CHANGED` | `{ seat, turnNo, wind, cloudLevel, delays, queue }` | 차례 시작 — 연료는 그 포대 종류의 가득(`units[].fuel`). `wind` −10~10(양수 = 오른쪽). `delays` 좌석 순 누적 딜레이, `queue` 앞으로의 차례 순서(살아 있는 좌석, 지금 차례 주인부터 — D-226) |
 | `SHOT_RESOLVED` | `{ report }` | 발사 대본 하나 — 아래. 이 뒤 `report.durationMs` 동안 **아무의 차례도 아니다**(연출 대기, 엔진 타이머) |
-| `TURN_SKIPPED` | `{ seat, reason }` | `SKIP`·`TIMEOUT`. 바로 뒤에 `TURN_CHANGED` |
+| `TURN_SKIPPED` | `{ seat, reason }` | `SKIP`·`TIMEOUT`(차례 전체 마감 — 엔진 타이머, D-228). 바로 뒤에 `TURN_CHANGED` |
+| `UNIT_MOVED` | `{ seat, turn, path: [x, y …], toX, toY, fuelLeft, fall, hpAfter, eliminated }` | D-228 — `MOVE` 확정(순번 있음, 결과값). `path` 걸음마다 발 칸(출발점 제외), `fall` = `{seat, x, fromY, toY, damage, hpAfter, intoCloud}` | null, `eliminated` = `KNOCKED_OUT`·`CLOUD_SEA` | null — 탈락이면 그 차례 끝: 판이 끝나면 바로 `MATCH_ENDED`, 아니면 연출 대기(`RESOLVING`, `lastShot` 없음) 뒤 `TURN_CHANGED` |
+| `AIM_PREVIEW` | `{ seat, turn, angle, shell, n }` | D-229 — **순번 없음**(상태 무변경, `seq` 필드 없음). `shell` 은 그 포대가 지금 쏠 수 있는 탄일 때만(아니면 null), 힘·위치 없음. 받는 쪽은 `turn` 이 지금 차례이고 `n` 이 지금까지 본 최대보다 클 때만 쓴다(락 없이 읽어 `SHOT_RESOLVED` 뒤에 올 수 있다) |
 | `UNIT_ELIMINATED` | `{ seat, cause, cloudLevel }` | 발사 밖의 탈락 — `CLOUD_SEA`(구름 밀물)·`DESERTED`. 발사로 인한 탈락은 대본 안에 |
 | `MATCH_ENDED` | `{ reason, placements: [{seat, rank, hp, deserted}], teams, winnerTeam }` | `reason`: `LAST_STANDING`·`ALL_DOWN`·`NO_HUMANS`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위. 팀전(`teams`)이면 이긴 팀(좌석 홀짝 0·1) 전원 1위·`winnerTeam`, 무승부면 `winnerTeam` null(D-225). 판을 끝낸 발사면 `SHOT_RESOLVED` 바로 뒤(연출 대기 없음) |
 
@@ -532,14 +543,16 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
   - `damages` = `[{seat, amount, hpAfter, direct}]`(씨앗 피해의 합), `falls` = `[{seat, x, fromY, toY, damage, hpAfter, intoCloud}]`.
 - `eliminated` = `[{seat, cause}]`(`KNOCKED_OUT`·`CLOUD_SEA` — 두 단계여도 한 순간), `units` = 해소 뒤 전체 `[{seat, x, footY, hp, alive}]`.
 
-**서버 → 클라 (비공개)**: `ERROR` 뿐 — 씨앗포 코드 `NOT_YOUR_TURN`(연출 대기 중·고르기 중 `PICK` 밖 액션·두 번째 `PICK` 포함)·`MATCH_OVER`·`OUT_OF_RANGE`·`NO_AMMO`(남의 특수탄 포함)·`NO_ITEM`·`INVALID_ACTION`.
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 씨앗포 코드 `NOT_YOUR_TURN`(연출 대기 중·고르기 중 `PICK` 밖 액션·두 번째 `PICK` 포함)·`MATCH_OVER`·`OUT_OF_RANGE`(`MOVE.dx` 0 포함)·`NO_AMMO`(남의 특수탄 포함)·`NO_ITEM`·`CANNOT_MOVE`(D-228)·`INVALID_ACTION`(`/action` 의 `PREVIEW` 포함).
 
 **resync**: `tableView` = `{ phase, seatCount, width, height, units: [UnitView], terrain, turnSeat, turnNo, wind, cloudLevel, suddenDeathTurn,
-fuel, resolveRemainingMs, pickRemainingMs, lastShot, result, teams, turnOrder, queue, delays }` — `UnitView` = `{seat, x, footY, hp, pumpkins, alive, outCause, kind, picked, maxHp,
+fuel, resolveRemainingMs, pickRemainingMs, lastShot, result, teams, turnOrder, queue, delays, turnRemainingMs }` — `UnitView` = `{seat, x, footY, hp, pumpkins, alive, outCause, kind, picked, maxHp,
 fuel, special, specials, items, team, delay}`(`team` 팀전이면 좌석 홀짝·개인전이면 좌석, `delay` 누적 딜레이 — D-225·D-226; 고르기 중엔 `kind`·`special` 이 null 이고 `picked` 만 보인다), `phase` 는 `PICKING`·`AIMING`·`RESOLVING`·`ENDED`,
 `terrain` 은 640열 각각의 흙 구간 `[시작, 끝, 시작, 끝 …]`(위에서부터, 양끝 포함 — 약 15KB), `resolveRemainingMs`·`lastShot` 은 연출 대기
 중에만(다시 들어온 클라가 재생 중인 장면의 끝을 맞춘다), `pickRemainingMs` 는 고르기 중에만. `turnOrder` 는 `DELAY`(배포 전 판은 `SEAT`),
-`queue` 는 고르기·끝 밖에서 앞으로의 차례 순서, `delays` = `{ shells: {PEA: 100, …}, items: {…}, skip, fuelPerDelay }` 딜레이 표(화면 안내용 — 판정은 서버). **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다).
+`queue` 는 고르기·끝 밖에서 앞으로의 차례 순서, `delays` = `{ shells: {PEA: 100, …}, items: {…}, skip, fuelPerDelay }` 딜레이 표(화면 안내용 — 판정은 서버). `fuel` 은 지금 차례 포대의 **남은** 연료(이번 차례 `MOVE` 로 쓴 만큼 줄어 있다 — D-228), `turnRemainingMs` 는
+`AIMING` 차례 전체 마감까지 남은 시간(엔진 계산 — `MOVE` 를 해도 차례 시작 기준, 차례 시계가 없는 옛 판은 null). 바깥 `turnRemainingMs`(인프라 — 마지막 액션
+기준)는 `MOVE` 뒤에 틀리므로 씨앗포 클라는 `tableView.turnRemainingMs` 를 쓴다. **매치 시드는 싣지 않는다**(다음 바람을 계산할 수 있다).
 `privateHand` 는 고르기 중 내가 골랐을 때만 `{ pickedKind }`, 그 밖에는 null.
 
 ---

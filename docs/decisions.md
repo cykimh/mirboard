@@ -203,6 +203,16 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 `GameSummary.playerCounts` 로 싣는다(가산 필드 — 기존 필드·다섯 게임 값은 그대로, 카탈로그 IT 로 고정). 클라는 이어지면 "2~4인", 끊기면
 "2·4인"(`features/lobby/playerCountLabel`), 필드가 없으면 min~max. 관제 승인. 계약 `docs/api.md` 카탈로그.
 
+## D-250 (2026-11-11) — 씨앗포 S6a 구현: 연료는 "이번 차례에 쓴 양"으로, 시계 없는 판은 엔진 마감 없음
+
+D-228·D-229 를 서버·포트에 넣으며 설계서에서 구체화한 것. ① 연료는 포대별 남은 값이 아니라 상태의 `moveFuelUsed`(이번 차례에 `MOVE` 로 쓴 연료,
+AIMING 밖은 0)로 둔다 — 옛 JSON 의 기본값 0 이 그대로 맞고 `FIRE` 걷기·딜레이 공식("포대 연료 − 남은 연료")이 바뀌지 않는다. ② 차례 시계
+`turnStartedAt` 은 차례를 여는 순간의 시각(어댑터 시계)이고, 시계 없이 연 판(테스트·시뮬레이션의 `startMatch(kinds)`·`desert(state, seat)`)은
+0 — 엔진 마감·`onTimer` 가 없다(인프라 턴 데드라인만). 그래서 불변식은 "AIMING 밖이면 0, 연료 0~포대 연료"이고 `turnStartedAt > 0` 은 서버 경로
+(IT)로 확인한다. ③ `MOVE` 로 탈락하면 별도 `UNIT_ELIMINATED` 없이 `UNIT_MOVED.eliminated` 로 알리고 연출 대기의 `lastShot` 은 null(재생할 대본
+없음 — S6b 클라가 처리). ④ 미리보기 입력 `PREVIEW` 는 모르는 필드를 무시한다 — 힘을 실은 프레임도 각도·탄은 살린다. 결정 번호는 씨앗포 두 번째
+블록 D-250~259. 물리 지문 무변경, JSON 골든 셋은 두 필드를 빼면 S5 바이트 그대로(테스트로 고정) — 해시만 다시 고정.
+
 ## D-229 (2026-11-11) — 포트 선택 확장 ⑧ `preview`: 상태를 바꾸지 않는 실시간 미리보기 (기본 empty)
 
 포신 각도·탄은 쏘기 전까지 바뀌므로 확정하지 않는 미리보기로 흘린다. 엔진 액션으로 보내면 끌 때마다 락·저장·순번·턴 시계 재무장이 돌고

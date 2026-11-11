@@ -148,10 +148,15 @@ mirboard:
       api-default:
         limit: ${MIRBOARD_RATELIMIT_API_LIMIT:300}
         window: 1m
-      # 인게임 액션 — 정상 연타·봇 매치가 절대 안 걸리는 수준(초당 3회 상당).
+      # 인게임 액션 — 정상 연타·봇 매치가 절대 안 걸리는 수준(초당 6회 상당).
+      # D-228 — 씨앗포 걷기 확정(MOVE 초당 4번 + FIRE, 딜레이 차례로 연달아 받는 차례)이 생겨 30 → 60.
       # 조이려면 실제 트래픽 분포를 본 뒤에. 봇/턴타임아웃은 STOMP 미경유라 무관.
       game-action:
-        limit: ${MIRBOARD_RATELIMIT_ACTION_LIMIT:30}
+        limit: ${MIRBOARD_RATELIMIT_ACTION_LIMIT:60}
+        window: 10s
+      # D-229 — 미리보기(상태 무변경, 차례 주인 초당 4번 + 2초 유지). 넘친 프레임은 조용히 버린다.
+      game-preview:
+        limit: ${MIRBOARD_RATELIMIT_PREVIEW_LIMIT:60}
         window: 10s
       chat:
         limit: ${MIRBOARD_RATELIMIT_CHAT_LIMIT:10}
