@@ -17,7 +17,11 @@ const ERROR_LABEL: Record<string, string> = {
   NO_AMMO: '그 탄이 남지 않았어요.',
   NO_ITEM: '그 아이템은 이미 썼어요.',
   INVALID_ACTION: '잘못된 요청입니다.',
+  CANNOT_MOVE: '더 걸어갈 수 없어요.',
 };
+
+/** 보낸 `MOVE` 가 답을 기다릴 때 띠를 띄우지 않는 거절 — 걷기 보내기가 다시 보내거나(BUSY) 서버 자리로 돌아간다(D-251). */
+const QUIET_WHILE_MOVING = new Set(['BUSY', 'CANNOT_MOVE']);
 
 /**
  * 씨앗포용 {@link RoomEventSink}. 모듈 상수이고 각 메서드는 호출 시점에 `useArtilleryStore.getState()` 를 읽는다(D-103).
@@ -39,7 +43,10 @@ export const artilleryRoomSink: RoomEventSink<ArtilleryTableView, ArtilleryPriva
   applyPrivateEvent(envelope: StompEnvelope<unknown>) {
     if (envelope.type === 'ERROR') {
       const p = envelope.payload as ErrorPayload;
-      useArtilleryStore.getState().setError(errorText(p.code, p.message, ERROR_LABEL));
+      const st = useArtilleryStore.getState();
+      st.noteError(p.code);
+      if (st.moveInFlight && QUIET_WHILE_MOVING.has(p.code)) return;
+      st.setError(errorText(p.code, p.message, ERROR_LABEL));
     }
   },
 

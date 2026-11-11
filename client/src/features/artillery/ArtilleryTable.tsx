@@ -17,7 +17,6 @@ import { VoiceControls } from '@/features/voice/VoiceControls';
 import {
   FUEL,
   ITEM_NAMES,
-  MAX_MOVE,
   SHELL_NAMES,
   UNIT_KINDS,
   type Item,
@@ -34,7 +33,8 @@ import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
 import { ArtilleryPicker, KIND_ICONS } from './ArtilleryPicker';
 import { seatColor } from './draw';
 import { minDelay, teamName, turnDelay } from './delay';
-import { walk } from './terrain';
+import { useLiveMove } from './useLiveMove';
+import { useAimPreviewSender } from './useAimPreviewSender';
 import { ARTILLERY_TUTORIAL } from './tutorial/artilleryTutorial';
 
 interface Props {
@@ -87,7 +87,8 @@ export function shotSummary(r: ShotReport, nameOf: (seat: number) => string): st
  * 씨앗포 게임판 조립 루트 (S3, 설계 `docs/plans/artillery.md` §8). 자기 소켓을 소유하고 자기 sink 를 주입한다(D-103).
  *
  * <p>화면 중심은 Canvas 전장이다. 서버 대본을 재생하는 동안은 아무의 차례도 아니고, 내 차례에는 전장을 끌어 각도를, 조작부로 힘·탄·이동을
- * 정한다. 이동은 미리보기만 하다가 발사와 함께 한 번에 보낸다(D-220 — 차례당 액션 하나).
+ * 정한다. S6b(D-251): 걸으면 250ms 마다 `MOVE` 로 그 자리에서 확정하고(한 번에 하나 — `useLiveMove`), 포신 각도·탄은 초당 4번 미리보기로
+ * 흘린다(`useAimPreviewSender`, 힘은 숨김). 남의 걸음(`UNIT_MOVED`)·포신(`AIM_PREVIEW`)은 전장이 따라 그린다.
  */
 export function ArtilleryTable({
   roomId,
@@ -107,7 +108,7 @@ export function ArtilleryTable({
   tiers = {},
 }: Props) {
   const token = useAuthStore((st) => st.token);
-  const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef } = useStompRoom(
+  const { connected, sendAction, sendPreview, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef } = useStompRoom(
     roomId,
     token,
     artilleryRoomSink,
@@ -146,7 +147,7 @@ export function ArtilleryTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerIds, usernames, botSeats]);
 
-  // 조준 상태(이 화면에만) — 차례마다 이동은 처음으로, 각도·힘은 지난 값을 둔다.
+  // 조준 상태(이 화면에만) — 차례마다 아이템은 비우고, 각도·힘은 지난 값을 둔다.
   const [angle, setAngleRaw] = useState(45);
   const angleTouched = useRef(false);
   const setAngle = (a: number) => {
@@ -156,12 +157,10 @@ export function ArtilleryTable({
   const [power, setPower] = useState(55);
   const [shell, setShell] = useState<Shell>('PEA');
   const [item, setItem] = useState<Item | null>(null);
-  const [moveDx, setMoveDx] = useState(0);
   const [lastPower, setLastPower] = useState<number | null>(null);
   const [lastAngles, setLastAngles] = useState<Record<number, number>>({});
   const turnKey = `${s.turnSeat}:${s.turnNo}`;
   useEffect(() => {
-    setMoveDx(0);
     setItem(null);
   }, [turnKey]);
   const shells = useMemo(() => {
@@ -182,20 +181,11 @@ export function ArtilleryTable({
   }, [me, item]);
   const myFuel = me?.fuel ?? FUEL;
 
-  const preview = useMemo(() => {
-    if (!me || !s.mask) return null;
-    return walk(s.mask, me.x, me.footY, moveDx, myFuel, s.cloudLevel);
-  }, [me, s.mask, moveDx, s.cloudLevel, myFuel]);
-
-  const step = (dir: -1 | 1) => {
-    if (!me || !s.mask) return false;
-    const target = Math.max(-MAX_MOVE, Math.min(MAX_MOVE, moveDx + dir));
-    if (target === moveDx) return false;
-    const p = walk(s.mask, me.x, me.footY, target, myFuel, s.cloudLevel);
-    if (p.dx !== target) return false;
-    setMoveDx(target);
-    return true;
-  };
+  // D-251 — 걷기는 그 자리에서 확정(MOVE 한 번에 하나), 조준은 미리보기(힘 없음). 재생 중·끊김이면 멈춘다.
+  const live = useLiveMove({ active: myTurn && connected && s.replay === null, mySeat, turnKey, sendAction });
+  const preview = live.predicted;
+  const step = live.step;
+  useAimPreviewSender({ active: myTurn && connected && s.replay === null, angle, shell, sendPreview });
 
   // 내 차례 알림. 처음 차례에는 전장 가운데를 향하게 각도를 잡아 준다(오른쪽 절반이면 왼쪽으로).
   const wasMyTurn = useRef(myTurn);
@@ -221,15 +211,20 @@ export function ArtilleryTable({
   }, [replayNonce]);
   useEffect(() => {
     if (!s.notice) return;
-    setAnnouncement(`${turnSeatName.current} — ${s.notice.text === 'TIMEOUT' ? '시간 초과로 넘김' : '넘김'}`);
+    const t = s.notice.text;
+    const who = t === 'FELL' || t === 'WILTED' ? movedSeatName.current : turnSeatName.current;
+    const what = t === 'TIMEOUT' ? '시간 초과로 넘김' : t === 'FELL' ? '걷다가 구름 속으로 추락' : t === 'WILTED' ? '걷다가 떨어져 시듦' : '넘김';
+    setAnnouncement(`${who} — ${what}`);
   }, [s.notice]);
   const turnSeatName = useRef('');
   turnSeatName.current = s.turnSeat >= 0 ? nameOf(s.turnSeat) : '';
+  const movedSeatName = useRef('');
+  movedSeatName.current = s.lastMove ? nameOf(s.lastMove.seat) : '';
 
+  // 응답 안 온 MOVE 가 있으면 그 뒤에 — 남은 걸음은 FIRE.moveDx 로(D-251).
   const fire = (p: number) => {
     if (!canAct || !preview) return;
-    s.setPending(true);
-    sendAction({ '@action': 'FIRE', moveDx: preview.dx, angle, power: p, shell, ...(item ? { item } : {}) });
+    live.requestFire({ angle, power: p, shell, item });
   };
   const picking = s.phase === 'PICKING' && s.result === null && !roomFinished;
   const canPick = picking && !spectator && mySeat >= 0 && connected && !!me?.alive && !me.picked && s.myPick === null;
@@ -261,6 +256,8 @@ export function ArtilleryTable({
   // D-226 — 딜레이: 좌석은 가장 작은 딜레이와의 차이, 조작부는 이번 발에 쌓일 값.
   const baseDelay = minDelay(s.units);
   const delayCost = myTurn && preview ? turnDelay(s.delayTable, shell, item, myFuel - preview.fuelLeft) : null;
+  // 남의 조준 미리보기(D-229) — 지금 차례 주인 것만 스토어에 남는다.
+  const liveAim = s.aimPreview && s.aimPreview.seat !== mySeat ? s.aimPreview : null;
   // 순서·좌석 ⏱ 는 차례가 열린 동안만 — 연출 대기 중에는 쏜 사람의 딜레이가 다음 TURN_CHANGED 에야 오기 때문이다.
   const aiming = s.phase === 'AIMING' && turnSeat >= 0;
   const upcoming = aiming
@@ -439,7 +436,16 @@ export function ArtilleryTable({
             <span className="ar-badge ar-badge-turn">내 차례</span>
           ) : (
             !roomFinished &&
-            turnSeat >= 0 && <span className="ar-badge">{nameOf(turnSeat)} 조준 중</span>
+            turnSeat >= 0 && (
+              <span className="ar-badge ar-aiming">
+                {nameOf(turnSeat)} 조준 중
+                {liveAim?.shell && liveAim.seat === turnSeat && (
+                  <span className="ar-aim-shell" title="고른 탄(조준 미리보기)">
+                    {SHELL_NAMES[liveAim.shell]}
+                  </span>
+                )}
+              </span>
+            )
           )}
           {!roomFinished && !s.result && upcoming.length > 0 && (
             <span className="ar-badge ar-queue" aria-label={`다음 차례 ${upcoming.map(nameOf).join(', ')}`}>
@@ -457,6 +463,8 @@ export function ArtilleryTable({
           names={names}
           aim={myTurn && me && preview ? { seat: mySeat, angle, power, x: preview.x, footY: preview.footY } : null}
           angles={lastAngles}
+          follow={s.follow && s.follow.seat !== mySeat ? s.follow : null}
+          liveAim={liveAim && liveAim.seat === turnSeat ? { seat: liveAim.seat, angle: liveAim.angle, at: liveAim.at } : null}
           onAimAngle={canAct ? setAngle : undefined}
           onReplayDone={s.finishReplay}
           reducedMotion={reducedMotion}
@@ -475,13 +483,11 @@ export function ArtilleryTable({
           onItem={setItem}
           fuelLeft={preview?.fuelLeft ?? myFuel}
           fuelMax={myFuel}
-          moveDx={moveDx}
           enabled={canAct}
           onAngle={setAngle}
           onPower={setPower}
           onShell={setShell}
           onStep={step}
-          onResetMove={() => setMoveDx(0)}
           onFire={fire}
           onSkip={skip}
           delayCost={delayCost}

@@ -1,18 +1,20 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtilleryTable, shotSummary } from './ArtilleryTable';
 import { useArtilleryStore } from './artilleryStore';
 import { artilleryRoomSink } from './artilleryRoomSink';
 import { useAuthStore } from '@/features/auth/authStore';
-import { DELAY_TABLE, hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
+import { DELAY_TABLE, flatRuns, hitReport, hitShot, hitStage, seedStore, unit } from './testFixtures';
 import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
 
 const sendAction = vi.fn();
+const sendPreview = vi.fn();
 let socketConnected = true;
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: socketConnected,
     sendAction: (a: Record<string, unknown>) => sendAction(a),
+    sendPreview: (p: Record<string, unknown>) => sendPreview(p),
     sendChat: vi.fn(),
     sendReaction: vi.fn(),
     sendVoice: vi.fn(),
@@ -38,12 +40,13 @@ describe('ArtilleryTable', () => {
   });
   beforeEach(() => {
     sendAction.mockReset();
+    sendPreview.mockReset();
     socketConnected = true;
     useAuthStore.setState({ token: 't' } as never);
     seedStore();
   });
 
-  it('내 차례면 조작부가 뜨고 [발사]가 이동·각도·힘·탄을 한 번에 보낸다', () => {
+  it('내 차례면 조작부가 뜨고, 박자 전에 누른 [발사]는 모은 걸음을 FIRE.moveDx 로 싣는다', () => {
     renderTable();
     expect(screen.getByText('내 차례')).toBeInTheDocument();
     expect(screen.getByText(/바람 → 3/)).toBeInTheDocument();
@@ -250,5 +253,135 @@ describe('ArtilleryTable', () => {
     );
     expect(screen.getByText('무승부')).toBeInTheDocument();
     expect(screen.getAllByText('무')).toHaveLength(4);
+  });
+
+  describe('실시간 걷기·조준 공유 (S6b, D-251)', () => {
+    const right = () => fireEvent.keyDown(screen.getByRole('button', { name: '오른쪽으로 걷기(누르고 있기)' }), { key: 'Enter' });
+    const movedEvent = (seat: number, toX: number, seq: number, fuelLeft: number) => ({
+      type: 'UNIT_MOVED',
+      seq,
+      payload: { seat, turn: 0, path: [toX, 299], toX, toY: 299, fuelLeft, fall: null, hpAfter: 100, eliminated: null },
+    });
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('걸음은 250ms 박자로 MOVE 하나씩 — 답이 오기 전엔 다음을 안 보내고, [발사]는 답 뒤에 남은 걸음을 싣는다', () => {
+      renderTable();
+      expect(screen.queryByRole('button', { name: '제자리' })).toBeNull();   // 되돌리기 없음
+      right();
+      right();
+      right();
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'MOVE', dx: 3 });
+      right();
+      right();
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);   // 답을 기다린다
+      fireEvent.click(screen.getByRole('button', { name: '발사' }));
+      expect(sendAction).toHaveBeenCalledTimes(1);   // FIRE 도 MOVE 를 앞지르지 않는다
+      expect(screen.getByRole('button', { name: '발사' })).toBeDisabled();
+      act(() => {
+        useArtilleryStore.getState().applyEvent(movedEvent(0, 103, 2, 97));
+      });
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      expect(sendAction).toHaveBeenLastCalledWith(expect.objectContaining({ '@action': 'FIRE', moveDx: 2 }));
+    });
+
+    it('꾹 누르고 걸어도 낭떠러지 앞에서 멈춘다 — 타이머가 매번 지금 자리에서 다시 잰다(브라우저에서 잡은 회귀)', () => {
+      // 95열부터 땅 — 100 에 선 포대는 93 까지(받침 반폭 2)만 걸을 수 있다
+      seedStore({ terrain: flatRuns().map((run, x) => (x >= 95 ? run : [])) });
+      renderTable();
+      const left = screen.getByRole('button', { name: '왼쪽으로 걷기(누르고 있기)' });
+      fireEvent.pointerDown(left);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      fireEvent.pointerUp(left);
+      expect(screen.getByTitle('이동 연료 93/100')).toBeInTheDocument();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      expect((sendAction.mock.calls[0][0] as { dx: number }).dx).toBeGreaterThanOrEqual(-7);
+    });
+
+    it('BUSY 면 같은 MOVE 를 한 번 다시 보내고 띠를 띄우지 않는다, CANNOT_MOVE 면 서버 자리로', () => {
+      renderTable();
+      right();
+      right();
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'MOVE', dx: 2 });
+      act(() => {
+        artilleryRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'x' } } as never);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'MOVE', dx: 2 });
+      expect(screen.queryByRole('alert')).toBeNull();
+      act(() => {
+        artilleryRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'CANNOT_MOVE', message: 'x' } } as never);
+      });
+      expect(useArtilleryStore.getState().moveInFlight).toBe(false);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('조준 미리보기 — 차례가 열리면 바로, 바뀌면 250ms 간격, 안 바뀌어도 2초마다. 힘은 보내지 않는다', () => {
+      renderTable();
+      expect(sendPreview).toHaveBeenCalledTimes(1);
+      expect(sendPreview).toHaveBeenLastCalledWith({ '@action': 'PREVIEW', angle: 45, shell: 'PEA', n: 1 });
+      fireEvent.click(screen.getByRole('button', { name: '각도 1도 왼쪽으로' }));
+      fireEvent.click(screen.getByRole('radio', { name: /호박탄/ }));
+      fireEvent.change(screen.getByLabelText('힘'), { target: { value: '90' } });
+      act(() => {
+        vi.advanceTimersByTime(260);
+      });
+      expect(sendPreview).toHaveBeenCalledTimes(2);
+      expect(sendPreview).toHaveBeenLastCalledWith({ '@action': 'PREVIEW', angle: 46, shell: 'PUMPKIN', n: 2 });
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(sendPreview).toHaveBeenCalledTimes(2);   // 힘만 바뀐 것은 보내지 않는다
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+      expect(sendPreview).toHaveBeenCalledTimes(3);   // 유지
+      for (const call of sendPreview.mock.calls) expect(call[0]).not.toHaveProperty('power');
+    });
+
+    it('남의 차례 — 미리보기 탄 칩이 보이고, 내 미리보기·걷기는 보내지 않는다', () => {
+      seedStore({ turnSeat: 1 });
+      renderTable();
+      expect(sendPreview).not.toHaveBeenCalled();
+      act(() => {
+        useArtilleryStore.getState().applyEvent({ type: 'AIM_PREVIEW', payload: { seat: 1, turn: 0, angle: 130, shell: 'PUMPKIN', n: 1 } });
+        useArtilleryStore.getState().applyEvent(movedEvent(1, 497, 2, 97));
+      });
+      expect(screen.getByText('호박탄')).toBeInTheDocument();
+      expect(useArtilleryStore.getState().units[1].x).toBe(497);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(sendAction).not.toHaveBeenCalled();
+    });
+
+    it('걸으면 연료·⏱ +N 이 예측 자리를 따르고, 남은 시간은 엔진 값', () => {
+      seedStore({ fuel: 90, turnRemainingMs: 9_000, delays: DELAY_TABLE }, 29_000);
+      renderTable();
+      expect(screen.getByRole('timer')).toHaveTextContent('9초');
+      expect(screen.getByText('⏱ +105')).toBeInTheDocument();   // 콩알 100 + 이미 걸은 10칸 /2
+      right();
+      right();
+      expect(screen.getByText('⏱ +106')).toBeInTheDocument();
+    });
   });
 });

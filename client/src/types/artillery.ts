@@ -175,6 +175,8 @@ export interface ArtilleryTableView {
   /** 앞으로의 차례 순서 — 살아 있는 좌석, 지금 차례 주인부터(D-226). */
   queue?: number[];
   delays?: DelayTable;
+  /** AIMING 차례 전체 마감까지 남은 시간(엔진 계산, D-228) — `MOVE` 를 해도 차례 시작 기준. 구 서버·시계 없는 판이면 없음/null. */
+  turnRemainingMs?: number | null;
 }
 
 /** 비공개 뷰 — 고르기 단계의 내 선택뿐(D-224). */
@@ -213,3 +215,37 @@ export interface UnitEliminatedPayload {
 }
 
 export type MatchEndedPayload = MatchResult;
+
+/** 낙하 한 번(대본·`UNIT_MOVED` 공통). */
+export interface FallView {
+  seat: number;
+  x: number;
+  fromY: number;
+  toY: number;
+  damage: number;
+  hpAfter: number;
+  intoCloud: boolean;
+}
+
+/** `MOVE` 확정 (D-228) — 순번 있음, 결과값. 탈락이면 그 차례가 끝난다. */
+export interface UnitMovedPayload {
+  seat: number;
+  turn: number;
+  /** 걸음마다 발 칸 [x, footY, …] (출발점 제외). */
+  path: number[];
+  toX: number;
+  toY: number;
+  fuelLeft: number;
+  fall: FallView | null;
+  hpAfter: number;
+  eliminated: OutCause | null;
+}
+
+/** 조준 미리보기 (D-229) — 순번 없음, 힘·위치 없음. */
+export interface AimPreviewPayload {
+  seat: number;
+  turn: number;
+  angle: number;
+  shell: Shell | null;
+  n: number;
+}

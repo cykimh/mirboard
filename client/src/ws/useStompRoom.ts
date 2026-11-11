@@ -245,6 +245,22 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     [roomId],
   );
 
+  /**
+   * D-229 — 상태를 바꾸지 않는 미리보기(`/app/room/{id}/preview`, 서버 포트 ⑧). 게임 중립 — 무엇을 보낼지는 게임판이 정한다. 서버는
+   * 받을 수 없는 프레임을 ERROR 없이 버리고, 게임이 걸러 준 순번 없는 공개 이벤트만 방 토픽으로 낸다.
+   */
+  const sendPreview = useCallback(
+    (preview: Record<string, unknown>) => {
+      const client = clientRef.current;
+      if (!client?.connected) return;
+      client.publish({
+        destination: `/app/room/${roomId}/preview`,
+        body: JSON.stringify(preview),
+      });
+    },
+    [roomId],
+  );
+
   const sendChat = useCallback(
     (message: string) => {
       const client = clientRef.current;
@@ -290,6 +306,7 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
   return {
     connected,
     sendAction,
+    sendPreview,
     sendChat,
     sendReaction,
     sendVoice,

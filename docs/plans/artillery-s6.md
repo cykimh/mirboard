@@ -1,6 +1,6 @@
 # 씨앗포 S6 — 실시간 이동·조준 공유 (설계)
 
-> 상태: **S6a 서버·포트 구현 완료(D-250, 2026-11-11 — §10)**, S6b 클라 대기(스킨 층 D-227 뒤) · 설계 D-228·D-229 · 상위 기획 `docs/plans/artillery.md` §9 S6 행 · 룰 정본 `docs/rules-artillery.md`
+> 상태: **S6a 서버·포트(D-250)·S6b 클라(D-251) 구현 완료(2026-11-11 — §10·§11)** · 설계 D-228·D-229 · 상위 기획 `docs/plans/artillery.md` §9 S6 행 · 룰 정본 `docs/rules-artillery.md`
 > 포트 정본 `docs/game-port.md` · STOMP 정본 `docs/stomp-protocol.md`
 > 단계: **S6a 서버·포트**(지금 바로 가능) → **S6b 클라**(스킨 층 D-227 이 main 에 들어간 뒤). 관제 세션이 단계마다 검증해 main 에 넣는다.
 
@@ -274,3 +274,21 @@ default Optional<GameEvent> preview(GameState state, int seat, GameAction input)
   IT 에서 첫 `MOVE` 가 공개 직후 `BUSY` 를 받는 것을 봤다(앞 전이가 락을 쥔 채 방송) — §6.2 의 "`BUSY` 면 한 번 다시"가 실제로 필요하다.
 - 테스트: `ArtilleryMoveTest`·`ArtilleryTurnClockTest`·`ArtilleryPreviewTest`·`core/GameEnginePreviewDefaultTest`·`infra.ws.GamePreviewControllerTest`·
   `RateLimitRoutingTest` 추가 2건·`ArtilleryGoldenTest`(두 필드를 빼면 S5 바이트 그대로)·`ArtillerySimulationTest`(MOVE 조각)·`infra.ws.ArtilleryLiveMoveIT`(Docker).
+
+## 11. S6b 클라 구현 결과 (D-251)
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 보내기 계획(조각 모으기·한 번에 하나·BUSY 한 번·FIRE 순서)·예측·따라가기·포신 보간·미리보기 간격 | `liveMove.ts` | `liveMove.test.ts`(계획 8·따라가기 3) |
+| 소켓 붙이기(응답·거절·resync 를 스토어 구독으로 같은 순간에) | `useLiveMove.ts` | `ArtilleryTable.test.tsx`(박자·답 대기·FIRE 순서·BUSY·낭떠러지) |
+| 조준 미리보기 보내기(바뀌면 250ms, 유지 2초, 힘 없음) | `useAimPreviewSender.ts`, 게임 중립 `ws/useStompRoom.sendPreview` | `ArtilleryTable.test.tsx` |
+| `UNIT_MOVED`·`AIM_PREVIEW`·엔진 남은 시간·남은 연료·MOVE 탈락 대기 | `artilleryStore.ts`, sink `CANNOT_MOVE`·답 대기 중 조용한 거절 | `liveMove.test.ts`(스토어 8) |
+| 남의 걸음·포신 그리기 | `ArtilleryField.tsx`(`follow`·`liveAim`, 따라가는 동안만 매 프레임) | 브라우저 두 탭 |
+| [제자리]·유령 제거, 탄 칩, 튜토리얼 문구 | `ArtilleryControls.tsx`·`ArtilleryTable.tsx`·`23-artillery-table.css`(`.ar-aiming`·`.ar-aim-shell`) | `ArtilleryTable.test.tsx` |
+
+브라우저 실측(로컬 서버, 두 탭 = 두 게스트): 2초 꾹 누르기 → `MOVE` 8번 / 2.2초(초당 ≈ 3.6, 늘 하나만 대기), 각도를 바꾸는 동안 `PREVIEW` 250ms 간격 +
+2초 유지, 힘 필드 없음. 상대 탭 캔버스에서 걷는 포대 중심을 200ms 마다 재면 4초 동안 고르게 이동(465 → 739px)하고 멈춘 뒤 그대로, 포신·탄 칩도 따라 바뀜.
+걷기 응답 뒤 [발사]가 남은 걸음 3칸을 `moveDx` 로 실음. 시간 초과 넘김에 이동 딜레이가 붙음(⏱ +129 = 80 + 연료 100/2 − 상대 1). 375px 가로 넘침 없음.
+처음 실측에서 꾹 누르기가 낭떠러지를 넘어 실제로 떨어져(서버가 확정하니까) 판이 끝났다 — 낡은 클로저 회귀를 고치고 회귀 테스트를 넣었다(D-251).
+
+- 하지 않은 것: 남의 "이번 차례 +N" 예상(§6.7 — 선택), 봇 차례 포신 돌리기 연출(§6.6 후속 후보).

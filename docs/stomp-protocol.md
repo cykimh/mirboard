@@ -514,7 +514,7 @@ result }`. `privateHand` 는 늘 `null`(본인 전용 정보가 없다 — 내 �
 
 **클라 → 서버 미리보기**(`/app/room/{roomId}/preview`, D-229 — 액션 아님): `{ "@action": "PREVIEW", angle, shell, n }` — 포신 각도 0~180, 고른 탄
 (생략 가능), `n` 은 그 차례 안에서 1씩 올리는 번호. **힘은 필드가 없다**(실어 보내도 버린다). 차례 주인·`AIMING` 일 때만 `AIM_PREVIEW` 가 나가고
-그 밖은 조용히 버린다. `/action` 으로 보내면 `INVALID_ACTION`. 클라 계획: 바뀌었을 때 250ms 마다 + 2초마다 유지(resync 뒤를 메운다).
+그 밖은 조용히 버린다. `/action` 으로 보내면 `INVALID_ACTION`. 클라(D-251): 바뀌었을 때 250ms 마다 + 2초마다 유지(resync 뒤를 메운다), `MOVE` 는 250ms 박자로 한 번에 하나.
 
 **서버 → 클라 (공개)** — 숨길 정보가 없어 전부 공개, `AIM_PREVIEW` 말고는 모두 방 순번을 쓴다. payload 는 결과값이다:
 

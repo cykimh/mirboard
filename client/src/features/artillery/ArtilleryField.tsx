@@ -6,6 +6,7 @@ import type { Replay } from './artilleryStore';
 import { drawScene, toCanvas, type Palette } from './draw';
 import { poseAt, poseScript, type PoseScript, type PoseState } from './unitPose';
 import { skinSource, type ArtillerySkin } from './skins';
+import { FOLLOW_MS, easeAngle, followPosition, type WalkFollow } from './liveMove';
 
 interface Props {
   mask: Mask | null;
@@ -19,6 +20,10 @@ interface Props {
   aim: { seat: number; angle: number; power: number; x: number; footY: number } | null;
   /** 다른 사람의 마지막 각도(포신 방향 그리기용). */
   angles: Record<number, number>;
+  /** 남의 걸음 따라가기(D-251) — 마지막 `UNIT_MOVED`. `units` 는 이미 도착 자리라 그 사이만 경로를 걷는다. */
+  follow?: WalkFollow | null;
+  /** 차례 주인의 조준 미리보기(D-251) — 포신을 이 각도로 {@link FOLLOW_MS} 동안 돌린다. */
+  liveAim?: { seat: number; angle: number; at: number } | null;
   /** 끌어서 각도 정하기 — 내 차례만. */
   onAimAngle?: (angle: number) => void;
   onReplayDone: () => void;
@@ -60,6 +65,8 @@ export function ArtilleryField({
   names,
   aim,
   angles,
+  follow = null,
+  liveAim = null,
   onAimAngle,
   onReplayDone,
   reducedMotion,
@@ -97,8 +104,11 @@ export function ArtilleryField({
   const posesRef = useRef<PoseState[]>([]);
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion };
+  // 남의 포신 보간 — 새 미리보기가 오면 지금 그리던 각도에서 출발한다.
+  const shownAngle = useRef<{ seat: number; from: number; to: number; at: number } | null>(null);
+  const animatingRef = useRef(false);
 
   const render = (now: number) => {
     const canvas = canvasRef.current;
@@ -114,12 +124,35 @@ export function ArtilleryField({
       done = frame.done;
     }
     const aimAngles = { ...L.angles };
+    let animating = false;
+    if (L.liveAim && !frame) {
+      const la = L.liveAim;
+      const cur = shownAngle.current;
+      if (!cur || cur.seat !== la.seat || cur.at !== la.at) {
+        const now0 = cur && cur.seat === la.seat ? easeAngle(cur.from, cur.to, cur.at, now) : (aimAngles[la.seat] ?? la.angle);
+        shownAngle.current = { seat: la.seat, from: L.reducedMotion ? la.angle : now0, to: la.angle, at: now };
+      }
+      const sa = shownAngle.current!;
+      aimAngles[la.seat] = easeAngle(sa.from, sa.to, sa.at, now);
+      animating ||= now - sa.at < FOLLOW_MS;
+    } else if (!L.liveAim) {
+      shownAngle.current = null;
+    }
     if (L.aim) aimAngles[L.aim.seat] = L.aim.angle;
     if (L.replay) aimAngles[L.replay.report.seat] = L.replay.report.angle;
+    // 남의 걸음 — 받은 시각부터 경로를 따라 걷는다(움직임 줄이기면 바로 도착 자리).
+    const walking = !frame && !L.reducedMotion ? followPosition(L.follow, Date.now()) : null;
+    animating ||= walking !== null;
+    animatingRef.current = animating;
     const drawUnits = frame
       ? frame.units
-      : L.units.map((u) => (L.aim && u.seat === L.aim.seat ? { ...u, x: L.aim.x, footY: L.aim.footY } : u));
-    const ghostFrom = L.aim ? L.units.find((u) => u.seat === L.aim!.seat) : undefined;
+      : L.units.map((u) =>
+          L.aim && u.seat === L.aim.seat
+            ? { ...u, x: L.aim.x, footY: L.aim.footY }
+            : walking && L.follow && u.seat === L.follow.seat
+              ? { ...u, x: walking.x, footY: walking.footY, alive: true }
+              : u,
+        );
     // 포대 상태(D-227) — 재생 중이면 대본의 창, 아니면 차례 주인 = 조준.
     let script: PoseScript | null = null;
     if (frame && !frame.done && L.replay) {
@@ -141,10 +174,8 @@ export function ArtilleryField({
       cloudLevel: L.cloudLevel,
       names: L.names,
       aim: L.aim && !frame ? { seat: L.aim.seat, angle: L.aim.angle, power: L.aim.power } : null,
-      ghost:
-        L.aim && ghostFrom && !frame && (ghostFrom.x !== L.aim.x || ghostFrom.footY !== L.aim.footY)
-          ? { x: ghostFrom.x, footY: ghostFrom.footY }
-          : null,
+      // D-251 — 걸음은 바로 확정되니 원래 자리 유령은 그리지 않는다(되돌리기 없음).
+      ghost: null,
       frame,
       palette: readPalette(wrapRef.current, L.skin.fallbackPalette),
       time: now,
@@ -214,24 +245,27 @@ export function ArtilleryField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replay?.nonce, reducedMotion]);
 
-  // 재생이 아닐 때 — 값이 바뀌면 다시 그리고, 차례 화살표를 위해 느린 루프.
+  // 재생이 아닐 때 — 값이 바뀌면 다시 그리고, 차례 화살표를 위해 느린 루프. 남의 걸음·포신을 따라가는 동안은 매 프레임(D-251).
   useEffect(() => {
     if (replay) return;
     render(performance.now());
-    if (turnSeat < 0 || reducedMotion) return;
+    const followLeft = follow && !reducedMotion ? FOLLOW_MS - (Date.now() - follow.startedAt) : 0;
+    if ((turnSeat < 0 && followLeft <= 0) || reducedMotion) return;
     let raf = 0;
     let last = 0;
     const loop = (now: number) => {
-      if (now - last > 50) {
+      if (animatingRef.current || now - last > 50) {
         last = now;
         render(now);
       }
+      // 차례가 없으면(걷다 떨어진 뒤 대기) 따라가기가 끝나는 대로 멈춘다.
+      if (turnSeat < 0 && !animatingRef.current) return;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow, skin]);
+  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow, skin, follow, liveAim]);
 
   // 끌어서 조준
   const dragging = useRef(false);

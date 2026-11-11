@@ -28,14 +28,12 @@ interface Props {
   fuelLeft: number;
   /** 내 유닛의 연료 가득(새싹 100·도토리 70·민들레 130). */
   fuelMax?: number;
-  moveDx: number;
   enabled: boolean;
   onAngle: (angle: number) => void;
   onPower: (power: number) => void;
   onShell: (shell: Shell) => void;
-  /** 한 칸 이동(미리보기) — 더 못 가면 false. */
+  /** 한 칸 걷기 — 그 자리에서 확정된다(D-251, 되돌리기 없음). 더 못 가면 false. */
   onStep: (dir: -1 | 1) => boolean;
-  onResetMove: () => void;
   onFire: (power: number) => void;
   onSkip: () => void;
   /** D-226 — 이번 발에 쌓일 딜레이(모르면 null — 숨김)와 넘길 때의 딜레이. */
@@ -45,8 +43,8 @@ interface Props {
 
 /**
  * 조작부 (`docs/plans/artillery.md` §8.3) — 휴대폰 터치 우선. 각도는 전장을 끌어서 정하고 여기서 1°씩 다듬는다. 힘은 슬라이더로 정해
- * [발사]를 누르거나, [꾹 눌러 쏘기]를 누르고 있다가 원하는 힘에서 뗀다. 이동은 버튼을 누르고 있는 동안 걷는다(서버에는 발사와 함께
- * 한 번에 간다 — 이동만으로는 아무것도 안 보낸다).
+ * [발사]를 누르거나, [꾹 눌러 쏘기]를 누르고 있다가 원하는 힘에서 뗀다. 이동은 버튼을 누르고 있는 동안 걷고, 걸은 만큼 바로 확정된다
+ * (D-251 — 250ms 마다 서버로, 연료가 나간다. [제자리] 되돌리기는 없앴다).
  */
 export function ArtilleryControls({
   angle,
@@ -59,19 +57,19 @@ export function ArtilleryControls({
   onItem,
   fuelLeft,
   fuelMax = 100,
-  moveDx,
   enabled,
   onAngle,
   onPower,
   onShell,
   onStep,
-  onResetMove,
   onFire,
   onSkip,
   delayCost = null,
   skipDelay = null,
 }: Props) {
-  // 이동 길게 누르기
+  // 이동 길게 누르기 — 타이머는 늘 최신 onStep 을 부른다(누른 순간의 것을 잡으면 처음 자리 기준으로 계속 걸어 낭떠러지 검사가 낡는다).
+  const onStepRef = useRef(onStep);
+  onStepRef.current = onStep;
   const moveTimer = useRef<number | null>(null);
   const stopMove = () => {
     if (moveTimer.current !== null) {
@@ -81,9 +79,9 @@ export function ArtilleryControls({
   };
   const startMove = (dir: -1 | 1) => {
     stopMove();
-    if (!onStep(dir)) return;
+    if (!onStepRef.current(dir)) return;
     moveTimer.current = window.setInterval(() => {
-      if (!onStep(dir)) stopMove();
+      if (!onStepRef.current(dir)) stopMove();
     }, MOVE_STEP_MS);
   };
 
@@ -167,11 +165,6 @@ export function ArtilleryControls({
         <span className="ar-fuel" title={`이동 연료 ${fuelLeft}/${fuelMax}`}>
           <span className="ar-fuel-bar" style={{ width: `${Math.round((100 * fuelLeft) / Math.max(1, fuelMax))}%` }} />
         </span>
-        {moveDx !== 0 && (
-          <button type="button" className="ar-btn ar-btn-small" disabled={!enabled} onClick={onResetMove}>
-            제자리
-          </button>
-        )}
       </div>
       <div className="ar-row">
         <label className="ar-label" htmlFor="ar-power">

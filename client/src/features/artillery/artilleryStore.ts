@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ApplyEventResult, ResyncEnvelope } from '@/types/stomp';
 import type {
+  AimPreviewPayload,
   ArtilleryPrivateView,
   ArtilleryTableView,
   DelayTable,
@@ -12,12 +13,19 @@ import type {
   TurnSkippedPayload,
   UnitEliminatedPayload,
   UnitKind,
+  UnitMovedPayload,
   UnitPickedPayload,
   UnitsRevealedPayload,
   UnitView,
 } from '@/types/artillery';
 import { applyOp, maskFromRuns, type Mask } from './terrain';
 import { terrainOps, type FrameUnit } from './replay';
+import type { WalkFollow } from './liveMove';
+
+/** 남의 조준 미리보기(D-229) — 받은 시각과 함께. 지금 차례 것만 둔다. */
+export interface AimPreview extends AimPreviewPayload {
+  at: number;
+}
 
 /** 재생 중인 발사 — 게임판이 시작 시각부터 `frameAt` 으로 그린다. */
 export interface Replay {
@@ -66,6 +74,19 @@ export interface ArtilleryRoomState {
   queue: number[];
   /** 딜레이 표(D-226) — 구 서버면 null(안내를 숨긴다). */
   delayTable: DelayTable | null;
+  /** 차례 주인의 남은 연료(D-228 — `MOVE` 로 쓴 만큼 줄었다). null 이면 그 포대 연료 가득. */
+  fuelLeft: number | null;
+  /** 남의 걸음 따라가기(D-251) — 마지막 `UNIT_MOVED`. */
+  follow: WalkFollow | null;
+  /** 마지막 `UNIT_MOVED` 의 좌석과 번호 — 내 `MOVE` 응답을 알아보는 데 쓴다. */
+  lastMove: { seat: number; nonce: number } | null;
+  /** 차례 주인의 조준 미리보기(D-229). */
+  aimPreview: AimPreview | null;
+  /** 보낸 `MOVE` 가 답을 기다린다 — 그 사이의 `BUSY`·`CANNOT_MOVE` 는 띠를 띄우지 않고 {@link lastError} 로만 남긴다. */
+  moveInFlight: boolean;
+  lastError: { code: string; nonce: number } | null;
+  /** resync 마다 오른다 — 로컬에 모아 둔 걸음을 버리는 기준. */
+  snapshotNonce: number;
 }
 
 export interface ArtilleryActions {
@@ -78,6 +99,9 @@ export interface ArtilleryActions {
   finishReplay: () => void;
   /** 내가 고른 종류(보낸 직후 — 서버는 다 고를 때까지 남에게 숨긴다). */
   setMyPick: (kind: UnitKind) => void;
+  setMoveInFlight: (inFlight: boolean) => void;
+  /** 거절 코드 기록(D-251) — 걷기 보내기가 자기 `MOVE` 의 거절을 알아본다. */
+  noteError: (code: string) => void;
 }
 
 const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
@@ -102,6 +126,13 @@ const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
   teams: false,
   queue: [],
   delayTable: null,
+  fuelLeft: null,
+  follow: null,
+  lastMove: null,
+  aimPreview: null,
+  moveInFlight: false,
+  lastError: null,
+  snapshotNonce: 0,
 };
 
 /**
@@ -141,10 +172,24 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
       myPick: t.phase === 'PICKING' ? (snap.privateHand?.pickedKind ?? null) : null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
+      // D-228 — 엔진이 센 차례 전체 남은 시간이 우선(바깥 값은 마지막 액션 기준이라 MOVE 뒤엔 틀린다). 구 서버면 바깥 값.
       turnClock:
         t.phase === 'AIMING' && t.turnSeat >= 0
-          ? { since: Date.now(), remainingMs: typeof snap.turnRemainingMs === 'number' ? snap.turnRemainingMs : null }
+          ? {
+              since: Date.now(),
+              remainingMs:
+                typeof t.turnRemainingMs === 'number'
+                  ? t.turnRemainingMs
+                  : typeof snap.turnRemainingMs === 'number'
+                    ? snap.turnRemainingMs
+                    : null,
+            }
           : null,
+      fuelLeft: t.phase === 'AIMING' && t.turnSeat >= 0 && typeof t.fuel === 'number' ? t.fuel : null,
+      follow: null,
+      aimPreview: null,
+      moveInFlight: false,
+      snapshotNonce: get().snapshotNonce + 1,
     });
   },
 
@@ -187,6 +232,9 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
           cloudLevel: p.cloudLevel,
           pending: false,
           turnClock: { since: Date.now(), remainingMs: null },
+          fuelLeft: null,
+          follow: null,
+          aimPreview: null,
           queue: p.queue ?? state.queue,
           units: p.delays
             ? state.units.map((u) => (p.delays && p.delays[u.seat] !== undefined ? { ...u, delay: p.delays[u.seat] } : u))
@@ -241,10 +289,59 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
           mask,
           pending: false,
           turnClock: null,
+          fuelLeft: null,
+          follow: null,
+          aimPreview: null,
           replay: maskBefore
             ? { report, before, maskBefore, masks, nonce: (state.replay?.nonce ?? 0) + 1 }
             : null,
         });
+        return 'applied';
+      }
+
+      case 'UNIT_MOVED': {
+        // D-228 — 걷기 확정(결과값). 탈락이면 그 차례가 끝나고 대본 없는 연출 대기(RESOLVING, lastShot 없음)가 이어진다.
+        const p = payload as UnitMovedPayload;
+        const before = state.units.find((u) => u.seat === p.seat);
+        const out = p.eliminated;
+        const path = p.fall ? [...p.path, p.toX, p.toY] : p.path;
+        set({
+          units: state.units.map((u) =>
+            u.seat === p.seat
+              ? { ...u, x: p.toX, footY: p.toY, hp: p.hpAfter, alive: out === null, outCause: out ?? u.outCause }
+              : u,
+          ),
+          fuelLeft: out === null ? p.fuelLeft : null,
+          follow: before
+            ? { seat: p.seat, fromX: before.x, fromY: before.footY, path, startedAt: Date.now(), nonce: (state.follow?.nonce ?? 0) + 1 }
+            : null,
+          lastMove: { seat: p.seat, nonce: (state.lastMove?.nonce ?? 0) + 1 },
+          ...(out !== null
+            ? {
+                phase: 'RESOLVING' as Phase,
+                turnSeat: -1,
+                turnClock: null,
+                aimPreview: null,
+                pending: false,
+                notice: { text: out === 'CLOUD_SEA' ? 'FELL' : 'WILTED', nonce: (state.notice?.nonce ?? 0) + 1 },
+              }
+            : {}),
+        });
+        return 'applied';
+      }
+
+      case 'AIM_PREVIEW': {
+        // D-229 — 순번 없음. 지금 차례 주인의 것이고 그 차례 안에서 더 새 번호일 때만(락 없이 읽은 낡은 프레임을 거른다).
+        const p = payload as AimPreviewPayload;
+        const prev = state.aimPreview;
+        const fresh =
+          state.phase === 'AIMING' &&
+          state.replay === null &&
+          p.seat === state.turnSeat &&
+          p.turn === state.turnNo &&
+          (prev === null || prev.turn !== p.turn || prev.seat !== p.seat || p.n > prev.n);
+        if (!fresh) return 'ignored';
+        set({ aimPreview: { ...p, at: Date.now() } });
         return 'applied';
       }
 
@@ -292,5 +389,13 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
 
   setMyPick(kind) {
     set({ myPick: kind });
+  },
+
+  setMoveInFlight(inFlight) {
+    if (get().moveInFlight !== inFlight) set({ moveInFlight: inFlight });
+  },
+
+  noteError(code) {
+    set({ lastError: { code, nonce: (get().lastError?.nonce ?? 0) + 1 } });
   },
 }));
