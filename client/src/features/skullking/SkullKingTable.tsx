@@ -23,6 +23,8 @@ import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { SKULL_KING_TUTORIAL } from './tutorial/skullkingTutorial';
+import { cabinTheme, skThemeClass } from './skullKingTheme';
+import { useBidReveal } from './skullFx';
 
 interface Props {
   roomId: string;
@@ -119,6 +121,12 @@ export function SkullKingTable({
     settled.winnerSeat !== turnSeat;
   const nextSeat = awaitingLead ? -1 : nextTurnSeat(turnSeat, seatCount, s.trick.length);
 
+  // D-231 — 연출 전용 파생값(화면만). 방금 끝난 트릭의 승자(다음 카드가 나오면 사라진다)·예측 공개 순간·좌석이 앉은 쪽.
+  const wonSeat = s.phase === 'PLAYING' && s.trick.length === 0 && settled ? settled.winnerSeat : -1;
+  const revealRound = useBidReveal(s.phase, s.roundNumber);
+  const sideOfSeat = (seat: number) =>
+    seat === bottomSeat || seat === mySeat ? 'bottom' : slots.find((x) => x.seat === seat)?.side;
+
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
     if (botSeats.includes(seat)) return usernames[uid] ?? `봇 ${seat}`;
@@ -146,6 +154,7 @@ export function SkullKingTable({
         voice={voiceStatusOf(voice, playerIds[seat])}
         chat={chatLines[seat]}
         tier={tiers[playerIds[seat]]}
+        justWon={wonSeat === seat}
       />
     );
   };
@@ -207,7 +216,7 @@ export function SkullKingTable({
 
   return (
     <div
-      className="sk-table"
+      className={`sk-table${skThemeClass}`}
       style={{ ['--sk-seat-min' as string]: seatMinWidth(seatCount) }}
     >
       <header className="sk-header gm-header">
@@ -270,9 +279,28 @@ export function SkullKingTable({
               handSize={s.handSize}
               completedTricks={completedTricks}
               nameOf={nameOf}
+              fromOf={sideOfSeat}
             />
           )}
         </div>
+
+        {/* D-231 — 예측 공개: 양피지가 펼쳐지며 모든 예측이 한꺼번에 뒤집힌다. 꾸밈이라 읽지 않고(값은 좌석에 있다) 누르기도
+            통과시킨다. 글자는 CSS attr() 로 그린다 — 좌석의 같은 이름·숫자와 DOM 에서 겹치지 않게. */}
+        {cabinTheme && revealRound !== null && (
+          <div key={revealRound} className="sk-fx-reveal" aria-hidden data-title="예측 공개">
+            <div className="sk-fx-reveal-row">
+              {s.seats.map((x) => (
+                <span
+                  key={x.seat}
+                  className="sk-fx-reveal-seal"
+                  style={{ ['--sk-accent' as string]: seatAccent(x.seat) }}
+                  data-bid={x.bid ?? '?'}
+                  data-name={nameOf(x.seat)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {bottomSeat !== null && <div className="sk-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}
       </div>
@@ -306,7 +334,7 @@ export function SkullKingTable({
       {!spectator && mySeat >= 0 && (
         <>
           <div
-            className={`sk-me${myTurn ? ' sk-me-turn' : ''}`}
+            className={`sk-me${myTurn ? ' sk-me-turn' : ''}${wonSeat === mySeat ? ' sk-seat-won' : ''}`}
             style={{ ['--sk-accent' as string]: seatAccent(mySeat) }}
           >
             {tiers[playerIds[mySeat]] && <TierBadge tier={tiers[playerIds[mySeat]]} size={18} />}

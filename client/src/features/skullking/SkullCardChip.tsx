@@ -4,13 +4,24 @@ import {
   type SkullCard,
   type TigressMode,
 } from '@/types/skullking';
+import { SpecialArt, SuitEmblem } from './SkullCardArt';
+import { cabinTheme } from './skullKingTheme';
 
 /** 색상별 표시색 — 검정(으뜸패)은 다른 3색과 확실히 구별돼야 한다 (§7.1). */
 const SUIT_STYLE: Record<string, { bg: string; fg: string }> = {
-  GREEN: { bg: 'var(--sk-suit-green)', fg: '#0b2a12' },
-  PURPLE: { bg: 'var(--sk-suit-purple)', fg: '#f4eaff' },
-  YELLOW: { bg: 'var(--sk-suit-yellow)', fg: '#2e2405' },
-  BLACK: { bg: 'var(--sk-suit-black)', fg: '#f3f3f6' },
+  GREEN: { bg: 'var(--sk-suit-green)', fg: 'var(--sk-suit-green-fg, #0b2a12)' },
+  PURPLE: { bg: 'var(--sk-suit-purple)', fg: 'var(--sk-suit-purple-fg, #f4eaff)' },
+  YELLOW: { bg: 'var(--sk-suit-yellow)', fg: 'var(--sk-suit-yellow-fg, #2e2405)' },
+  BLACK: { bg: 'var(--sk-suit-black)', fg: 'var(--sk-suit-black-fg, #f3f3f6)' },
+};
+
+/** D-231 — 겹친 손패의 왼쪽 조각에서도 특수 카드가 읽히게 왼쪽 위 봉랍에 찍는 한 글자(CSS `attr()` — DOM 글자가 아니다). */
+const SPECIAL_MARK: Record<string, string> = {
+  PIRATE: '해',
+  MERMAID: '인',
+  SKULL_KING: '왕',
+  TIGRESS: '티',
+  ESCAPE: '탈',
 };
 
 const SPECIAL_GLYPH: Record<string, string> = {
@@ -68,21 +79,38 @@ export function SkullCardChip({
     selected ? 'sk-card-selected' : '',
     dimmed ? 'sk-card-dimmed' : '',
     isSpecial ? 'sk-card-special' : 'sk-card-suit',
+    // D-231 — 테마가 종류별 양피지 색·무늬별 테두리를 고른다.
+    isSpecial ? `sk-sp-${card.special!.toLowerCase().replace('_', '-')}` : `sk-suit-${card.suit!.toLowerCase()}`,
   ]
     .filter(Boolean)
     .join(' ');
+
+  const mark = isSpecial ? SPECIAL_MARK[card.special!] : undefined;
 
   const body = (
     <>
       {isSpecial ? (
         <>
-          <span className="sk-card-glyph" aria-hidden>
-            {SPECIAL_GLYPH[card.special!]}
-          </span>
+          {cabinTheme ? (
+            <span className="sk-card-art" aria-hidden>
+              <SpecialArt kind={card.special!} />
+            </span>
+          ) : (
+            <span className="sk-card-glyph" aria-hidden>
+              {SPECIAL_GLYPH[card.special!]}
+            </span>
+          )}
           <span className="sk-card-name">{SPECIAL_LABEL[card.special!]}</span>
         </>
       ) : (
-        <span className="sk-card-rank">{card.rank}</span>
+        <>
+          <span className="sk-card-rank">{card.rank}</span>
+          {cabinTheme && (
+            <span className="sk-card-art sk-card-emblem" aria-hidden>
+              <SuitEmblem suit={card.suit!} />
+            </span>
+          )}
+        </>
       )}
       {declaredAs && (
         <span className="sk-card-declared">
@@ -98,6 +126,7 @@ export function SkullCardChip({
         className={className}
         style={{ background: style.bg, color: style.fg }}
         aria-label={aria}
+        data-mark={mark}
       >
         {body}
       </span>
@@ -111,6 +140,7 @@ export function SkullCardChip({
       style={{ background: style.bg, color: style.fg }}
       aria-label={aria}
       aria-pressed={selected}
+      data-mark={mark}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >

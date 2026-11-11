@@ -34,6 +34,8 @@ interface Props {
   chat?: SeatChatLine;
   /** D-166 — 이 사람의 계급(봇·게스트는 없음). */
   tier?: Tier;
+  /** D-231 — 방금 끝난 트릭을 가져간 좌석(다음 카드가 나올 때까지). 놋쇠 빛 연출 전용. */
+  justWon?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export function SkullSeatCard({
   onKick,
   chat,
   tier,
+  justWon = false,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
   const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
@@ -64,6 +67,7 @@ export function SkullSeatCard({
   const className = [
     'sk-seat',
     isTurn ? 'sk-seat-turn' : '',
+    justWon ? 'sk-seat-won' : '',
     side === 'left' || side === 'right' ? 'sk-seat-side' : '',
     isDeserted ? 'sk-seat-deserted' : '',
     isDisconnected ? 'sk-seat-offline' : '',
@@ -117,7 +121,11 @@ export function SkullSeatCard({
       <div className="sk-seat-stats">
         <span className="sk-stat" title="예측 승수">
           <span className="sk-stat-key" aria-hidden>예</span>
-          <span className="sk-stat-val">
+          {/* key — 공개되는 순간 다시 그려 뒤집힘 연출(D-231)이 돈다. */}
+          <span
+            key={bidsRevealed && seat.bid !== null ? 'open' : 'closed'}
+            className={`sk-stat-val${bidsRevealed && seat.bid !== null ? ' sk-bid-open' : ''}`}
+          >
             {bidsRevealed && seat.bid !== null
               ? seat.bid
               : seat.hasBid

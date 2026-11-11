@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react';
+import { SK_TOKENS_CLASS } from '../skullKingTheme';
 import { describe, expect, it } from 'vitest';
 import { SKULL_KING_TUTORIAL_STEPS } from './skullkingTutorialSteps';
 import { SKULL_KING_TUTORIAL } from './skullkingTutorial';
@@ -44,7 +45,9 @@ describe('스컬킹 튜토리얼 — 구조', () => {
     expect(SKULL_KING_TUTORIAL.steps).toBe(steps);
     expect(SKULL_KING_TUTORIAL.seenKey).toBe('mirboard.tutorial.skull_king.seen.v1');
     // 다이얼로그는 body 포털(.sk-table 밖)이라 칩 색 토큰을 여기서 푼다.
-    expect(SKULL_KING_TUTORIAL.bodyClassName).toBe('sk-tokens');
+    // D-231 — 테마 클래스가 같이 붙어 포털의 카드도 게임판과 같은 그림이다.
+    expect(SKULL_KING_TUTORIAL.bodyClassName).toBe(SK_TOKENS_CLASS);
+    expect(SK_TOKENS_CLASS.split(' ')).toContain('sk-tokens');
   });
 });
 

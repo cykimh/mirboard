@@ -1,5 +1,7 @@
 import type { CompletedRoundView, MatchEndedPayload } from '@/types/skullking';
 import { SkullRoundHistoryTable } from './SkullRoundHistoryTable';
+import { TreasureChestArt } from './SkullCardArt';
+import { cabinTheme } from './skullKingTheme';
 
 const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
@@ -72,6 +74,8 @@ export function SkullRoundResultPanel({
                   <td>{signed(s.base)}</td>
                   <td>{s.bonus > 0 ? `+${s.bonus}` : hit ? '0' : '—'}</td>
                   <td>
+                    {/* D-231 — 정산 연출: 적중은 금화가 튀고 실패는 물이 튄다(꾸밈). */}
+                    {cabinTheme && <span className={hit ? 'sk-fx-coin' : 'sk-fx-splash'} aria-hidden />}
                     <strong>
                       {signed(s.total)} {hit ? '✓' : '✗'}
                     </strong>
@@ -133,7 +137,18 @@ export function SkullMatchEndPanel({
     seats.length > 0 ? seats : Object.keys(match.finalScores).map(Number).sort((a, b) => a - b);
 
   return (
-    <section className="match-end sk-match-end" aria-label="매치 종료">
+    <section className={`match-end sk-match-end${iWon ? ' sk-match-won' : ''}`} aria-label="매치 종료">
+      {/* D-231 — 매치 승리 축하: 보물 상자와 금화 비(꾸밈). */}
+      {cabinTheme && match.winners.length > 0 && (
+        <div className="sk-fx-treasure" aria-hidden>
+          <span className="sk-fx-rain">
+            {Array.from({ length: 12 }, (_, i) => (
+              <i key={i} style={{ ['--sk-i' as string]: i }} />
+            ))}
+          </span>
+          <TreasureChestArt />
+        </div>
+      )}
       <h3>
         {match.winners.length === 0
           ? '매치 종료'
