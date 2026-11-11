@@ -121,3 +121,59 @@ describe('OmokBoard — 두 단계 확정 (D-180)', () => {
     expect(container.querySelector('.om-winline')).not.toBeNull();
   });
 });
+
+describe('OmokBoard — 연출 표시 (D-192, 그림만)', () => {
+  const B = { seat: 0, x: 7, y: 7, timedOut: false };
+  const W = { seat: 1, x: 8, y: 8, timedOut: false };
+
+  it('처음 그릴 때는 내려앉지 않고, 한 수가 늘면 그 돌만 내려앉는다', () => {
+    const { container, rerender, props } = setup({ moves: [B] });
+    expect(container.querySelector('.om-stone.om-drop')).toBeNull();
+    rerender(<OmokBoard {...props} moves={[B, W]} />);
+    const dropped = container.querySelectorAll('.om-stone.om-drop');
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0].getAttribute('data-color')).toBe('WHITE');
+    expect(container.querySelectorAll('.om-dust')).toHaveLength(8);
+  });
+
+  it('여러 수가 한꺼번에 바뀌면(다시 받기) 연출 없이 그린다', () => {
+    const { container, rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} moves={[B, W]} />);
+    expect(container.querySelector('.om-drop')).toBeNull();
+  });
+
+  it('내가 누른 수는 바로 내려앉고, 확정되면 같은 돌이 이어받아 다시 떨어지지 않는다', () => {
+    const { container, rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} pending={{ x: 7, y: 7 }} />);
+    const pending = screen.getByTestId('om-pending');
+    expect(pending.getAttribute('class')).toContain('om-drop');
+    expect(screen.queryAllByTestId('om-stone')).toHaveLength(0);
+    rerender(<OmokBoard {...props} moves={[B]} pending={null} />);
+    const placed = screen.getByTestId('om-stone');
+    expect(placed).toBe(pending); // 같은 요소 — 연출이 끊기지 않는다
+    expect(placed.getAttribute('class')).toContain('om-drop');
+    expect(container.querySelectorAll('.om-stone')).toHaveLength(1);
+  });
+
+  it('내 금수 자리의 미리보기는 ✕ 에 경고를 싣고 안내선을 그리지 않는다', () => {
+    const { container } = setup({
+      forbidden: [{ x: 5, y: 5, kind: 'DOUBLE_THREE' }],
+      forbiddenIsMine: true,
+      preview: { x: 5, y: 5 },
+    });
+    expect(container.querySelector('.om-forbidden.om-warn')).not.toBeNull();
+    expect(container.querySelector('.om-guide')).toBeNull();
+    expect(container.querySelector('svg')!.getAttribute('class')).toContain('om-board-warn');
+  });
+
+  it('5목 줄의 돌에 순서를 싣고 금가루는 상한(26)을 넘지 않는다', () => {
+    const line = [3, 4, 5, 6, 7].map((x) => ({ x, y: 7 }));
+    const moves = line.flatMap((p, i) => [
+      { seat: 0, ...p, timedOut: false },
+      { seat: 1, x: i, y: 0, timedOut: false },
+    ]);
+    const { container } = setup({ moves: moves.slice(0, 9), winLine: line });
+    expect(container.querySelectorAll('.om-stone.om-won')).toHaveLength(5);
+    expect(container.querySelectorAll('.om-gold').length).toBeLessThanOrEqual(26);
+  });
+});

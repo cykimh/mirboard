@@ -1,6 +1,6 @@
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
@@ -10,7 +10,7 @@ import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useSfx } from '@/features/sound/useSfx';
-import type { OmokPoint, OmokStone } from '@/types/omok';
+import { BOARD_SIZE, type OmokPoint, type OmokStone } from '@/types/omok';
 import { omokRoomSink } from './omokRoomSink';
 import { useOmokStore } from './omokStore';
 import { FORBIDDEN_LABEL, coordName, forbiddenAt, key, stonesOf } from './omokRules';
@@ -18,6 +18,7 @@ import { OmokBoard } from './OmokBoard';
 import { OmokMatchEnd } from './OmokMatchEnd';
 import { OmokTurnCountdown } from './OmokTurnCountdown';
 import { OMOK_TUTORIAL } from './tutorial/omokTutorial';
+import { OMOK_TOKENS_CLASS } from './omokTheme';
 
 /** D-140 — 원카드와 같은 멈춘 차례 복구 유예·지터. */
 export const STALE_TURN_GRACE_MS = 2000;
@@ -41,7 +42,57 @@ function writeSingleClick(on: boolean) {
   }
 }
 
-const RULE_LABEL = { RENJU: '렌주', DOUBLE_THREE_ONLY: '삼삼만 금지', FREESTYLE: '자유 오목' } as const;
+/** 판 틀의 좌표 눈금(D-192) — 넓은 판에서만 보인다(CSS 컨테이너 쿼리). 가로 A~O, 세로 15~1. */
+const RULER_X = Array.from({ length: BOARD_SIZE }, (_, i) => String.fromCharCode(65 + i));
+const RULER_Y = Array.from({ length: BOARD_SIZE }, (_, i) => BOARD_SIZE - i);
+
+interface MarkerBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * D-192 — 차례 띠의 놋쇠 고리. 지금 차례인 명패 자리를 재서 고리 하나를 그 위로 옮긴다(CSS 전환이 미끄러뜨린다). 명패 폭은
+ * 카운트다운·끊김 배지로 바뀌므로 크기 변화를 지켜본다. 재지 못하는 환경(테스트)에서는 고리가 없을 뿐이다.
+ */
+function useTurnMarker(turnSeat: number, seatCount: number) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState<MarkerBox | null>(null);
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const measure = () => {
+      const el = wrap.querySelector<HTMLElement>('.om-seat-turn');
+      const next =
+        el && el.offsetWidth > 0
+          ? {
+              x: el.offsetLeft,
+              y: el.offsetTop,
+              w: el.offsetWidth,
+              h: el.offsetHeight,
+            }
+          : null;
+      setBox((prev) =>
+        prev && next && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h ? prev : next,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    wrap.querySelectorAll('.om-seat').forEach((seat) => observer.observe(seat));
+    return () => observer.disconnect();
+  }, [turnSeat, seatCount]);
+  return { wrapRef, box };
+}
+
+const RULE_LABEL = {
+  RENJU: '렌주',
+  DOUBLE_THREE_ONLY: '삼삼만 금지',
+  FREESTYLE: '자유 오목',
+} as const;
 const COLOR_LABEL: Record<OmokStone, string> = { BLACK: '흑', WHITE: '백' };
 
 interface Props {
@@ -201,9 +252,10 @@ export function OmokTable({
   else status = `${nameOf(turnSeat)}${turnColor ? `(${COLOR_LABEL[turnColor]})` : ''} 차례`;
 
   const seats = Array.from({ length: seatCount }, (_, i) => i);
+  const marker = useTurnMarker(turnSeat, seatCount);
 
   return (
-    <div className="om-table om-tokens">
+    <div className={`om-table ${OMOK_TOKENS_CLASS}`}>
       <header className="om-header">
         <div className="om-header-badges">
           <span className="om-badge om-badge-title">오목</span>
@@ -251,63 +303,103 @@ export function OmokTable({
         </p>
       )}
 
-      {/* 차례 띠 — 좌석 순서(진행 +1). 2:2 는 같은 팀이 같은 색이다. */}
-      <ol className="om-strip" aria-label="차례 순서">
-        {seats.map((seat) => {
-          const color = s.seatColors[seat];
-          const uid = playerIds[seat];
-          const isTurn = turnSeat === seat;
-          return (
-            <li
-              key={seat}
-              className={`om-seat${isTurn ? ' om-seat-turn' : ''}${seat === mySeat ? ' om-seat-me' : ''}`}
-              data-color={color}
-              aria-current={isTurn ? 'step' : undefined}
-            >
-              <span className={`om-dot om-dot-${color === 'BLACK' ? 'black' : 'white'}`} aria-label={color ? COLOR_LABEL[color] : ''} />
-              {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
-              <span className="om-seat-name">
-                {nameOf(seat)}
-                {seat === mySeat ? ' (나)' : ''}
-              </span>
-              {isTurn && <OmokTurnCountdown turnSeconds={turnSeconds} />}
-              {s.disconnectedSeats.has(seat) && <span className="om-badge om-badge-warn">끊김</span>}
-              {onKick && !roomFinished && seat !== mySeat && s.disconnectedSeats.has(seat) && (
-                <button type="button" className="om-badge" onClick={() => onKick(uid)}>
-                  내보내기
-                </button>
-              )}
-              {chatLines[seat] && (
-                <span key={chatLines[seat].id} className="om-seat-chat" title={chatLines[seat].text}>
-                  {chatLines[seat].text}
+      {/* 차례 띠 — 좌석 순서(진행 +1). 2:2 는 같은 팀이 같은 색이다. 놋쇠 고리가 지금 차례인 명패로 미끄러진다(D-192). */}
+      <div className="om-strip-wrap" ref={marker.wrapRef}>
+        <span
+          className="om-turn-marker"
+          aria-hidden="true"
+          style={
+            marker.box
+              ? {
+                  opacity: 1,
+                  transform: `translate(${marker.box.x}px, ${marker.box.y}px)`,
+                  width: marker.box.w,
+                  height: marker.box.h,
+                }
+              : undefined
+          }
+        >
+          {/* 차례가 넘어갈 때마다 고리 위로 반사광이 한 번 지나간다. */}
+          <span key={turnSeat} className="om-turn-sheen" />
+        </span>
+        <ol className="om-strip" aria-label="차례 순서">
+          {seats.map((seat) => {
+            const color = s.seatColors[seat];
+            const uid = playerIds[seat];
+            const isTurn = turnSeat === seat;
+            return (
+              <li
+                key={seat}
+                className={`om-seat${isTurn ? ' om-seat-turn' : ''}${seat === mySeat ? ' om-seat-me' : ''}`}
+                data-color={color}
+                aria-current={isTurn ? 'step' : undefined}
+              >
+                <span
+                  className={`om-dot om-dot-${color === 'BLACK' ? 'black' : 'white'}`}
+                  aria-label={color ? COLOR_LABEL[color] : ''}
+                />
+                {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
+                <span className="om-seat-name">
+                  {nameOf(seat)}
+                  {seat === mySeat ? ' (나)' : ''}
                 </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className={`om-board-wrap${myTurn ? ' om-board-myturn' : ''}`}>
-        <OmokBoard
-          moves={s.moves}
-          forbidden={turnColor === 'BLACK' && !s.result ? s.forbidden : []}
-          forbiddenIsMine={myTurn && myColor === 'BLACK'}
-          preview={preview}
-          pending={s.pending}
-          myColor={myColor}
-          winLine={winLine}
-          showNumbers={showNumbers}
-          enabled={canPlace}
-          singleClick={singleClick}
-          setPreview={s.setPreview}
-          onConfirm={place}
-        />
+                {isTurn && <OmokTurnCountdown turnSeconds={turnSeconds} />}
+                {s.disconnectedSeats.has(seat) && <span className="om-badge om-badge-warn">끊김</span>}
+                {onKick && !roomFinished && seat !== mySeat && s.disconnectedSeats.has(seat) && (
+                  <button type="button" className="om-badge" onClick={() => onKick(uid)}>
+                    내보내기
+                  </button>
+                )}
+                {chatLines[seat] && (
+                  <span key={chatLines[seat].id} className="om-seat-chat" title={chatLines[seat].text}>
+                    {chatLines[seat].text}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       </div>
 
-      <p className="om-status" aria-live="polite">
+      <div className="om-stage">
+        <div className={`om-board-wrap${myTurn ? ' om-board-myturn' : ''}`}>
+          <div className="om-ruler om-ruler-y" aria-hidden="true">
+            {RULER_Y.map((n) => (
+              <span key={n}>{n}</span>
+            ))}
+          </div>
+          <div className="om-ruler om-ruler-x" aria-hidden="true">
+            {RULER_X.map((c) => (
+              <span key={c}>{c}</span>
+            ))}
+          </div>
+          {/* 등불 — 판 위에 얹는 빛 한 겹(불투명도만 흔들린다). */}
+          <span className="om-lamp" aria-hidden="true" />
+          <OmokBoard
+            moves={s.moves}
+            forbidden={turnColor === 'BLACK' && !s.result ? s.forbidden : []}
+            forbiddenIsMine={myTurn && myColor === 'BLACK'}
+            preview={preview}
+            pending={s.pending}
+            myColor={myColor}
+            winLine={winLine}
+            showNumbers={showNumbers}
+            enabled={canPlace}
+            singleClick={singleClick}
+            setPreview={s.setPreview}
+            onConfirm={place}
+          />
+        </div>
+      </div>
+
+      <p className={`om-status${myTurn && previewForbidden ? ' om-status-warn' : ''}`} aria-live="polite">
         {status}
         {last && s.mode === 'TEAMS_2V2' && !s.result && (
-          <span className="om-last-by"> · 방금 {nameOf(last.seat)}{last.timedOut ? '(시간 초과)' : ''}</span>
+          <span className="om-last-by">
+            {' '}
+            · 방금 {nameOf(last.seat)}
+            {last.timedOut ? '(시간 초과)' : ''}
+          </span>
         )}
       </p>
 
@@ -331,6 +423,7 @@ export function OmokTable({
       {s.result && (
         <OmokMatchEnd
           result={s.result}
+          afterWinLine={winLine.length >= 2}
           mode={s.mode}
           mySeat={mySeat}
           nameOf={nameOf}

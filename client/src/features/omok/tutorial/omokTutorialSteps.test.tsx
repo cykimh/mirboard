@@ -15,7 +15,7 @@ describe('오목 튜토리얼', () => {
 
   it('레지스트리에 등록돼 있다', () => {
     expect(tutorialFor('OMOK')?.seenKey).toBe('mirboard.tutorial.omok.seen.v1');
-    expect(tutorialFor('OMOK')?.bodyClassName).toBe('om-tokens');
+    expect(tutorialFor('OMOK')?.bodyClassName?.split(' ')).toContain('om-tokens');
   });
 
   it('두 단계 확정·2:2 번갈아·룰 셋·금수·시간 초과 두 번을 설명한다', () => {
