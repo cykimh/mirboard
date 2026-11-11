@@ -42,7 +42,7 @@ export function describe(entry: LogEntry, nameOf: (seat: number) => string): str
   switch (entry.type) {
     case 'DICE_ROLLED': {
       const p = entry.payload as DiceRolled;
-      return `${nameOf(p.seat)} 🎲 ${p.die1}·${p.die2}${p.doubles ? ' 더블!' : ''}`;
+      return `${nameOf(p.seat)} 주사위 ${p.die1}·${p.die2}${p.doubles ? ' 더블!' : ''}`;
     }
     case 'TOKEN_MOVED': {
       const p = entry.payload as TokenMoved;
@@ -96,7 +96,7 @@ export function describe(entry: LogEntry, nameOf: (seat: number) => string): str
     }
     case 'FESTIVAL_HOSTED': {
       const p = entry.payload as FestivalHosted;
-      return `${nameOf(p.seat)} ${tile(p.tile)}에 등불 축제 🏮`;
+      return `${nameOf(p.seat)} ${tile(p.tile)}에 등불 축제`;
     }
     case 'ASSETS_LIQUIDATED': {
       const p = entry.payload as AssetsLiquidated;

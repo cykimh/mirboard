@@ -204,6 +204,129 @@
   }
 }
 
+/* D-218 — 구름항로 그림책 테마. 22 는 미디어 0개 규칙이라 여기 둔다(스컬킹 맨 끝 두 블록 앞).
+   ① 넓은 화면은 판 왼쪽 + 좌석·결정 패널 오른쪽 두 단. 판은 화면 높이를 넘지 않게 줄인다(단위 `--cr-u` 는 게임판이 다시 잰다).
+   ② 움직임 줄이기면 남은 CSS 움직임(구름·풍차·맥박·전환)도 모두 멈춘다 — 연출 감독은 애초에 붙지 않는다. */
+@media (min-width: 960px) {
+  .cr-table.cr-storybook {
+    max-width: 1120px;
+    padding: 14px 18px 18px;
+  }
+
+  .cr-storybook .cr-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .cr-storybook .cr-side {
+    position: sticky;
+    top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .cr-storybook .cr-layout > .cr-side > .cr-seats {
+    order: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .cr-storybook .cr-seat {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 8px 10px;
+  }
+
+  .cr-storybook .cr-seat-name {
+    grid-column: 2;
+  }
+
+  .cr-storybook .cr-seat-cash {
+    grid-row: 1;
+    grid-column: 3;
+    font-size: 15px;
+  }
+
+  .cr-storybook .cr-seat-tags {
+    grid-column: 2 / 4;
+    justify-content: flex-start;
+  }
+
+  .cr-storybook .cr-seat.cr-seat-turn .cr-seat-name {
+    padding-right: 0;
+  }
+
+  .cr-storybook .cr-tag.cr-tag-turn {
+    position: static;
+    margin-left: auto;
+  }
+
+  .cr-storybook .cr-seat-avatar {
+    width: 34px;
+    height: 35px;
+  }
+
+  .cr-storybook .cr-board-wrap {
+    width: min(100%, calc(100vh - 96px));
+    margin: 0 auto;
+  }
+
+  .cr-storybook .cr-panel {
+    position: static;
+    min-height: 132px;
+  }
+}
+
+/* ③ 좁은 화면 — 머리줄 알약을 한 줄에 맞추고, 가운데 하늘은 사건 줄 두 줄 + 편지 더미를 글줄 안으로. */
+@media (max-width: 560px) {
+  .cr-storybook .cr-header {
+    gap: 6px;
+  }
+
+  .cr-storybook .cr-header-badges {
+    gap: 4px;
+  }
+
+  .cr-storybook .cr-badge {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+
+  .cr-storybook .cr-badge.cr-badge-title {
+    padding: 3px 10px;
+    font-size: 13px;
+  }
+
+  .cr-storybook .cr-log li:first-child:nth-last-child(3) {
+    display: none;
+  }
+
+  .cr-storybook .cr-deck {
+    position: static;
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .cr-storybook .cr-deck-pile {
+    width: 13px;
+    min-width: 13px;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-table,
+  .cr-table *,
+  .cr-table *::before,
+  .cr-table *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —
    가운데(트릭 레일·방향)를 옆줄 아래 전체 폭으로 내린다. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이는 빈다. 넓은 화면은

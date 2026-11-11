@@ -7,7 +7,11 @@
  * ⚠ 네임스페이스: 모든 선택자는 `.cr-` 클래스를 포함한다. 공용 클래스를 단독으로 재정의하지 않는다
  *   (styles/cloudrouteCssNamespace.test.ts 가 기계로 검사).
  *
- * 테마: 중립색은 전역 토큰(--color-*). 하늘·섬 색은 라이트·다크 모두 읽히는 중간 채도다.
+ * 테마(D-218): 이 파일 앞부분은 **기본 모습(`cr-classic`)과 뼈대** — 중립색은 전역 토큰(--color-*). 뒷부분 `.cr-storybook` 블록이
+ *   그림책 테마(시안 A)의 색·모양·움직임을 얹는다. 루트 클래스는 `features/cloudroute/theme.ts` 한 줄이 정한다.
+ *
+ * 단위: `--cr-u` = 판 폭의 1/100(게임판이 ResizeObserver 로 심는다, 기본값은 화면 폭 근사). 판 안쪽 여백 1.2u · 칸 사이 0.8u 는
+ *   말 자리 계산(`tokenLayout.ts`)과 같은 수다 — 바꾸면 같이 고친다.
  */
 
 /* 게임판은 `.app-shell` **밖**이라 tailwind 의 border-box 리셋이 닿지 않는다. 스코프 안에서만 명시한다. */
@@ -34,6 +38,19 @@
   --cr-star-apple: #d9534f;
   --cr-lava: #8f3b2c;
   --cr-crown: #b48ad8;
+  --cr-sp: var(--color-bg-surface-elevated);
+  --cr-u: min(1vw, 7px);
+  --cr-art-ink: var(--color-text-secondary);
+  --cr-art-fill: var(--color-bg-surface);
+  --cr-paper: var(--color-bg-surface);
+  --cr-edge: var(--color-border);
+  --cr-good: var(--color-success);
+  --cr-bad: var(--color-danger);
+  --cr-rb-ink: #fff;
+  --cr-seat-0-deep: #2f5fc4;
+  --cr-seat-1-deep: #c0334f;
+  --cr-seat-2-deep: #2c7a42;
+  --cr-seat-3-deep: #8a6a00;
 
   position: relative;
   display: flex;
@@ -129,6 +146,32 @@ button.cr-badge {
   font-size: 13px;
 }
 
+.cr-c-0 { --cr-c: var(--cr-seat-0); --cr-c-deep: var(--cr-seat-0-deep); }
+.cr-c-1 { --cr-c: var(--cr-seat-1); --cr-c-deep: var(--cr-seat-1-deep); }
+.cr-c-2 { --cr-c: var(--cr-seat-2); --cr-c-deep: var(--cr-seat-2-deep); }
+.cr-c-3 { --cr-c: var(--cr-seat-3); --cr-c-deep: var(--cr-seat-3-deep); }
+.cr-c-none { --cr-c: #9a8fb0; --cr-c-deep: #6b5d80; }
+
+.cr-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cr-side {
+  display: contents;
+}
+
+.cr-layout > .cr-side > .cr-seats {
+  order: -1;
+}
+
+.cr-board-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
 .cr-seat-0 { border-left: 6px solid var(--cr-seat-0); }
 .cr-seat-1 { border-left: 6px solid var(--cr-seat-1); }
 .cr-seat-2 { border-left: 6px solid var(--cr-seat-2); }
@@ -144,6 +187,12 @@ button.cr-badge {
   opacity: 0.55;
 }
 
+.cr-seat-avatar {
+  flex: none;
+  width: 26px;
+  height: 27px;
+}
+
 .cr-seat-name {
   display: flex;
   align-items: center;
@@ -154,11 +203,19 @@ button.cr-badge {
   text-overflow: ellipsis;
 }
 
+.cr-seat-lands {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .cr-seat-me {
   color: var(--color-text-muted);
 }
 
 .cr-seat-cash {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
@@ -179,6 +236,9 @@ button.cr-badge {
 }
 
 .cr-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   padding: 0 6px;
   border-radius: 6px;
   background: var(--color-bg-surface-elevated);
@@ -201,10 +261,11 @@ button.cr-kick {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-template-rows: repeat(7, minmax(0, 1fr));
-  gap: 3px;
+  gap: calc(var(--cr-u) * 0.8);
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  padding: 4px;
+  padding: calc(var(--cr-u) * 1.2);
   border-radius: 14px;
   border: 3px solid var(--cr-sky-edge);
   background: var(--cr-sky);
@@ -221,6 +282,9 @@ button.cr-kick {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
+  z-index: 1;
+  --cr-isl: var(--cr-sp);
+  --cr-isl-d: var(--cr-art-ink);
   min-width: 0;
   min-height: 0;
   padding: 0 2px 2px;
@@ -241,14 +305,39 @@ button.cr-kick {
   background: transparent;
 }
 
-.cr-tile[data-island='MOSS'] .cr-tile-band { background: var(--cr-moss); }
-.cr-tile[data-island='SHELL'] .cr-tile-band { background: var(--cr-shell); }
-.cr-tile[data-island='MUSHROOM'] .cr-tile-band { background: var(--cr-mushroom); }
-.cr-tile[data-island='WINDMILL'] .cr-tile-band { background: var(--cr-windmill); }
-.cr-tile[data-island='GLASS'] .cr-tile-band { background: var(--cr-glass); }
-.cr-tile[data-island='STAR_APPLE'] .cr-tile-band { background: var(--cr-star-apple); }
-.cr-tile[data-island='LAVA'] .cr-tile-band { background: var(--cr-lava); }
-.cr-tile[data-island='CROWN'] .cr-tile-band { background: var(--cr-crown); }
+.cr-tile .cr-tile-band {
+  background: var(--cr-isl);
+}
+
+.cr-tile[data-island='MOSS'],
+.cr-sheet-art[data-island='MOSS'] { --cr-isl: var(--cr-moss); }
+.cr-tile[data-island='SHELL'],
+.cr-sheet-art[data-island='SHELL'] { --cr-isl: var(--cr-shell); }
+.cr-tile[data-island='MUSHROOM'],
+.cr-sheet-art[data-island='MUSHROOM'] { --cr-isl: var(--cr-mushroom); }
+.cr-tile[data-island='WINDMILL'],
+.cr-sheet-art[data-island='WINDMILL'] { --cr-isl: var(--cr-windmill); }
+.cr-tile[data-island='GLASS'],
+.cr-sheet-art[data-island='GLASS'] { --cr-isl: var(--cr-glass); }
+.cr-tile[data-island='STAR_APPLE'],
+.cr-sheet-art[data-island='STAR_APPLE'] { --cr-isl: var(--cr-star-apple); }
+.cr-tile[data-island='LAVA'],
+.cr-sheet-art[data-island='LAVA'] { --cr-isl: var(--cr-lava); }
+.cr-tile[data-island='CROWN'],
+.cr-sheet-art[data-island='CROWN'] { --cr-isl: var(--cr-crown); }
+
+.cr-tile-art {
+  display: flex;
+  justify-content: center;
+  height: 30%;
+  min-height: 0;
+}
+
+.cr-tile-art .cr-art {
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1;
+}
 
 .cr-tile-name {
   display: -webkit-box;
@@ -278,35 +367,427 @@ button.cr-kick {
   line-height: 1;
 }
 
-.cr-tokens {
-  display: flex;
-  flex-wrap: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  font-size: clamp(8px, 2.3vw, 14px);
-}
-
-.cr-token + .cr-token {
-  margin-left: -0.35em;
-}
-
-.cr-tile-festival {
-  font-size: clamp(8px, 2.1vw, 13px);
+.cr-tile-price {
+  margin: 0 auto;
+  font-size: clamp(7px, calc(var(--cr-u) * 1.5), 10.5px);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
 }
 
 .cr-tile-owner {
   display: flex;
   align-items: center;
-  flex: none;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
   padding: 0 2px;
   border-radius: 4px;
-  background: var(--color-bg-surface-elevated);
-  font-size: clamp(7px, 1.8vw, 11px);
+  background: var(--cr-c-deep);
+  color: var(--cr-rb-ink);
+  font-size: clamp(7px, calc(var(--cr-u) * 1.5), 10.5px);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.cr-tile-level {
-  letter-spacing: -1px;
+.cr-tile-seatno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25em;
+  height: 1.25em;
+  border-radius: 50%;
+  background: var(--cr-rb-ink);
+  color: var(--cr-c-deep);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cr-tile-bld {
+  position: absolute;
+  top: 3%;
+  right: 3%;
+  width: 32%;
+  pointer-events: none;
+}
+
+.cr-tile-festival {
+  position: absolute;
+  top: 3%;
+  left: 3%;
+  width: 26%;
+  pointer-events: none;
+}
+
+.cr-tile-festival .cr-ico {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── 그림 (art.tsx) — 모양은 SVG, 칠·선은 여기 ─────────────────────── */
+.cr-art,
+.cr-bld,
+.cr-balloon,
+.cr-die-face,
+.cr-cardback,
+.cr-letter-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.cr-art .cr-art-f {
+  fill: var(--cr-art-fill);
+  stroke: var(--cr-art-ink);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.cr-art .cr-art-a {
+  fill: var(--cr-isl-d);
+}
+
+.cr-art .cr-art-d {
+  fill: var(--cr-isl);
+}
+
+.cr-art .cr-art-l {
+  fill: none;
+  stroke: var(--cr-art-ink);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cr-bld .cr-bld-f {
+  fill: var(--cr-c, #9a8fb0);
+  stroke: #fff;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.cr-bld .cr-bld-a {
+  fill: #ffe27a;
+  stroke: var(--cr-c, #9a8fb0);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.cr-bld .cr-bld-w {
+  fill: #fff;
+  opacity: 0.9;
+}
+
+.cr-bld .cr-bld-l {
+  fill: none;
+  stroke: #5d4c70;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cr-balloon .cr-bal-f {
+  fill: var(--cr-c);
+  stroke: #fff;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.cr-balloon .cr-bal-mark {
+  fill: #fff;
+  opacity: 0.42;
+}
+
+.cr-balloon .cr-bal-shine {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.cr-balloon .cr-bal-eye {
+  fill: #33273f;
+}
+
+.cr-balloon .cr-bal-mouth {
+  fill: none;
+  stroke: #33273f;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cr-balloon .cr-bal-mouth-open {
+  fill: #33273f;
+}
+
+.cr-balloon .cr-bal-rope {
+  fill: none;
+  stroke: #8a6444;
+  stroke-width: 0.9;
+}
+
+.cr-balloon .cr-bal-basket {
+  fill: #fff7e6;
+  stroke: #8a6444;
+  stroke-width: 0.9;
+}
+
+.cr-balloon .cr-bal-no {
+  fill: #4a2f14;
+  font-size: 8px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.cr-die-face .cr-die-body {
+  fill: #fffdf8;
+  stroke: #d6c6e2;
+  stroke-width: 1.5;
+}
+
+.cr-die-face .cr-die-pip {
+  fill: #e0457c;
+}
+
+.cr-die + .cr-die .cr-die-pip {
+  fill: #2f74e0;
+}
+
+.cr-cardback .cr-cardback-f {
+  fill: var(--cr-cardback, #7fb6ee);
+}
+
+.cr-cardback .cr-cardback-l {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.2;
+  stroke-dasharray: 2 2.6;
+  stroke-linecap: round;
+}
+
+.cr-cardback .cr-cardback-c {
+  fill: #fff;
+}
+
+.cr-cardback .cr-cardback-w {
+  fill: none;
+  stroke: var(--cr-cardback, #7fb6ee);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.cr-letter-art .cr-la-f {
+  fill: #fffdf8;
+  stroke: #5d4c70;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.cr-letter-art .cr-la-a {
+  fill: #ff8fab;
+  stroke: #5d4c70;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.cr-letter-art .cr-la-s {
+  fill: #ffd34d;
+  stroke: #b57f0a;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.cr-letter-art .cr-la-l {
+  fill: none;
+  stroke: #5d4c70;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cr-letter-art .cr-la-hole {
+  fill: #fffaf2;
+  stroke: #5d4c70;
+  stroke-width: 1.3;
+}
+
+.cr-letter-art .cr-la-glass {
+  fill: #bcd4ff;
+  fill-opacity: 0.6;
+  stroke: #5d4c70;
+  stroke-width: 1.8;
+}
+
+.cr-ico {
+  display: inline-block;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  overflow: visible;
+}
+
+.cr-ico .cr-ico-f {
+  fill: #fffdf8;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.cr-ico .cr-ico-l {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cr-ico .cr-ico-dot {
+  fill: currentColor;
+}
+
+.cr-ico .cr-ico-red {
+  fill: #ff6b6b;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.cr-ico .cr-ico-hole {
+  fill: var(--cr-paper);
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.cr-ico .cr-ico-coin {
+  fill: #ffd34d;
+  stroke: #b57f0a;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.cr-ico .cr-ico-coin-star {
+  fill: #fff6c9;
+}
+
+/* ── 말·연출 층 — 자리는 게임판이 판 단위 transform 으로 준다 ──────── */
+.cr-sky {
+  display: none;
+}
+
+.cr-tokens,
+.cr-route,
+.cr-cardwrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cr-tokens {
+  z-index: 4;
+}
+
+.cr-token {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--cr-u) * 7.2);
+  height: calc(var(--cr-u) * 7.42);
+  transition: transform 220ms ease;
+}
+
+.cr-token.cr-token-moving,
+.cr-token.cr-token-turn {
+  z-index: 2;
+}
+
+.cr-token-body {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+.cr-token-shadow {
+  position: absolute;
+  right: 22%;
+  bottom: -3%;
+  left: 22%;
+  height: 9%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.16;
+}
+
+.cr-route {
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  fill: none;
+}
+
+.cr-cardwrap {
+  z-index: 6;
+  display: grid;
+  place-items: center;
+}
+
+.cr-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cr-fx .cr-particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  will-change: transform, opacity;
+}
+
+.cr-fx .cr-particle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.cr-fx .cr-particle-ring {
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+}
+
+.cr-fx .cr-pop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--cr-paper);
+  box-shadow: 0 2px 0 var(--cr-edge);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.cr-fx .cr-pop-gain {
+  color: var(--cr-good);
+}
+
+.cr-fx .cr-pop-loss {
+  color: var(--cr-bad);
 }
 
 .cr-tile.cr-pickable {
@@ -355,22 +836,15 @@ button.cr-kick {
 }
 
 .cr-dice {
+  --cr-die: clamp(26px, calc(var(--cr-u) * 10.5), 62px);
   display: flex;
-  gap: 6px;
+  gap: calc(var(--cr-die) * 0.28);
 }
 
 .cr-die {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: clamp(26px, 8vw, 40px);
-  height: clamp(26px, 8vw, 40px);
-  border-radius: 8px;
-  background: #fbfaf6;
-  color: #1f2228;
-  font-size: clamp(14px, 4vw, 22px);
-  font-weight: 800;
-  box-shadow: 0 2px 0 rgb(0 0 0 / 25%);
+  display: inline-block;
+  width: var(--cr-die);
+  height: var(--cr-die);
 }
 
 .cr-center-turn {
@@ -380,6 +854,9 @@ button.cr-kick {
 }
 
 .cr-letter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 0;
   padding: 2px 10px;
   border-radius: 8px;
@@ -399,6 +876,10 @@ button.cr-kick {
 .cr-log li:last-child {
   color: var(--color-text-primary);
   font-weight: 600;
+}
+
+.cr-deck-pile {
+  display: none;
 }
 
 .cr-deck {
@@ -451,6 +932,10 @@ button.cr-kick {
 }
 
 .cr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 44px;
   padding: 8px 16px;
   border-radius: 10px;
@@ -478,7 +963,16 @@ button.cr-kick {
   gap: 6px;
 }
 
+.cr-level .cr-bld {
+  flex: none;
+  width: 22px;
+}
+
 .cr-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   flex: 1;
   min-height: 44px;
   border-radius: 10px;
@@ -519,6 +1013,28 @@ button.cr-kick {
   justify-content: space-between;
 }
 
+.cr-sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-sheet-art {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--cr-isl, var(--cr-sp));
+}
+
+.cr-sheet-tolls th .cr-bld {
+  display: inline-block;
+  width: 18px;
+  margin-right: 6px;
+  vertical-align: -4px;
+}
+
 .cr-sheet-tolls {
   width: 100%;
   border-collapse: collapse;
@@ -555,8 +1071,18 @@ button.cr-kick {
   list-style: none;
 }
 
+.cr-match-kicker {
+  display: none;
+}
+
+.cr-standing-avatar {
+  flex: none;
+  width: 26px;
+}
+
 .cr-standings li {
   display: flex;
+  align-items: center;
   gap: 10px;
   padding: 6px 0;
   border-bottom: 1px solid var(--color-border-subtle);
@@ -623,4 +1149,1252 @@ button.cr-kick {
 .cr-level:hover:not(:disabled) {
   background: var(--color-bg-surface);
   border-color: var(--color-accent);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 그림책 테마 (D-218) — 시안 A "솜구름 그림책". 루트의 `.cr-storybook` 아래에서만 먹는다.
+ * 색은 테마 토큰을 직접 둔다(color-mix 없음). 다크는 밤 구름. 글자 대비는 WCAG AA(본문 4.5:1 이상)로 골랐다.
+ * 움직임은 `.cr-motion`(움직임 줄이기가 아닐 때만 게임판이 붙인다) 아래에만 있다.
+ * ══════════════════════════════════════════════════════════════════════ */
+.cr-table.cr-storybook {
+  --cr-ink: #45385a;
+  --cr-muted: #6b5d80;
+  --cr-paper: #fffaf2;
+  --cr-paper-2: #f6ecdd;
+  --cr-edge: #e2d0bd;
+  --cr-line: #e6d6c4;
+  --cr-sky-1: #cdeaff;
+  --cr-sky-2: #ffe3ee;
+  --cr-pane: rgb(255 255 255 / 34%);
+  --cr-accent: #ff8fab;
+  --cr-accent-d: #e0607f;
+  --cr-accent-ink: #4a1f3a;
+  --cr-gold: #8a5a00;
+  --cr-bad: #c2335b;
+  --cr-good: #157a52;
+  --cr-cardback: #7fb6ee;
+  --cr-cloud: rgb(255 255 255 / 94%);
+  --cr-rainbow: 0.6;
+  --cr-star: 0;
+  --cr-art-ink: #5d4c70;
+  --cr-art-fill: #fffdf8;
+  --cr-rb-ink: #fff;
+  --cr-seat-0: #3f86f5;
+  --cr-seat-1: #f0558a;
+  --cr-seat-2: #1faa74;
+  --cr-seat-3: #f08a1d;
+  --cr-seat-0-deep: #2563c9;
+  --cr-seat-1-deep: #c7306a;
+  --cr-seat-2-deep: #12754f;
+  --cr-seat-3-deep: #a85a00;
+  --cr-moss: #a9dd8c;
+  --cr-shell: #f9bdd0;
+  --cr-mushroom: #f6b085;
+  --cr-windmill: #b8d6f4;
+  --cr-glass: #9fe3e0;
+  --cr-star-apple: #f79a9a;
+  --cr-lava: #e39a85;
+  --cr-crown: #cdb0f5;
+  --cr-sp: #ffe9a8;
+  --cr-moss-d: #4f8a3c;
+  --cr-shell-d: #c2577a;
+  --cr-mushroom-d: #b8623a;
+  --cr-windmill-d: #4f7fb0;
+  --cr-glass-d: #2f8f8c;
+  --cr-star-apple-d: #c24a4a;
+  --cr-lava-d: #9c4a36;
+  --cr-crown-d: #7a55b8;
+  --cr-sp-d: #b58a1a;
+
+  width: 100%;
+  max-width: 760px;
+  padding: 10px;
+  background: linear-gradient(160deg, var(--cr-sky-1), var(--cr-sky-2));
+  color: var(--cr-ink);
+  font-family: ui-rounded, 'SF Pro Rounded', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+}
+
+html.dark .cr-table.cr-storybook {
+  --cr-ink: #f4ecff;
+  --cr-muted: #cdc3e3;
+  --cr-paper: #3a3256;
+  --cr-paper-2: #463d66;
+  --cr-edge: #221c36;
+  --cr-line: #5a4e80;
+  --cr-sky-1: #29284f;
+  --cr-sky-2: #493461;
+  --cr-pane: rgb(20 16 40 / 30%);
+  --cr-accent: #ff9fba;
+  --cr-accent-d: #c9607f;
+  --cr-accent-ink: #3a1228;
+  --cr-gold: #ffd66b;
+  --cr-bad: #ff9db3;
+  --cr-good: #86e6b8;
+  --cr-cardback: #5878c8;
+  --cr-cloud: rgb(255 255 255 / 13%);
+  --cr-rainbow: 0.3;
+  --cr-star: 0.9;
+  --cr-art-ink: #2a2140;
+  --cr-rb-ink: #1c172b;
+  --cr-seat-0: #6aa5ff;
+  --cr-seat-1: #ff7fa8;
+  --cr-seat-2: #4fd29a;
+  --cr-seat-3: #ffab4a;
+  --cr-seat-0-deep: #8dbaff;
+  --cr-seat-1-deep: #ff9cbb;
+  --cr-seat-2-deep: #6fe0b0;
+  --cr-seat-3-deep: #ffbe73;
+  --cr-moss: #5f9a55;
+  --cr-shell: #b96c84;
+  --cr-mushroom: #b87248;
+  --cr-windmill: #6689b3;
+  --cr-glass: #4a9c9b;
+  --cr-star-apple: #bd5a61;
+  --cr-lava: #a05846;
+  --cr-crown: #8368ba;
+  --cr-sp: #8a7636;
+  --cr-moss-d: #2f5a2a;
+  --cr-shell-d: #7a3550;
+  --cr-mushroom-d: #7a421f;
+  --cr-windmill-d: #34527a;
+  --cr-glass-d: #1f5f5e;
+  --cr-star-apple-d: #7c2c33;
+  --cr-lava-d: #68301f;
+  --cr-crown-d: #4c3880;
+  --cr-sp-d: #5a4a14;
+}
+
+/* ── 헤더·알약 ── */
+.cr-storybook .cr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 0;
+  background: var(--cr-paper);
+  box-shadow: 0 2px 0 var(--cr-edge);
+  color: var(--cr-ink);
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.cr-storybook .cr-badge.cr-badge-title {
+  padding: 4px 14px;
+  background: var(--cr-accent);
+  box-shadow: 0 3px 0 var(--cr-accent-d);
+  color: var(--cr-accent-ink);
+  font-size: 15px;
+}
+
+.cr-storybook .cr-badge.cr-badge-off {
+  color: var(--cr-bad);
+}
+
+.cr-storybook button.cr-badge:hover:not(:disabled) {
+  background: var(--cr-paper-2);
+}
+
+.cr-storybook .cr-countdown.cr-countdown-urgent {
+  color: var(--cr-bad);
+  box-shadow: 0 2px 0 var(--cr-bad);
+}
+
+.cr-storybook .cr-error {
+  border-radius: 14px;
+  background: var(--cr-paper);
+  box-shadow: 0 2px 0 var(--cr-bad);
+  color: var(--cr-bad);
+  font-weight: 700;
+}
+
+/* ── 좌석 ── */
+.cr-storybook .cr-seats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cr-storybook .cr-seat {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 6px;
+  padding: 5px 8px;
+  border: 2.5px solid transparent;
+  border-radius: 16px;
+  background: var(--cr-paper);
+  box-shadow: 0 3px 0 var(--cr-edge);
+}
+
+.cr-storybook .cr-seat.cr-seat-turn {
+  border-color: var(--cr-c);
+}
+
+.cr-storybook .cr-seat.cr-seat-out {
+  opacity: 0.62;
+  filter: grayscale(1);
+}
+
+.cr-storybook .cr-seat-avatar {
+  grid-row: 1 / 3;
+  width: 28px;
+  height: 29px;
+}
+
+.cr-storybook .cr-seat-me,
+.cr-storybook .cr-seat-lands {
+  color: var(--cr-muted);
+  font-weight: 400;
+}
+
+.cr-storybook .cr-seat-name {
+  grid-column: 2 / 4;
+}
+
+.cr-storybook .cr-seat-cash {
+  grid-row: 2;
+  grid-column: 2;
+  color: var(--cr-gold);
+  font-size: 14px;
+}
+
+.cr-storybook .cr-seat-tags {
+  grid-row: 2;
+  grid-column: 3;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.cr-storybook .cr-seat-tags > * {
+  flex: none;
+}
+
+.cr-storybook .cr-tag {
+  border: 1.5px solid var(--cr-line);
+  border-radius: 999px;
+  background: var(--cr-paper-2);
+  color: var(--cr-ink);
+  font-weight: 700;
+}
+
+/* 좁은 좌석 칩에서는 "차례" 표시가 이름 줄 오른쪽 위에 선다(아랫줄은 현금·땅·상태). 넓은 화면은 17 에서 글줄 안으로. */
+.cr-storybook .cr-seat {
+  position: relative;
+}
+
+.cr-storybook .cr-seat.cr-seat-turn .cr-seat-name {
+  padding-right: 46px;
+}
+
+.cr-storybook .cr-tag.cr-tag-turn {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  border-color: var(--cr-c-deep);
+  background: var(--cr-c-deep);
+  color: var(--cr-rb-ink);
+}
+
+.cr-storybook .cr-tag.cr-tag-bad,
+.cr-storybook button.cr-kick {
+  border-color: var(--cr-bad);
+  color: var(--cr-bad);
+}
+
+/* ── 판 ── */
+.cr-storybook .cr-board {
+  border: 0;
+  border-radius: calc(var(--cr-u) * 4.4);
+  background: var(--cr-pane);
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 30%);
+}
+
+.cr-storybook .cr-board.cr-board-myturn {
+  box-shadow:
+    0 0 0 3px var(--cr-accent),
+    0 0 0 calc(3px + var(--cr-u) * 0.9) rgb(255 143 171 / 35%);
+}
+
+.cr-storybook .cr-sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.cr-storybook .cr-sky-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: translate(calc(var(--cr-px, 0) * var(--cr-depth) * 1px), calc(var(--cr-py, 0) * var(--cr-depth) * 1px));
+  transition: transform 0.5s ease-out;
+}
+
+.cr-storybook .cr-sky-far { --cr-depth: -4; }
+.cr-storybook .cr-sky-mid { --cr-depth: -10; }
+.cr-storybook .cr-sky-near { --cr-depth: -18; }
+
+.cr-storybook .cr-sky-rainbow {
+  opacity: var(--cr-rainbow);
+}
+
+.cr-storybook .cr-sky-stars {
+  fill: #fff6c9;
+  opacity: var(--cr-star);
+}
+
+.cr-storybook .cr-cloud {
+  fill: var(--cr-cloud);
+}
+
+.cr-storybook .cr-tile {
+  padding: 0;
+  border: 0;
+  border-radius: 20%;
+  background: var(--cr-paper);
+  box-shadow: 0 calc(var(--cr-u) * 0.6) 0 var(--cr-edge);
+  color: var(--cr-ink);
+  font-family: inherit;
+}
+
+.cr-storybook .cr-tile .cr-tile-band {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 39%;
+  min-height: 0;
+  margin: 0;
+  border-radius: 0 0 50% 50% / 0 0 26% 26%;
+}
+
+.cr-storybook .cr-tile[data-island='MOSS'],
+.cr-storybook .cr-sheet-art[data-island='MOSS'] { --cr-isl-d: var(--cr-moss-d); }
+.cr-storybook .cr-tile[data-island='SHELL'],
+.cr-storybook .cr-sheet-art[data-island='SHELL'] { --cr-isl-d: var(--cr-shell-d); }
+.cr-storybook .cr-tile[data-island='MUSHROOM'],
+.cr-storybook .cr-sheet-art[data-island='MUSHROOM'] { --cr-isl-d: var(--cr-mushroom-d); }
+.cr-storybook .cr-tile[data-island='WINDMILL'],
+.cr-storybook .cr-sheet-art[data-island='WINDMILL'] { --cr-isl-d: var(--cr-windmill-d); }
+.cr-storybook .cr-tile[data-island='GLASS'],
+.cr-storybook .cr-sheet-art[data-island='GLASS'] { --cr-isl-d: var(--cr-glass-d); }
+.cr-storybook .cr-tile[data-island='STAR_APPLE'],
+.cr-storybook .cr-sheet-art[data-island='STAR_APPLE'] { --cr-isl-d: var(--cr-star-apple-d); }
+.cr-storybook .cr-tile[data-island='LAVA'],
+.cr-storybook .cr-sheet-art[data-island='LAVA'] { --cr-isl-d: var(--cr-lava-d); }
+.cr-storybook .cr-tile[data-island='CROWN'],
+.cr-storybook .cr-sheet-art[data-island='CROWN'] { --cr-isl-d: var(--cr-crown-d); }
+
+.cr-storybook .cr-tile.cr-kind-start,
+.cr-storybook .cr-tile.cr-kind-customs { --cr-isl: var(--cr-sp); --cr-isl-d: var(--cr-sp-d); }
+.cr-storybook .cr-tile.cr-kind-letter,
+.cr-storybook .cr-tile.cr-kind-station { --cr-isl: var(--cr-windmill); --cr-isl-d: var(--cr-windmill-d); }
+.cr-storybook .cr-tile.cr-kind-whirlpool { --cr-isl: var(--cr-crown); --cr-isl-d: var(--cr-crown-d); }
+.cr-storybook .cr-tile.cr-kind-festival { --cr-isl: var(--cr-shell); --cr-isl-d: var(--cr-shell-d); }
+
+.cr-storybook .cr-tile.cr-kind-start,
+.cr-storybook .cr-tile.cr-kind-whirlpool,
+.cr-storybook .cr-tile.cr-kind-festival,
+.cr-storybook .cr-tile.cr-kind-station {
+  background: var(--cr-paper);
+}
+
+.cr-storybook .cr-tile-art {
+  position: relative;
+  flex: none;
+  height: 31%;
+  margin-top: 4%;
+}
+
+/* 건물이 서면 섬 그림은 왼쪽으로 비켜 준다. */
+.cr-storybook .cr-tile.cr-owned .cr-tile-art {
+  justify-content: flex-start;
+  padding-left: 9%;
+}
+
+.cr-storybook .cr-tile-name {
+  position: relative;
+  flex: none;
+  margin-top: 6%;
+  padding: 0 3%;
+  font-size: clamp(7.5px, calc(var(--cr-u) * 1.72), 12px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.cr-storybook .cr-tile:not(.cr-kind-land) .cr-tile-art {
+  height: 44%;
+  margin-top: 6%;
+}
+
+.cr-storybook .cr-tile:not(.cr-kind-land) .cr-tile-band {
+  height: 54%;
+}
+
+.cr-storybook .cr-tile:not(.cr-kind-land) .cr-tile-name {
+  margin-top: 8%;
+}
+
+.cr-storybook .cr-tile-foot {
+  position: relative;
+  height: 20%;
+  min-height: 9px;
+}
+
+.cr-storybook .cr-tile-price {
+  color: var(--cr-gold);
+  font-weight: 700;
+}
+
+.cr-storybook .cr-tile-owner {
+  align-self: stretch;
+  gap: calc(var(--cr-u) * 0.35);
+  border-radius: 0;
+}
+
+.cr-storybook .cr-tile-owner .cr-ico {
+  width: 1em;
+  height: 1em;
+}
+
+/* 주인 표시 — 칸을 두르는 좌석 색 테두리 + 아랫띠의 좌석 번호(색만으로 구분하지 않는다). */
+.cr-storybook .cr-tile.cr-owned::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: calc(var(--cr-u) * 0.5) solid var(--cr-c);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.cr-storybook .cr-tile-bld {
+  top: 2%;
+  right: 3%;
+  width: 36%;
+  transform-origin: 50% 100%;
+}
+
+.cr-storybook .cr-tile-festival {
+  top: 2%;
+  left: 5%;
+  width: 28%;
+  transform-origin: 50% 0;
+}
+
+.cr-storybook .cr-tile.cr-pickable {
+  box-shadow:
+    0 0 0 calc(var(--cr-u) * 0.6) var(--cr-accent),
+    0 calc(var(--cr-u) * 0.6) 0 calc(var(--cr-u) * 0.6) var(--cr-accent-d);
+  z-index: 2;
+}
+
+.cr-storybook .cr-tile:hover:not(:disabled) {
+  background: var(--cr-paper);
+  filter: brightness(1.05);
+}
+
+/* ── 가운데 ── */
+.cr-storybook .cr-center {
+  position: relative;
+  z-index: 1;
+  gap: calc(var(--cr-u) * 1.3);
+  padding: calc(var(--cr-u) * 7.6);
+  overflow: visible;
+}
+
+.cr-storybook .cr-center-top {
+  flex-direction: column;
+  gap: calc(var(--cr-u) * 2.2);
+}
+
+.cr-storybook .cr-dice {
+  perspective: 520px;
+}
+
+.cr-storybook .cr-die-3d {
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.cr-storybook .cr-die-toss {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.cr-storybook .cr-cube {
+  --cr-rx: 0deg;
+  --cr-ry: 0deg;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--cr-die) / -2)) rotateX(var(--cr-rx)) rotateY(var(--cr-ry));
+}
+
+.cr-storybook .cr-cube-v2 { --cr-ry: -90deg; }
+.cr-storybook .cr-cube-v5 { --cr-ry: 90deg; }
+.cr-storybook .cr-cube-v3 { --cr-rx: -90deg; }
+.cr-storybook .cr-cube-v4 { --cr-rx: 90deg; }
+.cr-storybook .cr-cube-v6 { --cr-ry: 180deg; }
+
+.cr-storybook .cr-cube-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.cr-storybook .cr-cube-f1 { transform: translateZ(calc(var(--cr-die) / 2)); }
+.cr-storybook .cr-cube-f6 { transform: rotateY(180deg) translateZ(calc(var(--cr-die) / 2)); }
+.cr-storybook .cr-cube-f2 { transform: rotateY(90deg) translateZ(calc(var(--cr-die) / 2)); }
+.cr-storybook .cr-cube-f5 { transform: rotateY(-90deg) translateZ(calc(var(--cr-die) / 2)); }
+.cr-storybook .cr-cube-f3 { transform: rotateX(90deg) translateZ(calc(var(--cr-die) / 2)); }
+.cr-storybook .cr-cube-f4 { transform: rotateX(-90deg) translateZ(calc(var(--cr-die) / 2)); }
+
+.cr-storybook .cr-die-shadow {
+  position: absolute;
+  right: 4%;
+  bottom: -16%;
+  left: 4%;
+  height: 16%;
+  border-radius: 50%;
+  background: #1c172b;
+  opacity: 0.2;
+}
+
+.cr-storybook .cr-center-turn {
+  padding: 3px 16px;
+  border-radius: 999px;
+  background: var(--cr-paper);
+  box-shadow: 0 2px 0 var(--cr-edge);
+  font-size: clamp(12px, calc(var(--cr-u) * 2.7), 17px);
+}
+
+.cr-storybook .cr-letter {
+  border-radius: 999px;
+  background: var(--cr-paper);
+  box-shadow: 0 2px 0 var(--cr-edge);
+  font-size: clamp(10.5px, calc(var(--cr-u) * 2.2), 14px);
+  font-weight: 700;
+}
+
+.cr-storybook .cr-log {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  width: 100%;
+  font-size: clamp(10px, calc(var(--cr-u) * 2.05), 13px);
+  color: var(--cr-ink);
+}
+
+.cr-storybook .cr-log li {
+  max-width: 100%;
+  padding: 1px 10px;
+  border-radius: 12px;
+  background: var(--cr-paper);
+  color: var(--cr-muted);
+}
+
+.cr-storybook .cr-log li:last-child {
+  color: var(--cr-ink);
+}
+
+.cr-storybook .cr-deck {
+  position: absolute;
+  right: calc(var(--cr-u) * 7.6);
+  bottom: calc(var(--cr-u) * 7.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--cr-ink);
+  font-size: clamp(9px, calc(var(--cr-u) * 1.7), 11px);
+  font-weight: 700;
+}
+
+.cr-storybook .cr-deck > span:last-child {
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--cr-paper);
+}
+
+.cr-storybook .cr-deck-pile {
+  display: block;
+  width: calc(var(--cr-u) * 6.4);
+  min-width: 22px;
+  aspect-ratio: 5 / 7;
+  transform: rotate(6deg);
+  filter: drop-shadow(0 2px 0 var(--cr-edge));
+}
+
+.cr-storybook .cr-deck-pile .cr-cardback {
+  height: 100%;
+}
+
+/* ── 말 ── */
+.cr-storybook .cr-token-turn::before {
+  content: '';
+  position: absolute;
+  inset: -6% 4% 26%;
+  border: calc(var(--cr-u) * 0.45) solid var(--cr-c);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.cr-storybook .cr-token.cr-token-moving .cr-token-body {
+  filter: drop-shadow(0 calc(var(--cr-u) * 0.4) 0 rgb(0 0 0 / 14%));
+}
+
+/* ── 비행 길 ── */
+.cr-storybook .cr-route-dots {
+  stroke: #fff;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 3.3;
+  opacity: 0.95;
+}
+
+.cr-storybook .cr-route-tail {
+  stroke-linecap: round;
+  stroke-dasharray: 24 200;
+  stroke-dashoffset: 24;
+  opacity: 0;
+}
+
+/* ── 편지 카드 ── */
+.cr-storybook .cr-cardwrap {
+  perspective: 900px;
+}
+
+.cr-storybook .cr-card {
+  position: relative;
+  width: calc(var(--cr-u) * 34);
+  min-width: 124px;
+  max-width: 230px;
+  aspect-ratio: 5 / 7;
+  perspective: 900px;
+}
+
+.cr-storybook .cr-card-flipper {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 1.5, 0.5, 1);
+}
+
+.cr-storybook .cr-card-flip .cr-card-flipper,
+.cr-storybook .cr-card-out .cr-card-flipper {
+  transform: rotateY(180deg);
+}
+
+.cr-storybook .cr-card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 9%;
+  box-shadow:
+    0 calc(var(--cr-u) * 0.9) 0 var(--cr-edge),
+    0 calc(var(--cr-u) * 2) calc(var(--cr-u) * 4) rgb(0 0 0 / 22%);
+  backface-visibility: hidden;
+}
+
+.cr-storybook .cr-card-back .cr-cardback {
+  height: 100%;
+}
+
+/* 앞면은 라이트·다크 모두 밝은 종이다 — 밤 구름에서도 등불 아래 편지처럼 읽힌다(글자 대비 10:1). */
+.cr-storybook .cr-card-front {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  padding: 8%;
+  border: calc(var(--cr-u) * 0.8) solid var(--cr-cardback);
+  background: #fffaf2;
+  color: #45385a;
+  text-align: center;
+  transform: rotateY(180deg);
+}
+
+.cr-storybook .cr-card-front .cr-letter-art {
+  width: 46%;
+}
+
+.cr-storybook .cr-card-kicker {
+  color: #8a5a00;
+  font-size: clamp(9px, calc(var(--cr-u) * 1.9), 12px);
+  font-weight: 700;
+}
+
+.cr-storybook .cr-card-name {
+  font-size: clamp(14px, calc(var(--cr-u) * 3.3), 21px);
+}
+
+.cr-storybook .cr-card-effect {
+  font-size: clamp(11px, calc(var(--cr-u) * 2.2), 14px);
+}
+
+.cr-storybook .cr-card-rays {
+  position: absolute;
+  inset: -34% -52%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgb(255 236 150 / 85%) 0deg 9deg, transparent 9deg 24deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent 96%);
+  mask-image: radial-gradient(closest-side, #000 35%, transparent 96%);
+  opacity: 0;
+}
+
+/* ── 결정 패널·버튼 ── */
+.cr-storybook .cr-panel {
+  border: 2.5px solid transparent;
+  border-radius: 20px;
+  background: var(--cr-paper);
+  box-shadow: 0 3px 0 var(--cr-edge);
+  color: var(--cr-ink);
+}
+
+.cr-storybook .cr-panel.cr-panel-mine {
+  border-color: var(--cr-accent);
+}
+
+.cr-storybook .cr-panel.cr-panel-wait {
+  color: var(--cr-muted);
+}
+
+.cr-storybook .cr-panel-actions .cr-btn {
+  flex: 1 1 auto;
+}
+
+.cr-storybook .cr-btn {
+  border: 2px solid var(--cr-line);
+  border-radius: 16px;
+  background: var(--cr-paper);
+  box-shadow: 0 4px 0 var(--cr-edge);
+  color: var(--cr-ink);
+  font-weight: 700;
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
+}
+
+.cr-storybook .cr-btn.cr-btn-main {
+  border-color: var(--cr-accent-d);
+  background: var(--cr-accent);
+  box-shadow: 0 4px 0 var(--cr-accent-d);
+  color: var(--cr-accent-ink);
+}
+
+.cr-storybook .cr-btn:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--cr-edge);
+  transform: translateY(3px);
+}
+
+.cr-storybook .cr-btn:hover:not(:disabled) {
+  border-color: var(--cr-accent-d);
+  background: var(--cr-paper-2);
+}
+
+.cr-storybook .cr-btn.cr-btn-main:hover:not(:disabled) {
+  background: var(--cr-accent);
+  filter: brightness(1.05);
+}
+
+.cr-storybook .cr-level {
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 2px;
+  border: 2px solid var(--cr-line);
+  border-radius: 14px;
+  background: var(--cr-paper);
+  color: var(--cr-ink);
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+
+.cr-storybook .cr-level .cr-bld {
+  width: 26px;
+}
+
+.cr-storybook .cr-level.cr-level-on {
+  border-color: var(--cr-accent-d);
+  background: var(--cr-paper-2);
+  transform: translateY(-3px);
+}
+
+.cr-storybook .cr-level:hover:not(:disabled) {
+  border-color: var(--cr-accent-d);
+  background: var(--cr-paper-2);
+}
+
+/* ── 칸 시트 ── */
+.cr-storybook .cr-sheet {
+  border: 0;
+  border-radius: 24px 24px 0 0;
+  background: var(--cr-paper);
+  box-shadow: 0 -6px 24px rgb(0 0 0 / 25%);
+  color: var(--cr-ink);
+}
+
+.cr-storybook .cr-sheet-tolls th,
+.cr-storybook .cr-sheet-tolls td {
+  border-bottom-color: var(--cr-line);
+}
+
+.cr-storybook .cr-sheet-tolls .cr-sheet-now {
+  color: var(--cr-gold);
+}
+
+/* ── 결과 ── */
+.cr-storybook .cr-match-end {
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--cr-paper);
+  box-shadow: 0 5px 0 var(--cr-edge);
+  color: var(--cr-ink);
+  text-align: center;
+}
+
+.cr-storybook .cr-match-end h3 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.cr-storybook .cr-match-kicker {
+  display: block;
+  margin: 0;
+  color: var(--cr-gold);
+  font-weight: 700;
+}
+
+.cr-storybook .cr-match-reason {
+  color: var(--cr-muted);
+  word-break: keep-all;
+}
+
+.cr-storybook .cr-panel p,
+.cr-storybook .cr-log li {
+  word-break: keep-all;
+}
+
+.cr-storybook .cr-standings {
+  display: grid;
+  gap: 6px;
+}
+
+.cr-storybook .cr-standings li {
+  padding: 6px 10px;
+  border: 2.5px solid transparent;
+  border-bottom: 2.5px solid transparent;
+  border-radius: 14px;
+  background: var(--cr-paper-2);
+  text-align: left;
+}
+
+.cr-storybook .cr-standings .cr-standing-me {
+  border-color: var(--cr-c);
+}
+
+.cr-storybook .cr-standings .cr-standing-out {
+  opacity: 0.66;
+  filter: grayscale(1);
+}
+
+.cr-storybook .cr-standing-rank {
+  min-width: 30px;
+  font-weight: 800;
+}
+
+.cr-storybook .cr-standing-assets {
+  color: var(--cr-gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-storybook .cr-finished-note {
+  border-radius: 20px;
+  background: var(--cr-paper);
+  box-shadow: 0 3px 0 var(--cr-edge);
+}
+
+/* ══ 움직임 (움직임 줄이기가 아닐 때만 `.cr-motion`) ══════════════════ */
+.cr-motion .cr-cloud-a { animation: cr-drift 13s ease-in-out infinite alternate; }
+.cr-motion .cr-cloud-b { animation: cr-drift 17s ease-in-out infinite alternate-reverse; }
+.cr-motion .cr-cloud-c { animation: cr-drift 21s ease-in-out infinite alternate; }
+.cr-motion .cr-sky-stars { animation: cr-twinkle 3.2s ease-in-out infinite alternate; }
+
+.cr-motion .cr-art-spin {
+  transform-box: view-box;
+  transform-origin: 50% 41.7%;
+  animation: cr-spin 9s linear infinite;
+}
+
+.cr-motion .cr-art-swirl {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: cr-spin 14s linear infinite reverse;
+}
+
+.cr-motion .cr-tile-festival {
+  animation: cr-swing 2s ease-in-out infinite alternate;
+}
+
+.cr-motion .cr-seat.cr-seat-turn {
+  animation: cr-bob 1.8s ease-in-out infinite;
+}
+
+.cr-motion .cr-tile.cr-pickable {
+  animation: cr-pick 0.9s ease-in-out infinite;
+}
+
+.cr-motion .cr-tile-bld .cr-bld {
+  transform-origin: 50% 100%;
+  animation: cr-build 0.6s cubic-bezier(0.3, 1.9, 0.5, 1);
+}
+
+.cr-motion .cr-token .cr-balloon {
+  animation: cr-float 2.8s ease-in-out infinite;
+}
+
+.cr-motion .cr-token:nth-child(2n) .cr-balloon {
+  animation-delay: -1.1s;
+}
+
+.cr-motion .cr-token:nth-child(3n) .cr-balloon {
+  animation-delay: -1.9s;
+}
+
+.cr-motion .cr-token-turn::before {
+  animation: cr-ping 1.6s ease-out infinite;
+}
+
+.cr-motion .cr-token-hop {
+  animation: cr-hop var(--cr-ms) cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.cr-motion .cr-token-shadow-hop {
+  animation: cr-shadow-hop var(--cr-ms) cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.cr-motion .cr-token-land {
+  animation: cr-squash 0.45s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+.cr-motion .cr-token-fly {
+  animation: cr-fly var(--cr-ms) ease-in-out;
+}
+
+.cr-motion .cr-token-shadow-fly {
+  animation: cr-shadow-fly var(--cr-ms) ease-in-out;
+}
+
+.cr-motion .cr-token-spin {
+  transform-origin: 50% 50%;
+  animation: cr-whirl var(--cr-ms) ease-in-out;
+}
+
+.cr-motion .cr-token-wig {
+  animation: cr-wig var(--cr-ms) ease-in-out;
+}
+
+.cr-motion .cr-token-out {
+  animation: cr-out var(--cr-ms) ease-in forwards;
+}
+
+.cr-motion .cr-token-shadow-out {
+  animation: cr-fade var(--cr-ms) ease-in forwards;
+}
+
+.cr-motion .cr-die-tossing {
+  animation: cr-toss 0.68s cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.cr-motion .cr-die + .cr-die .cr-die-tossing {
+  animation-name: cr-toss-b;
+}
+
+.cr-motion .cr-cube-roll {
+  animation: cr-cube-roll 0.68s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.cr-motion .cr-die + .cr-die .cr-cube-roll {
+  animation-name: cr-cube-roll-b;
+}
+
+.cr-motion .cr-die-shadow-toss {
+  animation: cr-shadow-toss 0.68s cubic-bezier(0.3, 0, 0.5, 1);
+}
+
+.cr-motion .cr-route-dots {
+  animation: cr-route-dots var(--cr-ms) linear both;
+}
+
+.cr-motion .cr-route-tail {
+  animation: cr-route-tail var(--cr-ms) cubic-bezier(0.45, 0, 0.4, 1) both;
+}
+
+.cr-motion .cr-card-in {
+  animation: cr-card-in 0.43s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+.cr-motion .cr-card-out {
+  animation: cr-card-out 0.24s ease-in forwards;
+}
+
+.cr-motion .cr-card-flip .cr-card-rays {
+  animation: cr-rays 1.5s ease-out both;
+}
+
+.cr-motion .cr-match-end {
+  animation: cr-rise 0.5s cubic-bezier(0.2, 1.3, 0.4, 1);
+}
+
+.cr-motion .cr-standing-first .cr-standing-avatar {
+  animation: cr-float 1.4s ease-in-out infinite;
+}
+
+/* 연출 감독이 잠깐 붙이는 표식(`data-cr-fx`) — React 가 다시 그려도 지워지지 않는다. */
+.cr-motion .cr-tile[data-cr-fx] {
+  z-index: 3;
+}
+
+.cr-motion .cr-tile[data-cr-fx='pass'] { animation: cr-pass 0.4s ease-out; }
+.cr-motion .cr-tile[data-cr-fx='land'] { animation: cr-land 0.55s cubic-bezier(0.3, 1.8, 0.5, 1); }
+.cr-motion .cr-tile[data-cr-fx='claim'],
+.cr-motion .cr-tile[data-cr-fx='claim-build'] { animation: cr-claim 0.7s cubic-bezier(0.3, 1.7, 0.5, 1); }
+.cr-motion .cr-tile[data-cr-fx='build'] { animation: cr-bump 0.5s cubic-bezier(0.3, 1.7, 0.5, 1); }
+.cr-motion .cr-tile[data-cr-fx='toll'] { animation: cr-wig 0.7s ease-in-out; }
+.cr-motion .cr-tile[data-cr-fx='mono'] { animation: cr-mono 1s ease-out; }
+.cr-motion .cr-tile[data-cr-fx='release'] { animation: cr-release 0.55s ease-in; }
+.cr-motion .cr-tile[data-cr-fx='sink'] { animation: cr-sink 0.9s ease-in-out; }
+.cr-motion .cr-seat[data-cr-fx='got'] { animation: cr-bump 0.5s cubic-bezier(0.3, 1.7, 0.5, 1); }
+.cr-motion .cr-seat[data-cr-fx='lost'] { animation: cr-wig 0.7s ease-in-out; }
+
+@keyframes cr-drift {
+  from { transform: translateX(-16px); }
+  to { transform: translateX(16px); }
+}
+
+@keyframes cr-twinkle {
+  from { opacity: calc(var(--cr-star) * 0.45); }
+  to { opacity: var(--cr-star); }
+}
+
+@keyframes cr-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cr-swing {
+  from { transform: rotate(-10deg); }
+  to { transform: rotate(10deg); }
+}
+
+@keyframes cr-bob {
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes cr-float {
+  50% { transform: translateY(-5%); }
+}
+
+@keyframes cr-ping {
+  0% { opacity: 0.8; transform: scale(0.85); }
+  100% { opacity: 0; transform: scale(1.22); }
+}
+
+@keyframes cr-pick {
+  50% { transform: translateY(-5%) scale(1.04); }
+}
+
+@keyframes cr-build {
+  0% { transform: translateY(60%) scale(0); }
+  100% { transform: none; }
+}
+
+/* 칸마다 폴짝 — 웅크렸다 포물선으로 뛰어 올라 늘어났다가 내려앉는다. 그림자는 바닥에 남아 작아진다. */
+@keyframes cr-hop {
+  0% { transform: scale(1.12, 0.86); }
+  22% { transform: translateY(-38%) scale(0.94, 1.08); }
+  50% { transform: translateY(-62%) scale(0.96, 1.05); }
+  82% { transform: translateY(-14%) scale(1, 1); }
+  100% { transform: scale(1.1, 0.9); }
+}
+
+@keyframes cr-shadow-hop {
+  0%,
+  100% { opacity: 0.18; transform: scale(1); }
+  50% { opacity: 0.08; transform: scale(0.55); }
+}
+
+@keyframes cr-squash {
+  0% { transform: scale(1.25, 0.7); }
+  60% { transform: scale(0.92, 1.1); }
+  100% { transform: none; }
+}
+
+@keyframes cr-fly {
+  0% { transform: none; }
+  18% { transform: translateY(-30%) scale(1.5) rotate(-8deg); }
+  50% { transform: translateY(-46%) scale(1.9) rotate(6deg); }
+  82% { transform: translateY(-30%) scale(1.5) rotate(-5deg); }
+  100% { transform: none; }
+}
+
+@keyframes cr-shadow-fly {
+  0%,
+  100% { opacity: 0.16; transform: scale(1); }
+  20%,
+  80% { opacity: 0.05; transform: translateY(120%) scale(0.5); }
+}
+
+@keyframes cr-whirl {
+  0% { transform: none; }
+  60% { transform: rotate(540deg) scale(0.6); }
+  100% { transform: rotate(720deg) scale(1); }
+}
+
+@keyframes cr-wig {
+  20% { transform: rotate(-7deg); }
+  40% { transform: rotate(7deg); }
+  60% { transform: rotate(-4deg); }
+  80% { transform: rotate(3deg); }
+}
+
+@keyframes cr-out {
+  0% { transform: none; filter: none; }
+  12% { transform: rotate(-16deg) scale(1.1); }
+  24% { transform: rotate(16deg) scale(1.1); filter: none; }
+  38% { transform: rotate(-10deg) scale(0.92); filter: grayscale(1); }
+  100% { opacity: 0; transform: translateY(170%) rotate(50deg) scale(0.2); filter: grayscale(1); }
+}
+
+@keyframes cr-fade {
+  to { opacity: 0; }
+}
+
+@keyframes cr-toss {
+  0% { transform: none; }
+  30% { transform: translateY(-95%); }
+  56% { transform: translateY(0) scale(1.12, 0.86); }
+  74% { transform: translateY(-30%); }
+  90% { transform: translateY(0) scale(1.07, 0.92); }
+  100% { transform: none; }
+}
+
+@keyframes cr-toss-b {
+  0% { transform: none; }
+  34% { transform: translateY(-78%); }
+  60% { transform: translateY(0) scale(1.12, 0.86); }
+  78% { transform: translateY(-22%); }
+  92% { transform: translateY(0) scale(1.06, 0.93); }
+  100% { transform: none; }
+}
+
+@keyframes cr-cube-roll {
+  from {
+    transform: translateZ(calc(var(--cr-die) / -2)) rotateX(calc(var(--cr-rx) - 720deg))
+      rotateY(calc(var(--cr-ry) + 540deg)) rotateZ(50deg);
+  }
+  to {
+    transform: translateZ(calc(var(--cr-die) / -2)) rotateX(var(--cr-rx)) rotateY(var(--cr-ry)) rotateZ(0deg);
+  }
+}
+
+@keyframes cr-cube-roll-b {
+  from {
+    transform: translateZ(calc(var(--cr-die) / -2)) rotateX(calc(var(--cr-rx) + 540deg))
+      rotateY(calc(var(--cr-ry) - 720deg)) rotateZ(-60deg);
+  }
+  to {
+    transform: translateZ(calc(var(--cr-die) / -2)) rotateX(var(--cr-rx)) rotateY(var(--cr-ry)) rotateZ(0deg);
+  }
+}
+
+@keyframes cr-shadow-toss {
+  0%,
+  56%,
+  100% { opacity: 0.2; transform: scale(1); }
+  30% { opacity: 0.07; transform: scale(0.5); }
+  74% { opacity: 0.13; transform: scale(0.8); }
+}
+
+@keyframes cr-route-dots {
+  0% { opacity: 0; }
+  12% { opacity: 0.95; }
+  86% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+@keyframes cr-route-tail {
+  0% { opacity: 0; stroke-dashoffset: 24; }
+  10% { opacity: 0.95; }
+  88% { opacity: 0.95; }
+  100% { opacity: 0; stroke-dashoffset: -76; }
+}
+
+@keyframes cr-card-in {
+  from { opacity: 0.4; transform: translate(calc(var(--cr-u) * 26), calc(var(--cr-u) * 25)) scale(0.14) rotate(50deg); }
+}
+
+@keyframes cr-card-out {
+  to { opacity: 0; transform: translateY(calc(var(--cr-u) * 6)) scale(0.3); }
+}
+
+@keyframes cr-rays {
+  0% { opacity: 0; transform: rotate(0deg) scale(0.5); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: rotate(70deg) scale(1.1); }
+}
+
+@keyframes cr-rise {
+  from { opacity: 0; transform: translateY(20px) scale(0.92); }
+}
+
+@keyframes cr-pass {
+  40% { transform: translateY(7%) scale(0.96); }
+}
+
+@keyframes cr-land {
+  0% { transform: translateY(10%) scale(1.06, 0.9); }
+  100% { transform: none; }
+}
+
+@keyframes cr-claim {
+  0% { transform: none; }
+  40% { transform: scale(1.28) rotate(-5deg); }
+  100% { transform: none; }
+}
+
+@keyframes cr-bump {
+  0% { transform: none; }
+  40% { transform: scale(1.12); }
+  100% { transform: none; }
+}
+
+@keyframes cr-mono {
+  0% { transform: none; }
+  30% { transform: scale(1.14); }
+  60% { transform: scale(0.98); }
+  100% { transform: none; }
+}
+
+@keyframes cr-release {
+  50% { transform: scale(0.9) rotate(4deg); filter: grayscale(1); }
+}
+
+/* 파산 — 섬이 잿빛으로 가라앉았다가 주인 없는 땅으로 떠오른다. */
+@keyframes cr-sink {
+  0% { transform: none; filter: none; }
+  35% { transform: translateY(14%) scale(0.92) rotate(-3deg); filter: grayscale(1) brightness(0.8); }
+  70% { transform: translateY(14%) scale(0.92) rotate(2deg); filter: grayscale(1) brightness(0.8); }
+  100% { transform: none; filter: none; }
 }
