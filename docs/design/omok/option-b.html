@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>오목 시안 B — 먹</title>
+<script>(function(){var h=document.documentElement;h.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(matchMedia('(prefers-reduced-motion: reduce)').matches)h.classList.add('rm')})()</script>
+<style>
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 var(--font-ui);transition:background .3s,color .3s}
+button{font:inherit;color:inherit}
+/* ── 시안 틀(앱에는 없는 부분) ── */
+.mk-bar{max-width:1100px;margin:0 auto;padding:14px 16px 4px}
+.mk-bar h1{margin:0;font:700 20px/1.3 var(--font-display)}
+.mk-bar p{margin:4px 0 10px;color:var(--muted);font-size:13px}
+.mk-ctl{display:flex;flex-wrap:wrap;gap:6px}
+.mk-ctl button,.mk-ctl a{display:inline-flex;align-items:center;min-height:36px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:inherit;font-size:13px;text-decoration:none;cursor:pointer}
+.mk-ctl button[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.mk-stage{display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:flex-start;padding:12px 16px 40px}
+.mk-col{min-width:0}
+.mk-cap{margin:0 0 6px;font-size:12px;color:var(--muted);text-align:center}
+.mk-desk{width:min(640px,100%)}
+.mk-desk .om-table{border-radius:14px;border:1px solid var(--border)}
+.mk-bezel{width:393px;border:9px solid var(--bezel);border-radius:38px;overflow:hidden}
+@media(max-width:820px){.mk-phonecol,.mk-cap{display:none}.mk-stage{padding:8px 0 32px}.mk-desk .om-table{border-radius:0;border-left:0;border-right:0}}
+/* ── 게임판 뼈대(앱의 .om- 클래스와 같은 이름) ── */
+.om-table{container-type:inline-size;position:relative;overflow:hidden;background:var(--table)}
+.om-inner{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:14px 20px 20px}
+.om-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.om-header-badges,.om-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.om-badge{padding:2px 9px;border-radius:999px;border:1px solid var(--border);background:transparent;font-size:12px;white-space:nowrap}
+button.om-badge{min-height:32px;cursor:pointer}
+.om-badge-title{font-weight:700}
+.om-strip{position:relative;display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.om-seat{position:relative;z-index:1;display:flex;align-items:center;gap:6px;min-height:36px;padding:4px 10px;font-size:13px}
+.om-seat-me .om-seat-name{font-weight:700}
+.om-seat-name{max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.om-team{font-size:10px;color:var(--muted);white-space:nowrap}
+.om-count{display:none;font-size:12px;font-variant-numeric:tabular-nums}
+.om-seat-turn .om-count{display:inline}
+.om-turn-marker{position:absolute;z-index:0;left:0;top:0;width:0;height:0;opacity:0;pointer-events:none}
+.om-dot{display:inline-block;flex:none;width:14px;height:14px;border-radius:50%}
+.om-board-wrap{position:relative}
+.om-frame{display:grid;grid-template-columns:auto 1fr;grid-template-rows:1fr auto;padding:var(--fp,var(--fpl))}
+.om-ruler-y{display:grid;grid-template-rows:repeat(15,1fr);place-items:center;width:1.6em;font-size:10px}
+.om-ruler-x{grid-column:2;display:grid;grid-template-columns:repeat(15,1fr);place-items:center;height:1.6em;font-size:10px}
+.om-board{grid-column:2;grid-row:1;display:block;width:100%;height:auto;aspect-ratio:1;overflow:hidden;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.om-board:focus{outline:none}
+.om-board:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.om-num{font-size:.42px;font-weight:700;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.om-l-nums{display:none}
+.om-nums .om-l-nums{display:block}
+.om-nums .om-l-last{display:none}
+.om-status{margin:0;min-height:1.45em;text-align:center;font-size:14px}
+.om-last-by{color:var(--muted);font-size:12px}
+.om-controls{display:flex;flex-direction:column;gap:6px}
+.om-primary{min-height:48px;padding:8px 16px;border:0;border-radius:10px;background:var(--accent);color:var(--on-accent);font-size:16px;font-weight:700;cursor:pointer}
+.om-primary:disabled{opacity:.45;cursor:not-allowed}
+.om-end{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;text-align:center}
+.om-end[hidden]{display:none}
+.om-end-title{margin:0;font:800 22px/1.2 var(--font-display)}
+.om-end-line{margin:0;font-size:14px}
+.om-end-muted{color:var(--muted)}
+.om-end-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:4px}
+.om-end .om-primary{min-height:40px;font-size:14px}
+@container (max-width:480px){.om-inner{padding:10px 10px 16px}.om-ruler-x,.om-ruler-y{display:none}.om-frame{--fp:var(--fps)}}
+/* 연출 줄이기 — OS 설정(prefers-reduced-motion)이면 처음부터 .rm 이 붙는다(머리말 스크립트). */
+.rm *,.rm *::before,.rm *::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+.om-over .om-controls{display:none}
+/* ══ 시안 B · 먹 ══ */
+:root{
+  --font-display:"Nanum Myeongjo","Noto Serif KR","AppleMyungjo","Batang",Georgia,serif;
+  --font-ui:var(--font-display);
+  --page:#e6dfce;--table:#f0e9d8;--ink:#1c1a18;--muted:#666055;--border:#c6bca8;--surface:#f7f2e4;
+  --accent:#b5362b;--on-accent:#fff7ec;--warn:#b5362b;--bezel:#1c1a18;
+  --paper:#f5efe0;--inkline:#262320;--stone-b:#1a1816;--stone-rim:transparent;--stone-w:#fffdf6;--cinnabar:#c8372d;--washc:#5f6f76;
+}
+:root[data-theme=dark]{
+  --page:#121110;--table:#1a1917;--ink:#ebe4d4;--muted:#a59d8e;--border:#3d3a34;--surface:#262421;
+  --accent:#e2604f;--on-accent:#1a1917;--warn:#ff8573;--bezel:#000;
+  /* 밤 한지 — 먹지 위에 흰 먹(호분) 줄. 흑돌은 옅은 테를 둘러 판과 구분한다 */
+  --paper:#2b2925;--inkline:#d2c9b7;--stone-b:#070707;--stone-rim:#a39a88;--stone-w:#efe8d8;--cinnabar:#e2604f;--washc:#9fb0b6;
+}
+/* 탁자 바닥에 옅은 산 능선(수묵 담채) */
+.om-table::after{content:"";position:absolute;inset:auto 0 0 0;height:130px;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 120' preserveAspectRatio='none'%3E%3Cpath d='M0 120V78Q40 38 80 68T160 48T240 76T330 34T400 68V120Z' fill='%23777' opacity='.13'/%3E%3Cpath d='M0 120V100Q60 68 120 94T250 78T400 96V120Z' fill='%23777' opacity='.2'/%3E%3C/svg%3E") bottom/100% 100% no-repeat}
+.om-badge{border-radius:3px;border-color:var(--border)}
+.om-badge-title{border:0;padding-left:0;font-size:18px;font-weight:800;letter-spacing:.2em}
+
+/* 좌석 — 테 없는 글씨. 차례는 붓 밑줄이 옮겨 간다 */
+.om-strip{gap:4px 10px;padding-bottom:4px}
+.om-seat{padding:4px 6px}
+.om-dot-b{background:var(--stone-b);border-radius:48% 52% 50% 50%/52% 48% 52% 48%;box-shadow:0 0 0 1px var(--stone-rim)}
+.om-dot-w{background:var(--stone-w);border:2px solid var(--inkline);border-radius:52% 48% 50% 50%/48% 52% 48% 52%}
+.om-seat-turn .om-seat-name{letter-spacing:.04em}
+.om-count{color:var(--accent);font-weight:700}
+.om-turn-marker{transition:left .5s cubic-bezier(.5,0,.2,1),top .5s,width .5s cubic-bezier(.5,0,.2,1),opacity .2s}
+.om-turn-marker::after{content:"";position:absolute;left:-2px;right:-2px;bottom:-3px;height:7px;background:var(--ink);opacity:.85;
+  clip-path:polygon(0 55%,6% 18%,45% 0,100% 35%,98% 62%,60% 78%,30% 100%,4% 92%)}
+.om-handoff .om-turn-marker::after{animation:ob-under .5s ease-out}
+@keyframes ob-under{0%{clip-path:polygon(0 55%,6% 18%,8% 0,10% 35%,10% 62%,8% 78%,6% 100%,4% 92%);opacity:.4}}
+
+/* 판 — 족자처럼 두 겹 테를 두른 한지 */
+.om-frame{--fpl:10px;--fps:4px;background:var(--paper);border:1.5px solid var(--inkline);outline:1px solid var(--inkline);outline-offset:3px;margin:4px;
+  box-shadow:0 10px 22px -14px rgba(0,0,0,.5);color:var(--muted)}
+.om-ruler-x,.om-ruler-y{font-size:11px}
+.ob-paper{fill:var(--paper)}
+.ob-grid path{fill:none;stroke:var(--inkline);stroke-linecap:round;stroke-linejoin:round}
+.ob-star{fill:var(--inkline)}
+.om-board-myturn .om-frame{outline-color:var(--cinnabar);animation:ob-myturn 1.8s ease-in-out infinite}
+@keyframes ob-myturn{50%{outline-offset:5px}}
+
+/* 돌 — 흑은 먹 얼룩(농담 한 겹), 백은 붓으로 두른 동그라미 */
+.ob-bk{fill:var(--stone-b);stroke:var(--stone-rim);stroke-width:.022}
+.ob-bk2{fill:#fff;opacity:.08}
+.ob-wh{fill:var(--stone-w);stroke:var(--inkline);stroke-width:.06;stroke-linejoin:round}
+.ob-wh2{fill:none;stroke:var(--inkline);stroke-width:.014;opacity:.5}
+:root[data-theme=dark] .ob-wh{stroke:#8f8777;stroke-width:.04}
+:root[data-theme=dark] .ob-wh2{stroke:#8f8777}
+
+/* 돌 놓기 — 붓끝이 닿아 먹이 스미고, 번짐이 퍼지고, 먹 방울이 튄다 */
+.om-drop .om-in{animation:ob-soak .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes ob-soak{0%{transform:scale(.4);opacity:0}55%{transform:scale(1.06);opacity:1}100%{transform:none}}
+.ob-bleed{fill:var(--stone-b);opacity:0;animation:ob-bleed .95s ease-out both}
+.om-fx-w .ob-bleed{fill:var(--washc)}
+@keyframes ob-bleed{0%{transform:scale(.7);opacity:.3}100%{transform:scale(2);opacity:0}}
+.ob-spl{fill:var(--inkline);opacity:0;animation:ob-spl .9s calc(var(--d)*.02s + .08s) cubic-bezier(.1,.8,.2,1) both}
+.om-fx-w .ob-spl{fill:var(--washc)}
+@keyframes ob-spl{0%{transform:scale(.3);opacity:0}25%{opacity:.8}70%{transform:none;opacity:.7}100%{transform:none;opacity:0}}
+
+/* 미리보기 — 옅은 먹 돌 + 한 붓에 그려지는 원(끝이 열린 일원상), 젖은 붓 안내선 */
+.om-guide line{stroke:var(--washc);stroke-width:.2;stroke-linecap:round;opacity:.16}
+.ob-ghost{opacity:.42}
+.ob-enso{fill:none;stroke:var(--inkline);stroke-width:.05;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:.1;animation:ob-enso .45s ease-out both}
+@keyframes ob-enso{0%{stroke-dashoffset:1}}
+.om-preview .om-in{animation:ob-breathe 2.4s ease-in-out infinite}
+@keyframes ob-breathe{50%{transform:scale(1.05)}}
+
+/* 금수 — 주홍 붓 ✕. 누르면 ✕ 가 눌러 찍히고 붉은 물이 번진다 */
+.ob-x{fill:var(--cinnabar)}
+.om-warn .om-in{animation:ob-stamp .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes ob-stamp{0%{transform:scale(2.2) rotate(-12deg);opacity:.2}60%{transform:scale(1.25)}100%{transform:none}}
+.ob-wwash{fill:var(--cinnabar);animation:ob-wwash .8s ease-out both}
+@keyframes ob-wwash{0%{transform:scale(.5);opacity:.4}100%{transform:scale(2.4);opacity:0}}
+.om-shake .om-frame{animation:ob-shake .3s}
+@keyframes ob-shake{30%{transform:rotate(-.5deg)}70%{transform:rotate(.4deg)}}
+.om-warn-text{color:var(--warn)}
+
+/* 마지막 수 — 작은 주홍 낙관 */
+.ob-seal-dot{fill:var(--cinnabar)}
+.om-last .om-in{animation:ob-sealdot .3s .25s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes ob-sealdot{0%{transform:scale(2.4);opacity:0}}
+.om-num-b{fill:#f5efe0}
+.om-num-w{fill:#1c1a18}
+
+/* 5목 — 주홍 큰 붓이 다섯 돌을 한 획에 긋고(마른 붓 자국 두 줄), 돌에 먹이 다시 번진다 */
+.ob-stroke{stroke:var(--cinnabar);stroke-width:.2;stroke-linecap:round;opacity:.82;stroke-dasharray:1;stroke-dashoffset:1;animation:ob-draw .65s .2s cubic-bezier(.7,0,.2,1) forwards}
+.ob-dry{stroke:var(--cinnabar);stroke-width:.03;stroke-linecap:round;opacity:0;stroke-dasharray:.12 .02 .2 .05 .3 .03;animation:ob-dry .4s .7s ease-out forwards}
+.ob-dry2{stroke-dasharray:.2 .06 .1 .03 .25 .04}
+@keyframes ob-draw{to{stroke-dashoffset:0}}
+@keyframes ob-dry{to{opacity:.55}}
+.om-won .om-in{animation:ob-pulse .6s calc(var(--i)*.09s + .25s) ease-out both}
+@keyframes ob-pulse{0%{transform:none}35%{transform:scale(1.16)}100%{transform:none}}
+
+/* 결과 — 위아래 먹줄만 있는 종이 띠 + 눌러 찍는 낙관 */
+.om-end{border-top:3px double var(--ink);border-bottom:3px double var(--ink);background:var(--surface);padding:16px 14px;animation:ob-unroll .5s ease-out both}
+@keyframes ob-unroll{0%{clip-path:inset(0 50% 0 50%);opacity:.3}100%{clip-path:inset(0)}}
+.om-end-title{font-size:26px;letter-spacing:.14em}
+.ob-seal{position:absolute;right:14px;top:10px;display:grid;place-items:center;width:44px;height:44px;border-radius:5px;background:var(--cinnabar);color:#fff7ec;
+  font:800 24px/1 var(--font-display);transform:rotate(-6deg);box-shadow:inset 0 0 0 2px var(--cinnabar),inset 0 0 0 3px rgba(255,247,236,.7);animation:ob-sealin .45s .45s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes ob-sealin{0%{transform:scale(2.6) rotate(-18deg);opacity:0}}
+.om-primary{border-radius:3px;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<filter id="ob-fiber" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="3.6 .22" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 .5 0 0 0 0 .44 0 0 0 0 .34 0 0 0 1.5 -.72"/></filter>
+<filter id="ob-speck" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="5" numOctaves="2" seed="9"/><feColorMatrix values="0 0 0 0 .45 0 0 0 0 .4 0 0 0 0 .32 0 0 0 2.4 -1.45"/></filter>
+<radialGradient id="ob-wash"><stop offset="0" stop-color="#8a8478" stop-opacity=".22"/><stop offset="1" stop-color="#8a8478" stop-opacity="0"/></radialGradient>
+</defs></svg>
+<div class="mk-bar">
+<h1>오목 시안 B · 먹</h1>
+<p>한지에 붓으로 그은 판, 먹 번짐으로 놓이는 돌, 주홍 낙관. 수묵화 한 장을 함께 그리는 느낌. 판을 눌러 미리보기 → 같은 자리를 한 번 더 누르면(또는 [여기에 두기]) 놓입니다. ✕ 는 흑 금수 자리.</p>
+<div class="mk-ctl">
+<button type="button" data-act="win">5목 연출 보기</button>
+<button type="button" data-act="forbid">금수 경고 보기</button>
+<button type="button" data-act="auto">네 수 자동 진행</button>
+<button type="button" data-act="reset">처음 장면으로</button>
+<button type="button" data-act="theme"></button>
+<button type="button" data-act="rm" aria-pressed="false"></button>
+<a href="option-a.html">시안 A · 결</a>
+<a href="option-c.html">시안 C · 별자리</a>
+</div>
+</div>
+<main class="mk-stage">
+<div class="mk-col mk-desk"><p class="mk-cap">데스크톱 (게임판 최대 640px)</p><div class="om-table" data-om></div></div>
+<div class="mk-col mk-phonecol"><p class="mk-cap">휴대폰 375px</p><div class="mk-bezel"><div class="om-table" data-om></div></div></div>
+</main>
+<script>
+/* 시안 B 그림 — 붓 자국은 필터가 아니라 씨앗값으로 만든 경로(돌마다 조금씩 다른 먹 얼룩). */
+window.OM_THEME=(()=>{
+const R=s=>{const x=Math.sin(s*127.1+3.7)*43758.5453;return x-Math.floor(x)};
+const f=v=>v.toFixed(3);
+/** 울퉁불퉁한 닫힌 곡선 — 반지름 r, 흔들림 j, 씨앗 s. */
+const blob=(s,r,j=.09,n=10)=>{
+  const P=[];
+  for(let k=0;k<n;k++){const a=k/n*6.2832+R(s+k*.7)*.25,q=r*(1+(R(s*3.1+k)-.5)*2*j);P.push([Math.cos(a)*q,Math.sin(a)*q])}
+  const m=(a,b)=>f((a[0]+b[0])/2)+' '+f((a[1]+b[1])/2);
+  let d='M'+m(P[n-1],P[0]);
+  for(let k=0;k<n;k++)d+='Q'+f(P[k][0])+' '+f(P[k][1])+' '+m(P[k],P[(k+1)%n]);
+  return d+'Z';
+};
+const RECT='x="-.5" y="-.5" width="15" height="15"';
+const body=(c,i)=>c==='b'
+  ?`<path class="ob-bk" d="${blob(i+1,.475)}"/><path class="ob-bk2" d="${blob(i+40,.27,.22)}" transform="translate(-.07 -.08)"/>`
+  :`<path class="ob-wh" d="${blob(i+1,.455,.06)}"/><path class="ob-wh2" d="${blob(i+77,.4,.09)}"/>`;
+return{
+  fxMs:1000,winMs:1700,
+  board:()=>`<rect class="ob-paper" ${RECT}/><rect ${RECT} filter="url(#ob-fiber)" opacity=".38"/><rect ${RECT} filter="url(#ob-speck)" opacity=".5"/><ellipse cx="3.5" cy="11.5" rx="6" ry="4.5" fill="url(#ob-wash)"/><ellipse cx="11.5" cy="2.5" rx="5" ry="3.5" fill="url(#ob-wash)"/>`,
+  grid:()=>{
+    let s='<g class="ob-grid">';
+    for(let i=0;i<15;i++)for(const v of[0,1]){
+      let d='';
+      for(let k=0;k<=7;k++){const t=k*2,j=f(i+(R(i*31+k*7+v*101)-.5)*.04);d+=(k?'L':'M')+(v?j+' '+t:t+' '+j)}
+      const e=i===0||i===14;
+      s+=`<path d="${d}" stroke-width="${e?'.08':f(.03+R(i*13+v*5)*.022)}" opacity="${e?1:f(.68+R(i*7+v)*.3)}"/>`;
+    }
+    return s+'</g>';
+  },
+  star:(x,y)=>`<g transform="translate(${x} ${y})"><path class="ob-star" d="${blob(x*3+y,.11,.2,7)}"/></g>`,
+  stone:body,
+  fx:(c,i)=>{
+    let s=`<path class="ob-bleed" d="${blob(i+5,.5,.18)}"/>`;
+    for(let k=0;k<7;k++){const a=R(i*9+k)*6.2832,d=.7+R(i+k*3)*.4;s+=`<circle class="ob-spl" style="--d:${k}" cx="${f(Math.cos(a)*d)}" cy="${f(Math.sin(a)*d)}" r="${f(.018+R(i*5+k)*.035)}"/>`}
+    return s;
+  },
+  preview:c=>`<g class="ob-ghost">${body(c,3)}</g><circle class="ob-enso" r=".6" pathLength="1" transform="rotate(-70)"/>`,
+  forbid:()=>'<path class="ob-x" d="M-.26 -.25Q.04 -.09 .26 .25Q-.07 .07 -.26 -.25Z"/><path class="ob-x" d="M.25 -.26Q.08 .04 -.25 .26Q-.06 -.07 .25 -.26Z"/>',
+  warn:()=>`<path class="ob-wwash" d="${blob(9,.45,.22)}"/>`,
+  last:()=>'<rect class="ob-seal-dot" x="-.09" y="-.09" width=".18" height=".18" rx=".025" transform="rotate(9)"/>',
+  win:p=>{
+    const a=p[0],b=p[p.length-1],l=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/l,uy=(b.y-a.y)/l,e=.42;
+    const ln=(o,cls)=>`<line class="${cls}" pathLength="1" x1="${f(a.x-ux*e-uy*o)}" y1="${f(a.y-uy*e+ux*o)}" x2="${f(b.x+ux*e-uy*o)}" y2="${f(b.y+uy*e+ux*o)}"/>`;
+    return ln(0,'ob-stroke')+ln(.115,'ob-dry')+ln(-.1,'ob-dry ob-dry2');
+  },
+  end:'<span class="ob-seal" aria-hidden="true">승</span>',
+};
+})();
+</script>
+<script>
+/* 시안 공용 데모 스크립트 — 룰 판정은 흉내만(5목 검사 + 미리 정한 금수 자리). 앱 코드와 무관. */
+(()=>{
+const T=window.OM_THEME,N=15,D=document,H=D.documentElement;
+const B0=[[7,7],[6,6],[6,8],[7,9],[9,8],[10,9],[12,7],[11,9],[12,8],[2,10],[5,12],[3,11],[6,12],[5,9],[8,6]];
+const W0=[[8,8],[7,8],[8,7],[6,7],[9,6],[10,8],[7,6],[11,10],[13,8],[5,11],[2,11],[6,10],[9,10],[5,7],[4,10]];
+const FORB=[[12,9,'삼삼'],[4,12,'삼삼']];
+const SEATS=[{n:'다솜',c:'b'},{n:'하늬',c:'w'},{n:'미르',c:'b',me:1},{n:'봇 가람',c:'w'}];
+const AUTO=[[11,4],[3,4],[12,3],[4,3]];
+const LAYERS=['guide','fxu','forb','stones','last','win','nums','prev','fxo'];
+const CN={b:'흑',w:'백'},COL='ABCDEFGHIJKLMNO';
+const nm=p=>COL[p.x]+(N-p.y),K=(x,y)=>x+','+y,rm=()=>H.classList.contains('rm');
+const at=(x,y,inner,cls,extra='')=>`<g transform="translate(${x} ${y})" class="${cls}" ${extra}><g class="om-in">${inner}</g></g>`;
+const restart=(el,c)=>{el.classList.remove(c);void el.getBoundingClientRect();el.classList.add(c)};
+
+function mount(root){
+  const idx=[...Array(N).keys()];
+  root.innerHTML=`<div class="om-inner">
+<header class="om-header"><div class="om-header-badges"><span class="om-badge om-badge-title">오목</span><span class="om-badge">2:2 팀전</span><span class="om-badge">렌주</span></div>
+<div class="om-header-actions"><button type="button" class="om-badge">규칙</button><button type="button" class="om-badge">채팅</button><button type="button" class="om-badge">기권</button></div></header>
+<ol class="om-strip" aria-label="차례 순서"><li class="om-turn-marker" aria-hidden="true"></li>${SEATS.map(s=>`<li class="om-seat${s.me?' om-seat-me':''}" data-color="${s.c}"><span class="om-dot om-dot-${s.c}"></span><span class="om-seat-name">${s.n}${s.me?' (나)':''}</span><span class="om-team">${CN[s.c]} 팀</span><span class="om-count"></span></li>`).join('')}</ol>
+<div class="om-board-wrap"><div class="om-frame"><div class="om-ruler-y" aria-hidden="true">${idx.map(i=>`<span>${N-i}</span>`).join('')}</div>
+<svg class="om-board" viewBox="-0.5 -0.5 15 15" role="img" aria-label="오목 판" tabindex="0"></svg>
+<div class="om-ruler-x" aria-hidden="true">${idx.map(i=>`<span>${COL[i]}</span>`).join('')}</div></div></div>
+<p class="om-status" aria-live="polite"></p>
+<div class="om-controls"><button type="button" class="om-primary" disabled>여기에 두기</button></div>
+<section class="om-end" hidden role="status">${T.end||''}<p class="om-end-title"></p><p class="om-end-line"></p><p class="om-end-line om-end-muted">5목</p>
+<div class="om-end-actions"><button type="button" class="om-badge" data-a="nums" aria-pressed="false">수 번호 보기</button><button type="button" class="om-primary" data-a="reset">처음 장면으로</button></div></section></div>`;
+  const $=s=>root.querySelector(s),svg=$('.om-board'),wrap=$('.om-board-wrap'),strip=$('.om-strip'),marker=$('.om-turn-marker'),
+    seats=[...root.querySelectorAll('.om-seat')],status=$('.om-status'),go=$('.om-controls .om-primary'),end=$('.om-end');
+  let g='';for(const i of idx)g+=`<line class="om-grid" x1="0" y1="${i}" x2="14" y2="${i}"/><line class="om-grid" x1="${i}" y1="0" x2="${i}" y2="14"/>`;
+  svg.innerHTML=T.board()+(T.grid?T.grid():`<g>${g}</g>`)
+    +[[3,3],[11,3],[7,7],[3,11],[11,11]].map(([x,y])=>T.star?T.star(x,y):`<circle class="om-star" cx="${x}" cy="${y}" r=".09"/>`).join('')
+    +LAYERS.map(k=>`<g class="om-l-${k}"></g>`).join('');
+  const L=k=>svg.querySelector('.om-l-'+k);
+  let moves,occ,pv,result,gen=0,left=30;
+  const turn=()=>moves.length%4,tc=()=>SEATS[turn()].c;
+  const fx=(layer,html,ms)=>{const l=L(layer);l.insertAdjacentHTML('beforeend',html);const n=l.lastElementChild;setTimeout(()=>n.remove(),ms)};
+  const forbAt=p=>!result&&tc()==='b'&&FORB.find(f=>f[0]===p.x&&f[1]===p.y&&!occ.has(K(p.x,p.y)));
+
+  function addStone(m,i,drop){
+    const c=i%2?'w':'b';
+    L('stones').insertAdjacentHTML('beforeend',at(m.x,m.y,T.stone(c,i),`om-stone om-stone-${c}${drop?' om-drop':''}`,`data-k="${K(m.x,m.y)}"`));
+    L('nums').insertAdjacentHTML('beforeend',`<text class="om-num om-num-${c}" x="${m.x}" y="${m.y}">${i+1}</text>`);
+  }
+  function paintLast(){const m=moves[moves.length-1];L('last').innerHTML=m?at(m.x,m.y,T.last(moves.length%2?'b':'w'),'om-last'):''}
+  function paintForb(){
+    L('forb').innerHTML=!result&&tc()==='b'?FORB.filter(f=>!occ.has(K(f[0],f[1]))).map(f=>at(f[0],f[1],T.forbid(f[2]),'om-forbidden om-forbidden-mine',`data-k="${K(f[0],f[1])}"`)).join(''):'';
+  }
+  function tick(){const s=seats[turn()];if(s&&!result)s.querySelector('.om-count').textContent='0:'+String(left).padStart(2,'0')}
+  function placeMarker(){
+    const s=result?null:seats[turn()];
+    if(!s){marker.style.opacity=0;return}
+    Object.assign(marker.style,{opacity:1,left:s.offsetLeft+'px',top:s.offsetTop+'px',width:s.offsetWidth+'px',height:s.offsetHeight+'px'});
+  }
+  function paintTurn(first){
+    const t=result?-1:turn();
+    seats.forEach((s,i)=>{s.classList.toggle('om-seat-turn',i===t);i===t?s.setAttribute('aria-current','step'):s.removeAttribute('aria-current')});
+    wrap.classList.toggle('om-board-myturn',t>=0&&!!SEATS[t].me);
+    left=30;tick();
+    if(first){marker.style.transition='none';placeMarker();void marker.offsetWidth;marker.style.transition=''}else{placeMarker();restart(strip,'om-handoff')}
+  }
+  function say(){
+    const p=pv,f=p&&forbAt(p);let t;
+    if(result)t='판이 끝났어요.';
+    else if(f)t=`<b class="om-warn-text">${f[2]}</b> — 흑은 둘 수 없는 자리예요`;
+    else if(p)t=`${nm(p)} — 한 번 더 누르거나 [여기에 두기]`;
+    else t=SEATS[turn()].me?'내 차례예요 — 둘 자리를 누르세요':`${SEATS[turn()].n}(${CN[tc()]}) 차례 — 시안에서는 대신 둬 볼 수 있어요`;
+    status.innerHTML=t+(!result&&moves.length?`<span class="om-last-by"> · 방금 ${SEATS[(moves.length-1)%4].n}</span>`:'');
+    go.disabled=!!result||!p||!!f;
+  }
+  function setPv(p){
+    if(result)return;
+    if(p&&occ.has(K(p.x,p.y)))p=null;
+    pv=p;const f=p&&forbAt(p),c=tc();
+    L('guide').innerHTML=p&&!f?`<g class="om-guide"><line x1="-.5" y1="${p.y}" x2="14.5" y2="${p.y}"/><line x1="${p.x}" y1="-.5" x2="${p.x}" y2="14.5"/></g>`:'';
+    L('prev').innerHTML=p&&!f?at(p.x,p.y,T.preview(c),'om-preview om-preview-'+c):'';
+    if(f){
+      const el=L('forb').querySelector(`[data-k="${K(p.x,p.y)}"]`);el&&restart(el,'om-warn');
+      restart(wrap,'om-shake');
+      if(T.warn)fx('fxo',at(p.x,p.y,T.warn(),'om-warnfx'),1000);
+    }
+    say();
+  }
+  function winOf(p,c){
+    const col=(x,y)=>{const i=occ.get(K(x,y));return i===undefined?null:i%2?'w':'b'};
+    for(const[dx,dy]of[[1,0],[0,1],[1,1],[1,-1]]){
+      const a=[p];
+      for(const s of[1,-1])for(let k=1;k<6;k++){const x=p.x+dx*k*s,y=p.y+dy*k*s;if(col(x,y)!==c)break;s>0?a.push({x,y}):a.unshift({x,y})}
+      if(a.length>=5)return a;
+    }
+    return null;
+  }
+  function finish(){
+    const{c,w}=result,g0=gen;
+    w.forEach((q,i)=>{const el=L('stones').querySelector(`[data-k="${K(q.x,q.y)}"]`);el.style.setProperty('--i',i);el.classList.add('om-won')});
+    L('win').innerHTML=T.win(w);root.classList.add('om-over');
+    end.querySelector('.om-end-title').textContent=c==='b'?'이겼어요!':'졌어요';
+    end.querySelector('.om-end-line').textContent=`${CN[c]} 팀 승 — ${SEATS.filter(s=>s.c===c).map(s=>s.n).join(' · ')}`;
+    setTimeout(()=>{if(g0===gen)end.hidden=false},rm()?0:T.winMs||1500);
+  }
+  function confirm(p){
+    if(result||!p||occ.has(K(p.x,p.y))||forbAt(p))return;
+    const i=moves.length,c=tc();
+    moves.push(p);occ.set(K(p.x,p.y),i);pv=null;L('guide').innerHTML='';L('prev').innerHTML='';
+    addStone(p,i,true);
+    fx('fxu',at(p.x,p.y,T.fx(c,i),'om-fx om-fx-'+c),T.fxMs||1200);
+    if(T.fxOver)fx('fxo',at(p.x,p.y,T.fxOver(c,i),'om-fx om-fx-'+c),T.fxMs||1200);
+    restart(wrap,'om-thud');paintLast();
+    const w=winOf(p,c);if(w){result={c,w};finish()}
+    paintForb();paintTurn();say();
+  }
+  function reset(){
+    gen++;moves=[];occ=new Map;pv=null;result=null;
+    LAYERS.forEach(k=>L(k).innerHTML='');
+    root.classList.remove('om-over','om-nums');end.hidden=true;
+    const nb=end.querySelector('[data-a=nums]');nb.textContent='수 번호 보기';nb.setAttribute('aria-pressed','false');
+    for(let i=0;i<30;i++){const[x,y]=(i%2?W0:B0)[i>>1],m={x,y};moves.push(m);occ.set(K(x,y),i);addStone(m,i,false)}
+    paintLast();paintForb();paintTurn(true);say();
+  }
+
+  // 두 단계 확정(앱의 useStonePicker 흉내): 누르면 미리보기, 끌면 따라오고, 미리보기를 다시 누르면 확정.
+  const hit=e=>{const r=svg.getBoundingClientRect(),f=(v,o,s)=>Math.max(0,Math.min(N-1,Math.round((v-o)/s*N-.5)));return{x:f(e.clientX,r.left,r.width),y:f(e.clientY,r.top,r.height)}};
+  let down=null;
+  svg.addEventListener('pointerdown',e=>{
+    if(result)return;
+    const p=hit(e),same=!!pv&&pv.x===p.x&&pv.y===p.y;
+    down={same,moved:false};
+    try{svg.setPointerCapture(e.pointerId)}catch(_){}
+    if(!same||forbAt(p))setPv(p);
+  });
+  svg.addEventListener('pointermove',e=>{
+    if(!down)return;
+    const p=hit(e);
+    if(pv?pv.x!==p.x||pv.y!==p.y:!occ.has(K(p.x,p.y))){down.moved=true;setPv(p)}
+  });
+  svg.addEventListener('pointerup',()=>{if(down&&down.same&&!down.moved)confirm(pv);down=null});
+  svg.addEventListener('pointercancel',()=>{down=null});
+  svg.addEventListener('keydown',e=>{
+    if(result)return;
+    const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key],a=pv||moves[moves.length-1]||{x:7,y:7};
+    if(d){
+      e.preventDefault();
+      let x=a.x,y=a.y;
+      do{x+=d[0];y+=d[1]}while(x>=0&&x<N&&y>=0&&y<N&&occ.has(K(x,y)));
+      if(x>=0&&x<N&&y>=0&&y<N)setPv({x,y});
+    }else if((e.key==='Enter'||e.key===' ')&&pv){e.preventDefault();confirm(pv)}
+    else if(e.key==='Escape')setPv(null);
+  });
+  go.addEventListener('click',()=>confirm(pv));
+  end.addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.a==='reset')reset();
+    else{const on=root.classList.toggle('om-nums');b.textContent=on?'수 번호 숨기기':'수 번호 보기';b.setAttribute('aria-pressed',on)}
+  });
+  setInterval(()=>{if(!result&&left>0){left--;tick()}},1000);
+  reset();
+  return{
+    reset,place:placeMarker,
+    win(){reset();const g0=gen;setPv({x:9,y:5});setTimeout(()=>g0===gen&&confirm({x:9,y:5}),rm()?200:900)},
+    forbid(){reset();setPv({x:12,y:9})},
+    auto(){reset();const g0=gen;AUTO.forEach(([x,y],i)=>{setTimeout(()=>g0===gen&&setPv({x,y}),i*1200+200);setTimeout(()=>g0===gen&&confirm({x,y}),i*1200+750)})},
+  };
+}
+
+const insts=[...D.querySelectorAll('[data-om]')].map(mount);
+const replace=()=>insts.forEach(i=>i.place());
+addEventListener('resize',replace);addEventListener('load',replace);
+const tb=D.querySelector('[data-act=theme]'),rb=D.querySelector('[data-act=rm]');
+const label=()=>{tb.textContent=H.dataset.theme==='dark'?'라이트로 보기':'다크로 보기';rb.textContent=rm()?'연출 줄이기: 켜짐':'연출 줄이기: 꺼짐';rb.setAttribute('aria-pressed',rm())};
+label();
+D.querySelector('.mk-ctl').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='theme')H.dataset.theme=H.dataset.theme==='dark'?'light':'dark';
+  else if(a==='rm')H.classList.toggle('rm');
+  else insts.forEach(i=>i[a]());
+  label();
+  replace();
+});
+})();
+</script>
+</body>
+</html>
