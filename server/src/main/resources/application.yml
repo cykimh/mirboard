@@ -47,6 +47,8 @@ spring:
     redis:
       host: ${MIRBOARD_REDIS_HOST:127.0.0.1}
       port: ${MIRBOARD_REDIS_PORT:6379}
+      # 로컬에서 여러 서버를 함께 띄울 때 키·마감 스케줄이 섞이지 않게 DB 번호를 나눈다(운영은 0).
+      database: ${MIRBOARD_REDIS_DATABASE:0}
       # Phase 7-3 (D-39) — Upstash / 매니지드 Redis 는 비밀번호 + TLS 필수.
       # 로컬 docker-compose 는 둘 다 비활성. prod 에서는 application-prod.yml 가 강제.
       password: ${MIRBOARD_REDIS_PASSWORD:}

@@ -2,6 +2,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// @types/node 없이 읽는다(설정 파일만 Node 에서 돈다).
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const DEV_API = env.MIRBOARD_DEV_API ?? 'http://localhost:8080';
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -24,13 +28,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 로컬에서 여러 작업 세션이 동시에 띄울 때 포트를 나눈다 — VITE_PORT·MIRBOARD_DEV_API(CONTRIBUTING.md).
+    port: Number(env.VITE_PORT ?? 5173),
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': DEV_API,
       // 아바타 조회는 비-/api 공개 경로(D-80) — dev 에서도 백엔드로 프록시해야 표시됨.
-      '/avatars': 'http://localhost:8080',
+      '/avatars': DEV_API,
       '/ws': {
-        target: 'http://localhost:8080',
+        target: DEV_API,
         ws: true,
       },
     },
