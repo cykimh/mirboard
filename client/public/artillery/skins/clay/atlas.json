@@ -1,0 +1,316 @@
+{
+  "format": "mirboard-artillery-skin",
+  "version": 1,
+  "image": "atlas.png",
+  "pxPerCell": 6,
+  "labelLift": 21,
+  "recoilCells": 2,
+  "soil": {
+    "grass": "#74d44a",
+    "grassDark": "#46a63a",
+    "topsoil": "#b0683c",
+    "subsoil": "#884c2c"
+  },
+  "anims": {
+    "unit.SPROUT.idle": {
+      "frames": [
+        [430, 360, 84, 63],
+        [172, 360, 84, 63]
+      ],
+      "tint": [
+        [258, 0, 84, 63],
+        [258, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "frameMs": 1600
+    },
+    "unit.SPROUT.aim": {
+      "frames": [
+        [344, 360, 84, 63]
+      ],
+      "tint": [
+        [258, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.SPROUT.recoil": {
+      "frames": [
+        [516, 360, 84, 63]
+      ],
+      "tint": [
+        [258, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.SPROUT.hit": {
+      "frames": [
+        [602, 360, 84, 63]
+      ],
+      "tint": [
+        [258, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.SPROUT.down": {
+      "frames": [
+        [258, 360, 84, 63]
+      ],
+      "tint": [
+        [258, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "barrel": false,
+      "loop": false
+    },
+    "leaves.SPROUT": {
+      "frames": [
+        [888, 187, 108, 63],
+        [0, 295, 108, 63]
+      ],
+      "anchor": [54, 45]
+    },
+    "barrel.SPROUT": {
+      "frames": [
+        [98, 425, 96, 48]
+      ],
+      "tint": [
+        [744, 0, 96, 48]
+      ],
+      "anchor": [12, 24]
+    },
+    "droop.SPROUT": {
+      "frames": [
+        [824, 360, 66, 54]
+      ],
+      "tint": [
+        [480, 0, 66, 54]
+      ],
+      "anchor": [12, 87]
+    },
+    "unit.ACORN.idle": {
+      "frames": [
+        [368, 295, 84, 63],
+        [110, 295, 84, 63]
+      ],
+      "tint": [
+        [86, 0, 84, 63],
+        [86, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "frameMs": 1600
+    },
+    "unit.ACORN.aim": {
+      "frames": [
+        [282, 295, 84, 63]
+      ],
+      "tint": [
+        [86, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.ACORN.recoil": {
+      "frames": [
+        [454, 295, 84, 63]
+      ],
+      "tint": [
+        [86, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.ACORN.hit": {
+      "frames": [
+        [540, 295, 84, 63]
+      ],
+      "tint": [
+        [86, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.ACORN.down": {
+      "frames": [
+        [196, 295, 84, 63]
+      ],
+      "tint": [
+        [86, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "barrel": false,
+      "loop": false
+    },
+    "leaves.ACORN": {
+      "frames": [
+        [448, 187, 108, 63],
+        [558, 187, 108, 63]
+      ],
+      "anchor": [54, 45]
+    },
+    "barrel.ACORN": {
+      "frames": [
+        [892, 360, 96, 48]
+      ],
+      "tint": [
+        [548, 0, 96, 48]
+      ],
+      "anchor": [12, 24]
+    },
+    "droop.ACORN": {
+      "frames": [
+        [688, 360, 66, 54]
+      ],
+      "tint": [
+        [344, 0, 66, 54]
+      ],
+      "anchor": [12, 87]
+    },
+    "unit.DANDELION.idle": {
+      "frames": [
+        [884, 295, 84, 63],
+        [626, 295, 84, 63]
+      ],
+      "tint": [
+        [172, 0, 84, 63],
+        [172, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "frameMs": 1600
+    },
+    "unit.DANDELION.aim": {
+      "frames": [
+        [798, 295, 84, 63]
+      ],
+      "tint": [
+        [172, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.DANDELION.recoil": {
+      "frames": [
+        [0, 360, 84, 63]
+      ],
+      "tint": [
+        [172, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.DANDELION.hit": {
+      "frames": [
+        [86, 360, 84, 63]
+      ],
+      "tint": [
+        [172, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24]
+    },
+    "unit.DANDELION.down": {
+      "frames": [
+        [712, 295, 84, 63]
+      ],
+      "tint": [
+        [172, 0, 84, 63]
+      ],
+      "anchor": [42, 57],
+      "mount": [42, 24],
+      "barrel": false,
+      "loop": false
+    },
+    "leaves.DANDELION": {
+      "frames": [
+        [668, 187, 108, 63],
+        [778, 187, 108, 63]
+      ],
+      "anchor": [54, 45]
+    },
+    "barrel.DANDELION": {
+      "frames": [
+        [0, 425, 96, 48]
+      ],
+      "tint": [
+        [646, 0, 96, 48]
+      ],
+      "anchor": [12, 24]
+    },
+    "droop.DANDELION": {
+      "frames": [
+        [756, 360, 66, 54]
+      ],
+      "tint": [
+        [412, 0, 66, 54]
+      ],
+      "anchor": [12, 87]
+    },
+    "flash": {
+      "frames": [
+        [0, 0, 84, 63]
+      ],
+      "anchor": [42, 57]
+    },
+    "seed.PEA": {
+      "frames": [
+        [176, 187, 66, 66]
+      ],
+      "anchor": [33, 33]
+    },
+    "seed.PUMPKIN": {
+      "frames": [
+        [244, 187, 66, 66]
+      ],
+      "anchor": [33, 33]
+    },
+    "seed.VINE": {
+      "frames": [
+        [380, 187, 66, 66]
+      ],
+      "anchor": [33, 33]
+    },
+    "seed.CHESTNUT": {
+      "frames": [
+        [108, 187, 66, 66]
+      ],
+      "anchor": [33, 33]
+    },
+    "seed.SPORE": {
+      "frames": [
+        [312, 187, 66, 66]
+      ],
+      "anchor": [33, 33]
+    },
+    "explosion": {
+      "frames": [
+        [432, 65, 106, 106],
+        [540, 65, 106, 106],
+        [648, 65, 106, 106],
+        [756, 65, 106, 106],
+        [864, 65, 106, 106],
+        [0, 187, 106, 106]
+      ],
+      "anchor": [53, 53],
+      "radius": 42,
+      "loop": false
+    },
+    "mound": {
+      "frames": [
+        [0, 65, 106, 120],
+        [108, 65, 106, 120],
+        [216, 65, 106, 120],
+        [324, 65, 106, 120]
+      ],
+      "anchor": [53, 67],
+      "radius": 42,
+      "loop": false
+    }
+  }
+}
