@@ -1,9 +1,12 @@
-/* 오목 게임판 (D-175·D-180) — 원카드(19)와 같은 규칙을 따른다.
+/* 오목 게임판 (D-175·D-180, 테마 "결" D-192) — 원카드(19)와 같은 규칙을 따른다.
  *
  * ⚠ 캐스케이드: index.css 에서 19 다음, **17-responsive 앞**에 import 된다. 이 파일에는 폭 미디어가 **0개**다 — 판은 폭에 맞춰
- *   늘고 줄며(최대 폭만 정한다) 차례 띠는 줄바꿈된다.
+ *   늘고 줄며(최대 폭만 정한다) 차례 띠는 줄바꿈된다. 좌표 눈금은 판 폭 컨테이너 쿼리로, 연출 끄기(prefers-reduced-motion)는
+ *   17-responsive 맨 아래에 둔다.
  * ⚠ 네임스페이스: 모든 선택자는 `.om-` 클래스를 포함한다. 공용 클래스를 단독으로 재정의하지 않는다.
- * 테마: 중립색은 전역 토큰(--color-*). 판 나무색은 두 테마 모두 같은 밝은 색이다(돌의 흑백 대비를 위해).
+ * 구성: ① 기본 모습(납작한 판·돌) → ② 테마 층 `.om-theme-grain`(D-192). 테마 클래스를 떼면 ① 그대로다 — 그림 조각(`.om-art`)은
+ *   ① 에서 숨고, ② 에서는 납작한 원(`.om-flat`)이 숨는다.
+ * 테마: 판 나무색은 라이트·다크 모두 밝은 색이다(돌의 흑백 대비를 위해). 다크는 방만 어두워진다.
  */
 
 .om-table,
@@ -22,9 +25,15 @@
   --om-white: #fbfaf5;
   --om-white-edge: #8b8577;
   --om-accent: #e85d3a;
+  --om-on-accent: #ffffff;
   --om-forbidden: #9a3412;
   --om-forbidden-mine: #dc2626;
+  --om-warn-text: #dc2626;
   --om-win: #e11d48;
+  --om-border: var(--color-border);
+  --om-muted: var(--color-text-muted);
+  --om-surface: var(--color-bg-surface);
+  --om-surface-2: var(--color-bg-surface-elevated);
 }
 
 .om-table {
@@ -58,7 +67,7 @@
 .om-badge {
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--om-border);
   background: transparent;
   color: inherit;
   font-size: 12px;
@@ -75,8 +84,8 @@ button.om-badge {
 }
 
 .om-badge-warn {
-  border-color: var(--om-forbidden-mine);
-  color: var(--om-forbidden-mine);
+  border-color: var(--om-warn-text);
+  color: var(--om-warn-text);
 }
 
 .om-error {
@@ -87,8 +96,8 @@ button.om-badge {
   margin: 0;
   padding: 6px 10px;
   border-radius: 8px;
-  border: 1px solid var(--om-forbidden-mine);
-  background: var(--color-bg-surface);
+  border: 1px solid var(--om-warn-text);
+  background: var(--om-surface);
   font-size: 13px;
 }
 
@@ -101,6 +110,10 @@ button.om-badge {
 }
 
 /* ── 차례 띠 ───────────────────────────────────────────────────────── */
+.om-strip-wrap {
+  position: relative;
+}
+
 .om-strip {
   display: flex;
   flex-wrap: wrap;
@@ -118,8 +131,8 @@ button.om-badge {
   min-height: 36px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 2px solid var(--color-border);
-  background: var(--color-bg-surface);
+  border: 2px solid var(--om-border);
+  background: var(--om-surface);
   font-size: 13px;
 }
 
@@ -143,11 +156,12 @@ button.om-badge {
   position: absolute;
   left: 8px;
   bottom: 100%;
+  z-index: 3;
   max-width: 14em;
   padding: 1px 6px;
   border-radius: 6px;
-  background: var(--color-bg-surface-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--om-surface-2);
+  border: 1px solid var(--om-border);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -173,13 +187,22 @@ button.om-badge {
 }
 
 .om-countdown-urgent {
-  border-color: var(--om-forbidden-mine);
-  color: var(--om-forbidden-mine);
+  border-color: var(--om-warn-text);
+  color: var(--om-warn-text);
   font-weight: 700;
+}
+
+/* 테마 전용 조각 — 기본 모습에서는 없다. */
+.om-turn-marker,
+.om-ruler,
+.om-lamp,
+.om-art {
+  display: none;
 }
 
 /* ── 판 ───────────────────────────────────────────────────────────── */
 .om-board-wrap {
+  position: relative;
   border-radius: 6px;
   padding: 0;
   outline: 3px solid transparent;
@@ -211,6 +234,11 @@ button.om-badge {
   outline-offset: 2px;
 }
 
+/* 마우스로 눌러 생긴 초점에는 브라우저 기본 테를 그리지 않는다(키보드 초점 테는 위 규칙 그대로). */
+.om-board:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .om-board-bg {
   fill: var(--om-wood);
   stroke: var(--om-wood-edge);
@@ -233,11 +261,28 @@ button.om-badge {
   opacity: 0.7;
 }
 
-.om-stone-black {
+/* 연출은 돌·표식의 가운데를 축으로(SVG 기본 축은 좌표 원점이라 상자 기준으로 바꾼다). */
+.om-in,
+.om-stone-shadow,
+.om-impact,
+.om-ripple,
+.om-dust,
+.om-ink,
+.om-warn-ring,
+.om-last-ring,
+.om-preview-ring,
+.om-glint,
+.om-gold,
+.om-spark {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.om-stone-black .om-flat {
   fill: var(--om-black);
 }
 
-.om-stone-white {
+.om-stone-white .om-flat {
   fill: var(--om-white);
   stroke: var(--om-white-edge);
   stroke-width: 0.04;
@@ -252,11 +297,11 @@ button.om-badge {
   animation: om-pending 0.8s ease-in-out infinite;
 }
 
-.om-last.om-last-on-black {
+.om-last.om-last-on-black .om-last-dot {
   fill: var(--om-white);
 }
 
-.om-last.om-last-on-white {
+.om-last.om-last-on-white .om-last-dot {
   fill: var(--om-black);
 }
 
@@ -306,7 +351,7 @@ button.om-badge {
 }
 
 .om-last-by {
-  color: var(--color-text-muted);
+  color: var(--om-muted);
   font-size: 12px;
 }
 
@@ -323,7 +368,7 @@ button.om-badge {
   border-radius: 10px;
   border: 0;
   background: var(--om-accent);
-  color: #ffffff;
+  color: var(--om-on-accent);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -340,7 +385,7 @@ button.om-badge {
   justify-content: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--om-muted);
 }
 
 /* ── 결과 ─────────────────────────────────────────────────────────── */
@@ -351,8 +396,8 @@ button.om-badge {
   gap: 6px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--om-border);
+  background: var(--om-surface-2);
   text-align: center;
 }
 
@@ -368,7 +413,7 @@ button.om-badge {
 }
 
 .om-end-muted {
-  color: var(--color-text-muted);
+  color: var(--om-muted);
 }
 
 .om-end-actions {
@@ -393,7 +438,7 @@ button.om-badge {
   margin-top: 4px;
   font-size: 12px;
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--om-muted);
 }
 
 .om-quiz-choices {
@@ -408,8 +453,8 @@ button.om-badge {
 }
 
 .om-quiz-wrong {
-  border-color: var(--om-forbidden-mine);
-  color: var(--om-forbidden-mine);
+  border-color: var(--om-warn-text);
+  color: var(--om-warn-text);
 }
 
 .om-quiz-answer {
@@ -434,5 +479,930 @@ button.om-badge {
 @keyframes om-pending {
   50% {
     opacity: 0.35;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 테마 "결" (D-192) — 등불 아래 나무 바둑판, 흑석과 조개 백돌.
+ * 여기부터는 전부 `.om-theme-grain` 아래다. 이 클래스를 떼면(omokTheme.ts) 위의 기본 모습으로 돌아간다.
+ * 성능: 나뭇결은 필터 없이 한 번 그리는 배경 SVG(경로 3개), 연출은 transform·opacity 만, 입자는 돌 하나에 8·5목에 26 이 상한.
+ *       늘 도는 것은 등불 빛(불투명도)·마지막 수 맥박·미리보기 고리 셋뿐이다.
+ * ══════════════════════════════════════════════════════════════════════ */
+.om-theme-grain {
+  --om-font-display: 'Iowan Old Style', 'Noto Serif KR', 'Nanum Myeongjo', 'AppleMyungjo', Georgia, serif;
+  --om-room: #f2e9d8;
+  --om-ink: #2a2017;
+  --om-muted: #6a5943;
+  --om-border: #c9b48d;
+  --om-surface: #fbf5e8;
+  --om-surface-2: #fffaf0;
+  --om-accent: #8a5a14;
+  --om-on-accent: #fff8ea;
+  --om-brass: #b8862f;
+  --om-gold: #f7d36a;
+  --om-wood1: #ecc582;
+  --om-wood2: #d9a85c;
+  --om-frame1: #7a4e24;
+  --om-frame2: #4f3013;
+  --om-line: #3f2a12;
+  --om-vig: 0.12;
+  --om-lamp: 0.3;
+  --om-forbidden: #7a3b12;
+  --om-forbidden-mine: #b3261e;
+  --om-warn-text: #a3221b;
+  --om-win: var(--om-gold);
+  --om-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300' preserveAspectRatio='none' fill='none' stroke-linecap='round'%3E%3Cpath stroke='%237a4712' stroke-opacity='.1' stroke-width='3.2' d='M59 11.2C141 9.7 222 7.9 304 10.5M70 34.5C148 32.6 226 38 304 34.6M-4 53.5C99 54.3 201 50.9 304 53.6M-4 82.6C99 78.8 201 81.4 304 83.7M-4 107.5C99 111.4 201 108.6 304 105.4M-4 123.4C91 120.4 186 121.5 281 123.3M51 144.9C135 143.6 220 149.2 304 143.7M42 178.9C129 179.5 217 183 304 181.4M58 191C140 188.2 222 188.7 304 193.2M-4 225C99 224.1 201 224.3 304 227.2M70 245.3C148 244.6 226 249.5 304 245M-4 268.1C99 266.6 201 264.1 304 267.6M-4 292.1C76 293.2 155 293.3 235 291.7'/%3E%3Cpath stroke='%236b3d10' stroke-opacity='.2' stroke-width='.55' d='M-4 6.1C99 7.7 201 4.3 304 7.7M-4 13.6C99 14.8 201 11.9 304 11.9M-4 21C99 21 201 20.2 304 19.9M-4 30.9C99 29.7 201 28.2 304 29.9M24 40.9C117 40.6 211 43.3 304 42.6M-4 45.1C99 46.8 201 43 304 43.4M-4 55.4C74 54.5 151 52.8 229 54M-4 67.6C99 68 201 67.5 304 68.8M-4 77.3C66 77.2 137 79.9 207 78.7M-4 81.5C99 84.2 201 80.5 304 82.5M-4 91.8C89 94.2 181 89.1 274 90.7M-4 100.3C99 98.2 201 101.2 304 101.7M-4 113.2C99 115.8 201 115.8 304 114.7M-4 118.3C99 117.2 201 118.6 304 117.7M-4 128.8C99 130.1 201 127.9 304 130.4M-4 133.8C99 134.6 201 134.1 304 135.4M-4 146.3C99 145.6 201 147.6 304 145.7M36 152.5C125 151.1 215 153.5 304 152.4M-4 161.5C80 159.7 165 159.9 249 161.6M45 169.2C131 167.2 218 167.1 304 170.5M-4 183.5C86 186.1 177 186.3 267 184M-4 192.7C99 192.8 201 195.5 304 192.2M-4 196.5C99 196.7 201 198.4 304 198M-4 205.3C99 202.9 201 205.9 304 206M-4 215C99 217.1 201 217.3 304 213.8M-4 223C65 222.2 135 221.1 204 221.7M-4 233.6C99 234.2 201 232.7 304 233.8M-4 244.9C99 244.2 201 242.1 304 243.3M-4 253C99 251.9 201 250.9 304 253.2M-4 263C99 265.3 201 262.1 304 262.9M22 267C116 267.2 210 267.2 304 265.8M-4 278.1C61 278.3 126 278.5 191 276.6M-4 285C99 285.7 201 284.1 304 283.9M-4 293C99 292.5 201 290.2 304 292.3'/%3E%3Cpath stroke='%23fff2cf' stroke-opacity='.22' stroke-width='.8' d='M-4 12.3C99 12.8 201 12.5 304 11.7M-4 24.1C99 26.7 201 27 304 24.6M-4 40.4C99 42.9 201 37.7 304 41.9M-4 59.9C99 58.8 201 59.5 304 61.7M-4 82.6C99 82.1 201 85.5 304 81.6M-4 91.9C99 93.5 201 92.1 304 92.2M16 117.3C112 119.6 208 120.4 304 117M-4 134.8C99 137 201 135.2 304 136M-4 147.9C99 150.6 201 150.8 304 149.2M-4 167C99 167.4 201 167.7 304 169M-4 191.2C99 194.4 201 189.4 304 192.1M16 207.8C72 206.8 129 208.8 185 208M-4 219.5C99 219.7 201 218.9 304 218.2M-4 238.2C59 237.7 123 240.9 186 238.6M-4 254.8C95 254.5 195 257.9 294 254.3M-4 275.8C99 276.4 201 278 304 277.4M-4 285.8C99 283 201 288.3 304 286.9'/%3E%3C/svg%3E");
+}
+
+.dark .om-theme-grain {
+  --om-room: #1c150e;
+  --om-ink: #efe4d0;
+  --om-muted: #b3a188;
+  --om-border: #57442d;
+  --om-surface: #2a2017;
+  --om-surface-2: #33271b;
+  --om-accent: #dba844;
+  --om-on-accent: #1c150e;
+  --om-brass: #d2a24a;
+  --om-wood1: #deb574;
+  --om-wood2: #bd8b45;
+  --om-frame1: #5a3a1c;
+  --om-frame2: #2c1b0c;
+  --om-vig: 0.42;
+  --om-lamp: 0.42;
+  --om-warn-text: #ff8a7d;
+}
+
+/* 방 — 게임판은 앱 틀(#root 의 폭·여백) 안에 있으므로 방 바탕은 화면에 고정한 한 겹으로 깐다(판 뒤로 등불 빛이 번진다).
+   좌우 여백은 얇게 — 휴대폰 375px 에서 칸이 22px 아래로 줄지 않게. */
+.om-theme-grain.om-table {
+  padding: 10px 2px 24px;
+  color: var(--om-ink);
+}
+
+.om-theme-grain.om-table::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(70% 50% at 50% 40%, color-mix(in srgb, var(--om-brass) 24%, transparent), transparent 74%),
+    var(--om-room);
+  pointer-events: none;
+}
+
+.om-theme-grain .om-badge-title {
+  font-family: var(--om-font-display);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.om-theme-grain button.om-badge {
+  background: color-mix(in srgb, var(--om-surface) 70%, transparent);
+  transition: background 0.15s;
+}
+
+.om-theme-grain button.om-badge:hover {
+  background: var(--om-surface-2);
+}
+
+/* 좌석 = 나무 명패. 같은 팀은 같은 돌·같은 바탕. */
+.om-theme-grain .om-seat {
+  border: 1px solid var(--om-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 2px rgba(40, 20, 0, 0.16);
+}
+
+.om-theme-grain .om-seat[data-color='BLACK'] {
+  background: color-mix(in srgb, var(--om-surface) 86%, #3a2a18);
+}
+
+.om-theme-grain .om-seat-turn {
+  animation: none;
+}
+
+.om-theme-grain .om-dot {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  box-shadow: 1px 2px 2px rgba(30, 15, 0, 0.35);
+}
+
+.om-theme-grain .om-dot-black {
+  background: radial-gradient(circle at 36% 30%, #6b6f7a, #26272c 45%, #070709);
+}
+
+.dark .om-theme-grain .om-dot-black {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    1px 2px 2px rgba(0, 0, 0, 0.5);
+}
+
+.om-theme-grain .om-dot-white {
+  background: radial-gradient(circle at 38% 32%, #ffffff, #f4efe3 55%, #c8bea6);
+}
+
+/* 차례가 오면 그 자리 돌이 통 튄다. */
+.om-theme-grain .om-seat-turn .om-dot {
+  animation: om-bounce 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.om-theme-grain .om-countdown {
+  padding: 0 2px;
+  border: 0;
+  color: var(--om-accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.om-theme-grain .om-countdown.om-countdown-urgent {
+  color: var(--om-warn-text);
+}
+
+/* 놋쇠 고리 — 지금 차례인 명패 위로 튕기듯 미끄러지고, 그때마다 반사광이 한 번 지나간다. */
+.om-theme-grain .om-turn-marker {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 2px solid var(--om-brass);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--om-brass) 26%, transparent),
+    0 0 14px color-mix(in srgb, var(--om-brass) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.45s cubic-bezier(0.3, 1.35, 0.5, 1),
+    width 0.3s,
+    height 0.3s,
+    opacity 0.2s;
+}
+
+.om-theme-grain .om-turn-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 246, 214, 0.8) 50%, transparent 68%);
+  transform: translateX(110%);
+  animation: om-sheen 0.75s 0.2s ease-out backwards;
+}
+
+/* 판 — 짙은 나무 틀 + 결 있는 판. 높이가 낮은 화면에서는 판이 화면에 다 들어오게 폭을 줄인다. */
+.om-theme-grain .om-stage {
+  container-type: inline-size;
+  width: min(100%, max(300px, calc(100dvh - 300px)));
+  margin: 0 auto;
+}
+
+.om-theme-grain .om-board-wrap {
+  --om-pad: 5px;
+  padding: var(--om-pad);
+  border-radius: 9px;
+  outline: 0;
+  animation: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 30%, rgba(0, 0, 0, 0.12)),
+    linear-gradient(135deg, var(--om-frame1), var(--om-frame2));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 16px 28px -12px rgba(30, 15, 0, 0.65),
+    0 0 0 0 transparent,
+    0 0 0 0 transparent;
+  transition: box-shadow 0.5s;
+}
+
+/* 내 차례 — 놋쇠 테가 한 번 번쩍인 뒤 은은하게 남는다(계속 깜박이지 않는다). */
+.om-theme-grain .om-board-wrap.om-board-myturn {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 16px 28px -12px rgba(30, 15, 0, 0.65),
+    0 0 0 2px var(--om-brass),
+    0 0 18px 1px color-mix(in srgb, var(--om-brass) 50%, transparent);
+  animation: om-myturn 1.1s ease-out;
+}
+
+.om-theme-grain .om-ruler {
+  position: absolute;
+  place-items: center;
+  color: #f1dcb4;
+  font: 600 10px/1 var(--om-font-display);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.om-theme-grain .om-ruler-y {
+  left: 0;
+  top: var(--om-pad);
+  bottom: var(--om-pad);
+  width: var(--om-pad);
+  grid-template-rows: repeat(15, 1fr);
+}
+
+.om-theme-grain .om-ruler-x {
+  left: var(--om-pad);
+  right: var(--om-pad);
+  bottom: 0;
+  height: var(--om-pad);
+  grid-template-columns: repeat(15, 1fr);
+}
+
+/* 좌표 눈금은 판이 넓을 때만 — 휴대폰에서는 틀을 얇게 두어 칸을 줄이지 않는다. */
+@container (min-width: 500px) {
+  .om-theme-grain .om-board-wrap {
+    --om-pad: 22px;
+  }
+
+  .om-theme-grain .om-board-wrap .om-ruler {
+    display: grid;
+  }
+}
+
+.om-theme-grain .om-board {
+  border-radius: 3px;
+  background:
+    radial-gradient(
+      farthest-corner at 36% 28%,
+      rgba(255, 250, 235, 0.16),
+      transparent 48%,
+      rgba(26, 12, 0, var(--om-vig)) 100%
+    ),
+    var(--om-grain) center / 100% 100% no-repeat,
+    linear-gradient(135deg, var(--om-wood1), var(--om-wood2));
+  box-shadow:
+    0 0 0 1px rgba(30, 15, 0, 0.6),
+    0 1px 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.om-theme-grain .om-board:focus-visible {
+  outline-color: var(--om-gold);
+}
+
+/* 등불 — 판 왼쪽 위에서 비추는 빛 한 겹. 불투명도만 느리게 흔들린다(합성 층 하나). */
+.om-theme-grain .om-lamp {
+  display: block;
+  position: absolute;
+  inset: var(--om-pad);
+  z-index: 1;
+  border-radius: 3px;
+  background: radial-gradient(62% 56% at 33% 25%, rgba(255, 233, 180, var(--om-lamp)), transparent 72%);
+  pointer-events: none;
+  animation: om-lamp 7s ease-in-out infinite;
+}
+
+.om-theme-grain .om-board-bg {
+  fill: none;
+  stroke: none;
+}
+
+.om-theme-grain .om-flat {
+  display: none;
+}
+
+.om-theme-grain .om-art {
+  display: inline;
+}
+
+.om-theme-grain .om-grid {
+  stroke-width: 0.032;
+}
+
+.om-theme-grain .om-board-edge {
+  fill: none;
+  stroke: var(--om-line);
+  stroke-width: 0.065;
+}
+
+.om-theme-grain .om-guide line {
+  stroke: #6e4210;
+  stroke-width: 0.04;
+  stroke-dasharray: 0.14 0.1;
+  opacity: 0.8;
+}
+
+/* 돌 놓기 — 위에서 내려와 "딱" 눌렸다 자리 잡고, 그림자가 모인다. */
+.om-theme-grain .om-drop .om-in {
+  animation: om-drop 0.38s cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+}
+
+.om-theme-grain .om-drop .om-stone-shadow {
+  animation: om-shadow 0.38s ease-out backwards;
+}
+
+/* 닿는 순간(0.2s) — 빛이 번쩍, 결을 따라 파문 세 겹, 먼지 여덟 알. */
+.om-theme-grain .om-impact {
+  opacity: 0;
+  animation: om-impact 0.45s 0.2s ease-out;
+}
+
+.om-theme-grain .om-ripple {
+  fill: none;
+  stroke: var(--om-line);
+  stroke-width: 0.03;
+  opacity: 0;
+  animation: om-ripple 0.75s 0.2s ease-out;
+}
+
+.om-theme-grain .om-ripple-2 {
+  animation-delay: 0.31s;
+}
+
+.om-theme-grain .om-ripple-3 {
+  stroke: #fff2cf;
+  animation-delay: 0.42s;
+}
+
+.om-theme-grain .om-dust {
+  fill: #f6e6c2;
+  opacity: 0;
+  animation: om-dust 0.6s calc(0.2s + var(--om-delay) * 1s) cubic-bezier(0.1, 0.7, 0.3, 1);
+}
+
+/* 판이 살짝 눌린다 — 같은 연출을 수마다 다시 틀려고 이름 둘을 번갈아 쓴다. */
+.om-theme-grain .om-thud-0 {
+  animation: om-thud-a 0.24s 0.2s ease-out;
+}
+
+.om-theme-grain .om-thud-1 {
+  animation: om-thud-b 0.24s 0.2s ease-out;
+}
+
+/* 내가 누른 수 — 바로 내려앉고, 서버 응답이 늦을 때만 숨을 쉰다. */
+.om-theme-grain .om-pending {
+  opacity: 1;
+  animation: none;
+}
+
+.om-theme-grain .om-pending .om-in {
+  animation: om-wait 1s 0.7s ease-in-out infinite;
+}
+
+.om-theme-grain .om-pending.om-drop .om-in {
+  animation:
+    om-drop 0.38s cubic-bezier(0.3, 0.7, 0.3, 1) backwards,
+    om-wait 1s 0.7s ease-in-out infinite;
+}
+
+/* 미리보기 — 떠 있는 돌 + 천천히 도는 점선 고리. */
+.om-theme-grain .om-preview {
+  opacity: 1;
+}
+
+.om-theme-grain .om-preview .om-in {
+  transform: translateY(-0.05px);
+  animation: om-hover 0.22s ease-out backwards;
+}
+
+.om-theme-grain .om-preview-stone {
+  opacity: 0.62;
+}
+
+.om-theme-grain .om-preview-ring {
+  fill: none;
+  stroke: var(--om-frame2);
+  stroke-width: 0.045;
+  stroke-dasharray: 0.2 0.164;
+  animation: om-spin 7s linear infinite;
+}
+
+.om-theme-grain .om-preview.om-preview-warn {
+  display: none;
+}
+
+/* 금수 — 새긴 ✕. 누르면 ✕ 가 고개를 젓고, 붉은 잉크가 번지고, 판이 떤다. */
+.om-theme-grain .om-forbidden line {
+  stroke-width: 0.07;
+}
+
+.om-theme-grain .om-forbidden-ring {
+  fill: rgba(255, 240, 220, 0.4);
+  stroke: var(--om-forbidden-mine);
+  stroke-width: 0.02;
+  opacity: 0.75;
+}
+
+.om-theme-grain .om-forbidden:not(.om-forbidden-mine) .om-forbidden-ring {
+  display: none;
+}
+
+.om-theme-grain .om-warn .om-in {
+  animation: om-no 0.48s ease-in-out;
+}
+
+.om-theme-grain .om-ink {
+  opacity: 0;
+  animation: om-ink 1s ease-out;
+}
+
+.om-theme-grain .om-ink-2 {
+  animation-delay: 0.07s;
+}
+
+.om-theme-grain .om-ink-3 {
+  animation-delay: 0.13s;
+}
+
+.om-theme-grain .om-warn-ring {
+  fill: none;
+  stroke: var(--om-forbidden-mine);
+  stroke-width: 0.06;
+  opacity: 0;
+  animation: om-warn-ring 0.6s ease-out;
+}
+
+.om-theme-grain .om-board.om-board-warn {
+  animation: om-shake 0.36s ease-in-out;
+}
+
+/* 마지막 수 — 금빛(흑 위)·주홍(백 위) 점과 느린 맥박. */
+.om-theme-grain .om-last.om-last-on-black .om-last-dot {
+  fill: var(--om-gold);
+}
+
+.om-theme-grain .om-last.om-last-on-white .om-last-dot {
+  fill: #b3261e;
+}
+
+.om-theme-grain .om-last-ring {
+  fill: none;
+  stroke-width: 0.03;
+  opacity: 0;
+  animation: om-last-pulse 2.4s 0.35s ease-out infinite;
+}
+
+.om-theme-grain .om-last-on-black .om-last-ring {
+  stroke: var(--om-gold);
+}
+
+.om-theme-grain .om-last-on-white .om-last-ring {
+  stroke: #b3261e;
+}
+
+.om-theme-grain .om-num.om-num-black {
+  fill: #fbf5e8;
+}
+
+/* 5목 — 불티가 줄을 긋고 금 상감이 따라 채워진다. 줄이 빛나고, 돌이 차례로 들썩이며, 금가루가 날린다. */
+.om-theme-grain .om-winline {
+  stroke-width: 0.11;
+  opacity: 1;
+}
+
+.om-theme-grain .om-winline-groove {
+  stroke: #4f3013;
+  stroke-width: 0.2;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.om-theme-grain .om-board:not(.om-mini-board) .om-winline,
+.om-theme-grain .om-board:not(.om-mini-board) .om-winline-groove {
+  stroke-dasharray: 1;
+  animation: om-draw 0.7s 0.25s cubic-bezier(0.6, 0, 0.3, 1) backwards;
+}
+
+.om-theme-grain .om-winline-glow {
+  stroke: #fff3b0;
+  stroke-width: 0.36;
+  stroke-linecap: round;
+  opacity: 0.14;
+  animation: om-line-glow 1.8s 0.85s ease-in-out backwards;
+}
+
+.om-theme-grain .om-spark {
+  opacity: 0;
+  animation: om-spark 0.7s 0.25s cubic-bezier(0.6, 0, 0.3, 1);
+}
+
+.om-theme-grain .om-won .om-in {
+  animation: om-lift 0.55s calc(var(--om-i) * 0.1s + 0.4s) cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.om-theme-grain .om-won.om-drop .om-in {
+  animation:
+    om-drop 0.38s cubic-bezier(0.3, 0.7, 0.3, 1) backwards,
+    om-lift 0.55s calc(var(--om-i) * 0.1s + 0.4s) cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.om-theme-grain .om-glint {
+  fill: #fffbe6;
+  opacity: 0;
+  animation: om-glint 0.75s calc(var(--om-i) * 0.1s + 0.55s) ease-out;
+}
+
+.om-theme-grain .om-gold {
+  fill: var(--om-gold);
+  opacity: 0;
+  animation: om-gold 1.15s calc(0.3s + var(--om-t) * 0.65s) cubic-bezier(0.15, 0.6, 0.3, 1);
+}
+
+.om-theme-grain .om-gold:nth-child(3n) {
+  fill: #fff6cf;
+}
+
+.om-theme-grain .om-gold:nth-child(4n) {
+  animation-duration: 1.5s;
+}
+
+/* 상태·조작 */
+.om-theme-grain .om-status.om-status-warn {
+  color: var(--om-warn-text);
+  font-weight: 700;
+}
+
+.om-theme-grain .om-primary {
+  box-shadow:
+    0 2px 0 color-mix(in srgb, var(--om-accent) 60%, #000000),
+    0 6px 12px -6px rgba(30, 15, 0, 0.5);
+  transition: transform 0.08s;
+}
+
+.om-theme-grain .om-primary:not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+/* 결과 — 놋쇠 테 두른 나무 현판. 아래에서 올라와 자리 잡고 빛이 한 번 쓸고 간다. */
+.om-theme-grain .om-end {
+  --om-end-delay: 0s;
+  position: relative;
+  overflow: hidden;
+  margin: 4px;
+  padding: 16px 14px;
+  border: 1px solid var(--om-brass);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 40%, rgba(0, 0, 0, 0.14)),
+    linear-gradient(135deg, var(--om-frame1), var(--om-frame2));
+  color: #f8ead0;
+  box-shadow:
+    0 0 0 3px var(--om-frame2),
+    0 0 0 4px var(--om-brass),
+    0 14px 26px -10px rgba(30, 15, 0, 0.65);
+  animation: om-plaque 0.55s var(--om-end-delay) cubic-bezier(0.2, 1.2, 0.4, 1) backwards;
+}
+
+/* 5목이면 줄이 다 그어진 뒤에 뜬다. */
+.om-theme-grain .om-end.om-end-after-line {
+  --om-end-delay: 1.5s;
+}
+
+.om-theme-grain .om-end::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 243, 200, 0.32) 50%, transparent 62%);
+  transform: translateX(110%);
+  pointer-events: none;
+  animation: om-sheen 1s calc(var(--om-end-delay) + 0.4s) ease-out backwards;
+}
+
+.om-theme-grain .om-end-art {
+  display: block;
+  width: 132px;
+  height: auto;
+  margin-bottom: 2px;
+}
+
+.om-theme-grain .om-end-art.om-end-art-pair {
+  width: 54px;
+}
+
+.om-theme-grain .om-end-inlay {
+  stroke: var(--om-gold);
+  stroke-width: 0.12;
+  stroke-linecap: round;
+}
+
+.om-theme-grain .om-end-title {
+  color: var(--om-gold);
+  font-family: var(--om-font-display);
+  font-size: 24px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.om-theme-grain .om-end-lost .om-end-title {
+  color: #f1dcb4;
+}
+
+.om-theme-grain .om-end-muted {
+  color: #e6d3ae;
+}
+
+.om-theme-grain .om-end .om-badge {
+  border-color: #b89a66;
+  background: transparent;
+  color: #f8ead0;
+}
+
+.om-theme-grain .om-end .om-primary {
+  min-height: 40px;
+  background: var(--om-gold);
+  color: #2c1b0c;
+  font-size: 14px;
+  box-shadow:
+    0 2px 0 #8a6a1c,
+    0 6px 12px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* 튜토리얼 미니 판 — 같은 나무·같은 돌, 얇은 틀. 연출은 없다. */
+.om-theme-grain .om-mini-board {
+  border: 5px solid var(--om-frame2);
+  border-radius: 6px;
+  box-shadow: 0 6px 12px -6px rgba(30, 15, 0, 0.5);
+}
+
+.om-theme-grain .om-mark-plate {
+  fill: #fff8ea;
+  stroke: #7a4e24;
+  stroke-width: 0.03;
+}
+
+.om-theme-grain .om-mark {
+  fill: #5e3a18;
+  font-size: 0.5px;
+}
+
+@keyframes om-bounce {
+  from {
+    transform: translateY(-7px) scale(1.25);
+  }
+}
+
+@keyframes om-sheen {
+  from {
+    transform: translateX(-110%);
+  }
+}
+
+@keyframes om-myturn {
+  from {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+      0 16px 28px -12px rgba(30, 15, 0, 0.65),
+      0 0 0 4px var(--om-gold),
+      0 0 34px 6px color-mix(in srgb, var(--om-gold) 70%, transparent);
+  }
+}
+
+@keyframes om-lamp {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  13% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 0.84;
+  }
+  36% {
+    opacity: 0.96;
+  }
+  49% {
+    opacity: 0.7;
+  }
+  57% {
+    opacity: 0.92;
+  }
+  71% {
+    opacity: 1;
+  }
+  83% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes om-drop {
+  0% {
+    transform: translate(-0.05px, -0.26px) scale(1.3);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  62% {
+    transform: translate(0, 0) scale(0.94);
+  }
+  82% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-shadow {
+  0% {
+    transform: translate(0.18px, 0.26px) scale(1.3);
+    opacity: 0;
+  }
+  62% {
+    transform: scale(0.92);
+    opacity: 1;
+  }
+}
+
+@keyframes om-impact {
+  from {
+    transform: scale(0.55);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes om-ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(3, 2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes om-dust {
+  from {
+    transform: none;
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(calc(var(--om-dx) * 1px), calc(var(--om-dy) * 1px)) scale(0.4);
+    opacity: 0;
+  }
+}
+
+@keyframes om-thud-a {
+  40% {
+    transform: translateY(1.5px) scale(0.998);
+  }
+}
+
+@keyframes om-thud-b {
+  40% {
+    transform: translateY(1.5px) scale(0.998);
+  }
+}
+
+@keyframes om-wait {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes om-hover {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes om-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes om-no {
+  20% {
+    transform: translateX(-0.1px) scale(1.35);
+  }
+  45% {
+    transform: translateX(0.09px) scale(1.35);
+  }
+  70% {
+    transform: translateX(-0.05px) scale(1.2);
+  }
+}
+
+@keyframes om-ink {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.75;
+  }
+  55% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+@keyframes om-warn-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes om-shake {
+  20% {
+    transform: translateX(-3px);
+  }
+  45% {
+    transform: translateX(2.5px);
+  }
+  70% {
+    transform: translateX(-1.5px);
+  }
+}
+
+@keyframes om-last-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  60%,
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+@keyframes om-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes om-line-glow {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes om-spark {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--om-lx) * 1px), calc(var(--om-ly) * 1px));
+    opacity: 0;
+  }
+}
+
+@keyframes om-lift {
+  40% {
+    transform: translateY(-0.1px) scale(1.14);
+  }
+}
+
+@keyframes om-glint {
+  0% {
+    transform: scale(0) rotate(-40deg);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.5) rotate(40deg);
+    opacity: 0;
+  }
+}
+
+@keyframes om-gold {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--om-dx) * 1px), calc(var(--om-dy) * 1px + 0.6px)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes om-plaque {
+  from {
+    transform: translateY(18px) scale(0.95);
+    opacity: 0;
+    visibility: hidden;
   }
 }
