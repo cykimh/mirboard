@@ -31,9 +31,10 @@
 
 ### 게임별 진행
 
-| 게임 | D2 선택 | D3 구현 | D4 확인 |
-|---|---|---|---|
-| 씨앗포 | 시안 B "말랑 클레이 장난감"(D-252) | 브랜치 `design/artillery-clay` — 스킨 `clay`(기본), 연출 강화(사용자 추가 요청) | 로컬 봇 판 실측(데스크톱·375px·라이트/다크·2:2·연출 끔) — 스크린샷 `docs/design/artillery/shots/`, 관제 PR 대기 |
+| 게임 | D1 시안 | D2 선택 | D3 구현 | D4 확인 |
+|---|---|---|---|---|
+| 구름항로 | ✅ 3개(`docs/design/cloudroute/`) | ✅ A "솜구름 그림책"(D-218) | ✅ 브랜치 `design/cloudroute-storybook` — 테마 층 `cr-storybook` + 연출 큐(D-218) | 로컬 봇 판 스크린샷 `docs/design/cloudroute/shots/` — 관제 PR·main 대기 |
+| 씨앗포 | ✅ 3개(`docs/design/artillery/`) | 시안 B "말랑 클레이 장난감"(D-252) | 브랜치 `design/artillery-clay` — 스킨 `clay`(기본), 연출 강화(사용자 추가 요청) | 로컬 봇 판 실측(데스크톱·375px·라이트/다크·2:2·연출 끔) — 스크린샷 `docs/design/artillery/shots/`, 관제 PR 대기 |
 
 - 요트·오목·구름항로는 파일이 겹치지 않아 병렬. 씨앗포는 S6b(클라)와 같은 코드라 **그림 파일(시트 PNG·JSON)·연출 정의 먼저**, 코드 쪽은 S6b 뒤.
 

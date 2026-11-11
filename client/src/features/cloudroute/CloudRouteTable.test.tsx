@@ -100,14 +100,14 @@ describe('CloudRouteTable — 결정 패널 (D-213)', () => {
   it('축제는 패널 버튼으로도 고를 수 있다', () => {
     seed(tableOf({ tiles: tilesOf({ 1: [0, 0] }), pending: { kind: 'FESTIVAL', candidates: [1] } }));
     renderTable();
-    fireEvent.click(screen.getByRole('button', { name: '🏮 이끼 나루' }));
+    fireEvent.click(screen.getByRole('button', { name: '이끼 나루' }));
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'HOST_FESTIVAL', tile: 1 });
   });
 
   it('등불 선물은 패널이나 판의 후보 칸으로 고른다', () => {
     seed(tableOf({ tiles: tilesOf({ 4: [0, 1], 7: [0, 0] }), pending: { kind: 'GIFT', candidates: [4, 7] } }));
     renderTable();
-    fireEvent.click(screen.getByRole('button', { name: '🎁 조개 모래톱' }));
+    fireEvent.click(screen.getByRole('button', { name: '조개 모래톱' }));
     expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'GIFT_BUILD', tile: 4 });
     fireEvent.click(within(screen.getByRole('group', { name: '판' })).getByRole('button', { name: /^버섯 숲길/ }));
     expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'GIFT_BUILD', tile: 7 });
@@ -175,7 +175,7 @@ describe('CloudRouteTable — 판·좌석·결과', () => {
     const sheet = screen.getByRole('dialog', { name: '버섯 숲길 자세히' });
     expect(within(sheet).getByText(/섬 독점 ×1.5/)).toBeInTheDocument();
     expect(within(sheet).getByText('140G')).toBeInTheDocument();
-    expect(screen.getByText('🛟 부표')).toBeInTheDocument();
+    expect(screen.getByText('부표')).toBeInTheDocument();
   });
 
   it('사건 줄과 알림이 같은 문장을 쓴다', () => {

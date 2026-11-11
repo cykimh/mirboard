@@ -120,3 +120,12 @@ export function gridOf(tile: number): { row: number; col: number } {
   if (tile <= 18) return { row: 0, col: tile - 12 };
   return { row: tile - 18, col: 6 };
 }
+
+/**
+ * 지금 통행료(표시용, D-218) — 룰 §6.3: 기본 × 배수(섬 독점 ×1.5 · 축제 ×2), 10G 단위 반올림(5 는 올림). 판정은 서버가 한다.
+ */
+export function tollOf(tile: number, level: number, monopoly: boolean, festival: boolean): number {
+  const base = TILES[tile].tolls[level] ?? 0;
+  const raw = base * (monopoly ? 1.5 : 1) * (festival ? 2 : 1);
+  return Math.floor((raw + 5) / 10) * 10;
+}

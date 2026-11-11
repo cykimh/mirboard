@@ -2,6 +2,7 @@ import type { RoomEventSink } from '@/ws/roomEventSink';
 import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
 import type { CloudRouteTableView } from '@/types/cloudroute';
+import { cloudrouteFxBus, fxViewOf } from './cloudrouteFxBus';
 import { useCloudRouteStore } from './cloudrouteStore';
 
 interface ErrorPayload {
@@ -28,14 +29,29 @@ const ERROR_LABEL: Record<string, string> = {
 export const cloudrouteRoomSink: RoomEventSink<CloudRouteTableView, unknown> = {
   reset(roomId) {
     useCloudRouteStore.getState().reset(roomId);
+    cloudrouteFxBus.clear();
   },
 
   applySnapshot(snap) {
     useCloudRouteStore.getState().applySnapshot(snap);
+    cloudrouteFxBus.clear();
   },
 
+  // D-218 — 스토어에는 늘 바로 적용한다(진짜 값). 연출 감독이 붙어 있을 때만 적용 전·후 화면 값을 연출 버스에 넘긴다.
   applyEvent(envelope) {
-    return useCloudRouteStore.getState().applyEvent(envelope);
+    const store = useCloudRouteStore.getState();
+    if (!cloudrouteFxBus.attached) return store.applyEvent(envelope);
+    const before = fxViewOf(store);
+    const result = store.applyEvent(envelope);
+    if (result === 'applied') {
+      cloudrouteFxBus.emit({
+        type: envelope.type,
+        payload: envelope.payload,
+        before,
+        after: fxViewOf(useCloudRouteStore.getState()),
+      });
+    }
+    return result;
   },
 
   applyPrivateEvent(envelope: StompEnvelope<unknown>) {
