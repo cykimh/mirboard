@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>요트 시안 B — 공방 나무 트레이</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);background:var(--page);color:var(--ink);-webkit-text-size-adjust:100%;line-height:1.4}
+.defs{position:absolute;width:0;height:0;overflow:hidden}
+.demo-head{padding:16px;max-width:1240px;margin:0 auto}
+.demo-head h1{font-size:20px;margin:0 0 4px}
+.demo-head p{margin:0 0 10px;font-size:14px;opacity:.82}
+.demo-head nav{font-size:13px;margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap}
+.demo-head nav a{color:inherit}
+.demo-bar{display:flex;flex-wrap:wrap;gap:8px}
+.demo-bar button{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:inherit;font:inherit;font-size:14px;cursor:pointer}
+.demo-bar button.primary{background:var(--brand);color:var(--on-brand);border-color:transparent;font-weight:700}
+.demo-bar button[aria-pressed=true]{outline:2px solid var(--brand);outline-offset:1px}
+.demo-bar .sep{flex-basis:100%;height:0}
+.stage{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;padding:0 16px 48px;max-width:1240px;margin:0 auto}
+.frame-wrap{min-width:0;max-width:100%}
+.frame-wrap.desk{flex:1 1 560px;max-width:760px}
+.frame-wrap.phone{flex:0 0 auto;width:375px}
+.frame-label{font-size:12px;opacity:.7;margin:0 0 6px;padding:0 4px}
+.frame{container-type:inline-size;position:relative;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--board-bg)}
+@media (max-width:420px){.stage{padding:0 0 48px}.frame{border-radius:0;border-left:0;border-right:0}.frame-wrap.phone{width:100%}}
+
+/* ── 게임판 뼈대 — 앱의 20-yacht-table.css 와 같은 구조(.yt-), 폭은 컨테이너 단위(cqi)로 ── */
+.yt-table{position:relative;display:flex;flex-direction:column;gap:10px;padding:10px;color:var(--ink);font-size:13px}
+.yt-table button{font-family:inherit;color:inherit}
+.yt-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.yt-badges{display:flex;flex-wrap:wrap;gap:6px}
+.yt-badge{padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:transparent;font-size:12px;white-space:nowrap;line-height:1.5}
+.yt-title{font-weight:700}
+.yt-seats{display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(120px,40%,170px),1fr));gap:6px;margin:0;padding:0;list-style:none}
+.yt-seat{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:6px 8px;min-width:0;font-size:13px}
+.yt-seat svg{flex:none}
+.yt-seat-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt-seat-total{margin-left:auto;font-variant-numeric:tabular-nums;position:relative}
+.yt-seat-tag{padding:0 6px;border-radius:999px;border:1px solid var(--line);font-size:11px;white-space:nowrap}
+.yt-felt{position:relative;display:flex;flex-direction:column;gap:8px;padding:12px 8px;overflow:hidden}
+.yt-decor,.yt-fx{position:absolute;inset:0;pointer-events:none}
+.yt-decor{z-index:0}
+.yt-fx{z-index:3}
+.yt-status{position:relative;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:24px}
+.yt-tray{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px}
+.yt-dice{display:flex;justify-content:center;gap:clamp(6px,2cqi,12px);width:100%}
+.yt-die{position:relative;width:clamp(48px,15cqi,64px);height:clamp(48px,15cqi,64px);padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.yt-die:disabled{cursor:default}
+.yt-die-body{position:relative;z-index:1;display:block;width:100%;height:100%;transition:transform .2s cubic-bezier(.3,1.5,.5,1),box-shadow .2s,filter .2s}
+.yt-die-body svg{display:block;width:100%;height:100%}
+.yt-die-empty .yt-die-body{opacity:.4}
+.yt-die-tag{position:absolute;z-index:2;left:50%;bottom:-27px;transform:translateX(-50%);font-size:11px;white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none}
+.yt-die-held .yt-die-tag{opacity:1}
+.yt-actions{margin-top:24px;min-height:44px;display:flex;align-items:center}
+.yt-roll{min-height:44px;padding:0 22px;border:none;font-size:15px;font-weight:700;cursor:pointer}
+.yt-roll:disabled{opacity:.5;cursor:default}
+.yt-note{font-size:13px}
+.yt-card{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums}
+.yt-card th,.yt-card td{padding:4px 2px;text-align:center;position:relative;height:34px}
+.yt-card .yt-cat{width:32%;padding-left:8px;text-align:left;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt-col{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.yt-row-sum th,.yt-row-sum td{font-size:12px}
+.yt-row-total th,.yt-row-total td{font-weight:700}
+.yt-pick{display:block;width:100%;min-height:28px;padding:0;background:transparent;border:0;font-weight:700;font-size:inherit;cursor:pointer}
+.yt-end{display:flex;flex-direction:column;gap:8px;padding:14px}
+.yt-end-title{margin:0;font-size:18px}
+.yt-end-reason{margin:0;font-size:13px;opacity:.85}
+.yt-end-best{margin:0;font-size:14px;font-weight:700}
+.yt-end-list{margin:0;padding:0;list-style:none}
+.yt-end-row{display:flex;gap:8px;padding:5px 0;align-items:center}
+.yt-end-me{font-weight:700}
+.yt-end-rank{min-width:40px}
+.yt-end-total{margin-left:auto;font-variant-numeric:tabular-nums}
+.yt-end-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.yt-fly{position:absolute;z-index:20;pointer-events:none;left:0;top:0}
+
+/* 연출 줄이기 — OS 설정 또는 [연출 줄이기] 버튼. CSS 연출은 끝 상태로 바로 가고, JS 연출은 재생하지 않는다. */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+[data-motion=reduce] *,[data-motion=reduce] *::before,[data-motion=reduce] *::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+
+/* ── 시안 B · 공방 나무 트레이 ──────────────────────────────────────── */
+:root{
+  --font:system-ui,-apple-system,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  --hand:"Chalkboard SE","Segoe Print","Bradley Hand","Comic Sans MS","Nanum Pen Script",cursive;
+  --page:#efe3cf;--ink:#3a2a1a;--line:rgba(90,60,30,.32);--panel:#fbf4e6;--brand:#a9541f;--on-brand:#fff6e8;
+  --board-bg:#f6ecd9;
+  --wood:#c08a52;--wood-hi:#d9a66d;--wood-lo:#8f5f33;--lining:#31506a;--lining-lo:#213a50;
+  --paper:#fdf8ec;--paper-ink:#34302a;--rule:rgba(60,110,160,.24);--margin:rgba(200,70,60,.4);--pencil:#8a8580;
+  --mark:#c0392b;--tag:#fffaf0;--tape:rgba(240,200,90,.6);--card-frame:transparent;--card-shadow:0 2px 8px rgba(80,50,20,.22);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='60'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .32' numOctaves='3' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .22 0 0 0 0 .12 0 0 0 0 .04 0 0 0 .9 -.25'/%3E%3C/filter%3E%3Crect width='300' height='60' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+:root[data-theme=dark]{
+  --page:#17110c;--ink:#f1e4cf;--line:rgba(240,200,150,.28);--panel:#261b12;--brand:#f0b35a;--on-brand:#2a1806;
+  --board-bg:#1e1610;
+  --wood:#6e4526;--wood-hi:#8a5a34;--wood-lo:#3f2715;--lining:#1f3a4d;--lining-lo:#122633;
+  --paper:#202c28;--paper-ink:#ece8da;--rule:rgba(255,255,255,.13);--margin:rgba(240,179,90,.4);--pencil:#9aa39d;
+  --mark:#f0b35a;--tag:#2a1f15;--tape:rgba(240,179,90,.35);--card-frame:#6e4526;--card-shadow:0 2px 10px rgba(0,0,0,.5);
+}
+.yt-title{background:var(--brand);color:var(--on-brand);border-color:transparent;border-radius:6px}
+.yt-badge{border-radius:6px}
+
+/* 좌석 — 이름표 + 말 */
+.yt-seat{background:var(--tag);border:1px solid var(--line);border-radius:8px;border-bottom:3px solid var(--line)}
+.yt-seat-turn{border-bottom-color:var(--acc);background:linear-gradient(transparent 60%,color-mix(in srgb,var(--acc) 18%,transparent)),var(--tag)}
+.yt-seat-tag{border:0;border-radius:2px;background:var(--tape);transform:rotate(-3deg);padding:1px 8px;font-weight:700}
+.yt-total-num{font-family:var(--hand);font-size:15px}
+
+/* 나무 트레이 — 나뭇결 테두리 + 가죽 안감 + 고정 홈 */
+.yt-felt{
+  border-radius:20px;padding:14px 10px 16px;color:#f3ead8;
+  border:13px solid transparent;
+  background:
+    radial-gradient(120% 100% at 50% 0%,rgba(255,255,255,.08),transparent 60%) padding-box,
+    linear-gradient(var(--lining),var(--lining-lo)) padding-box,
+    var(--grain) border-box,
+    linear-gradient(100deg,var(--wood-hi),var(--wood) 40%,var(--wood-lo)) border-box;
+  box-shadow:inset 0 3px 10px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.25) inset,0 6px 14px rgba(60,35,10,.3);
+}
+.yt-felt-myturn{animation:b-turn 2s ease-in-out infinite}
+@keyframes b-turn{
+  0%,100%{box-shadow:inset 0 3px 10px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.4),0 6px 14px rgba(60,35,10,.3),0 0 0 0 var(--acc)}
+  50%{box-shadow:inset 0 3px 10px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.4),0 6px 14px rgba(60,35,10,.3),0 0 0 3px var(--acc)}
+}
+.yt-felt .yt-badge{border-color:rgba(255,255,255,.35);color:#f3ead8;background:rgba(0,0,0,.2)}
+.yt-felt .yt-badge-turn{background:#f3ead8;color:#2b2218;border-color:transparent;font-weight:700}
+.yt-felt .yt-countdown-urgent{background:#c0392b;border-color:transparent;color:#fff;font-weight:700}
+.yt-felt .yt-celebrate{background:#f0b35a;border-color:transparent;color:#2a1806;font-weight:700}
+/* 주사위마다 아래에 파인 홈 — 고정하면 주사위가 반듯하게 돌아와 홈에 꽂힌다 */
+.yt-die::before{content:"";position:absolute;left:4%;right:4%;bottom:-15px;height:11px;border-radius:5px;background:rgba(0,0,0,.38);box-shadow:inset 0 3px 4px rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.12)}
+.yt-die-body{transform:rotate(var(--rest));filter:drop-shadow(0 4px 2px rgba(0,0,0,.4))}
+.yt-die-held .yt-die-body{transform:translateY(12px) rotate(0deg);filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
+.yt-die:not(:disabled):not(.yt-die-held):hover .yt-die-body{transform:translateY(-3px) rotate(var(--rest))}
+.yt-die-tag{bottom:-33px;font-family:var(--hand);font-size:12px;color:#f0b35a}
+.yt-actions{margin-top:30px}
+.yt-roll{border-radius:10px;background:#b5632b;color:#fff6e8!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),0 3px 0 #7a3d16,0 5px 8px rgba(0,0,0,.35);outline:1.5px dashed rgba(255,240,220,.55);outline-offset:-6px;transition:transform .08s,box-shadow .08s}
+.yt-roll:not(:disabled):active{transform:translateY(3px);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),0 0 0 #7a3d16}
+.yt-note{color:#f3ead8}
+
+/* 점수표 — 손글씨 점수지(다크는 칠판) */
+.yt-card-wrap{position:relative;padding:10px 6px 6px;background:var(--paper);color:var(--paper-ink);border-radius:4px;border:5px solid var(--card-frame);box-shadow:var(--card-shadow);margin-top:4px}
+.yt-card-wrap::before,.yt-card-wrap::after{content:"";position:absolute;top:-12px;width:64px;height:18px;background:var(--tape);z-index:1}
+.yt-card-wrap::before{left:18px;transform:rotate(-4deg)}
+.yt-card-wrap::after{right:18px;transform:rotate(3deg)}
+.yt-card th,.yt-card td{border-bottom:1px solid var(--rule)}
+.yt-card .yt-cat{border-right:1.5px solid var(--margin)}
+.yt-card thead th{font-weight:700;border-bottom:2px solid var(--rule)}
+.yt-col-turn{background:linear-gradient(transparent 62%,color-mix(in srgb,var(--acc) 40%,transparent) 62%)}
+.yt-cell{font-family:var(--hand);font-size:16px}
+.yt-row-upper-end th,.yt-row-upper-end td{border-bottom-width:2px}
+.yt-row-sum .yt-cell{font-size:13px;opacity:.8}
+.yt-row-total th,.yt-row-total td{border-bottom:none;border-top:2px solid var(--paper-ink)}
+.yt-row-total .yt-cell{font-size:18px}
+.yt-cell-candidate{color:var(--pencil)}
+.yt-pick{font-family:var(--hand);font-size:16px;min-height:26px;border:1.5px dashed var(--pencil);border-radius:7px 9px 6px 10px;color:var(--mark)!important;transition:background .15s}
+.yt-pick:hover{background:color-mix(in srgb,var(--mark) 14%,transparent)}
+.yt-pick-zero{color:var(--pencil)!important;font-weight:400}
+.yt-cell-flash .yt-num{display:inline-block;font-weight:700;animation:b-write .35s steps(6) backwards}
+@keyframes b-write{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 -10% 0 0)}}
+.b-circle{position:absolute;left:10%;top:1px;width:80%;height:calc(100% - 2px);overflow:visible;pointer-events:none}
+.b-circle path{fill:none;stroke:var(--mark);stroke-width:2.2;stroke-linecap:round;vector-effect:non-scaling-stroke;stroke-dasharray:100;stroke-dashoffset:0;animation:b-draw .5s ease-out .25s backwards}
+@keyframes b-draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+
+/* 요트 축하 — 도장 + 색종이 */
+.b-stamp{position:absolute;left:50%;top:50%;width:118px;height:118px;margin:-59px 0 0 -59px;color:#ffd9a0;animation:b-stamp 2.6s ease forwards}
+.b-stamp svg{display:block;width:100%;height:100%;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+@keyframes b-stamp{0%{transform:scale(2.8) rotate(-26deg);opacity:0}11%{transform:scale(.9) rotate(-9deg);opacity:1}16%{transform:scale(1.04) rotate(-10deg)}20%,82%{transform:scale(1) rotate(-10deg);opacity:1}100%{transform:scale(1) rotate(-10deg);opacity:0}}
+.b-bit{position:absolute;top:-12px;width:9px;height:12px;border-radius:1px}
+
+/* 결과 — 계산서 종이 */
+.yt-end{background:var(--paper);color:var(--paper-ink);border-radius:4px;border:5px solid var(--card-frame);box-shadow:var(--card-shadow);animation:b-end .5s cubic-bezier(.3,1.3,.5,1) backwards;transform-origin:top center}
+@keyframes b-end{from{opacity:0;transform:translateY(-14px) rotate(-1.5deg)}}
+.yt-end-title{font-family:var(--hand);font-size:22px}
+.yt-end-best-new{color:var(--mark);font-family:var(--hand);font-size:16px}
+.yt-end-row{border-bottom:1px dashed var(--rule)}
+.yt-end-total{font-family:var(--hand);font-size:16px}
+.yt-end .yt-badge{border-color:var(--line);min-height:44px;padding:0 14px;cursor:pointer}
+
+</style>
+</head>
+<body>
+<svg class="defs" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="b-maple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6ddb0"/><stop offset=".6" stop-color="#e9c68d"/><stop offset="1" stop-color="#cfa56a"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="demo-head">
+  <h1>요트 시안 B — 공방 나무 트레이</h1>
+  <p>보드게임 카페의 나무 트레이와 손글씨 점수지. 나무 주사위가 위에서 떨어져 통통 튀고, 점수는 색연필 동그라미로 적힌다.</p>
+  <nav><a href="option-a.html">시안 A</a><a href="option-b.html">시안 B</a><a href="option-c.html">시안 C</a><a href="README.md">설명</a></nav>
+  <div class="demo-bar" role="group" aria-label="연출 재생">
+    <button type="button" class="primary" data-demo="roll">굴려 보기</button>
+    <button type="button" data-demo="rollall">5개 모두 굴리기</button>
+    <button type="button" data-demo="yacht">요트 내 보기</button>
+    <button type="button" data-demo="score">점수 기록해 보기</button>
+    <button type="button" data-demo="result">결과 화면</button>
+    <button type="button" data-demo="reset">처음으로</button>
+    <span class="sep"></span>
+    <button type="button" data-demo="theme">라이트 / 다크</button>
+    <button type="button" data-demo="motion" aria-pressed="false">연출 줄이기</button>
+  </div>
+  <p style="margin:10px 0 0;font-size:13px">장면: 4인 · 내 차례 · 굴림 2/3 · 4 세 개 고정. 주사위를 누르면 고정, 점수표의 후보 칸을 누르면 기록됩니다.</p>
+</div>
+<main class="stage">
+  <div class="frame-wrap desk"><p class="frame-label">데스크톱 폭 (게임판 최대 760px)</p><div class="frame"></div></div>
+  <div class="frame-wrap phone"><p class="frame-label">휴대폰 375px</p><div class="frame"></div></div>
+</main>
+<script>
+/* 시안 공용 도우미 — 눈 위치, 조각 날리기, 입자, 숫자 올리기. */
+window.YT={
+  PIPS:{1:[[50,50]],2:[[30,30],[70,70]],3:[[28,28],[50,50],[72,72]],4:[[30,30],[70,30],[30,70],[70,70]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[30,26],[70,26],[30,50],[70,50],[30,74],[70,74]]},
+  /* from 사각형 → to 요소로 작은 조각을 포물선으로 날린다(프레임 좌표). */
+  fly:function(frame,from,toEl,html,cls,dur){
+    var fr=frame.getBoundingClientRect(),b=toEl.getBoundingClientRect();
+    var ax=from.left+from.width/2-fr.left,ay=from.top+from.height/2-fr.top,dx=b.left+b.width/2-fr.left-ax,dy=b.top+b.height/2-fr.top-ay;
+    var n=document.createElement('span');n.className='yt-fly '+cls;n.innerHTML=html;frame.appendChild(n);
+    var base='translate('+ax+'px,'+ay+'px) translate(-50%,-50%) ';
+    var an=n.animate([
+      {transform:base+'translate(0,0) scale(.6)',opacity:0},
+      {transform:base+'translate('+dx*.15+'px,'+(dy*.15-18)+'px) scale(1.15)',opacity:1,offset:.2},
+      {transform:base+'translate('+dx*.6+'px,'+(dy*.6-34)+'px) scale(1.1)',opacity:1,offset:.6},
+      {transform:base+'translate('+dx+'px,'+dy+'px) scale(.7)',opacity:.9}
+    ],{duration:dur,easing:'ease-in-out'});
+    an.onfinish=function(){n.remove()};return an;
+  },
+  burst:function(parent,n,cls,make){
+    for(var k=0;k<n;k++){(function(k){var s=document.createElement('span');s.className=cls;parent.appendChild(s);var an=make(k,s);if(an)an.onfinish=function(){s.remove()};})(k)}
+  },
+  countUp:function(el,from,to,dur){
+    if(!el)return;var t0=performance.now();
+    (function step(t){var p=Math.min(1,Math.max(0,(t-t0)/dur));el.textContent=Math.round(from+(to-from)*p);if(p<1)requestAnimationFrame(step)})(t0);
+  }
+};
+
+/* 시안 B · 공방 나무 트레이 — 나무 주사위, 위에서 떨어져 통통, 색연필 동그라미, 도장. */
+window.THEME=(function(){
+  var YT=window.YT;
+  var BITS=['#e9c68d','#31506a','#c0392b','#f0b35a','#fdf8ec','#5d8a66'];
+  function die(f){
+    var pips=f?YT.PIPS[f].map(function(p){return '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(f===1?11:8.2)+'" fill="#3a2212" stroke="#7a4f2a" stroke-width="2.2"/>'}).join(''):'';
+    return '<svg viewBox="0 0 100 100" aria-hidden="true"><rect x="3" y="3" width="94" height="94" rx="15" fill="url(#b-maple)" stroke="#9a6e3c" stroke-width="2"/>'+
+      '<g fill="none" stroke="#a9773f" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"><path d="M8 24 C30 16 62 30 92 20"/><path d="M8 44 C34 36 58 52 92 40"/><path d="M8 63 C28 58 66 70 92 60"/><path d="M8 82 C36 74 60 88 92 79"/></g>'+
+      '<path d="M12 12 H88" stroke="#fff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>'+pips+'</svg>';
+  }
+  return {
+    accents:['#c0553a','#3f7fa6','#5d8a46','#b98524'],
+    stagger:50,settleAt:.46,scoreDelay:250,
+    die:die,
+    seatIcon:function(){return '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1.6a3 3 0 0 1 1.9 5.3L12.3 14.4H3.7L6.1 6.9A3 3 0 0 1 8 1.6Z" fill="var(--acc)" stroke="rgba(0,0,0,.35)" stroke-width=".8" stroke-linejoin="round"/></svg>'},
+    cellMark:function(){return '<svg class="b-circle" viewBox="0 0 60 36" preserveAspectRatio="none" aria-hidden="true"><path pathLength="100" d="M9 21 C5 7 48 1 54 15 C59 31 16 37 8 23 C5 16 13 8 27 6"/></svg>'},
+    /* 위에서 떨어져 바닥에 닿고(눈 확정), 두 번 통통 튄 뒤 제 각도로 멈춘다. */
+    roll:function(btn,body,k,c){
+      var r0=(k%2?1:-1)*(160+Math.random()*120),r=c.rest;
+      body.animate([
+        {transform:'translateY(-110px) rotate('+r0+'deg)',opacity:0,offset:0,easing:'ease-in'},
+        {opacity:1,offset:.12},
+        {transform:'translateY(0) rotate('+(r+r0*.08)+'deg)',offset:.46,easing:'ease-out'},
+        {transform:'translateY(-18px) rotate('+(r+7)+'deg)',offset:.64,easing:'ease-in'},
+        {transform:'translateY(0) rotate('+(r-3)+'deg)',offset:.82,easing:'ease-out'},
+        {transform:'translateY(-5px) rotate('+r+'deg)',offset:.91,easing:'ease-in'},
+        {transform:'translateY(0) rotate('+r+'deg)',offset:1}
+      ],{duration:c.dur,delay:c.delay,fill:'backwards'});
+    },
+    /* 바닥에 닿는 순간 트레이가 살짝 눌린다. */
+    land:function(frame,dur){
+      frame.querySelector('.yt-tray').animate([{transform:'translateY(0)'},{transform:'translateY(3px)'},{transform:'translateY(0)'},{transform:'translateY(1.5px)'},{transform:'translateY(0)'}],{duration:260,delay:dur*.46,easing:'ease-out'});
+    },
+    hold:function(btn,held){
+      if(held)btn.animate([{transform:'translateY(0)'},{transform:'translateY(2px)'},{transform:'translateY(0)'}],{duration:160,delay:120});
+    },
+    score:function(){},
+    yacht:function(frame){
+      var fx=frame.querySelector('.yt-fx'),w=fx.clientWidth,h=fx.clientHeight;
+      fx.innerHTML='<div class="b-stamp"><svg viewBox="0 0 120 120"><g fill="none" stroke="currentColor"><circle cx="60" cy="60" r="54" stroke-width="5"/><circle cx="60" cy="60" r="45" stroke-width="1.6" stroke-dasharray="3 4"/><path d="M26 44 H94 M26 84 H94" stroke-width="1.6"/></g><text x="60" y="72" text-anchor="middle" font-size="27" font-weight="800" fill="currentColor">요트!</text><text x="60" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor">다섯 개 모두</text><text x="60" y="99" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">50점</text></svg></div>';
+      frame.querySelector('.yt-tray').animate([{transform:'translateY(0)'},{transform:'translateY(4px)'},{transform:'translateY(0)'}],{duration:200,delay:270});
+      [].forEach.call(frame.querySelectorAll('.yt-die-body'),function(b,i){
+        var base=getComputedStyle(b).transform;base=base==='none'?'':base+' ';
+        b.animate([{transform:base+'translateY(0)'},{transform:base+'translateY(-12px)'},{transform:base+'translateY(0)'}],{duration:300,delay:300+i*50,easing:'ease-out'});
+      });
+      YT.burst(fx,30,'b-bit',function(k,s){
+        s.style.left=(Math.random()*100)+'%';s.style.background=BITS[k%BITS.length];
+        if(k%4===0)s.style.borderRadius='50%';
+        var sway=(Math.random()-.5)*90;
+        return s.animate([
+          {transform:'translate(0,0) rotate(0deg) rotateX(0deg)',opacity:1},
+          {transform:'translate('+sway+'px,'+(h*.6)+'px) rotate('+(Math.random()*360)+'deg) rotateX(540deg)',opacity:1,offset:.7},
+          {transform:'translate('+sway*1.3+'px,'+(h+20)+'px) rotate('+(Math.random()*540)+'deg) rotateX(900deg)',opacity:0}
+        ],{duration:1400+Math.random()*900,delay:250+Math.random()*500,easing:'cubic-bezier(.3,.2,.6,1)',fill:'both'});
+      });
+      setTimeout(function(){var s=fx.querySelector('.b-stamp');if(s)s.remove()},2700);
+    }
+  };
+})();
+
+/* 시안 장면·조작 — 앱 코드와 무관한 독립 데모. 연출만 THEME 훅이 맡는다. */
+(function(){
+'use strict';
+var T=window.THEME,YT=window.YT,ROLL_MS=600; /* 앱 DiceTray.ROLL_ANIMATION_MS 와 같은 길이 */
+var CATS=[['ONES','1'],['TWOS','2'],['THREES','3'],['FOURS','4'],['FIVES','5'],['SIXES','6'],['CHOICE','초이스'],['FOUR_OF_A_KIND','포 카드'],['FULL_HOUSE','풀 하우스'],['SMALL_STRAIGHT','스몰 스트레이트'],['LARGE_STRAIGHT','라지 스트레이트'],['YACHT','요트']];
+var UPPER=['ONES','TWOS','THREES','FOURS','FIVES','SIXES'];
+var REST=[-3,2,-1,3,-2];
+/* 시안용 점수 계산 — 실제 앱은 서버가 후보 점수를 준다(클라 룰 미러 없음). */
+function scoreOf(cat,d){
+  var c=[0,0,0,0,0,0,0],sum=0;d.forEach(function(v){c[v]++;sum+=v});
+  var u=UPPER.indexOf(cat);if(u>=0)return (u+1)*c[u+1];
+  var mx=Math.max.apply(null,c),run=0,best=0;
+  for(var i=1;i<=6;i++){run=c[i]?run+1:0;best=Math.max(best,run)}
+  switch(cat){
+    case 'CHOICE':return sum;
+    case 'FOUR_OF_A_KIND':return mx>=4?sum:0;
+    case 'FULL_HOUSE':return (mx===5||(c.indexOf(3)>0&&c.indexOf(2)>0))?sum:0;
+    case 'SMALL_STRAIGHT':return best>=4?15:0;
+    case 'LARGE_STRAIGHT':return best>=5?30:0;
+    case 'YACHT':return mx===5?50:0;
+  }
+  return 0;
+}
+function init(){return{
+  dice:[4,4,2,4,6],held:[true,true,false,true,false],rolls:2,turn:0,last:null,celebrate:null,result:false,seconds:18,
+  seats:[
+    {name:'미르',me:true,scores:{ONES:3,THREES:9,SIXES:18,FULL_HOUSE:22,SMALL_STRAIGHT:15}},
+    {name:'하늘',scores:{ONES:2,FOURS:16,FIVES:15,CHOICE:23,LARGE_STRAIGHT:30}},
+    {name:'도토리',scores:{TWOS:6,THREES:6,SIXES:24,FOUR_OF_A_KIND:26,SMALL_STRAIGHT:15}},
+    {name:'봇 바다',scores:{ONES:4,FIVES:20,FULL_HOUSE:19,CHOICE:18,YACHT:0}}
+  ]};}
+var S=init(),busy=false,root=document.documentElement;
+var motionReduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+root.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+function reduce(){return motionReduce}
+function applyMotion(){root.dataset.motion=motionReduce?'reduce':'full';var b=document.querySelector('[data-demo=motion]');if(b)b.setAttribute('aria-pressed',String(motionReduce))}
+var frames=[].slice.call(document.querySelectorAll('.frame'));
+function totals(seat){var up=0,t=0;CATS.forEach(function(c){var v=seat.scores[c[0]];if(v==null)return;t+=v;if(UPPER.indexOf(c[0])>=0)up+=v});var bonus=up>=63?35:0;return{up:up,bonus:bonus,total:t+bonus}}
+function cands(){var o={};if(!S.dice||S.turn<0)return o;var seat=S.seats[S.turn];CATS.forEach(function(c){if(seat.scores[c[0]]==null)o[c[0]]=scoreOf(c[0],S.dice)});return o}
+function round(){return Math.min(12,Object.keys(S.seats[3].scores).length+1)}
+
+function skeleton(){
+  return '<div class="yt-table"><header class="yt-header"><div class="yt-badges"><span class="yt-badge yt-title">요트</span><span class="yt-badge" data-slot="round"></span><span class="yt-badge">차례 30초</span><span class="yt-badge">● 연결</span></div>'+
+  '<div class="yt-badges"><span class="yt-badge">효과음</span><span class="yt-badge">채팅</span><span class="yt-badge">규칙</span><span class="yt-badge">나가기</span></div></header>'+
+  '<ol class="yt-seats" aria-label="좌석"></ol>'+
+  '<div class="yt-felt"><div class="yt-decor" aria-hidden="true">'+(T.decor?T.decor():'')+'</div><div class="yt-status"></div><section class="yt-tray" aria-label="주사위"></section><div class="yt-fx" aria-hidden="true"></div></div>'+
+  '<div class="yt-endslot"></div><div class="yt-card-wrap"></div></div>';
+}
+function seatsHtml(){
+  return S.seats.map(function(s,i){var turn=i===S.turn&&!S.result;
+    return '<li class="yt-seat'+(turn?' yt-seat-turn':'')+'" data-seat="'+i+'" style="--acc:'+T.accents[i]+'">'+(T.seatIcon?T.seatIcon(i):'')+
+      '<span class="yt-seat-name">'+s.name+(s.me?' (나)':'')+'</span><span class="yt-seat-total"><b class="yt-total-num">'+totals(s).total+'</b>점</span>'+
+      (turn?'<span class="yt-seat-tag">차례</span>':'')+'</li>'}).join('');
+}
+function statusHtml(){var my=S.turn===0&&!S.result;
+  if(S.result)return '';
+  return '<span class="yt-badge yt-countdown'+(S.seconds<=5?' yt-countdown-urgent':'')+'" role="timer" aria-live="off"><span class="yt-count-num">'+S.seconds+'</span>초</span>'+
+    (my?'<span class="yt-badge yt-badge-turn">내 차례</span>':'')+(S.celebrate?'<span class="yt-badge yt-celebrate">'+S.celebrate+'</span>':'');
+}
+function trayHtml(){var my=S.turn===0&&!S.result,canHold=my&&S.rolls>=1&&S.rolls<3,h='<div class="yt-dice" role="group">';
+  for(var i=0;i<5;i++){var f=S.dice?S.dice[i]:null,held=S.held[i];
+    h+='<button type="button" class="yt-die'+(held?' yt-die-held':'')+(f==null?' yt-die-empty':'')+'" data-die="'+i+'" style="--i:'+i+';--rest:'+REST[i]+'deg" aria-pressed="'+held+'" aria-label="'+(f==null?'주사위 '+(i+1)+' 비어 있음':'주사위 '+(i+1)+': '+f+(held?', 고정':''))+'"'+(canHold&&f!=null?'':' disabled')+'><span class="yt-die-body">'+T.die(f)+'</span><span class="yt-die-tag">'+(T.holdTag||'고정')+'</span></button>'}
+  h+='</div><div class="yt-actions">'+(my?'<button type="button" class="yt-roll" data-act="roll"'+(S.rolls>=3?' disabled':'')+'>굴리기 · '+(3-S.rolls)+'번 남음</button>':'<span class="yt-note">'+(S.result?'판이 끝났어요':S.seats[S.turn].name+' 차례 · 굴림 '+S.rolls+'/3')+'</span>')+'</div>';
+  return h;
+}
+function cardHtml(){var cd=cands(),my=S.turn===0&&S.rolls>=1&&!S.result;
+  function cell(s,i,cat,label){var v=s.scores[cat],col=(i===S.turn&&!S.result?' yt-in-turn':'')+(i===0?' yt-in-me':'');
+    if(v!=null){var fl=S.last&&S.last.seat===i&&S.last.cat===cat;return '<td class="yt-cell yt-cell-written'+col+(fl?' yt-cell-flash':'')+'"><span class="yt-num">'+v+'</span>'+(fl&&T.cellMark?T.cellMark():'')+'</td>'}
+    var c=i===S.turn&&!S.result?cd[cat]:undefined;
+    if(c!==undefined&&i===0&&my)return '<td class="yt-cell yt-cell-pick'+col+'"><button type="button" class="yt-pick'+(c===0?' yt-pick-zero':'')+'" data-score="'+cat+'" aria-label="'+label+'에 '+c+'점 기록">'+c+'</button></td>';
+    return '<td class="yt-cell'+col+(c!==undefined?' yt-cell-candidate':'')+'">'+(c!==undefined?c:'')+'</td>'}
+  function row(c){return '<tr'+(c[0]==='SIXES'?' class="yt-row-upper-end"':'')+'><th scope="row" class="yt-cat">'+c[1]+'</th>'+S.seats.map(function(s,i){return cell(s,i,c[0],c[1])}).join('')+'</tr>'}
+  var tt=S.seats.map(totals);
+  function sum(label,cls,fn){return '<tr class="'+cls+'"><th scope="row" class="yt-cat">'+label+'</th>'+tt.map(function(t,i){return '<td class="yt-cell'+(i===S.turn&&!S.result?' yt-in-turn':'')+(i===0?' yt-in-me':'')+'">'+fn(t)+'</td>'}).join('')+'</tr>'}
+  return '<table class="yt-card" aria-label="점수표"><thead><tr><th scope="col" class="yt-cat">칸</th>'+S.seats.map(function(s,i){return '<th scope="col" class="yt-col'+(i===S.turn&&!S.result?' yt-col-turn':'')+'" style="--acc:'+T.accents[i]+'">'+(s.me?'나':s.name)+'</th>'}).join('')+'</tr></thead><tbody>'+
+    CATS.slice(0,6).map(row).join('')+sum('상단 소계','yt-row-sum',function(t){return t.up+'/63'})+sum('보너스','yt-row-sum',function(t){return t.bonus?'+35':'-'})+
+    CATS.slice(6).map(row).join('')+sum('총점','yt-row-total',function(t){return t.total})+'</tbody></table>';
+}
+function endHtml(){if(!S.result)return '';
+  var rows=[[1,'미르',true,212],[2,'하늘',false,198],[3,'도토리',false,176],[4,'봇 바다',false,151]];
+  return '<section class="yt-end" aria-label="게임 결과"><h2 class="yt-end-title">결과</h2><p class="yt-end-reason">12칸을 모두 채웠습니다.</p><p class="yt-end-best yt-end-best-new">새 최고 기록! (이전 187점)</p><ol class="yt-end-list">'+
+    rows.map(function(r){return '<li class="yt-end-row'+(r[2]?' yt-end-me':'')+'"><span class="yt-end-rank">'+r[0]+'위</span><span class="yt-end-name">'+r[1]+(r[2]?' (나)':'')+'</span><span class="yt-end-total">'+r[3]+'점</span></li>'}).join('')+
+    '</ol><div class="yt-end-actions"><button type="button" class="yt-roll">대기실로</button><button type="button" class="yt-badge">메인으로</button></div></section>';
+}
+function render(){
+  frames.forEach(function(f){
+    if(!f.firstChild)f.innerHTML=skeleton();
+    f.querySelector('[data-slot=round]').textContent=round()+'/12 라운드';
+    f.querySelector('.yt-seats').innerHTML=seatsHtml();
+    var felt=f.querySelector('.yt-felt');felt.classList.toggle('yt-felt-myturn',S.turn===0&&!S.result);felt.style.setProperty('--acc',T.accents[0]);
+    f.querySelector('.yt-status').innerHTML=statusHtml();
+    f.querySelector('.yt-tray').innerHTML=trayHtml();
+    f.querySelector('.yt-fx').innerHTML='';
+    f.querySelector('.yt-endslot').innerHTML=endHtml();
+    f.querySelector('.yt-card-wrap').innerHTML=cardHtml();
+  });
+}
+function five(){return S.dice&&S.dice.every(function(v){return v===S.dice[0]})}
+function celebrate(label){
+  S.celebrate=label;
+  frames.forEach(function(f){f.querySelector('.yt-status').innerHTML=statusHtml();if(!reduce()&&T.yacht)T.yacht(f)});
+}
+function playRoll(prevHeld){
+  var maxDelay=0;
+  frames.forEach(function(f){var k=0;
+    [].forEach.call(f.querySelectorAll('.yt-die'),function(btn,i){
+      if(prevHeld[i])return;var body=btn.querySelector('.yt-die-body'),fin=S.dice[i];
+      if(reduce())return; /* 연출 줄이기 — 눈만 바로 바뀐다 */
+      var delay=k*(T.stagger||40);maxDelay=Math.max(maxDelay,delay);
+      var fl=setInterval(function(){body.innerHTML=T.die(1+Math.floor(Math.random()*6))},70);
+      setTimeout(function(){clearInterval(fl);body.innerHTML=T.die(fin)},delay+ROLL_MS*(T.settleAt||.6));
+      T.roll(btn,body,k,{delay:delay,dur:ROLL_MS,rest:REST[i],frame:f});k++;
+    });
+    if(!reduce()&&T.land)T.land(f,ROLL_MS);
+  });
+  busy=true;
+  setTimeout(function(){busy=false;if(five())celebrate('요트! 다섯 개 모두 '+S.dice[0])},reduce()?180:ROLL_MS+maxDelay+60);
+}
+function roll(forced){
+  if(busy)return;
+  if(S.result||S.turn!==0||S.rolls>=3)S=init();
+  var prev=S.held.slice();if(prev.every(Boolean))return;
+  S.dice=(S.dice||[1,1,1,1,1]).map(function(v,i){return prev[i]?v:(forced?forced[i]:1+Math.floor(Math.random()*6))});
+  S.rolls++;S.last=null;S.celebrate=null;render();playRoll(prev);
+}
+function toggleHold(i){
+  if(busy||S.turn!==0||S.rolls<1||S.rolls>=3)return;
+  S.held[i]=!S.held[i];
+  frames.forEach(function(f){var b=f.querySelectorAll('.yt-die')[i];b.classList.toggle('yt-die-held',S.held[i]);b.setAttribute('aria-pressed',String(S.held[i]));if(!reduce()&&T.hold)T.hold(b,S.held[i],f)});
+}
+function score(cat){
+  if(busy||!cat||S.turn!==0||S.rolls<1||S.seats[0].scores[cat]!=null)return;
+  var pts=scoreOf(cat,S.dice),before=totals(S.seats[0]).total,origins=frames.map(function(f){return f.querySelector('.yt-dice').getBoundingClientRect()});
+  S.seats[0].scores[cat]=pts;S.last={seat:0,cat:cat,pts:pts};
+  var big=(cat==='YACHT'||cat==='LARGE_STRAIGHT')&&pts>0;
+  S.turn=1;S.dice=null;S.held=[false,false,false,false,false];S.rolls=0;S.celebrate=null;S.seconds=30;render();
+  var after=totals(S.seats[0]).total;
+  frames.forEach(function(f,idx){
+    if(reduce())return;
+    var cell=f.querySelector('.yt-cell-flash'),seat=f.querySelector('.yt-seat[data-seat="0"]'),num=seat.querySelector('.yt-total-num');
+    num.textContent=before;setTimeout(function(){YT.countUp(num,before,after,450)},T.scoreDelay||0);
+    if(T.score)T.score(cell,f,{pts:pts,seat:seat,from:origins[idx]});
+  });
+  if(big)celebrate(cat==='YACHT'?'요트! +50':'라지 스트레이트! +30');
+}
+function bestPick(){var cd=cands(),best=null;Object.keys(cd).forEach(function(c){if(best===null||cd[c]>cd[best])best=c});return best}
+
+frames.forEach(function(f){f.addEventListener('click',function(e){
+  var d=e.target.closest('[data-die]');if(d){toggleHold(+d.dataset.die);return}
+  if(e.target.closest('[data-act=roll]')){roll();return}
+  var p=e.target.closest('[data-score]');if(p)score(p.dataset.score);
+})});
+document.querySelector('.demo-bar').addEventListener('click',function(e){
+  var b=e.target.closest('[data-demo]');if(!b)return;
+  switch(b.dataset.demo){
+    case 'roll':roll();break;
+    case 'rollall':if(busy)break;S=init();S.held=[false,false,false,false,false];S.rolls=0;S.dice=null;roll();break;
+    case 'yacht':if(busy)break;S=init();roll([4,4,4,4,4]);break;
+    case 'score':if(busy)break;if(S.result||S.turn!==0||S.rolls<1){S=init();render()}score(bestPick());break;
+    case 'result':if(busy)break;S.result=!S.result;S.celebrate=null;render();if(S.result&&!reduce()&&T.result)frames.forEach(function(f){T.result(f)});break;
+    case 'reset':if(busy)break;S=init();render();break;
+    case 'theme':root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';break;
+    case 'motion':motionReduce=!motionReduce;applyMotion();break;
+  }
+});
+setInterval(function(){
+  if(S.result)return;S.seconds=S.seconds<=0?30:S.seconds-1;
+  frames.forEach(function(f){var n=f.querySelector('.yt-count-num');if(!n)return;n.textContent=S.seconds;n.parentNode.classList.toggle('yt-countdown-urgent',S.seconds<=5)});
+},1000);
+applyMotion();render();
+})();
+
+</script>
+</body>
+</html>
