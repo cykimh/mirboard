@@ -196,6 +196,24 @@ S4 순수 엔진을 `SkullKingGameDefinition`(id `SKULL_KING`, 2~8인, AVAILABLE
 `GameSummary.playerCounts` 로 싣는다(가산 필드 — 기존 필드·다섯 게임 값은 그대로, 카탈로그 IT 로 고정). 클라는 이어지면 "2~4인", 끊기면
 "2·4인"(`features/lobby/playerCountLabel`), 필드가 없으면 min~max. 관제 승인. 계약 `docs/api.md` 카탈로그.
 
+## D-228 (2026-11-11) — 씨앗포 S6 설계: 걸음은 확정 액션 `MOVE`, 차례 전체 마감은 엔진 타이머 (포트 변경 0)
+
+실시간 이동·조준 공유(S6)에서 사용자가 "걸으면 바로 확정"(되돌리기 없음)·"위치·포신 각도·탄까지 보여 줌(힘은 숨김)"·"초당 4번"을 골랐다.
+그래서 이동은 미리보기가 아니라 새 액션 `MOVE(dx)` 로 그 자리에서 서버가 걷고(지금 `FIRE` 안의 같은 `Walker`) 공개 순번 이벤트 `UNIT_MOVED`
+(결과값)로 알린다. 성공한 액션마다 인프라가 턴 시계를 다시 거는 문제는 요트의 D-183 그대로 — 상태에 차례 시작 시각 `turnStartedAt` 을 두고
+AIMING 엔진 타이머가 차례 시작 + `turnSeconds` 에 시간 초과를 낸다(포트·인프라 무변경, 공개 뷰에 엔진 `turnRemainingMs`). `FIRE.moveDx` 는
+"더 걷고 쏜다"로 남아 봇·골든 물리가 그대로다. 룰 변경: 넘김·시간 초과에도 이동 딜레이를 더하고, 물뿌리개는 `FIRE` 해소 때, 한 걸음도 못 가는
+`MOVE` 는 `CANNOT_MOVE`. 클라는 `MOVE` 를 250ms 마다 한 번에 하나만 보낸다(서버가 같은 세션 프레임 순서를 보장하지 않음). 설계서 `docs/plans/artillery-s6.md`.
+
+## D-229 (2026-11-11) — 포트 선택 확장 ⑧ `preview`: 상태를 바꾸지 않는 실시간 미리보기 (기본 empty)
+
+포신 각도·탄은 쏘기 전까지 바뀌므로 확정하지 않는 미리보기로 흘린다. 엔진 액션으로 보내면 끌 때마다 락·저장·순번·턴 시계 재무장이 돌고
+`game-action` 버킷을 넘겨 `FIRE` 가 버려질 수 있으며, 인프라가 내용 모르는 중계를 하면 서버가 값을 검증하지 못한다. 그래서 포트에
+`default Optional<GameEvent> preview(GameState, int seat, GameAction input)`(기본 empty — 다른 여섯 게임 무변경)을 두고, 게임 중립
+`infra.ws.GamePreviewController`(`/app/room/{id}/preview`)가 락 없이 상태를 읽어 엔진이 걸러 준 **공개·순번 없는** 이벤트만 방 토픽으로 낸다
+(어기면 WARN 후 버림, 거절 ERROR 없음). 새 버킷 `game-preview` 10초 60번, `game-action` 은 연속 걷기를 위해 10초 30 → 60. 씨앗포는 `AIM_PREVIEW
+{seat, turn, angle, shell, n}`(힘 없음, 쏠 수 없는 탄은 null). 구현은 S6a(서버·포트), 클라는 스킨 층(D-227) 뒤 S6b.
+
 ## D-226 (2026-11-10) — 씨앗포 차례 = 포트리스식 딜레이 (개인전·팀전 모두)
 
 차례가 좌석 순서가 아니라 **누적 딜레이가 가장 작은 살아 있는 포대**에게 간다(사용자 결정 — 포트리스처럼). 한 차례가 끝나면 그 포대에
