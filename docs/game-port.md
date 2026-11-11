@@ -423,6 +423,25 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 - **라운드 시작에도 같은 값(오목 S3b)**: `GameStartingEvent.options` — 라운드 스타터는 엔진이 아니라 시작 이벤트를 받으므로, `RoomService` 가
   발행할 때 `effectiveOptions(def, room)` 를 싣는다(4인자 생성자는 빈 맵으로 남겼다). 오목 라운드 스타터가 모드·룰을 여기서 읽는다.
 
+### 상태를 바꾸지 않는 실시간 미리보기 ⑧ `preview` (D-229) — *설계, 구현은 씨앗포 S6a*
+
+씨앗포 S6(실시간 이동·조준 공유)에서 처음 필요해졌다. 확정하는 이동은 새 엔진 액션 + 차례 전체 마감(D-183)으로 포트 변경 없이 풀고(D-228),
+쏘기 전까지 바뀌는 포신 각도·탄만 이 확장으로 흘린다. 설계서 `docs/plans/artillery-s6.md` §5.
+
+```java
+default Optional<GameEvent> preview(GameState state, int seat, GameAction input) { return Optional.empty(); }
+```
+
+- **기본 없음(옵트인)** — ⑦ 엔진 타이머와 같은 방식. override 하지 않은 게임은 미리보기 프레임이 전부 버려진다.
+- 인프라: 게임 중립 `infra.ws.GamePreviewController`(`/app/room/{id}/preview`) — `IN_GAME`·좌석 확인 → `actionType()` 으로 역직렬화 →
+  `loadState()`(**락 없음**) → `preview` → 있으면 방 토픽으로 방송. 락·저장·`onTurnAdvanced`·봇 스케줄을 하지 않으므로 `BUSY`·턴 시계와 무관하다.
+  레이트리밋 버킷 `game-preview`(넘치면 조용히 버림).
+- 계약: ① 순수(상태·저장소 무변경, 락 밖이라 낡은 상태를 볼 수 있다) ② 가볍다(차례 주인이 초당 수 번) ③ 돌려주는 이벤트는 **공개·순번 없음** —
+  어기면 인프라가 WARN 후 버린다 ④ 받아들일 수 없는 입력은 empty(거절 `ERROR` 없음) ⑤ 미리보기 입력 타입은 `actionType()` 의 한 갈래 —
+  `apply` 는 `INVALID_ACTION` 으로 거절, `legalActions`·봇에 나오지 않는다.
+- 클라 훅 변경 없음 — 순번 없는 공개 이벤트는 `judgeSeq` 가 `unsequenced` 로 sink 에 넘긴다(D-124). 받는 쪽이 낡은 프레임을 거르는 기준은 게임이
+  이벤트에 싣는다(씨앗포: 차례 번호 + 보낸 쪽 번호 `n`).
+
 ### 비공개 뷰 없음 — 오목에서 실증 (D-175)
 
 §1 설계 판단 2 의 "요트는 empty" 가 오목에서 처음 실제 경로를 탔다. `OmokGameEngine.privateView` 는 늘 `Optional.empty()` 이고,
