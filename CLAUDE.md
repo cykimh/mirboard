@@ -156,6 +156,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   액션마다 다시 걸리므로(한 차례 = 한 액션 가정) 한 차례가 여러 액션인 게임은 차례 시작 시각을 상태에 두고 엔진 타이머로 **차례 전체 마감**을 건다(요트 — 만기면
   최고점 칸 자동 기록). 요트 클라는 `HOLD` 를 마지막 탭 뒤 250ms 에 모아 보내고 `ROLL` 에 홀드를 싣는다(탭마다 보내면 방 락 `BUSY`), `ROLL`·`SCORE` 의 `BUSY` 는 한 번 재전송.
   요트 1인 판은 기록·전적을 남기지 않는다(D-181) — 끝까지 친 판의 총점만 개인 최고 점수 `yacht_solo_scores`(V17)에, 최고 = 1인 판 + 끝까지 친 여럿 판(게스트·봇 제외, 포트 `BestScoreSource` → stats `games[].bestScore`, D-201).
+- D-241: 티츄 **"옻칠 찻집" 테마 층** — `features/tichu/tichuTheme.TICHU_THEME`(되돌리기 `'classic'` 한 줄), 꾸밈은 `25-tichu-lacquer.css`(`.tc-` 접두·미디어 0개, 폭·동작 줄이기는 17 의 `.tc-` 블록 — 스컬킹 맨 끝 두 블록 앞). 카드·특수 카드 그림은 인라인 SVG(`tichuArt.tsx`, id 금지), 경기장 연출은 `effectStore.arenaFx` 줄 → `ArenaFxLayer`(화면만, 좌석 방향은 `viewPosOf` + 컨테이너 단위).
 - D-174: **방 종류 없음** — 방 만들기는 게임·이름만, 봇은 대기실에서 방장이 **[빈자리 봇으로 채우기]**(`POST /api/rooms/{id}/bots`, 정원까지·준비 없음)·**[봇 빼기]**(`DELETE …/bots`). 봇이 낀 판도 정상 종료면 **봇과 함께 대기실로**(`MatchProgressService` — `fillWithBots` 방만 FINISHED, 봇에겐 끊김 유예 없음). 봇만 남으면 방 소멸·방장은 사람에게(`RoomService.settleBotsAfterHumanChange`). 대기실 시작 줄은 문구 왼쪽·버튼 오른쪽, 참가자 카드 계급은 이름 왼쪽, 원카드! 버튼은 원형.
 - D-173: 원카드 **내 차례 빛은 경기장(`.oc-felt-myturn`) 테두리**(손패 칸·나 줄 빛 제거), **2인 Q 는 상대 차례**(한 번 더는 K·2인 J 만 — `TurnOrder.afterPlay`), 상대 좌석 손패는 **뒷면 최대 3장 뭉치 + "×N"**(`OneCardSeat`).
 - D-172: **Redis 구독 연결 하트비트** — `RedisMessageGateway` 가 `mirboard.messaging.redis-heartbeat`(기본 30s)마다 `mirboard:pubsub-heartbeat` 에 발행, 3번 연속 안 돌아오면 구독 재연결(프록시가 조용한 연결을 끊어도 STOMP 방송이 멈추지 않게).

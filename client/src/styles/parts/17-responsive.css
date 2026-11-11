@@ -472,6 +472,76 @@
   }
 }
 
+/* D-241 — 티츄 "옻칠 찻집"(`.tc-`). 25 는 미디어 0개 규칙이라 폭·동작 줄이기는 여기 둔다(스컬킹 맨 끝 두 블록 앞).
+   ① 휴대폰: 옻칠 틀을 얇게(좌우 좌석이 모서리에 붙는다), 연출 카드·인장·소원 패를 한 단계 작게. */
+@media (max-width: 480px) {
+  .tc-theme-lacquer {
+    --tc-frame: 3px;
+  }
+  .tc-wish-tile {
+    left: 10px;
+    top: 46px;
+  }
+  .tc-fx-deal-card {
+    width: 22px;
+    height: 31px;
+    margin: -15px 0 0 -11px;
+  }
+  .tc-fx-sweep-card .tc-card {
+    width: 34px;
+    height: 48px;
+  }
+  .tc-fx-sweep-card {
+    margin-left: -20px;
+  }
+  .tc-fx-stamp .tc-seal {
+    font-size: 0.9rem;
+    padding: 5px 8px;
+    min-width: 42px;
+  }
+  .tc-fx-wish-tile {
+    width: 62px;
+  }
+}
+
+/* ② 동작 줄이기: 움직임을 끄고 결과만 남긴다(인장·현판·소원 패는 제자리에 떴다 사라진다). 파편·금가루·등불·고리는 그리지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  .tc-theme-lacquer .seat.turn::after,
+  .tc-theme-lacquer .scoreboard-team,
+  .tc-theme-lacquer .round-ended,
+  .tc-theme-lacquer .round-ended h3 + p,
+  .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
+  .tc-wish-tile,
+  .tc-shake-a,
+  .tc-shake-b,
+  .tc-fx-layer *,
+  .tc-fx-screen * {
+    animation: none !important;
+  }
+  .tc-land-ring,
+  .tc-fx-ring,
+  .tc-fx-shard,
+  .tc-fx-dust,
+  .tc-fx-lantern,
+  .tc-fx-bomb-core,
+  .tc-fx-bomb-ring,
+  .tc-fx-declare-ring {
+    display: none;
+  }
+  .tc-fx-bomb-flash {
+    opacity: 0.3;
+  }
+  .tc-fx-stamp .tc-seal {
+    transform: translate(-50%, -50%) rotate(-8deg);
+  }
+  .tc-fx-wish {
+    transform: translate(-50%, -50%);
+  }
+  .tc-fx-points {
+    transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78));
+  }
+}
+
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —
    가운데(트릭 레일·방향)를 옆줄 아래 전체 폭으로 내린다. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이는 빈다. 넓은 화면은

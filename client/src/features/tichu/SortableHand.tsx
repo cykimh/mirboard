@@ -14,19 +14,23 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
+import type { CSSProperties } from 'react';
 import { CSS } from '@dnd-kit/utilities';
 import type { Card } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
 import { CardChip } from './CardChip';
-import { useHandOverlap } from './useHandOverlap';
+import { MIN_VISIBLE_STEP, useHandOverlap } from './useHandOverlap';
+import { LACQUER_MIN_VISIBLE_STEP, lacquerTheme } from './tichuTheme';
 
 interface SortableCardProps {
   card: Card;
   selected: boolean;
   onClick: () => void;
+  /** D-241 — 손패 안 순서. 받는 연출(딜)의 엇갈림 지연에만 쓴다(`--tc-i`). */
+  index: number;
 }
 
-function SortableCard({ card, selected, onClick }: SortableCardProps) {
+function SortableCard({ card, selected, onClick, index }: SortableCardProps) {
   const id = cardKey(card);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -36,10 +40,11 @@ function SortableCard({ card, selected, onClick }: SortableCardProps) {
     transition,
     opacity: isDragging ? 0.4 : 1,
     touchAction: 'none',
-  } as const;
+    '--tc-i': index,
+  } as CSSProperties;
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} className={lacquerTheme ? 'tc-hand-slot' : undefined} style={style} {...attributes} {...listeners}>
       <CardChip card={card} selected={selected} onClick={onClick} />
     </div>
   );
@@ -73,7 +78,8 @@ export function SortableHand({
   );
   const ids = cards.map(cardKey);
   // overlap=false 면 0 을 넘겨 측정/겹침 비활성(클래스도 안 붙음).
-  const handRef = useHandOverlap(overlap ? cards.length : 0);
+  // D-241 — 옻칠 카드는 모서리 표기가 좁아 한 줄 겹침 하한을 낮춘다(375px 에서 14장 한 줄).
+  const handRef = useHandOverlap(overlap ? cards.length : 0, lacquerTheme ? LACQUER_MIN_VISIBLE_STEP : MIN_VISIBLE_STEP);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -89,13 +95,14 @@ export function SortableHand({
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
         <div className={`hand-cards${overlap ? ' overlap' : ''}`} ref={handRef}>
-          {cards.map((c) => {
+          {cards.map((c, index) => {
             const key = cardKey(c);
             return (
               <SortableCard
                 key={key}
                 card={c}
                 selected={selectedKeys.has(key)}
+                index={index}
                 onClick={() => onCardClick(c)}
               />
             );

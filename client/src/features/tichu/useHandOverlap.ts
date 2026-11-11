@@ -26,9 +26,14 @@ export function computeHandOverlap(containerW: number, cardW: number, count: num
  * 한 줄 겹침을 유지할 수 없을 만큼 좁은가 — 카드당 보이는 폭(cardW+마진)이
  * {@link MIN_VISIBLE_STEP} 미만이면 true(줄바꿈 폴백). 순수 함수(테스트 대상).
  */
-export function shouldWrapHand(containerW: number, cardW: number, count: number): boolean {
+export function shouldWrapHand(
+  containerW: number,
+  cardW: number,
+  count: number,
+  minVisibleStep: number = MIN_VISIBLE_STEP,
+): boolean {
   if (count <= 1 || containerW <= 0) return false;
-  return cardW + computeHandOverlap(containerW, cardW, count) < MIN_VISIBLE_STEP;
+  return cardW + computeHandOverlap(containerW, cardW, count) < minVisibleStep;
 }
 
 /**
@@ -42,8 +47,10 @@ export function shouldWrapHand(containerW: number, cardW: number, count: number)
  * 반환한 ref 를 `.hand-cards` 컨테이너에 붙이고, CSS 가
  * `margin-left: var(--hand-overlap)` 로 소비한다. count<=1 이면(겹침 비활성 포함)
  * 측정·관찰을 건너뛴다.
+ *
+ * D-241 — `minVisibleStep` 은 줄바꿈 폴백의 하한이다. 옻칠 카드는 모서리 표기가 좁아 더 낮은 값을 넘긴다.
  */
-export function useHandOverlap(count: number) {
+export function useHandOverlap(count: number, minVisibleStep: number = MIN_VISIBLE_STEP) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   const recompute = useCallback(() => {
@@ -70,12 +77,12 @@ export function useHandOverlap(count: number) {
     if (el.style.getPropertyValue('--hand-overlap') !== next) {
       el.style.setProperty('--hand-overlap', next);
     }
-    const wrap = shouldWrapHand(containerW, cardW, count) ? '1' : undefined;
+    const wrap = shouldWrapHand(containerW, cardW, count, minVisibleStep) ? '1' : undefined;
     if (el.dataset.handWrap !== wrap) {
       if (wrap) el.dataset.handWrap = wrap;
       else delete el.dataset.handWrap;
     }
-  }, [count]);
+  }, [count, minVisibleStep]);
 
   useLayoutEffect(() => {
     recompute();

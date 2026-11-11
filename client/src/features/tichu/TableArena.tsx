@@ -15,6 +15,9 @@ import { viewPosOf } from './seatView';
 import { ReactionFloats } from './ReactionFloats';
 import { TurnCountdown } from './TurnCountdown';
 import type { FlyState } from './useGameTableEffects';
+import { ArenaFxLayer, wishLabel } from './ArenaFxLayer';
+import { useEffectStore } from './effectStore';
+import { lacquerTheme } from './tichuTheme';
 
 interface TableArenaProps {
   tableView: TableView;
@@ -90,8 +93,15 @@ export function TableArena({
   onPlay,
   onOpenRoundHistory,
 }: TableArenaProps) {
+  // D-241 — 폭탄이 터지면 경기장이 잠깐 흔들린다(옻칠 테마). 연달아 터져도 다시 흔들리게 연출 id 로 키프레임 이름을 번갈아 쓴다.
+  const bombId = useEffectStore((s) =>
+    s.active && (s.active.kind === 'BOMB' || s.active.kind === 'STRAIGHT_FLUSH_BOMB') ? s.active.id : null,
+  );
+  const shake = lacquerTheme && bombId !== null ? ` tc-shake-${bombId % 2 === 0 ? 'a' : 'b'}` : '';
+  const myScore = tableView.matchScores[myTeam] ?? 0;
+  const theirScore = tableView.matchScores[myTeam === 'A' ? 'B' : 'A'] ?? 0;
   return (
-    <div className={`table-arena ${arenaTint}`} ref={arenaRef}>
+    <div className={`table-arena ${arenaTint}${shake}`} ref={arenaRef}>
       {playerIds.map((uid, seat) => {
         const ready = isInDealing && tableView.readySeats.includes(seat);
         const submitted =
@@ -206,6 +216,14 @@ export function TableArena({
                   <CardChip key={cardKey(c)} card={c} />
                 ))}
               </div>
+              {/* D-241 — 카드가 내려앉는 자리에 금빛 고리 한 번(낼 때마다 key 로 다시 돈다). */}
+              {lacquerTheme && cardAnimEnabled && (
+                <span
+                  key={`ring:${tableView.currentTopSeat}:${tableView.currentTop.cards.map(cardKey).join(',')}`}
+                  className="tc-land-ring"
+                  aria-hidden="true"
+                />
+              )}
             </>
           ) : (
             <p className="trick-empty">{t('trick.leadWaiting')}</p>
@@ -222,11 +240,16 @@ export function TableArena({
             top: fly.top,
             zIndex: 18,
             pointerEvents: 'none',
+            // D-241 — 옻칠 테마는 살짝 기울어 날아와 조금 지나쳤다 내려앉는다(같은 길이 — 정리 타이머 420ms 안).
             transform: fly.settled
               ? 'translate(-50%, -50%) scale(1)'
-              : `translate(calc(-50% + ${fly.dx}px), calc(-50% + ${fly.dy}px)) scale(0.92)`,
+              : lacquerTheme
+                ? `translate(calc(-50% + ${fly.dx}px), calc(-50% + ${fly.dy}px)) scale(0.78) rotate(-9deg)`
+                : `translate(calc(-50% + ${fly.dx}px), calc(-50% + ${fly.dy}px)) scale(0.92)`,
             opacity: fly.settled ? 1 : 0.85,
-            transition: 'transform 350ms ease-out, opacity 350ms ease-out',
+            transition: lacquerTheme
+              ? 'transform 360ms cubic-bezier(0.2, 0.85, 0.3, 1.22), opacity 240ms ease-out'
+              : 'transform 350ms ease-out, opacity 350ms ease-out',
           }}
         >
           <div className="hand-cards">
@@ -246,13 +269,29 @@ export function TableArena({
         onClick={onOpenRoundHistory}
       >
         <span className="scoreboard-round">R{tableView.roundNumber}</span>
-        <span className="scoreboard-team us">
-          우리 {tableView.matchScores[myTeam] ?? 0}
+        {/* D-241 — 점수가 바뀌면 key 가 바뀌어 다시 마운트되고, 옻칠 테마 CSS 가 한 번 튀어 오르게 한다. */}
+        <span key={`us:${myScore}`} className="scoreboard-team us">
+          우리 {myScore}
         </span>
-        <span className="scoreboard-team them">
-          상대 {tableView.matchScores[myTeam === 'A' ? 'B' : 'A'] ?? 0}
+        <span key={`them:${theirScore}`} className="scoreboard-team them">
+          상대 {theirScore}
         </span>
       </button>
+      {lacquerTheme && isInPlaying && tableView.activeWishRank !== null && (
+        // D-241 — 걸려 있는 소원 숫자를 경기장 안 작은 패로(머리 줄 글자는 휴대폰에서 눈에 잘 안 띈다).
+        <div className="tc-wish-tile" role="status" aria-label={`소원 ${wishLabel(tableView.activeWishRank)}`}>
+          <small>소원</small>
+          <b>{wishLabel(tableView.activeWishRank)}</b>
+        </div>
+      )}
+      {lacquerTheme && (
+        <ArenaFxLayer
+          mySeat={mySeat}
+          isInDealing={isInDealing}
+          dealingCardCount={tableView.dealingCardCount}
+          cardAnimEnabled={cardAnimEnabled}
+        />
+      )}
       {isInPlaying && turnSeconds > 0 && (
         <TurnCountdown turnSeconds={turnSeconds} />
       )}

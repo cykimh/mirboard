@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
+import { CardBack } from './CardChip';
 import type { SeatViewPos } from './seatView';
+import { lacquerTheme } from './tichuTheme';
 
 const BACK_SRC = '/cards/back.svg';
 const MAX_SHOWN = 6;
@@ -29,16 +31,23 @@ export function SeatCardStack({
   return (
     <div className={`seat-cardstack fan-${viewPos}`} aria-label={`${count}장`}>
       <span className="seat-cardstack-fan">
-        {Array.from({ length: shown }).map((_, i) => (
-          <img
-            key={i}
-            src={BACK_SRC}
-            alt=""
-            className="seat-cardback"
-            draggable={false}
-            style={{ '--i': i - mid } as CSSProperties}
-          />
-        ))}
+        {Array.from({ length: shown }).map((_, i) =>
+          lacquerTheme ? (
+            // D-241 — 옻칠 뒷면(인라인 SVG). 크기·겹침·회전은 그대로 `.seat-cardback` 이 정한다.
+            <span key={i} className="seat-cardback tc-seat-back" style={{ '--i': i - mid } as CSSProperties}>
+              <CardBack />
+            </span>
+          ) : (
+            <img
+              key={i}
+              src={BACK_SRC}
+              alt=""
+              className="seat-cardback"
+              draggable={false}
+              style={{ '--i': i - mid } as CSSProperties}
+            />
+          ),
+        )}
       </span>
       {/* 내 좌석(s)은 실제 손패가 아래에 보이므로 장수 숫자는 생략(요청). */}
       {viewPos !== 's' && <span className="seat-cardstack-count">{count}</span>}

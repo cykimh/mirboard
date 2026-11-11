@@ -300,6 +300,15 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       case 'TRICK_TAKEN': {
         if (!table) return 'unhandled';
         const p = envelope.payload as TrickTakenPayload;
+        // D-241 — 가운데 카드 더미가 가져간 좌석으로 쓸려 가는 연출(화면만 — 상태 갱신은 아래 그대로).
+        if (table.currentTop) {
+          useEffectStore.getState().pushArenaFx({
+            kind: 'TRICK_SWEEP',
+            seat: p.takerSeat,
+            cards: table.currentTop.cards.slice(0, 6),
+            points: p.trickPoints,
+          });
+        }
         const team = teamOf(p.takerSeat);
         const nextScores = {
           ...table.roundScores,
@@ -332,13 +341,23 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
         useEffectStore.getState().trigger(
           'TICHU_DECLARED',
           `${p.kind === 'GRAND_TICHU' ? '👑 그랜드 티츄!' : '🔔 티츄!'} · 시트 ${p.seat}`,
+          undefined,
+          p.kind === 'GRAND_TICHU',
         );
+        // D-241 — 선언한 좌석에 인장이 찍힌다.
+        useEffectStore.getState().pushArenaFx({
+          kind: 'DECLARE_STAMP',
+          seat: p.seat,
+          grand: p.kind === 'GRAND_TICHU',
+        });
         return 'applied';
       }
       case 'WISH_MADE': {
         if (!table) return 'unhandled';
         const p = envelope.payload as WishMadePayload;
         advance({ ...table, activeWishRank: p.rank });
+        // D-241 — 가운데에 소원 패가 뜬다.
+        useEffectStore.getState().pushArenaFx({ kind: 'WISH', rank: p.rank });
         return 'applied';
       }
       case 'WISH_CLEARED': {
@@ -352,7 +371,9 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
       case 'DRAGON_GIVEN': {
         // 발행 시점에 TRICK_TAKEN 도 같이 들어오므로 별도 패치 없음.
         if (!table) return 'unhandled';
-        envelope.payload as DragonGivenPayload;
+        const p = envelope.payload as DragonGivenPayload;
+        // D-241 — 용 패가 준 사람에게서 받는 사람에게 건너간다(뒤따르는 TRICK_TAKEN 이 더미를 쓸어 간다).
+        useEffectStore.getState().pushArenaFx({ kind: 'DRAGON_GIVEN', fromSeat: p.fromSeat, seat: p.toSeat });
         return 'applied';
       }
       case 'PLAYER_READY': {
