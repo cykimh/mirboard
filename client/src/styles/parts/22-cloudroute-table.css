@@ -2398,3 +2398,419 @@ html.dark .cr-table.cr-storybook {
   70% { transform: translateY(14%) scale(0.92) rotate(2deg); filter: grayscale(1) brightness(0.8); }
   100% { transform: none; filter: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 2차 연출 (D-219) — 루트의 `.cr-fx2`(theme.ts `CLOUD_ROUTE_FX_LEVEL`) 아래에서만 먹는다. 그림책 테마 위에 얹는 층이다.
+ * 하늘 시간대(`data-cr-sky` — 아침·낮·노을·밤)는 겹쳐 둔 색 층의 투명도와 해·달 자리(transform)만 바꾼다.
+ * 움직임은 여기서도 `.cr-motion` 아래에만 둔다 — 움직임 줄이기에서는 시간대 색만 바로 바뀐다.
+ * ══════════════════════════════════════════════════════════════════════ */
+.cr-daylight,
+.cr-sky-orb,
+.cr-sky-birds,
+.cr-cloud-flow,
+.cr-win-rainbow {
+  display: none;
+}
+
+.cr-table.cr-storybook.cr-fx2 {
+  --cr-tint-morning: linear-gradient(200deg, rgb(255 233 150 / 78%), rgb(255 214 196 / 40%) 42%, rgb(255 255 255 / 0%) 74%);
+  --cr-tint-sunset: linear-gradient(170deg, #ffc98f, #ff9d9d 48%, #c79be6);
+  --cr-tint-night: linear-gradient(165deg, #2b3170, #4a3f8c 55%, #7a4f96);
+
+  isolation: isolate;
+}
+
+html.dark .cr-table.cr-storybook.cr-fx2 {
+  --cr-tint-morning: linear-gradient(200deg, rgb(255 178 140 / 34%), rgb(120 130 215 / 22%) 48%, rgb(0 0 0 / 0%) 80%);
+  --cr-tint-sunset: linear-gradient(170deg, #6a3a4c, #5e2f55 50%, #33295c);
+  --cr-tint-night: linear-gradient(165deg, #0d0f26, #15173a 55%, #241b40);
+}
+
+/* 시간대마다 달라지는 하늘 소품 값 — 별·구름·무지개. */
+.cr-table.cr-storybook.cr-fx2[data-cr-sky='sunset'] {
+  --cr-cloud: rgb(255 241 232 / 92%);
+  --cr-star: 0.3;
+}
+
+.cr-table.cr-storybook.cr-fx2[data-cr-sky='night'] {
+  --cr-cloud: rgb(255 255 255 / 40%);
+  --cr-rainbow: 0.28;
+  --cr-star: 0.95;
+}
+
+html.dark .cr-table.cr-storybook.cr-fx2[data-cr-sky='morning'] {
+  --cr-star: 0.25;
+}
+
+html.dark .cr-table.cr-storybook.cr-fx2[data-cr-sky='day'] {
+  --cr-star: 0.5;
+}
+
+html.dark .cr-table.cr-storybook.cr-fx2[data-cr-sky='sunset'] {
+  --cr-cloud: rgb(255 214 214 / 17%);
+  --cr-star: 0.7;
+}
+
+html.dark .cr-table.cr-storybook.cr-fx2[data-cr-sky='night'] {
+  --cr-cloud: rgb(255 255 255 / 9%);
+  --cr-rainbow: 0.2;
+  --cr-star: 1;
+}
+
+.cr-storybook.cr-fx2 .cr-daylight {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cr-fx2 .cr-daylight-tint {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 2.6s ease-in-out;
+}
+
+.cr-fx2 .cr-daylight-morning { background: var(--cr-tint-morning); }
+.cr-fx2 .cr-daylight-sunset { background: var(--cr-tint-sunset); }
+.cr-fx2 .cr-daylight-night { background: var(--cr-tint-night); }
+
+.cr-fx2[data-cr-sky='morning'] .cr-daylight-morning,
+.cr-fx2[data-cr-sky='sunset'] .cr-daylight-sunset,
+.cr-fx2[data-cr-sky='night'] .cr-daylight-night {
+  opacity: 1;
+}
+
+.cr-storybook.cr-fx2 .cr-cloud {
+  transition: fill 2.6s ease-in-out;
+}
+
+.cr-storybook.cr-fx2 .cr-sky-stars,
+.cr-storybook.cr-fx2 .cr-sky-rainbow {
+  transition: opacity 2.6s ease-in-out;
+}
+
+/* 해와 달 — 판 단위로 자리를 옮긴다(아침 왼쪽 아래 → 낮 오른쪽 위 → 노을 오른쪽 아래 → 밤에는 달). */
+.cr-storybook.cr-fx2 .cr-sky-orb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: calc(var(--cr-u) * 14);
+  height: calc(var(--cr-u) * 14);
+  transform: translate(calc(var(--cr-u) * 66), calc(var(--cr-u) * 17));
+  transition: transform 3.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cr-storybook.cr-fx2 .cr-sky-morning .cr-sky-orb {
+  transform: translate(calc(var(--cr-u) * 17), calc(var(--cr-u) * 40));
+}
+
+.cr-storybook.cr-fx2 .cr-sky-sunset .cr-sky-orb {
+  transform: translate(calc(var(--cr-u) * 70), calc(var(--cr-u) * 44));
+}
+
+.cr-storybook.cr-fx2 .cr-sky-night .cr-sky-orb {
+  transform: translate(calc(var(--cr-u) * 19), calc(var(--cr-u) * 17));
+}
+
+.cr-fx2 .cr-sky-sun,
+.cr-fx2 .cr-sky-moon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: opacity 2.2s ease-in-out;
+}
+
+.cr-fx2 .cr-sky-moon,
+.cr-fx2 .cr-sky-night .cr-sky-sun {
+  opacity: 0;
+}
+
+.cr-fx2 .cr-sky-sun {
+  opacity: 0.92;
+}
+
+.cr-fx2 .cr-sky-night .cr-sky-moon {
+  opacity: 0.95;
+}
+
+.cr-fx2 .cr-sky-sun-disc {
+  fill: #ffd86b;
+  stroke: #f0a93a;
+  stroke-width: 2;
+  transition: fill 2.6s ease-in-out;
+}
+
+.cr-fx2 .cr-sky-rays {
+  stroke: #ffc04d;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.cr-fx2 .cr-sky-sunset .cr-sky-sun-disc {
+  fill: #ff9a6b;
+  stroke: #e0703f;
+}
+
+.cr-fx2 .cr-sky-sunset .cr-sky-rays {
+  stroke: #ffab7a;
+}
+
+.cr-fx2 .cr-sky-sun-face,
+.cr-fx2 .cr-sky-moon-face {
+  fill: none;
+  stroke: #a8641c;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.cr-fx2 .cr-sky-moon-disc {
+  fill: #fff3c4;
+  stroke: #e2c877;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/* 새 떼·흐르는 구름 — 움직임이 꺼져 있으면 보이지 않는 자리(투명)에 그대로 있다. */
+.cr-storybook.cr-fx2 .cr-sky-birds {
+  display: block;
+}
+
+.cr-fx2 .cr-flock,
+.cr-fx2 .cr-cloud-flow {
+  display: inline;
+  opacity: 0;
+}
+
+.cr-fx2 .cr-bird {
+  fill: none;
+  stroke: var(--cr-muted);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.cr-fx2 .cr-sky-night .cr-flock {
+  visibility: hidden;
+}
+
+.cr-fx .cr-particle-puff {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+}
+
+/* 우승 무지개 — 결과 상자 머리에 한 줄씩 그려진다. */
+.cr-storybook.cr-fx2 .cr-win-rainbow {
+  display: block;
+  width: min(44%, 168px);
+  margin: -2px auto -4px;
+  overflow: visible;
+}
+
+.cr-fx2 .cr-win-rainbow path {
+  fill: none;
+  stroke-width: 8;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+}
+
+/* 구매·건설 반짝임 — 칸 위를 빛줄기가 한 번 훑는다(칸이 넘침을 자르므로 칸 안에서만 보인다). */
+.cr-motion.cr-fx2 .cr-tile[data-cr-fx='claim']::before,
+.cr-motion.cr-fx2 .cr-tile[data-cr-fx='claim-build']::before,
+.cr-motion.cr-fx2 .cr-tile[data-cr-fx='build']::before {
+  content: '';
+  position: absolute;
+  inset: -20% -60%;
+  z-index: 2;
+  background: linear-gradient(105deg, rgb(255 255 255 / 0%) 45%, rgb(255 255 255 / 72%) 50%, rgb(255 255 255 / 0%) 55%);
+  pointer-events: none;
+  animation: cr-gleam 0.8s ease-out 0.12s both;
+}
+
+.cr-motion.cr-fx2 .cr-sky-rays { animation: cr-spin 48s linear infinite; }
+.cr-motion.cr-fx2 .cr-flock { animation: cr-flock 44s linear 6s infinite; }
+.cr-motion.cr-fx2 .cr-bird { animation: cr-flap 0.46s ease-in-out infinite alternate; }
+.cr-motion.cr-fx2 .cr-cloud-flow-a { animation: cr-flow 62s linear infinite; }
+.cr-motion.cr-fx2 .cr-cloud-flow-b { animation: cr-flow 84s linear -36s infinite; }
+
+/* 그림책 주사위 — 양옆에서 굴러 들어와 두 번 튀고 선다(길이는 게임판이 배속에 맞춰 준다). */
+.cr-motion.cr-fx2 .cr-die-tossing {
+  animation: cr-tumble 0.78s linear;
+}
+
+.cr-motion.cr-fx2 .cr-die + .cr-die .cr-die-tossing {
+  animation-name: cr-tumble-b;
+}
+
+.cr-motion.cr-fx2 .cr-die-shadow-toss {
+  animation: cr-shadow-tumble 0.78s linear;
+}
+
+.cr-motion.cr-fx2 .cr-die + .cr-die .cr-die-shadow-toss {
+  animation-name: cr-shadow-tumble-b;
+}
+
+/* 통통 — 착지한 열기구가 두 번 튄다. */
+.cr-motion.cr-fx2 .cr-token-land {
+  animation: cr-bounce 0.62s linear;
+}
+
+.cr-motion.cr-fx2 .cr-token-shadow-land {
+  animation: cr-shadow-bounce 0.62s linear;
+}
+
+/* 팝업북 — 깃발·건물이 접혀 있다가 벌떡 선다. */
+.cr-motion.cr-fx2 .cr-tile-bld .cr-bld {
+  animation: cr-popup 0.72s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* 돈이 들어오고 나갈 때 좌석의 현금 숫자가 튄다. */
+.cr-motion.cr-fx2 .cr-seat-cash[data-cr-fx] {
+  transform-origin: 0 50%;
+}
+
+.cr-motion.cr-fx2 .cr-seat-cash[data-cr-fx='got'] { animation: cr-cash-up 0.6s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.cr-motion.cr-fx2 .cr-seat-cash[data-cr-fx='paid'] { animation: cr-cash-down 0.5s ease-out; }
+
+/* 파산 — 바람이 빠지며 이리저리 쏠리다 쪼그라들어 내려앉는다. */
+.cr-motion.cr-fx2 .cr-token-out {
+  transform-origin: 50% 80%;
+  animation: cr-deflate var(--cr-ms) linear forwards;
+}
+
+.cr-motion.cr-fx2 .cr-win-rainbow path {
+  animation: cr-rainbow-draw 1.1s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+
+.cr-motion.cr-fx2 .cr-win-rainbow path:nth-child(2) { animation-delay: 0.12s; }
+.cr-motion.cr-fx2 .cr-win-rainbow path:nth-child(3) { animation-delay: 0.24s; }
+.cr-motion.cr-fx2 .cr-win-rainbow path:nth-child(4) { animation-delay: 0.36s; }
+.cr-motion.cr-fx2 .cr-win-rainbow path:nth-child(5) { animation-delay: 0.48s; }
+
+@keyframes cr-flock {
+  0% { opacity: 0; transform: translate(-90px, 0); }
+  2% { opacity: 0.75; }
+  21% { opacity: 0.75; }
+  23% { opacity: 0; transform: translate(830px, -110px); }
+  100% { opacity: 0; transform: translate(830px, -110px); }
+}
+
+@keyframes cr-flap {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.3); }
+}
+
+@keyframes cr-flow {
+  0% { opacity: 0; transform: translateX(-90px); }
+  5% { opacity: 0.9; }
+  95% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateX(790px); }
+}
+
+@keyframes cr-gleam {
+  from { opacity: 1; transform: translateX(-70%); }
+  to { opacity: 1; transform: translateX(70%); }
+}
+
+@keyframes cr-tumble {
+  0% { opacity: 0; transform: translate(-330%, -70%) rotate(-220deg); animation-timing-function: cubic-bezier(0.4, 0, 0.8, 0.6); }
+  8% { opacity: 1; }
+  34% { transform: translate(-170%, 0) rotate(-100deg) scale(1.12, 0.86); animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1); }
+  52% { transform: translate(-95%, -62%) rotate(-50deg); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  70% { transform: translate(-36%, 0) rotate(-14deg) scale(1.1, 0.9); animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1); }
+  82% { transform: translate(-12%, -22%) rotate(-4deg); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  93% { transform: scale(1.06, 0.94); }
+  100% { transform: none; }
+}
+
+@keyframes cr-tumble-b {
+  0% { opacity: 0; transform: translate(330%, -90%) rotate(240deg); animation-timing-function: cubic-bezier(0.4, 0, 0.8, 0.6); }
+  8% { opacity: 1; }
+  38% { transform: translate(160%, 0) rotate(100deg) scale(1.12, 0.86); animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1); }
+  56% { transform: translate(86%, -52%) rotate(46deg); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  74% { transform: translate(30%, 0) rotate(12deg) scale(1.1, 0.9); animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1); }
+  85% { transform: translate(9%, -18%) rotate(3deg); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5); }
+  95% { transform: scale(1.05, 0.95); }
+  100% { transform: none; }
+}
+
+@keyframes cr-shadow-tumble {
+  0% { opacity: 0; transform: translateX(-330%) scale(0.5); }
+  34% { opacity: 0.2; transform: translateX(-170%) scale(1); }
+  52% { opacity: 0.09; transform: translateX(-95%) scale(0.6); }
+  70% { opacity: 0.2; transform: translateX(-36%) scale(1); }
+  82% { opacity: 0.14; transform: translateX(-12%) scale(0.82); }
+  100% { opacity: 0.2; transform: none; }
+}
+
+@keyframes cr-shadow-tumble-b {
+  0% { opacity: 0; transform: translateX(330%) scale(0.5); }
+  38% { opacity: 0.2; transform: translateX(160%) scale(1); }
+  56% { opacity: 0.1; transform: translateX(86%) scale(0.64); }
+  74% { opacity: 0.2; transform: translateX(30%) scale(1); }
+  85% { opacity: 0.15; transform: translateX(9%) scale(0.85); }
+  100% { opacity: 0.2; transform: none; }
+}
+
+@keyframes cr-bounce {
+  0% { transform: scale(1.28, 0.68); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  28% { transform: translateY(-34%) scale(0.92, 1.1); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  52% { transform: scale(1.16, 0.84); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  70% { transform: translateY(-13%) scale(0.97, 1.04); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  86% { transform: scale(1.07, 0.94); }
+  100% { transform: none; }
+}
+
+@keyframes cr-shadow-bounce {
+  0%,
+  52%,
+  100% { opacity: 0.18; transform: scale(1); }
+  28% { opacity: 0.08; transform: scale(0.6); }
+  70% { opacity: 0.13; transform: scale(0.84); }
+}
+
+@keyframes cr-popup {
+  0% { opacity: 0; transform: perspective(120px) rotateX(-92deg) scale(0.7); }
+  18% { opacity: 1; }
+  52% { transform: perspective(120px) rotateX(16deg) scale(1.2); }
+  72% { transform: perspective(120px) rotateX(-8deg) scale(0.96); }
+  88% { transform: perspective(120px) rotateX(3deg) scale(1.03); }
+  100% { transform: none; }
+}
+
+@keyframes cr-cash-up {
+  0% { transform: none; }
+  35% { transform: translateY(-22%) scale(1.3); }
+  62% { transform: scale(0.95); }
+  100% { transform: none; }
+}
+
+@keyframes cr-cash-down {
+  30% { transform: translateY(14%) scale(0.86); }
+  100% { transform: none; }
+}
+
+@keyframes cr-deflate {
+  0% { transform: none; filter: none; }
+  6% { transform: scale(1.14, 1.1); }
+  14% { transform: translate(-46%, -30%) rotate(-28deg) scale(0.9, 1); }
+  24% { transform: translate(40%, -52%) rotate(32deg) scale(0.8, 0.94); }
+  34% { transform: translate(-30%, -34%) rotate(-24deg) scale(0.7, 0.86); filter: saturate(0.6); }
+  44% { transform: translate(22%, -44%) rotate(18deg) scale(0.6, 0.78); }
+  54% { transform: translate(-8%, -20%) rotate(-10deg) scale(0.52, 0.66); filter: grayscale(0.8); }
+  78% { opacity: 1; transform: translate(4%, 34%) rotate(8deg) scale(0.5, 0.42); filter: grayscale(1); }
+  88% { opacity: 1; transform: translate(0, 40%) scale(0.6, 0.26); filter: grayscale(1); }
+  100% { opacity: 0; transform: translate(0, 42%) scale(0.62, 0.2); filter: grayscale(1); }
+}
+
+@keyframes cr-rainbow-draw {
+  from { opacity: 0.2; stroke-dashoffset: 100; }
+}
