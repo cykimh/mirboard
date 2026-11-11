@@ -7,6 +7,10 @@ import { drawScene, toCanvas, type Palette } from './draw';
 import { poseAt, poseScript, type PoseScript, type PoseState } from './unitPose';
 import { skinSource, type ArtillerySkin } from './skins';
 import { FOLLOW_MS, easeAngle, followPosition, type WalkFollow } from './liveMove';
+import { fxEndMs, fxScript, type FxEvent } from './effects';
+
+/** 승리 축포 길이(ms) — 그 뒤로는 루프를 멈춘다(배터리). */
+const CELEBRATE_MS = 9000;
 
 interface Props {
   mask: Mask | null;
@@ -28,6 +32,10 @@ interface Props {
   onAimAngle?: (angle: number) => void;
   onReplayDone: () => void;
   reducedMotion: boolean;
+  /** 아래는 D-252 — 스킨 연출용. 바람(하늘·바람개비), 2:2 팀전(팀 아우라), 이긴 좌석(축포). */
+  wind?: number;
+  teams?: boolean;
+  winners?: readonly number[] | null;
 }
 
 /** 테마 색(CSS 변수 — 라이트/다크)을 읽는다. 변수가 없으면 스킨의 기본 색. */
@@ -41,6 +49,7 @@ function readPalette(el: HTMLElement | null, fallback: Palette): Palette {
     cloud: v('--ar-cloud', fallback.cloud),
     cloudEdge: v('--ar-cloud-edge', fallback.cloudEdge),
     label: v('--ar-label', fallback.label),
+    night: v('--ar-night', '') === '1',
   };
 }
 
@@ -70,6 +79,9 @@ export function ArtilleryField({
   onAimAngle,
   onReplayDone,
   reducedMotion,
+  wind,
+  teams = false,
+  winners = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -81,15 +93,16 @@ export function ArtilleryField({
 
   const terrainNow = useMemo(() => (mask && hasCanvas ? safeCanvas(mask, skin) : null), [mask, hasCanvas, skin]);
   // 재생 중 지형 — 연산 k 개를 적용한 그림을 필요할 때 한 번씩 만든다(홀씨·겹씨앗은 구멍이 여럿, D-224).
-  const replayTerrains = useRef<{ nonce: number; skin: ArtillerySkin | null; images: (CanvasImageSource | null | undefined)[] }>({
-    nonce: -1,
+  // 캐시 열쇠는 대본 객체 자체다 — nonce 는 재생이 끝나면(replay = null) 다시 1 부터라 다음 대본과 겹친다(D-252 에서 고침).
+  const replayTerrains = useRef<{ replay: Replay | null; skin: ArtillerySkin | null; images: (CanvasImageSource | null | undefined)[] }>({
+    replay: null,
     skin: null,
     images: [],
   });
   const terrainAt = (r: Replay, k: number, sk: ArtillerySkin): CanvasImageSource | null => {
     if (!hasCanvas) return null;
-    if (replayTerrains.current.nonce !== r.nonce || replayTerrains.current.skin !== sk) {
-      replayTerrains.current = { nonce: r.nonce, skin: sk, images: [] };
+    if (replayTerrains.current.replay !== r || replayTerrains.current.skin !== sk) {
+      replayTerrains.current = { replay: r, skin: sk, images: [] };
     }
     const idx = Math.min(k, r.masks.length - 1);
     if (idx < 0) return null;
@@ -100,12 +113,19 @@ export function ArtilleryField({
     return made;
   };
   // 포대 상태 — 대본마다 창을 한 번 만들고, 상태 객체는 포대 수만큼 만들어 두고 고쳐 쓴다.
-  const poseScriptRef = useRef<{ nonce: number; script: PoseScript | null }>({ nonce: -1, script: null });
+  const poseScriptRef = useRef<{ replay: Replay | null; script: PoseScript | null }>({ replay: null, script: null });
   const posesRef = useRef<PoseState[]>([]);
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin, follow, liveAim, reducedMotion, wind, teams, winners };
+  // 대본 연출(D-252) — 사건은 대본마다 한 번 뽑고, 재생이 끝나도 꼬리가 사라질 때까지 시계를 둔다(조작은 막지 않는다).
+  const fxRef = useRef<{ nonce: number; events: FxEvent[]; startedAt: number; endMs: number } | null>(null);
+  const fxArg = useRef<{ events: readonly FxEvent[]; nowMs: number }>({ events: [], nowMs: 0 });
+  const celebrateRef = useRef<{ startedAt: number } | null>(null);
+  const celebrateArg = useRef<{ seats: readonly number[]; elapsedMs: number }>({ seats: [], elapsedMs: 0 });
+  // 테마 색은 0.4초에 한 번만 다시 읽는다(프레임마다 getComputedStyle 을 부르지 않게).
+  const paletteRef = useRef<{ at: number; skin: ArtillerySkin | null; value: Palette | null }>({ at: -1e9, skin: null, value: null });
   // 남의 포신 보간 — 새 미리보기가 오면 지금 그리던 각도에서 출발한다.
   const shownAngle = useRef<{ seat: number; from: number; to: number; at: number } | null>(null);
   const animatingRef = useRef(false);
@@ -125,6 +145,30 @@ export function ArtilleryField({
     }
     const aimAngles = { ...L.angles };
     let animating = false;
+    // 움직임 줄이기면 화면 시계를 세워 대기 몸짓·구름·꽃잎이 멈춘다.
+    const clock = L.reducedMotion ? 0 : now;
+    let fx: { events: readonly FxEvent[]; nowMs: number } | null = null;
+    const fr = fxRef.current;
+    if (fr && !L.reducedMotion && L.skin.drawEffects) {
+      const fxNow = now - fr.startedAt;
+      if (fxNow < fr.endMs) {
+        fxArg.current.events = fr.events;
+        fxArg.current.nowMs = fxNow;
+        fx = fxArg.current;
+        animating = true;
+      } else if (!frame) fxRef.current = null;
+    }
+    let celebrate: { seats: readonly number[]; elapsedMs: number } | null = null;
+    if (L.winners && L.winners.length > 0 && !frame && !L.reducedMotion && L.skin.drawCelebration) {
+      if (!celebrateRef.current) celebrateRef.current = { startedAt: now };
+      const el = now - celebrateRef.current.startedAt;
+      if (el < CELEBRATE_MS) {
+        celebrateArg.current.seats = L.winners;
+        celebrateArg.current.elapsedMs = el;
+        celebrate = celebrateArg.current;
+        animating = true;
+      }
+    } else if (!L.winners) celebrateRef.current = null;
     if (L.liveAim && !frame) {
       const la = L.liveAim;
       const cur = shownAngle.current;
@@ -143,6 +187,8 @@ export function ArtilleryField({
     // 남의 걸음 — 받은 시각부터 경로를 따라 걷는다(움직임 줄이기면 바로 도착 자리).
     const walking = !frame && !L.reducedMotion ? followPosition(L.follow, Date.now()) : null;
     animating ||= walking !== null;
+    // 살아 있는 스킨(구름·꽃잎·숨쉬기)은 차례 중에 늘 부드럽게 돈다.
+    animating ||= L.skin.drawEffects !== undefined && !L.reducedMotion && L.turnSeat >= 0;
     animatingRef.current = animating;
     const drawUnits = frame
       ? frame.units
@@ -156,15 +202,21 @@ export function ArtilleryField({
     // 포대 상태(D-227) — 재생 중이면 대본의 창, 아니면 차례 주인 = 조준.
     let script: PoseScript | null = null;
     if (frame && !frame.done && L.replay) {
-      if (poseScriptRef.current.nonce !== L.replay.nonce) {
-        poseScriptRef.current = { nonce: L.replay.nonce, script: poseScript(L.replay.report) };
+      if (poseScriptRef.current.replay !== L.replay) {
+        poseScriptRef.current = { replay: L.replay, script: poseScript(L.replay.report) };
       }
       script = poseScriptRef.current.script;
     }
     const replayMs = script && replayStart.current !== null ? now - replayStart.current : null;
     const poses = posesRef.current;
     while (poses.length < drawUnits.length) poses.push({ pose: 'idle', elapsedMs: 0 });
-    for (let i = 0; i < drawUnits.length; i++) poseAt(drawUnits[i], script, replayMs, L.turnSeat, now, poses[i]);
+    for (let i = 0; i < drawUnits.length; i++) poseAt(drawUnits[i], script, replayMs, L.turnSeat, clock, poses[i]);
+    const pal = paletteRef.current;
+    if (!pal.value || pal.skin !== L.skin || now - pal.at > 400 || now < pal.at) {
+      pal.value = readPalette(wrapRef.current, L.skin.fallbackPalette);
+      pal.skin = L.skin;
+      pal.at = now;
+    }
     drawScene(ctx, (w * dpr) / FIELD_W, {
       terrain: frame && L.replay && !frame.done ? terrainAt(L.replay, frame.opsApplied, L.skin) : L.terrainNow,
       units: drawUnits,
@@ -177,9 +229,13 @@ export function ArtilleryField({
       // D-251 — 걸음은 바로 확정되니 원래 자리 유령은 그리지 않는다(되돌리기 없음).
       ghost: null,
       frame,
-      palette: readPalette(wrapRef.current, L.skin.fallbackPalette),
-      time: now,
+      palette: pal.value,
+      time: clock,
       poses,
+      wind: L.wind,
+      teams: L.teams,
+      fx,
+      celebrate,
     }, w / FIELD_W, L.skin);
     return done;
   };
@@ -220,6 +276,8 @@ export function ArtilleryField({
       return;
     }
     replayStart.current = performance.now();
+    const events = fxScript(replay.report, replay.before);
+    fxRef.current = { nonce: replay.nonce, events, startedAt: replayStart.current, endMs: fxEndMs(events) };
     let raf = 0;
     const step = (now: number) => {
       if (render(now)) {
@@ -250,7 +308,8 @@ export function ArtilleryField({
     if (replay) return;
     render(performance.now());
     const followLeft = follow && !reducedMotion ? FOLLOW_MS - (Date.now() - follow.startedAt) : 0;
-    if ((turnSeat < 0 && followLeft <= 0) || reducedMotion) return;
+    const tail = fxRef.current !== null || (winners !== null && winners.length > 0);
+    if ((turnSeat < 0 && followLeft <= 0 && !tail) || reducedMotion) return;
     let raf = 0;
     let last = 0;
     const loop = (now: number) => {
@@ -265,7 +324,7 @@ export function ArtilleryField({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow, skin, follow, liveAim]);
+  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow, skin, follow, liveAim, wind, teams, winners]);
 
   // 끌어서 조준
   const dragging = useRef(false);
@@ -283,7 +342,7 @@ export function ArtilleryField({
   };
 
   return (
-    <div className="ar-field" ref={wrapRef}>
+    <div className={`ar-field ar-field-${skin.id.replace(/[^a-z0-9]+/gi, '-')}`} ref={wrapRef}>
       <canvas
         ref={canvasRef}
         className={`ar-canvas${aim && onAimAngle ? ' ar-canvas-aiming' : ''}`}
@@ -311,7 +370,7 @@ export function ArtilleryField({
 
 function safeCanvas(mask: Mask, skin: ArtillerySkin): CanvasImageSource | null {
   try {
-    return toCanvas(skin.terrainImage(mask));
+    return skin.terrainCanvas?.(mask) ?? toCanvas(skin.terrainImage(mask));
   } catch {
     return null;
   }
