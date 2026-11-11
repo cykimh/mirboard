@@ -66,5 +66,7 @@
 @import './parts/23-artillery-table.css';
 /* 게임판 ⋮ 메뉴·한 줄 머리 줄(D-186) — `.gm-` 접두 전용, 게임판 CSS 뒤(머리 줄 줄바꿈을 이긴다)·17 앞, 폭 미디어 0개. */
 @import './parts/24-game-menu.css';
+/* 티츄 "옻칠 찻집" 테마 층(D-241) — `.tc-` 접두 전용, 공용 part(03~16) 뒤에서 덧칠만 한다. 미디어 0개(폭·동작 줄이기는 17). */
+@import './parts/25-tichu-lacquer.css';
 /* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
 @import './parts/17-responsive.css';

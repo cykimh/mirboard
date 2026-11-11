@@ -27,6 +27,7 @@ import { RoundHistoryModal } from './RoundHistoryModal';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { TICHU_TUTORIAL } from './tutorial/tichuTutorial';
+import { tichuThemeClass } from './tichuTheme';
 
 interface GameTableProps {
   roomId: string;
@@ -170,7 +171,7 @@ export function GameTable({
       className="game-table-layout"
       style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}
     >
-    <section className="game-table" style={{ flex: 1, minWidth: 0 }} onClick={a.handleBackgroundClick}>
+    <section className={`game-table${tichuThemeClass}${cardAnimEnabled ? '' : ' tc-anim-off'}`} style={{ flex: 1, minWidth: 0 }} onClick={a.handleBackgroundClick}>
       <EffectsOverlay />
       <ReconnectBanner connected={connected} />
       <GameTableHeader

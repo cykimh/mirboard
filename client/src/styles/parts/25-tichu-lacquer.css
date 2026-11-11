@@ -1,0 +1,1071 @@
+/* 티츄 "옻칠 찻집" 테마 층 (D-241, 디자인 2차 D-187).
+ *
+ * 기본 모습(03~16 의 공용 게임판 part) 위에 얹는 꾸밈이다. 되돌리기는 `features/tichu/tichuTheme.ts` 의 `TICHU_THEME` 한 줄 —
+ * `'classic'` 이면 아래 클래스가 하나도 붙지 않아 이 파일 전체가 죽은 규칙이 된다.
+ *
+ * ⚠ 네임스페이스: 모든 선택자는 `.tc-` 클래스를 포함한다. 공용 클래스(.seat, .card-chip, .table-arena …)는 `.tc-theme-lacquer`
+ *   (게임판 루트) 또는 `.tc-card`(카드 자신) 아래에서만 덧칠한다 — 단독 재정의 금지.
+ * ⚠ 미디어 쿼리 0개: 이 파일은 17 앞에 import 된다. 폭·동작 줄이기 규칙은 `17-responsive.css` 의 `.tc-` 블록에 둔다.
+ * ⚠ 키프레임 이름은 전부 `tc-` 로 시작한다(이름은 전역이다).
+ */
+
+/* ── 색 토큰 ─────────────────────────────────────────────────────────────── */
+.tc-theme-lacquer {
+  --tc-felt-hi: #2c5a4a;
+  --tc-felt-mid: #1b4034;
+  --tc-felt-lo: #0c211b;
+  --tc-lacquer: #7c1714;
+  --tc-lacquer-hi: #a52a22;
+  --tc-lacquer-lo: #4a0c0d;
+  --tc-black-hi: #2b1a17;
+  --tc-black: #17100f;
+  --tc-black-lo: #0e0808;
+  --tc-gold: #d9b25a;
+  --tc-gold-pale: #f6e2a4;
+  --tc-gold-line: rgba(217, 178, 90, 0.62);
+  --tc-lamp: rgba(255, 186, 110, 0.2);
+  --tc-plate-text: #f3e6c8;
+  --tc-frame: 5px;
+}
+
+/* 라이트 — 낮의 찻집: 펠트와 옻칠이 한 톤 밝고 등불 대신 창빛이 든다. */
+html:not(.dark) .tc-theme-lacquer {
+  --tc-felt-hi: #418069;
+  --tc-felt-mid: #2d6552;
+  --tc-felt-lo: #1c4538;
+  --tc-lacquer: #9a211b;
+  --tc-lacquer-hi: #c2372c;
+  --tc-lacquer-lo: #6b1412;
+  --tc-black-hi: #3a2622;
+  --tc-black: #231614;
+  --tc-black-lo: #170e0d;
+  --tc-lamp: rgba(255, 226, 170, 0.26);
+}
+
+/* ── 카드 ────────────────────────────────────────────────────────────────── */
+/* 카드는 게임판 밖(튜토리얼·받은 카드 창)에서도 그려지므로 토큰을 스스로 든다. 글자·그림 크기는 카드 폭을 따른다(cqw). */
+.tc-card {
+  --tc-jade: #12805a;
+  --tc-sword: #2450b0;
+  --tc-pagoda: #c2650a;
+  --tc-star: #c21f3a;
+  container-type: inline-size;
+}
+
+.card-chip.tc-card {
+  padding: 0;
+  gap: 0;
+  border: 1px solid #b3944e;
+  border-radius: 7px;
+  background: linear-gradient(158deg, #fffbf1 0%, #f7efdc 46%, #eadcbb 100%);
+  box-shadow:
+      0 1px 2px rgba(20, 8, 6, 0.5),
+      0 3px 8px rgba(20, 8, 6, 0.26);
+  overflow: hidden;
+}
+
+/* 08-hand 의 `.card-chip:hover:not(:disabled)`(0,3,0)가 바탕을 회색으로 바꾸지 않게. */
+.card-chip.tc-card:hover:not(:disabled) {
+  background: linear-gradient(158deg, #fffbf1 0%, #f7efdc 46%, #eadcbb 100%);
+}
+
+.card-chip.tc-card.selected,
+.card-chip.tc-card.selected:hover:not(:disabled) {
+  border-color: #f0c24a;
+  background: linear-gradient(158deg, #fffdf4 0%, #fff1c4 50%, #f3dc9a 100%);
+  box-shadow:
+      0 0 0 2px #f0c24a,
+      0 0 12px rgba(240, 194, 74, 0.55),
+      0 7px 14px rgba(20, 8, 6, 0.42);
+}
+
+/* 연출용(누를 수 없는) 카드 — 떠오르기·손가락 커서 없음. */
+.card-chip.tc-card.tc-card-static,
+.card-chip.tc-card.tc-card-static:hover {
+  cursor: default;
+  transform: none;
+}
+
+.tc-card .tc-face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(130% 95% at 100% 100%, var(--tc-wash, transparent) 0%, transparent 62%);
+}
+
+.tc-card .tc-suit-jade {
+  color: var(--tc-jade);
+  --tc-wash: rgba(18, 128, 90, 0.17);
+}
+.tc-card .tc-suit-sword {
+  color: var(--tc-sword);
+  --tc-wash: rgba(36, 80, 176, 0.16);
+}
+.tc-card .tc-suit-pagoda {
+  color: var(--tc-pagoda);
+  --tc-wash: rgba(194, 101, 10, 0.17);
+}
+.tc-card .tc-suit-star {
+  color: var(--tc-star);
+  --tc-wash: rgba(194, 31, 58, 0.15);
+}
+
+/* 왼쪽 위 모서리 표기 — 숫자 위·무늬 아래. 겹친 손패에서 왼쪽 21px 띠만 보여도 읽힌다(카드 48px 기준 오른쪽 끝 ≈18px). */
+.tc-card .tc-index {
+  position: absolute;
+  left: 5cqw;
+  top: 5cqw;
+  width: 31cqw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.tc-card .tc-rank {
+  font-size: 34cqw;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* 두 글자("10") — 폭을 맞추려고 조금 작게·촘촘하게. */
+.tc-card .tc-rank-wide {
+  font-size: 28cqw;
+  letter-spacing: -0.1em;
+  margin-left: -0.08em;
+  line-height: 1.14;
+}
+
+.tc-card .tc-pip {
+  width: 23cqw;
+  height: 23cqw;
+  margin-top: 4cqw;
+  display: block;
+}
+
+.tc-card .tc-emblem {
+  position: absolute;
+  right: 7cqw;
+  bottom: 7cqw;
+  width: 54cqw;
+  height: 54cqw;
+  display: block;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+/* 특수 카드 — 검은 칠기 바탕 + 금박 두 줄 테두리. */
+.tc-card .tc-face-special {
+  color: #f6e2a4;
+  background: radial-gradient(120% 80% at 50% 0%, #3d2622 0%, #1d1211 55%, #0e0808 100%);
+  box-shadow:
+      inset 0 0 0 1px rgba(231, 192, 103, 0.95),
+      inset 0 0 0 3px #17100f,
+      inset 0 0 0 4px rgba(231, 192, 103, 0.42);
+}
+
+.tc-card .tc-art {
+  position: absolute;
+  left: 9cqw;
+  top: 16cqw;
+  width: calc(100% - 13cqw);
+  height: calc(100% - 21cqw);
+  display: block;
+}
+
+.tc-card .tc-face-special .tc-index {
+  left: 0;
+  top: 0;
+  width: 33cqw;
+  padding: 6cqw 0 5cqw;
+  border-radius: 6px 0 8cqw 0;
+  background: rgba(14, 8, 8, 0.82);
+  box-shadow: inset -1px -1px 0 rgba(231, 192, 103, 0.5);
+}
+
+.tc-card .tc-face-special .tc-rank {
+  font-size: 27cqw;
+  letter-spacing: 0;
+}
+
+.tc-card .tc-sp-mahjong .tc-rank {
+  font-size: 34cqw;
+  color: #8fe6bd;
+}
+.tc-card .tc-sp-phoenix .tc-rank {
+  color: #ffb199;
+}
+.tc-card .tc-sp-dog .tc-rank {
+  color: #f1e7cf;
+}
+
+/* 뒷면 — 붉은 옻칠 + 금박 문양(문양은 인라인 SVG). */
+.tc-back {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background: linear-gradient(152deg, #b02a22 0%, #8a1a19 42%, #590e11 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.tc-back .tc-back-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tc-seat-back {
+  display: inline-block;
+  overflow: hidden;
+}
+
+/* ── 판 질감 ─────────────────────────────────────────────────────────────── */
+/* 비단 펠트: 등불 빛(위) + 칠보 무늬 + 비단 결 + 바탕. 틀은 붉은 옻칠 + 금박 선(안쪽 그림자라 배치가 변하지 않는다). */
+.tc-theme-lacquer .table-arena {
+  border-color: var(--tc-gold);
+  /* 펠트는 두 테마 모두 어두우니 글자는 늘 밝게(라이트에서 좌석 장수가 묻히지 않게). */
+  color: var(--tc-plate-text);
+  background:
+      radial-gradient(ellipse 72% 48% at 50% -8%, var(--tc-lamp), transparent 70%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.05'%3E%3Ccircle cx='0' cy='0' r='22'/%3E%3Ccircle cx='44' cy='0' r='22'/%3E%3Ccircle cx='0' cy='44' r='22'/%3E%3Ccircle cx='44' cy='44' r='22'/%3E%3Ccircle cx='22' cy='22' r='22'/%3E%3C/g%3E%3C/svg%3E"),
+      repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.024) 0 2px, transparent 2px 7px),
+      radial-gradient(ellipse 80% 70% at 50% 46%, var(--tc-felt-hi) 0%, var(--tc-felt-mid) 50%, var(--tc-felt-lo) 100%);
+  box-shadow:
+      inset 0 0 0 var(--tc-frame) var(--tc-lacquer),
+      inset 0 0 0 calc(var(--tc-frame) + 1px) var(--tc-gold-line),
+      inset 0 0 0 calc(var(--tc-frame) + 2px) rgba(0, 0, 0, 0.3),
+      inset 0 0 84px rgba(0, 0, 0, 0.42),
+      0 10px 30px rgba(0, 0, 0, 0.36);
+}
+
+/* 선언 틴트 — 틀(옻칠·금박 선)은 가리지 않게 안쪽에만 깔고, 티츄는 금빛·그랜드는 주홍으로(기본 모습은 파랑·빨강). */
+.tc-theme-lacquer .table-arena.arena-tint-tichu::before,
+.tc-theme-lacquer .table-arena.arena-tint-grand::before {
+  inset: calc(var(--tc-frame) + 2px);
+  border-radius: 17px;
+}
+.tc-theme-lacquer .table-arena.arena-tint-tichu::before {
+  background: radial-gradient(ellipse 82% 72% at 50% 50%, transparent 46%, rgba(240, 194, 74, 0.2) 100%);
+  box-shadow: inset 0 0 60px 8px rgba(240, 194, 74, 0.24);
+}
+.tc-theme-lacquer .table-arena.arena-tint-grand::before {
+  background: radial-gradient(ellipse 82% 72% at 50% 50%, transparent 44%, rgba(216, 57, 44, 0.3) 100%);
+  box-shadow: inset 0 0 66px 10px rgba(216, 57, 44, 0.36);
+}
+
+/* 좌석 명패 — 검은 칠기 + 금박 선. 팀 색은 글자로 남긴다. */
+.tc-theme-lacquer .seat-team {
+  padding: 1px 9px;
+  border: 1px solid var(--tc-gold-line);
+  background: linear-gradient(180deg, var(--tc-black-hi), var(--tc-black-lo));
+  box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 2px 5px rgba(0, 0, 0, 0.4);
+}
+.tc-theme-lacquer .seat-team.us {
+  color: #8fe3b8;
+}
+.tc-theme-lacquer .seat-team.them {
+  color: #ffa9a1;
+}
+
+.tc-theme-lacquer .seat-avatar {
+  box-shadow:
+      0 0 0 2px var(--tc-black),
+      0 0 0 3px var(--tc-gold-line);
+}
+
+/* 차례 강조 — 금빛 맥박. 좌석 자체의 transform 은 자리 정렬에 쓰이므로 ::after 고리만 움직인다. */
+.tc-theme-lacquer .seat.turn {
+  border-color: transparent;
+  box-shadow: none;
+}
+.tc-theme-lacquer .seat.turn::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 14px;
+  border: 2px solid var(--tc-gold-pale);
+  box-shadow:
+      0 0 14px 2px rgba(240, 194, 74, 0.55),
+      inset 0 0 10px rgba(240, 194, 74, 0.22);
+  pointer-events: none;
+  animation: tc-turn-pulse 1.5s ease-in-out infinite;
+}
+@keyframes tc-turn-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.035); }
+}
+
+/* 좌석의 선언 표시 — 붉은 인장. */
+.tc-theme-lacquer .seat > .declared {
+  padding: 2px 8px;
+  border-radius: 4px 5px 3px 6px;
+  color: #fff1d6;
+  background: #b3221b;
+  box-shadow:
+      inset 0 0 0 1px #b3221b,
+      inset 0 0 0 2px rgba(255, 241, 214, 0.7),
+      0 2px 5px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.04em;
+}
+.tc-theme-lacquer .seat > .declared.grand {
+  color: #ffe08a;
+  background: #8f1512;
+}
+
+/* 가운데 트릭 — 검은 칠기 쟁반. */
+.tc-theme-lacquer .table-center-trick {
+  background: linear-gradient(180deg, rgba(34, 20, 18, 0.74), rgba(14, 8, 8, 0.8));
+  border-color: rgba(217, 178, 90, 0.5);
+  box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      inset 0 0 22px rgba(0, 0, 0, 0.4),
+      0 6px 18px rgba(0, 0, 0, 0.34);
+}
+.tc-theme-lacquer .table-center-trick .hand-type {
+  color: #2a1608;
+  background: linear-gradient(180deg, var(--tc-gold-pale), var(--tc-gold));
+}
+
+/* 카드가 내려앉는 자리의 금빛 고리 — 비행(360ms)이 끝날 즈음 한 번. */
+.tc-land-ring {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 92px;
+  height: 92px;
+  margin: -46px 0 0 -46px;
+  border-radius: 50%;
+  border: 2px solid rgba(246, 226, 164, 0.9);
+  box-shadow: 0 0 16px rgba(240, 194, 74, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  animation: tc-land-ring 520ms ease-out 300ms both;
+}
+@keyframes tc-land-ring {
+  0%   { opacity: 0.9; transform: scale(0.5); }
+  100% { opacity: 0; transform: scale(1.75); }
+}
+
+/* 점수판·남은 시간 — 칠기 알약. 점수 칸은 값이 바뀌면 다시 마운트되어 한 번 튀어 오른다. */
+.tc-theme-lacquer .scoreboard,
+.tc-theme-lacquer .turn-countdown:not(.urgent) {
+  color: var(--tc-plate-text);
+  background: linear-gradient(180deg, var(--tc-black-hi), var(--tc-black-lo));
+  box-shadow:
+      0 0 0 1px var(--tc-gold-line),
+      0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.tc-theme-lacquer .scoreboard:hover {
+  background: linear-gradient(180deg, #3d2824, #1d1211);
+}
+.tc-theme-lacquer .scoreboard-team {
+  display: inline-block;
+  animation: tc-score-pop 700ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+@keyframes tc-score-pop {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(1.5); text-shadow: 0 0 10px rgba(240, 194, 74, 0.9); }
+  100% { transform: scale(1); }
+}
+
+/* 걸려 있는 소원 — 점수판 아래 작은 마작 패. */
+.tc-wish-tile,
+.tc-fx-wish-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #17100f;
+  background: linear-gradient(180deg, #fffaf0, #efe3c4);
+  border-radius: 6px;
+  box-shadow:
+      0 3px 0 #1f7d5d,
+      0 6px 12px rgba(0, 0, 0, 0.45);
+  line-height: 1;
+}
+.tc-wish-tile small,
+.tc-fx-wish-tile small {
+  font-weight: 800;
+  color: #b3221b;
+}
+.tc-wish-tile b,
+.tc-fx-wish-tile b {
+  font-weight: 900;
+}
+.tc-wish-tile {
+  position: absolute;
+  left: 14px;
+  top: 52px;
+  z-index: 14;
+  min-width: 34px;
+  padding: 4px 4px 5px;
+  gap: 2px;
+  animation: tc-wish-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.tc-wish-tile small {
+  font-size: 0.58rem;
+}
+.tc-wish-tile b {
+  font-size: 1.1rem;
+}
+@keyframes tc-wish-in {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-14deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* 내 손패 쟁반 — 검은 칠기 + 금박 선 + 위에서 드는 등불 빛. */
+.tc-theme-lacquer .my-hand {
+  border-color: rgba(217, 178, 90, 0.7);
+  background:
+      radial-gradient(ellipse 90% 140% at 50% 0%, rgba(255, 186, 110, 0.11), transparent 60%),
+      linear-gradient(180deg, var(--tc-black-hi) 0%, var(--tc-black) 60%, var(--tc-black-lo) 100%);
+  box-shadow:
+      inset 0 0 0 3px var(--tc-black),
+      inset 0 0 0 4px rgba(217, 178, 90, 0.26),
+      inset 0 0 30px rgba(0, 0, 0, 0.5),
+      0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.tc-theme-lacquer .my-hand.pick-emphasis {
+  border-color: #f0c24a;
+  box-shadow:
+      inset 0 0 0 3px var(--tc-black),
+      inset 0 0 30px rgba(0, 0, 0, 0.5),
+      0 0 0 2px rgba(240, 194, 74, 0.5);
+}
+
+/* 손패에 카드가 들어올 때(딜·되돌린 패스 카드) — 위에서 내려앉는다. 플레이 단계(겹침)에서는 쓰지 않는다:
+   드래그 재배열이 노드를 옮기면 애니메이션이 다시 돌기 때문. 카드 애니 끔(`tc-anim-off`)이면 없다. */
+.tc-theme-lacquer:not(.tc-anim-off) .hand-cards:not(.overlap) > .tc-hand-slot > .tc-card {
+  animation: tc-deal-in 420ms cubic-bezier(0.2, 0.8, 0.3, 1.15) backwards;
+  animation-delay: calc(var(--tc-i, 0) * 28ms);
+}
+@keyframes tc-deal-in {
+  0%   { opacity: 0; transform: translateY(-46px) scale(0.7) rotate(-7deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+/* 내기·패스 — 옻칠 버튼. 낼 수 있을 때만 붉은 옻칠 + 금 테(기본 모습의 '거짓 활성 회피' 규칙 그대로). */
+.tc-theme-lacquer .seat-action-btn.play:not(:disabled),
+.tc-theme-lacquer .seat-action-btn.play:hover:not(:disabled) {
+  color: #fff3dc;
+  background: linear-gradient(180deg, var(--tc-lacquer-hi), var(--tc-lacquer));
+  box-shadow:
+      0 0 0 2px rgba(240, 194, 74, 0.9),
+      0 4px 16px rgba(0, 0, 0, 0.45);
+}
+.tc-theme-lacquer .seat-action-btn.pass:not(:disabled),
+.tc-theme-lacquer .seat-action-btn.pass:hover:not(:disabled) {
+  color: var(--tc-plate-text);
+  background: linear-gradient(180deg, #3d2c28, #1d1413);
+  box-shadow:
+      0 0 0 1px var(--tc-gold-line),
+      0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* 못 누를 때는 둘 다 어두운 칠기로 가라앉힌다(전역 button:disabled 의 opacity .5 가 더 흐리게 한다). */
+.tc-theme-lacquer .seat-action-btn.play:disabled,
+.tc-theme-lacquer .seat-action-btn.pass:disabled {
+  color: var(--tc-plate-text);
+  background: linear-gradient(180deg, #3d2c28, #1d1413);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 패스 슬롯 — 빈 칸만 칠기 바탕으로(고르는 중·채워짐 강조는 기본 규칙 그대로). */
+.tc-theme-lacquer .pass-slot:not(.droppable):not(.filled) {
+  border-color: rgba(217, 178, 90, 0.5);
+  background: linear-gradient(180deg, var(--tc-black-hi), var(--tc-black-lo));
+}
+.tc-theme-lacquer .pass-slot {
+  color: var(--tc-plate-text);
+}
+
+/* 라운드 끝 — 칠기 현판이 내려오고 점수가 튀어 오른다. */
+.tc-theme-lacquer .round-ended {
+  border-color: rgba(217, 178, 90, 0.75);
+  color: var(--tc-plate-text);
+  background:
+      radial-gradient(ellipse 80% 120% at 50% -30%, rgba(255, 186, 110, 0.16), transparent 60%),
+      linear-gradient(135deg, #3d1512, #1d0b0a);
+  box-shadow:
+      inset 0 0 0 3px var(--tc-black),
+      inset 0 0 0 4px rgba(217, 178, 90, 0.3);
+  animation: tc-plaque-in 420ms ease-out both;
+}
+.tc-theme-lacquer .round-ended h3 {
+  margin: 0;
+  color: var(--tc-gold-pale);
+}
+.tc-theme-lacquer .round-ended h3 + p {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #ffe9a8;
+  transform-origin: left center;
+  animation: tc-round-score 900ms cubic-bezier(0.2, 0.9, 0.3, 1.3) 160ms both;
+}
+@keyframes tc-plaque-in {
+  0%   { opacity: 0; transform: translateY(-10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes tc-round-score {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.6); }
+  40%  { opacity: 1; transform: translateY(-5px) scale(1.2); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 매치 끝 패널 — 붉은 옻칠 현판. */
+.tc-theme-lacquer .match-ended {
+  border-color: var(--tc-gold);
+  background:
+      radial-gradient(ellipse 80% 90% at 50% -25%, rgba(255, 186, 110, 0.2), transparent 62%),
+      linear-gradient(135deg, #4d1613, #210b0a 72%);
+  box-shadow:
+      inset 0 0 0 3px var(--tc-black),
+      inset 0 0 0 4px rgba(217, 178, 90, 0.32),
+      0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.tc-theme-lacquer .match-ended h3 {
+  color: var(--tc-gold-pale);
+  letter-spacing: 0.02em;
+}
+
+/* ── 경기장 연출 층 ──────────────────────────────────────────────────────── */
+/* 층이 컨테이너라 좌석 방향 클래스가 컨테이너 단위(cqw/cqh)로 이동 거리를 정한다 — JS 로 자리를 재지 않는다. */
+.tc-fx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+
+.tc-to-s { --tc-tx: 0cqw;   --tc-ty: 35cqh; }
+.tc-to-n { --tc-tx: 0cqw;   --tc-ty: -36cqh; }
+.tc-to-e { --tc-tx: -40cqw; --tc-ty: 0cqh; }
+.tc-to-w { --tc-tx: 40cqw;  --tc-ty: 0cqh; }
+.tc-from-s { --tc-fx: 0cqw;   --tc-fy: 35cqh; }
+.tc-from-n { --tc-fx: 0cqw;   --tc-fy: -36cqh; }
+.tc-from-e { --tc-fx: -40cqw; --tc-fy: 0cqh; }
+.tc-from-w { --tc-fx: 40cqw;  --tc-fy: 0cqh; }
+
+/* 딜 — 가운데에서 네 좌석으로 뒷면이 돌며 날아간다. */
+.tc-fx-deal-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 42px;
+  margin: -21px 0 0 -15px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  animation: tc-deal-fly 560ms cubic-bezier(0.3, 0.7, 0.3, 1) var(--tc-d, 0ms) both;
+}
+@keyframes tc-deal-fly {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.6) rotate(0deg); }
+  14%  { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--tc-tx), var(--tc-ty)) scale(0.9) rotate(200deg); }
+}
+
+/* 트릭 가져가기 — 더미가 잠깐 모였다가 가져간 좌석 쪽으로 빨려 간다. */
+.tc-fx-sweep {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  animation: tc-sweep 640ms cubic-bezier(0.5, 0, 0.75, 0.45) both;
+}
+@keyframes tc-sweep {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(-2deg); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tc-tx)), calc(-50% + var(--tc-ty))) scale(0.32) rotate(16deg); }
+}
+.tc-fx-sweep-pile {
+  display: flex;
+}
+.tc-fx-sweep-card {
+  display: block;
+  margin-left: -24px;
+  transform: rotate(calc((var(--tc-i, 0) - 2) * 4deg));
+}
+.tc-fx-sweep-card:first-child {
+  margin-left: 0;
+}
+.tc-fx-sweep-card .tc-card {
+  width: 42px;
+  height: 60px;
+}
+
+/* 가져간 좌석에 트릭 점수가 떠오른다(0점 트릭은 없음). */
+.tc-fx-points {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffe08a;
+  text-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.75),
+      0 0 12px rgba(240, 194, 74, 0.6);
+  white-space: nowrap;
+  animation: tc-points-rise 880ms ease-out 300ms both;
+}
+.tc-fx-points-minus {
+  color: #ffa9a1;
+}
+@keyframes tc-points-rise {
+  0%   { opacity: 0; transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78)) scale(0.5); }
+  28%  { opacity: 1; transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78 - 8px)) scale(1.3); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78 - 30px)) scale(1); }
+}
+
+/* 용 트릭 넘기기 — 준 사람에게서 받는 사람에게 용 패가 포물선으로 건너간다. */
+.tc-fx-dragon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: tc-dragon-fly 1150ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes tc-dragon-fly {
+  0%   { opacity: 0; transform: translate(calc(-50% + var(--tc-fx)), calc(-50% + var(--tc-fy))) scale(0.6); }
+  14%  { opacity: 1; }
+  50%  { transform: translate(calc(-50% + (var(--tc-fx) + var(--tc-tx)) / 2), calc(-50% + (var(--tc-fy) + var(--tc-ty)) / 2 - 7cqh)) scale(1.3); }
+  86%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tc-tx)), calc(-50% + var(--tc-ty))) scale(0.7); }
+}
+.tc-fx-dragon-token {
+  display: block;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle, #3d2622, #0e0808);
+  box-shadow:
+      0 0 0 2px #e7c067,
+      0 0 18px 4px rgba(240, 194, 74, 0.6);
+}
+.tc-fx-dragon-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.7) translate(-4%, 16%);
+}
+.tc-fx-dragon-label {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 178, 90, 0.6);
+  background: rgba(14, 8, 8, 0.82);
+  color: #ffe9a8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* 인장 — 붉은 도장. 좌석 인장(연출 층)과 화면 가운데 큰 인장이 같은 모양을 쓴다. */
+.tc-seal {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  min-width: 50px;
+  color: #fff1d6;
+  background: #b3221b;
+  border-radius: 7px 9px 6px 10px;
+  box-shadow:
+      inset 0 0 0 2px #b3221b,
+      inset 0 0 0 3.5px rgba(255, 241, 214, 0.85),
+      0 3px 10px rgba(0, 0, 0, 0.45);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.tc-seal small {
+  display: block;
+  font-size: 0.4em;
+  letter-spacing: 0.32em;
+  margin-right: -0.32em;
+}
+
+/* 선언 인장 — 좌석 쪽 자리에 쾅 찍히고 금빛 고리 둘이 퍼진다. */
+.tc-fx-stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(calc(var(--tc-tx) * 0.86), calc(var(--tc-ty) * 0.8));
+}
+.tc-fx-stamp .tc-seal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: tc-stamp 1750ms both;
+}
+.tc-fx-stamp-grand .tc-seal,
+.tc-fx-declare-grand .tc-seal {
+  color: #ffe08a;
+  background: #8f1512;
+  box-shadow:
+      inset 0 0 0 2px #8f1512,
+      inset 0 0 0 3.5px rgba(255, 224, 138, 0.9),
+      0 3px 12px rgba(0, 0, 0, 0.5);
+}
+@keyframes tc-stamp {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(-20deg) scale(2.8); }
+  12%  { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(0.9); }
+  18%  { transform: translate(-50%, -50%) rotate(-8deg) scale(1.07); }
+  24%  { transform: translate(-50%, -50%) rotate(-8deg) scale(1); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(1.05); }
+}
+.tc-fx-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 70px;
+  height: 70px;
+  margin: -35px 0 0 -35px;
+  border-radius: 50%;
+  border: 3px solid #f0c24a;
+  box-shadow:
+      0 0 14px rgba(240, 194, 74, 0.8),
+      inset 0 0 10px rgba(240, 194, 74, 0.5);
+  opacity: 0;
+  animation: tc-ring 820ms ease-out 200ms both;
+}
+.tc-fx-ring-late {
+  animation-delay: 420ms;
+}
+@keyframes tc-ring {
+  0%   { opacity: 0.95; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
+/* 소원 — 가운데에 마작 패가 튀어나왔다 사라진다(걸려 있는 동안은 `.tc-wish-tile` 이 남는다). */
+.tc-fx-wish {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  animation: tc-wish-pop 1750ms ease-out both;
+}
+.tc-fx-wish-tile {
+  width: 76px;
+  padding: 9px 0 11px;
+  gap: 4px;
+  border-radius: 9px;
+}
+.tc-fx-wish-tile small {
+  font-size: 0.74rem;
+}
+.tc-fx-wish-tile b {
+  font-size: 2.3rem;
+}
+@keyframes tc-wish-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-16deg); }
+  14%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(4deg); }
+  22%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  78%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(calc(-50% - 30cqw), calc(-50% - 30cqh)) scale(0.4) rotate(0deg); }
+}
+
+/* 폭탄 — 경기장이 흔들린다. 연달아 터져도 다시 흔들리게 이름 둘을 번갈아 쓴다(내용은 같다). */
+.tc-shake-a {
+  animation: tc-shake-a 620ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+.tc-shake-b {
+  animation: tc-shake-b 620ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes tc-shake-a {
+  10%, 90%      { transform: translate3d(-2px, 1px, 0); }
+  20%, 80%      { transform: translate3d(4px, -2px, 0); }
+  30%, 50%, 70% { transform: translate3d(-7px, 3px, 0) rotate(-0.4deg); }
+  40%, 60%      { transform: translate3d(7px, -3px, 0) rotate(0.4deg); }
+}
+@keyframes tc-shake-b {
+  10%, 90%      { transform: translate3d(-2px, 1px, 0); }
+  20%, 80%      { transform: translate3d(4px, -2px, 0); }
+  30%, 50%, 70% { transform: translate3d(-7px, 3px, 0) rotate(-0.4deg); }
+  40%, 60%      { transform: translate3d(7px, -3px, 0) rotate(0.4deg); }
+}
+
+/* ── 화면 전역 연출 ──────────────────────────────────────────────────────── */
+.tc-fx-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 폭탄 — 금빛 섬광·불덩이·충격 고리·파편. */
+.tc-fx-bomb-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%,
+      rgba(255, 236, 170, 0.85) 0%, rgba(240, 170, 60, 0.45) 22%,
+      rgba(179, 34, 27, 0.22) 48%, transparent 72%);
+  animation: tc-bomb-flash 900ms ease-out both;
+}
+@keyframes tc-bomb-flash {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+.tc-fx-bomb-core {
+  position: absolute;
+  width: 38vmin;
+  height: 38vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7d6 0%, #ffd66b 28%, #f08a2a 55%, rgba(179, 34, 27, 0) 72%);
+  animation: tc-bomb-core 700ms cubic-bezier(0.1, 0.8, 0.2, 1) both;
+}
+@keyframes tc-bomb-core {
+  0%   { opacity: 1; transform: scale(0.1); }
+  55%  { opacity: 0.9; transform: scale(1.25); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+.tc-fx-bomb-ring {
+  position: absolute;
+  width: 30vmin;
+  height: 30vmin;
+  border-radius: 50%;
+  border: 4px solid #ffe08a;
+  box-shadow: 0 0 24px 4px rgba(255, 214, 107, 0.7);
+  opacity: 0;
+  animation: tc-bomb-ring 820ms ease-out 60ms both;
+}
+.tc-fx-bomb-ring-late {
+  animation-delay: 240ms;
+}
+.tc-fx-bomb-sf .tc-fx-bomb-ring-late {
+  border-color: #ff6a4d;
+  box-shadow: 0 0 24px 4px rgba(255, 106, 77, 0.7);
+}
+@keyframes tc-bomb-ring {
+  0%   { opacity: 1; transform: scale(0.2); }
+  100% { opacity: 0; transform: scale(3.2); }
+}
+.tc-fx-shard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 5px;
+  margin: -2.5px 0 0 -6.5px;
+  border-radius: 1px 4px 4px 1px;
+  background: linear-gradient(90deg, #fff3c2, #f0b93a);
+  opacity: 0;
+  animation: tc-shard 950ms cubic-bezier(0.12, 0.75, 0.3, 1) var(--tc-d, 0ms) both;
+}
+.tc-fx-shard-red {
+  background: linear-gradient(90deg, #ffb199, #d8392c);
+}
+.tc-fx-bomb-sf .tc-fx-shard {
+  width: 17px;
+}
+@keyframes tc-shard {
+  0%   { opacity: 1; transform: rotate(var(--tc-a)) translateX(0) scale(var(--tc-s)); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--tc-a)) translateX(var(--tc-r)) scale(calc(var(--tc-s) * 0.4)); }
+}
+.tc-fx-bomb-label {
+  position: relative;
+  padding: 10px 26px;
+  border-radius: 10px;
+  color: #ffe9a8;
+  background: linear-gradient(180deg, #a52a22, #6b1412);
+  box-shadow:
+      inset 0 0 0 2px #17100f,
+      inset 0 0 0 3.5px rgba(246, 226, 164, 0.85),
+      0 10px 30px rgba(0, 0, 0, 0.5);
+  font-size: clamp(1.6rem, 7vw, 3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  animation: tc-banner 1750ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.tc-fx-bomb-sf .tc-fx-bomb-label {
+  font-size: clamp(1.05rem, 5vw, 2.2rem);
+}
+@keyframes tc-banner {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+  14%  { opacity: 1; transform: scale(1.12) rotate(-2deg); }
+  24%  { transform: scale(1) rotate(-2deg); }
+  78%  { opacity: 1; transform: scale(1) rotate(-2deg); }
+  100% { opacity: 0; transform: scale(1.08) rotate(-2deg); }
+}
+
+/* 선언 — 화면 가운데 큰 인장. */
+.tc-seal.tc-seal-big {
+  padding: 0.22em 0.5em 0.26em;
+  border-radius: 14px 18px 12px 20px;
+  font-size: clamp(2.2rem, 12vw, 4.2rem);
+  box-shadow:
+      inset 0 0 0 3px #b3221b,
+      inset 0 0 0 6px rgba(255, 241, 214, 0.85),
+      0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: tc-stamp-big 1950ms both;
+}
+.tc-fx-declare-grand .tc-seal.tc-seal-big {
+  box-shadow:
+      inset 0 0 0 3px #8f1512,
+      inset 0 0 0 6px rgba(255, 224, 138, 0.9),
+      0 0 40px 6px rgba(240, 194, 74, 0.45),
+      0 10px 30px rgba(0, 0, 0, 0.5);
+}
+@keyframes tc-stamp-big {
+  0%   { opacity: 0; transform: rotate(-18deg) scale(3); }
+  11%  { opacity: 1; transform: rotate(-7deg) scale(0.92); }
+  17%  { transform: rotate(-7deg) scale(1.05); }
+  23%  { transform: rotate(-7deg) scale(1); }
+  80%  { opacity: 1; transform: rotate(-7deg) scale(1); }
+  100% { opacity: 0; transform: rotate(-7deg) scale(1.04); }
+}
+.tc-fx-declare-ring {
+  position: absolute;
+  width: 34vmin;
+  height: 34vmin;
+  border-radius: 50%;
+  border: 4px solid #f0c24a;
+  box-shadow:
+      0 0 26px 4px rgba(240, 194, 74, 0.7),
+      inset 0 0 18px rgba(240, 194, 74, 0.5);
+  opacity: 0;
+  animation: tc-bomb-ring 900ms ease-out 230ms both;
+}
+
+/* 매치 끝 — 금가루가 내리고 등불이 오른다. */
+.tc-fx-victory-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, rgba(255, 200, 110, 0.3), transparent 62%);
+  animation: tc-fade-io 3500ms both;
+}
+.tc-fx-victory-lose .tc-fx-victory-glow {
+  background: radial-gradient(ellipse at 50% 45%, rgba(70, 70, 84, 0.32), transparent 62%);
+}
+@keyframes tc-fade-io {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.tc-fx-lantern {
+  position: absolute;
+  left: var(--tc-x, 50%);
+  bottom: -110px;
+  width: calc(46px * var(--tc-s, 1));
+  margin-left: -23px;
+  opacity: 0;
+  filter: drop-shadow(0 0 12px rgba(255, 170, 80, 0.7));
+  animation: tc-lantern-rise 3250ms ease-out var(--tc-d, 0ms) both;
+}
+.tc-fx-victory-lose .tc-fx-lantern {
+  filter: grayscale(0.55) brightness(0.8);
+}
+.tc-fx-lantern-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+@keyframes tc-lantern-rise {
+  0%   { opacity: 0; transform: translateY(0) rotate(-3deg); }
+  12%  { opacity: 1; }
+  50%  { transform: translateY(-56vh) rotate(3deg); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-104vh) rotate(-2deg); }
+}
+.tc-fx-dust {
+  position: absolute;
+  top: -12px;
+  left: var(--tc-x, 50%);
+  width: calc(7px * var(--tc-s, 1));
+  height: calc(7px * var(--tc-s, 1));
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6cf 0%, #f0c24a 55%, rgba(240, 194, 74, 0) 75%);
+  opacity: 0;
+  animation: tc-dust-fall 2400ms linear var(--tc-d, 0ms) both;
+}
+@keyframes tc-dust-fall {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  10%  { opacity: 1; }
+  80%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(var(--tc-w, 0), 104vh); }
+}
+.tc-fx-plaque {
+  position: relative;
+  padding: 16px 44px;
+  border-radius: 14px;
+  color: #ffe9a8;
+  background: linear-gradient(160deg, #3d2622, #120a09);
+  box-shadow:
+      inset 0 0 0 2px #17100f,
+      inset 0 0 0 4px rgba(246, 226, 164, 0.9),
+      0 0 50px 8px rgba(240, 170, 60, 0.45),
+      0 14px 40px rgba(0, 0, 0, 0.55);
+  font-size: clamp(1.7rem, 9vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  animation: tc-plaque 3500ms both;
+}
+.tc-fx-victory-lose .tc-fx-plaque {
+  color: #d9d2c4;
+  font-size: clamp(1.4rem, 7vw, 2.4rem);
+  box-shadow:
+      inset 0 0 0 2px #17100f,
+      inset 0 0 0 4px rgba(200, 190, 170, 0.5),
+      0 14px 40px rgba(0, 0, 0, 0.55);
+}
+@keyframes tc-plaque {
+  0%   { opacity: 0; transform: scale(0.5); }
+  10%  { opacity: 1; transform: scale(1.1); }
+  16%  { transform: scale(1); }
+  86%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+
+/* 내 차례 — 작은 칠기 알약(매 차례라 가볍게). */
+.tc-fx-myturn-pill {
+  padding: 8px 24px;
+  border-radius: 999px;
+  color: #ffe9a8;
+  background: linear-gradient(180deg, #3d2622, #120a09);
+  box-shadow:
+      inset 0 0 0 1.5px rgba(246, 226, 164, 0.9),
+      0 0 28px 4px rgba(240, 194, 74, 0.5);
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  animation: tc-myturn 1300ms ease-out both;
+}
+@keyframes tc-myturn {
+  0%   { opacity: 0; transform: scale(0.6); }
+  22%  { opacity: 1; transform: scale(1.1); }
+  34%  { transform: scale(1); }
+  72%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.06) translateY(-6px); }
+}

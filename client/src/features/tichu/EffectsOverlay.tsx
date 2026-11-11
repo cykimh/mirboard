@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useEffectStore } from './effectStore';
 import { useSfx } from '@/features/sound/useSfx';
+import { LacquerEffect } from './LacquerEffects';
+import { lacquerTheme } from './tichuTheme';
 
 /**
  * Phase 8G — 화면 전역 이펙트 오버레이. effectStore.active 가 셋팅되면 CSS
@@ -24,6 +26,9 @@ export function EffectsOverlay() {
   }, [active, clear, play]);
 
   if (!active) return null;
+
+  // D-241 — 옻칠 테마는 그림만 바꾼다(노출 시간·소리·해제는 위 그대로).
+  if (lacquerTheme) return <LacquerEffect key={active.id} effect={active} />;
 
   // 내 차례 — 작은 비차단 펄스 배지(화면 가운데, #5). 매 차례라 가볍게.
   // 중앙 정렬은 flex 래퍼로 하고 pop 애니(transform:scale)는 안쪽 요소에만 — 같은
