@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FIELD_H, FIELD_W } from '@/types/artillery';
 import type { Mask } from './terrain';
 import { frameAt, replayLengthMs, type FrameUnit } from './replay';
 import type { Replay } from './artilleryStore';
-import { drawScene, terrainImage, toCanvas, type Palette } from './draw';
+import { drawScene, toCanvas, type Palette } from './draw';
+import { poseAt, poseScript, type PoseScript, type PoseState } from './unitPose';
+import { skinSource, type ArtillerySkin } from './skins';
 
 interface Props {
   mask: Mask | null;
@@ -23,24 +25,17 @@ interface Props {
   reducedMotion: boolean;
 }
 
-const FALLBACK: Palette = {
-  skyTop: '#9fd3f5',
-  skyBottom: '#e8f5ff',
-  cloud: '#ffffff',
-  cloudEdge: '#d6e6f2',
-  label: '#1d2a36',
-};
-
-function readPalette(el: HTMLElement | null): Palette {
-  if (!el || typeof getComputedStyle !== 'function') return FALLBACK;
+/** 테마 색(CSS 변수 — 라이트/다크)을 읽는다. 변수가 없으면 스킨의 기본 색. */
+function readPalette(el: HTMLElement | null, fallback: Palette): Palette {
+  if (!el || typeof getComputedStyle !== 'function') return fallback;
   const cs = getComputedStyle(el);
   const v = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb;
   return {
-    skyTop: v('--ar-sky-top', FALLBACK.skyTop),
-    skyBottom: v('--ar-sky-bottom', FALLBACK.skyBottom),
-    cloud: v('--ar-cloud', FALLBACK.cloud),
-    cloudEdge: v('--ar-cloud-edge', FALLBACK.cloudEdge),
-    label: v('--ar-label', FALLBACK.label),
+    skyTop: v('--ar-sky-top', fallback.skyTop),
+    skyBottom: v('--ar-sky-bottom', fallback.skyBottom),
+    cloud: v('--ar-cloud', fallback.cloud),
+    cloudEdge: v('--ar-cloud-edge', fallback.cloudEdge),
+    label: v('--ar-label', fallback.label),
   };
 }
 
@@ -52,7 +47,7 @@ export function angleToward(cx: number, cy: number, px: number, py: number): num
 }
 
 /**
- * 전장 Canvas. 지형 이미지는 마스크가 바뀔 때만 만들고(대본 재생 중에는 폭발 전까지 이전 지형), 재생 중에만 rAF 를 돌린다. 숨은 탭·움직임
+ * 전장 Canvas. 그림은 스킨(`skins/`, D-227)이 그리고, 시트 스킨을 다 받으면 다시 그린다(그 전에는 도형 스킨). 지형 이미지는 마스크가 바뀔 때만 만들고(대본 재생 중에는 폭발 전까지 이전 지형), 재생 중에만 rAF 를 돌린다. 숨은 탭·움직임
  * 줄이기면 재생을 끝 장면으로 건너뛴다.
  */
 export function ArtilleryField({
@@ -74,24 +69,36 @@ export function ArtilleryField({
   const sizeRef = useRef({ w: 0, dpr: 1 });
   const hasCanvas = typeof document !== 'undefined' && typeof ImageData !== 'undefined';
 
-  const terrainNow = useMemo(() => (mask && hasCanvas ? safeCanvas(mask) : null), [mask, hasCanvas]);
+  const [skin, setSkin] = useState<ArtillerySkin>(() => skinSource.current());
+  useEffect(() => skinSource.subscribe(() => setSkin(skinSource.current())), []);
+
+  const terrainNow = useMemo(() => (mask && hasCanvas ? safeCanvas(mask, skin) : null), [mask, hasCanvas, skin]);
   // 재생 중 지형 — 연산 k 개를 적용한 그림을 필요할 때 한 번씩 만든다(홀씨·겹씨앗은 구멍이 여럿, D-224).
-  const replayTerrains = useRef<{ nonce: number; images: (CanvasImageSource | null | undefined)[] }>({ nonce: -1, images: [] });
-  const terrainAt = (r: Replay, k: number): CanvasImageSource | null => {
+  const replayTerrains = useRef<{ nonce: number; skin: ArtillerySkin | null; images: (CanvasImageSource | null | undefined)[] }>({
+    nonce: -1,
+    skin: null,
+    images: [],
+  });
+  const terrainAt = (r: Replay, k: number, sk: ArtillerySkin): CanvasImageSource | null => {
     if (!hasCanvas) return null;
-    if (replayTerrains.current.nonce !== r.nonce) replayTerrains.current = { nonce: r.nonce, images: [] };
+    if (replayTerrains.current.nonce !== r.nonce || replayTerrains.current.skin !== sk) {
+      replayTerrains.current = { nonce: r.nonce, skin: sk, images: [] };
+    }
     const idx = Math.min(k, r.masks.length - 1);
     if (idx < 0) return null;
     const cached = replayTerrains.current.images[idx];
     if (cached !== undefined) return cached;
-    const made = safeCanvas(r.masks[idx]);
+    const made = safeCanvas(r.masks[idx], sk);
     replayTerrains.current.images[idx] = made;
     return made;
   };
+  // 포대 상태 — 대본마다 창을 한 번 만들고, 상태 객체는 포대 수만큼 만들어 두고 고쳐 쓴다.
+  const poseScriptRef = useRef<{ nonce: number; script: PoseScript | null }>({ nonce: -1, script: null });
+  const posesRef = useRef<PoseState[]>([]);
 
   // 그리기에 필요한 최신 값 — rAF 콜백이 읽는다.
-  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow });
-  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow };
+  const latest = useRef({ units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin });
+  latest.current = { units, replay, cloudLevel, turnSeat, mySeat, names, aim, angles, terrainNow, skin };
 
   const render = (now: number) => {
     const canvas = canvasRef.current;
@@ -113,8 +120,20 @@ export function ArtilleryField({
       ? frame.units
       : L.units.map((u) => (L.aim && u.seat === L.aim.seat ? { ...u, x: L.aim.x, footY: L.aim.footY } : u));
     const ghostFrom = L.aim ? L.units.find((u) => u.seat === L.aim!.seat) : undefined;
+    // 포대 상태(D-227) — 재생 중이면 대본의 창, 아니면 차례 주인 = 조준.
+    let script: PoseScript | null = null;
+    if (frame && !frame.done && L.replay) {
+      if (poseScriptRef.current.nonce !== L.replay.nonce) {
+        poseScriptRef.current = { nonce: L.replay.nonce, script: poseScript(L.replay.report) };
+      }
+      script = poseScriptRef.current.script;
+    }
+    const replayMs = script && replayStart.current !== null ? now - replayStart.current : null;
+    const poses = posesRef.current;
+    while (poses.length < drawUnits.length) poses.push({ pose: 'idle', elapsedMs: 0 });
+    for (let i = 0; i < drawUnits.length; i++) poseAt(drawUnits[i], script, replayMs, L.turnSeat, now, poses[i]);
     drawScene(ctx, (w * dpr) / FIELD_W, {
-      terrain: frame && L.replay && !frame.done ? terrainAt(L.replay, frame.opsApplied) : L.terrainNow,
+      terrain: frame && L.replay && !frame.done ? terrainAt(L.replay, frame.opsApplied, L.skin) : L.terrainNow,
       units: drawUnits,
       angles: aimAngles,
       turnSeat: L.turnSeat,
@@ -127,9 +146,10 @@ export function ArtilleryField({
           ? { x: ghostFrom.x, footY: ghostFrom.footY }
           : null,
       frame,
-      palette: readPalette(wrapRef.current),
+      palette: readPalette(wrapRef.current, L.skin.fallbackPalette),
       time: now,
-    }, w / FIELD_W);
+      poses,
+    }, w / FIELD_W, L.skin);
     return done;
   };
 
@@ -211,7 +231,7 @@ export function ArtilleryField({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow]);
+  }, [replay, units, mask, aim, turnSeat, cloudLevel, reducedMotion, terrainNow, skin]);
 
   // 끌어서 조준
   const dragging = useRef(false);
@@ -255,9 +275,9 @@ export function ArtilleryField({
   );
 }
 
-function safeCanvas(mask: Mask): CanvasImageSource | null {
+function safeCanvas(mask: Mask, skin: ArtillerySkin): CanvasImageSource | null {
   try {
-    return toCanvas(terrainImage(mask));
+    return toCanvas(skin.terrainImage(mask));
   } catch {
     return null;
   }

@@ -1,0 +1,309 @@
+{
+  "format": "mirboard-artillery-skin",
+  "version": 1,
+  "image": "atlas.png",
+  "pxPerCell": 4,
+  "labelLift": 15,
+  "recoilCells": 2,
+  "soil": {
+    "grass": "#60a848",
+    "grassDark": "#468438",
+    "topsoil": "#96663e",
+    "subsoil": "#704a2e"
+  },
+  "anims": {
+    "unit.SPROUT.idle": {
+      "frames": [
+        [178, 804, 88, 56],
+        [356, 804, 88, 56]
+      ],
+      "tint": [
+        [267, 804, 88, 56],
+        [0, 861, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 520,
+      "loop": true
+    },
+    "unit.SPROUT.aim": {
+      "frames": [
+        [178, 690, 88, 56],
+        [356, 690, 88, 56]
+      ],
+      "tint": [
+        [267, 690, 88, 56],
+        [0, 747, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 260,
+      "loop": true
+    },
+    "unit.SPROUT.recoil": {
+      "frames": [
+        [89, 861, 88, 56],
+        [267, 861, 88, 56],
+        [0, 918, 88, 56]
+      ],
+      "tint": [
+        [178, 861, 88, 56],
+        [356, 861, 88, 56],
+        [89, 918, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 60,
+      "loop": false
+    },
+    "unit.SPROUT.hit": {
+      "frames": [
+        [267, 747, 88, 56],
+        [0, 804, 88, 56]
+      ],
+      "tint": [
+        [356, 747, 88, 56],
+        [89, 804, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 90,
+      "loop": true
+    },
+    "unit.SPROUT.down": {
+      "frames": [
+        [89, 747, 88, 56]
+      ],
+      "tint": [
+        [178, 747, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 0,
+      "loop": false,
+      "barrel": false
+    },
+    "barrel.SPROUT": {
+      "frames": [
+        [59, 975, 58, 28]
+      ],
+      "tint": [
+        [118, 975, 58, 28]
+      ],
+      "anchor": [6, 14]
+    },
+    "unit.ACORN.idle": {
+      "frames": [
+        [178, 348, 88, 56],
+        [356, 348, 88, 56]
+      ],
+      "tint": [
+        [267, 348, 88, 56],
+        [0, 405, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 520,
+      "loop": true
+    },
+    "unit.ACORN.aim": {
+      "frames": [
+        [194, 194, 88, 56],
+        [372, 194, 88, 56]
+      ],
+      "tint": [
+        [283, 194, 88, 56],
+        [0, 291, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 260,
+      "loop": true
+    },
+    "unit.ACORN.recoil": {
+      "frames": [
+        [89, 405, 88, 56],
+        [267, 405, 88, 56],
+        [0, 462, 88, 56]
+      ],
+      "tint": [
+        [178, 405, 88, 56],
+        [356, 405, 88, 56],
+        [89, 462, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 60,
+      "loop": false
+    },
+    "unit.ACORN.hit": {
+      "frames": [
+        [267, 291, 88, 56],
+        [0, 348, 88, 56]
+      ],
+      "tint": [
+        [356, 291, 88, 56],
+        [89, 348, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 90,
+      "loop": true
+    },
+    "unit.ACORN.down": {
+      "frames": [
+        [89, 291, 88, 56]
+      ],
+      "tint": [
+        [178, 291, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 0,
+      "loop": false,
+      "barrel": false
+    },
+    "barrel.ACORN": {
+      "frames": [
+        [363, 918, 58, 28]
+      ],
+      "anchor": [6, 14]
+    },
+    "unit.DANDELION.idle": {
+      "frames": [
+        [178, 576, 88, 56],
+        [356, 576, 88, 56]
+      ],
+      "tint": [
+        [267, 576, 88, 56],
+        [0, 633, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 520,
+      "loop": true
+    },
+    "unit.DANDELION.aim": {
+      "frames": [
+        [178, 462, 88, 56],
+        [356, 462, 88, 56]
+      ],
+      "tint": [
+        [267, 462, 88, 56],
+        [0, 519, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 260,
+      "loop": true
+    },
+    "unit.DANDELION.recoil": {
+      "frames": [
+        [89, 633, 88, 56],
+        [267, 633, 88, 56],
+        [0, 690, 88, 56]
+      ],
+      "tint": [
+        [178, 633, 88, 56],
+        [356, 633, 88, 56],
+        [89, 690, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 60,
+      "loop": false
+    },
+    "unit.DANDELION.hit": {
+      "frames": [
+        [267, 519, 88, 56],
+        [0, 576, 88, 56]
+      ],
+      "tint": [
+        [356, 519, 88, 56],
+        [89, 576, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 90,
+      "loop": true
+    },
+    "unit.DANDELION.down": {
+      "frames": [
+        [89, 519, 88, 56]
+      ],
+      "tint": [
+        [178, 519, 88, 56]
+      ],
+      "anchor": [44, 48],
+      "mount": [44, 26],
+      "frameMs": 0,
+      "loop": false,
+      "barrel": false
+    },
+    "barrel.DANDELION": {
+      "frames": [
+        [422, 918, 58, 28]
+      ],
+      "tint": [
+        [0, 975, 58, 28]
+      ],
+      "anchor": [6, 14]
+    },
+    "seed.PEA": {
+      "frames": [
+        [215, 918, 36, 36]
+      ],
+      "anchor": [18, 18]
+    },
+    "seed.PUMPKIN": {
+      "frames": [
+        [252, 918, 36, 36]
+      ],
+      "anchor": [18, 18]
+    },
+    "seed.VINE": {
+      "frames": [
+        [326, 918, 36, 36]
+      ],
+      "anchor": [18, 18]
+    },
+    "seed.CHESTNUT": {
+      "frames": [
+        [178, 918, 36, 36]
+      ],
+      "anchor": [18, 18]
+    },
+    "seed.SPORE": {
+      "frames": [
+        [289, 918, 36, 36]
+      ],
+      "anchor": [18, 18]
+    },
+    "explosion": {
+      "frames": [
+        [0, 0, 96, 96],
+        [97, 0, 96, 96],
+        [194, 0, 96, 96],
+        [291, 0, 96, 96],
+        [388, 0, 96, 96],
+        [0, 97, 96, 96]
+      ],
+      "anchor": [48, 48],
+      "radius": 32,
+      "loop": false
+    },
+    "mound": {
+      "frames": [
+        [97, 97, 96, 96],
+        [194, 97, 96, 96],
+        [291, 97, 96, 96],
+        [388, 97, 96, 96],
+        [0, 194, 96, 96],
+        [97, 194, 96, 96]
+      ],
+      "anchor": [48, 48],
+      "radius": 32,
+      "loop": false
+    }
+  }
+}
