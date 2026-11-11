@@ -1325,3 +1325,1161 @@ button.oc-pile-draw {
     transform: translateY(0);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 네온 파티 테마 (D-260, 디자인 2차 D-187)
+ *
+ * 테마 클래스 `.oc-theme-neon` 하나를 게임판 루트(`.oc-table`)와 튜토리얼 포털 본문(`.oc-tokens`)에 얹는다
+ * (`features/onecard/oneCardTheme.ts` — `'classic'` 한 줄이면 이 구역 전체가 꺼진다). 위의 기본 규칙은 건드리지 않고
+ * 토큰을 다시 풀고 테마 접두로만 덧칠한다. 다크는 짙은 남색·보라에 형광 분홍·하늘·라임, 라이트는 파스텔 파티.
+ * 연출 조각(`.oc-fx*`·`.oc-party*`)은 화면 전용 장식이고 transform·opacity 만 움직인다. 움직임 줄이기는 17 끝의 `.oc-` 블록.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 토큰 ── */
+.oc-theme-neon {
+  --oc-neon-pink: #ff5fb2;
+  --oc-neon-sky: #4fd8ff;
+  --oc-neon-lime: #b6ff3c;
+  --oc-neon-amber: #ffc94d;
+  --oc-suit-spade: #4fd8ff;
+  --oc-suit-heart: #ff5fb2;
+  --oc-suit-diamond: #ffc94d;
+  --oc-suit-club: #b6ff3c;
+  --oc-face-ink: #f4f1ff;
+  --oc-face-atk: #ff8a3d;
+  --oc-neon-select: #ffffff;
+  --oc-panel-bg: rgba(12, 10, 38, 0.6);
+  --oc-panel-solid: #1b1746;
+  --oc-tray-bg: linear-gradient(180deg, #1a1548, #0e0c2a);
+  --oc-room-bg: linear-gradient(180deg, #0d0b26, #17103f);
+  --oc-back-a: #2a1a66;
+  --oc-back-b: #120f30;
+  --oc-card-bg: linear-gradient(160deg, #241d58, #130f33);
+  --oc-card-red: #ff5fb2;
+  --oc-card-black: #4fd8ff;
+  --oc-joker-black-bg: linear-gradient(160deg, #26262e, #0c0c12);
+  --oc-joker-black-fg: #f1f1f6;
+  --oc-joker-color-bg:
+    linear-gradient(160deg, #2c1259, #170a34) padding-box,
+    linear-gradient(135deg, #ff5fb2, #ffc94d 35%, #b6ff3c 65%, #4fd8ff) border-box;
+  --oc-joker-color-fg: #ffffff;
+  --oc-race-call: #0fae76;
+  --oc-race-catch: #f0306e;
+  --oc-accent-0: #4fa8ff;
+  --oc-accent-1: #ff5fb2;
+  --oc-accent-2: #5fe07a;
+  --oc-accent-3: #ffc94d;
+  --oc-accent-4: #b388ff;
+  --oc-accent-5: #2fe0d8;
+  --oc-felt-bg:
+    radial-gradient(60% 40% at 18% 12%, rgba(255, 95, 178, 0.2), transparent 70%),
+    radial-gradient(55% 40% at 85% 88%, rgba(79, 216, 255, 0.18), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, #2c1b66 0%, #17123f 55%, #0c0a26 100%);
+  --oc-felt-edge: #ff5fb2;
+}
+
+/* 라이트 — 파스텔 파티. 카드 면은 밝은 종이색, 무늬 색은 한 톤 짙게(대비). */
+html:not(.dark) .oc-theme-neon {
+  --oc-neon-pink: #f0379b;
+  --oc-neon-sky: #1c9be6;
+  --oc-neon-lime: #58b712;
+  --oc-neon-amber: #e89412;
+  --oc-suit-spade: #0b7fd1;
+  --oc-suit-heart: #e11d8f;
+  --oc-suit-diamond: #c96a00;
+  --oc-suit-club: #3d8f0a;
+  --oc-face-ink: #2a2350;
+  --oc-face-atk: #e2460b;
+  --oc-neon-select: #2a2350;
+  --oc-panel-bg: rgba(255, 255, 255, 0.72);
+  --oc-panel-solid: #ffffff;
+  --oc-tray-bg: linear-gradient(180deg, #fbe9ff, #e6f3ff);
+  --oc-room-bg: linear-gradient(180deg, #fff6fc, #f0f6ff);
+  --oc-back-a: #ffd3ec;
+  --oc-back-b: #d6ecff;
+  --oc-card-bg: linear-gradient(160deg, #ffffff, #fff4fb);
+  --oc-card-red: #e11d8f;
+  --oc-card-black: #0b7fd1;
+  --oc-joker-black-bg: linear-gradient(160deg, #3a3a44, #17171d);
+  --oc-joker-color-bg:
+    linear-gradient(160deg, #ffffff, #fff1fa) padding-box,
+    linear-gradient(135deg, #f0379b, #e89412 35%, #58b712 65%, #1c9be6) border-box;
+  --oc-joker-color-fg: #2a2350;
+  --oc-felt-bg:
+    radial-gradient(60% 40% at 18% 12%, rgba(255, 143, 205, 0.4), transparent 70%),
+    radial-gradient(55% 40% at 85% 88%, rgba(120, 205, 255, 0.4), transparent 70%),
+    linear-gradient(160deg, #ffe6f5, #e9f3ff 50%, #f0ffdf);
+  --oc-felt-edge: #f0379b;
+}
+
+/* 무늬 네 색 — 칩·이전 카드 줄·무늬 고르기·지정 배지·연출이 같이 쓴다. */
+.oc-theme-neon .oc-s-spade {
+  color: var(--oc-suit-spade);
+}
+
+.oc-theme-neon .oc-s-heart {
+  color: var(--oc-suit-heart);
+}
+
+.oc-theme-neon .oc-s-diamond {
+  color: var(--oc-suit-diamond);
+}
+
+.oc-theme-neon .oc-s-club {
+  color: var(--oc-suit-club);
+}
+
+/* ── 판 질감 ── */
+.oc-table.oc-theme-neon {
+  border-radius: 16px;
+  background: var(--oc-room-bg);
+}
+
+.oc-theme-neon .oc-badge-title {
+  border-color: var(--oc-neon-pink);
+  color: var(--oc-neon-pink);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--oc-neon-pink) 60%, transparent);
+}
+
+/* 네온 테두리 경기장. 반짝이는 파티 조명 점은 ::before(천 뒤, opacity 만 깜빡인다). */
+.oc-theme-neon .oc-felt {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    inset 0 0 0 1px var(--oc-neon-sky),
+    0 0 16px -2px var(--oc-neon-pink),
+    inset 0 0 30px -10px var(--oc-neon-sky);
+}
+
+.oc-theme-neon .oc-felt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 3px at 12% 22%, var(--oc-neon-pink) 0 55%, transparent 100%),
+    radial-gradient(circle 2px at 31% 9%, var(--oc-neon-lime) 0 55%, transparent 100%),
+    radial-gradient(circle 3px at 68% 15%, var(--oc-neon-sky) 0 55%, transparent 100%),
+    radial-gradient(circle 2px at 90% 34%, var(--oc-neon-amber) 0 55%, transparent 100%),
+    radial-gradient(circle 3px at 8% 71%, var(--oc-neon-sky) 0 55%, transparent 100%),
+    radial-gradient(circle 2px at 26% 92%, var(--oc-neon-amber) 0 55%, transparent 100%),
+    radial-gradient(circle 3px at 74% 90%, var(--oc-neon-pink) 0 55%, transparent 100%),
+    radial-gradient(circle 2px at 93% 66%, var(--oc-neon-lime) 0 55%, transparent 100%);
+  opacity: 0.55;
+  animation: oc-neon-twinkle 2.8s ease-in-out infinite;
+}
+
+@keyframes oc-neon-twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* D-173 의 내 차례 빛을 네온으로 — 테두리는 켜 두고 바깥·안쪽 빛은 ::after 의 opacity 로 숨 쉰다(box-shadow 를 매 프레임 다시 그리지 않는다). */
+.oc-theme-neon .oc-felt-myturn {
+  border-color: var(--oc-accent);
+  box-shadow:
+    inset 0 0 0 1px #ffffff,
+    0 0 0 2px var(--oc-accent);
+  animation: none;
+}
+
+.oc-theme-neon .oc-felt-myturn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    0 0 22px 5px var(--oc-accent),
+    inset 0 0 30px -4px var(--oc-accent);
+  animation: oc-neon-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes oc-neon-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.oc-theme-neon .oc-center {
+  border: 1px solid color-mix(in srgb, var(--oc-neon-sky) 45%, transparent);
+  background: var(--oc-panel-bg);
+}
+
+.oc-theme-neon .oc-seat {
+  border-color: color-mix(in srgb, var(--oc-accent) 55%, transparent);
+  border-left-color: var(--oc-accent);
+  background: var(--oc-panel-solid);
+}
+
+.oc-theme-neon .oc-me {
+  background: var(--oc-panel-solid);
+}
+
+/* 탈락 좌석은 흑백으로 가라앉는다. */
+.oc-theme-neon .oc-seat-out {
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition:
+    filter 600ms ease,
+    opacity 600ms ease;
+}
+
+.oc-theme-neon .oc-direction-arrow {
+  display: inline-block;
+  color: var(--oc-neon-lime);
+  animation: oc-neon-spin 600ms cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+}
+
+@keyframes oc-neon-spin {
+  from {
+    transform: rotate(-360deg) scale(1.6);
+  }
+  to {
+    transform: rotate(0) scale(1);
+  }
+}
+
+/* ── 카드 — SVG 그림 면(OneCardFace) ── */
+.oc-theme-neon .oc-card {
+  padding: 0;
+  border-color: currentColor;
+  background: var(--oc-card-bg);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 9px -2px currentColor;
+}
+
+.oc-theme-neon .oc-card:hover:not(:disabled) {
+  background: var(--oc-card-bg);
+}
+
+.oc-theme-neon .oc-card.oc-card-joker-black,
+.oc-theme-neon .oc-card.oc-card-joker-black:hover:not(:disabled) {
+  background: var(--oc-joker-black-bg);
+  color: var(--oc-joker-black-fg);
+}
+
+.oc-theme-neon .oc-card.oc-card-joker-color,
+.oc-theme-neon .oc-card.oc-card-joker-color:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--oc-joker-color-bg);
+  color: var(--oc-neon-pink);
+}
+
+.oc-theme-neon .oc-card-selected {
+  outline: 3px solid var(--oc-neon-select);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 0 16px 3px currentColor;
+}
+
+.oc-theme-neon .oc-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.oc-face .oc-f-fill {
+  fill: currentColor;
+}
+
+.oc-face .oc-f-glow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linejoin: round;
+  opacity: 0.26;
+}
+
+.oc-face .oc-f-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oc-face .oc-f-ink {
+  fill: none;
+  stroke: var(--oc-face-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.oc-face .oc-f-ink.oc-f-thick {
+  stroke-width: 2.5;
+}
+
+.oc-face .oc-f-inkfill {
+  fill: var(--oc-face-ink);
+}
+
+.oc-face .oc-f-rank {
+  fill: currentColor;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.oc-face .oc-f-rank.oc-f-rank-wide {
+  font-size: 20px;
+  letter-spacing: -2px;
+}
+
+.oc-face .oc-f-tag {
+  fill: var(--oc-face-atk);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.oc-face .oc-f-joker-name {
+  fill: var(--oc-face-ink);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+}
+
+/* 조커 — 컬러는 갈래마다 다른 형광, 흑백은 흰색·회색. */
+.oc-face .oc-j-a {
+  fill: var(--oc-neon-pink);
+}
+
+.oc-face .oc-j-b {
+  fill: var(--oc-neon-sky);
+}
+
+.oc-face .oc-j-c {
+  fill: var(--oc-neon-lime);
+}
+
+.oc-face .oc-j-ball {
+  fill: var(--oc-neon-amber);
+}
+
+.oc-face .oc-j-face {
+  fill: none;
+  stroke: var(--oc-face-ink);
+  stroke-width: 1.9;
+}
+
+.oc-face .oc-j-eye {
+  fill: var(--oc-face-ink);
+}
+
+.oc-card-joker-black .oc-face .oc-j-a,
+.oc-card-joker-black .oc-face .oc-j-c {
+  fill: #f1f1f6;
+}
+
+.oc-card-joker-black .oc-face .oc-j-b {
+  fill: #8d8fa3;
+}
+
+.oc-card-joker-black .oc-face .oc-j-ball {
+  fill: #c9cbd6;
+}
+
+.oc-card-joker-black .oc-face .oc-j-face {
+  stroke: #f1f1f6;
+}
+
+.oc-card-joker-black .oc-face .oc-j-eye,
+.oc-card-joker-black .oc-face .oc-f-joker-name {
+  fill: #f1f1f6;
+}
+
+.oc-card-joker-black .oc-face .oc-f-tag {
+  fill: #c9cbd6;
+}
+
+/* 이전 카드 줄·무늬 고르기·지정 배지 — 무늬 색 테두리. */
+.oc-theme-neon .oc-trail-card {
+  border-color: currentColor;
+}
+
+.oc-theme-neon .oc-trail-card.oc-card-joker-color {
+  border-color: transparent;
+}
+
+.oc-theme-neon .oc-declared {
+  border-color: currentColor;
+  background: var(--oc-panel-solid);
+}
+
+.oc-theme-neon .oc-suits {
+  border-color: var(--oc-neon-pink);
+}
+
+.oc-theme-neon .oc-suit-opt {
+  border: 2px solid currentColor;
+}
+
+.oc-theme-neon .oc-suit-opt.selected {
+  outline: 3px solid var(--oc-neon-select);
+  box-shadow: 0 0 14px 2px currentColor;
+}
+
+/* 뒷면 — 남색 바탕에 분홍·하늘 빗금이 엇갈린 마름모 격자. 더미·좌석 뭉치·먹기 비행·벌칙 카드가 같이 쓴다. */
+.oc-theme-neon .oc-pile:not([data-empty]),
+.oc-theme-neon .oc-fly-fan-card,
+.oc-theme-neon .oc-fx-pour-card {
+  border-color: var(--oc-neon-pink);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 5px, color-mix(in srgb, var(--oc-neon-pink) 70%, transparent) 5px 6px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, color-mix(in srgb, var(--oc-neon-sky) 70%, transparent) 5px 6px),
+    linear-gradient(160deg, var(--oc-back-a), var(--oc-back-b));
+}
+
+.oc-theme-neon .oc-pile:not([data-empty]) {
+  box-shadow:
+    2px 2px 0 -1px var(--oc-back-b),
+    2px 2px 0 0 var(--oc-neon-sky),
+    4px 4px 0 -1px var(--oc-back-b),
+    4px 4px 0 0 var(--oc-neon-lime),
+    0 0 12px -2px var(--oc-neon-pink);
+}
+
+.oc-theme-neon button.oc-pile-draw {
+  filter: drop-shadow(0 0 7px var(--oc-neon-lime));
+}
+
+.oc-theme-neon .oc-seat-hand-card {
+  border-color: var(--oc-neon-pink);
+  background:
+    repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--oc-neon-sky) 80%, transparent) 3px 4px),
+    linear-gradient(160deg, var(--oc-back-a), var(--oc-back-b));
+}
+
+/* ── 손패 칸·버튼 ── */
+.oc-theme-neon .oc-hand {
+  border-color: color-mix(in srgb, var(--oc-neon-sky) 55%, transparent);
+  background: var(--oc-tray-bg);
+  box-shadow: inset 0 0 30px -12px var(--oc-neon-pink);
+}
+
+.oc-theme-neon .oc-play:not(:disabled) {
+  background: linear-gradient(135deg, #e0218a, #7b3ff2);
+  box-shadow: 0 0 12px -2px #e0218a;
+}
+
+.oc-theme-neon .oc-draw:not(:disabled) {
+  background: linear-gradient(135deg, #0b74c4, #0e9488);
+  box-shadow: 0 0 12px -2px #0b74c4;
+}
+
+/* ── 공격 누적 — 숫자가 커지고 불꽃 테두리를 두른다 ── */
+.oc-theme-neon .oc-attack {
+  border-color: #ffd166;
+  background: linear-gradient(180deg, #ff7a18, #f0306e);
+  color: #ffffff;
+  box-shadow: 0 0 10px 1px rgba(255, 90, 31, 0.8);
+}
+
+.oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level] {
+  --oc-atk-scale: 1;
+  position: relative;
+  z-index: 2;
+  flex: none;
+  overflow: visible;
+  transform: scale(var(--oc-atk-scale));
+  animation: oc-neon-flame 520ms ease-in-out infinite alternate;
+}
+
+.oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level='2'] {
+  --oc-atk-scale: 1.14;
+}
+
+.oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level='3'] {
+  --oc-atk-scale: 1.28;
+}
+
+.oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level='4'] {
+  --oc-atk-scale: 1.42;
+}
+
+@keyframes oc-neon-flame {
+  from {
+    transform: scale(var(--oc-atk-scale));
+  }
+  to {
+    transform: scale(calc(var(--oc-atk-scale) * 1.07));
+  }
+}
+
+/* 맨 위 카드의 불꽃 테두리 — 단계가 오를수록 넓고 밝다. 빛은 ::after 의 opacity 로만 일렁인다. */
+.oc-theme-neon .oc-top[data-attack] > .oc-card::after {
+  --oc-fire: 6px;
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 11px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px #ffd166,
+    0 0 var(--oc-fire) calc(var(--oc-fire) / 2) #ff7a18,
+    0 0 calc(var(--oc-fire) * 2.4) var(--oc-fire) rgba(240, 48, 110, 0.6);
+  animation: oc-neon-fire 420ms ease-in-out infinite alternate;
+}
+
+.oc-theme-neon .oc-top[data-attack='2'] > .oc-card::after {
+  --oc-fire: 9px;
+}
+
+.oc-theme-neon .oc-top[data-attack='3'] > .oc-card::after {
+  --oc-fire: 12px;
+}
+
+.oc-theme-neon .oc-top[data-attack='4'] > .oc-card::after {
+  --oc-fire: 16px;
+}
+
+@keyframes oc-neon-fire {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── 비행 ── */
+.oc-theme-neon .oc-fly {
+  filter: drop-shadow(0 0 10px var(--oc-neon-pink)) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
+}
+
+/* 먹기 — 더미에서 뒷면 여러 장이 부채꼴로 펼쳐지며 난다(틀은 비우고 장마다 그린다). */
+.oc-theme-neon .oc-fly.oc-fly-draw {
+  border-color: transparent;
+  background: transparent;
+  filter: drop-shadow(0 0 8px var(--oc-neon-sky));
+}
+
+.oc-fly-fan-card {
+  position: absolute;
+  inset: -2px;
+  border-radius: 6px;
+  border: 2px solid;
+  transform-origin: 50% 130%;
+  animation: oc-fan-open 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes oc-fan-open {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(calc(var(--oc-fan, 0) * 16deg));
+  }
+}
+
+.oc-theme-neon .oc-fly-draw-count {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── 원카드!/잡기! 버튼 — 네온 빛과 등장 깜빡임 ── */
+/* 찾기 난이도(D-165)가 보통일 때만 빛·깜빡임을 준다 — 어려움·매우 어려움은 일부러 눈에 덜 띄게 한 설정이라 그대로 둔다.
+   위치·크기·투명도 규칙은 위 기본 구역 그대로다(여기서는 그림자·필터만). */
+.oc-theme-neon .oc-race-vis-normal .oc-race-btn {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--oc-race-glow, #ffffff) 45%, transparent),
+    0 0 20px 5px var(--oc-race-glow, #ffffff),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  animation: oc-neon-flicker 520ms linear 1;
+}
+
+.oc-theme-neon .oc-race-vis-normal .oc-race-call {
+  --oc-race-glow: #2bffb0;
+}
+
+.oc-theme-neon .oc-race-vis-normal .oc-race-catch {
+  --oc-race-glow: #ff5fb2;
+}
+
+@keyframes oc-neon-flicker {
+  0% {
+    filter: brightness(0.45);
+  }
+  14% {
+    filter: brightness(1.5);
+  }
+  28% {
+    filter: brightness(0.6);
+  }
+  42% {
+    filter: brightness(1.6);
+  }
+  56% {
+    filter: brightness(0.85);
+  }
+  70% {
+    filter: brightness(1.35);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* ── 연출 조각 (useOneCardFx → OneCardFxLayer) ── */
+.oc-fx {
+  position: absolute;
+  z-index: 115;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 공격 누적 — 불꽃 고리가 퍼지고 "+N" 이 튀어나온다. 카드가 내려앉은 뒤(280ms)에 시작. */
+.oc-fx-attack-num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #ffffff;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow:
+    0 0 4px #ffd166,
+    0 0 14px #ff7a18,
+    0 0 28px #f0306e,
+    0 2px 0 #7a1030;
+  animation: oc-fx-pop 950ms 280ms cubic-bezier(0.2, 1, 0.4, 1) both;
+}
+
+.oc-fx-attack[data-level='2'] .oc-fx-attack-num {
+  font-size: 58px;
+}
+
+.oc-fx-attack[data-level='3'] .oc-fx-attack-num {
+  font-size: 70px;
+}
+
+.oc-fx-attack[data-level='4'] .oc-fx-attack-num {
+  font-size: 84px;
+}
+
+.oc-fx-attack-ring {
+  position: absolute;
+  left: -52px;
+  top: -52px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 4px solid #ffb347;
+  box-shadow:
+    0 0 18px 2px #ff7a18,
+    inset 0 0 20px 2px #f0306e;
+  animation: oc-fx-ring 800ms 280ms ease-out both;
+}
+
+@keyframes oc-fx-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -110%) scale(1.08);
+  }
+}
+
+@keyframes oc-fx-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+/* 받는 사람 쪽으로 가는 충격 — 불덩이가 가운데에서 좌석으로 날아가고, 닿은 자리에 고리가 터진다. */
+.oc-fx-shock::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: -13px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0 25%, #ffd166 45%, rgba(255, 122, 24, 0) 72%);
+  box-shadow: 0 0 16px 6px rgba(255, 122, 24, 0.85);
+  animation: oc-fx-shock 440ms 380ms cubic-bezier(0.5, 0, 0.9, 0.6) both;
+}
+
+@keyframes oc-fx-shock {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+    transform: translate(var(--oc-fx-dx), var(--oc-fx-dy)) scale(1.3);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--oc-fx-dx), var(--oc-fx-dy)) scale(1.3);
+  }
+}
+
+.oc-fx-hit::before,
+.oc-fx-hit::after {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: -24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid #ffd166;
+  box-shadow: 0 0 14px 2px #f0306e;
+  animation: oc-fx-hit 420ms 780ms ease-out both;
+}
+
+.oc-fx-hit::after {
+  border-color: #ffffff;
+  animation-delay: 860ms;
+}
+
+@keyframes oc-fx-hit {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+/* 7 — 지정한 무늬가 크게 돌며 나타났다가 아래 지정 배지 쪽으로 가라앉는다. */
+.oc-fx-suit .oc-glyph {
+  position: absolute;
+  left: -52px;
+  top: -52px;
+  filter: drop-shadow(0 0 10px currentColor);
+  animation: oc-fx-suit-spin 1050ms 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes oc-fx-suit-spin {
+  0% {
+    opacity: 0;
+    transform: rotate(-540deg) scale(0.2);
+  }
+  30% {
+    opacity: 1;
+  }
+  55% {
+    transform: rotate(0) scale(1.15);
+  }
+  78% {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(46px) rotate(0) scale(0.3);
+  }
+}
+
+/* J·Q·K — 맨 위 카드 위쪽에 그림과 한 줄. 건너뛰기는 옆으로 휙, 방향 바뀜은 한 바퀴, 한 번 더는 두 번 튄다. */
+.oc-fx-special {
+  color: var(--oc-neon-lime, #b6ff3c);
+}
+
+.oc-fx-special-icon {
+  position: absolute;
+  left: -28px;
+  top: -122px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px currentColor);
+  animation: oc-fx-again 950ms 280ms ease-out both;
+}
+
+.oc-fx-special-skip .oc-fx-special-icon {
+  animation-name: oc-fx-skip;
+}
+
+.oc-fx-special-reverse .oc-fx-special-icon {
+  animation-name: oc-fx-reverse;
+}
+
+.oc-fx-special-label {
+  position: absolute;
+  left: 0;
+  top: -62px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(12, 10, 38, 0.82);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 0 10px -1px currentColor;
+  animation: oc-fx-label 950ms 280ms ease-out both;
+}
+
+@keyframes oc-fx-skip {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px) scale(0.8);
+  }
+  25% {
+    opacity: 1;
+    transform: translateX(0) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(8px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(70px) scale(0.9);
+  }
+}
+
+@keyframes oc-fx-reverse {
+  0% {
+    opacity: 0;
+    transform: rotate(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+    transform: rotate(-360deg) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-360deg) scale(0.9);
+  }
+}
+
+@keyframes oc-fx-again {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  36% {
+    transform: scale(0.95);
+  }
+  54% {
+    transform: scale(1.2);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes oc-fx-label {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  22%,
+  78% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+/* 잡혔다 — 벌칙 카드가 주인 좌석 위로 쏟아진다. */
+.oc-fx-pour-card {
+  position: absolute;
+  left: calc((var(--oc-i) - 3) * 13px - 9px);
+  top: -112px;
+  width: 18px;
+  height: 25px;
+  border-radius: 3px;
+  border: 1px solid;
+  animation: oc-fx-pour 720ms calc(var(--oc-i) * 70ms) cubic-bezier(0.5, 0, 0.9, 0.7) both;
+}
+
+@keyframes oc-fx-pour {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(calc((var(--oc-i) - 3) * 28deg));
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(108px) rotate(calc((var(--oc-i) - 3) * -22deg));
+  }
+}
+
+/* 누른 순간 — 버튼이 있던 자리에서 폭죽이 퍼지고 글자가 터진다. 버튼과 같은 화면 고정 레이어(가장자리 보정도 같다). */
+.oc-fx-race {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.oc-fx-spark {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  color: #ff5fb2;
+  box-shadow: 0 0 10px 2px currentColor;
+  animation: oc-fx-spark 760ms ease-out both;
+}
+
+.oc-fx-spark:nth-child(3n + 2) {
+  color: #4fd8ff;
+  animation-duration: 880ms;
+}
+
+.oc-fx-spark:nth-child(3n) {
+  color: #b6ff3c;
+  animation-duration: 680ms;
+}
+
+@keyframes oc-fx-spark {
+  0% {
+    opacity: 1;
+    transform: rotate(calc(var(--oc-i) * 30deg)) translateY(-12px) scale(1.2);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--oc-i) * 30deg)) translateY(-104px) scale(0.3);
+  }
+}
+
+.oc-fx-race-text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  animation: oc-fx-burst-text 980ms cubic-bezier(0.2, 1, 0.4, 1) both;
+}
+
+.oc-fx-race-call .oc-fx-race-text {
+  text-shadow:
+    0 0 6px #2bffb0,
+    0 0 18px #0fae76,
+    0 2px 0 #06543a;
+}
+
+.oc-fx-race-catch .oc-fx-race-text {
+  text-shadow:
+    0 0 6px #ff5fb2,
+    0 0 18px #f0306e,
+    0 2px 0 #7a1030;
+}
+
+@keyframes oc-fx-burst-text {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(-8deg);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.5) rotate(4deg);
+  }
+  36% {
+    transform: translate(-50%, -50%) scale(1.15) rotate(0);
+  }
+  74% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2);
+  }
+}
+
+/* ── 판 종료 — 파티 조명(모두)과 색종이(내가 1위일 때). 한 번 돌고 사라진다 ── */
+.oc-theme-neon .oc-match-end {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 2px solid var(--oc-neon-pink);
+  background: var(--oc-panel-solid);
+  box-shadow:
+    0 0 18px -2px var(--oc-neon-pink),
+    inset 0 0 24px -10px var(--oc-neon-sky);
+}
+
+.oc-theme-neon .oc-standings li.oc-standing-win {
+  background: color-mix(in srgb, var(--oc-neon-amber) 28%, transparent);
+  box-shadow: 0 0 12px -2px var(--oc-neon-amber);
+}
+
+.oc-party {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.oc-party-beam {
+  --oc-beam-a: -24deg;
+  --oc-beam-b: 18deg;
+  position: absolute;
+  top: -8vh;
+  left: 14%;
+  width: 34vmax;
+  height: 130vh;
+  margin-left: -17vmax;
+  transform-origin: 50% 0;
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, rgba(255, 95, 178, 0.42), rgba(255, 95, 178, 0) 78%);
+  opacity: 0;
+  animation: oc-party-sweep 3.6s ease-in-out 1 both;
+}
+
+.oc-party-beam:nth-child(2) {
+  --oc-beam-a: 16deg;
+  --oc-beam-b: -14deg;
+  left: 50%;
+  background: linear-gradient(180deg, rgba(79, 216, 255, 0.42), rgba(79, 216, 255, 0) 78%);
+  animation-delay: 150ms;
+}
+
+.oc-party-beam:nth-child(3) {
+  --oc-beam-a: 26deg;
+  --oc-beam-b: -20deg;
+  left: 86%;
+  background: linear-gradient(180deg, rgba(182, 255, 60, 0.4), rgba(182, 255, 60, 0) 78%);
+  animation-delay: 300ms;
+}
+
+@keyframes oc-party-sweep {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--oc-beam-a));
+  }
+  12% {
+    opacity: 1;
+  }
+  35% {
+    transform: rotate(var(--oc-beam-b));
+  }
+  65% {
+    transform: rotate(var(--oc-beam-a));
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--oc-beam-b));
+  }
+}
+
+.oc-party-confetti {
+  display: none;
+  position: absolute;
+  top: -24px;
+  left: calc(var(--oc-i) * 5.5% + 3%);
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: #ff5fb2;
+  animation: oc-party-fall 2.6s calc(var(--oc-i) * 90ms) linear both;
+}
+
+.oc-party-win .oc-party-confetti {
+  display: block;
+}
+
+.oc-party-confetti:nth-child(4n + 1) {
+  background: #4fd8ff;
+}
+
+.oc-party-confetti:nth-child(4n + 2) {
+  background: #b6ff3c;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.oc-party-confetti:nth-child(4n + 3) {
+  background: #ffc94d;
+}
+
+@keyframes oc-party-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(108vh) rotate(calc(420deg + var(--oc-i) * 47deg));
+  }
+}

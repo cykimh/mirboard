@@ -2,6 +2,7 @@ import { openGameMenu, queryMenuItem, getMenuItem, clickMenuItem, menuInfoText }
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DRAW_FAN_MAX,
   LATE_NOTICE_MS,
   OneCardTable,
   PRESS_RETRY_DELAY_MS,
@@ -16,6 +17,7 @@ import { useOneCardStore } from './onecardStore';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
+import { neonTheme } from './oneCardTheme';
 import type {
   OneCardCard,
   OneCardMatchResult,
@@ -1467,6 +1469,8 @@ describe('OneCardTable — 경기장 상태 줄 (D-139)', () => {
 describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
   const fly = () => document.querySelector('.oc-fly');
   const top = () => document.querySelector('.oc-top');
+  // D-260 — 네온 테마의 그림 면(SVG)에는 무늬 글자가 없다. 맨 위 카드는 칩의 이름(aria-label)으로 가린다.
+  const topLabel = () => top()!.querySelector('.oc-card')?.getAttribute('aria-label') ?? null;
   const play = (seat: number, card: OneCardCard, seq: number) =>
     act(() => {
       onecardRoomSink.applyEvent({
@@ -1484,19 +1488,19 @@ describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
   it('남이 내면 그 좌석 패널에서 날아오고, 다 덮을 때까지 가운데는 이전 카드 — 내려앉으면 새 카드', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
     renderTable();
-    const before = top()!.textContent;
+    const before = topLabel();
 
     play(2, c('SPADE', 9), 2);
     expect(fly()).toHaveAttribute('data-from-seat', '2');
     expect(fly()).toHaveAttribute('aria-hidden', 'true');
-    expect(top()!.textContent).toBe(before);
+    expect(topLabel()).toBe(before);
     expect(top()!.querySelector('.oc-card')).toBeVisible();
 
     act(() => {
       vi.advanceTimersByTime(600);
     });
     expect(fly()).toBeNull();
-    expect(top()!.textContent).not.toBe(before);
+    expect(topLabel()).not.toBe(before);
   });
 
   it('내가 내면 내 줄에서 날아간다', () => {
@@ -1512,10 +1516,10 @@ describe('OneCardTable — 카드 내기 비행 효과 (D-139)', () => {
     seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
     renderTable();
 
-    const before = top()!.textContent;
+    const before = topLabel();
     play(2, c('SPADE', 9), 2);
     expect(fly()).toBeNull();
-    expect(top()!.textContent).not.toBe(before); // 날지 않으면 곧바로 새 카드.
+    expect(topLabel()).not.toBe(before); // 날지 않으면 곧바로 새 카드.
   });
 
   it('다시 받기(resync)로 맨 위 카드가 바뀌어도 날리지 않는다', () => {
@@ -1766,5 +1770,126 @@ describe('OneCardTable — 음성 대화 (D-155)', () => {
 
     expect(container.querySelector('[data-seat="2"] .oc-seat-voice')).toHaveTextContent('🎧');
     expect(container.querySelector('[data-seat="1"] .oc-seat-voice')).toBeNull();
+  });
+});
+
+/**
+ * D-260 — 네온 파티 테마의 화면 전용 연출. 공개 이벤트의 순번이 바뀔 때만 조각이 생기고(처음 그릴 때·resync 는 아니다), 카드 애니메이션
+ * 설정이 꺼져 있으면 만들지 않는다. 테마가 기본 모습(`ONE_CARD_THEME = 'classic'`)이면 이 묶음은 건너뛴다.
+ */
+describe.runIf(neonTheme)('OneCardTable — 네온 파티 연출 (D-260)', () => {
+  const fx = (kind: string) => document.querySelector(`.oc-fx-${kind}`);
+  const apply = (type: string, seq: number, payload: object) =>
+    act(() => {
+      onecardRoomSink.applyEvent({ type, seq, payload } as never);
+    });
+  const play = (seat: number, card: OneCardCard, seq: number, extra: object = {}) =>
+    apply('CARD_PLAYED', seq, { seat, card, declaredSuit: null, handCount: 4, attackStack: 0, direction: 1, ...extra });
+
+  beforeEach(() => {
+    useCardAnimStore.setState({ enabled: true });
+  });
+
+  it('게임판 루트에 테마 클래스가 붙는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    const { container } = renderTable();
+    expect(container.querySelector('.oc-table')).toHaveClass('oc-theme-neon');
+  });
+
+  it('공격 카드를 내면 누적 수가 터지고, 차례가 넘어가면 받는 사람 쪽으로 충격이 간다 — 잠시 뒤 걷힌다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 2), 2, { attackStack: 2 });
+    expect(fx('attack')).toHaveAttribute('data-level', '1');
+    expect(fx('attack')).toHaveTextContent('+2');
+    expect(document.querySelector('.oc-top')).toHaveAttribute('data-attack', '1');
+    expect(fx('shock')).toBeNull(); // 아직 받는 사람이 정해지지 않았다.
+
+    apply('TURN_CHANGED', 3, { seat: 3, direction: 1, attackStack: 2 });
+    expect(fx('shock')).not.toBeNull();
+    expect(fx('hit')).not.toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(fx('attack')).toBeNull();
+    expect(fx('shock')).toBeNull();
+  });
+
+  it('7 을 내면 지정한 무늬가 돈다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 7), 2, { declaredSuit: 'HEART' });
+    expect(fx('suit')!.querySelector('.oc-glyph')).toHaveClass('oc-s-heart');
+  });
+
+  it('J 는 건너뛰기, K 는 한 번 더', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 11), 2);
+    expect(fx('special-skip')).toHaveTextContent('건너뛰기');
+    play(2, c('SPADE', 13), 3);
+    expect(fx('special-again')).toHaveTextContent('한 번 더');
+  });
+
+  it('카드 애니메이션을 끄면 조각을 만들지 않는다 — 불꽃 단계 표식은 상태라 남는다', () => {
+    useCardAnimStore.setState({ enabled: false });
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    play(2, c('SPADE', 2), 2, { attackStack: 2 });
+    apply('TURN_CHANGED', 3, { seat: 3, direction: 1, attackStack: 2 });
+    expect(document.querySelector('.oc-fx')).toBeNull();
+    expect(document.querySelector('.oc-top')).toHaveAttribute('data-attack', '1');
+  });
+
+  it('다시 받기(resync)로는 조각이 생기지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    act(() => {
+      seed({ seatCount: 4, mySeat: 0, turnSeat: 3, topCard: c('CLUB', 2), attackStack: 2 });
+    });
+    expect(document.querySelector('.oc-fx')).toBeNull();
+  });
+
+  it('경쟁이 잡기로 닫히면 버튼 자리에 글자가 터지고 주인 좌석으로 벌칙 카드가 쏟아진다 — 버튼 자체는 그대로다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    apply('RACE_OPENED', 2, { raceId: 7, ownerSeat: 2, slot: 3, jitterX: 0, jitterY: 0, windowMillis: 3000 });
+    const button = screen.getByRole('button', { name: '잡기!' });
+    const { left, top } = button.style;
+    expect(document.querySelector('.oc-fx-race')).toBeNull();
+
+    apply('RACE_RESOLVED', 3, { raceId: 7, outcome: 'CAUGHT', bySeat: 1 });
+    const burst = document.querySelector<HTMLElement>('.oc-fx-race')!;
+    expect(burst).toHaveClass('oc-fx-race-catch');
+    // 버튼이 있던 바로 그 자리(같은 CSS 좌표).
+    expect(burst.style.left).toBe(left);
+    expect(burst.style.top).toBe(top);
+    expect(fx('pour')).not.toBeNull();
+  });
+
+  it('시간 초과로 닫힌 경쟁은 터지지 않는다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    apply('RACE_OPENED', 2, { raceId: 7, ownerSeat: 2, slot: 3, jitterX: 0, jitterY: 0, windowMillis: 3000 });
+    apply('RACE_RESOLVED', 3, { raceId: 7, outcome: 'EXPIRED', bySeat: -1 });
+    expect(document.querySelector('.oc-fx-race')).toBeNull();
+    expect(fx('pour')).toBeNull();
+  });
+
+  it('여러 장을 먹으면 뒷면이 부채꼴로 난다(최대 5장)', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 2 });
+    renderTable();
+
+    apply('CARDS_DRAWN', 2, { seat: 2, count: 7, reason: 'ATTACK', handCount: 11, drawPileCount: 20 });
+    expect(document.querySelectorAll('.oc-fly-draw .oc-fly-fan-card')).toHaveLength(DRAW_FAN_MAX);
+    expect(document.querySelector('.oc-fly-draw-count')).toHaveTextContent('+7');
   });
 });

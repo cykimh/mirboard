@@ -10,6 +10,8 @@ import {
 import type { LastRace } from './onecardStore';
 import { OneCardCardChip, toneOf } from './OneCardCardChip';
 import { drawCount } from './onecardRules';
+import { SUIT_CLASS } from './OneCardFace';
+import { attackLevel } from './useOneCardFx';
 
 /** 방금 닫힌 경쟁의 한 줄 안내 — 화면과 스크린리더 알림이 같은 문장을 쓴다. */
 export function raceResultText(race: LastRace, nameOf: (seat: number) => string): string {
@@ -100,7 +102,8 @@ export function OneCardCenter({
             </span>
           </div>
         )}
-        <div className="oc-top">
+        {/* D-260 — 공격 누적 단계(1~4). 네온 테마가 맨 위 카드에 불꽃 테두리를 두른다(기본 모습은 쓰지 않는다). */}
+        <div className="oc-top" data-attack={attackStack > 0 ? attackLevel(attackStack) : undefined}>
           {shownTop ? (
             <OneCardCardChip card={shownTop} />
           ) : (
@@ -108,7 +111,7 @@ export function OneCardCenter({
           )}
           {/* D-154 — 자리를 늘 둔다(비면 보이지만 않게) — 7 을 낼 때마다 칸 높이가 바뀌어 게임판이 흔들렸다. */}
           <span
-            className="oc-badge oc-declared"
+            className={`oc-badge oc-declared${shownSuit ? ` ${SUIT_CLASS[shownSuit]}` : ''}`}
             data-empty={shownSuit ? undefined : ''}
             aria-hidden={shownSuit ? undefined : true}
           >
@@ -126,7 +129,7 @@ export function OneCardCenter({
             aria-label={`이전에 낸 카드: ${beneath.map(cardLabel).join(', ')}`}
           >
             {[...beneath].reverse().map((card) => (
-              <span key={cardKey(card)} className={`oc-trail-card ${toneOf(card)}`} aria-hidden="true">
+              <span key={cardKey(card)} className={`oc-trail-card ${toneOf(card)}${card.suit ? ` ${SUIT_CLASS[card.suit]}` : ''}`} aria-hidden="true">
                 {card.joker ? '★' : `${SUIT_SYMBOL[card.suit!]}${rankLabel(card.rank)}`}
               </span>
             ))}
@@ -135,7 +138,11 @@ export function OneCardCenter({
       </div>
 
       <div className="oc-center-info">
-        {attackStack > 0 && <span className="oc-badge oc-attack">공격 +{attackStack}</span>}
+        {attackStack > 0 && (
+          <span className="oc-badge oc-attack" data-level={attackLevel(attackStack)}>
+            공격 +{attackStack}
+          </span>
+        )}
         {raceOpen ? (
           <span className="oc-badge oc-race-status">원카드 경쟁 중</span>
         ) : (

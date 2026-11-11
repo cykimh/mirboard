@@ -204,6 +204,26 @@
   }
 }
 
+/* D-260 — 원카드 네온 파티 테마: 움직임 줄이기면 깜빡임·불꽃·회전을 멈추고(빛은 남는다) 연출 조각은 그리지 않는다
+   (`useOneCardFx` 도 만들지 않는다 — 이 블록은 이중 안전망). */
+@media (prefers-reduced-motion: reduce) {
+  .oc-theme-neon .oc-felt::before,
+  .oc-theme-neon .oc-felt-myturn::after,
+  .oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level],
+  .oc-theme-neon .oc-top[data-attack] > .oc-card::after,
+  .oc-theme-neon .oc-race-vis-normal .oc-race-btn,
+  .oc-theme-neon .oc-direction-arrow,
+  .oc-fly-fan-card {
+    animation: none;
+  }
+
+  .oc-fx,
+  .oc-fx-race-layer,
+  .oc-party {
+    display: none;
+  }
+}
+
 /* 요트 S4 — 굴림 흔들기·내 차례 맥박도 움직임 줄이기면 멈춘다. 20 은 미디어 0개 규칙이라 여기 둔다(스컬킹 맨 끝 두 블록 앞). */
 @media (prefers-reduced-motion: reduce) {
   .yt-die-rolling,

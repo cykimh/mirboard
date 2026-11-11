@@ -30,6 +30,12 @@ import { RaceButton } from './RaceButton';
 import { ONE_CARD_TUTORIAL } from './tutorial/onecardTutorial';
 import { useCardPlayFlight } from './useCardPlayFlight';
 import { useCardDrawFlight } from './useCardDrawFlight';
+import { neonTheme, oneCardThemeClass } from './oneCardTheme';
+import { OneCardFxLayer, OneCardParty } from './OneCardFx';
+import { useOneCardFx } from './useOneCardFx';
+
+/** D-260 — 부채꼴 먹기 비행에 그리는 뒷면 최대 장수(장수는 배지가 읽는다). */
+export const DRAW_FAN_MAX = 5;
 
 /** `BUSY` 로 거절된 누름을 다시 보내기까지의 간격. 창(기본 3초) 안에 두 번 재시도할 여유가 있다. */
 export const PRESS_RETRY_DELAY_MS = 120;
@@ -140,6 +146,21 @@ export function OneCardTable({
   const mySeat = spectator ? -1 : s.mySeat;
   const flight = useCardPlayFlight(tableRef, s.lastPlay, mySeat, cardAnimEnabled);
   const drawFlight = useCardDrawFlight(tableRef, s.lastDraw, mySeat, cardAnimEnabled);
+  // D-260 — 네온 파티 테마의 화면 전용 연출(공격 누적·7·J/Q/K·경쟁 터짐). 공개 상태에서만 파생되고 아무것도 보내지 않는다.
+  const fx = useOneCardFx(
+    tableRef,
+    {
+      lastPlay: s.lastPlay,
+      declaredSuit: s.declaredSuit,
+      attackStack: s.attackStack,
+      turnSeat: s.turnSeat,
+      aliveCount: s.seats.filter((x) => x.eliminated === null).length,
+      lastRace: s.lastRace,
+      race: s.race,
+    },
+    mySeat,
+    neonTheme && cardAnimEnabled,
+  );
   const { bottomSeat, slots } = tableLayout(seatCount, mySeat);
   const me = s.seats.find((x) => x.seat === mySeat) ?? null;
   // D-132 — 일반 진행 기준 다음 차례. 차례가 비면(카드 직후·경쟁 창·종료) 테두리와 함께 사라진다.
@@ -311,7 +332,7 @@ export function OneCardTable({
         : resultText;
 
   return (
-    <div ref={tableRef} className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
+    <div ref={tableRef} className={`oc-table${oneCardThemeClass}`} style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
       <header className="oc-header gm-header">
         <div className="oc-header-badges gm-header-info">
           <span className="oc-badge oc-badge-title">원카드</span>
@@ -367,7 +388,8 @@ export function OneCardTable({
           </div>
           <div className="oc-felt-status-right">
             <span className="oc-badge oc-direction">
-              <span className="oc-direction-arrow" aria-hidden="true">
+              {/* D-260 — key 로 방향이 바뀔 때마다 다시 그려 회전 연출이 한 번 돈다(네온 테마 CSS). */}
+              <span key={s.direction >= 0 ? 'cw' : 'ccw'} className="oc-direction-arrow" aria-hidden="true">
                 {s.direction >= 0 ? '↻' : '↺'}
               </span>{' '}
               {s.direction >= 0 ? '시계 방향' : '반시계 방향'}
@@ -526,8 +548,21 @@ export function OneCardTable({
               : `translate(calc(-50% + ${drawFlight.dx}px), calc(-50% + ${drawFlight.dy}px))`,
           }}
         >
+          {/* D-260 — 네온 테마는 여러 장이 부채꼴로 펼쳐지며 난다(최대 DRAW_FAN_MAX 장 — 장수는 배지). */}
+          {neonTheme &&
+            Array.from({ length: Math.min(drawFlight.count, DRAW_FAN_MAX) }, (_, i) => (
+              <span
+                key={i}
+                className="oc-fly-fan-card"
+                style={{ ['--oc-fan' as string]: i - (Math.min(drawFlight.count, DRAW_FAN_MAX) - 1) / 2 }}
+              />
+            ))}
           {drawFlight.count > 1 && <span className="oc-fly-draw-count">+{drawFlight.count}</span>}
         </div>
+      )}
+      {neonTheme && <OneCardFxLayer items={fx} raceSize={raceButtonSize} />}
+      {neonTheme && s.result && (
+        <OneCardParty win={s.result.standings.some((x) => x.seat === mySeat && x.rank === 1)} />
       )}
     </div>
   );

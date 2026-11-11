@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ONE_CARD_TUTORIAL_STEPS } from './onecardTutorialSteps';
 import { ONE_CARD_TUTORIAL } from './onecardTutorial';
+import { ONE_CARD_TOKENS_CLASS } from '../oneCardTheme';
 
 /**
  * D-129 — 튜토리얼 문구 ↔ `docs/rules-onecard.md` 동기화 가드. 튜토리얼은 룰 문서의 요약이라 룰이 바뀌면 조용히
@@ -41,7 +42,9 @@ describe('원카드 튜토리얼 — 구조', () => {
     expect(ONE_CARD_TUTORIAL.steps).toBe(steps);
     expect(ONE_CARD_TUTORIAL.seenKey).toBe('mirboard.tutorial.one_card.seen.v1');
     // 다이얼로그는 body 포털(.oc-table 밖)이라 칩·연습 버튼 토큰을 여기서 푼다.
-    expect(ONE_CARD_TUTORIAL.bodyClassName).toBe('oc-tokens');
+    // D-260 — 테마 클래스가 뒤에 붙는다(기본 모습이면 'oc-tokens' 만).
+    expect(ONE_CARD_TUTORIAL.bodyClassName).toBe(ONE_CARD_TOKENS_CLASS);
+    expect(ONE_CARD_TOKENS_CLASS.split(' ')[0]).toBe('oc-tokens');
   });
 });
 
