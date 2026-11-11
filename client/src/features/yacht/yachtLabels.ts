@@ -32,8 +32,15 @@ export const CATEGORY_HINT: Record<Category, string> = {
   YACHT: '5개 모두 같음 — 50점',
 };
 
-/** 주사위 눈 글리프(보조기기는 숫자를 읽는다). */
-export const DIE_FACE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+/** 위쪽 6칸 — 칸 이름 옆에 그 눈의 작은 주사위를 그린다(D-203). */
+export const UPPER_FACE: Partial<Record<Category, number>> = {
+  ONES: 1,
+  TWOS: 2,
+  THREES: 3,
+  FOURS: 4,
+  FIVES: 5,
+  SIXES: 6,
+};
 
 /** 큰 칸 — 기록하면 짧은 축하 효과. */
 export const BIG_CATEGORIES: ReadonlySet<Category> = new Set(['YACHT', 'LARGE_STRAIGHT']);

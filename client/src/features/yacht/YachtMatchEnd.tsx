@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
+import { GoldBurst } from './GoldBurst';
+import { salonTheme } from './yachtTheme';
 import type { MatchResult } from '@/types/yacht';
 
 const REASON_TEXT: Record<MatchResult['reason'], string> = {
@@ -53,15 +57,36 @@ export function YachtMatchEnd({
 }: Props) {
   const solo = result.placements.length === 1;
   const best = bestLine(result, mySeat, previousBest, guest);
+  // 결과 카드는 점수표 아래라 휴대폰에서는 화면 밖이다 — 뜨는 순간 한 번 보이는 곳으로 올린다(D-203).
+  const ref = useRef<HTMLElement>(null);
+  // 내가 1위(여럿 판)이거나 새 최고 기록이면 카드 위에서 금가루가 한 번 터진다 — 카드가 자리를 잡은 뒤에.
+  const animate = useCardAnimStore((st) => st.enabled);
+  const mine = result.placements.find((p) => p.seat === mySeat);
+  const cheer = salonTheme && animate && ((!solo && mine?.rank === 1 && !mine.deserted) || best?.record === true);
+  const [burst, setBurst] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (!cheer) return;
+    const timer = window.setTimeout(() => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setBurst({ x: r.left + r.width / 2, y: Math.max(40, r.top + 30) });
+    }, 450);
+    return () => window.clearTimeout(timer);
+    // 결과 카드가 뜰 때 한 번.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
-    <section className="yt-end" aria-label="게임 결과">
+    <section className={`yt-end${solo ? ' yt-end-solo' : ''}`} aria-label="게임 결과" ref={ref}>
       <h2 className="yt-end-title">{solo ? `총점 ${result.placements[0].total}점` : '결과'}</h2>
       <p className="yt-end-reason">{REASON_TEXT[result.reason]}</p>
       {best && <p className={`yt-end-best${best.record ? ' yt-end-best-new' : ''}`}>{best.text}</p>}
       {!solo && (
         <ol className="yt-end-list">
           {result.placements.map((p) => (
-            <li key={p.seat} className={`yt-end-row${p.seat === mySeat ? ' yt-end-me' : ''}`}>
+            <li
+              key={p.seat}
+              className={`yt-end-row${p.seat === mySeat ? ' yt-end-me' : ''}${!p.deserted && p.rank === 1 ? ' yt-end-first' : ''}`}
+            >
               <span className="yt-end-rank">{p.deserted ? '탈주' : `${p.rank}위`}</span>
               <span className="yt-end-name">
                 {nameOf(p.seat)}
@@ -73,6 +98,7 @@ export function YachtMatchEnd({
         </ol>
       )}
       {solo && <p className="yt-end-note">혼자 한 판은 승패 없이 최고 기록에만 남습니다.</p>}
+      {burst && <GoldBurst x={burst.x} y={burst.y} count={120} power={0.9} />}
       <div className="yt-end-actions">
         {onBackToRoom && (
           <button type="button" className="yt-roll" onClick={onBackToRoom}>

@@ -1,5 +1,6 @@
 import { BONUS_THRESHOLD, CATEGORIES, UPPER_CATEGORIES, type Category, type YachtSeatView } from '@/types/yacht';
-import { CATEGORY_HINT, CATEGORY_LABEL } from './yachtLabels';
+import { CATEGORY_HINT, CATEGORY_LABEL, UPPER_FACE } from './yachtLabels';
+import { YachtDie } from './YachtDie';
 import type { LastScore } from './yachtStore';
 
 interface Props {
@@ -16,24 +17,30 @@ interface Props {
 
 /**
  * 점수표 — 칸 × 좌석 열(최대 4열 + 칸 이름, 375px 에서 가로 스크롤 없음). 차례인 좌석 열의 빈 칸에 후보 점수가 흐리게 뜬다
- * (구경꾼도 "어디 넣을까"를 같이 본다). 내 차례면 그 칸이 버튼이다.
+ * (구경꾼도 "어디 넣을까"를 같이 본다). 내 차례면 그 칸이 버튼이다. D-203 — 내 열은 `yt-cell-me`(옅은 황동 물),
+ * 적힌 칸은 `data-yt-cell`(황동 칩이 날아와 꽂힐 자리).
  */
 export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, onScore, lastScore }: Props) {
   const cell = (seat: YachtSeatView, c: Category) => {
     const written = seat.scores[c];
     const isTurn = seat.seat === turnSeat;
     const flash = lastScore && lastScore.seat === seat.seat && lastScore.category === c;
+    const me = seat.seat === mySeat ? ' yt-cell-me' : '';
     if (written !== undefined) {
       return (
-        <td key={seat.seat} className={`yt-cell yt-cell-written${flash ? ' yt-cell-flash' : ''}`}>
-          {written}
+        <td
+          key={seat.seat}
+          className={`yt-cell yt-cell-written${me}${flash ? ' yt-cell-flash' : ''}`}
+          data-yt-cell={`${seat.seat}:${c}`}
+        >
+          <span className="yt-num">{written}</span>
         </td>
       );
     }
     const candidate = isTurn ? candidates[c] : undefined;
     if (candidate !== undefined && onScore && seat.seat === mySeat) {
       return (
-        <td key={seat.seat} className="yt-cell yt-cell-pick">
+        <td key={seat.seat} className={`yt-cell yt-cell-pick${me}`}>
           <button
             type="button"
             className={`yt-pick${candidate === 0 ? ' yt-pick-zero' : ''}`}
@@ -46,7 +53,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
       );
     }
     return (
-      <td key={seat.seat} className={`yt-cell${candidate !== undefined ? ' yt-cell-candidate' : ''}`}>
+      <td key={seat.seat} className={`yt-cell${me}${candidate !== undefined ? ' yt-cell-candidate' : ''}`}>
         {candidate !== undefined ? candidate : ''}
       </td>
     );
@@ -55,6 +62,11 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
   const row = (c: Category) => (
     <tr key={c} className={c === 'SIXES' ? 'yt-row-upper-end' : undefined}>
       <th scope="row" className="yt-cat" title={CATEGORY_HINT[c]}>
+        {UPPER_FACE[c] !== undefined && (
+          <span className="yt-cat-die" aria-hidden="true">
+            <YachtDie face={UPPER_FACE[c] ?? null} mini />
+          </span>
+        )}
         {CATEGORY_LABEL[c]}
       </th>
       {seats.map((s) => cell(s, c))}
@@ -73,7 +85,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
               <th
                 scope="col"
                 key={s.seat}
-                className={`yt-col${s.seat === turnSeat ? ' yt-col-turn' : ''}${s.deserted ? ' yt-col-out' : ''}`}
+                className={`yt-col${s.seat === mySeat ? ' yt-cell-me' : ''}${s.seat === turnSeat ? ' yt-col-turn' : ''}${s.deserted ? ' yt-col-out' : ''}`}
               >
                 {s.seat === mySeat ? '나' : nameOf(s.seat)}
               </th>
@@ -87,7 +99,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
               상단 소계
             </th>
             {seats.map((s) => (
-              <td key={s.seat} className="yt-cell">
+              <td key={s.seat} className={`yt-cell${s.seat === mySeat ? ' yt-cell-me' : ''}`}>
                 {s.upperSubtotal}/{BONUS_THRESHOLD}
               </td>
             ))}
@@ -97,7 +109,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
               보너스
             </th>
             {seats.map((s) => (
-              <td key={s.seat} className={`yt-cell${s.bonus > 0 ? ' yt-cell-bonus' : ''}`}>
+              <td key={s.seat} className={`yt-cell${s.seat === mySeat ? ' yt-cell-me' : ''}${s.bonus > 0 ? ' yt-cell-bonus' : ''}`}>
                 {s.bonus > 0 ? `+${s.bonus}` : '-'}
               </td>
             ))}
@@ -108,7 +120,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
               총점
             </th>
             {seats.map((s) => (
-              <td key={s.seat} className="yt-cell">
+              <td key={s.seat} className={`yt-cell${s.seat === mySeat ? ' yt-cell-me' : ''}`}>
                 {s.total}
               </td>
             ))}

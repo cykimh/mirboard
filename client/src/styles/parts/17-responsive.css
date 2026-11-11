@@ -204,6 +204,60 @@
   }
 }
 
+/* D-203 — 요트 "미드나잇 살롱" 연출도 움직임 줄이기면 끈다: 눈·점수만 바로 바뀌고 축하는 상태 줄 배지 하나로만. 테마 규칙과
+   명시도를 맞춰야 이긴다(.yt-theme-salon 접두). */
+@media (prefers-reduced-motion: reduce) {
+  .yt-theme-salon .yt-felt-myturn,
+  .yt-theme-salon .yt-felt-party,
+  .yt-theme-salon .yt-felt-myturn.yt-felt-party,
+  .yt-theme-salon .yt-die-rolling .yt-die-face,
+  .yt-theme-salon .yt-die-rolling .yt-die-shadow,
+  .yt-theme-salon .yt-die-rolling .yt-cube,
+  .yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube,
+  .yt-theme-salon .yt-dice-same .yt-die-face,
+  .yt-theme-salon .yt-dice-same::after,
+  .yt-theme-salon .yt-roll:not(:disabled)::after,
+  .yt-theme-salon .yt-cell-flash::after,
+  .yt-theme-salon .yt-die-tag,
+  .yt-theme-salon .yt-seat-total-bump,
+  .yt-theme-salon .yt-cell-flash,
+  .yt-theme-salon .yt-cell-flash .yt-num,
+  .yt-theme-salon .yt-end {
+    animation: none;
+  }
+
+  .yt-theme-salon .yt-lamp,
+  .yt-theme-salon .yt-die-shadow,
+  .yt-theme-salon .yt-die-face,
+  .yt-theme-salon .yt-roll,
+  .yt-theme-salon .yt-pick,
+  .yt-theme-salon .yt-seat {
+    transition: none;
+  }
+
+  .yt-theme-salon .yt-fx,
+  .yt-theme-salon .yt-chip,
+  .yt-burst {
+    display: none;
+  }
+}
+
+/* D-203 — 마우스가 있는 기기에서만 떠오르는 주사위·채워지는 후보 칸(터치에서는 눌린 채 남는 :hover 를 피한다). */
+@media (hover: hover) {
+  .yt-theme-salon .yt-die:not(:disabled):not(.yt-die-held):hover .yt-die-face {
+    transform: translateY(-3px);
+  }
+
+  .yt-theme-salon .yt-pick:hover {
+    background: var(--yt-s-brass-ink);
+    color: var(--yt-s-ledger);
+  }
+
+  .yt-theme-salon .yt-roll:not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+}
+
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —
    가운데(트릭 레일·방향)를 옆줄 아래 전체 폭으로 내린다. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이는 빈다. 넓은 화면은

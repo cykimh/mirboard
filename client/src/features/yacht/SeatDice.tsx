@@ -1,7 +1,7 @@
 import { MAX_ROLLS, type YachtSeatTurn } from '@/types/yacht';
-import { DIE_FACE } from './yachtLabels';
+import { YachtDie } from './YachtDie';
 
-/** D-202 — 동시 진행에서 남의 주사위를 좌석 띠에 작게(보기만). 고정한 주사위는 밑줄 색. */
+/** D-202 — 동시 진행에서 남의 주사위를 좌석 띠에 작게(보기만). 고정한 주사위는 황동 테(D-203 — 가운데 판과 같은 그림). */
 export function SeatDice({ turn }: { turn: YachtSeatTurn }) {
   const label = turn.dice
     ? `주사위 ${turn.dice.join(', ')} · 굴림 ${turn.rolls}/${MAX_ROLLS}`
@@ -11,8 +11,12 @@ export function SeatDice({ turn }: { turn: YachtSeatTurn }) {
       {Array.from({ length: 5 }, (_, i) => {
         const face = turn.dice ? turn.dice[i] : null;
         return (
-          <span key={i} className={`yt-mini-die${turn.held[i] ? ' yt-mini-die-held' : ''}`} aria-hidden="true">
-            {face === null ? '·' : DIE_FACE[face]}
+          <span
+            key={i}
+            className={`yt-mini-die${turn.held[i] ? ' yt-mini-die-held' : ''}${face === null ? ' yt-mini-die-empty' : ''}`}
+            aria-hidden="true"
+          >
+            <YachtDie face={face} mini />
           </span>
         );
       })}
