@@ -22,6 +22,7 @@ import java.util.stream.IntStream;
  * @param turnSeat  지금 둘 좌석, 끝났으면 −1
  * @param timeouts  좌석별 연속 시간 초과 수 (룰 §8)
  * @param result    끝나기 전에는 null
+ * @param slams     좌석별 강하게 두기 사용 수 (룰 §4.1, D-193) — 옛 JSON 에 없으면 0
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -32,13 +33,31 @@ public record OmokState(OmokMode mode,
                         List<Move> moves,
                         int turnSeat,
                         List<Integer> timeouts,
-                        MatchResult result) implements GameState {
+                        MatchResult result,
+                        List<Integer> slams) implements GameState {
+
+    /** 좌석마다 한 판에 쓸 수 있는 강하게 두기 수 (룰 §4.1, D-193). */
+    public static final int SLAMS_PER_MATCH = 1;
 
     public OmokState {
         moves = moves == null ? List.of() : List.copyOf(moves);
-        timeouts = timeouts == null
-                ? IntStream.range(0, mode.seatCount()).map(i -> 0).boxed().toList()
-                : List.copyOf(timeouts);
+        timeouts = timeouts == null ? zeros(mode.seatCount()) : List.copyOf(timeouts);
+        slams = slams == null ? zeros(mode.seatCount()) : List.copyOf(slams);
+    }
+
+    /** 강하게 두기 이전의 모양 — 사용 수는 0 으로 시작한다. */
+    public OmokState(OmokMode mode, OmokRule rule, int blackTeam, int firstSeat, List<Move> moves, int turnSeat,
+                     List<Integer> timeouts, MatchResult result) {
+        this(mode, rule, blackTeam, firstSeat, moves, turnSeat, timeouts, result, null);
+    }
+
+    private static List<Integer> zeros(int n) {
+        return IntStream.range(0, n).map(i -> 0).boxed().toList();
+    }
+
+    /** 그 좌석이 이 판에서 아직 강하게 둘 수 있는 수. */
+    public int slamsLeft(int seat) {
+        return Math.max(0, SLAMS_PER_MATCH - slams.get(seat));
     }
 
     public int seatCount() {
@@ -72,12 +91,17 @@ public record OmokState(OmokMode mode,
     }
 
     public OmokState withMove(Move move, int nextTurn, List<Integer> nextTimeouts, MatchResult nextResult) {
+        return withMove(move, nextTurn, nextTimeouts, nextResult, slams);
+    }
+
+    public OmokState withMove(Move move, int nextTurn, List<Integer> nextTimeouts, MatchResult nextResult,
+                              List<Integer> nextSlams) {
         List<Move> next = new ArrayList<>(moves);
         next.add(move);
-        return new OmokState(mode, rule, blackTeam, firstSeat, next, nextTurn, nextTimeouts, nextResult);
+        return new OmokState(mode, rule, blackTeam, firstSeat, next, nextTurn, nextTimeouts, nextResult, nextSlams);
     }
 
     public OmokState ended(MatchResult r) {
-        return new OmokState(mode, rule, blackTeam, firstSeat, moves, -1, timeouts, r);
+        return new OmokState(mode, rule, blackTeam, firstSeat, moves, -1, timeouts, r, slams);
     }
 }

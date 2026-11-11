@@ -420,7 +420,7 @@ candidates, turnRemainingMs, result }` — `phase` 는 `PLAYING`·`ENDED`, `scor
 
 | @action | 추가 필드 | 비고 |
 | --- | --- | --- |
-| `PLACE_STONE` | `x`, `y` (0..14) | 내 차례만. 흑 금수 자리는 `FORBIDDEN_MOVE` |
+| `PLACE_STONE` | `x`, `y` (0..14), `slam?` (boolean, 기본 false) | 내 차례만. 흑 금수 자리는 `FORBIDDEN_MOVE`. `slam: true` 는 강하게 두기(D-193 — 연출 전용, 좌석마다 한 판에 한 번) — 이미 썼으면 착수 전체를 `SLAM_USED` 로 거절 |
 | `RESIGN` | — | 차례와 무관. 2:2 는 팀 패 |
 
 시간 초과 자동 수(`TimeoutPlace`)는 서버 내부 액션이라 **클라가 보낼 수 없다** — Jackson 하위 타입에 등록돼 있지 않다.
@@ -430,15 +430,15 @@ candidates, turnRemainingMs, result }` — `phase` 는 `PLAYING`·`ENDED`, `scor
 | type | payload | 의미 |
 | --- | --- | --- |
 | `MATCH_STARTED` | `{ firstSeat, seatColors }` | **타입만 정의 — 서버는 시작 때 보내지 않는다.** 시작 상태는 resync 로 |
-| `STONE_PLACED` | `{ seat, color, x, y, moveNumber, timedOut }` | `moveNumber` 는 1부터 — 같은 수를 두 번 받아도 같은 판. `timedOut` 은 시간 초과 자동 수 |
+| `STONE_PLACED` | `{ seat, color, x, y, moveNumber, timedOut, slam }` | `moveNumber` 는 1부터 — 같은 수를 두 번 받아도 같은 판. `timedOut` 은 시간 초과 자동 수. `slam` 은 강하게 두기(D-193) — 받은 모든 화면이 강한 착수 연출을 보여 준다 |
 | `TURN_CHANGED` | `{ seat, color, forbidden: [{x, y, kind}] }` | 착수마다 낸다(턴 카운트다운의 기준, D-131). 흑 차례면 그 판의 금수 자리 — `kind`: `DOUBLE_THREE`·`DOUBLE_FOUR`·`OVERLINE`(서버가 계산, 클라 판정 금지) |
 | `MATCH_ENDED` | `{ winnerColor, winnerSeats, reason, causeSeat, winLine, totalMoves }` | `reason`: `FIVE`·`RESIGN`·`TIMEOUT`·`DESERTED`·`BOARD_FULL`·`NO_LEGAL_MOVE`. 무승부면 `winnerColor` null·`winnerSeats` []. `causeSeat` 은 기권·시간패·탈주를 만든 좌석(그 밖 −1), `winLine` 은 5목일 때 5점 |
 
-**서버 → 클라 (비공개)**: `ERROR` 뿐 — 오목 고유 코드 `MATCH_OVER`·`NOT_YOUR_TURN`·`OUT_OF_BOARD`·`OCCUPIED`·`FORBIDDEN_MOVE`
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 오목 고유 코드 `MATCH_OVER`·`NOT_YOUR_TURN`·`OUT_OF_BOARD`·`OCCUPIED`·`FORBIDDEN_MOVE`·`SLAM_USED`
 (금수 종류는 클라가 이미 받은 `forbidden` 목록에서 읽는다).
 
-**resync**: `tableView` = `{ mode, rule, seatColors, moves: [{seat, x, y, timedOut}], turnSeat, forbidden, timeouts, result }` —
-`moves` 는 수순 전체(짝수 번째가 흑), `timeouts` 는 좌석별 연속 시간 초과 수, `result` 는 `MATCH_ENDED` 와 같은 값(`{ winnerColor,
+**resync**: `tableView` = `{ mode, rule, seatColors, moves: [{seat, x, y, timedOut}], turnSeat, forbidden, timeouts, result, slamsLeft }` —
+`moves` 는 수순 전체(짝수 번째가 흑), `timeouts` 는 좌석별 연속 시간 초과 수, `slamsLeft` 는 좌석별 남은 강하게 두기 수(0 또는 1, D-193), `result` 는 `MATCH_ENDED` 와 같은 값(`{ winnerColor,
 winnerSeats, reason, causeSeat, winLine }`). **`privateHand` 는 없다** — 비공개 뷰가 없는 첫 게임이다(`docs/game-port.md` §1 설계 판단 2).
 
 ## 구름항로 (gameType=CLOUD_ROUTE, D-212·D-213)

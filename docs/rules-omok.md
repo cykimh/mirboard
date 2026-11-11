@@ -59,8 +59,20 @@
 | `OCCUPIED` | 이미 돌이 있음 |
 | `FORBIDDEN_MOVE` | 흑 차례에 그 룰의 금수 자리(§6) — 사유에 금수 종류를 싣는다 |
 | `MATCH_OVER` | 판이 끝남 |
+| `SLAM_USED` | 강하게 두기(§4.1)를 이 판에서 이미 썼는데 또 `slam` 을 실음 — 착수 전체 거절 |
 
 **코드:** `OmokEngine.apply`·`place`·`requireTurn` · `action/RejectionReason` · **테스트:** `OmokEnginePlayTest`(`rejects_*` 3건 — 다섯 사유 전부, 2:2 차례 순서, 백은 금수 없음, 흑 차례 이벤트의 금수 목록)
+
+### 4.1 강하게 두기 (D-193)
+
+- 착수에 `slam` 을 실으면 그 돌을 **강하게** 둔다. **룰에는 영향이 없다** — 놓이는 자리·금수·승패·차례·시간은 보통 착수와 똑같고, 공개
+  착수 이벤트에 `slam: true` 가 실려 모든 화면이 강한 착수 연출을 보여 줄 뿐이다.
+- **좌석마다 한 판에 한 번.** 2:2 는 팀이 아니라 사람마다 한 번이다. 남은 횟수는 공개 뷰의 `slamsLeft`(좌석별).
+- 이미 쓴 사람이 또 `slam` 을 실으면 **착수 전체를 `SLAM_USED` 로 거절**한다(돌은 놓이지 않고 차례·시간 그대로). **[결정]** — `slam` 만 버리고
+  두면 보낸 사람 화면과 다른 화면의 연출이 갈린다. 다른 거절 사유(차례·자리·금수)가 먼저다 — 남의 차례에 실으면 `NOT_YOUR_TURN`.
+- 시간 초과 자동 수(§8)는 강하게 두지 않는다. **봇은 쓰지 않는다** — 합법 수 목록과 봇 정책은 보통 착수만 낸다. **[결정]**
+
+**코드:** `OmokAction.Place.slam` · `OmokState.slams`·`slamsLeft`·`SLAMS_PER_MATCH`(옛 JSON 은 0) · `OmokEngine.apply`(사용 수 확인)·`place` · 불변식 `OmokInvariantChecker`(좌석별 사용 수 0~1) · **테스트:** `OmokEngineSlamTest`(8건), `OmokJsonRoundTripTest`(`slam` 역직렬화·옛 상태), `OmokGameEngineTest.a_slam_goes_through_the_adapter_once_and_the_bot_never_slams`
 
 ## 5. 승리 — 5목
 
@@ -222,6 +234,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 | 12 | 탈주 | 그 편 패, 판 종료 | 사용자 결정 — 티츄와 같다 |
 | 13 | 금수만 남은 흑 | 무승부 | 패스가 없는 게임에서 끝을 보장 |
 | 14 | 레이팅 | 오목 하나, 무승부는 ELO 변화 없음 | 사용자 결정 |
+| 15 | 강하게 두기 | 연출 전용, 좌석마다 한 판에 한 번, 두 번째는 착수 전체 거절(`SLAM_USED`), 시간 초과 수·봇은 안 씀 | 사용자 피드백(D-193) — 화면마다 연출이 같아야 한다 |
 
 ## 12. 범위 밖 (v1)
 

@@ -76,14 +76,17 @@ public final class OmokEngine {
             case OmokAction.Resign __ -> lose(state, seat, EndReason.RESIGN);
             case OmokAction.Place place -> {
                 requireTurn(state, seat);
-                yield place(state, seat, new Point(place.x(), place.y()), false);
+                if (place.slam() && state.slamsLeft(seat) <= 0) {
+                    throw new OmokActionRejectedException(RejectionReason.SLAM_USED, "seat " + seat);
+                }
+                yield place(state, seat, new Point(place.x(), place.y()), false, place.slam());
             }
             case OmokAction.TimeoutPlace __ -> {
                 requireTurn(state, seat);
                 if (state.timeouts().get(seat) >= 1) {
                     yield lose(state, seat, EndReason.TIMEOUT);       // 같은 사람 연속 2번째 (룰 §8-4)
                 }
-                yield place(state, seat, timeoutPoint(state), true);
+                yield place(state, seat, timeoutPoint(state), true, false);
             }
         };
     }
@@ -94,7 +97,7 @@ public final class OmokEngine {
         }
     }
 
-    private Result place(OmokState state, int seat, Point p, boolean timedOut) {
+    private Result place(OmokState state, int seat, Point p, boolean timedOut, boolean slam) {
         if (!p.onBoard()) {
             throw new OmokActionRejectedException(RejectionReason.OUT_OF_BOARD, p.toString());
         }
@@ -112,29 +115,35 @@ public final class OmokEngine {
         Board after = board.with(p, color);
         List<Integer> timeouts = new ArrayList<>(state.timeouts());
         timeouts.set(seat, timedOut ? timeouts.get(seat) + 1 : 0);
+        List<Integer> slams = state.slams();
+        if (slam) {
+            List<Integer> used = new ArrayList<>(slams);
+            used.set(seat, used.get(seat) + 1);
+            slams = used;
+        }
         Move move = new Move(seat, p.x(), p.y(), timedOut);
         int moveNumber = state.moves().size() + 1;
 
         List<OmokEvent> events = new ArrayList<>();
-        events.add(new OmokEvent.StonePlaced(seat, color, p.x(), p.y(), moveNumber, timedOut));
+        events.add(new OmokEvent.StonePlaced(seat, color, p.x(), p.y(), moveNumber, timedOut, slam));
 
         Optional<List<Point>> winLine = WinRule.winLine(after, p, state.rule());
         if (winLine.isPresent()) {
             MatchResult r = new MatchResult(color, state.seatsOfTeam(TurnOrder.team(seat)), EndReason.FIVE, -1,
                     winLine.get());
-            return finish(state.withMove(move, -1, timeouts, r), events);
+            return finish(state.withMove(move, -1, timeouts, r, slams), events);
         }
         if (after.isFull()) {
-            return finish(state.withMove(move, -1, timeouts, draw(EndReason.BOARD_FULL)), events);
+            return finish(state.withMove(move, -1, timeouts, draw(EndReason.BOARD_FULL), slams), events);
         }
         int next = TurnOrder.next(seat, state.seatCount());
         Stone nextColor = state.colorOf(next);
         List<ForbiddenPoint> forbidden = nextColor == Stone.BLACK ? ForbiddenRule.all(after, state.rule()) : List.of();
         if (nextColor == Stone.BLACK && forbidden.size() == Board.CELLS - after.stoneCount()) {
-            return finish(state.withMove(move, -1, timeouts, draw(EndReason.NO_LEGAL_MOVE)), events);
+            return finish(state.withMove(move, -1, timeouts, draw(EndReason.NO_LEGAL_MOVE), slams), events);
         }
         events.add(new OmokEvent.TurnChanged(next, nextColor, forbidden));
-        return new Result(state.withMove(move, next, timeouts, null), events);
+        return new Result(state.withMove(move, next, timeouts, null, slams), events);
     }
 
     /** 그 좌석의 편이 진다 — 기권·시간패·탈주 (룰 §7~§9). */
@@ -244,6 +253,7 @@ public final class OmokEngine {
     public OmokPublicView publicView(OmokState state) {
         List<Stone> colors = IntStream.range(0, state.seatCount()).mapToObj(state::colorOf).toList();
         return new OmokPublicView(state.mode(), state.rule(), colors, state.moves(), state.turnSeat(),
-                forbiddenPoints(state), state.timeouts(), state.result());
+                forbiddenPoints(state), state.timeouts(), state.result(),
+                IntStream.range(0, state.seatCount()).mapToObj(state::slamsLeft).toList());
     }
 }

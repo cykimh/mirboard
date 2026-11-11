@@ -18,8 +18,15 @@ import com.mirboard.domain.game.core.GameAction;
 public sealed interface OmokAction extends GameAction
         permits OmokAction.Place, OmokAction.Resign, OmokAction.TimeoutPlace {
 
-    /** 돌 하나 두기 (룰 §4). */
-    record Place(int x, int y) implements OmokAction {
+    /**
+     * 돌 하나 두기 (룰 §4). {@code slam} 은 "강하게 두기"(룰 §4.1, D-193) — 연출 전용, 좌석마다 한 판에 한 번. JSON 에 없으면
+     * false.
+     */
+    record Place(int x, int y, boolean slam) implements OmokAction {
+
+        public Place(int x, int y) {
+            this(x, y, false);
+        }
     }
 
     /** 기권 (룰 §7) — 차례와 무관. 2:2 는 팀 패. */
