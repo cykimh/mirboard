@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { indexCssSource, responsiveCssSource, yachtCssSource } from './cssSources';
+import { ROLL_ANIMATION_MS, ROLL_DIE_MS, ROLL_STAGGER_MS } from '@/features/yacht/DiceTray';
 
 /**
  * `.yt-` 네임스페이스 규칙을 기계로 강제한다(원카드 `onecardCssNamespace.test` 와 같은 규칙). 요트 게임판 CSS 가 공용 클래스를
@@ -53,6 +54,30 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(i19).toBeGreaterThan(-1);
     expect(i20).toBeGreaterThan(i19);
     expect(i17).toBeGreaterThan(i20);
+  });
+
+  it('D-203 — 굴림 연출이 ROLL_ANIMATION_MS 안에 끝난다(주사위 5개: 4 × 엇갈림 + 한 개 길이)', () => {
+    const rolling = /\.yt-theme-salon \.yt-die-rolling \.yt-die-face\s*\{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(rolling).toContain(`yt-salon-throw ${ROLL_DIE_MS}ms`);
+    expect(rolling).toContain(`* ${ROLL_STAGGER_MS}ms`);
+    expect(4 * ROLL_STAGGER_MS + ROLL_DIE_MS).toBeLessThanOrEqual(ROLL_ANIMATION_MS);
+    // 정육면체 회전·바닥 그림자도 같은 길이·같은 엇갈림이다.
+    for (const part of ['.yt-cube', '.yt-die-shadow']) {
+      const body = new RegExp(`\\.yt-theme-salon \\.yt-die-rolling \\${part}\\s*\\{([^}]*)\\}`).exec(cssCode)?.[1] ?? '';
+      expect(body, part).toContain(`${ROLL_DIE_MS}ms`);
+      expect(body, part).toContain(`* ${ROLL_STAGGER_MS}ms`);
+    }
+  });
+
+  it('D-203 — 살롱 연출은 움직임 줄이기에서 꺼진다(17 에 같은 명시도로)', () => {
+    for (const needle of [
+      '.yt-theme-salon .yt-die-rolling .yt-cube',
+      '.yt-theme-salon .yt-felt-party',
+      '.yt-theme-salon .yt-fx',
+      '.yt-burst',
+    ]) {
+      expect(responsiveCssSource, needle).toContain(needle);
+    }
   });
 
   it('튜토리얼 포털 토큰(.yt-tokens)이 게임판 토큰과 같은 값이다', () => {

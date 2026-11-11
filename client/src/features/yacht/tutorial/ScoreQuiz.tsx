@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Category } from '@/types/yacht';
-import { CATEGORY_LABEL, DIE_FACE } from '../yachtLabels';
+import { CATEGORY_LABEL } from '../yachtLabels';
+import { YachtDie } from '../YachtDie';
+import { yachtThemeClass } from '../yachtTheme';
 
 interface Question {
   dice: [number, number, number, number, number];
@@ -48,11 +50,11 @@ export function ScoreQuiz() {
   const [picked, setPicked] = useState<Category | null>(null);
   const q = QUESTIONS[index];
   return (
-    <div className="yt-quiz">
+    <div className={`yt-quiz${yachtThemeClass}`}>
       <p className="yt-quiz-dice" aria-label={`주사위 ${q.dice.join(', ')}`}>
         {q.dice.map((d, i) => (
-          <span key={i} aria-hidden="true">
-            {DIE_FACE[d]}
+          <span key={i} className="yt-quiz-die" aria-hidden="true">
+            <YachtDie face={d} />
           </span>
         ))}
       </p>

@@ -41,7 +41,9 @@ export function YachtTurnCountdown({ turnSeconds }: { turnSeconds: number }) {
       aria-label={`이번 차례 남은 시간 ${seconds}초`}
       title="0초가 되면 점수가 가장 높은 칸에 자동으로 기록합니다"
     >
-      <span aria-hidden>⏱ </span>
+      <span className="yt-countdown-icon" aria-hidden>
+        ⏱{' '}
+      </span>
       {seconds}초
     </span>
   );

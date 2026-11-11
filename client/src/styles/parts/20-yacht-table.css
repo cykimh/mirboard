@@ -7,6 +7,8 @@
  * ⚠ 네임스페이스: 모든 선택자는 `.yt-` 클래스를 포함한다(styles/yachtCssNamespace.test.ts 가 기계로 검사).
  *
  * 테마: 중립색은 전역 토큰(--color-*)을 써서 라이트·다크가 저절로 따라간다. 주사위 면은 두 테마 모두 밝은 상아색이다.
+ *
+ * 테마 층(D-203): 파일 뒤쪽 "미드나잇 살롱" 구역은 전부 `.yt-theme-salon` 아래에만 있다. 그 앞까지가 기본 모습이다.
  */
 
 /* 게임판은 `.app-shell` **밖**이라 tailwind 의 border-box 리셋이 닿지 않는다. 스코프 안에서만 명시한다. */
@@ -213,8 +215,6 @@ button.yt-badge {
   height: 18px;
   border-radius: 4px;
   background: var(--yt-die-bg);
-  color: var(--yt-die-fg);
-  font-size: 14px;
   line-height: 1;
   box-sizing: border-box;
   border-bottom: 2px solid transparent;
@@ -319,7 +319,6 @@ button.yt-badge {
   border: 2px solid rgba(0, 0, 0, 0.18);
   background: var(--yt-die-bg);
   color: var(--yt-die-fg);
-  font-size: clamp(34px, 11vw, 46px);
   line-height: 1;
   cursor: pointer;
   transition: transform 0.15s ease;
@@ -573,8 +572,6 @@ button.yt-badge {
   display: flex;
   gap: 6px;
   margin: 0;
-  font-size: 36px;
-  color: var(--yt-die-fg);
 }
 
 .yt-quiz-dice span {
@@ -616,6 +613,1462 @@ button.yt-badge {
   margin: 0;
   text-align: center;
   font-size: 13px;
+}
+
+/* ── D-203 공통 뼈대 — SVG 주사위·연출 층(기본 모습에서는 꾸밈 층을 그리지 않는다) ─────────── */
+.yt-die {
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yt-die-face,
+.yt-die-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+
+.yt-mini-die .yt-die-svg {
+  border-radius: 4px;
+}
+
+.yt-mini-die-empty {
+  opacity: 0.4;
+}
+
+.yt-cat-die {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.yt-quiz-die {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.yt-rolls {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.yt-rolls-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  opacity: 0.7;
+}
+
+.yt-rolls-dot-used {
+  background: currentColor;
+  opacity: 1;
+}
+
+.yt-seat-chip,
+.yt-die-shadow,
+.yt-lamp,
+.yt-fx,
+.yt-chip {
+  display: none;
+}
+
+/* 굴러오는 정육면체 — 기본 모습에서는 앞면만 평평하게. */
+.yt-cube,
+.yt-cube-front {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.yt-cube-side {
+  display: none;
+}
+
+/* 금가루 캔버스(GoldBurst) — 화면 전체, 조작을 막지 않는다. */
+.yt-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* ══ 테마 "미드나잇 살롱" (D-203) ═══════════════════════════════════════════
+ * 게임판 루트·튜토리얼 퀴즈의 `.yt-theme-salon` 아래에만 있다 — `yachtTheme.YACHT_THEME` 을 'classic' 으로 바꾸면 이 구역 전체가
+ * 꺼지고 위의 기본 모습만 남는다. 초록 펠트·마호가니 레일·황동, 상아 주사위, 금선 장부. 다크 = 밤 살롱, 라이트 = 낮 살롱.
+ * 글자 대비: 펠트 위 글자는 어두운 받침(배지·안내 알약) 위에만 놓고, 장부의 황동 글자는 테마별로 따로 고른 `--yt-s-brass-ink`(AA).
+ */
+.yt-theme-salon {
+  --yt-s-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Noto Serif KR', 'Noto Serif CJK KR', 'Nanum Myeongjo',
+    AppleMyungjo, 'Apple SD Gothic Neo', Batang, Georgia, serif;
+  --yt-s-page: linear-gradient(#f8f3e7, #ebe2ce);
+  --yt-s-ink: #2a241a;
+  --yt-s-ink-soft: #5c4f38;
+  --yt-s-line: rgba(122, 92, 30, 0.42);
+  --yt-s-felt: #2a7354;
+  --yt-s-felt-hi: #3d9a70;
+  --yt-s-felt-lo: #1d563f;
+  --yt-s-rail: #6b4226;
+  --yt-s-rail-hi: #94623c;
+  --yt-s-rail-lo: #4a2c18;
+  --yt-s-brass: #a8842f;
+  --yt-s-brass-hi: #e9d08a;
+  --yt-s-brass-lo: #7a5c1c;
+  --yt-s-brass-ink: #765610;
+  --yt-s-brass-glow: rgba(214, 178, 94, 0.55);
+  --yt-s-plaque: #fffbf2;
+  --yt-s-ledger: #fffbf2;
+  --yt-s-ledger-line: rgba(122, 92, 30, 0.28);
+  --yt-s-me-wash: rgba(168, 132, 47, 0.13);
+  --yt-s-danger: #a3271c;
+  --yt-s-on-felt: #f7f0dc;
+  --yt-s-felt-pad: rgba(8, 26, 18, 0.62);
+  --yt-die-held: #d6b25e;
+}
+
+html.dark .yt-theme-salon {
+  --yt-s-page: radial-gradient(120% 70% at 50% 0%, #17271f, #0b110e 70%);
+  --yt-s-ink: #efe6d0;
+  --yt-s-ink-soft: #bdb196;
+  --yt-s-line: rgba(214, 178, 94, 0.38);
+  --yt-s-felt: #17503a;
+  --yt-s-felt-hi: #23704f;
+  --yt-s-felt-lo: #0c3023;
+  --yt-s-rail: #3a2417;
+  --yt-s-rail-hi: #5e3d26;
+  --yt-s-rail-lo: #24150c;
+  --yt-s-brass: #d6b25e;
+  --yt-s-brass-hi: #f6e2a4;
+  --yt-s-brass-lo: #8f6f2c;
+  --yt-s-brass-ink: #dcb962;
+  --yt-s-plaque: #15221d;
+  --yt-s-ledger: #0f1915;
+  --yt-s-ledger-line: rgba(214, 178, 94, 0.22);
+  --yt-s-me-wash: rgba(214, 178, 94, 0.09);
+  --yt-s-danger: #ff9a8a;
+}
+
+/* 방 전체 바탕 — 게임판은 760px 기둥이라 화면 전체에 깔리는 고정 층을 뒤에 둔다. */
+.yt-table.yt-theme-salon::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--yt-s-page);
+  pointer-events: none;
+}
+
+.yt-theme-salon .yt-header,
+.yt-theme-salon .yt-seats,
+.yt-theme-salon .yt-error {
+  color: var(--yt-s-ink);
+}
+
+/* 머리 배지 */
+.yt-theme-salon .yt-badge {
+  border-color: var(--yt-s-line);
+  line-height: 1.5;
+}
+
+.yt-theme-salon .yt-header .yt-badge {
+  background: color-mix(in srgb, var(--yt-s-plaque) 70%, transparent);
+}
+
+.yt-theme-salon .yt-badge-title {
+  padding-left: 14px;
+  border-color: var(--yt-s-brass);
+  color: var(--yt-s-brass-ink);
+  font-family: var(--yt-s-serif);
+  letter-spacing: 0.32em;
+}
+
+.yt-theme-salon .yt-reaction-palette {
+  border-color: var(--yt-s-brass-lo);
+  background: var(--yt-s-plaque);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+/* 좌석 — 이름 명패 */
+.yt-theme-salon .yt-seat {
+  border: 1px solid var(--yt-s-line);
+  border-left: 4px solid var(--yt-accent);
+  border-radius: 6px;
+  background: var(--yt-s-plaque);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
+}
+
+.yt-theme-salon .yt-seat-turn {
+  border-color: var(--yt-s-brass);
+  border-left-color: var(--yt-accent);
+  box-shadow:
+    0 0 0 1px var(--yt-s-brass),
+    0 0 12px var(--yt-s-brass-glow);
+}
+
+/* 좌석 색 칩 — 가운데가 뚫린 작은 포커 칩. */
+.yt-theme-salon .yt-seat-chip {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--yt-accent);
+  box-shadow:
+    inset 0 0 0 1.5px var(--yt-accent),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.85),
+    inset 0 0 0 4.5px var(--yt-accent),
+    0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.yt-theme-salon .yt-seat-total {
+  font-family: var(--yt-s-serif);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.yt-theme-salon .yt-seat-total-bump {
+  animation: yt-salon-bump 0.6s ease-out 0.32s backwards;
+}
+
+@keyframes yt-salon-bump {
+  0% {
+    transform: scale(1.35);
+    color: var(--yt-s-brass-ink);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.yt-theme-salon .yt-seat-tag {
+  border-color: var(--yt-s-brass);
+  color: var(--yt-s-brass-ink);
+  letter-spacing: 0.08em;
+}
+
+/* "차례" 는 명패 위 모서리에 걸친 작은 리본 — 줄을 차지하지 않아 차례가 바뀌어도 좌석 띠 높이가 그대로다. */
+/* 긴 이름은 줄이고 점수는 같은 줄에 둔다(이름이 길다고 명패가 두 줄이 되지 않게). 내 명패는 옅은 황동 물. */
+.yt-theme-salon .yt-seat-name {
+  flex: 1 1 40px;
+  display: block;
+}
+
+.yt-theme-salon .yt-seat-name > * {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.yt-theme-salon .yt-seat-total {
+  margin-left: 0;
+}
+
+.yt-theme-salon .yt-seat-me {
+  background: linear-gradient(var(--yt-s-me-wash), var(--yt-s-me-wash)), var(--yt-s-plaque);
+}
+
+.yt-theme-salon .yt-seat-tag-turn {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 7px;
+  border-color: var(--yt-s-brass);
+  background: linear-gradient(#f6e2a4, #c9a24b);
+  color: #2a1d05;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.14em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.yt-theme-salon .yt-seat-kick {
+  border-color: var(--yt-s-line);
+}
+
+.yt-theme-salon .yt-mini-die {
+  width: 19px;
+  height: 19px;
+  border-bottom: none;
+  border-radius: 5px;
+  background: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+.yt-theme-salon .yt-seat-dice {
+  gap: 3px;
+  padding-top: 1px;
+}
+
+.yt-theme-salon .yt-seat-dice-empty {
+  min-height: 20px;
+}
+
+.yt-theme-salon .yt-mini-die-held {
+  box-shadow:
+    0 0 0 1.5px var(--yt-die-held),
+    0 0 5px var(--yt-s-brass-glow);
+  transform: translateY(1px);
+}
+
+.yt-theme-salon .yt-mini-die-empty .yt-die-svg-body {
+  fill: transparent;
+  stroke: var(--yt-s-ink-soft);
+  stroke-dasharray: 14 10;
+}
+
+/* 펠트 테이블 — 마호가니 레일(테두리 칸에 나뭇결) + 황동 선 + 스티치 */
+.yt-theme-salon .yt-felt {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(12px, 3vw, 18px) clamp(8px, 2.4vw, 14px) clamp(14px, 3vw, 18px);
+  border: clamp(7px, 2vw, 10px) solid transparent;
+  border-radius: clamp(22px, 6vw, 30px);
+  color: var(--yt-s-on-felt);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E")
+      padding-box,
+    radial-gradient(70% 55% at 50% 38%, rgba(255, 244, 200, 0.13), transparent 70%) padding-box,
+    radial-gradient(130% 100% at 50% 0%, var(--yt-s-felt-hi), var(--yt-s-felt) 50%, var(--yt-s-felt-lo)) padding-box,
+    repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 7px, rgba(255, 255, 255, 0.05) 7px 8px, transparent 8px 13px)
+      border-box,
+    linear-gradient(var(--yt-s-rail-hi), var(--yt-s-rail) 30%, var(--yt-s-rail-lo)) border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 10px 26px rgba(0, 0, 0, 0.42),
+    0 0 0 1px var(--yt-s-brass-lo),
+    0 8px 20px rgba(0, 0, 0, 0.3);
+  animation: none;
+}
+
+.yt-theme-salon .yt-felt::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: clamp(12px, 4vw, 17px);
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.yt-theme-salon .yt-felt-myturn {
+  animation: yt-salon-turn 2.2s ease-in-out infinite;
+}
+
+@keyframes yt-salon-turn {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+      inset 0 10px 26px rgba(0, 0, 0, 0.42),
+      0 0 0 1px var(--yt-s-brass),
+      0 0 0 2px var(--yt-s-brass-lo),
+      0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+      inset 0 10px 26px rgba(0, 0, 0, 0.42),
+      0 0 0 1px var(--yt-s-brass-hi),
+      0 0 0 3px var(--yt-s-brass),
+      0 0 22px 3px var(--yt-s-brass-glow);
+  }
+}
+
+/* 차례 조명 — 위에서 내려오는 등불이 차례인 좌석 명패 쪽으로 미끄러져 간다(transform 만 움직인다). */
+.yt-theme-salon .yt-lamp {
+  display: block;
+  position: absolute;
+  z-index: 1;
+  top: -30%;
+  left: 50%;
+  width: min(78%, 460px);
+  height: 150%;
+  margin-left: calc(min(78%, 460px) / -2);
+  background: radial-gradient(50% 50% at 50% 30%, rgba(255, 240, 190, 0.24), rgba(255, 240, 190, 0.08) 55%, transparent 72%);
+  opacity: 0.45;
+  pointer-events: none;
+  transition:
+    transform 0.75s cubic-bezier(0.3, 1.3, 0.5, 1),
+    opacity 0.5s;
+}
+
+.yt-theme-salon .yt-lamp-on {
+  opacity: 1;
+}
+
+/* 요트 축하 — 펠트가 짧게 울린다(내 차례 맥박과 같이 돌 수 있게 두 벌). */
+.yt-theme-salon .yt-felt-party {
+  animation: yt-salon-shake 0.5s cubic-bezier(0.3, 0, 0.3, 1) 0.05s;
+}
+
+.yt-theme-salon .yt-felt-myturn.yt-felt-party {
+  animation:
+    yt-salon-shake 0.5s cubic-bezier(0.3, 0, 0.3, 1) 0.05s,
+    yt-salon-turn 2.2s ease-in-out infinite;
+}
+
+@keyframes yt-salon-shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  12% {
+    transform: translate(-4px, 2px) rotate(-0.4deg);
+  }
+  28% {
+    transform: translate(4px, -2px) rotate(0.4deg);
+  }
+  44% {
+    transform: translate(-3px, -1px) rotate(-0.25deg);
+  }
+  60% {
+    transform: translate(2px, 1px) rotate(0.15deg);
+  }
+  78% {
+    transform: translate(-1px, 0);
+  }
+}
+
+.yt-theme-salon .yt-felt-status {
+  position: relative;
+  z-index: 4;
+  min-height: 24px;
+}
+
+/* 펠트 위 글자는 어두운 받침 위에만(라이트 펠트에서도 AA). */
+.yt-theme-salon .yt-felt .yt-badge {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: var(--yt-s-felt-pad);
+  color: var(--yt-s-on-felt);
+}
+
+.yt-theme-salon .yt-felt .yt-badge-turn {
+  border-color: #f6e2a4;
+  color: #f6e2a4;
+  letter-spacing: 0.12em;
+}
+
+.yt-theme-salon .yt-countdown-icon {
+  display: none;
+}
+
+.yt-theme-salon .yt-countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+.yt-theme-salon .yt-countdown::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  vertical-align: -1px;
+}
+
+.yt-theme-salon .yt-felt .yt-countdown-urgent {
+  border-color: #ff9a8a;
+  background: rgba(70, 12, 8, 0.82);
+  color: #ffd2c9;
+  font-weight: 700;
+}
+
+.yt-theme-salon .yt-felt .yt-celebrate {
+  border-color: #f6e2a4;
+  background: linear-gradient(#f6e2a4, #d6b25e);
+  color: #2a1d05;
+  font-weight: 700;
+}
+
+.yt-theme-salon .yt-rolls {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--yt-s-felt-pad);
+  color: #f6e2a4;
+}
+
+.yt-theme-salon .yt-tray {
+  position: relative;
+  z-index: 2;
+}
+
+/* 상아 주사위 — 버튼은 자리만 잡고 그림(.yt-die-face)이 움직인다. */
+.yt-theme-salon .yt-dice {
+  --yt-throw: min(42vw, 190px);
+  --yt-die-size: clamp(50px, 14.4vw, 68px);
+  gap: clamp(6px, 2vw, 13px);
+}
+
+.yt-theme-salon .yt-die {
+  width: var(--yt-die-size);
+  height: var(--yt-die-size);
+  border: 0;
+  border-radius: 21%;
+  background: none;
+  transform: none;
+  box-shadow: none;
+  transition: none;
+}
+
+/* 남의 차례(누를 수 없음)에도 주사위는 또렷하게 — 전역 button:disabled 흐림을 받지 않는다. */
+.yt-theme-salon .yt-die:disabled {
+  opacity: 1;
+}
+
+.yt-theme-salon .yt-die:focus-visible {
+  outline: 2px solid #f6e2a4;
+  outline-offset: 4px;
+}
+
+.yt-theme-salon .yt-die-face {
+  position: relative;
+  z-index: 1;
+  border-radius: 21%;
+  filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.45));
+  transition:
+    transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1),
+    box-shadow 0.2s,
+    filter 0.2s;
+}
+
+.yt-theme-salon .yt-die:not(:disabled):active .yt-die-face {
+  transform: translateY(3px) scale(0.97);
+}
+
+.yt-theme-salon .yt-die-held .yt-die-face,
+.yt-theme-salon .yt-die-held:not(:disabled):active .yt-die-face {
+  transform: translateY(8px);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+  box-shadow:
+    0 0 0 3px #d6b25e,
+    0 0 14px rgba(246, 226, 164, 0.7);
+}
+
+/* 아직 굴리지 않음 — 펠트 위 빈 자리(점선). */
+.yt-theme-salon .yt-die-empty {
+  opacity: 1;
+}
+
+.yt-theme-salon .yt-die-empty .yt-die-face {
+  filter: none;
+}
+
+.yt-theme-salon .yt-die-empty .yt-die-svg-body {
+  fill: rgba(0, 0, 0, 0.16);
+  stroke: rgba(255, 255, 255, 0.42);
+  stroke-width: 2;
+  stroke-dasharray: 9 7;
+}
+
+.yt-theme-salon .yt-die-empty .yt-die-svg-shade,
+.yt-theme-salon .yt-die-empty .yt-die-svg-shine {
+  display: none;
+}
+
+/* "고정" 황동 명패 — 펼쳐지며 나타난다. */
+.yt-theme-salon .yt-die-tag {
+  z-index: 2;
+  bottom: -27px;
+  padding: 1px 7px 1px 9px;
+  border-radius: 2px;
+  background: linear-gradient(#f6e2a4, #c9a24b);
+  color: #2a1d05;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  animation: yt-salon-plaque 0.2s ease-out backwards;
+}
+
+@keyframes yt-salon-plaque {
+  0% {
+    transform: translateX(-50%) scaleX(0.2);
+    opacity: 0;
+  }
+}
+
+/* 굴림 — 오른쪽 레일 너머에서 정육면체가 던져져 구르며 날아와 바닥에 닿고(58%), 한 번 튀고(72%), 잔 튐(93%) 뒤 멈춘다.
+ * 주사위마다 40ms 엇갈려 4 × 40 + 440 = 600ms(`ROLL_ANIMATION_MS`) 안에 모두 멈춘다. 움직임은 transform·opacity 뿐(GPU).
+ * 이동·튐은 그림 상자(.yt-die-face), 회전은 정육면체(.yt-cube), 펠트에 닿는 그림자는 .yt-die-shadow 가 따로 맡는다. */
+.yt-theme-salon .yt-die-rolling {
+  animation: none;
+}
+
+.yt-theme-salon .yt-die-shadow {
+  display: block;
+  position: absolute;
+  z-index: 0;
+  left: 4%;
+  right: 4%;
+  bottom: -11%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.22) 55%, transparent);
+  pointer-events: none;
+  transition:
+    transform 0.2s,
+    opacity 0.2s;
+}
+
+.yt-theme-salon .yt-die-held .yt-die-shadow {
+  transform: translateY(5px) scale(0.86);
+  opacity: 0.7;
+}
+
+.yt-theme-salon .yt-die-empty .yt-die-shadow {
+  display: none;
+}
+
+.yt-theme-salon .yt-die-rolling .yt-die-face {
+  filter: none;
+  perspective: 340px;
+  animation: yt-salon-throw 440ms linear backwards;
+  animation-delay: calc(var(--yt-i, 0) * 40ms);
+  will-change: transform;
+}
+
+.yt-theme-salon .yt-die-rolling .yt-die-shadow {
+  animation: yt-salon-shadow 440ms linear backwards;
+  animation-delay: calc(var(--yt-i, 0) * 40ms);
+}
+
+@keyframes yt-salon-throw {
+  0% {
+    transform: translate(var(--yt-throw, 170px), -38px) scale(0.82);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.75, 0.6);
+  }
+  12% {
+    opacity: 1;
+  }
+  58% {
+    transform: translate(-12px, 2px) scale(1.04, 0.95);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  72% {
+    transform: translate(3px, -13px) scale(1);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.5);
+  }
+  86% {
+    transform: translate(0, 1px) scale(1.02, 0.98);
+    animation-timing-function: ease-out;
+  }
+  93% {
+    transform: translate(0, -3px) scale(1);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes yt-salon-shadow {
+  0% {
+    transform: translate(var(--yt-throw, 170px), 4px) scale(0.5);
+    opacity: 0;
+  }
+  58% {
+    transform: translate(-12px, 0) scale(1.05);
+    opacity: 1;
+  }
+  72% {
+    transform: translate(3px, 3px) scale(0.72);
+    opacity: 0.55;
+  }
+  86% {
+    transform: translate(0, 0) scale(1.02);
+    opacity: 1;
+  }
+  93% {
+    transform: translate(0, 1px) scale(0.92);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 정육면체 — 여섯 면을 반 변만큼 밀어 세우고, 통째로 반 변만큼 뒤로 물려 앞면이 그림 상자 평면에 오게 한다. */
+.yt-theme-salon .yt-die-rolling .yt-cube {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--yt-die-size) / -2));
+  animation: yt-salon-tumble 440ms linear backwards;
+  animation-delay: calc(var(--yt-i, 0) * 40ms);
+  will-change: transform;
+}
+
+.yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube {
+  animation-name: yt-salon-tumble-b;
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-side {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  backface-visibility: hidden;
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-front {
+  transform: translateZ(calc(var(--yt-die-size) / 2));
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-back {
+  transform: rotateY(180deg) translateZ(calc(var(--yt-die-size) / 2));
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-right {
+  transform: rotateY(90deg) translateZ(calc(var(--yt-die-size) / 2));
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-left {
+  transform: rotateY(-90deg) translateZ(calc(var(--yt-die-size) / 2));
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-top {
+  transform: rotateX(90deg) translateZ(calc(var(--yt-die-size) / 2));
+}
+
+.yt-theme-salon .yt-die-rolling .yt-cube-bottom {
+  transform: rotateX(-90deg) translateZ(calc(var(--yt-die-size) / 2));
+}
+
+@keyframes yt-salon-tumble {
+  0% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-560deg) rotateY(430deg) rotateZ(40deg);
+    animation-timing-function: cubic-bezier(0.15, 0.4, 0.5, 1);
+  }
+  58% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-34deg) rotateY(28deg) rotateZ(6deg);
+    animation-timing-function: ease-out;
+  }
+  72% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(12deg) rotateY(-10deg) rotateZ(-3deg);
+    animation-timing-function: ease-in-out;
+  }
+  86% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-4deg) rotateY(3deg) rotateZ(0deg);
+  }
+  100% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+}
+
+@keyframes yt-salon-tumble-b {
+  0% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(470deg) rotateY(-610deg) rotateZ(-55deg);
+    animation-timing-function: cubic-bezier(0.15, 0.4, 0.5, 1);
+  }
+  58% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(30deg) rotateY(-36deg) rotateZ(-8deg);
+    animation-timing-function: ease-out;
+  }
+  72% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(-10deg) rotateY(13deg) rotateZ(4deg);
+    animation-timing-function: ease-in-out;
+  }
+  86% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(3deg) rotateY(-4deg) rotateZ(0deg);
+  }
+  100% {
+    transform: translateZ(calc(var(--yt-die-size) / -2)) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+}
+
+/* 다섯 개가 같게 멈춤 — 가벼운 반짝임 한 번 + 옅은 금빛(본 축하는 요트 칸에 기록할 때). */
+.yt-theme-salon .yt-dice-same .yt-die-face {
+  animation: yt-salon-glint 0.62s ease-in-out backwards;
+  animation-delay: calc(var(--yt-i, 0) * 70ms);
+  filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 5px rgba(255, 224, 138, 0.75));
+}
+
+.yt-theme-salon .yt-dice {
+  position: relative;
+}
+
+.yt-theme-salon .yt-dice-same::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: -18%;
+  bottom: -18%;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(100deg, transparent, rgba(255, 240, 190, 0.75) 50%, transparent);
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-shimmer 0.75s ease-out 0.1s;
+}
+
+@keyframes yt-salon-shimmer {
+  0% {
+    transform: translateX(-120%) skewX(-14deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(420%) skewX(-14deg);
+    opacity: 0.2;
+  }
+}
+
+@keyframes yt-salon-glint {
+  50% {
+    translate: 0 -6px;
+    filter: drop-shadow(0 9px 5px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 12px #ffe08a) brightness(1.15);
+  }
+}
+
+.yt-theme-salon .yt-tray-actions {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  margin-top: 24px;
+}
+
+.yt-theme-salon .yt-roll {
+  min-height: 46px;
+  padding: 0 30px;
+  border-radius: 999px;
+  background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
+  color: #2a1d05;
+  font-family: var(--yt-s-serif);
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 0.08s,
+    filter 0.15s;
+}
+
+/* 전역 `button:hover:not(:disabled)` 가 바탕을 회색으로 바꾼다 — 살롱 버튼은 제 바탕을 지킨다(명시도를 맞춰 다시 적는다). */
+.yt-theme-salon .yt-die:hover:not(:disabled) {
+  background: none;
+}
+
+.yt-theme-salon .yt-roll:hover:not(:disabled) {
+  background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
+}
+
+.yt-theme-salon button.yt-badge:hover:not(:disabled),
+.yt-theme-salon .yt-seat-kick:hover:not(:disabled) {
+  background: var(--yt-s-me-wash);
+  border-color: var(--yt-s-brass);
+}
+
+/* 황동 광택 — 누를 수 있을 때만 빛 한 줄이 천천히 지나간다. */
+.yt-theme-salon .yt-roll {
+  position: relative;
+  overflow: hidden;
+}
+
+.yt-theme-salon .yt-roll:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7) 50%, transparent);
+  transform: translateX(-130%) skewX(-18deg);
+  pointer-events: none;
+  animation: yt-salon-sheen 3.4s ease-in-out 0.6s infinite;
+}
+
+@keyframes yt-salon-sheen {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  32%,
+  100% {
+    transform: translateX(400%) skewX(-18deg);
+  }
+}
+
+.yt-theme-salon .yt-roll:not(:disabled):active {
+  transform: translateY(2px);
+  filter: brightness(0.95);
+}
+
+.yt-theme-salon .yt-roll:focus-visible {
+  outline: 2px solid #fff6d0;
+  outline-offset: 3px;
+}
+
+.yt-theme-salon .yt-roll:disabled {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+
+.yt-theme-salon .yt-tray-note {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--yt-s-felt-pad);
+  color: var(--yt-s-on-felt);
+  opacity: 1;
+  letter-spacing: 0.04em;
+}
+
+/* 점수표 — 금선 장부 */
+.yt-theme-salon .yt-card-wrap {
+  padding: 7px 7px 5px;
+  border-radius: 10px;
+  border: 1px solid var(--yt-s-brass-lo);
+  background: var(--yt-s-ledger);
+  color: var(--yt-s-ink);
+  box-shadow:
+    inset 0 0 0 3px var(--yt-s-ledger),
+    inset 0 0 0 4px var(--yt-s-ledger-line),
+    0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.yt-theme-salon .yt-card th,
+.yt-theme-salon .yt-card td {
+  height: 40px;
+  padding: 3px 2px;
+  border-bottom: 1px solid var(--yt-s-ledger-line);
+}
+
+.yt-theme-salon .yt-card thead th {
+  height: 32px;
+  border-bottom: 1px solid var(--yt-s-brass);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.yt-theme-salon .yt-card .yt-cat {
+  padding-left: 8px;
+}
+
+.yt-theme-salon .yt-cat-die {
+  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.3));
+}
+
+.yt-theme-salon .yt-cell-me {
+  background: var(--yt-s-me-wash);
+}
+
+.yt-theme-salon .yt-col-turn {
+  color: var(--yt-s-brass-ink);
+  box-shadow: inset 0 -3px 0 var(--yt-s-brass);
+}
+
+.yt-theme-salon .yt-cell,
+.yt-theme-salon .yt-pick {
+  font-family: var(--yt-s-serif);
+}
+
+.yt-theme-salon .yt-num {
+  display: inline-block;
+  font-size: 15px;
+}
+
+.yt-theme-salon .yt-row-upper-end th,
+.yt-theme-salon .yt-row-upper-end td {
+  border-bottom: 2px solid var(--yt-s-brass-lo);
+}
+
+.yt-theme-salon .yt-row-sum th,
+.yt-theme-salon .yt-row-sum td {
+  color: var(--yt-s-ink-soft);
+  font-style: italic;
+  opacity: 1;
+}
+
+.yt-theme-salon .yt-row-sum .yt-cell-bonus {
+  color: var(--yt-s-brass-ink);
+  font-style: normal;
+}
+
+.yt-theme-salon .yt-row-total th,
+.yt-theme-salon .yt-row-total td {
+  border-top: 3px double var(--yt-s-brass);
+  border-bottom: none;
+  font-size: 16px;
+}
+
+/* 후보 점수 — 흐리게 하지 않고 황동 잉크 기울임(AA). 내 차례의 칸은 황동 테 알약 버튼. */
+.yt-theme-salon .yt-cell-candidate {
+  color: var(--yt-s-brass-ink);
+  font-size: 14px;
+  font-style: italic;
+  opacity: 1;
+}
+
+.yt-theme-salon .yt-pick {
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--yt-s-brass);
+  border-radius: 999px;
+  background: var(--yt-s-ledger);
+  color: var(--yt-s-brass-ink);
+  font-size: 15px;
+  font-style: italic;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.08s;
+}
+
+.yt-theme-salon .yt-pick:active {
+  transform: scale(0.96);
+  background: var(--yt-s-brass-ink);
+  color: var(--yt-s-ledger);
+}
+
+.yt-theme-salon .yt-pick:focus-visible {
+  outline: 2px solid var(--yt-s-brass-ink);
+  outline-offset: 1px;
+}
+
+.yt-theme-salon .yt-pick-zero {
+  border-style: dashed;
+  border-color: var(--yt-s-line);
+  color: var(--yt-s-ink-soft);
+  font-weight: 400;
+  opacity: 1;
+  box-shadow: none;
+}
+
+/* 기록 — 칩이 닿는 순간(0.32s) 칸에 금박이 훑고 숫자가 찍힌다. */
+.yt-theme-salon .yt-cell-flash {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(246, 226, 164, 0.75) 50%, transparent 70%);
+  background-size: 300% 100%;
+  background-position: -60% 0;
+  background-repeat: no-repeat;
+  animation: yt-salon-leaf 1.15s ease-out 0.32s backwards;
+}
+
+@keyframes yt-salon-leaf {
+  0% {
+    background-position: 160% 0;
+    background-color: rgba(214, 178, 94, 0.5);
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+.yt-theme-salon .yt-cell-flash .yt-num {
+  color: var(--yt-s-brass-ink);
+  font-weight: 700;
+  animation: yt-salon-emboss 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) 0.32s backwards;
+}
+
+@keyframes yt-salon-emboss {
+  0% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 황동 칩 — 주사위 자리에서 칸으로 포물선. 게임판 루트 좌표, 조작을 막지 않는다. */
+.yt-theme-salon .yt-chip {
+  display: block;
+  position: absolute;
+  z-index: 20;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #7a5c1c;
+  background:
+    radial-gradient(circle, transparent 0 5.5px, #7a5c1c 5.5px 6.5px, transparent 6.5px),
+    radial-gradient(circle at 35% 30%, #f7e6ae, #d6b25e 60%, #8f6f2c);
+  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: yt-salon-chip 0.36s ease-in-out forwards;
+}
+
+.yt-theme-salon .yt-chip-ghost {
+  z-index: 19;
+  border-color: transparent;
+  background: radial-gradient(circle, rgba(255, 236, 170, 0.9), rgba(214, 178, 94, 0.35) 55%, transparent 72%);
+  box-shadow: none;
+}
+
+.yt-theme-salon .yt-cell {
+  position: relative;
+}
+
+.yt-theme-salon .yt-cell-flash::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 2px solid var(--yt-s-brass);
+  opacity: 0;
+  pointer-events: none;
+  animation: yt-salon-ring 0.55s ease-out 0.32s;
+}
+
+@keyframes yt-salon-ring {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes yt-salon-chip {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(calc(-50% + var(--yt-dx) * 0.15), calc(-50% + var(--yt-dy) * 0.15 - 18px)) scale(1.15);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(calc(-50% + var(--yt-dx) * 0.6), calc(-50% + var(--yt-dy) * 0.6 - 34px)) scale(1.1);
+    opacity: 1;
+  }
+  92% {
+    transform: translate(calc(-50% + var(--yt-dx)), calc(-50% + var(--yt-dy))) scale(0.7);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--yt-dx)), calc(-50% + var(--yt-dy))) scale(0.45);
+    opacity: 0;
+  }
+}
+
+/* 요트 칸 기록 축하 — 금빛 훑기 + 현수막 + 금가루. 펠트 안 연출 층. */
+.yt-theme-salon .yt-fx {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.yt-theme-salon .yt-fx-sweep {
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 228, 150, 0.42) 50%, transparent 60%);
+  animation: yt-salon-sweep 1.1s ease-out forwards;
+}
+
+@keyframes yt-salon-sweep {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(60%);
+    opacity: 0;
+  }
+}
+
+.yt-theme-salon .yt-fx-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  padding: 9px 30px 10px;
+  border-top: 1px solid #d6b25e;
+  border-bottom: 1px solid #d6b25e;
+  background: rgba(6, 18, 13, 0.88);
+  color: #f6e2a4;
+  font-family: var(--yt-s-serif);
+  text-align: center;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  animation: yt-salon-banner 2.4s ease forwards;
+}
+
+.yt-theme-salon .yt-fx-banner b {
+  display: block;
+  background: linear-gradient(100deg, #d6b25e 20%, #fff6d0 45%, #f6e2a4 55%, #d6b25e 80%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: yt-salon-gilt 1.6s ease-in-out 0.3s both;
+  margin-right: -0.5em;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.5em;
+  line-height: 1.2;
+}
+
+.yt-theme-salon .yt-fx-banner i {
+  display: block;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: 0.16em;
+}
+
+@keyframes yt-salon-gilt {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -40% 0;
+  }
+}
+
+@keyframes yt-salon-banner {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50%);
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  14% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate(-50%, -50%) scale(0.97);
+  }
+  22% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  82% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 0);
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+/* 빛줄기 — 현수막 뒤에서 천천히 도는 금빛 부챗살(가장자리는 흐려진다). */
+.yt-theme-salon .yt-fx-rays {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 150vmax;
+  height: 150vmax;
+  margin: -75vmax 0 0 -75vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 226, 140, 0.34) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.5) 22%, transparent 46%);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.5) 22%, transparent 46%);
+  animation: yt-salon-rays 2.4s linear forwards;
+}
+
+@keyframes yt-salon-rays {
+  0% {
+    transform: rotate(0deg) scale(0.3);
+    opacity: 0;
+  }
+  14% {
+    transform: rotate(10deg) scale(1);
+    opacity: 1;
+  }
+  78% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: rotate(70deg) scale(1.08);
+    opacity: 0;
+  }
+}
+
+/* 터지는 순간의 섬광. */
+.yt-theme-salon .yt-fx-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(50% 60% at 50% 46%, rgba(255, 246, 208, 0.85), rgba(255, 226, 140, 0.25) 55%, transparent 75%);
+  opacity: 0;
+  animation: yt-salon-flash 0.5s ease-out;
+}
+
+@keyframes yt-salon-flash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 결과 — 장부 한 장 */
+.yt-theme-salon .yt-end {
+  gap: 10px;
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px solid var(--yt-s-brass);
+  background: var(--yt-s-ledger);
+  color: var(--yt-s-ink);
+  box-shadow:
+    inset 0 0 0 3px var(--yt-s-ledger),
+    inset 0 0 0 4px var(--yt-s-ledger-line),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+  scroll-margin: 12px;
+  animation: yt-salon-end 0.6s ease backwards;
+}
+
+@keyframes yt-salon-end {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.yt-theme-salon .yt-end-title {
+  margin-right: -0.4em;
+  color: var(--yt-s-brass-ink);
+  font-family: var(--yt-s-serif);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.yt-theme-salon .yt-end-solo .yt-end-title {
+  margin-right: 0;
+  font-size: 26px;
+  letter-spacing: 0.08em;
+}
+
+.yt-theme-salon .yt-end-title::after {
+  content: '';
+  display: block;
+  width: 60%;
+  height: 1px;
+  margin: 8px auto 0;
+  background: linear-gradient(90deg, transparent, var(--yt-s-brass), transparent);
+}
+
+.yt-theme-salon .yt-end-reason,
+.yt-theme-salon .yt-end-note,
+.yt-theme-salon .yt-end-best {
+  color: var(--yt-s-ink-soft);
+  text-align: center;
+  opacity: 1;
+}
+
+.yt-theme-salon .yt-end-best-new {
+  color: var(--yt-s-brass-ink);
+  font-family: var(--yt-s-serif);
+  font-size: 16px;
+}
+
+.yt-theme-salon .yt-end > p {
+  margin: 0;
+  text-align: center;
+}
+
+.yt-theme-salon .yt-end-row {
+  align-items: center;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--yt-s-ledger-line);
+}
+
+.yt-theme-salon .yt-end-me {
+  background: var(--yt-s-me-wash);
+}
+
+.yt-theme-salon .yt-end-rank {
+  min-width: 44px;
+  font-family: var(--yt-s-serif);
+}
+
+.yt-theme-salon .yt-end-first .yt-end-rank {
+  color: var(--yt-s-brass-ink);
+  font-weight: 700;
+}
+
+.yt-theme-salon .yt-end-first .yt-end-rank::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f7e6ae, #d6b25e 60%, #8f6f2c);
+  box-shadow: 0 0 0 1px #7a5c1c;
+}
+
+.yt-theme-salon .yt-end-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yt-theme-salon .yt-end-total {
+  font-family: var(--yt-s-serif);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.yt-theme-salon .yt-end-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.yt-theme-salon .yt-end .yt-roll {
+  align-self: center;
+}
+
+.yt-theme-salon .yt-end .yt-badge {
+  min-height: 46px;
+  padding: 0 18px;
+  color: var(--yt-s-ink);
+  font-size: 14px;
+}
+
+/* 튜토리얼 퀴즈 — 작은 펠트 받침 위의 같은 주사위. */
+.yt-theme-salon .yt-quiz-dice {
+  gap: 7px;
+  padding: 12px 14px;
+  border: 5px solid #5a3a24;
+  border-radius: 16px;
+  background: radial-gradient(130% 100% at 50% 0%, #23704f, #17503a 55%, #0c3023);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.yt-theme-salon .yt-quiz-dice span {
+  padding: 0;
+  background: none;
+}
+
+.yt-theme-salon .yt-quiz-die {
+  width: clamp(36px, 11vw, 44px);
+  height: clamp(36px, 11vw, 44px);
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.45));
 }
 
 /* 보조기기 전용 알림. */

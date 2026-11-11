@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { MAX_ROLLS, type Dice, type Held } from '@/types/yacht';
-import { DIE_FACE } from './yachtLabels';
+import { YachtDie, YachtDieCube } from './YachtDie';
 
 /** 굴림 애니메이션 길이 — 봇 템포(700ms) 안에 끝나야 한다. */
 export const ROLL_ANIMATION_MS = 600;
+/**
+ * 주사위마다 엇갈리는 간격·한 개가 굴러와 멈추기까지(D-203). `4 × 40 + 440 = 600` — 마지막 주사위도 `ROLL_ANIMATION_MS` 안에 멈춘다.
+ * 실제 값은 CSS(`20-yacht-table.css` 의 `yt-salon-throw`·`--yt-i * 40ms`)에 있고 `yachtCssNamespace.test` 가 둘을 맞춰 본다.
+ */
+export const ROLL_STAGGER_MS = 40;
+export const ROLL_DIE_MS = 440;
 
 interface Props {
   dice: Dice | null;
@@ -24,8 +30,9 @@ interface Props {
 }
 
 /**
- * 주사위 판(설계 §7.2). 홀드한 주사위는 아래로 내려앉고 테두리. 내 차례면 탭으로 홀드, 남의 차례면 보기만(DICE_HELD 실시간).
- * 실제 `<button>` 이라 키보드·보조기기로도 홀드한다. 굴리는 동안 홀드 안 한 주사위만 흔들린다.
+ * 주사위 판(설계 §7.2). 홀드한 주사위는 아래로 내려앉고 황동 테 + "고정" 명패. 내 차례면 탭으로 홀드, 남의 차례면 보기만(DICE_HELD 실시간).
+ * 실제 `<button>` 이라 키보드·보조기기로도 홀드한다. 굴리는 동안 홀드 안 한 주사위만 정육면체(`YachtDieCube`)로 굴러와 바닥에 한 번
+ * 튀고 멈춘다 — 앞면이 서버가 준 눈이고 `aria-label` 도 늘 그 눈이다. 연출은 조작을 막지 않는다(굴러오는 중에도 눌린다).
  */
 export function DiceTray({
   dice,
@@ -49,9 +56,15 @@ export function DiceTray({
   }, [rollNonce, animate]);
 
   const left = MAX_ROLLS - rolls;
+  // D-203 — 다섯 개가 같게 멈추면 가벼운 반짝임(본 축하는 요트 칸에 기록할 때).
+  const allSame = dice !== null && rolls > 0 && !rolling && dice.every((d) => d === dice[0]);
   return (
     <section className="yt-tray" aria-label="주사위">
-      <div className="yt-dice" role="group" aria-label={dice ? `주사위 ${dice.join(', ')}` : '아직 굴리지 않음'}>
+      <div
+        className={`yt-dice${allSame ? ' yt-dice-same' : ''}`}
+        role="group"
+        aria-label={dice ? `주사위 ${dice.join(', ')}` : '아직 굴리지 않음'}
+      >
         {Array.from({ length: 5 }, (_, i) => {
           const face = dice ? dice[i] : null;
           const isHeld = held[i];
@@ -61,13 +74,15 @@ export function DiceTray({
               type="button"
               key={i}
               className={`yt-die${isHeld ? ' yt-die-held' : ''}${shaking ? ' yt-die-rolling' : ''}${face === null ? ' yt-die-empty' : ''}`}
+              style={{ ['--yt-i' as string]: i } as CSSProperties}
               disabled={!canHold || face === null}
               aria-pressed={isHeld}
               aria-label={face === null ? `주사위 ${i + 1} 비어 있음` : `주사위 ${i + 1}: ${face}${isHeld ? ', 고정' : ''}`}
               onClick={() => onToggle?.(i)}
             >
+              <span aria-hidden="true" className="yt-die-shadow" />
               <span aria-hidden="true" className="yt-die-face">
-                {face === null ? '·' : DIE_FACE[face]}
+                {shaking && face !== null ? <YachtDieCube face={face} /> : <YachtDie face={face} />}
               </span>
               {isHeld && <span className="yt-die-tag">고정</span>}
             </button>
