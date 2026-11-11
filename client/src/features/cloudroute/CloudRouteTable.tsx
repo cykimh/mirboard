@@ -23,8 +23,9 @@ import { ISLAND_NAME, KIND_HINT, LEVEL_NAME, LETTER_TEXT, TILES, gridOf, partner
 import { cloudrouteRoomSink } from './cloudrouteRoomSink';
 import { useCloudRouteStore } from './cloudrouteStore';
 import { describe, g } from './describe';
-import { burst } from './fxParticles';
-import { CLOUD_ROUTE_THEME } from './theme';
+import { burst, confettiFall } from './fxParticles';
+import { skyPhaseOf, type SkyPhase } from './sky';
+import { CLOUD_ROUTE_FX_LEVEL, CLOUD_ROUTE_THEME } from './theme';
 import { tokenPoint } from './tokenLayout';
 import { CLOUD_ROUTE_TUTORIAL } from './tutorial/cloudrouteTutorial';
 import { useCloudRouteFx, type CardFx, type TokenFx } from './useCloudRouteFx';
@@ -125,6 +126,8 @@ export function CloudRouteTable({
   const logEntries = shown?.log ?? s.log;
   // 결과 화면은 마지막 연출(파산 등)이 끝난 뒤에 올린다.
   const result = s.result && !fx.busy ? s.result : null;
+  // 하늘 시간대(D-219) — 보여 주는 라운드를 따라 아침 → 낮 → 노을 → 밤. 화면 전용.
+  const skyPhase = skyPhaseOf(shownRound, s.roundLimit);
 
   // 판 크기 단위 — 판 폭의 1/100 을 `--cr-u` 로 심는다(말 자리·글자 크기가 이것을 쓴다. 시안의 container query 대신).
   useLayoutEffect(() => {
@@ -184,6 +187,18 @@ export function CloudRouteTable({
         burst(layer, { x, y: a.top - b.top + a.height * (i === 0 || i === 3 ? 0.3 : 0.55) }, 'cheer', Math.min(1.1, a.width / 380));
       }, delay),
     );
+    if (CLOUD_ROUTE_FX_LEVEL >= 2) {
+      // 종이 꽃가루 비 — 축포 사이로 결과 상자 위에서 두 번 내린다.
+      for (const delay of [200, 1500]) {
+        timers.push(
+          window.setTimeout(() => {
+            const a = box.getBoundingClientRect();
+            const b = layer.getBoundingClientRect();
+            confettiFall(layer, a.left - b.left, a.right - b.left, Math.max(0, a.top - b.top - 40), Math.min(a.height + 60, 420), 22);
+          }, delay),
+        );
+      }
+    }
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [result, motion]);
 
@@ -287,7 +302,17 @@ export function CloudRouteTable({
   const standing = seats.filter((x) => !x.eliminated);
 
   return (
-    <div ref={rootRef} className={`cr-table cr-${CLOUD_ROUTE_THEME}${motion ? ' cr-motion' : ''}`}>
+    <div
+      ref={rootRef}
+      className={`cr-table cr-${CLOUD_ROUTE_THEME}${CLOUD_ROUTE_FX_LEVEL >= 2 ? ' cr-fx2' : ''}${motion ? ' cr-motion' : ''}`}
+      data-cr-sky={skyPhase}
+    >
+      {/* 하늘빛 층(D-219) — 시간대마다 겹쳐 둔 색 층의 투명도만 바꾼다. 장식. */}
+      <div className="cr-daylight" aria-hidden="true">
+        <span className="cr-daylight-tint cr-daylight-morning" />
+        <span className="cr-daylight-tint cr-daylight-sunset" />
+        <span className="cr-daylight-tint cr-daylight-night" />
+      </div>
       <header className="cr-header gm-header">
         <div className="cr-header-badges gm-header-info">
           <span className="cr-badge cr-badge-title">구름항로</span>
@@ -333,7 +358,7 @@ export function CloudRouteTable({
       <div className="cr-layout">
         <div className="cr-board-wrap">
           <div ref={boardRef} className={`cr-board${myTurn ? ' cr-board-myturn' : ''}`} role="group" aria-label="판">
-            <Sky />
+            <Sky phase={skyPhase} />
             {TILES.map((info) => {
               const view = tiles.find((t) => t.tile === info.id);
               const { row, col } = gridOf(info.id);
@@ -513,9 +538,25 @@ export function CloudRouteTable({
 const ROUTE_TAIL = ['#ff9aa2', '#ffd59e', '#fff3a6', '#b5ead7', '#bcd4ff'];
 
 /** 가운데 하늘 — 무지개와 세 겹 구름(깊이마다 다른 속도로 흐르고, 마우스를 따라 살짝 어긋난다). 장식. */
-function Sky() {
+function Sky({ phase }: { phase: SkyPhase }) {
   return (
-    <div className="cr-sky" aria-hidden="true">
+    <div className={`cr-sky cr-sky-${phase}`} aria-hidden="true">
+      {/* 해와 달(D-219) — 시간대마다 자리를 옮기고 서로 바뀐다. */}
+      <div className="cr-sky-orb">
+        <svg className="cr-sky-sun" viewBox="0 0 60 60">
+          <g className="cr-sky-rays" strokeWidth="3.4" strokeLinecap="round">
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+              <path key={deg} d="M30 5v7" transform={`rotate(${deg} 30 30)`} />
+            ))}
+          </g>
+          <circle className="cr-sky-sun-disc" cx="30" cy="30" r="13" />
+          <path className="cr-sky-sun-face" d="M25 29.500q1 -1.600 2 0M33 29.500q1 -1.600 2 0M26.500 34q3.500 2.600 7 0" />
+        </svg>
+        <svg className="cr-sky-moon" viewBox="0 0 60 60">
+          <path className="cr-sky-moon-disc" d="M39 10a21 21 0 1 0 11 29a17 17 0 0 1 -11 -29Z" />
+          <path className="cr-sky-moon-face" d="M24 30q1.200 1.600 2.400 0M27 37q3 2 5.600 -.400" />
+        </svg>
+      </div>
       <svg className="cr-sky-layer cr-sky-far" viewBox="0 0 700 700" preserveAspectRatio="none">
         <g className="cr-sky-stars">
           {SKY_STARS.map(([x, y, r], i) => (
@@ -546,6 +587,27 @@ function Sky() {
           <circle cx="336" cy="549" r="18" />
           <circle cx="366" cy="545" r="21" />
         </g>
+        {/* 판을 가로질러 흐르는 구름 두 덩이(D-219). */}
+        <g className="cr-cloud cr-cloud-flow cr-cloud-flow-a">
+          <ellipse cx="0" cy="262" rx="44" ry="13" />
+          <circle cx="-12" cy="252" r="17" />
+          <circle cx="14" cy="248" r="21" />
+        </g>
+        <g className="cr-cloud cr-cloud-flow cr-cloud-flow-b">
+          <ellipse cx="0" cy="424" rx="34" ry="10" />
+          <circle cx="-9" cy="416" r="13" />
+          <circle cx="11" cy="413" r="16" />
+        </g>
+      </svg>
+      {/* 가끔 지나가는 새 떼(D-219) — 낮에만. */}
+      <svg className="cr-sky-layer cr-sky-birds" viewBox="0 0 700 700" preserveAspectRatio="none">
+        <g className="cr-flock">
+          {SKY_BIRDS.map(([x, y, k], i) => (
+            <g key={i} transform={`translate(${x} ${y}) scale(${k})`}>
+              <path className="cr-bird" d="M-11 0q5.500 -8 11 0q5.500 -8 11 0" />
+            </g>
+          ))}
+        </g>
       </svg>
       <svg className="cr-sky-layer cr-sky-near" viewBox="0 0 700 700" preserveAspectRatio="none">
         <g className="cr-cloud cr-cloud-b">
@@ -562,6 +624,13 @@ function Sky() {
     </div>
   );
 }
+
+const SKY_BIRDS: [number, number, number][] = [
+  [0, 200, 1],
+  [-34, 216, 0.8],
+  [-30, 184, 0.85],
+  [-70, 204, 0.7],
+];
 
 const SKY_STARS: [number, number, number][] = [
   [150, 150, 3],
@@ -1188,6 +1257,8 @@ function TileSheet({
   );
 }
 
+const WIN_RAINBOW = ['#ff9aa2', '#ffd59e', '#fff3a6', '#b5ead7', '#bcd4ff'];
+
 const REASON_TEXT: Record<EndReason, string> = {
   ROUND_LIMIT: '마지막 라운드가 끝나 총자산으로 순위를 매겼습니다.',
   LAST_STANDING: '한 명만 남아 판이 끝났습니다.',
@@ -1213,6 +1284,12 @@ function MatchEnd({
   const title = mine?.rank === 1 ? (winners > 1 ? '공동 1위!' : '승리!') : '판 종료';
   return (
     <section className="match-end cr-match-end" aria-label="판 종료">
+      {/* 우승 무지개(D-219) — 결과 상자 위로 한 줄씩 그려진다. 장식. */}
+      <svg className="cr-win-rainbow" viewBox="0 0 200 100" aria-hidden="true">
+        {WIN_RAINBOW.map((color, i) => (
+          <path key={color} d={`M${14 + i * 8} 100a${86 - i * 8} ${86 - i * 8} 0 0 1 ${172 - i * 16} 0`} pathLength={100} stroke={color} />
+        ))}
+      </svg>
       <p className="cr-match-kicker">오늘의 하늘 산책 끝!</p>
       <h3>{title}</h3>
       <p className="cr-match-reason">

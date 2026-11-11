@@ -9,3 +9,11 @@
 export type CloudRouteTheme = 'storybook' | 'classic';
 
 export const CLOUD_ROUTE_THEME: CloudRouteTheme = 'storybook';
+
+/**
+ * 그림책 테마의 연출 단계 (D-219). `2` 는 2차 연출(솜구름 꼬리·동전 비행·하늘 시간대·바람 빠지는 파산·무지개 결과),
+ * `1` 은 D-218 연출 그대로. 연출 큐 따라잡기(`paceFor`)는 단계와 무관하게 늘 켜져 있다.
+ */
+export type CloudRouteFxLevel = 1 | 2;
+
+export const CLOUD_ROUTE_FX_LEVEL: CloudRouteFxLevel = 2;

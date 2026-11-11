@@ -212,8 +212,29 @@ describe('CloudRouteTable — 판·좌석·결과', () => {
     const end = screen.getByRole('region', { name: '판 종료' });
     expect(within(end).getByText('총자산 3,400G')).toBeInTheDocument();
     expect(within(end).getByText('파산')).toBeInTheDocument();
+    // D-219 — 우승 무지개는 장식이다(보조기기에 없다).
+    expect(end.querySelector('.cr-win-rainbow')).toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(within(end).getByRole('button', { name: '대기실로' }));
     expect(onBackToRoom).toHaveBeenCalled();
+  });
+
+  it('하늘 시간대는 라운드를 따라 바뀐다 — 장식 층은 보조기기에 없다 (D-219)', () => {
+    seed(tableOf({ round: 2, roundLimit: 30 }));
+    const first = renderTable();
+    const root = first.container.querySelector('.cr-table')!;
+    expect(root).toHaveAttribute('data-cr-sky', 'morning');
+    expect(root).toHaveClass('cr-fx2');
+    expect(root.querySelector('.cr-daylight')).toHaveAttribute('aria-hidden', 'true');
+    expect(root.querySelector('.cr-sky')).toHaveClass('cr-sky-morning');
+    act(() => {
+      useCloudRouteStore.getState().applyEvent({ type: 'TURN_CHANGED', payload: { seat: 1, round: 17 } });
+    });
+    expect(root).toHaveAttribute('data-cr-sky', 'sunset');
+    act(() => {
+      useCloudRouteStore.getState().applyEvent({ type: 'TURN_CHANGED', payload: { seat: 0, round: 28 } });
+    });
+    expect(root).toHaveAttribute('data-cr-sky', 'night');
+    expect(root.querySelector('.cr-sky')).toHaveClass('cr-sky-night');
   });
 
   it('서버 거절 문구를 보이고 닫을 수 있다', () => {

@@ -7,9 +7,8 @@ import { useCloudRouteStore } from './cloudrouteStore';
 import { snapshotOf, tableOf } from './testTables';
 import { CLOUD_ROUTE_THEME } from './theme';
 import { BOARD_GAP_U, BOARD_PAD_U, CELL_U, stepPath, tileCenter, tokenPoint } from './tokenLayout';
-import { SKIP_LOAD, speedFor } from './useCloudRouteFx';
 
-/** D-218 — 그림책 테마의 화면 전용 연출: 버스·말 자리·배속. 스토어(진짜 값)는 연출과 무관하게 바로 바뀐다. */
+/** D-218 — 그림책 테마의 화면 전용 연출: 버스·말 자리(배속·따라잡기는 `cloudrouteFxCatchUp.test.tsx`, D-219). 스토어(진짜 값)는 연출과 무관하게 바로 바뀐다. */
 
 describe('연출 버스 — sink 는 스토어에 바로 적용하고, 감독이 붙어 있을 때만 화면 값을 넘긴다', () => {
   const seen: (FxItem | 'clear')[] = [];
@@ -49,24 +48,6 @@ describe('연출 버스 — sink 는 스토어에 바로 적용하고, 감독이
     cloudrouteRoomSink.applySnapshot(snapshotOf(tableOf()));
     cloudrouteRoomSink.reset('r-2');
     expect(seen).toEqual(['clear', 'clear']);
-  });
-});
-
-describe('배속 — 연출이 조작을 늦추지 않게 밀리면 빨라진다', () => {
-  it('남은 연출이 많을수록 빨라진다', () => {
-    expect(speedFor(0, false)).toBe(1);
-    expect(speedFor(2, false)).toBe(1);
-    expect(speedFor(3, false)).toBeGreaterThan(1);
-    expect(speedFor(8, false)).toBeGreaterThan(speedFor(5, false));
-  });
-
-  it('내 결정이 와 있으면 남의 연출은 적어도 2.8배', () => {
-    expect(speedFor(0, true)).toBeGreaterThanOrEqual(2.8);
-    expect(speedFor(8, true)).toBeGreaterThan(speedFor(8, false));
-  });
-
-  it('건너뛰는 기준은 가장 빠른 배속 구간보다 뒤다', () => {
-    expect(SKIP_LOAD).toBeGreaterThan(8);
   });
 });
 

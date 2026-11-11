@@ -1,5 +1,5 @@
 /**
- * 구름항로 연출 입자 (D-218) — 꽃가루·별·동전·빗방울·먼지·말풍선. 전부 효과 레이어(`.cr-fx`) 안의 잠깐 사는 DOM 조각이고
+ * 구름항로 연출 입자 (D-218, D-219 솜구름 꼬리·반짝임·꽃가루 비) — 꽃가루·별·동전·빗방울·먼지·말풍선. 전부 효과 레이어(`.cr-fx`) 안의 잠깐 사는 DOM 조각이고
  * `transform`·`opacity` 만 움직인다(Web Animations). 동시에 사는 조각은 {@link MAX_LIVE} 개까지 — 넘치면 새 조각을 만들지 않는다
  * (휴대폰 60fps). 좌표는 효과 레이어 기준 px.
  */
@@ -22,6 +22,10 @@ const DROP = '<svg viewBox="0 0 18 18"><path d="M9 2q5 7 5 10a5 5 0 0 1-10 0q0-3
 const PUFF = '<svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="#fff" opacity=".85"/></svg>';
 const SPARK =
   '<svg viewBox="0 0 18 18"><path d="M9 1q.800 6.200 8 8-7.200 1.800-8 8-.800-6.200-8-8 7.200-1.800 8-8Z" fill="#fff8d6" stroke="#ffd34d" stroke-width=".6"/></svg>';
+
+/** 솜구름 한 덩이 — 이동 꼬리·주사위 착지·바람 빠지는 열기구. */
+const CLOUDLET =
+  '<svg viewBox="0 0 18 18"><path d="M4.500 13.500a3 3 0 0 1-.400-5.970 4.200 4.200 0 0 1 8.100-.900 3.500 3.500 0 0 1 1.300 6.870Z" fill="#fff" stroke="#b9a8d6" stroke-opacity=".45" stroke-width=".7" stroke-linejoin="round"/></svg>';
 
 function confetto(i: number): string {
   const c = PALETTE[i % PALETTE.length];
@@ -113,6 +117,83 @@ export function burst(layer: HTMLElement, p: Px, kind: BurstKind, scale = 1): vo
   }
 }
 
+/**
+ * 솜구름 꼬리 (D-219) — 말이 떠난 자리에 구름 몇 덩이가 남아 부풀다 흩어진다. `drift` 는 흩어지는 쪽(px, 진행 반대 방향).
+ */
+export function puffs(layer: HTMLElement, p: Px, count: number, scale = 1, drift: Px = { x: 0, y: 0 }): void {
+  for (let i = 0; i < count; i++) {
+    const ox = rand(-7, 7) * scale;
+    const oy = rand(-3, 5) * scale;
+    const size = rand(0.75, 1.25) * scale;
+    spawn(
+      layer,
+      CLOUDLET,
+      'cr-particle cr-particle-puff',
+      [
+        { transform: `translate(${p.x + ox}px,${p.y + oy}px) scale(${0.35 * size})`, opacity: 0 },
+        { transform: `translate(${p.x + ox + drift.x * 0.3}px,${p.y + oy + drift.y * 0.3 - 2 * scale}px) scale(${1.1 * size})`, opacity: 0.92, offset: 0.25 },
+        {
+          transform: `translate(${p.x + ox + drift.x}px,${p.y + oy + drift.y - 9 * scale}px) scale(${1.7 * size})`,
+          opacity: 0,
+        },
+      ],
+      { duration: rand(620, 900), delay: i * 45, easing: 'cubic-bezier(.2,.6,.4,1)' },
+    );
+  }
+}
+
+/** 제자리 반짝임 (D-219) — 칸 둘레에서 별빛이 하나씩 켜졌다 꺼진다(구매·건설). `size` 는 칸 한 변(px). */
+export function twinkle(layer: HTMLElement, p: Px, size: number, count = 6): void {
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + rand(-0.4, 0.4);
+    const reach = size * rand(0.32, 0.62);
+    const x = p.x + Math.cos(angle) * reach;
+    const y = p.y + Math.sin(angle) * reach;
+    const k = rand(0.7, 1.25);
+    spawn(
+      layer,
+      SPARK,
+      'cr-particle',
+      [
+        { transform: `translate(${x}px,${y}px) scale(0) rotate(0deg)`, opacity: 0 },
+        { transform: `translate(${x}px,${y}px) scale(${k}) rotate(60deg)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(${x}px,${y}px) scale(0) rotate(120deg)`, opacity: 0 },
+      ],
+      { duration: rand(420, 640), delay: i * 70, easing: 'ease-in-out' },
+    );
+  }
+}
+
+/** 종이 꽃가루 비 (D-219) — 결과 화면 위에서 한들한들 떨어진다. `x0`~`x1` 사이에서 `height` 만큼. */
+export function confettiFall(layer: HTMLElement, x0: number, x1: number, y: number, height: number, count: number): void {
+  for (let i = 0; i < count; i++) {
+    const x = rand(x0, x1);
+    const sway = rand(14, 38) * (i % 2 === 0 ? 1 : -1);
+    const spin = rand(-540, 540);
+    const size = rand(0.7, 1.2);
+    spawn(
+      layer,
+      i % 7 === 6 ? STAR : confetto(i),
+      'cr-particle',
+      [
+        { transform: `translate(${x}px,${y}px) scale(${size}) rotate(0deg)`, opacity: 0 },
+        { transform: `translate(${x + sway}px,${y + height * 0.3}px) scale(${size}) rotate(${spin * 0.3}deg)`, opacity: 1, offset: 0.12 },
+        { transform: `translate(${x - sway * 0.6}px,${y + height * 0.65}px) scale(${size}) rotate(${spin * 0.65}deg)`, opacity: 1, offset: 0.6 },
+        { transform: `translate(${x + sway * 0.4}px,${y + height}px) scale(${size * 0.8}) rotate(${spin}deg)`, opacity: 0 },
+      ],
+      { duration: rand(1700, 2700), delay: rand(0, 900), easing: 'linear' },
+    );
+  }
+}
+
+/** 금액 → 날아가는 동전 수 (D-219). 50G 마다 하나, 적어도 2개·많아야 {@link MAX_COINS}개. */
+export const MAX_COINS = 12;
+
+export function coinCount(amount: number): number {
+  if (!(amount > 0)) return 0;
+  return Math.max(2, Math.min(MAX_COINS, Math.round(amount / 50) + 1));
+}
+
 /** 별 동전 무리가 포물선으로 날아가 받는 쪽에 쏙 들어간다. 끝나는 시각(ms)을 돌려준다. */
 export function coins(layer: HTMLElement, from: Px, to: Px, count: number, ms: number, scale = 1): number {
   const gap = Math.min(70, ms / (count + 2));
@@ -154,7 +235,7 @@ export function ring(layer: HTMLElement, p: Px, size: number, color: string): vo
 export type PopTone = 'gain' | 'loss' | 'note';
 
 /** 숫자·한마디 말풍선이 떠올랐다 사라진다. */
-export function pop(layer: HTMLElement, p: Px, text: string, tone: PopTone): void {
+export function pop(layer: HTMLElement, p: Px, text: string, tone: PopTone, bouncy = false): void {
   if (live >= MAX_LIVE || typeof layer.animate !== 'function') return;
   const el = document.createElement('span');
   el.className = `cr-pop cr-pop-${tone}`;
@@ -170,14 +251,25 @@ export function pop(layer: HTMLElement, p: Px, text: string, tone: PopTone): voi
     el.remove();
     live--;
   };
+  // D-219 — 튀어 오르는 숫자: 크게 솟았다 한 번 통 튀고 떠오르며 사라진다(잃은 돈은 아래로 떨어진다).
+  const end = tone === 'loss' ? y + 14 : y - 40;
+  const bounce: Keyframe[] = [
+        { transform: `translate(${x}px,${y + 10}px) translate(-50%,-50%) scale(.3)`, opacity: 0 },
+        { transform: `translate(${x}px,${y - 24}px) translate(-50%,-50%) scale(1.42)`, opacity: 1, offset: 0.14 },
+        { transform: `translate(${x}px,${y - 8}px) translate(-50%,-50%) scale(.94, 1.04)`, opacity: 1, offset: 0.27 },
+        { transform: `translate(${x}px,${y - 17}px) translate(-50%,-50%) scale(1.1)`, opacity: 1, offset: 0.38 },
+        { transform: `translate(${x}px,${y - 12}px) translate(-50%,-50%) scale(1)`, opacity: 1, offset: 0.48 },
+        { transform: `translate(${x}px,${y - 14}px) translate(-50%,-50%) scale(1)`, opacity: 1, offset: 0.76 },
+        { transform: `translate(${x}px,${end}px) translate(-50%,-50%) scale(.92)`, opacity: 0 },
+  ];
   const anim = el.animate(
-    [
+    bouncy ? bounce : [
       { transform: `translate(${x}px,${y + 8}px) translate(-50%,-50%) scale(.6)`, opacity: 0 },
       { transform: `translate(${x}px,${y - 10}px) translate(-50%,-50%) scale(1.14)`, opacity: 1, offset: 0.16 },
       { transform: `translate(${x}px,${y - 14}px) translate(-50%,-50%) scale(1)`, opacity: 1, offset: 0.7 },
       { transform: `translate(${x}px,${y - 34}px) translate(-50%,-50%) scale(.96)`, opacity: 0 },
     ],
-    { duration: 1350, easing: 'ease-out', fill: 'both' },
+    { duration: bouncy ? 1500 : 1350, easing: 'ease-out', fill: 'both' },
   );
   anim.onfinish = done;
   anim.oncancel = done;
