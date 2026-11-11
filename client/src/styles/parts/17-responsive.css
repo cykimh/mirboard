@@ -420,6 +420,23 @@
   }
 }
 
+/* D-231 — 스컬킹 "촛불 선장실" 연출도 움직임 줄이기면 끈다(18 은 미디어 0개 규칙이라 여기 둔다 — 맨 끝 두 블록 앞). 카드·좌석·
+   보너스 배지·금화는 제자리에 바로 서고, 촛불 빛은 일렁이지 않고 켜진 채 남는다. 예측 공개 양피지·금화 비는 꾸밈뿐이라 감춘다
+   (값은 좌석·점수표에 있다). 포털(튜토리얼)의 카드에는 애니메이션이 없다. */
+@media (prefers-reduced-motion: reduce) {
+  .sk-theme-cabin *,
+  .sk-theme-cabin *::before,
+  .sk-theme-cabin *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .sk-theme-cabin .sk-fx-reveal,
+  .sk-theme-cabin .sk-fx-rain {
+    display: none;
+  }
+}
+
 /* D-186 — 휴대폰 경기장 확대·고정(티츄·스컬킹·원카드·요트·구름항로). 머리 줄이 한 줄(⋮ 메뉴)로 줄어든 만큼 경기장을 키운다.
    높이는 100dvh 기준이라 주소창 때문에 실제 보이는 높이가 작은 휴대폰에서는 예전 최소값으로 돌아간다(그보다 작아지지 않는다).
    좌우 여백도 줄여 폭이 정하는 경기장(구름항로 정사각 판·요트 주사위 줄)을 키운다. 기준 실측(375×812) — 머리 줄 81~151 → 44px.

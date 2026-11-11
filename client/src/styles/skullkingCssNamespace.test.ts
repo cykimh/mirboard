@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { indexCssSource, responsiveCssSource, skullkingCssSource } from './cssSources';
+import { SK_TOKENS_CLASS, cabinTheme } from '@/features/skullking/skullKingTheme';
 
 /**
  * `.sk-` 네임스페이스 규칙을 관례가 아니라 **기계로** 강제한다 (D-103).
@@ -16,7 +17,10 @@ const indexCss = indexCssSource;
 
 /** 주석을 제거한 뒤 선언 블록 앞의 선택자 그룹만 뽑는다. */
 function selectorGroups(source: string): string[] {
-  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '');
+  // D-231 — @keyframes 의 단계(0%·100%)는 선택자가 아니다. 이름 규칙은 아래 "촛불 선장실" 묶음이 따로 본다.
+  const withoutComments = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/@keyframes\s+[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   const groups: string[] = [];
   const re = /(^|})\s*([^{}@]+?)\s*\{/g;
   let m: RegExpExecArray | null;
@@ -216,6 +220,68 @@ describe('18-skullking-table.css — 테이블 배치 (D-132)', () => {
   it('라이트 테마 천 위 트릭 대기 칸·빈 트릭 안내도 덜 흐리게 한다', () => {
     expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-trick-slot.waiting', 'opacity')).toBe('0.8');
     expect(lastDeclaredIn('html:not(.dark) .sk-felt .sk-trick-empty', 'opacity')).toBe('0.8');
+  });
+});
+
+/** D-231 — "촛불 선장실" 테마 층. 되돌리기가 한 줄이려면 꾸밈이 전부 테마 클래스 아래에 있어야 한다. */
+describe('18-skullking-table.css — 촛불 선장실 테마 (D-231)', () => {
+  const start = cssCode.indexOf('.sk-theme-cabin');
+  const themeCode = cssCode.slice(start);
+  const themeGroups = selectorGroups(themeCode);
+
+  it('테마 구역이 있고, 그 앞(기본 모습)에는 테마 클래스가 없다', () => {
+    expect(start).toBeGreaterThan(0);
+    expect(themeGroups.length).toBeGreaterThan(40);
+  });
+
+  // 테마 클래스 없이 걸리는 규칙은 테마일 때만 그려지는 조각(연출 `.sk-fx-*`, 카드 그림 `.sk-card-art`)과 그 지연뿐이다.
+  it('꾸밈 규칙은 .sk-theme-cabin 아래에만 있다 — 예외는 테마일 때만 그리는 조각', () => {
+    const offenders = themeGroups.filter((g) =>
+      g
+        .split(',')
+        .map((one) => one.trim())
+        .some((one) => !one.includes('.sk-theme-cabin') && !/\.sk-fx-|\.sk-card-art/.test(one)),
+    );
+    expect(offenders, offenders.join(' | ')).toEqual([]);
+  });
+
+  it('keyframes 이름은 전부 sk- 접두다 (전역 이름 공간이라 다른 게임과 겹치면 안 된다)', () => {
+    const names = [...cssCode.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1]);
+    expect(names.length).toBeGreaterThan(8);
+    expect(names.filter((n) => !n.startsWith('sk-'))).toEqual([]);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('연출은 레이아웃 속성을 움직이지 않는다 — keyframes 안에는 transform·opacity·filter 만', () => {
+    const frames = [...cssCode.matchAll(/@keyframes\s+[\w-]+\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)].map((m) => m[1]);
+    const props = new Set(frames.flatMap((f) => [...f.matchAll(/([\w-]+)\s*:/g)].map((m) => m[1])));
+    expect([...props].sort()).toEqual(['filter', 'opacity', 'transform']);
+  });
+
+  it('라이트·다크 갑판 색을 따로 둔다', () => {
+    const dark = tokensOf('.sk-table.sk-theme-cabin');
+    const light = tokensOf('html:not(.dark) .sk-table.sk-theme-cabin');
+    for (const t of ['--sk-deck-hi', '--sk-deck-ink', '--sk-parch']) {
+      expect(dark.get(t), t).toBeTruthy();
+      expect(light.get(t), t).toBeTruthy();
+      expect(light.get(t), t).not.toBe(dark.get(t));
+    }
+  });
+
+  it('카드 토큰은 .sk-theme-cabin 하나에 있어 게임판과 튜토리얼 포털이 같이 쓴다', () => {
+    const tokens = tokensOf('.sk-theme-cabin');
+    for (const t of ['--sk-suit-green', '--sk-suit-purple', '--sk-suit-yellow', '--sk-suit-black', '--sk-special-bg']) {
+      expect(tokens.get(t), t).toBeTruthy();
+    }
+    expect(SK_TOKENS_CLASS).toBe(cabinTheme ? 'sk-tokens sk-theme-cabin' : 'sk-tokens');
+  });
+
+  it('움직임 줄이기면 17-responsive 의 테마 블록이 연출을 전부 끈다', () => {
+    const code = responsiveCssSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+    expect(code).toContain(
+      '@media (prefers-reduced-motion: reduce) { .sk-theme-cabin *, .sk-theme-cabin *::before, .sk-theme-cabin *::after { ' +
+        'animation: none !important; transition: none !important; }',
+    );
   });
 });
 
