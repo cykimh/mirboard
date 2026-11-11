@@ -14,7 +14,7 @@ const NAMES: Record<string, string> = {
   ARTILLERY: '씨앗포',
   UNKNOWN: '기본(모르는 게임)',
 };
-const SIZES = [16, 20, 24, 44, 96];
+const SIZES = [16, 24, 44];
 const ids = [...GAME_ICON_IDS, 'UNKNOWN'];
 const icon = (id: string, size: number) => renderToStaticMarkup(<GameIcon gameId={id} size={size} />);
 

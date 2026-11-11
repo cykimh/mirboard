@@ -34,24 +34,34 @@ const line = (deep: string) =>
   ({ stroke: deep, strokeWidth: 2, strokeLinejoin: 'round', strokeLinecap: 'round' }) as const;
 
 const ICONS: Record<string, IconDef> = {
-  // 티츄 — 붉은 옻칠 타일, 카드 위의 용(S 자 몸)과 여의주.
+  // 티츄 — 붉은 옻칠 타일, 카드 부채 위로 고개를 내민 용(옆모습 — 금빛 뿔·갈기·수염). 작을 때는 부채와 붉은 마름모만.
   TICHU: {
     tile: { hi: '#e0503a', lo: '#8a1612', deep: '#4f0b09' },
     glyph: ({ detail, deep }) => (
-      <g transform="rotate(-8 24 24)">
-        <rect x="12.5" y="7.5" width="23" height="33" rx="4.5" fill={CREAM} {...line(deep)} />
-        <path
-          d="M29.5 15.5c-6-3.2-11.2-.2-10.3 4.2s9.3 3 10.3 8.3-5 7.4-11 4.3"
-          fill="none"
-          stroke="#c62a1e"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        <path d="M26.6 12.6l7.4.6-1.6 6.2-5.6.4z" fill="#c62a1e" stroke="#c62a1e" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M28 12.4l-2.6-3.2M31 12.6l-.2-3.8" stroke="#c62a1e" strokeWidth="1.8" strokeLinecap="round" />
-        <circle cx="17.6" cy="33" r="2.6" fill={GOLD} stroke={deep} strokeWidth="1" />
-        {detail && <circle cx="30.4" cy="15.2" r="1" fill={GOLD} />}
-      </g>
+      <>
+        <rect x="16" y="9" width="16" height="27" rx="3.5" fill="#f1dcb4" {...line(deep)} transform="rotate(-26 24 43)" />
+        <rect x="16" y="9" width="16" height="27" rx="3.5" fill="#f1dcb4" {...line(deep)} transform="rotate(26 24 43)" />
+        <rect x="16" y="8" width="16" height="28" rx="3.5" fill={CREAM} {...line(deep)} />
+        {!detail && <path d="M24 14.5l4.5 7.5-4.5 7.5-4.5-7.5z" fill="#c62a1e" />}
+        {detail && (
+          <>
+            <path d="M21 19L12.5 10.5l12 6.3z" fill={GOLD} stroke={deep} strokeWidth="1.2" strokeLinejoin="round" />
+            <path d="M25 18l-4.5-9.5 8 9.3z" fill={GOLD} stroke={deep} strokeWidth="1.2" strokeLinejoin="round" />
+            <path d="M16 24l-4.8-1.8 4.3 5.3zM15.4 29.5l-4.9-.6 4.7 4.6z" fill={GOLD} stroke={deep} strokeWidth="1.2" strokeLinejoin="round" />
+            <path
+              d="M15 37.5l.5-10Q16 20 23 17.5l6 1 6 3 2.5 2.5-1.2 2.8-8.3-.2 6.2 2.8-1 2.6-7.700.4-3.5 5z"
+              fill="#c62a1e"
+              stroke={deep}
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path d="M36.8 23.6c3-.6 5.200.8 5.7 3.9" fill="none" stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" />
+            <circle cx="28.3" cy="22" r="1.8" fill={CREAM} stroke={deep} strokeWidth="0.8" />
+            <circle cx="28.7" cy="22" r="0.7" fill={deep} />
+            <circle cx="35.3" cy="23.5" r="0.6" fill={deep} />
+          </>
+        )}
+      </>
     ),
   },
   // 스컬킹 — 밤바다 타일, 금관을 쓴 해골.
