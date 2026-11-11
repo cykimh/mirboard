@@ -28,6 +28,15 @@ import { artilleryRoomSink } from './artilleryRoomSink';
 import { useArtilleryStore } from './artilleryStore';
 import { ArtilleryField } from './ArtilleryField';
 import { ArtilleryControls } from './ArtilleryControls';
+import { ArtilleryLoadout } from './ArtilleryLoadout';
+import {
+  PORTRAIT_HEADROOM,
+  canLockLandscape,
+  dismissRotateHint,
+  lockLandscape,
+  rotateHintDismissed,
+  useArtilleryLayout,
+} from './useArtilleryLayout';
 import { ArtilleryCountdown } from './ArtilleryCountdown';
 import { ArtilleryMatchEnd } from './ArtilleryMatchEnd';
 import { ArtilleryPicker, KIND_ICONS } from './ArtilleryPicker';
@@ -123,6 +132,16 @@ export function ArtilleryTable({
   const animate = useCardAnimStore((st) => st.enabled);
   const reducedMotion =
     !animate || (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true);
+
+  const layout = useArtilleryLayout();
+  // D-253 — 세로 화면에서 한 번 "가로로 돌리면 크게"(닫으면 로컬 기억). 터치 기기만.
+  const [hintClosed, setHintClosed] = useState(rotateHintDismissed);
+  const coarse = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+  const rotateHint = layout === 'portrait' && coarse && !hintClosed;
+  const closeRotateHint = () => {
+    dismissRotateHint();
+    setHintClosed(true);
+  };
 
   const s = useArtilleryStore();
   const mySeat = spectator ? -1 : playerIds.indexOf(myUserId);
@@ -279,7 +298,7 @@ export function ArtilleryTable({
   const suddenDeath = s.turnNo >= s.suddenDeathTurn && s.suddenDeathTurn > 0;
 
   return (
-    <div className="ar-table">
+    <div className={`ar-table ar-layout-${layout}`}>
       <header className="ar-header gm-header">
         <div className="ar-header-badges gm-header-info">
           <span className="ar-badge ar-badge-title">씨앗포</span>
@@ -308,15 +327,9 @@ export function ArtilleryTable({
         </div>
       </header>
 
-      <ReconnectBanner connected={connected} />
-      {s.errorMessage && (
-        <p className="ar-error" role="alert">
-          <span>{s.errorMessage}</span>
-          <button type="button" className="ar-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-            ×
-          </button>
-        </p>
-      )}
+      <div className="ar-reconnect">
+        <ReconnectBanner connected={connected} />
+      </div>
 
       <ol className="ar-seats" aria-label="좌석">
         {s.units.map((u) => {
@@ -329,23 +342,20 @@ export function ArtilleryTable({
               key={u.seat}
               className={`ar-seat${isTurn ? ' ar-seat-turn' : ''}${u.alive ? '' : ' ar-seat-out'}${s.teams ? ` ar-seat-team${u.seat % 2}` : ''}`}
               style={{ ['--ar-accent' as string]: seatColor(u.seat) }}
+              aria-label={`${nameOf(u.seat)}${u.seat === mySeat ? ' (나)' : ''} — 체력 ${u.hp}/${u.maxHp}${isTurn ? ', 차례' : ''}`}
             >
               <span className="ar-seat-name">
-                {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
+                {tiers[uid] && <TierBadge tier={tiers[uid]} size={14} />}
                 {u.kind && (
                   <span className="ar-seat-kind" title={UNIT_KINDS[u.kind].name} aria-label={UNIT_KINDS[u.kind].name}>
                     {KIND_ICONS[u.kind]}
                   </span>
                 )}
                 {s.teams && <span className={`ar-team-chip ar-team-${u.seat % 2}`}>{teamName(u.seat % 2)}</span>}
-                {nameOf(u.seat)}
-                {u.seat === mySeat ? ' (나)' : ''}
-              </span>
-              <span className="ar-seat-hp" aria-label={`체력 ${u.hp}/${u.maxHp}`}>
-                <span
-                  className="ar-seat-hp-bar"
-                  style={{ width: `${u.alive ? Math.round((100 * u.hp) / Math.max(1, u.maxHp)) : 0}%` }}
-                />
+                <span className="ar-seat-label">
+                  {nameOf(u.seat)}
+                  {u.seat === mySeat ? ' (나)' : ''}
+                </span>
               </span>
               {!picking && (
                 <span className="ar-seat-ammo" title={`남은 호박탄${u.special ? `·${SHELL_NAMES[u.special]}` : ''}·아이템`}>
@@ -359,7 +369,6 @@ export function ArtilleryTable({
                   ⏱{u.delay - baseDelay}
                 </span>
               )}
-              {isTurn && <span className="ar-seat-tag">차례</span>}
               {!u.alive && <span className="ar-seat-tag">{OUT_LABEL[u.outCause ?? ''] ?? '탈락'}</span>}
               {disconnected && u.alive && <span className="ar-seat-tag">끊김</span>}
               {v === 'on' && <span aria-label="음성 참여 중">🎧</span>}
@@ -383,46 +392,7 @@ export function ArtilleryTable({
         })}
       </ol>
 
-      {picking && (
-        <ArtilleryPicker
-          units={s.units}
-          mySeat={mySeat}
-          canPick={canPick}
-          myPick={s.myPick}
-          nameOf={nameOf}
-          onPick={pick}
-        />
-      )}
-
       <div className={`ar-stage${myTurn ? ' ar-stage-myturn' : ''}`}>
-        <div className="ar-status">
-          <span className="ar-badge ar-wind" aria-label={windText}>
-            🍃 {windText}
-          </span>
-          {suddenDeath && <span className="ar-badge ar-badge-warn">☁ 구름이 차오른다</span>}
-          {picking && <span className="ar-badge">포대 고르는 중</span>}
-          {!roomFinished && s.phase === 'AIMING' && turnSeat >= 0 && <ArtilleryCountdown turnSeconds={turnSeconds} />}
-          {myTurn ? (
-            <span className="ar-badge ar-badge-turn">내 차례</span>
-          ) : (
-            !roomFinished &&
-            turnSeat >= 0 && (
-              <span className="ar-badge ar-aiming">
-                {nameOf(turnSeat)} 조준 중
-                {liveAim?.shell && liveAim.seat === turnSeat && (
-                  <span className="ar-aim-shell" title="고른 탄(조준 미리보기)">
-                    {SHELL_NAMES[liveAim.shell]}
-                  </span>
-                )}
-              </span>
-            )
-          )}
-          {!roomFinished && !s.result && upcoming.length > 0 && (
-            <span className="ar-badge ar-queue" aria-label={`다음 차례 ${upcoming.map(nameOf).join(', ')}`}>
-              다음 {upcoming.map((seat) => (seat === mySeat ? '나' : nameOf(seat))).join(' › ')}
-            </span>
-          )}
-        </div>
         <ArtilleryField
           mask={s.mask}
           units={s.units}
@@ -441,25 +411,106 @@ export function ArtilleryTable({
           wind={s.wind}
           teams={s.teams}
           winners={s.replay ? null : winners}
-        />
+          headroom={layout === 'portrait' ? PORTRAIT_HEADROOM : 0}
+        >
+          <div className="ar-hud" aria-label="전장 정보">
+            <div className="ar-hud-tl">
+              <span className="ar-badge ar-hud-badge ar-wind" aria-label={windText}>
+                🍃 {windText}
+              </span>
+              {suddenDeath && <span className="ar-badge ar-hud-badge ar-badge-warn">☁ 구름이 차오른다</span>}
+              {picking && <span className="ar-badge ar-hud-badge">포대 고르는 중</span>}
+            </div>
+            <div className="ar-hud-tr">
+              {myTurn ? (
+                <span className="ar-badge ar-hud-badge ar-badge-turn">내 차례</span>
+              ) : (
+                !roomFinished &&
+                turnSeat >= 0 && (
+                  <span className="ar-badge ar-hud-badge ar-aiming">
+                    {nameOf(turnSeat)} 조준 중
+                    {liveAim?.shell && liveAim.seat === turnSeat && (
+                      <span className="ar-aim-shell" title="고른 탄(조준 미리보기)">
+                        {SHELL_NAMES[liveAim.shell]}
+                      </span>
+                    )}
+                  </span>
+                )
+              )}
+              {!roomFinished && s.phase === 'AIMING' && turnSeat >= 0 && <ArtilleryCountdown turnSeconds={turnSeconds} />}
+              {!roomFinished && !s.result && upcoming.length > 0 && (
+                <span className="ar-badge ar-hud-badge ar-queue" aria-label={`다음 차례 ${upcoming.map(nameOf).join(', ')}`}>
+                  다음 {upcoming.map((seat) => (seat === mySeat ? '나' : nameOf(seat))).join(' › ')}
+                </span>
+              )}
+            </div>
+            {s.errorMessage && (
+              <p className="ar-error" role="alert">
+                <span>{s.errorMessage}</span>
+                <button type="button" className="ar-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
+                  ×
+                </button>
+              </p>
+            )}
+            {myTurn && (
+              <ArtilleryLoadout
+                shell={shell}
+                shells={shells}
+                items={me?.items ?? []}
+                item={item}
+                enabled={canAct}
+                onShell={setShell}
+                onItem={setItem}
+              />
+            )}
+          </div>
+        </ArtilleryField>
       </div>
+
+      {rotateHint && (
+        <p className="ar-rotate-hint" role="note">
+          <span aria-hidden="true">📱↻</span>
+          <span className="ar-rotate-text">가로로 돌리면 전장을 크게 볼 수 있어요</span>
+          {canLockLandscape() && (
+            <button
+              type="button"
+              className="ar-btn ar-btn-small"
+              onClick={() => {
+                void lockLandscape();
+                closeRotateHint();
+              }}
+            >
+              가로 전체화면
+            </button>
+          )}
+          <button type="button" className="ar-error-close" aria-label="안내 닫기" onClick={closeRotateHint}>
+            ×
+          </button>
+        </p>
+      )}
+
+      {picking && (
+        <ArtilleryPicker
+          units={s.units}
+          mySeat={mySeat}
+          canPick={canPick}
+          myPick={s.myPick}
+          nameOf={nameOf}
+          onPick={pick}
+        />
+      )}
 
       {myTurn && (
         <ArtilleryControls
           angle={angle}
           power={power}
           lastPower={lastPower}
-          shell={shell}
-          shells={shells}
-          items={me?.items ?? []}
-          item={item}
-          onItem={setItem}
           fuelLeft={preview?.fuelLeft ?? myFuel}
           fuelMax={myFuel}
           enabled={canAct}
+          initialFacing={me && me.x > 320 ? -1 : 1}
           onAngle={setAngle}
           onPower={setPower}
-          onShell={setShell}
           onStep={step}
           onFire={fire}
           onSkip={skip}
