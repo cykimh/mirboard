@@ -12,7 +12,8 @@ import java.util.Random;
  *
  * <p>표면은 티츄 구현에서 역산했다. 여섯 가지 책임이 있다: ① 액션 적용 ② 상태 직렬화
  * ③ 공개/비공개 뷰 ④ 단계 이름 ⑤ 라운드·매치 진행 ⑥ 봇·타임아웃용 합법 액션. 여기에 기본값이 있는
- * 선택형 확장이 하나 붙었다: ⑦ 엔진 타이머(D-128 — 시간이 지나면 저절로 일어나는 전이, 구현하지 않으면 없음).
+ * 선택형 확장이 둘 붙었다: ⑦ 엔진 타이머(D-128 — 시간이 지나면 저절로 일어나는 전이, 구현하지 않으면 없음), ⑧ 미리보기
+ * (D-229 — 상태를 바꾸지 않는 실시간 표시, 구현하지 않으면 없음).
  * 자세한 근거와 "요트가 깨는 지점"은 {@code docs/game-port.md}.
  *
  * <p><b>포트에 없는 것</b>(의도적): 팀, 칩/판돈, ELO, 좌석 수 4 고정, 트릭·리드수트.
@@ -131,6 +132,25 @@ public interface GameEngine {
      * 않은 것은 의도적이다: 액션은 클라 JSON 에서 역직렬화되므로 그 계층에 두면 클라가 위조해 보낼 수 있다.
      */
     default Optional<Result> onTimer(GameState state) {
+        return Optional.empty();
+    }
+
+    // ---------- ⑧ 미리보기 (D-229) ----------
+
+    /**
+     * D-229 — 상태를 바꾸지 않는 실시간 표시용 미리보기(씨앗포의 포신 각도·고른 탄). 기본은 없음 — 다른 게임은 아무것도 안 한다.
+     * 인프라는 {@code /app/room/{roomId}/preview} 프레임을 {@link #actionType()} 으로 역직렬화해 넘긴다(새 역직렬화 seam 없음).
+     *
+     * <p>계약 ({@code docs/game-port.md} §⑧):
+     * <ol>
+     *   <li><b>순수</b> — 상태를 바꾸지 않고 저장소를 건드리지 않는다. 락 밖에서 불리므로 같은 순간의 액션과 겹칠 수 있다(낡은 상태를 볼 수 있다).</li>
+     *   <li><b>가볍다</b> — 한 사람이 초당 수 번 부른다. 지형 재구성 정도(≤ 1ms)까지만.</li>
+     *   <li>돌려주는 이벤트는 <b>공개·순번 없음</b>({@code privateSeat() < 0}, {@code sequenced() == false}). 어기면 인프라가 WARN 로그 후 버린다.</li>
+     *   <li>받아들일 수 없는 입력(차례 아님·단계 아님·범위 밖·이 게임의 미리보기 타입이 아님)은 empty — 거절 ERROR 를 보내지 않는다.</li>
+     *   <li>미리보기 전용 입력 타입은 {@link #apply} 가 거절하고 {@link #legalActions}·봇에는 나오지 않는다.</li>
+     * </ol>
+     */
+    default Optional<GameEvent> preview(GameState state, int seat, GameAction input) {
         return Optional.empty();
     }
 

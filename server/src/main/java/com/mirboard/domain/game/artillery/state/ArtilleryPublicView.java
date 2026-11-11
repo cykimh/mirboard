@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * 지형은 구멍 목록이 아니라 열 단위 런 길이 부호로 싣는다 — 클라가 맵 생성을 흉내 내지 않게.
  *
  * @param terrain            열마다 흙 구간 [시작, 끝, 시작, 끝 …] (위에서부터)
- * @param fuel               지금 차례 포대의 연료(차례가 없으면 100)
+ * @param fuel               지금 차례 포대의 <b>남은</b> 연료 — MOVE 로 쓴 만큼 줄어 있다(D-228). 차례가 없으면 100
  * @param resolveRemainingMs RESOLVING 의 남은 연출 시간, 아니면 null
  * @param pickRemainingMs    PICKING 의 남은 고르기 시간, 아니면 null
  * @param lastShot           RESOLVING 이면 재생 중인 대본(다시 들어온 클라가 끝 장면을 맞출 때), 아니면 null
@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
  * @param turnOrder          차례 규칙(D-226)
  * @param queue              앞으로의 차례 순서(살아 있는 좌석, 지금 차례 주인부터 — D-226)
  * @param delays             딜레이 표(D-226) — 화면의 "이번 차례 +N" 안내. 판정은 서버
+ * @param turnRemainingMs    AIMING 차례 전체 마감까지 남은 시간(엔진 계산, D-228 — MOVE 를 해도 차례 시작 기준), 차례 시계가 없으면 null.
+ *                           resync 바깥의 인프라 {@code turnRemainingMs}(마지막 액션 기준)는 MOVE 뒤엔 틀리므로 클라는 이것을 쓴다
  */
 public record ArtilleryPublicView(String phase,
                                   int seatCount,
@@ -46,7 +48,8 @@ public record ArtilleryPublicView(String phase,
                                   boolean teams,
                                   TurnOrder turnOrder,
                                   List<Integer> queue,
-                                  DelayTable delays) {
+                                  DelayTable delays,
+                                  Long turnRemainingMs) {
 
     /** 딜레이 표 (D-226) — 서버 정본({@code Shell.delay}·{@code Item.delay}·엔진 상수)을 그대로 싣는다. */
     public record DelayTable(Map<Shell, Integer> shells, Map<Item, Integer> items, int skip, int fuelPerDelay) {
@@ -82,16 +85,22 @@ public record ArtilleryPublicView(String phase,
     }
 
     public static ArtilleryPublicView of(ArtilleryState s, Long remainingMs) {
+        return of(s, remainingMs, null);
+    }
+
+    /** @param turnRemainingMs 차례 전체 마감까지 남은 시간(엔진 계산), 없으면 null (D-228) */
+    public static ArtilleryPublicView of(ArtilleryState s, Long remainingMs, Long turnRemainingMs) {
         boolean picking = s.phase() == Phase.PICKING;
         List<UnitView> units = s.units().stream().map(u -> UnitView.of(s, u, picking)).toList();
         boolean resolving = s.phase() == Phase.RESOLVING;
-        int fuel = s.phase() == Phase.AIMING ? s.unit(s.turnSeat()).kindOrDefault().fuel() : ArtilleryEngine.FUEL;
+        int fuel = s.phase() == Phase.AIMING ? s.turnFuelLeft() : ArtilleryEngine.FUEL;
         return new ArtilleryPublicView(s.phaseName(), s.seatCount(), Terrain.W, Terrain.H, units,
                 ArtilleryEngine.terrainOf(s).columnRuns(), s.turnSeat(), s.turnNo(), s.wind(), s.cloudLevel(),
                 ArtilleryEngine.SUDDEN_DEATH_TURNS_PER_SEAT * s.seatCount(), fuel,
                 resolving && remainingMs != null ? Math.max(0L, remainingMs) : null,
                 picking && remainingMs != null ? Math.max(0L, remainingMs) : null,
                 resolving ? s.lastShot() : null, s.result(), s.teams(), s.turnOrder(),
-                picking || s.ended() ? List.of() : ArtilleryEngine.turnQueue(s), DelayTable.RULES);
+                picking || s.ended() ? List.of() : ArtilleryEngine.turnQueue(s), DelayTable.RULES,
+                s.phase() == Phase.AIMING && turnRemainingMs != null ? Math.max(0L, turnRemainingMs) : null);
     }
 }

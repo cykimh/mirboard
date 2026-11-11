@@ -142,6 +142,19 @@ class RateLimitRoutingTest {
         // D-155 — 음성 신호(ICE 후보가 한꺼번에 몰린다)는 자기 버킷.
         assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/voice"))
                 .isEqualTo(RateLimitProperties.VOICE);
+        // D-229 — 미리보기 프레임은 액션 버킷을 나눠 쓰지 않는다(넘쳐도 FIRE 가 버려지지 않게).
+        assertThat(StompRateLimitInterceptor.bucketFor("/app/room/r1/preview"))
+                .isEqualTo(RateLimitProperties.GAME_PREVIEW);
+    }
+
+    /** D-228·D-229 — 씨앗포 걷기 확정(MOVE 초당 4번 + FIRE)·미리보기(초당 4.5번)를 감당하는 기본값. */
+    @Test
+    void game_action_and_preview_defaults_are_sixty_per_ten_seconds() {
+        RateLimitProperties props = new RateLimitProperties();
+        assertThat(props.policy(RateLimitProperties.GAME_ACTION).limit()).isEqualTo(60);
+        assertThat(props.policy(RateLimitProperties.GAME_ACTION).window()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(props.policy(RateLimitProperties.GAME_PREVIEW).limit()).isEqualTo(60);
+        assertThat(props.policy(RateLimitProperties.GAME_PREVIEW).window()).isEqualTo(Duration.ofSeconds(10));
     }
 
     @Test

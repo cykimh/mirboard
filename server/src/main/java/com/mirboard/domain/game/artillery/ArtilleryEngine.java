@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
@@ -41,6 +42,11 @@ import java.util.OptionalLong;
  *
  * <p>D-225·D-226: 판은 {@link Setup} 으로 시작한다 — 2:2 팀전(팀 = 좌석 홀짝, 한 팀만 남으면 끝)과 차례 규칙(포트리스식 딜레이). 인자에
  * {@code Setup} 이 없는 옛 {@code startMatch} 들은 개인전·좌석 순서(D-226 이전 규칙)다 — 기존 테스트·골든이 그 규칙의 물리를 고정한다.
+ *
+ * <p>D-228: 차례 주인은 {@code MOVE} 로 걸음을 그 자리에서 확정할 수 있다 — 같은 {@link Walker} 를 부르고, 쓴 연료는 상태의
+ * {@code moveFuelUsed} 에 남아 {@code FIRE.moveDx}·딜레이가 이어서 센다. 차례가 여러 액션이 되므로 차례 시작 시각
+ * {@code turnStartedAt} 을 상태에 두고 차례 전체 마감({@link #turnRemainingMillis})을 계산한다(요트 D-183 과 같은 방식).
+ * D-229: {@link #preview} 는 상태를 바꾸지 않는 조준 미리보기다.
  */
 public final class ArtilleryEngine {
 
@@ -143,7 +149,7 @@ public final class ArtilleryEngine {
             units.set(i, units.get(i).picked(kinds.get(i)));
         }
         List<ArtilleryEvent> events = new ArrayList<>();
-        ArtilleryState started = reveal(withUnits(s, units), events);
+        ArtilleryState started = reveal(withUnits(s, units), events, 0L);   // 시계 없이 연 판 — 첫 차례 시계 없음(테스트)
         return new Result(started, events);
     }
 
@@ -194,7 +200,7 @@ public final class ArtilleryEngine {
      * 고르기 끝 (D-224): 안 고른 좌석은 새싹포, 전원 무장 → 공개 이벤트 → 첫 차례(시드로 고른 좌석). 딜레이 규칙(D-226)이면 첫 좌석부터
      * 좌석 순서로 딜레이 0·1·2… 를 깐다 — 첫 바퀴는 좌석 순서와 같다(팀전이면 팀이 번갈아).
      */
-    private ArtilleryState reveal(ArtilleryState s, List<ArtilleryEvent> events) {
+    private ArtilleryState reveal(ArtilleryState s, List<ArtilleryEvent> events, long nowMillis) {
         int first = SplitMix64.below(s.seed(), 6000, s.seatCount());
         List<Unit> units = new ArrayList<>(s.units());
         for (int i = 0; i < units.size(); i++) {
@@ -210,7 +216,7 @@ public final class ArtilleryEngine {
                 s.turnOrder());
         events.add(new ArtilleryEvent.UnitsRevealed(
                 units.stream().map(u -> ArtilleryPublicView.UnitView.of(s, u, false)).toList()));
-        return beginTurn(armed, first, 0, events);
+        return beginTurn(armed, first, 0, events, nowMillis);
     }
 
     // ---------- 액션 ----------
@@ -223,20 +229,23 @@ public final class ArtilleryEngine {
             if (!(action instanceof ArtilleryAction.Pick pick)) {
                 throw new ArtilleryActionRejectedException(RejectionReason.NOT_YOUR_TURN);
             }
-            return pick(state, seat, pick);
+            return pick(state, seat, pick, nowMillis);
         }
         if (state.phase() != Phase.AIMING || state.turnSeat() != seat) {
             throw new ArtilleryActionRejectedException(RejectionReason.NOT_YOUR_TURN);
         }
         return switch (action) {
             case ArtilleryAction.Fire fire -> fire(state, seat, fire, nowMillis);
-            case ArtilleryAction.Skip __ -> skip(state, seat, ArtilleryEvent.TurnSkipped.Reason.SKIP);
+            case ArtilleryAction.Move move -> move(state, seat, move, nowMillis);
+            case ArtilleryAction.Skip __ -> skip(state, seat, ArtilleryEvent.TurnSkipped.Reason.SKIP, nowMillis);
             case ArtilleryAction.Pick __ -> throw new ArtilleryActionRejectedException(RejectionReason.INVALID_ACTION);
+            // 미리보기는 액션이 아니다 — /preview 경로의 preview() 로만(D-229).
+            case ArtilleryAction.Preview __ -> throw new ArtilleryActionRejectedException(RejectionReason.INVALID_ACTION);
             case null -> throw new ArtilleryActionRejectedException(RejectionReason.INVALID_ACTION);
         };
     }
 
-    private Result pick(ArtilleryState state, int seat, ArtilleryAction.Pick pick) {
+    private Result pick(ArtilleryState state, int seat, ArtilleryAction.Pick pick, long nowMillis) {
         if (!pendingSeats(state).contains(seat)) {
             throw new ArtilleryActionRejectedException(RejectionReason.NOT_YOUR_TURN);
         }
@@ -249,7 +258,7 @@ public final class ArtilleryEngine {
         events.add(new ArtilleryEvent.UnitPicked(seat));
         ArtilleryState s = withUnits(state, units);
         if (pendingSeats(s).isEmpty()) {
-            s = reveal(s, events);
+            s = reveal(s, events, nowMillis);
         }
         return new Result(s, events);
     }
@@ -259,7 +268,18 @@ public final class ArtilleryEngine {
         if (state.phase() != Phase.AIMING) {
             return null;
         }
-        return skip(state, state.turnSeat(), ArtilleryEvent.TurnSkipped.Reason.TIMEOUT);
+        return skip(state, state.turnSeat(), ArtilleryEvent.TurnSkipped.Reason.TIMEOUT, nowMillis);
+    }
+
+    /**
+     * 차례 전체 마감까지 남은 시간 (D-228, D-183 요트와 같은 방식) — {@code turnStartedAt + turnSeconds − 지금}. AIMING 이 아니거나
+     * 제한이 없거나({@code turnSeconds ≤ 0}) 차례 시계가 없으면(D-228 이전 판·시계 없이 연 판) 없음. 만기면 {@link #timeout}.
+     */
+    public OptionalLong turnRemainingMillis(ArtilleryState state, long nowMillis, int turnSeconds) {
+        if (state.phase() != Phase.AIMING || turnSeconds <= 0 || state.turnStartedAt() <= 0) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(state.turnStartedAt() + turnSeconds * 1000L - nowMillis);
     }
 
     /** 연출 대기(§9.2)·고르기(D-224)의 남은 시간. 둘 다 아니면 없음. */
@@ -275,8 +295,8 @@ public final class ArtilleryEngine {
     public Result expire(ArtilleryState state, long nowMillis) {
         List<ArtilleryEvent> events = new ArrayList<>();
         return switch (state.phase()) {
-            case RESOLVING -> new Result(nextTurn(state, events), events);
-            case PICKING -> new Result(reveal(state, events), events);
+            case RESOLVING -> new Result(nextTurn(state, events, nowMillis), events);
+            case PICKING -> new Result(reveal(state, events, nowMillis), events);
             default -> null;
         };
     }
@@ -330,7 +350,12 @@ public final class ArtilleryEngine {
 
     // ---------- 탈주 (§11) ----------
 
+    /** 시계 없이 — 다음 차례 시계 없음(테스트·시뮬레이션). */
     public Desertion desert(ArtilleryState state, int seat) {
+        return desert(state, seat, 0L);
+    }
+
+    public Desertion desert(ArtilleryState state, int seat, long nowMillis) {
         if (state.ended() || seat < 0 || seat >= state.seatCount() || !state.unit(seat).alive()) {
             return new Desertion(DesertOutcome.NOT_APPLICABLE, state, List.of());
         }
@@ -347,11 +372,11 @@ public final class ArtilleryEngine {
             return new Desertion(DesertOutcome.MATCH_ENDED, ended, events);
         }
         if (s.phase() == Phase.PICKING && pendingSeats(s).isEmpty()) {
-            s = reveal(s, events);
+            s = reveal(s, events, nowMillis);
             return new Desertion(s.ended() ? DesertOutcome.MATCH_ENDED : DesertOutcome.MATCH_CONTINUES, s, events);
         }
         if (s.phase() == Phase.AIMING && s.turnSeat() == seat) {
-            s = nextTurn(s, events);
+            s = nextTurn(s, events, nowMillis);
             if (s.ended()) {
                 return new Desertion(DesertOutcome.MATCH_ENDED, s, events);
             }
@@ -409,7 +434,7 @@ public final class ArtilleryEngine {
         List<Crater> craters = new ArrayList<>(state.craters());
         List<ShotReport.Eliminated> eliminated = new ArrayList<>();
 
-        // 아이템 (§6.4) — 쓰는 순간 없어진다. 물뿌리개는 걷기 전에.
+        // 아이템 (§6.4) — 쓰는 순간 없어진다. 물뿌리개는 걷기 전에(D-228 — MOVE 로 이미 걸은 뒤, moveDx 걷기 전).
         Unit shooter = units.get(seat);
         ShotReport.Heal heal = null;
         if (fire.item() != null) {
@@ -421,9 +446,9 @@ public final class ArtilleryEngine {
             }
         }
 
-        // 이동
+        // 이동 — 이번 차례에 MOVE 로 쓴 연료를 뺀 나머지로(D-228)
         UnitKind kind = shooter.kindOrDefault();
-        Walker.Walk walk = Walker.walk(t, shooter.x(), shooter.footY(), fire.moveDx(), kind.fuel(), cloud);
+        Walker.Walk walk = Walker.walk(t, shooter.x(), shooter.footY(), fire.moveDx(), state.turnFuelLeft(), cloud);
         shooter = shooter.withPosition(walk.x(), walk.footY());
         ShotReport.Fall walkFall = null;
         int walkFallTicks = 0;
@@ -610,23 +635,104 @@ public final class ArtilleryEngine {
         return new Volley(new ShotReport.Stage(shots, damages, falls), ticks);
     }
 
-    private Result skip(ArtilleryState state, int seat, ArtilleryEvent.TurnSkipped.Reason reason) {
+    /** 넘김·시간 초과 (§4.2): 딜레이 80 + 이번 차례 MOVE 로 쓴 연료의 이동 딜레이(D-228 — 걸어 놓고 넘겨 딜레이를 아끼지 못하게). */
+    private Result skip(ArtilleryState state, int seat, ArtilleryEvent.TurnSkipped.Reason reason, long nowMillis) {
         List<ArtilleryEvent> events = new ArrayList<>();
         events.add(new ArtilleryEvent.TurnSkipped(seat, reason));
         List<Unit> units = state.units();
         if (state.turnOrder() == TurnOrder.DELAY) {
             units = new ArrayList<>(units);
-            units.set(seat, units.get(seat).withDelay(units.get(seat).delay() + SKIP_DELAY));
+            int cost = SKIP_DELAY + state.moveFuelUsed() / FUEL_PER_DELAY;
+            units.set(seat, units.get(seat).withDelay(units.get(seat).delay() + cost));
         }
         ArtilleryState s = copy(state, units, state.craters(), state.phase(), state.turnSeat(), seat,
                 state.turnNo(), state.wind(), state.cloudLevel(), 0, state.eliminations(), state.lastShot());
-        return new Result(nextTurn(s, events), events);
+        return new Result(nextTurn(s, events, nowMillis), events);
+    }
+
+    // ---------- 걷기 확정 (D-228) ----------
+
+    /**
+     * {@code MOVE} — {@code FIRE} 안의 이동 단계와 같은 {@link Walker} 로 걷고 그 자리에서 확정한다. 한 걸음도 못 가면 {@code CANNOT_MOVE}
+     * (빈 이벤트로 순번을 쓰지 않게). 치명적이지 않은 낙하는 피해만 반영하고 차례가 계속된다. 구름 바다·체력 0 이면 탈락 → 매치 종료 판정 →
+     * 아니면 연출 대기({@code RESOLVING}, 걸음 × 2틱 + 떨어진 칸) → 다음 차례({@code FIRE} 이동 중 사망과 같다).
+     */
+    private Result move(ArtilleryState state, int seat, ArtilleryAction.Move move, long nowMillis) {
+        if (move.dx() == 0 || Math.abs(move.dx()) > ArtilleryAction.MAX_MOVE) {
+            throw new ArtilleryActionRejectedException(RejectionReason.OUT_OF_RANGE);
+        }
+        int fuelBefore = state.turnFuelLeft();
+        if (fuelBefore <= 0) {
+            throw new ArtilleryActionRejectedException(RejectionReason.CANNOT_MOVE);
+        }
+        Terrain t = terrainOf(state);
+        int cloud = state.cloudLevel();
+        Unit me = state.unit(seat);
+        Walker.Walk walk = Walker.walk(t, me.x(), me.footY(), move.dx(), fuelBefore, cloud);
+        if (walk.steps() == 0) {
+            throw new ArtilleryActionRejectedException(RejectionReason.CANNOT_MOVE);
+        }
+        int order = state.eliminations() + 1;
+        Unit moved = me.withPosition(walk.x(), walk.footY());
+        ShotReport.Fall fall = null;
+        Unit.Cause out = null;
+        if (walk.fall() != null) {
+            Body.Fall f = walk.fall();
+            if (f.intoCloud()) {
+                out = Unit.Cause.CLOUD_SEA;
+            } else {
+                moved = moved.withHp(Math.max(0, moved.hp() - f.damage()));
+                if (moved.hp() == 0) {
+                    out = Unit.Cause.KNOCKED_OUT;
+                }
+            }
+            fall = new ShotReport.Fall(seat, walk.x(), f.fromY(), f.toY(), f.intoCloud() ? 0 : f.damage(), moved.hp(),
+                    f.intoCloud());
+        }
+        if (out != null) {
+            moved = moved.eliminated(new Unit.Elimination(order, out, me.hp()));
+        }
+        List<Unit> units = new ArrayList<>(state.units());
+        units.set(seat, moved);
+        List<ArtilleryEvent> events = new ArrayList<>();
+        events.add(new ArtilleryEvent.UnitMoved(seat, state.turnNo(), walk.path(), walk.x(), walk.footY(),
+                walk.fuelLeft(), fall, moved.hp(), out));
+        int fuelUsed = state.moveFuelUsed() + (fuelBefore - walk.fuelLeft());
+        if (out == null) {
+            // 차례 계속 — D-228 이전 판(시계 없음)이면 첫 MOVE 가 차례 시계를 채운다(늘어나는 시간은 많아야 한 번의 T).
+            long startedAt = state.turnStartedAt() > 0 ? state.turnStartedAt() : nowMillis;
+            ArtilleryState s = copy(state, units, state.craters(), Phase.AIMING, seat, state.lastSeat(), state.turnNo(),
+                    state.wind(), cloud, 0, state.eliminations(), state.lastShot()).withTurnClock(startedAt, fuelUsed);
+            return new Result(s, events);
+        }
+        long ticks = (long) walk.steps() * WALK_TICKS_PER_STEP + walk.fall().distance();
+        long durationMs = Math.clamp(ticks * 1000 / 60, minResolveMs, maxResolveMs);
+        ArtilleryState resolved = copy(state, units, state.craters(), Phase.RESOLVING, -1, seat, state.turnNo(),
+                state.wind(), cloud, nowMillis + durationMs, order, null);
+        ArtilleryState ended = maybeEnd(resolved, events);
+        return new Result(ended != null ? ended : resolved, events);
+    }
+
+    // ---------- 조준 미리보기 (D-229) ----------
+
+    /**
+     * 상태를 바꾸지 않는 조준 미리보기 — 순수·가볍다(비교 몇 개). AIMING 의 차례 주인이 각도 0~180 을 보낼 때만 {@code AIM_PREVIEW}, 아니면
+     * 없음(거절 ERROR 를 보내지 않는다). 탄은 그 포대가 지금 쏠 수 있을 때만 싣는다. 힘·위치는 싣지 않는다.
+     */
+    public Optional<ArtilleryEvent.AimPreview> preview(ArtilleryState state, int seat,
+                                                                 ArtilleryAction.Preview input) {
+        if (input == null || state.phase() != Phase.AIMING || state.turnSeat() != seat
+                || input.angle() < 0 || input.angle() > 180) {
+            return Optional.empty();
+        }
+        Shell shell = input.shell() != null && state.unit(seat).ammo(input.shell()) != 0 ? input.shell() : null;
+        return Optional.of(new ArtilleryEvent.AimPreview(seat, state.turnNo(), input.angle(), shell, input.n()));
     }
 
     // ---------- 차례 ----------
 
     /** 다음 차례 주인({@link #pickNext})으로 차례 번호 +1. */
-    private ArtilleryState nextTurn(ArtilleryState state, List<ArtilleryEvent> events) {
+    private ArtilleryState nextTurn(ArtilleryState state, List<ArtilleryEvent> events, long nowMillis) {
         int next = pickNext(state.turnOrder(), state.units(), state.lastSeat());
         if (next < 0) {
             ArtilleryState ended = maybeEnd(state, events);
@@ -635,11 +741,15 @@ public final class ArtilleryEngine {
             }
             throw new IllegalStateException("no alive seat but match not over");
         }
-        return beginTurn(state, next, state.turnNo() + 1, events);
+        return beginTurn(state, next, state.turnNo() + 1, events, nowMillis);
     }
 
-    /** 차례 시작 (§4-1): 밀물 → (끝났나) → 바람 → AIMING. {@code candidate} 가 밀물에 빠지면 그 다음 살아 있는 좌석. */
-    private ArtilleryState beginTurn(ArtilleryState state, int candidate, int turnNo, List<ArtilleryEvent> events) {
+    /**
+     * 차례 시작 (§4-1): 밀물 → (끝났나) → 바람 → AIMING. {@code candidate} 가 밀물에 빠지면 그 다음 살아 있는 좌석. 차례 시계는
+     * {@code nowMillis}(D-228, 0 이면 시계 없음)에서, MOVE 연료는 0 에서 시작한다.
+     */
+    private ArtilleryState beginTurn(ArtilleryState state, int candidate, int turnNo, List<ArtilleryEvent> events,
+                                     long nowMillis) {
         List<Unit> units = new ArrayList<>(state.units());
         int cloud = state.cloudLevel();
         int eliminations = state.eliminations();
@@ -669,7 +779,8 @@ public final class ArtilleryEngine {
         int seat = units.get(candidate).alive() ? candidate
                 : state.turnOrder() == TurnOrder.DELAY ? pickNext(TurnOrder.DELAY, units, state.lastSeat())
                 : nextAlive(units, candidate, false);
-        s = copy(s, units, s.craters(), Phase.AIMING, seat, seat, turnNo, wind, cloud, 0, eliminations, null);
+        s = copy(s, units, s.craters(), Phase.AIMING, seat, seat, turnNo, wind, cloud, 0, eliminations, null)
+                .withTurnClock(nowMillis, 0);
         events.add(new ArtilleryEvent.TurnChanged(seat, turnNo, wind, cloud,
                 units.stream().map(Unit::delay).toList(), turnQueue(s)));
         return s;
@@ -861,14 +972,16 @@ public final class ArtilleryEngine {
     private static ArtilleryState withUnits(ArtilleryState s, List<Unit> units) {
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, s.craters(), s.phase(), s.turnSeat(),
                 s.lastSeat(), s.turnNo(), s.wind(), s.cloudLevel(), s.resolveUntil(), s.eliminations(), s.lastShot(),
-                s.result(), s.pickUntil(), s.teams(), s.turnOrder());
+                s.result(), s.pickUntil(), s.teams(), s.turnOrder(), s.turnStartedAt(), s.moveFuelUsed());
     }
 
+    /** 차례 시계·MOVE 연료는 AIMING 이면 그대로 잇고, 그 밖의 단계면 0 이다(D-228). */
     private static ArtilleryState copy(ArtilleryState s, List<Unit> units, List<Crater> craters, Phase phase,
                                        int turnSeat, int lastSeat, int turnNo, int wind, int cloud, long resolveUntil,
                                        int eliminations, ShotReport lastShot) {
+        boolean aiming = phase == Phase.AIMING;
         return new ArtilleryState(s.seed(), s.seatCount(), s.botSeats(), units, craters, phase, turnSeat, lastSeat,
                 turnNo, wind, cloud, resolveUntil, eliminations, lastShot, s.result(), s.pickUntil(), s.teams(),
-                s.turnOrder());
+                s.turnOrder(), aiming ? s.turnStartedAt() : 0L, aiming ? s.moveFuelUsed() : 0);
     }
 }

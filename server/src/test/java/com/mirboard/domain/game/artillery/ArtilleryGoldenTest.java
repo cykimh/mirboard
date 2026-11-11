@@ -146,6 +146,21 @@ class ArtilleryGoldenTest {
         assertThat(fnv(ArtilleryPhysicsPrint.print())).isEqualTo(PHYSICS_S4);
     }
 
+    /**
+     * S6a (D-228) — 상태 JSON 에 차례 시계·MOVE 연료 두 필드만 늘었다. 그 둘을 빼면 S5 까지의 세 골든 해시가 바이트 그대로다(MOVE 를 쓰지 않는
+     * 판은 필드 말고 아무것도 안 바뀐다).
+     */
+    @Test
+    void without_the_turn_clock_fields_the_s5_bytes_are_unchanged() throws Exception {
+        assertThat(fnv(withoutTurnClock(play()))).isEqualTo(GOLDEN_BEFORE_S6);
+        assertThat(fnv(withoutTurnClock(playUnits()))).isEqualTo(GOLDEN_S4_BEFORE_S6);
+        assertThat(fnv(withoutTurnClock(playTeams()))).isEqualTo(GOLDEN_S5_BEFORE_S6);
+    }
+
+    private static String withoutTurnClock(String text) {
+        return text.replaceAll(",\"turnStartedAt\":-?\\d+,\"moveFuelUsed\":-?\\d+", "");
+    }
+
     @Test
     void pinned_hash_teams_and_delay() throws Exception {
         String h = fnv(playTeams());
@@ -189,9 +204,13 @@ class ArtilleryGoldenTest {
      * S4(D-224)에서 JSON 모양(유닛 종류·특수탄·아이템·대본 단계)이 바뀌어 다시 고정했다 — 물리는 그대로다(S3 판의 구멍·포대 위치·지형 해시
      * {@code 5ca69b141e21e61} 가 같음을 확인).
      */
-    static final String GOLDEN = "19476ca78c55962e";
-    static final String GOLDEN_S4 = "42c54860feba1244";
+    static final String GOLDEN = "4ce2eb8271101120";
+    static final String GOLDEN_S4 = "bbd447e72912536";
     /** S5 에서 JSON 모양(유닛 딜레이·팀·차례 규칙·결과 팀)만 바뀌었다 — 물리는 {@link #PHYSICS_S4} 가 고정한다. */
     static final String PHYSICS_S4 = "f0ad1953e7075a05";
-    static final String GOLDEN_S5 = "add4a39902c16e66";
+    static final String GOLDEN_S5 = "c093560216cc09ff";
+    /** S6a(D-228) 에서 상태 JSON 에 {@code turnStartedAt}·{@code moveFuelUsed} 가 늘어 위 셋을 다시 고정했다 — 그 전 값(두 필드를 빼면 같다). */
+    static final String GOLDEN_BEFORE_S6 = "19476ca78c55962e";
+    static final String GOLDEN_S4_BEFORE_S6 = "42c54860feba1244";
+    static final String GOLDEN_S5_BEFORE_S6 = "add4a39902c16e66";
 }

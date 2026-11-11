@@ -40,6 +40,8 @@ public class StompRateLimitInterceptor implements ChannelInterceptor {
     private static final Logger log = LoggerFactory.getLogger(StompRateLimitInterceptor.class);
 
     private static final Pattern ROOM_ACTION = Pattern.compile("^/app/room/([^/]+)/action$");
+    /** D-229 — 미리보기 프레임. 넘치면 조용히 버린다({@link #notifyIfAction} 은 액션만). */
+    private static final Pattern ROOM_PREVIEW = Pattern.compile("^/app/room/([^/]+)/preview$");
     private static final Pattern ROOM_CHAT = Pattern.compile("^/app/room/([^/]+)/chat$");
     private static final Pattern ROOM_REACTION = Pattern.compile("^/app/room/([^/]+)/reaction$");
     private static final Pattern ROOM_VOICE = Pattern.compile("^/app/room/([^/]+)/voice$");
@@ -85,6 +87,9 @@ public class StompRateLimitInterceptor implements ChannelInterceptor {
     static String bucketFor(String destination) {
         if (ROOM_ACTION.matcher(destination).matches()) {
             return RateLimitProperties.GAME_ACTION;
+        }
+        if (ROOM_PREVIEW.matcher(destination).matches()) {
+            return RateLimitProperties.GAME_PREVIEW;
         }
         if (ROOM_CHAT.matcher(destination).matches()) {
             return RateLimitProperties.CHAT;

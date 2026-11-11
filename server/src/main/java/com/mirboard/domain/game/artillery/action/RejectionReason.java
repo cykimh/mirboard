@@ -8,5 +8,7 @@ public enum RejectionReason {
     NO_AMMO,
     /** 없는(이미 쓴) 아이템 (D-224). */
     NO_ITEM,
-    INVALID_ACTION
+    INVALID_ACTION,
+    /** 한 걸음도 못 감 — 연료 0 이거나 첫 걸음이 벽·전장 끝(D-228). 상태 무변경. */
+    CANNOT_MOVE
 }

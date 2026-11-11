@@ -29,6 +29,10 @@ import java.util.List;
  * @param pickUntil        PICKING 이 끝나는 시각(epoch ms), 아니면 0 (D-224)
  * @param teams            2:2 팀전인가(D-225) — 팀 = 좌석 홀짝. D-225 이전 JSON 에는 없다(개인전).
  * @param turnOrder        차례 규칙(D-226). D-226 이전 JSON 에는 없다 → {@link TurnOrder#SEAT}(그 판은 좌석 순서로 끝까지).
+ * @param turnStartedAt    AIMING 차례가 시작된 시각(epoch ms) — 차례 전체 마감의 기준(D-228, D-183 요트와 같은 방식). AIMING 밖은 0.
+ *                         D-228 이전 JSON·시계 없이 연 판(테스트)에는 0 → 엔진 타이머 없음(인프라 턴 데드라인만), 첫 {@code MOVE} 가 채운다.
+ * @param moveFuelUsed     이번 차례에 {@code MOVE} 로 이미 쓴 연료(D-228) — {@code FIRE.moveDx} 걷기·딜레이가 이어서 센다. AIMING 밖은 0,
+ *                         D-228 이전 JSON 에는 없다(0 — 그 판은 MOVE 가 없었으니 맞다).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ArtilleryState(long seed,
@@ -48,13 +52,24 @@ public record ArtilleryState(long seed,
                              MatchResult result,
                              long pickUntil,
                              boolean teams,
-                             TurnOrder turnOrder) implements GameState {
+                             TurnOrder turnOrder,
+                             long turnStartedAt,
+                             int moveFuelUsed) implements GameState {
 
     public ArtilleryState {
         botSeats = botSeats == null ? List.of() : List.copyOf(botSeats);
         units = List.copyOf(units);
         craters = craters == null ? List.of() : List.copyOf(craters);
         turnOrder = turnOrder == null ? TurnOrder.SEAT : turnOrder;
+    }
+
+    /** D-228 이전 모양(차례 시계·MOVE 연료 없음). */
+    public ArtilleryState(long seed, int seatCount, List<Integer> botSeats, List<Unit> units, List<Crater> craters,
+                          Phase phase, int turnSeat, int lastSeat, int turnNo, int wind, int cloudLevel,
+                          long resolveUntil, int eliminations, ShotReport lastShot, MatchResult result, long pickUntil,
+                          boolean teams, TurnOrder turnOrder) {
+        this(seed, seatCount, botSeats, units, craters, phase, turnSeat, lastSeat, turnNo, wind, cloudLevel,
+                resolveUntil, eliminations, lastShot, result, pickUntil, teams, turnOrder, 0L, 0);
     }
 
     /** D-225 이전 모양(개인전·좌석 순서). */
@@ -71,6 +86,21 @@ public record ArtilleryState(long seed,
                           long resolveUntil, int eliminations, ShotReport lastShot, MatchResult result) {
         this(seed, seatCount, botSeats, units, craters, phase, turnSeat, lastSeat, turnNo, wind, cloudLevel,
                 resolveUntil, eliminations, lastShot, result, 0L);
+    }
+
+    /** 차례 시계·MOVE 연료만 바꾼 사본 (D-228). */
+    public ArtilleryState withTurnClock(long startedAt, int fuelUsed) {
+        return new ArtilleryState(seed, seatCount, botSeats, units, craters, phase, turnSeat, lastSeat, turnNo, wind,
+                cloudLevel, resolveUntil, eliminations, lastShot, result, pickUntil, teams, turnOrder, startedAt, fuelUsed);
+    }
+
+    /** 차례 주인 포대의 남은 연료 (D-228) — AIMING 이 아니면 0. */
+    @JsonIgnore
+    public int turnFuelLeft() {
+        if (phase != Phase.AIMING || turnSeat < 0) {
+            return 0;
+        }
+        return Math.max(0, units.get(turnSeat).kindOrDefault().fuel() - moveFuelUsed);
     }
 
     @JsonIgnore
