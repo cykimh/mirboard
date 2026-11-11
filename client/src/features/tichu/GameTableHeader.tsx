@@ -1,9 +1,7 @@
-import { useState, type ReactNode } from 'react';
 import { t } from '@/i18n/messages';
-import { Button } from '@/components/ui/button';
-import { REACTIONS } from '@/features/chat/reactionStore';
-
-/** P2(7) — 빠른 이모지 반응 팔레트(서버 화이트리스트와 일치). */
+import { Button, buttonVariants } from '@/components/ui/button';
+import { GameMenu } from '@/components/GameMenu';
+import type { useVoiceChat } from '@/features/voice/useVoiceChat';
 
 interface GameTableHeaderProps {
   fillWithBots: boolean;
@@ -26,18 +24,19 @@ interface GameTableHeaderProps {
   unreadCount: number;
   /** D-135 — 방장 강제 종료(확인은 호출 측). 방장이고 나머지가 모두 봇일 때만 온다. */
   onAbort?: () => void;
-  /** D-156 — 음성 대화 버튼(🎧·🎙). 게임판이 만들어 넘긴다. */
-  voiceControls?: ReactNode;
+  /** D-186 — 나가기(탈주 확인은 호출 측). */
+  onExit?: () => void;
+  /** D-186 — 게임 방법 다시 보기. */
+  onRules?: () => void;
+  /** D-156 — 음성 대화. D-186 부터 ⋮ 메뉴 안(스위치가 켜져 있을 때만). */
+  voice?: ReturnType<typeof useVoiceChat>;
 }
 
 /**
- * 게임판 헤더 — 좌측은 방 상태 배지(혼자 연습/턴제한/판돈/연결/라운드/단계/관전/소원),
- * 우측은 토글 컨트롤(사운드·카드애니·이모지·채팅).
+ * 게임판 헤더 — D-186 부터 한 줄 고정: 왼쪽은 핵심 배지(라운드·단계·소원), 오른쪽은 채팅 + ⋮ 메뉴.
+ * 방 정보(혼자 연습·턴 제한·판돈·관전·연결)와 설정(사운드·카드 애니·라이트/다크)·이모지·규칙·게임 종료·나가기는 메뉴로 옮겼다.
  *
- * 이모지 팔레트 열림 상태는 헤더 밖에서 쓰이지 않아 여기서 소유한다. 반면
- * chatOpen 은 하단 RoomChat 패널도 읽으므로 호출부가 계속 소유한다.
- *
- * D-87 에서 GameTable 에서 분리. 마크업·클래스명·문구 모두 이동 전과 동일하다.
+ * chatOpen 은 하단 RoomChat 패널도 읽으므로 호출부가 소유한다. D-87 에서 GameTable 에서 분리.
  */
 export function GameTableHeader({
   fillWithBots,
@@ -59,100 +58,24 @@ export function GameTableHeader({
   onToggleChat,
   unreadCount,
   onAbort,
-  voiceControls,
+  onExit,
+  onRules,
+  voice,
 }: GameTableHeaderProps) {
-  const [reactionOpen, setReactionOpen] = useState(false);
-
   return (
-    <header className="game-table-header">
-      <div className="header-status">
-        {fillWithBots && (
-          <span className="solo-banner" title="봇과 연습 — 다른 좌석은 봇이 둡니다">
-            🤖 혼자 연습 (봇 {botSeats.length}명)
-          </span>
-        )}
-        {turnSeconds > 0 && (
-          <span className="turn-limit-badge" title="개인 턴 제한 — 초과 시 자동으로 다음 순서로 넘어갑니다">
-            ⏱ 턴 제한 {turnSeconds}초
-          </span>
-        )}
-        {stake > 0 && (
-          <span className="turn-limit-badge" title="내기 방 — 판돈(가상 칩). 승팀이 가져갑니다">
-            💰 판돈 {stake}칩
-          </span>
-        )}
-        <span
-          className="conn-indicator"
-          title={connected ? '서버 연결됨' : '서버 연결 끊김'}
-          aria-label={connected ? '서버 연결됨' : '서버 연결 끊김'}
-        >
-          <span className={`conn-dot ${connected ? 'on' : 'off'}`} aria-hidden="true" />
-        </span>
+    <header className="game-table-header gm-header">
+      <div className="header-status gm-header-info">
         <span>
           {t('game.header.round')} {roundNumber}
         </span>
-        <span>{phaseLabel}</span>
-        {spectatorCount > 0 && (
-          <span title="관전자 수">👁 관전 {spectatorCount}</span>
-        )}
+        <span className="header-phase">{phaseLabel}</span>
         {activeWishRank !== null && (
           <span>
             {t('game.header.activeWish')}: {activeWishRank}
           </span>
         )}
       </div>
-      <div className="header-controls">
-        {voiceControls}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onToggleMute}
-          aria-label="사운드 토글"
-          title={muted ? '사운드 켜기' : '사운드 끄기'}
-        >
-          {muted ? '🔇' : '🔊'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onToggleCardAnim}
-          aria-label="카드 애니메이션 토글"
-          title={cardAnimEnabled ? '카드 애니 끄기' : '카드 애니 켜기'}
-        >
-          {cardAnimEnabled ? '🎴' : '⏸'}
-        </Button>
-        {!spectator && (
-          <div className="reaction-bar">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReactionOpen((v) => !v)}
-              aria-label="이모지 반응"
-              title="이모지 반응"
-            >
-              😀
-            </Button>
-            {reactionOpen && (
-              <div className="reaction-palette">
-                {REACTIONS.map((e) => (
-                  <button
-                    type="button"
-                    key={e}
-                    onClick={() => {
-                      onSendReaction(e);
-                      setReactionOpen(false);
-                    }}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      <div className="header-controls gm-header-actions">
         <Button
           type="button"
           variant="outline"
@@ -168,11 +91,23 @@ export function GameTableHeader({
             </span>
           )}
         </Button>
-        {onAbort && (
-          <Button type="button" variant="outline" size="sm" onClick={onAbort}>
-            게임 종료
-          </Button>
-        )}
+        <GameMenu
+          triggerClassName={buttonVariants({ variant: 'outline', size: 'sm' })}
+          info={[
+            fillWithBots && `봇과 연습 (봇 ${botSeats.length}명)`,
+            turnSeconds > 0 && `턴 제한 ${turnSeconds}초`,
+            stake > 0 && `판돈 ${stake}칩`,
+            spectatorCount > 0 && `관전 ${spectatorCount}명`,
+            connected ? '연결됨' : '연결 끊김',
+          ]}
+          sound={{ muted, onToggle: onToggleMute }}
+          toggles={[{ key: 'card-anim', label: '카드 애니메이션', checked: cardAnimEnabled, onToggle: onToggleCardAnim }]}
+          onRules={onRules}
+          onReaction={spectator ? undefined : onSendReaction}
+          voice={voice}
+          onAbort={onAbort}
+          onExit={onExit}
+        />
       </div>
     </header>
   );

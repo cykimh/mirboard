@@ -1,3 +1,4 @@
+import { queryMenuItem, clickMenuItem } from '@/test/gameMenu';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './testPointerEvent';
@@ -120,14 +121,14 @@ describe('OmokTable (S4)', () => {
     seed();
     renderTable({ spectator: true, myUserId: 99 });
     expect(screen.queryByRole('button', { name: '여기에 두기' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '기권' })).toBeNull();
+    expect(queryMenuItem('기권')).toBeNull();
   });
 
   it('기권은 확인 뒤에 RESIGN 을 보낸다(2:2 는 팀 전체라고 알린다)', () => {
     seed({ mode: 'TEAMS_2V2', seatColors: ['BLACK', 'WHITE', 'BLACK', 'WHITE'], timeouts: [0, 0, 0, 0] });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderTable({ playerIds: [10, 20, 30, 40] });
-    fireEvent.click(screen.getByRole('button', { name: '기권' }));
+    clickMenuItem('기권');
     expect(confirm.mock.calls[0][0]).toContain('팀 전체');
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'RESIGN' });
   });

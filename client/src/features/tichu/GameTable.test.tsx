@@ -1,3 +1,4 @@
+import { queryMenuItem, getMenuItem, clickMenuItem, menuInfoText } from '@/test/gameMenu';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Card, PrivateHand, Suit, TableView } from '@/types/tichu';
@@ -414,7 +415,7 @@ describe('GameTable — 끝난 방 (D-240)', () => {
     expect(onExit).toHaveBeenCalled();
     expect(container.querySelector('.my-hand')).toBeNull();
     expect(container.querySelector('.arena-seat-actions')).toBeNull();
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
     expect(screen.queryByRole('button', { name: /내보내기/ })).toBeNull();
   });
 
@@ -425,7 +426,7 @@ describe('GameTable — 끝난 방 (D-240)', () => {
 
     expect(screen.queryByText('게임이 종료되었습니다.')).toBeNull();
     expect(container.querySelector('.my-hand')).not.toBeNull();
-    expect(screen.getByRole('button', { name: '게임 종료' })).toBeInTheDocument();
+    expect(getMenuItem('게임 종료')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '내보내기' })).toBeInTheDocument();
   });
 });
@@ -442,11 +443,12 @@ describe('GameTable — 헤더', () => {
       spectatorCount: 2,
     });
 
-    // D-136 — 봇 방은 "봇과 연습"이다(솔로 모드 → 혼자 연습).
-    expect(screen.getByText('🤖 혼자 연습 (봇 3명)')).toBeInTheDocument();
-    expect(screen.getByText('⏱ 턴 제한 30초')).toBeInTheDocument();
-    expect(screen.getByText('💰 판돈 100칩')).toBeInTheDocument();
-    expect(screen.getByText('👁 관전 2')).toBeInTheDocument();
+    // D-136 — 봇 방은 "봇과 연습"이다. D-186 — 방 정보는 머리 줄이 아니라 ⋮ 메뉴 맨 위 글 줄에.
+    const info = menuInfoText();
+    expect(info).toContain('봇과 연습 (봇 3명)');
+    expect(info).toContain('턴 제한 30초');
+    expect(info).toContain('판돈 100칩');
+    expect(info).toContain('관전 2명');
   });
 
   it('배지 조건이 꺼지면 렌더하지 않는다', () => {
@@ -454,10 +456,8 @@ describe('GameTable — 헤더', () => {
 
     renderTable();
 
-    expect(screen.queryByText(/혼자 연습/)).toBeNull();
-    expect(screen.queryByText(/턴 제한/)).toBeNull();
-    expect(screen.queryByText(/판돈/)).toBeNull();
-    expect(screen.queryByText(/관전/)).toBeNull();
+    const info = menuInfoText();
+    expect(info).not.toMatch(/봇과 연습|턴 제한|판돈|관전/);
   });
 });
 
@@ -519,7 +519,7 @@ describe('GameTable — 강제 종료 (D-135)', () => {
     const onAbort = vi.fn();
     renderTable({ onAbort });
 
-    fireEvent.click(screen.getByRole('button', { name: '게임 종료' }));
+    clickMenuItem('게임 종료');
     expect(onAbort).toHaveBeenCalledTimes(1);
   });
 
@@ -527,7 +527,7 @@ describe('GameTable — 강제 종료 (D-135)', () => {
     seed({ tableView: tableView(), privateHand: privateHand([card('JADE', 5)]) });
     renderTable();
 
-    expect(screen.queryByRole('button', { name: '게임 종료' })).toBeNull();
+    expect(queryMenuItem('게임 종료')).toBeNull();
   });
 });
 
@@ -557,8 +557,8 @@ describe('GameTable — 음성 대화 (D-156)', () => {
     seed({ tableView: tableView(), privateHand: privateHand([card('JADE', 5)]) });
     const { container } = renderTable();
 
-    expect(screen.getByRole('button', { name: '마이크' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: '음성 대화' }));
+    expect(getMenuItem('마이크')).toBeDisabled();
+    clickMenuItem('음성 대화');
     expect(sendVoice).toHaveBeenCalledWith({ type: 'JOIN' });
 
     await act(async () => {

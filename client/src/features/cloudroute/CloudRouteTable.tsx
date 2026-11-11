@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
@@ -287,52 +288,35 @@ export function CloudRouteTable({
 
   return (
     <div ref={rootRef} className={`cr-table cr-${CLOUD_ROUTE_THEME}${motion ? ' cr-motion' : ''}`}>
-      <header className="cr-header">
-        <div className="cr-header-badges">
+      <header className="cr-header gm-header">
+        <div className="cr-header-badges gm-header-info">
           <span className="cr-badge cr-badge-title">구름항로</span>
-          <span className="cr-badge">{seatCount}인</span>
           {s.roundLimit > 0 && (
             <span className="cr-badge">
               라운드 {shownRound}/{s.roundLimit}
             </span>
           )}
-          {practice && (
-            <span className="cr-badge">
-              <Icon name="bot" /> 혼자 연습
-            </span>
-          )}
-          {turnSeconds > 0 && <span className="cr-badge">턴 {turnSeconds}초</span>}
-          {spectatorCount > 0 && <span className="cr-badge">관전 {spectatorCount}</span>}
           {spectator && <span className="cr-badge">관전 모드</span>}
-          <span className={`cr-badge cr-badge-link${connected ? '' : ' cr-badge-off'}`}>{connected ? '● 연결' : '○ 끊김'}</span>
         </div>
-        <div className="cr-header-badges">
-          <button
-            type="button"
-            className="cr-badge"
-            onClick={toggleMute}
-            aria-label="효과음"
-            aria-pressed={!muted}
-            title={muted ? '효과음 켜기' : '효과음 끄기'}
-          >
-            <Icon name={muted ? 'mute' : 'sound'} />
-          </button>
+        <div className="cr-header-badges gm-header-actions">
           <button type="button" className="cr-badge" onClick={() => setChatOpen((v) => !v)}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
           </button>
-          <button type="button" className="cr-badge" onClick={rules.show} title="게임 방법 — 턴 타이머는 계속 흐릅니다">
-            규칙
-          </button>
-          {onAbort && !roomFinished && (
-            <button type="button" className="cr-badge" onClick={onAbort}>
-              게임 종료
-            </button>
-          )}
-          {onExit && (
-            <button type="button" className="cr-badge" onClick={exit}>
-              나가기
-            </button>
-          )}
+          {/* D-186 — 방 정보·설정·규칙·게임 종료·나가기는 ⋮ 메뉴로(머리 줄 한 줄 고정). */}
+          <GameMenu
+            triggerClassName="cr-badge"
+            info={[
+              `${seatCount}인`,
+              practice && '봇과 연습',
+              turnSeconds > 0 && `턴 ${turnSeconds}초`,
+              spectatorCount > 0 && `관전 ${spectatorCount}명`,
+              connected ? '연결됨' : '연결 끊김',
+            ]}
+            sound={{ muted, onToggle: toggleMute }}
+            onRules={rules.show}
+            onAbort={onAbort && !roomFinished ? onAbort : undefined}
+            onExit={onExit ? exit : undefined}
+          />
         </div>
       </header>
 
