@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
@@ -737,15 +738,18 @@ export function RoomPage() {
       {notice}
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {gameName ?? room.gameType} ·{' '}
-              {ROOM_STATUS_LABEL[room.status] ?? room.status} · {room.playerCount}/
-              {room.capacity}
-              {(room.spectatorIds ?? []).length > 0 &&
-                ` · 👁 관전 ${(room.spectatorIds ?? []).length}`}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <GameIcon gameId={room.gameType} size={44} />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
+              <p className="text-sm text-muted-foreground">
+                {gameName ?? room.gameType} ·{' '}
+                {ROOM_STATUS_LABEL[room.status] ?? room.status} · {room.playerCount}/
+                {room.capacity}
+                {(room.spectatorIds ?? []).length > 0 &&
+                  ` · 👁 관전 ${(room.spectatorIds ?? []).length}`}
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {tutorial && (

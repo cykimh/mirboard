@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -301,6 +302,7 @@ export function ArtilleryTable({
     <div className={`ar-table ar-layout-${layout}`}>
       <header className="ar-header gm-header">
         <div className="ar-header-badges gm-header-info">
+          <GameIcon gameId="ARTILLERY" size={22} />
           <span className="ar-badge ar-badge-title">씨앗포</span>
           <span className="ar-badge">{s.teams ? '2:2 팀전' : `${playerIds.length}인`}</span>
           {spectator && <span className="ar-badge">관전 모드</span>}

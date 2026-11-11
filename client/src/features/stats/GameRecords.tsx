@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { GameRecord } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 
@@ -16,7 +17,10 @@ export function GameRecords({ records, names }: Props) {
     <ul className="flex flex-col gap-2">
       {records.map((r) => (
         <li key={r.gameType} className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2">
-          <span className="min-w-16 font-medium">{names[r.gameType] ?? r.gameType}</span>
+          <span className="inline-flex min-w-16 items-center gap-2 font-medium">
+            <GameIcon gameId={r.gameType} size={24} />
+            {names[r.gameType] ?? r.gameType}
+          </span>
           <TierBadge tier={r.tier} rating={r.rating} detailed />
           <span className="text-sm text-muted-foreground">
             {r.winCount}승 {r.loseCount}패{r.desertCount > 0 && ` · 탈주 ${r.desertCount}`}

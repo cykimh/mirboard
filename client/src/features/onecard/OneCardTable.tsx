@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useRef, useState } from 'react';
@@ -314,6 +315,7 @@ export function OneCardTable({
     <div ref={tableRef} className="oc-table" style={{ ['--oc-seat-min' as string]: seatMinWidth(seatCount) }}>
       <header className="oc-header gm-header">
         <div className="oc-header-badges gm-header-info">
+          <GameIcon gameId="ONE_CARD" size={22} />
           <span className="oc-badge oc-badge-title">원카드</span>
           {spectator && <span className="oc-badge">관전 모드</span>}
         </div>

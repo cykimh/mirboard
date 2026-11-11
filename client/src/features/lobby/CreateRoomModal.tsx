@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
@@ -94,7 +95,10 @@ export function CreateRoomModal({
               <SelectContent className="app-shell">
                 {availableGames.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
-                    {g.displayName}
+                    <span className="inline-flex items-center gap-2">
+                      <GameIcon gameId={g.id} size={18} />
+                      {g.displayName}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -116,9 +116,11 @@ Redis 비밀번호 없음, :6379. 검증·테스트는 `scripts/check.sh` 가 �
 작업 세션 여럿이 한 컴퓨터에서 실제 판을 확인할 때는 포트와 Redis DB 번호를 나눈다(같은 Redis 의 마감 스케줄을 다른 서버가 가져가면 화면이 멈춘 것처럼 보인다).
 
 ```bash
-MIRBOARD_PORT=8181 MIRBOARD_REDIS_DATABASE=1 ./gradlew :server:bootRun
+MIRBOARD_PORT=8181 MIRBOARD_REDIS_DATABASE=1 MIRBOARD_ALLOWED_ORIGINS=http://localhost:5281 ./gradlew :server:bootRun
 VITE_PORT=5281 MIRBOARD_DEV_API=http://localhost:8181 npm --prefix client run dev
 ```
+
+`MIRBOARD_ALLOWED_ORIGINS` 는 클라 포트에 맞춘다 — 서버 origin 화이트리스트(D-83) 기본값이 5173·8080 뿐이라, 빼면 브라우저의 로그인·게스트 발급(POST)이 403 이다.
 
 ### 관측 스택 (선택, D-107)
 

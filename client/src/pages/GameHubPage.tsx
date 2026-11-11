@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
@@ -225,7 +226,8 @@ export function GameHubPage() {
                         </Badge>
                       )}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <GameIcon gameId={room.gameType} size={18} />
                       {/* D-130 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름과 한글 상태 라벨. 모르는 게임·상태는 원문. */}
                       {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}
                       {ROOM_STATUS_LABEL[room.status] ?? room.status}
@@ -289,16 +291,20 @@ export function GameHubPage() {
                   <Card
                     key={game.id}
                     className={cn(
-                      'flex flex-col',
+                      // D-188 — group: 카드에 올리면 아이콘이 살짝 떠오른다.
+                      'group flex flex-col',
                       !available && 'opacity-60',
                     )}
                   >
                     {/* D-154 — 작은 카드: 여백·글자를 줄이고 소개는 두 줄까지. */}
-                    <CardHeader className="space-y-1 p-4 pb-1">
-                      <CardTitle className="text-base">{game.displayName}</CardTitle>
-                      <CardDescription className="line-clamp-2 text-xs">
-                        {game.shortDescription}
-                      </CardDescription>
+                    <CardHeader className="flex flex-row items-start gap-3 space-y-0 p-4 pb-1">
+                      <GameIcon gameId={game.id} size={48} interactive />
+                      <div className="min-w-0 space-y-1">
+                        <CardTitle className="text-base">{game.displayName}</CardTitle>
+                        <CardDescription className="line-clamp-2 text-xs">
+                          {game.shortDescription}
+                        </CardDescription>
+                      </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-1 text-xs text-muted-foreground">
                       {/* D-196 — 서버가 준 할 수 있는 인원으로(오목은 2·4인). */}

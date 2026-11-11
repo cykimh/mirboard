@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -290,6 +291,7 @@ export function CloudRouteTable({
     <div ref={rootRef} className={`cr-table cr-${CLOUD_ROUTE_THEME}${motion ? ' cr-motion' : ''}`}>
       <header className="cr-header gm-header">
         <div className="cr-header-badges gm-header-info">
+          <GameIcon gameId="CLOUD_ROUTE" size={22} />
           <span className="cr-badge cr-badge-title">구름항로</span>
           {s.roundLimit > 0 && (
             <span className="cr-badge">
