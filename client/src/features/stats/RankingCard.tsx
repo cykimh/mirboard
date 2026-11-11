@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { usersApi, type RankEntry } from '@/api/users';
 import type { GameSummary } from '@/types/api';
@@ -77,7 +78,7 @@ export function RankingCard({ token, games, myUserId }: Props) {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle>랭킹</CardTitle>
-        <div role="tablist" aria-label="랭킹 게임" className="flex gap-1">
+        <div role="tablist" aria-label="랭킹 게임" className="flex flex-wrap gap-1">
           {ordered.map((g) => (
             <button
               key={g.id}
@@ -86,12 +87,13 @@ export function RankingCard({ token, games, myUserId }: Props) {
               aria-selected={g.id === gameType}
               onClick={() => setSelected(g.id)}
               className={cn(
-                'rounded-md border px-3 py-1 text-sm',
+                'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-1 text-sm',
                 g.id === gameType
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'hover:bg-accent',
               )}
             >
+              <GameIcon gameId={g.id} size={16} />
               {g.displayName}
             </button>
           ))}

@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { t } from '@/i18n/messages';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { GameMenu } from '@/components/GameMenu';
@@ -65,6 +66,7 @@ export function GameTableHeader({
   return (
     <header className="game-table-header gm-header">
       <div className="header-status gm-header-info">
+        <GameIcon gameId="TICHU" size={22} />
         <span>
           {t('game.header.round')} {roundNumber}
         </span>

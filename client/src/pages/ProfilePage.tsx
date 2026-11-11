@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -110,7 +111,10 @@ export function ProfilePage() {
               {rivals.map((r) => (
                 <li key={`${r.gameType}-${r.opponentId}`} className="flex items-center gap-2 rounded-md border px-3 py-1.5">
                   <span className="font-medium">{r.opponentName}</span>
-                  <span className="text-xs text-muted-foreground">{gameNames[r.gameType] ?? r.gameType}</span>
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <GameIcon gameId={r.gameType} size={16} />
+                    {gameNames[r.gameType] ?? r.gameType}
+                  </span>
                   <span className="ml-auto tabular-nums">{headToHeadText(r)}</span>
                 </li>
               ))}

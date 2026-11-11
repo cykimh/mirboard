@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -333,6 +334,7 @@ export function YachtTable({
     <div className={`yt-table${yachtThemeClass}`} ref={rootRef}>
       <header className="yt-header gm-header">
         <div className="yt-header-badges gm-header-info">
+          <GameIcon gameId="YACHT" size={22} />
           <span className="yt-badge yt-badge-title">요트</span>
           <span className="yt-badge">라운드 {Math.min(s.round, 12)}/12</span>
           {spectator && <span className="yt-badge">관전 모드</span>}

@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -259,6 +260,7 @@ export function OmokTable({
     <div className={`om-table ${OMOK_TOKENS_CLASS}`}>
       <header className="om-header gm-header">
         <div className="om-header-badges gm-header-info">
+          <GameIcon gameId="OMOK" size={22} />
           <span className="om-badge om-badge-title">오목</span>
           {s.rule && <span className="om-badge">{RULE_LABEL[s.rule]}</span>}
           {spectator && <span className="om-badge">👀 관전 중</span>}

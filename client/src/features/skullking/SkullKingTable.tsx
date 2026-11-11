@@ -1,3 +1,4 @@
+import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useState } from 'react';
@@ -212,6 +213,7 @@ export function SkullKingTable({
     >
       <header className="sk-header gm-header">
         <div className="sk-header-badges gm-header-info">
+          <GameIcon gameId="SKULL_KING" size={22} />
           <span className="sk-badge sk-badge-round">
             라운드 {s.roundNumber} / 10
           </span>
