@@ -15,3 +15,13 @@
 - 다른 게임·앱의 그림·캐릭터·상표를 쓰지 않았다(D-185 "독창").
 
 나중에 외부 에셋(CC0/CC-BY)이나 오픈소스 라이브러리를 넣게 되면 이 표에 이름·출처 URL·라이선스·저작자 표기를 한 줄씩 추가한다.
+
+## 2차 (D-204)
+
+| 무엇 | 어떻게 만들었나 | 파일 |
+| --- | --- | --- |
+| 가죽 주사위 컵 | 직접 그린 인라인 SVG | `client/src/features/yacht/DiceTray.tsx` (`DiceCup`) |
+| 샴페인 잔 · 금 리본 | 직접 그린 인라인 SVG | `client/src/features/yacht/YachtTable.tsx` (`Coupe` · `Ribbon`) |
+| 기포 · 금 띠 조각 · 착지 고리 · 잠김 빛 · 순위 뒤집기 | CSS `@keyframes` | `20-yacht-table.css` |
+
+외부 자원·그림 파일·npm 의존성 추가는 이번에도 0건이다.
