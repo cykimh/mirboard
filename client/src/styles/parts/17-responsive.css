@@ -212,6 +212,8 @@
   .om-tokens *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
 
 /* D-203 — 요트 "미드나잇 살롱" 연출도 움직임 줄이기면 끈다: 눈·점수만 바로 바뀌고 축하는 상태 줄 배지 하나로만. 테마 규칙과
    명시도를 맞춰야 이긴다(.yt-theme-salon 접두). */
