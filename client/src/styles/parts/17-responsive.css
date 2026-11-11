@@ -204,6 +204,13 @@
   }
 }
 
+/* D-193 — 휴대폰 폭에서 오목판은 앱 틀(#root) 여백과 게임판 여백까지 걷어 내 화면 폭을 다 쓴다(판 틀 3px 만 남는다). */
+@media (max-width: 720px) {
+  .om-theme-grain .om-stage {
+    --om-bleed: calc(var(--space-3) + 2px);
+  }
+}
+
 /* 오목 "결" 테마(D-192) — 움직임 줄이기면 연출 없이 끝 상태로 바로. 21 은 미디어 0개 규칙이라 여기 둔다. 연출 조각(파문·먼지·
    금가루·잉크)은 바탕이 투명이라 애니메이션을 끄면 보이지 않고, 돌·5목 줄·현판·놋쇠 고리는 제자리에 바로 선다. */
 @media (prefers-reduced-motion: reduce) {
@@ -212,6 +219,25 @@
   .om-tokens *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* D-193 강하게 두기 — 흔들림·낙하·입자 없이 금빛 고리가 한 번 밝아졌다 사라지는 짧은 강조만(불투명도만). */
+  .om-tokens .om-slam-calm {
+    display: inline;
+    fill: none;
+    stroke: var(--om-gold, #f7d36a);
+    stroke-width: 0.12;
+    opacity: 0;
+    animation: om-slam-calm 0.9s ease-out !important;
+  }
+}
+
+@keyframes om-slam-calm {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

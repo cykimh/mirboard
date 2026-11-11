@@ -37,14 +37,26 @@
 }
 
 .om-table {
+  /* D-193 — 판 말고 세로로 차지하는 몫(앱 틀 여백·헤더·차례 띠·상태·버튼·틈). 판은 화면 높이에서 이만큼 뺀 크기까지 커진다. */
+  --om-reserve: 300px;
+  --om-board-max: max(300px, calc(100dvh - var(--om-reserve)));
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px 16px;
   min-height: 100vh;
-  max-width: 640px;
+  max-width: max(640px, var(--om-board-max));
   margin: 0 auto;
+}
+
+/* 판 위·아래 줄은 판 폭을 넘지 않게(높은 데스크톱에서 판이 640px 를 넘어도 버튼 줄은 그대로). */
+.om-strip-wrap,
+.om-status,
+.om-controls {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
 }
 
 /* ── 헤더 ─────────────────────────────────────────────────────────── */
@@ -88,6 +100,35 @@ button.om-badge {
   color: var(--om-warn-text);
 }
 
+/* D-193 — 끊김·거절 안내는 판 위에 띄운다(흐름에 끼우면 판이 밀려 내려간다). */
+/* 판 자리 — 화면 높이가 허락하는 만큼(`--om-board-max`), 폭은 앱 틀 여백까지 걷어 낸 만큼(`--om-bleed`, 휴대폰 폭은 17 에서)
+   쓴다. % 는 쓰는 자리(게임판 폭)에서 풀린다. */
+.om-stage {
+  --om-bleed: 0px;
+  --om-stage-w: min(calc(100% + 2 * var(--om-bleed)), var(--om-board-max));
+  position: relative;
+  width: var(--om-stage-w);
+  margin: 0 0 0 calc((100% - var(--om-stage-w)) / 2);
+}
+
+.om-notices {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.om-notices > * {
+  pointer-events: auto;
+  margin: 0 !important;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.45);
+}
+
 .om-error {
   display: flex;
   align-items: center;
@@ -110,13 +151,15 @@ button.om-badge {
 }
 
 /* ── 차례 띠 ───────────────────────────────────────────────────────── */
+/* 차례 띠는 한 줄 고정(D-193) — 이름이 길거나 배지가 붙어도 줄바꿈하지 않고 이름을 줄여 판이 내려가지 않게. */
 .om-strip-wrap {
   position: relative;
+  height: 36px;
 }
 
 .om-strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   margin: 0;
   padding: 0;
@@ -126,9 +169,13 @@ button.om-badge {
 .om-seat {
   position: relative;
   display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   gap: 6px;
   min-height: 36px;
+  height: 36px;
+  white-space: nowrap;
   padding: 4px 10px;
   border-radius: 999px;
   border: 2px solid var(--om-border);
@@ -146,6 +193,8 @@ button.om-badge {
 }
 
 .om-seat-name {
+  min-width: 2em;
+  flex: 0 1 auto;
   max-width: 9em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -343,9 +392,12 @@ button.om-badge {
 }
 
 /* ── 상태·조작 ─────────────────────────────────────────────────────── */
+/* 상태 줄은 두 줄 높이 고정(D-193) — 문구 길이가 바뀌어도 아래 버튼이 들썩이지 않게. */
 .om-status {
   margin: 0;
-  min-height: 1.4em;
+  height: 2.6em;
+  line-height: 1.3;
+  overflow: hidden;
   font-size: 14px;
   text-align: center;
 }
@@ -360,6 +412,76 @@ button.om-badge {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
+}
+
+/* D-193 — [💥 강하게] 토글 + [여기에 두기]. */
+.om-place-row {
+  display: flex;
+  gap: 8px;
+}
+
+.om-place-row .om-primary {
+  flex: 1 1 auto;
+}
+
+.om-slam-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--om-accent);
+  background: var(--om-surface);
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.om-slam-toggle:disabled {
+  opacity: 0.45;
+  border-color: var(--om-border);
+  cursor: not-allowed;
+}
+
+.om-slam-toggle.om-slam-on {
+  background: linear-gradient(180deg, #ff8a3d, #d9361e);
+  border-color: #8f1d0c;
+  color: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff6a2b 35%, transparent);
+  animation: om-slam-armed 1.1s ease-in-out infinite;
+}
+
+.om-slam-left {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.om-primary.om-primary-slam:not(:disabled) {
+  background: linear-gradient(180deg, #ff7a2f, #c62a14);
+}
+
+/* D-193 강하게 두기 — 기본 모습(테마 없이도): 충격파 고리 두 겹. 움직임 줄이기 강조(om-slam-calm)는 17 에서만 보인다. */
+.om-shock {
+  fill: none;
+  stroke: var(--om-accent);
+  stroke-width: 0.08;
+  opacity: 0;
+  animation: om-shock 0.6s 0.32s ease-out;
+}
+
+.om-shock-2 {
+  stroke-width: 0.04;
+  animation-delay: 0.44s;
+}
+
+.om-slam-calm {
+  display: none;
 }
 
 .om-primary {
@@ -653,12 +775,10 @@ button.om-badge {
 /* 판 — 짙은 나무 틀 + 결 있는 판. 높이가 낮은 화면에서는 판이 화면에 다 들어오게 폭을 줄인다. */
 .om-theme-grain .om-stage {
   container-type: inline-size;
-  width: min(100%, max(300px, calc(100dvh - 300px)));
-  margin: 0 auto;
 }
 
 .om-theme-grain .om-board-wrap {
-  --om-pad: 5px;
+  --om-pad: 3px;
   padding: var(--om-pad);
   border-radius: 9px;
   outline: 0;
@@ -1404,5 +1524,275 @@ button.om-badge {
     transform: translateY(18px) scale(0.95);
     opacity: 0;
     visibility: hidden;
+  }
+}
+
+/* ── D-193 강하게 두기 (테마 "결") ─────────────────────────────────────
+ * 돌이 높이서 떨어져 판에 닿는 순간(0.32s) 크게 눌렸다 튀어 오르고, 판 틀이 흔들리고, 나뭇결에 금이 가고, 충격파 두 겹 + 빛이
+ * 퍼지고, 돌가루·나무 조각이 멀리 튀었다 떨어지고, 둘레 두 칸의 돌이 들썩인다. 모두 transform·opacity 만 움직이고 한 번만 돈다
+ * (상태·타이밍과 무관 — 수가 확정되면 같은 요소가 이어받는다). 같은 연출을 다시 틀려고 판·이웃 돌은 이름 둘을 번갈아 쓴다. */
+.om-theme-grain .om-drop.om-slam .om-in {
+  animation: om-slam-drop 0.62s cubic-bezier(0.55, 0, 0.35, 1) backwards;
+}
+
+.om-theme-grain .om-pending.om-drop.om-slam .om-in {
+  animation:
+    om-slam-drop 0.62s cubic-bezier(0.55, 0, 0.35, 1) backwards,
+    om-wait 1s 1s ease-in-out infinite;
+}
+
+.om-theme-grain .om-won.om-drop.om-slam .om-in {
+  animation:
+    om-slam-drop 0.62s cubic-bezier(0.55, 0, 0.35, 1) backwards,
+    om-lift 0.55s calc(var(--om-i) * 0.1s + 0.6s) cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.om-theme-grain .om-drop.om-slam .om-stone-shadow {
+  animation: om-slam-shadow 0.62s cubic-bezier(0.55, 0, 0.35, 1) backwards;
+}
+
+.om-theme-grain .om-shock {
+  stroke: #fff3cf;
+  stroke-width: 0.1;
+}
+
+.om-theme-grain .om-shock-2 {
+  stroke: var(--om-brass);
+  stroke-width: 0.05;
+}
+
+.om-theme-grain .om-crack {
+  fill: none;
+  stroke: #3d250c;
+  stroke-width: 0.05;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: om-crack 1.6s 0.32s ease-out;
+}
+
+.om-theme-grain .om-slam-flash {
+  opacity: 0;
+  animation: om-slam-flash 0.55s 0.3s ease-out;
+}
+
+.om-theme-grain .om-debris {
+  fill: #f3e2bd;
+  opacity: 0;
+  animation: om-debris 0.95s calc(0.32s + var(--om-delay) * 1s) cubic-bezier(0.15, 0.6, 0.45, 1);
+}
+
+.om-theme-grain .om-debris-chip {
+  fill: var(--om-wood2);
+  stroke: #5b3b16;
+  stroke-width: 0.012;
+}
+
+/* 판 — 한 번 크게 눌린다. 틀은 흔들린다(:has — 판의 연출 클래스를 틀이 따른다). */
+.om-theme-grain .om-slam-0 {
+  animation: om-slam-press-a 0.34s 0.32s ease-out;
+}
+
+.om-theme-grain .om-slam-1 {
+  animation: om-slam-press-b 0.34s 0.32s ease-out;
+}
+
+.om-theme-grain .om-board-wrap:has(.om-slam-0) {
+  animation: om-quake-a 0.56s 0.32s linear;
+}
+
+.om-theme-grain .om-board-wrap:has(.om-slam-1) {
+  animation: om-quake-b 0.56s 0.32s linear;
+}
+
+.om-theme-grain .om-jolt-0 .om-in {
+  animation: om-jolt-a 0.42s calc(0.34s + var(--om-near) * 0.05s) cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.om-theme-grain .om-jolt-1 .om-in {
+  animation: om-jolt-b 0.42s calc(0.34s + var(--om-near) * 0.05s) cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+/* 강하게 두기를 켜 두면 미리보기 돌이 더 높이 뜨고 고리가 붉게 달아오른다. */
+.om-theme-grain .om-preview-slam .om-in {
+  transform: translateY(-0.12px) scale(1.08);
+}
+
+.om-theme-grain .om-preview-slam .om-preview-ring {
+  stroke: #d9361e;
+  stroke-width: 0.07;
+}
+
+@keyframes om-slam-drop {
+  0% {
+    transform: translate(0.12px, -3.4px) scale(1.9);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  52% {
+    transform: translate(0, 0) scale(1.3, 0.7);
+  }
+  66% {
+    transform: translate(0, -0.06px) scale(0.88, 1.14);
+  }
+  80% {
+    transform: scale(1.06, 0.95);
+  }
+  90% {
+    transform: scale(0.98, 1.02);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-slam-shadow {
+  0% {
+    transform: translate(0.9px, 1.3px) scale(2.2);
+    opacity: 0;
+  }
+  52% {
+    transform: scale(1.25, 0.8);
+    opacity: 1;
+  }
+}
+
+@keyframes om-shock {
+  from {
+    transform: scale(0.6);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(5.2);
+    opacity: 0;
+  }
+}
+
+@keyframes om-crack {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0.85;
+  }
+  10% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  65% {
+    stroke-dashoffset: 0;
+    opacity: 0.55;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes om-slam-flash {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes om-debris {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  45% {
+    transform: translate(calc(var(--om-dx) * 0.7px), calc(var(--om-dy) * 0.7px - 0.55px))
+      rotate(calc(var(--om-rot) * 0.5deg));
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--om-dx) * 1px), calc(var(--om-dy) * 1px + 0.7px)) rotate(calc(var(--om-rot) * 1deg))
+      scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes om-slam-press-a {
+  35% {
+    transform: scale(0.985);
+  }
+}
+
+@keyframes om-slam-press-b {
+  35% {
+    transform: scale(0.985);
+  }
+}
+
+@keyframes om-quake-a {
+  10% {
+    transform: translate(-6px, 3px) rotate(-0.6deg);
+  }
+  25% {
+    transform: translate(5px, -3px) rotate(0.5deg);
+  }
+  40% {
+    transform: translate(-4px, 2px) rotate(-0.3deg);
+  }
+  55% {
+    transform: translate(3px, -1px) rotate(0.2deg);
+  }
+  72% {
+    transform: translate(-1.5px, 1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-quake-b {
+  10% {
+    transform: translate(-6px, 3px) rotate(-0.6deg);
+  }
+  25% {
+    transform: translate(5px, -3px) rotate(0.5deg);
+  }
+  40% {
+    transform: translate(-4px, 2px) rotate(-0.3deg);
+  }
+  55% {
+    transform: translate(3px, -1px) rotate(0.2deg);
+  }
+  72% {
+    transform: translate(-1.5px, 1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-jolt-a {
+  35% {
+    transform: translateY(-0.18px) scale(1.05);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-jolt-b {
+  35% {
+    transform: translateY(-0.18px) scale(1.05);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes om-slam-armed {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, #ff6a2b 22%, transparent);
   }
 }

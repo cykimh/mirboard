@@ -94,6 +94,8 @@ const RULE_LABEL = {
   FREESTYLE: '자유 오목',
 } as const;
 const COLOR_LABEL: Record<OmokStone, string> = { BLACK: '흑', WHITE: '백' };
+/** D-193 — 강하게 둔 돌이 판에 닿는 때(CSS `om-slam-drop` 의 눌림 지점). 효과음·진동이 여기에 맞춘다. */
+export const SLAM_IMPACT_SEC = 0.32;
 
 interface Props {
   roomId: string;
@@ -148,7 +150,9 @@ export function OmokTable({
   const [chatOpen, setChatOpen] = useState(false);
   const [showNumbers, setShowNumbers] = useState(false);
   const [singleClick, setSingleClick] = useState(readSingleClick);
-  const { muted, toggleMute, playChime } = useSfx();
+  /** D-193 — 다음 착수를 강하게 둘지(한 번 두면 풀린다). */
+  const [slamArmed, setSlamArmed] = useState(false);
+  const { muted, toggleMute, playChime, playSlam } = useSfx();
   const chatLines = useSeatChatLines(playerIds);
   const chatUnread = useRoomChatStore((st) => st.unreadCount);
   const rules = useTutorialGate(OMOK_TUTORIAL.seenKey, false);
@@ -161,6 +165,20 @@ export function OmokTable({
   const turnColor: OmokStone | null = turnSeat >= 0 ? (s.seatColors[turnSeat] ?? null) : null;
   const myTurn = !spectator && mySeat >= 0 && s.result === null && !roomFinished && turnSeat === mySeat;
   const canPlace = myTurn && connected && s.pending === null;
+  const mySlamsLeft = mySeat >= 0 ? (s.slamsLeft[mySeat] ?? 0) : 0;
+  const slamOn = slamArmed && mySlamsLeft > 0;
+
+  // D-193 — 강하게 둔 수가 판에 닿을 때 "쿵" + 진동. 내 수는 보낸 즉시(흐린 돌이 바로 내리친다), 남의 수는 STONE_PLACED.slam 을
+  // 받은 때. 내 수가 확정되면 pendingSlam 이 slamMoves 로 옮겨 가 합이 그대로라 두 번 울리지 않는다.
+  const slamCount = s.slamMoves.size + (s.pendingSlam ? 1 : 0);
+  const lastSlamCount = useRef(slamCount);
+  useEffect(() => {
+    if (slamCount > lastSlamCount.current) {
+      playSlam(SLAM_IMPACT_SEC);
+      if (!muted) window.setTimeout(() => navigator.vibrate?.([70, 40, 110]), SLAM_IMPACT_SEC * 1000);
+    }
+    lastSlamCount.current = slamCount;
+  }, [slamCount, playSlam, muted]);
 
   // 내 차례가 되면 알림음 + 휴대폰 진동 한 번(원카드 D-160 과 같다).
   const wasMyTurn = useRef(myTurn);
@@ -214,8 +232,9 @@ export function OmokTable({
       s.setPreview(p); // 확정하지 않고 이유를 보여 준다
       return;
     }
-    s.markPending(p);
-    sendAction({ '@action': 'PLACE_STONE', x: p.x, y: p.y });
+    s.markPending(p, slamOn);
+    sendAction(slamOn ? { '@action': 'PLACE_STONE', x: p.x, y: p.y, slam: true } : { '@action': 'PLACE_STONE', x: p.x, y: p.y });
+    setSlamArmed(false);
   };
 
   const resign = () => {
@@ -247,7 +266,8 @@ export function OmokTable({
   else if (turnSeat < 0) status = '다음 차례를 기다리는 중…';
   else if (myTurn && s.pending) status = '두는 중…';
   else if (myTurn && previewForbidden) status = FORBIDDEN_LABEL[previewForbidden.kind];
-  else if (myTurn && preview) status = `${coordName(preview)} — 한 번 더 누르거나 [여기에 두기]`;
+  else if (myTurn && preview) status = `${coordName(preview)} — 한 번 더 누르거나 [${slamOn ? '강하게 두기' : '여기에 두기'}]`;
+  else if (myTurn && slamOn) status = '💥 강하게 둘 자리를 누르세요';
   else if (myTurn) status = '내 차례예요 — 둘 자리를 누르세요';
   else status = `${nameOf(turnSeat)}${turnColor ? `(${COLOR_LABEL[turnColor]})` : ''} 차례`;
 
@@ -292,16 +312,6 @@ export function OmokTable({
           )}
         </div>
       </header>
-
-      <ReconnectBanner connected={connected} />
-      {s.errorMessage && (
-        <p className="om-error" role="alert">
-          <span>{s.errorMessage}</span>
-          <button type="button" className="om-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-            ×
-          </button>
-        </p>
-      )}
 
       {/* 차례 띠 — 좌석 순서(진행 +1). 2:2 는 같은 팀이 같은 색이다. 놋쇠 고리가 지금 차례인 명패로 미끄러진다(D-192). */}
       <div className="om-strip-wrap" ref={marker.wrapRef}>
@@ -362,6 +372,18 @@ export function OmokTable({
       </div>
 
       <div className="om-stage">
+        {/* D-193 — 끊김·거절 안내는 판 위에 띄운다(흐름에 끼우면 판이 밀려 내려간다). */}
+        <div className="om-notices">
+          <ReconnectBanner connected={connected} />
+          {s.errorMessage && (
+            <p className="om-error" role="alert">
+              <span>{s.errorMessage}</span>
+              <button type="button" className="om-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
+                ×
+              </button>
+            </p>
+          )}
+        </div>
         <div className={`om-board-wrap${myTurn ? ' om-board-myturn' : ''}`}>
           <div className="om-ruler om-ruler-y" aria-hidden="true">
             {RULER_Y.map((n) => (
@@ -381,6 +403,9 @@ export function OmokTable({
             forbiddenIsMine={myTurn && myColor === 'BLACK'}
             preview={preview}
             pending={s.pending}
+            pendingSlam={s.pendingSlam}
+            slamMoves={s.slamMoves}
+            slamArmed={slamOn && canPlace}
             myColor={myColor}
             winLine={winLine}
             showNumbers={showNumbers}
@@ -405,14 +430,28 @@ export function OmokTable({
 
       {!spectator && mySeat >= 0 && s.result === null && !roomFinished && (
         <div className="om-controls">
-          <button
-            type="button"
-            className="om-primary"
-            disabled={!canPlace || !previewOk}
-            onClick={() => preview && place(preview)}
-          >
-            여기에 두기
-          </button>
+          <div className="om-place-row">
+            {/* D-193 — 한 판에 한 번 강하게 두기. 켜 두면 다음 착수(어느 방법으로 두든)가 강하게 나간다. */}
+            <button
+              type="button"
+              className={`om-slam-toggle${slamOn ? ' om-slam-on' : ''}`}
+              aria-pressed={slamOn}
+              disabled={mySlamsLeft <= 0 || s.pending !== null}
+              onClick={() => setSlamArmed((v) => !v)}
+              title="한 판에 한 번 — 돌을 쾅 내리쳐 둡니다(룰은 그대로)"
+            >
+              <span aria-hidden="true">💥</span> 강하게
+              <span className="om-slam-left">{mySlamsLeft > 0 ? `${mySlamsLeft}회` : '다 씀'}</span>
+            </button>
+            <button
+              type="button"
+              className={`om-primary${slamOn ? ' om-primary-slam' : ''}`}
+              disabled={!canPlace || !previewOk}
+              onClick={() => preview && place(preview)}
+            >
+              {slamOn ? '강하게 두기!' : '여기에 두기'}
+            </button>
+          </div>
           <label className="om-single-click">
             <input type="checkbox" checked={singleClick} onChange={toggleSingleClick} />
             마우스 한 번 클릭으로 두기

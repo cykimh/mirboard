@@ -168,4 +168,29 @@ describe('OmokTable (S4)', () => {
     tap(svg, 7, 7);
     expect(sendAction).not.toHaveBeenCalled();
   });
+  it('D-193 — [강하게]를 켜고 두면 PLACE_STONE 에 slam:true 를 싣고 토글이 풀린다', () => {
+    seed({ slamsLeft: [1, 1] });
+    const { svg } = renderTable();
+    const toggle = screen.getByRole('button', { name: /강하게/ });
+    expect(toggle).toHaveTextContent('1회');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('💥 강하게 둘 자리를 누르세요')).toBeInTheDocument();
+    tap(svg, 7, 7);
+    fireEvent.click(screen.getByRole('button', { name: '강하게 두기!' }));
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 7, y: 7, slam: true });
+    expect(useOmokStore.getState().pendingSlam).toBe(true);
+    expect(screen.getByRole('button', { name: /강하게/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('D-193 — 이미 썼으면 [강하게]가 막히고 보통 착수만 나간다', () => {
+    seed({ slamsLeft: [0, 1] });
+    const { svg } = renderTable();
+    const toggle = screen.getByRole('button', { name: /강하게/ });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveTextContent('다 씀');
+    tap(svg, 7, 7);
+    tap(svg, 7, 7);
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 7, y: 7 });
+  });
 });

@@ -177,3 +177,46 @@ describe('OmokBoard — 연출 표시 (D-192, 그림만)', () => {
     expect(container.querySelectorAll('.om-gold').length).toBeLessThanOrEqual(26);
   });
 });
+
+describe('OmokBoard — 강하게 두기 연출 (D-193, 그림만)', () => {
+  const B = { seat: 0, x: 7, y: 7, timedOut: false };
+  const W = { seat: 1, x: 8, y: 8, timedOut: false };
+
+  it('강하게 둔 수(slamMoves)가 들어오면 그 돌에 강한 연출·충격파·금·돌가루를 그리고 둘레 돌이 들썩인다', () => {
+    const { container, rerender, props } = setup({ moves: [B] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set([2])} />);
+    const slammed = container.querySelector('.om-stone.om-slam');
+    expect(slammed?.getAttribute('data-color')).toBe('WHITE');
+    expect(screen.getByTestId('om-slam-fx')).toBeInTheDocument();
+    expect(container.querySelectorAll('.om-shock')).toHaveLength(2);
+    expect(container.querySelectorAll('.om-crack')).toHaveLength(6);
+    expect(container.querySelectorAll('.om-debris')).toHaveLength(18);
+    expect(container.querySelector('svg.om-board')?.getAttribute('class')).toMatch(/om-slam-[01]/);
+    expect(container.querySelector('.om-stone[class*="om-jolt-"]')?.getAttribute('data-color')).toBe('BLACK');
+  });
+
+  it('보통 수에는 강한 연출이 없다', () => {
+    const { container, rerender, props } = setup({ moves: [B] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set()} />);
+    expect(container.querySelector('.om-slam')).toBeNull();
+    expect(screen.queryByTestId('om-slam-fx')).toBeNull();
+    expect(container.querySelector('svg.om-board')?.getAttribute('class')).toMatch(/om-thud-[01]/);
+  });
+
+  it('다시 받기로 여러 수가 한꺼번에 오면 강하게 둔 수여도 다시 내리치지 않는다', () => {
+    const { rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set([1, 2])} />);
+    expect(screen.queryByTestId('om-slam-fx')).toBeNull();
+  });
+
+  it('내가 강하게 보낸 수는 응답 전에 바로 내리치고, 확정돼도 같은 연출을 이어받는다', () => {
+    const { rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} pending={{ x: 7, y: 7 }} pendingSlam />);
+    const pending = screen.getByTestId('om-pending');
+    expect(pending.getAttribute('class')).toContain('om-slam');
+    const fx = screen.getByTestId('om-slam-fx');
+    rerender(<OmokBoard {...props} moves={[B]} pending={null} slamMoves={new Set([1])} />);
+    expect(screen.getByTestId('om-stone')).toBe(pending);
+    expect(screen.getByTestId('om-slam-fx')).toBe(fx); // 다시 터지지 않는다
+  });
+});

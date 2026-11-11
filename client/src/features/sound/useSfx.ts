@@ -90,7 +90,52 @@ export function useSfx() {
     }
   }, [muted]);
 
+  /**
+   * D-193 오목 강하게 두기 — 낮게 떨어지는 "쿵" + 짧은 "딱" 을 합성한다(mp3 불필요). `delaySec` 뒤(돌이 판에 닿는 순간)에 울린다.
+   * 음소거 시 무음.
+   */
+  const playSlam = useCallback(
+    (delaySec = 0) => {
+      if (muted) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const t = ctx.currentTime + delaySec;
+        // 쿵 — 150Hz 에서 38Hz 로 떨어지는 사인.
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(38, t + 0.42);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(0.55, t + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.52);
+        // 딱 — 잡음 한 토막을 낮은 쪽만 남겨 나무를 치는 소리로.
+        const len = Math.floor(ctx.sampleRate * 0.12);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 1800;
+        const ng = ctx.createGain();
+        ng.gain.value = 0.5;
+        noise.connect(filter).connect(ng).connect(ctx.destination);
+        noise.start(t);
+      } catch {
+        // 합성 실패 — silent.
+      }
+    },
+    [muted],
+  );
+
   const toggleMute = useCallback(() => setMuted((v) => !v), []);
 
-  return { play, playChime, muted, toggleMute };
+  return { play, playChime, playSlam, muted, toggleMute };
 }

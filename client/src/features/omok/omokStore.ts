@@ -31,12 +31,18 @@ export interface OmokRoomState {
   turnSeat: number;
   forbidden: OmokForbiddenPoint[];
   result: OmokMatchResult | null;
+  /** D-193 — 좌석별 남은 강하게 두기 수. */
+  slamsLeft: number[];
+  /** D-193 — 이 세션에서 받은 강하게 둔 수의 번호(1부터). 연출만 본다 — resync 로 받은 판은 다시 내리치지 않는다. */
+  slamMoves: ReadonlySet<number>;
 
   // ── UI 로컬 ──
   /** 두 단계 확정의 미리보기 자리(D-180). 내 차례에만 둔다. */
   preview: OmokPoint | null;
   /** 확정해 보낸 자리 — 서버 응답(STONE_PLACED·ERROR) 전까지 흐리게 그린다(낙관적 표시). */
   pending: OmokPoint | null;
+  /** 보낸 수가 강하게 두기인가 — 내 화면은 응답을 기다리지 않고 바로 내리친다. */
+  pendingSlam: boolean;
   turnClock: TurnClock | null;
   /** D-140 — 차례를 처음부터 다시 세는 공개 이벤트(TURN_CHANGED)마다 오른다. */
   turnEpoch: number;
@@ -55,8 +61,8 @@ export interface OmokActions {
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
   setError: (message: string | null) => void;
   setPreview: (p: OmokPoint | null) => void;
-  /** 확정 — 미리보기를 보낸 자리로 옮긴다. */
-  markPending: (p: OmokPoint) => void;
+  /** 확정 — 미리보기를 보낸 자리로 옮긴다. `slam` 은 강하게 두기(D-193). */
+  markPending: (p: OmokPoint, slam?: boolean) => void;
   /** 서버가 거절했다 — 흐린 돌을 지운다. */
   clearPending: () => void;
   requestTurnResync: (turnEpoch: number) => void;
@@ -71,8 +77,11 @@ const INITIAL: OmokRoomState = {
   turnSeat: -1,
   forbidden: [],
   result: null,
+  slamsLeft: [],
+  slamMoves: new Set(),
   preview: null,
   pending: null,
+  pendingSlam: false,
   turnClock: null,
   turnEpoch: 0,
   staleTurnResyncFor: null,
@@ -90,7 +99,7 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
   ...INITIAL,
 
   reset(roomId) {
-    set({ ...INITIAL, roomId, disconnectedSeats: new Set() });
+    set({ ...INITIAL, roomId, disconnectedSeats: new Set(), slamMoves: new Set() });
   },
 
   applySnapshot(snap) {
@@ -108,9 +117,11 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
       turnSeat: t.result ? -1 : t.turnSeat,
       forbidden: t.forbidden,
       result: t.result,
+      slamsLeft: t.slamsLeft ?? t.seatColors.map(() => 0),
       // 판이 바뀌었을 수 있다 — 미리보기는 비우고, 보낸 자리는 아직 놓이지 않았으면 지킨다.
       preview: null,
       pending: t.result ? null : stillPending,
+      pendingSlam: t.result || stillPending === null ? false : state.pendingSlam,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
       turnClock:
@@ -140,14 +151,23 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
         if (p.moveNumber <= state.moves.length) return 'applied'; // 이미 가진 수
         if (p.moveNumber !== state.moves.length + 1) return 'unhandled'; // 빈 수 — 권위 스냅샷으로
         const placedPending = state.pending !== null && state.pending.x === p.x && state.pending.y === p.y;
+        let slamsLeft = state.slamsLeft;
+        let slamMoves = state.slamMoves;
+        if (p.slam) {
+          slamsLeft = state.slamsLeft.map((n, seat) => (seat === p.seat ? Math.max(0, n - 1) : n));
+          slamMoves = new Set(state.slamMoves).add(p.moveNumber);
+        }
         set({
           moves: [...state.moves, { seat: p.seat, x: p.x, y: p.y, timedOut: p.timedOut }],
+          slamsLeft,
+          slamMoves,
           // 다음 차례는 TURN_CHANGED 가 정한다 — 그 사이 '내 차례'·카운트다운을 세우지 않는다.
           turnSeat: -1,
           turnClock: null,
           forbidden: [],
           preview: null,
           pending: placedPending ? null : state.pending,
+          pendingSlam: placedPending ? false : state.pendingSlam,
         });
         return 'applied';
       }
@@ -179,6 +199,7 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
           forbidden: [],
           preview: null,
           pending: null,
+          pendingSlam: false,
         });
         return 'applied';
       }
@@ -196,12 +217,12 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
     set({ preview: p });
   },
 
-  markPending(p) {
-    set({ pending: p, preview: null });
+  markPending(p, slam = false) {
+    set({ pending: p, pendingSlam: slam, preview: null });
   },
 
   clearPending() {
-    set({ pending: null });
+    set({ pending: null, pendingSlam: false });
   },
 
   requestTurnResync(turnEpoch) {

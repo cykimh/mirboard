@@ -40,6 +40,8 @@ export interface OmokTableView {
   forbidden: OmokForbiddenPoint[];
   timeouts: number[];
   result: OmokMatchResult | null;
+  /** D-193 — 좌석별 남은 강하게 두기 수(0 또는 1). 옛 서버면 없다. */
+  slamsLeft?: number[];
 }
 
 export interface StonePlacedPayload extends OmokPoint {
@@ -47,6 +49,8 @@ export interface StonePlacedPayload extends OmokPoint {
   color: OmokStone;
   moveNumber: number;
   timedOut: boolean;
+  /** D-193 — 강하게 두기(연출 전용). 옛 서버면 없다. */
+  slam?: boolean;
 }
 
 export interface OmokTurnChangedPayload {

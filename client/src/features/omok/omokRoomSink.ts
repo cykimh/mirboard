@@ -16,6 +16,7 @@ const ERROR_LABEL: Record<string, string> = {
   OUT_OF_BOARD: '판 밖에는 둘 수 없습니다.',
   OCCUPIED: '이미 돌이 있는 자리입니다.',
   FORBIDDEN_MOVE: '흑은 그 자리에 둘 수 없습니다(금수).',
+  SLAM_USED: '강하게 두기는 이번 판에 이미 썼어요.',
 };
 
 /**
