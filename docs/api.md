@@ -470,26 +470,35 @@ tier 는 derived 값이다(D-164·D-167 — 포트리스2식 16단계, 서버 `T
 `tier` 가 `STAR_CROWN` 이다 — 전적 `games[]`·최상위 `tier`·랭킹 `entries[].tier` 모두. 레이팅·랭킹 순서·다른 사람의 왕관 순위는 그대로다.
 전적 응답의 `fixedTier` 는 그런 계정이면 `"STAR_CROWN"`, 아니면 `null` — 클라가 `games[]` 에 없는 게임(안 해 본 게임)에도 같은 계급을 그린다.
 
-### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
-쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
-rating 내림차순(동점 시 id 오름차순). **그 게임을 한 판이라도 한 사람만** 싣는다.
-등록되지 않은 `gameType` 은 `404 GAME_NOT_AVAILABLE`. username 외 식별 정보 노출
-0건 — D-02 constraint.
+### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115, 이번 달 D-199·D-209)*
+**이번 달**(Asia/Seoul 달력, 매달 1일 0시에 새로 시작) 랭킹. 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` — 생략 또는
+`ALL` 이면 **전체**(모든 게임 합), 게임 id 면 그 게임만(대소문자 무시). 등록되지 않은 `gameType` 은 `404 GAME_NOT_AVAILABLE`.
+봇·게스트(D-117) 제외, **이번 달에 한 판이라도 기록된 사람만** 싣는다. 순서는 이번 달 **승수 → 승률 → 판수**(끝까지 같으면 id 오름차순).
+username 외 식별 정보 노출 0건 — D-02 constraint.
+
+- `winCount`·`loseCount`·`desertCount`·`winRate`·`recent` 는 **이번 달** 값이다. `winRate` 는 % 반올림(승·패가 없으면 `null` — 무승부만 한 경우).
+- `recent` 는 이번 달 최근 결과를 **오래된 것 → 최근** 순으로 최대 5글자(`W` 승 · `L` 패 · `D` 무). 전체에서는 게임을 넘나든 순서다.
+- `tier`·`rating` 은 달과 상관없이 **누적 레이팅**에서 온다(D-164 왕관 순위·D-198 명예 계급 포함). 게임별이면 그 게임, 전체면 그 사람이
+  가장 많이 한 게임(누적 승+패, 동률은 게임 id 순)이고 그 게임이 `tierGameType` 이다(누적 승·패가 없으면 `null` + 시작 계급).
+- `month` 는 집계한 달 `YYYY-MM`.
 
 응답 `200`
 ```json
 {
-  "gameType": "TICHU",
+  "gameType": "ALL",
+  "month": "2026-11",
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
-      "tier": "GOLD", "winCount": 12, "loseCount": 4, "desertCount": 0 }
+      "tier": "GOLD_MEDAL", "tierGameType": "ONE_CARD",
+      "winCount": 12, "loseCount": 4, "desertCount": 0, "winRate": 75, "recent": "WWLWW" }
   ]
 }
 ```
 
-### GET `/api/users/ranking/games` *(D-160 — 랭킹 탭 순서)*
+### GET `/api/users/ranking/games` *(D-160 — 랭킹 게임 선택지 순서)*
 게임별 판수(`user_game_stats` 의 승+패 합, 봇 제외)를 많이 한 게임부터 준다. 한 판도 없는 게임은 싣지 않는다(클라가 카탈로그 순서로 뒤에
-붙인다). 한 매치를 여러 사람이 하므로 "사람-판" 수다 — 순서를 정하는 데 쓴다.
+붙인다). 한 매치를 여러 사람이 하므로 "사람-판" 수다 — 순서를 정하는 데 쓴다. 누적 판수다(달마다 바뀌지 않는다 — D-199 의 선택 상자가
+"전체" 다음에 이 순서로 게임을 늘어놓는다).
 
 응답 `200`
 ```json

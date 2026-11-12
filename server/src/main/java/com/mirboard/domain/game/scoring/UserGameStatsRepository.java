@@ -1,7 +1,6 @@
 package com.mirboard.domain.game.scoring;
 
 import java.util.List;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,17 +10,8 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
 
     List<UserGameStats> findByUserIdOrderByGameTypeAsc(long userId);
 
-    /**
-     * 게임별 랭킹 — 봇·게스트(D-117, {@code guestPattern}={@code GuestPolicy.LIKE_PATTERN}) 제외,
-     * rating 내림차순(동점은 먼저 가입한 순).
-     */
-    @Query("SELECT s FROM UserGameStats s, User u"
-            + " WHERE u.id = s.userId AND u.isBot = false AND s.gameType = :gameType"
-            + " AND u.username NOT LIKE :guestPattern"
-            + " ORDER BY s.rating DESC, s.userId ASC")
-    List<UserGameStats> findRanking(@Param("gameType") String gameType,
-                                    @Param("guestPattern") String guestPattern,
-                                    Pageable pageable);
+    /** D-199 — 랭킹에 오른 사람들의 누적 전적(계급 근거)을 한 번에. */
+    List<UserGameStats> findByUserIdIn(java.util.Collection<Long> userIds);
 
     /**
      * D-164 — 나보다 점수가 높은 사람 수(봇·게스트 제외). 순위 = 이 값 + 1 — 금훈장 이상의 왕관 판정에만 쓴다.

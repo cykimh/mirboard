@@ -322,6 +322,34 @@ describe('GameHubPage — 배치와 아바타 (D-154)', () => {
     expect(rooms.compareDocumentPosition(gameCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  /** D-199 — 목록 길이가 바뀌어도(5초 새로고침) 아래 카드가 밀리지 않는다: 방 목록은 고정 높이 + 안쪽 스크롤. */
+  it('대기 중인 방 목록은 비었을 때도 많을 때도 같은 고정 높이 스크롤 상자다', async () => {
+    renderHub();
+    await screen.findByRole('button', { name: '티츄 게임 방법' });
+    const box = screen.getByTestId('room-list');
+    for (const cls of ['h-44', 'overflow-y-auto', '[scrollbar-width:thin]', '[scrollbar-gutter:stable]']) {
+      expect(box).toHaveClass(cls);
+    }
+    expect(within(box).getByText('아직 방이 없습니다.')).toBeTruthy();
+
+    list.mockResolvedValue({ rooms: Array.from({ length: 8 }, (_, i) => room(`r${i}`, 'TICHU', 4)) });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await screen.findByText('방 r7');
+    expect(screen.getByTestId('room-list')).toBe(box);
+    expect(box).toHaveClass('h-44');
+    // 줄이 눌려 줄어들지 않고 넘치는 만큼 스크롤된다.
+    expect(screen.getByText('방 r7').closest('li')).toHaveClass('shrink-0');
+  });
+
+  it('랭킹 카드는 카탈로그를 받기 전부터 자리를 잡는다 — 나중에 끼어들어 아래 카드를 밀지 않는다', async () => {
+    catalog.mockReturnValue(new Promise(() => {}));
+    renderHub();
+
+    expect(screen.getByTestId('ranking')).toBeTruthy();
+  });
+
   it('위쪽에는 아바타만 — 이름 버튼이 없고, 아바타를 누르면 내 프로필로 간다', async () => {
     renderHub();
     await screen.findByRole('button', { name: '티츄 게임 방법' });

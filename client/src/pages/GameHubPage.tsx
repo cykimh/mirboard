@@ -8,6 +8,7 @@ import { gamesApi } from '@/api/games';
 import { roomsApi } from '@/api/rooms';
 import { usersApi, type UserStats } from '@/api/users';
 import { RankingCard } from '@/features/stats/RankingCard';
+import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import { primaryGame } from '@/features/stats/primaryGame';
 import { useAuthStore } from '@/features/auth/authStore';
 import { TierBadge } from '@/components/TierBadge';
@@ -251,10 +252,8 @@ export function GameHubPage() {
         )}
 
         {/* D-154 — 순서: 랭킹 → 대기 중인 방 → 게임 소개. */}
-        {/* 랭킹 — D-115 게임별 */}
-        {token && availableGames.length > 0 && (
-          <RankingCard token={token} games={availableGames} myUserId={user?.userId} />
-        )}
+        {/* 랭킹 — D-199 이번 달, 전체·게임별. 카탈로그를 받기 전에도 자리를 잡아 둔다(나중에 끼어들어 아래 카드를 밀지 않게). */}
+        {token && <RankingCard token={token} games={availableGames} myUserId={user?.userId} />}
         {/* D-146 — 로비 채팅을 없애 대기 중인 방이 한 줄을 다 쓴다. */}
         <div className="grid grid-cols-1 gap-6">
           {/* 대기 중인 방 */}
@@ -271,29 +270,37 @@ export function GameHubPage() {
               </Button>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {/* D-199 — 방 목록은 5초마다 길이가 바뀐다. 높이를 고정하고 안에서만 스크롤해 아래 게임 카드가 밀리지 않게 한다. */}
+              <ul
+                data-testid="room-list"
+                className={cn('m-0 flex h-44 list-none flex-col gap-2 p-0', HUB_SCROLL)}
+              >
                 {rooms.length === 0 && (
-                  <li className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  <li className="flex flex-1 items-center justify-center rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
                     아직 방이 없습니다.
                   </li>
                 )}
                 {rooms.map((room) => (
                   <li
                     key={room.roomId}
-                    className="flex items-center gap-3 rounded-md border p-3"
+                    className="flex shrink-0 items-center gap-3 rounded-md border p-3"
                   >
-                    <span className="flex flex-1 items-center gap-2 font-medium">
-                      {room.name}
+                    {/* 이름은 한 줄로 자른다 — 좁은 화면에서 글자마다 꺾여 줄 높이가 늘지 않게(고정 높이 목록). */}
+                    <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+                      <span className="truncate" title={room.name}>
+                        {room.name}
+                      </span>
                       {room.stake > 0 && (
                         <Badge
                           variant="outline"
+                          className="shrink-0"
                           title={`내기 방 — 판돈 ${room.stake}칩 (가상 칩)`}
                         >
                           💰 {room.stake}
                         </Badge>
                       )}
                     </span>
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
                       <GameIcon gameId={room.gameType} size={18} />
                       {/* D-130 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름과 한글 상태 라벨. 모르는 게임·상태는 원문. */}
                       {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}

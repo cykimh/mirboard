@@ -3,10 +3,12 @@ package com.mirboard.infra.rest.users;
 import com.mirboard.domain.game.core.GameRegistry;
 import com.mirboard.domain.game.scoring.BestScoreService;
 import com.mirboard.domain.game.scoring.HeadToHeadService;
+import com.mirboard.domain.game.scoring.StatsMonth;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,8 +34,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/users")
 public class UserController {
 
-    /** 최상위 호환 필드와 랭킹 기본값이 가리키는 게임 (D-115 이전엔 이 게임뿐이었다). */
+    /** 최상위 호환 필드가 가리키는 게임 (D-115 이전엔 이 게임뿐이었다). */
     static final String LEGACY_GAME = "TICHU";
+
+    /** D-199 — 랭킹 "전체"(모든 게임 합)를 가리키는 {@code gameType} 값. */
+    static final String ALL_GAMES = "ALL";
 
     private final UserRepository userRepo;
     private final UserGameStatsService gameStats;
@@ -88,30 +93,35 @@ public class UserController {
     }
 
     /**
-     * Phase 16(#5) — 유저 랭킹 (봇 제외, rating 내림차순). limit 1~100.
-     * 식별 정보는 username 만 (D-02 schema constraint).
+     * D-199·D-209 — <b>이번 달</b> 랭킹(봇·게스트 제외). 이번 달(Asia/Seoul)에 한 판이라도 기록된 사람만, 승수 → 승률 → 판수 순.
+     * limit 1~100. 식별 정보는 username 만 (D-02 schema constraint).
      *
-     * <p>D-115 — 게임별이다. {@code gameType} 생략 시 TICHU(기존 호출 호환). 그 게임을
-     * 한 판이라도 한 사람만 싣는다. 등록되지 않은 게임이면 404.
+     * <p>{@code gameType} 생략 또는 {@code ALL} 이면 모든 게임 합, 게임 id 면 그 게임만. 등록되지 않은 게임이면 404. 계급은
+     * 누적 레이팅에서 온다(전체는 그 사람이 가장 많이 한 게임 — {@code tierGameType}).
      */
     @GetMapping("/ranking")
     public RankingResponse ranking(@RequestParam(defaultValue = "20") int limit,
-                                   @RequestParam(defaultValue = LEGACY_GAME) String gameType) {
-        String game = games.require(gameType.toUpperCase(java.util.Locale.ROOT)).id();
+                                   @RequestParam(defaultValue = ALL_GAMES) String gameType) {
+        String upper = gameType.toUpperCase(java.util.Locale.ROOT);
+        String game = ALL_GAMES.equals(upper) ? null : games.require(upper).id();
         int capped = Math.max(1, Math.min(limit, 100));
-        List<RankEntry> entries = gameStats.ranking(game, capped).stream()
+        LocalDate month = gameStats.currentMonth();
+        List<RankEntry> entries = gameStats.monthlyRanking(game, month, capped).stream()
                 .map(r -> new RankEntry(
                         r.rank(),
                         r.userId(),
                         r.username(),
-                        r.stats().rating(),
-                        // D-164 목록 순위 왕관 + D-198 명예 계급 — 서비스가 정한다.
+                        r.rating(),
+                        // D-164 왕관 + D-198 명예 계급 — 서비스가 정한다.
                         r.tier(),
-                        r.stats().winCount(),
-                        r.stats().loseCount(),
-                        r.stats().desertCount()))
+                        r.tierGameType(),
+                        r.winCount(),
+                        r.loseCount(),
+                        r.desertCount(),
+                        r.winRate(),
+                        r.recent()))
                 .toList();
-        return new RankingResponse(game, entries);
+        return new RankingResponse(game == null ? ALL_GAMES : game, StatsMonth.label(month), entries);
     }
 
     /**
@@ -131,18 +141,32 @@ public class UserController {
     public record GamePlaysResponse(List<GamePlays> games) {
     }
 
+    /**
+     * @param rating       계급 근거 게임의 누적 레이팅
+     * @param tierGameType 계급 근거 게임(전체 랭킹이면 가장 많이 한 게임, 없으면 null)
+     * @param winCount     이번 달 승(loseCount·desertCount 도 이번 달)
+     * @param winRate      이번 달 승률(%) — 승·패가 없으면 null
+     * @param recent       이번 달 최근 결과, 오래된 것 → 최근, 최대 5글자(W 승·L 패·D 무)
+     */
     public record RankEntry(
             int rank,
             long userId,
             String username,
             int rating,
             String tier,
+            String tierGameType,
             int winCount,
             int loseCount,
-            int desertCount) {
+            int desertCount,
+            Integer winRate,
+            String recent) {
     }
 
-    public record RankingResponse(String gameType, List<RankEntry> entries) {
+    /**
+     * @param gameType 게임 id 또는 {@code ALL}
+     * @param month    집계한 달 "YYYY-MM"(Asia/Seoul)
+     */
+    public record RankingResponse(String gameType, String month, List<RankEntry> entries) {
     }
 
     private UserStatsResponse toResponse(User u) {

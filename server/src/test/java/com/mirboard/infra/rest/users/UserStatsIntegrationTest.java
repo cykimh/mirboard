@@ -87,15 +87,34 @@ class UserStatsIntegrationTest {
     }
 
     @Test
-    void ranking_excludes_bots_and_orders_by_rating_desc() throws Exception {
+    void ranking_defaults_to_all_games_this_month_and_excludes_bots() throws Exception {
         long me = registerAndGetId("rkuser", "validpass1");
         String token = login("rkuser", "validpass1");
-        // D-115 — 랭킹은 그 게임을 한 판이라도 한 사람만 싣는다.
+        // D-199·D-209 — 랭킹은 이번 달에 한 판이라도 기록된 사람만 싣는다. gameType 을 안 주면 전체(모든 게임 합).
         gameStats.record(me, "TICHU", true, 1020, false);
+        gameStats.record(me, "ONE_CARD", false, null, false);
+        gameStats.record(me, "TICHU", true, 1040, false);
 
-        mockMvc.perform(get("/api/users/ranking?limit=5")
+        mockMvc.perform(get("/api/users/ranking?limit=100")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gameType").value("ALL"))
+                .andExpect(jsonPath("$.month").value(
+                        java.time.YearMonth.now(java.time.ZoneId.of("Asia/Seoul")).toString()))
+                // 두 게임의 합 + 승률 + 최근 결과(오래된 것 → 최근).
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].winCount").value(2))
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].loseCount").value(1))
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].winRate").value(67))
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].recent").value("WLW"))
+                // 전체의 계급은 가장 많이 한 게임(티츄 2판)의 누적 레이팅에서.
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].tierGameType").value("TICHU"))
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].rating").value(1040))
+                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].tier").value("BRONZE_STAR"));
+
+        mockMvc.perform(get("/api/users/ranking?gameType=all&limit=5")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gameType").value("ALL"))
                 .andExpect(jsonPath("$.entries").isArray())
                 // 시드 봇(bot_*)은 랭킹에서 제외 — 어떤 entry 도 bot_ 로 시작하지 않음.
                 .andExpect(jsonPath("$.entries[?(@.username =~ /bot_.*/)]").isEmpty())
@@ -136,6 +155,9 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gameType").value("SKULL_KING"))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].rating").value(1300))
+                .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].tierGameType").value("SKULL_KING"))
+                .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].winRate").value(100))
+                .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].recent").value("W"))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gstconly')]").isEmpty());
     }
 
@@ -189,9 +211,9 @@ class UserStatsIntegrationTest {
         mockMvc.perform(get("/api/users/" + top + "/stats").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.games[?(@.gameType == 'ONE_CARD')].tier").value("STAR_CROWN"));
-        mockMvc.perform(get("/api/users/ranking?gameType=ONE_CARD&limit=1").header("Authorization", "Bearer " + token))
-                .andExpect(jsonPath("$.entries[0].username").value("gscrown"))
-                .andExpect(jsonPath("$.entries[0].tier").value("STAR_CROWN"));
+        // D-199 — 랭킹 순서는 이번 달 승수지만 계급은 그대로 누적 레이팅 순위에서 온다.
+        mockMvc.perform(get("/api/users/ranking?gameType=ONE_CARD&limit=100").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.entries[?(@.username == 'gscrown')].tier").value("STAR_CROWN"));
     }
 
     /**
@@ -222,7 +244,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.fixedTier").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("SILVER_STAR"));
 
-        // 랭킹: 순서는 점수 그대로(은별이 먼저), 계급 표시만 별왕관.
+        // 랭킹: 순서는 이번 달 승수 그대로(1승이 먼저), 계급 표시만 별왕관.
         mockMvc.perform(get("/api/users/ranking?gameType=YACHT&limit=100").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].tier").value("STAR_CROWN"))
