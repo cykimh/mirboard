@@ -1,6 +1,5 @@
 import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
-import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
@@ -21,7 +20,7 @@ import type { RaceButtonSize, RaceButtonVisibility } from '@/types/api';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useOneCardStore, type PressAction } from './onecardStore';
 import { isSuitChange, nextTurnSeat } from './onecardRules';
-import { ELIMINATED_LABEL, OneCardSeat, seatAccent } from './OneCardSeat';
+import { OneCardSeat, seatAccent } from './OneCardSeat';
 import { OneCardCardChip } from './OneCardCardChip';
 import { OneCardCenter, raceResultText } from './OneCardCenter';
 import { OneCardHand } from './OneCardHand';
@@ -374,7 +373,7 @@ export function OneCardTable({
         </p>
       )}
 
-      {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
+      {/* D-132 — 테이블. 내 자리는 아래 칸(D-262 — 판 안의 이름표)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
       {/* D-173 — 내 차례면 경기장 테두리가 내 색으로 맥박친다(손패 칸·나 줄 대신 — 빛나는 곳은 한 곳). */}
       <div
         className={`oc-felt${myTurn ? ' oc-felt-myturn' : ''}`}
@@ -408,6 +407,7 @@ export function OneCardTable({
           attackStack={s.attackStack}
           drawPileCount={s.drawPileCount}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
+          myTurn={myTurn}
           raceOpen={raceOpen}
           lastRace={s.lastRace}
           late={s.raceNotice === 'LATE'}
@@ -418,6 +418,43 @@ export function OneCardTable({
         />
 
         {bottomSeat !== null && <div className="oc-felt-bottom">{seatAt(bottomSeat, 'bottom', 0)}</div>}
+        {/* D-262 — 내 자리도 다른 좌석과 같은 이름표로 판 아래 가장자리에. 내 차례는 경기장 테두리 빛과 가운데 "내 차례"가 알린다
+            (여기에는 차례 배지·공격 표시를 두지 않는다). 장수는 내 손패에서 센다. */}
+        {me && (
+          <div className="oc-felt-bottom">
+            <OneCardSeat
+              me
+              seat={{ ...me, handCount: s.hand.length }}
+              userId={playerIds[mySeat]}
+              username={nameOf(mySeat)}
+              isNext={nextSeat === mySeat}
+              side="bottom"
+              slot={0}
+              reaction={liveReactions[mySeat]?.emoji}
+              chat={chatLines[mySeat]}
+              tier={tiers[playerIds[mySeat]]}
+            />
+          </div>
+        )}
+        {/* D-262 — 손패도 판 안 맨 아래 행(같은 천) — 판·내 자리·손패가 한 테이블이다. */}
+        {me && !roomFinished && s.result === null && !iAmOut && (
+          <OneCardHand
+            accent={seatAccent(mySeat)}
+            hand={s.hand}
+            selectedKey={s.selectedKey}
+            suitChoice={s.suitChoice}
+            topCard={s.topCard}
+            declaredSuit={s.declaredSuit}
+            attackStack={s.attackStack}
+            myTurn={myTurn}
+            raceOpen={raceOpen}
+            onSelect={s.selectCard}
+            onSuit={s.setSuitChoice}
+            onPlay={playSelected}
+            onDraw={draw}
+            onPlayCard={playCard}
+          />
+        )}
       </div>
 
       {s.result && (
@@ -440,56 +477,6 @@ export function OneCardTable({
             </button>
           )}
         </section>
-      )}
-
-      {!spectator && mySeat >= 0 && (
-        <>
-          <div
-            className="oc-me"
-            style={{ ['--oc-accent' as string]: seatAccent(mySeat) }}
-          >
-            {tiers[playerIds[mySeat]] && <TierBadge tier={tiers[playerIds[mySeat]]} size={18} />}
-            <strong>{nameOf(mySeat)} (나)</strong>
-            {chatLines[mySeat] && (
-              <span key={chatLines[mySeat].id} className="oc-seat-chat" title={chatLines[mySeat].text}>
-                {chatLines[mySeat].text}
-              </span>
-            )}
-            {liveReactions[mySeat] && (
-              <span key={liveReactions[mySeat].id} className="oc-seat-reaction" aria-hidden="true">
-                {liveReactions[mySeat].emoji}
-              </span>
-            )}
-            <span className="oc-me-count">손패 {s.hand.length}장</span>
-            {myTurn && <span className="oc-badge oc-badge-turn">내 차례</span>}
-            {nextSeat === mySeat && <span className="oc-badge oc-seat-next">다음</span>}
-            {myTurn && s.attackStack > 0 && (
-              <span className="oc-badge oc-attack">공격받는 중 +{s.attackStack}</span>
-            )}
-            {me?.eliminated && (
-              <span className="status-tag oc-seat-tag">탈락 — {ELIMINATED_LABEL[me.eliminated]}</span>
-            )}
-          </div>
-
-          {!roomFinished && s.result === null && !iAmOut && (
-            <OneCardHand
-              accent={seatAccent(mySeat)}
-              hand={s.hand}
-              selectedKey={s.selectedKey}
-              suitChoice={s.suitChoice}
-              topCard={s.topCard}
-              declaredSuit={s.declaredSuit}
-              attackStack={s.attackStack}
-              myTurn={myTurn}
-              raceOpen={raceOpen}
-              onSelect={s.selectCard}
-              onSuit={s.setSuitChoice}
-              onPlay={playSelected}
-              onDraw={draw}
-              onPlayCard={playCard}
-            />
-          )}
-        </>
       )}
 
       {s.race && canPress && (

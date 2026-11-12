@@ -35,6 +35,8 @@ interface Props {
   drawPileCount: number;
   /** 지금 차례인 사람 이름, 없으면 null. */
   turnName: string | null;
+  /** D-262 — 내 차례. 가운데 배지가 내 이름 대신 "내 차례"라고 한다(내 자리에는 차례 배지가 없다). */
+  myTurn?: boolean;
   raceOpen: boolean;
   lastRace: LastRace | null;
   late: boolean;
@@ -60,6 +62,7 @@ export function OneCardCenter({
   attackStack,
   drawPileCount,
   turnName,
+  myTurn = false,
   raceOpen,
   lastRace,
   late,
@@ -146,7 +149,9 @@ export function OneCardCenter({
         {raceOpen ? (
           <span className="oc-badge oc-race-status">원카드 경쟁 중</span>
         ) : (
-          turnName && <span className="oc-badge">{turnName} 차례</span>
+          turnName && (
+            <span className={`oc-badge${myTurn ? ' oc-badge-turn' : ''}`}>{myTurn ? '내 차례' : `${turnName} 차례`}</span>
+          )
         )}
       </div>
 

@@ -51,10 +51,15 @@ interface Props {
   chat?: SeatChatLine;
   /** D-166 — 이 사람의 계급(봇·게스트는 없음). */
   tier?: Tier;
+  /**
+   * D-262 — 내 자리(판 아래 가장자리). 다른 좌석과 같은 이름표에 표식 `.oc-me`(카드 비행·연출의 기준점)와 이름 뒤 "(나)"가 붙는다.
+   * 내 차례는 경기장 테두리 빛(D-173)이 알리므로 부르는 쪽이 `isTurn` 을 주지 않는다.
+   */
+  me?: boolean;
 }
 
 /**
- * 상대 좌석 하나 — 이름과 남은 손패 **장수**만 보인다(State Hiding, D-173 — 뒷면 뭉치 + ×N). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
+ * 좌석 하나(D-262 — 내 자리도 같은 이름표) — 이름과 남은 손패 **장수**만 보인다(State Hiding, D-173 — 뒷면 뭉치 + ×N). 1장 남으면 표시를 세우고, 탈락하면 사유를 단다.
  * 테이블(D-132)의 옆줄·윗줄에 놓인다 — 옆줄 칸은 좁아질 수 있어 이름은 말줄임하고 `title` 로 전체 이름을 보인다.
  */
 export function OneCardSeat({
@@ -72,14 +77,17 @@ export function OneCardSeat({
   onKick,
   chat,
   tier,
+  me = false,
 }: Props) {
   const glyph = isBot ? '🤖' : animalFor(userId, seat.seat);
-  const name = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
+  const baseName = username ?? (isBot ? '봇' : `#${userId ?? seat.seat}`);
+  const name = me ? `${baseName} (나)` : baseName;
   const out = seat.eliminated !== null;
   const last = !out && seat.handCount === 1;
 
   const className = [
     'oc-seat',
+    me ? 'oc-me' : '',
     isTurn ? 'oc-seat-turn' : '',
     out ? 'oc-seat-out' : '',
     isDisconnected ? 'oc-seat-offline' : '',
@@ -162,7 +170,7 @@ export function OneCardSeat({
 
       {(out || isDisconnected) && (
         <span className="status-tag oc-seat-tag">
-          {out ? ELIMINATED_LABEL[seat.eliminated!] : '연결 끊김'}
+          {out ? `${me ? '탈락 — ' : ''}${ELIMINATED_LABEL[seat.eliminated!]}` : '연결 끊김'}
         </span>
       )}
       {!out && isDisconnected && onKick && (
