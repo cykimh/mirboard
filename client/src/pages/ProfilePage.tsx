@@ -8,6 +8,8 @@ import { headToHeadText } from '@/features/stats/headToHead';
 import { gamesApi } from '@/api/games';
 import { GameRecords } from '@/features/stats/GameRecords';
 import { primaryGame } from '@/features/stats/primaryGame';
+import { STARTING_TIER } from '@/features/stats/playerTiers';
+import { TierTableButton } from '@/features/stats/TierTableButton';
 import { avatarSrc } from '@/api/avatar';
 import { TierBadge } from '@/components/TierBadge';
 import { ChangePasswordForm } from '@/features/profile/ChangePasswordForm';
@@ -71,7 +73,15 @@ export function ProfilePage() {
           </Avatar>
           <div className="flex flex-col gap-1">
             <span className="text-lg font-semibold">{user.username}</span>
-            {headerTier && <TierBadge tier={headerTier} size={24} />}
+            {/* D-266 — 계급 옆 [계급표]. 한 판도 안 했으면 시작 계급(미사일)을 강조, 게스트는 강조 없음. */}
+            <div className="flex items-center gap-2">
+              {headerTier && <TierBadge tier={headerTier} size={24} />}
+              <TierTableButton
+                className="h-8"
+                myTier={user.guest ? null : (headerTier ?? (stats ? STARTING_TIER : null))}
+                basis={!stats?.fixedTier && primary ? `${gameNames[primary.gameType] ?? primary.gameType} 기준` : undefined}
+              />
+            </div>
           </div>
           {/* D-117 — 게스트는 아바타를 못 바꾼다(서버도 403). 이유는 title 로. */}
           <Button

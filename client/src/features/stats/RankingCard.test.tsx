@@ -4,8 +4,8 @@ import { RankingCard } from './RankingCard';
 import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import type { GameSummary } from '@/types/api';
 
-const { ranking, rankingGames } = vi.hoisted(() => ({ ranking: vi.fn(), rankingGames: vi.fn() }));
-vi.mock('@/api/users', () => ({ RANKING_ALL: 'ALL', usersApi: { ranking, rankingGames } }));
+const { ranking, rankingGames, stats } = vi.hoisted(() => ({ ranking: vi.fn(), rankingGames: vi.fn(), stats: vi.fn() }));
+vi.mock('@/api/users', () => ({ RANKING_ALL: 'ALL', usersApi: { ranking, rankingGames, stats } }));
 
 const game = (id: string, displayName: string): GameSummary => ({
   id,
@@ -165,5 +165,67 @@ describe('RankingCard (D-199 — 이번 달 랭킹, 전체·게임별)', () => {
     render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
 
     expect((await screen.findByText('all_top')).closest('tr')).toHaveClass('bg-accent');
+  });
+});
+
+/** D-266 — 머리 줄 [계급표]: 고른 게임 기준으로 내 계급을 강조한다(내 전적은 열 때 받는다). */
+describe('RankingCard — 계급표 (D-266)', () => {
+  const rec = (gameType: string, tier: string, w: number) => ({
+    gameType,
+    rating: 1000,
+    tier,
+    winCount: w,
+    loseCount: 0,
+    desertCount: 0,
+  });
+
+  beforeEach(() => {
+    rankingGames.mockReset();
+    rankingGames.mockResolvedValue({ games: [] });
+    ranking.mockReset();
+    ranking.mockImplementation((_t: string, _l: number, gameType: string) =>
+      Promise.resolve({ gameType, entries: [entry(9, 'someone')] }),
+    );
+    stats.mockReset();
+    stats.mockResolvedValue({
+      userId: 1,
+      username: '철수',
+      games: [rec('TICHU', 'SILVER_MEDAL', 9), rec('ONE_CARD', 'BULLET', 2)],
+    });
+  });
+
+  const current = () =>
+    within(screen.getByRole('dialog', { name: '계급표' }))
+      .getAllByRole('listitem')
+      .filter((li) => li.getAttribute('aria-current') === 'true')
+      .map((li) => li.getAttribute('data-tier'));
+
+  it('선택 상자 옆 버튼으로 열고, "전체"면 가장 많이 한 게임의 계급을 강조한다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
+    await screen.findByText('someone');
+
+    const button = screen.getByRole('button', { name: '계급표' });
+    expect(button.parentElement).toBe(select().parentElement);
+    fireEvent.click(button);
+
+    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(16);
+    expect(stats).toHaveBeenCalledWith('tok', 1);
+    await waitFor(() => expect(current()).toEqual(['SILVER_MEDAL']));
+    expect(screen.getByRole('dialog')).toHaveTextContent('가장 많이 한 게임 기준');
+  });
+
+  it('게임을 고르면 그 게임 계급, 안 해 본 게임이면 시작 계급(미사일)', async () => {
+    render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
+    await screen.findByText('someone');
+
+    fireEvent.change(select(), { target: { value: 'ONE_CARD' } });
+    fireEvent.click(screen.getByRole('button', { name: '계급표' }));
+    await waitFor(() => expect(current()).toEqual(['BULLET']));
+    expect(screen.getByRole('dialog')).toHaveTextContent('원카드 기준');
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    fireEvent.change(select(), { target: { value: 'SKULL_KING' } });
+    fireEvent.click(screen.getByRole('button', { name: '계급표' }));
+    await waitFor(() => expect(current()).toEqual(['MISSILE']));
   });
 });
