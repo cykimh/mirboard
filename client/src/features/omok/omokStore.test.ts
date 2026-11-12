@@ -116,36 +116,28 @@ describe('omokStore', () => {
   });
 });
 
-describe('omokStore — 강하게 두기 (D-193)', () => {
+describe('omokStore — 강하게 두기 (D-193·D-195)', () => {
   beforeEach(() => useOmokStore.getState().reset('r1'));
 
-  it('스냅샷의 slamsLeft 를 받고, 없으면(옛 서버) 0 으로 둔다', () => {
-    useOmokStore.getState().applySnapshot(snap(view({ slamsLeft: [1, 0] })));
-    expect(useOmokStore.getState().slamsLeft).toEqual([1, 0]);
+  it('STONE_PLACED.slam 이면 수 번호를 기억한다 — 같은 이벤트를 두 번 받아도 한 번, 몇 번이든', () => {
     useOmokStore.getState().applySnapshot(snap(view()));
-    expect(useOmokStore.getState().slamsLeft).toEqual([0, 0]);
-  });
-
-  it('STONE_PLACED.slam 이면 그 좌석의 남은 수를 줄이고 수 번호를 기억한다 — 같은 이벤트를 두 번 받아도 한 번', () => {
-    useOmokStore.getState().applySnapshot(snap(view({ slamsLeft: [1, 1] })));
-    const ev = { ...placed(0, 7, 7, 1), payload: { ...placed(0, 7, 7, 1).payload, slam: true } };
-    useOmokStore.getState().applyEvent(ev);
-    useOmokStore.getState().applyEvent(ev);
-    const s = useOmokStore.getState();
-    expect(s.slamsLeft).toEqual([0, 1]);
-    expect([...s.slamMoves]).toEqual([1]);
+    const slam = (seat: number, x: number, n: number, c: 'BLACK' | 'WHITE') => ({
+      ...placed(seat, x, 7, n, c),
+      payload: { ...placed(seat, x, 7, n, c).payload, slam: true },
+    });
+    useOmokStore.getState().applyEvent(slam(0, 7, 1, 'BLACK'));
+    useOmokStore.getState().applyEvent(slam(0, 7, 1, 'BLACK'));
     useOmokStore.getState().applyEvent(placed(1, 8, 8, 2, 'WHITE'));
-    expect(useOmokStore.getState().slamsLeft).toEqual([0, 1]);
+    useOmokStore.getState().applyEvent(slam(0, 9, 3, 'BLACK'));
+    expect([...useOmokStore.getState().slamMoves]).toEqual([1, 3]);
   });
 
-  it('강하게 보낸 수는 pendingSlam 으로 그리고, 확정·거절되면 푼다', () => {
-    useOmokStore.getState().applySnapshot(snap(view({ slamsLeft: [1, 1] })));
+  it('강하게 보낸 수는 pendingSlam 으로 그리고, 거절되면 푼다', () => {
+    useOmokStore.getState().applySnapshot(snap(view()));
     useOmokStore.getState().markPending({ x: 7, y: 7 }, true);
     expect(useOmokStore.getState().pendingSlam).toBe(true);
-    omokRoomSink.applyPrivateEvent({ eventId: 'e', seq: 0, type: 'ERROR', ts: 0, payload: { code: 'SLAM_USED', message: '' } } as never);
+    omokRoomSink.applyPrivateEvent({ eventId: 'e', seq: 0, type: 'ERROR', ts: 0, payload: { code: 'OCCUPIED', message: '' } } as never);
     expect(useOmokStore.getState().pending).toBeNull();
     expect(useOmokStore.getState().pendingSlam).toBe(false);
-    expect(useOmokStore.getState().errorMessage).toContain('강하게 두기');
-    expect(useOmokStore.getState().resyncNonce).toBe(1); // 남은 수를 서버 값으로 맞춘다
   });
 });

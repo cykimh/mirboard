@@ -76,9 +76,6 @@ public final class OmokEngine {
             case OmokAction.Resign __ -> lose(state, seat, EndReason.RESIGN);
             case OmokAction.Place place -> {
                 requireTurn(state, seat);
-                if (place.slam() && state.slamsLeft(seat) <= 0) {
-                    throw new OmokActionRejectedException(RejectionReason.SLAM_USED, "seat " + seat);
-                }
                 yield place(state, seat, new Point(place.x(), place.y()), false, place.slam());
             }
             case OmokAction.TimeoutPlace __ -> {
@@ -115,12 +112,6 @@ public final class OmokEngine {
         Board after = board.with(p, color);
         List<Integer> timeouts = new ArrayList<>(state.timeouts());
         timeouts.set(seat, timedOut ? timeouts.get(seat) + 1 : 0);
-        List<Integer> slams = state.slams();
-        if (slam) {
-            List<Integer> used = new ArrayList<>(slams);
-            used.set(seat, used.get(seat) + 1);
-            slams = used;
-        }
         Move move = new Move(seat, p.x(), p.y(), timedOut);
         int moveNumber = state.moves().size() + 1;
 
@@ -131,19 +122,19 @@ public final class OmokEngine {
         if (winLine.isPresent()) {
             MatchResult r = new MatchResult(color, state.seatsOfTeam(TurnOrder.team(seat)), EndReason.FIVE, -1,
                     winLine.get());
-            return finish(state.withMove(move, -1, timeouts, r, slams), events);
+            return finish(state.withMove(move, -1, timeouts, r), events);
         }
         if (after.isFull()) {
-            return finish(state.withMove(move, -1, timeouts, draw(EndReason.BOARD_FULL), slams), events);
+            return finish(state.withMove(move, -1, timeouts, draw(EndReason.BOARD_FULL)), events);
         }
         int next = TurnOrder.next(seat, state.seatCount());
         Stone nextColor = state.colorOf(next);
         List<ForbiddenPoint> forbidden = nextColor == Stone.BLACK ? ForbiddenRule.all(after, state.rule()) : List.of();
         if (nextColor == Stone.BLACK && forbidden.size() == Board.CELLS - after.stoneCount()) {
-            return finish(state.withMove(move, -1, timeouts, draw(EndReason.NO_LEGAL_MOVE), slams), events);
+            return finish(state.withMove(move, -1, timeouts, draw(EndReason.NO_LEGAL_MOVE)), events);
         }
         events.add(new OmokEvent.TurnChanged(next, nextColor, forbidden));
-        return new Result(state.withMove(move, next, timeouts, null, slams), events);
+        return new Result(state.withMove(move, next, timeouts, null), events);
     }
 
     /** 그 좌석의 편이 진다 — 기권·시간패·탈주 (룰 §7~§9). */
@@ -254,6 +245,6 @@ public final class OmokEngine {
         List<Stone> colors = IntStream.range(0, state.seatCount()).mapToObj(state::colorOf).toList();
         return new OmokPublicView(state.mode(), state.rule(), colors, state.moves(), state.turnSeat(),
                 forbiddenPoints(state), state.timeouts(), state.result(),
-                IntStream.range(0, state.seatCount()).mapToObj(state::slamsLeft).toList(), state.boardSize());
+                state.boardSize());
     }
 }

@@ -16,7 +16,6 @@ const ERROR_LABEL: Record<string, string> = {
   OUT_OF_BOARD: '판 밖에는 둘 수 없습니다.',
   OCCUPIED: '이미 돌이 있는 자리입니다.',
   FORBIDDEN_MOVE: '흑은 그 자리에 둘 수 없습니다(금수).',
-  SLAM_USED: '강하게 두기는 이번 판에 이미 썼어요.',
 };
 
 /**
@@ -43,8 +42,6 @@ export const omokRoomSink: RoomEventSink<OmokTableView, unknown> = {
     const p = envelope.payload as ErrorPayload;
     store.clearPending();
     store.setError(errorText(p.code, p.message, ERROR_LABEL));
-    // D-193 — 남은 강하게 두기 수가 서버와 어긋났다(다른 탭에서 썼다 등) — 권위 스냅샷으로 맞춘다.
-    if (p.code === 'SLAM_USED') store.requestResync();
   },
 
   setError(message) {

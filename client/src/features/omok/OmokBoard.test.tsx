@@ -122,6 +122,45 @@ describe('OmokBoard — 두 단계 확정 (D-180)', () => {
   });
 });
 
+describe('OmokBoard — 연출 고도화 (D-194, 그림만)', () => {
+  const FIVE = [0, 1, 2, 3, 4].map((i) => ({ x: 3 + i, y: 7 }));
+  const moves = FIVE.flatMap((p, i) => [
+    { seat: 0, x: p.x, y: p.y, timedOut: false },
+    ...(i < 4 ? [{ seat: 1, x: p.x, y: 12, timedOut: false }] : []),
+  ]);
+
+  it('5목 — 돌 사이 구간마다 빛줄기 하나, 돌마다 고리 하나를 순서(--om-i)대로 그리고 박자 변수를 판에 넣는다', () => {
+    const { container, svg } = setup({ moves, winLine: FIVE, enabled: false });
+    const beams = [...container.querySelectorAll<SVGGElement>('.om-beam')];
+    expect(beams).toHaveLength(4);
+    expect(beams.map((b) => b.style.getPropertyValue('--om-i'))).toEqual(['0', '1', '2', '3']);
+    expect(container.querySelectorAll('.om-win-mark')).toHaveLength(5);
+    expect(container.querySelectorAll('.om-stone.om-won')).toHaveLength(5);
+    expect(svg.style.getPropertyValue('--om-n')).toBe('5');
+    expect(svg.style.getPropertyValue('--om-t0')).toBe('0.35');
+  });
+
+  it('승리 줄이 없으면(기권·무승부) 빛줄기·고리가 없다', () => {
+    const { container, svg } = setup({ moves, winLine: [], enabled: false });
+    expect(container.querySelector('.om-beam')).toBeNull();
+    expect(container.querySelector('.om-win-mark')).toBeNull();
+    expect(svg.style.getPropertyValue('--om-n')).toBe('');
+  });
+
+  it('마지막 수에 멈춘 고리, 강하게 둔 수에 빛살·잔상·번쩍임 조각이 붙는다(위협 표시는 없다)', () => {
+    const base = moves.slice(0, 2);
+    const { container, rerender, props } = setup({ moves: base });
+    expect(container.querySelector('.om-last .om-last-halo')).not.toBeNull();
+    expect(container.querySelector('.om-slam-rays')).toBeNull();
+    const next = [...base, { seat: 0, x: 9, y: 9, timedOut: false }];
+    rerender(<OmokBoard {...props} moves={next} slamMoves={new Set([3])} />);
+    expect(container.querySelectorAll('.om-slam-rays line')).toHaveLength(10);
+    expect(container.querySelector('.om-slam-trail')).not.toBeNull();
+    expect(container.querySelector('.om-slam-tint')).not.toBeNull();
+    expect(container.querySelector('.om-shock-far')).not.toBeNull();
+  });
+});
+
 describe('OmokBoard — 연출 표시 (D-192, 그림만)', () => {
   const B = { seat: 0, x: 7, y: 7, timedOut: false };
   const W = { seat: 1, x: 8, y: 8, timedOut: false };

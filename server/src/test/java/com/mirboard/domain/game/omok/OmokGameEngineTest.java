@@ -67,14 +67,12 @@ class OmokGameEngineTest {
     }
 
     @Test
-    void a_slam_goes_through_the_adapter_once_and_the_bot_never_slams() {
+    void a_slam_goes_through_the_adapter_and_the_bot_never_slams() {
         OmokGameEngine e = engine(Map.of());
         OmokState s = OmokStates.solo(OmokRule.RENJU);
         GameEngine.Result r = e.apply(s, 0, new OmokAction.Place(7, 7, true));
         assertThat(r.events().getFirst()).isInstanceOfSatisfying(OmokEvent.StonePlaced.class,
                 ev -> assertThat(ev.slam()).isTrue());
-        assertThat(e.publicView(r.newState())).isInstanceOfSatisfying(OmokPublicView.class,
-                v -> assertThat(v.slamsLeft()).containsExactly(0, 1));
         // 봇은 강하게 두지 않는다(D-193) — 백 봇이 고른 수도, 합법 수 목록도 전부 보통 착수.
         OmokState white = (OmokState) r.newState();
         assertThat(e.legalActions(white, 1)).allSatisfy(a ->

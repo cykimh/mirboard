@@ -54,11 +54,6 @@ public final class OmokInvariantChecker {
             }
         }
 
-        require(s.slams().size() == n, "slams size " + s.slams().size() + " != seats " + n);
-        for (int used : s.slams()) {
-            require(used >= 0 && used <= OmokState.SLAMS_PER_MATCH, "slam count " + used);   // 룰 §4.1, D-193
-        }
-
         for (int t : s.timeouts()) {
             require(t >= 0 && t <= (s.isOver() ? 2 : 1), "timeout count " + t);
         }

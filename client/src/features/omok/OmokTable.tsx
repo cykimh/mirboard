@@ -18,10 +18,10 @@ import { useOmokStore } from './omokStore';
 import { FORBIDDEN_LABEL, coordName, forbiddenAt, key, stonesOf } from './omokRules';
 import { OmokBoard } from './OmokBoard';
 import { OmokMatchEnd } from './OmokMatchEnd';
-import { OmokLoupe } from './OmokLoupe';
+import { OmokPlaceButton } from './OmokPlaceButton';
 import { OmokTurnCountdown } from './OmokTurnCountdown';
 import { OMOK_TUTORIAL } from './tutorial/omokTutorial';
-import { OMOK_TOKENS_CLASS } from './omokTheme';
+import { OMOK_FX, OMOK_TOKENS_CLASS } from './omokTheme';
 
 /** D-140 — 원카드와 같은 멈춘 차례 복구 유예·지터. */
 export const STALE_TURN_GRACE_MS = 2000;
@@ -102,6 +102,23 @@ export const SLAM_IMPACT_SEC = 0.32;
 /** D-193 — 발동 배너가 떠 있는 시간. 상태가 아니라 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
 export const SLAM_BANNER_MS = 1600;
 
+/** D-194 — 5목 연출의 박자(CSS `--om-step` 과 같은 값)와 시작 시각(`OmokBoard` 의 `--om-t0` 과 같은 값). 효과음·배너가 맞춘다. */
+export const WIN_STEP_SEC = 0.14;
+export const WIN_START_SEC = 0.35;
+export const WIN_START_AFTER_SLAM_SEC = 0.7;
+/** D-194 — 종료 배너가 떠 있는 시간(5목 / 그 밖). 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
+export const END_BANNER_FIVE_MS = 2600;
+export const END_BANNER_QUIET_MS = 2200;
+
+const END_BANNER_REASON = {
+  FIVE: '',
+  RESIGN: '기권',
+  TIMEOUT: '시간 초과',
+  DESERTED: '나감',
+  BOARD_FULL: '판이 가득 찼어요',
+  NO_LEGAL_MOVE: '흑이 둘 곳이 금수뿐',
+} as const;
+
 interface Props {
   roomId: string;
   playerIds: number[];
@@ -156,8 +173,9 @@ export function OmokTable({
   const [showNumbers, setShowNumbers] = useState(false);
   const [singleClick, setSingleClick] = useState(readSingleClick);
   /** D-193 — 다음 착수를 강하게 둘지(한 번 두면 풀린다). */
-  const [slamArmed, setSlamArmed] = useState(false);
-  const { muted, toggleMute, playChime, playSlam } = useSfx();
+  /** D-195 — [두기]를 길게 누르는 중(미리보기 돌이 달아오른다). */
+  const [charging, setCharging] = useState(false);
+  const { muted, toggleMute, playChime, playSlam, playFive } = useSfx();
   const chatLines = useSeatChatLines(playerIds);
   const chatUnread = useRoomChatStore((st) => st.unreadCount);
   const rules = useTutorialGate(OMOK_TUTORIAL.seenKey, false);
@@ -170,8 +188,6 @@ export function OmokTable({
   const turnColor: OmokStone | null = turnSeat >= 0 ? (s.seatColors[turnSeat] ?? null) : null;
   const myTurn = !spectator && mySeat >= 0 && s.result === null && !roomFinished && turnSeat === mySeat;
   const canPlace = myTurn && connected && s.pending === null;
-  const mySlamsLeft = mySeat >= 0 ? (s.slamsLeft[mySeat] ?? 0) : 0;
-  const slamOn = slamArmed && mySlamsLeft > 0;
 
   // D-193 — 강하게 둔 수가 판에 닿을 때 "쿵" + 진동. 내 수는 보낸 즉시(흐린 돌이 바로 내리친다), 남의 수는 STONE_PLACED.slam 을
   // 받은 때. 내 수가 확정되면 pendingSlam 이 slamMoves 로 옮겨 가 합이 그대로라 두 번 울리지 않는다.
@@ -201,6 +217,37 @@ export function OmokTable({
   }, [banner]);
 
   // 내 차례가 되면 알림음 + 휴대폰 진동 한 번(원카드 D-160 과 같다).
+  // D-194 — 종료 배너: 이 세션이 판이 끝나는 순간을 봤을 때만(끝난 판에 들어오면 현판만). 이긴 쪽·진 쪽·관전자 모두 같은 배너를
+  // 같은 크기로 본다. 5목이면 빛줄기가 다 켜진 뒤에 뜨고 박자에 맞춰 음이 올라간다. 화면만 — 상태·타이머와 무관하다.
+  const result = s.result;
+  const hadResult = useRef(result !== null);
+  const [endBanner, setEndBanner] = useState<{ delayMs: number; ms: number } | null>(null);
+  useEffect(() => {
+    if (result && !hadResult.current && OMOK_FX === 'rich') {
+      const five = result.reason === 'FIVE' && result.winLine.length >= 2;
+      if (five) {
+        const st = useOmokStore.getState();
+        const bySlam = st.slamMoves.has(st.moves.length) || st.pendingSlam;
+        const start = bySlam ? WIN_START_AFTER_SLAM_SEC : WIN_START_SEC;
+        playFive(start, WIN_STEP_SEC, result.winLine.length);
+        // 강하게 둔 수로 끝났으면 발동 배너가 사라진 뒤에 뜬다(두 배너가 겹치지 않게).
+        const lineDone = Math.round((start + (result.winLine.length - 1) * WIN_STEP_SEC + 0.1) * 1000);
+        setEndBanner({ delayMs: bySlam ? Math.max(lineDone, SLAM_BANNER_MS + 50) : lineDone, ms: END_BANNER_FIVE_MS });
+      } else {
+        // 기권·나감이 발동 배너와 겹치면 발동 배너를 걷는다(드문 경우 — 결과가 먼저다).
+        setBanner(null);
+        setEndBanner({ delayMs: 150, ms: END_BANNER_QUIET_MS });
+      }
+    }
+    if (!result) setEndBanner(null);
+    hadResult.current = result !== null;
+  }, [result, playFive]);
+  useEffect(() => {
+    if (!endBanner) return;
+    const t = window.setTimeout(() => setEndBanner(null), endBanner.delayMs + endBanner.ms);
+    return () => window.clearTimeout(t);
+  }, [endBanner]);
+
   const wasMyTurn = useRef(myTurn);
   useEffect(() => {
     if (myTurn && !wasMyTurn.current) {
@@ -245,16 +292,16 @@ export function OmokTable({
   const previewForbidden = myColor === 'BLACK' ? forbiddenAt(s.forbidden, preview) : null;
   const previewOk = preview !== null && !stones.has(key(preview)) && previewForbidden === null;
 
-  const place = (p: OmokPoint) => {
+  /** 두기 — `slam` 은 [두기] 길게 누르기(D-195). 판을 다시 누르는 확정·마우스 한 번 클릭은 늘 보통. */
+  const place = (p: OmokPoint, slam = false) => {
     if (!canPlace) return;
     if (stones.has(key(p))) return;
     if (myColor === 'BLACK' && forbiddenAt(s.forbidden, p)) {
       s.setPreview(p); // 확정하지 않고 이유를 보여 준다
       return;
     }
-    s.markPending(p, slamOn);
-    sendAction(slamOn ? { '@action': 'PLACE_STONE', x: p.x, y: p.y, slam: true } : { '@action': 'PLACE_STONE', x: p.x, y: p.y });
-    setSlamArmed(false);
+    s.markPending(p, slam);
+    sendAction(slam ? { '@action': 'PLACE_STONE', x: p.x, y: p.y, slam: true } : { '@action': 'PLACE_STONE', x: p.x, y: p.y });
   };
 
   const resign = () => {
@@ -286,8 +333,8 @@ export function OmokTable({
   else if (turnSeat < 0) status = '다음 차례를 기다리는 중…';
   else if (myTurn && s.pending) status = '두는 중…';
   else if (myTurn && previewForbidden) status = FORBIDDEN_LABEL[previewForbidden.kind];
-  else if (myTurn && preview) status = `${coordName(preview)} — 한 번 더 누르거나 [${slamOn ? '강하게 두기' : '여기에 두기'}]`;
-  else if (myTurn && slamOn) status = '💥 강하게 둘 자리를 누르세요';
+  else if (myTurn && preview && charging) status = `${coordName(preview)} — 💥 끝까지 누르고 있으면 강하게!`;
+  else if (myTurn && preview) status = `${coordName(preview)} — 한 번 더 누르거나 [여기에 두기]`;
   else if (myTurn) status = '내 차례예요 — 둘 자리를 누르세요';
   else status = `${nameOf(turnSeat)}${turnColor ? `(${COLOR_LABEL[turnColor]})` : ''} 차례`;
 
@@ -365,17 +412,6 @@ export function OmokTable({
                   {seat === mySeat ? ' (나)' : ''}
                 </span>
                 {isTurn && <OmokTurnCountdown turnSeconds={turnSeconds} />}
-                {/* D-193 — 좌석마다 강하게 두기 스킬: 남음(밝은 💥)·사용함(회색). */}
-                {s.slamsLeft.length > seat && (
-                  <span
-                    className={`om-seat-skill${(s.slamsLeft[seat] ?? 0) > 0 ? '' : ' om-seat-skill-used'}`}
-                    title={(s.slamsLeft[seat] ?? 0) > 0 ? '강하게 두기 남음' : '강하게 두기 사용함'}
-                    aria-label={(s.slamsLeft[seat] ?? 0) > 0 ? '강하게 두기 남음' : '강하게 두기 사용함'}
-                    data-testid="om-seat-skill"
-                  >
-                    💥
-                  </span>
-                )}
                 {s.disconnectedSeats.has(seat) && <span className="om-badge om-badge-warn">끊김</span>}
                 {onKick && !roomFinished && seat !== mySeat && s.disconnectedSeats.has(seat) && (
                   <button type="button" className="om-badge" onClick={() => onKick(uid)}>
@@ -427,7 +463,7 @@ export function OmokTable({
             pending={s.pending}
             pendingSlam={s.pendingSlam}
             slamMoves={s.slamMoves}
-            slamArmed={slamOn && canPlace}
+            slamArmed={charging && canPlace}
             myColor={myColor}
             winLine={winLine}
             showNumbers={showNumbers}
@@ -436,10 +472,6 @@ export function OmokTable({
             setPreview={s.setPreview}
             onConfirm={place}
           />
-          {/* D-193 돋보기 — 좁은 판에서 미리보기 둘레를 손가락 반대쪽 모서리에 크게. */}
-          {preview && myColor && !stones.has(key(preview)) && (
-            <OmokLoupe preview={preview} moves={s.moves} myColor={myColor} forbidden={previewForbidden !== null} />
-          )}
           {/* D-193 — 강하게 두기 발동 배너(모두에게 같은 크기). 돌이 닿는 순간에 맞춰 튀어나온다. */}
           {banner && (
             <div
@@ -454,6 +486,44 @@ export function OmokTable({
               <span className="om-slam-banner-text">
                 {COLOR_LABEL[banner.color]} 강하게 두기!
                 <span className="om-slam-banner-who">{nameOf(banner.seat)}</span>
+              </span>
+            </div>
+          )}
+          {/* D-194 — 종료 배너(모두에게 같은 크기). 승리 줄을 가리지 않게 줄 반대쪽 절반에 뜬다. 결과는 아래 현판이 읽어 준다. */}
+          {endBanner && s.result && (
+            <div
+              className={`om-end-banner om-end-banner-${
+                s.result.winnerColor === null ? 'draw' : s.result.reason === 'FIVE' ? 'five' : 'quiet'
+              }${s.result.winnerColor ? ` om-end-banner-${s.result.winnerColor === 'BLACK' ? 'black' : 'white'}` : ''}${
+                winLine.length >= 2 && winLine.reduce((sum, p) => sum + p.y, 0) / winLine.length < (BOARD_SIZE - 1) / 2
+                  ? ' om-end-banner-low'
+                  : ''
+              }`}
+              style={{ animationDelay: `${endBanner.delayMs}ms`, animationDuration: `${endBanner.ms}ms` }}
+              aria-hidden="true"
+              data-testid="om-end-banner"
+            >
+              {s.result.winnerColor === null ? (
+                <span className="om-end-banner-dots">
+                  <span className="om-dot om-dot-black" />
+                  <span className="om-dot om-dot-white" />
+                </span>
+              ) : (
+                <span className={`om-dot om-dot-${s.result.winnerColor === 'BLACK' ? 'black' : 'white'}`} />
+              )}
+              <span className="om-end-banner-text">
+                {s.result.winnerColor === null
+                  ? '무승부'
+                  : s.result.reason === 'FIVE'
+                    ? `${COLOR_LABEL[s.result.winnerColor]} 5목!`
+                    : `${COLOR_LABEL[s.result.winnerColor]} 승`}
+                <span className="om-end-banner-who">
+                  {s.result.reason === 'FIVE'
+                    ? s.result.winnerSeats.map(nameOf).join(' · ')
+                    : s.result.causeSeat >= 0 && s.result.winnerColor !== null
+                      ? `${nameOf(s.result.causeSeat)} ${END_BANNER_REASON[s.result.reason]}`
+                      : END_BANNER_REASON[s.result.reason]}
+                </span>
               </span>
             </div>
           )}
@@ -474,34 +544,12 @@ export function OmokTable({
       {!spectator && mySeat >= 0 && s.result === null && !roomFinished && (
         <div className="om-controls">
           <div className="om-place-row">
-            {/* D-193 — 스킬 슬롯: 한 판에 한 번 강하게 두기. 누르면 '장전', 장전된 채 두면(어느 방법으로 두든) 강하게 나간다. */}
-            <button
-              type="button"
-              className={`om-skill${slamOn ? ' om-skill-armed' : ''}${mySlamsLeft <= 0 ? ' om-skill-used' : ''}`}
-              aria-pressed={slamOn}
-              aria-label={mySlamsLeft > 0 ? `강하게 두기 스킬 ${slamOn ? '장전됨' : '준비'} — 남은 ${mySlamsLeft}/1` : '강하게 두기 스킬 사용함'}
-              disabled={mySlamsLeft <= 0 || s.pending !== null}
-              onClick={() => setSlamArmed((v) => !v)}
-              title="한 판에 한 번 — 돌을 쾅 내리쳐 둡니다(룰은 그대로)"
-            >
-              <span className="om-skill-icon" aria-hidden="true">
-                💥
-              </span>
-              <span className="om-skill-text">
-                <span className="om-skill-name">강하게 두기</span>
-                <span className="om-skill-state">
-                  {mySlamsLeft <= 0 ? '사용함' : slamOn ? '장전됨!' : `${mySlamsLeft}/1`}
-                </span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`om-primary${slamOn ? ' om-primary-slam' : ''}`}
+            {/* D-195 — 짧게 누르면 보통, 꾹 누르면(게이지가 다 차면) 강하게. */}
+            <OmokPlaceButton
               disabled={!canPlace || !previewOk}
-              onClick={() => preview && place(preview)}
-            >
-              {slamOn ? '강하게 두기!' : '여기에 두기'}
-            </button>
+              onPlace={(slam) => preview && place(preview, slam)}
+              onChargeChange={setCharging}
+            />
           </div>
           <label className="om-single-click">
             <input type="checkbox" checked={singleClick} onChange={toggleSingleClick} />

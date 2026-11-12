@@ -52,7 +52,9 @@ export function OmokMatchEnd({
 
   return (
     <section
-      className={`om-end${afterWinLine ? ' om-end-after-line' : ''}${iLost ? ' om-end-lost' : ''}`}
+      className={`om-end${afterWinLine ? ' om-end-after-line' : ''}${iLost ? ' om-end-lost' : ''}${
+        draw ? ' om-end-draw' : result.reason === 'FIVE' ? ' om-end-five' : ' om-end-quiet'
+      }`}
       aria-label="판 결과"
       role="status"
     >
@@ -74,10 +76,16 @@ export function OmokMatchEnd({
       ) : (
         <svg className="om-art om-end-art om-end-art-pair" viewBox="-0.6 -0.6 2.1 1.2" aria-hidden="true">
           <OmokDefs id={id} />
-          <g className="om-stone om-stone-black" transform="translate(0 0)">
+          {/* D-194 — 기권·시간 초과·나감으로 끝났으면 진 색 돌이 흐리다(무승부는 둘 다 그대로). */}
+          <g
+            className={`om-stone om-stone-black${result.winnerColor === 'WHITE' ? ' om-end-stone-lost' : ''}`}
+            transform="translate(0 0)"
+          >
             <StoneBody id={id} color="BLACK" />
           </g>
-          <g className="om-stone om-stone-white" transform="translate(0.9 0)">
+          <g
+            className={`om-stone om-stone-white${result.winnerColor === 'BLACK' ? ' om-end-stone-lost' : ''}`}
+            transform="translate(0.9 0)">
             <StoneBody id={id} color="WHITE" seed={2} />
           </g>
         </svg>
