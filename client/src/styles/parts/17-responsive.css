@@ -338,7 +338,10 @@
   .yt-theme-salon .yt-cell-bonus-new::after,
   .yt-theme-salon .yt-end-reveal .yt-end-row,
   .yt-theme-salon .yt-end-reveal .yt-end-first::after,
-  .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title {
+  .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title,
+  .yt-theme-salon .yt-seat-yacht,
+  .yt-theme-salon .yt-seat-party {
+    /* D-206 — 남의 요트: 꼬리표와 금테는 남고 움직임만 끈다. */
     animation: none;
   }
 

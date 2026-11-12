@@ -147,18 +147,54 @@ button.yt-badge {
   list-style: none;
 }
 
+/* D-205 — 명패 높이는 늘 같다. 줄을 차지하는 것은 이름·점수 한 줄(`yt-seat-head`)과 모두 같이일 때의 주사위 줄 한 칸뿐이고,
+   "차례"·"끊김"·"탈주"·"보는 중"·내보내기·채팅 한 줄은 전부 모서리에 걸친 겹침 층(absolute)이다 — 붙었다 사라져도 아래 주사위 판이
+   밀리지 않는다. */
 .yt-seat {
   position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  padding: 6px 8px;
+  min-width: 0;
   border-radius: 10px;
   border: 2px solid transparent;
   border-left: 4px solid var(--yt-accent);
   background: var(--color-bg-elevated, var(--color-bg));
   font-size: 13px;
+}
+
+.yt-seat-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* 누를 수 있는 명패 — 남의 명패는 그 사람 판 보기, 내 명패는 내 판으로. */
+.yt-seat-pick {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yt-seat-pick:focus-visible {
+  outline: 2px solid var(--yt-accent);
+  outline-offset: 2px;
+}
+
+.yt-seat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 20px;
+  white-space: nowrap;
 }
 
 .yt-seat-turn {
@@ -170,6 +206,7 @@ button.yt-badge {
 }
 
 .yt-seat-name {
+  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -180,7 +217,14 @@ button.yt-badge {
   white-space: nowrap;
 }
 
+.yt-seat-voice {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .yt-seat-total {
+  flex: none;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
@@ -190,6 +234,7 @@ button.yt-badge {
   border-radius: 999px;
   border: 1px solid var(--color-border);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 /* D-202 — 동시 진행: 이번 라운드를 기록한 좌석은 흐리게, 남의 주사위는 작게. */
@@ -197,15 +242,16 @@ button.yt-badge {
   opacity: 0.75;
 }
 
+/* 주사위 줄 — 주사위가 있든, 비었든, "기록함 ✓" 이든 같은 높이의 한 칸이다(D-205). */
 .yt-seat-dice {
-  display: inline-flex;
+  display: flex;
+  align-items: center;
   gap: 2px;
-  flex-basis: 100%;
+  height: 18px;
 }
 
-/* 주사위 줄 자리만 — 높이는 작은 주사위와 같다(좌석 띠 높이 고정). */
-.yt-seat-dice-empty {
-  min-height: 18px;
+.yt-seat-dice-done .yt-seat-tag {
+  line-height: 14px;
 }
 
 .yt-mini-die {
@@ -224,31 +270,110 @@ button.yt-badge {
   border-bottom-color: var(--yt-die-held);
 }
 
-.yt-seat-kick {
-  min-height: 32px;
-  padding: 0 8px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  cursor: pointer;
+/* 겹침 층 — 명패 위 모서리에 걸친다. 가운데는 "차례"·남의 요트 축하(D-206), 오른쪽은 상태 꼬리표·내보내기. */
+.yt-seat-tag-turn,
+.yt-seat-yacht {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  background: var(--color-bg-elevated, var(--color-bg));
+  line-height: 15px;
+  pointer-events: none;
 }
 
+.yt-seat-yacht {
+  z-index: 3;
+  border-color: #a8842f;
+  background: linear-gradient(#f6e2a4, #c9a24b);
+  color: #2a1d05;
+  font-weight: 700;
+}
+
+.yt-seat-party {
+  border-color: #c9a24b;
+}
+
+.yt-seat-flags {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.yt-seat-flags .yt-seat-tag {
+  background: var(--color-bg-elevated, var(--color-bg));
+  line-height: 15px;
+}
+
+.yt-seat-flags .yt-seat-tag-watch {
+  border-color: transparent;
+  background: var(--yt-accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.yt-seat-kick {
+  position: relative;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated, var(--color-bg));
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* 보이는 크기는 작아도 누르는 자리는 넉넉하게. */
+.yt-seat-kick::after {
+  content: '';
+  position: absolute;
+  inset: -12px -8px;
+}
+
+/* 지금 보고 있는 판의 명패(D-205). */
+.yt-seat-watch {
+  opacity: 1;
+  outline: 2px solid var(--yt-accent);
+  outline-offset: 1px;
+}
+
+/* 채팅 한 줄 — 명패 아래에 걸린 말풍선(줄을 차지하지 않고, 아래 것을 누르는 데 걸리지 않는다). */
 .yt-seat-chat {
-  flex-basis: 100%;
+  position: absolute;
+  top: calc(100% - 3px);
+  left: 6px;
+  z-index: 3;
+  box-sizing: border-box;
+  max-width: calc(100% - 12px);
+  padding: 1px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px 10px 10px 10px;
+  background: var(--color-bg-elevated, var(--color-bg));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  opacity: 0.85;
+  pointer-events: none;
 }
 
 .yt-seat-reaction {
   position: absolute;
   top: -10px;
   right: 6px;
+  z-index: 4;
   font-size: 20px;
+  pointer-events: none;
 }
 
 /* ── 경기장 — 주사위 판 ─────────────────────────────────────────────── */
@@ -394,6 +519,50 @@ button.yt-badge {
 .yt-tray-note {
   font-size: 13px;
   opacity: 0.85;
+}
+
+/* D-205 — 남의 판 구경: 굴리기 자리에 안내 + [내 판으로]. 굴리기 버튼과 같은 줄 높이라 판이 오르내리지 않는다. */
+.yt-tray-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.yt-back {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 아직 내 차례가 남았다 — 굴리기 버튼처럼 채운다. */
+.yt-back-urgent {
+  border-color: transparent;
+  background: var(--yt-accent);
+  color: #fff;
+}
+
+.yt-felt-watch {
+  outline: 2px dashed var(--yt-accent);
+  outline-offset: -5px;
+}
+
+.yt-badge-watch {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: var(--yt-accent);
+  font-weight: 700;
 }
 
 /* ── 점수표 — 칸 × 좌석(최대 4) ─────────────────────────────────────── */
@@ -881,10 +1050,6 @@ html.dark .yt-theme-salon {
 }
 
 .yt-theme-salon .yt-seat-tag-turn {
-  position: absolute;
-  top: -9px;
-  left: 50%;
-  transform: translateX(-50%);
   padding: 0 7px;
   border-color: var(--yt-s-brass);
   background: linear-gradient(#f6e2a4, #c9a24b);
@@ -897,7 +1062,78 @@ html.dark .yt-theme-salon {
 }
 
 .yt-theme-salon .yt-seat-kick {
-  border-color: var(--yt-s-line);
+  border-color: var(--yt-s-brass);
+  background: var(--yt-s-plaque);
+  color: var(--yt-s-brass-ink);
+}
+
+.yt-theme-salon .yt-seat-flags .yt-seat-tag,
+.yt-theme-salon .yt-seat-chat {
+  background: var(--yt-s-plaque);
+}
+
+.yt-theme-salon .yt-seat-chat {
+  border-color: var(--yt-s-brass);
+  color: var(--yt-s-ink);
+}
+
+.yt-theme-salon .yt-seat-flags .yt-seat-tag-watch {
+  border-color: transparent;
+  background: var(--yt-accent);
+  color: #fff;
+  letter-spacing: 0.04em;
+}
+
+/* D-205 — 보고 있는 판의 명패: 좌석 색 테 + 황동 빛. */
+.yt-theme-salon .yt-seat-watch {
+  outline: none;
+  border-color: var(--yt-accent);
+  box-shadow:
+    0 0 0 2px var(--yt-accent),
+    0 0 12px var(--yt-s-brass-glow);
+}
+
+/* D-206 — 남의 요트는 그 사람 명패에서만: 금빛 꼬리표가 톡 튀어나오고 명패에 금빛이 두 번 번진다. */
+.yt-theme-salon .yt-seat-yacht {
+  border-color: var(--yt-s-brass);
+  color: #2a1d05;
+  letter-spacing: 0.1em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  animation: yt-salon-seat-yacht 0.5s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+@keyframes yt-salon-seat-yacht {
+  0% {
+    transform: translateX(-50%) scale(0.4);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.yt-theme-salon .yt-seat-party {
+  border-color: var(--yt-s-brass);
+  border-left-color: var(--yt-accent);
+  box-shadow:
+    0 0 0 1px var(--yt-s-brass),
+    0 0 10px var(--yt-s-brass-glow);
+  animation: yt-salon-seat-party 1.3s ease-in-out 2;
+}
+
+@keyframes yt-salon-seat-party {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--yt-s-brass),
+      0 0 6px var(--yt-s-brass-glow);
+  }
+  40% {
+    box-shadow:
+      0 0 0 2px #f6e2a4,
+      0 0 22px 4px var(--yt-s-brass-glow);
+  }
 }
 
 .yt-theme-salon .yt-mini-die {
@@ -911,11 +1147,7 @@ html.dark .yt-theme-salon {
 
 .yt-theme-salon .yt-seat-dice {
   gap: 3px;
-  padding-top: 1px;
-}
-
-.yt-theme-salon .yt-seat-dice-empty {
-  min-height: 20px;
+  height: 20px;
 }
 
 .yt-theme-salon .yt-mini-die-held {
@@ -1735,6 +1967,23 @@ html.dark .yt-theme-salon {
 .yt-theme-salon .yt-roll:disabled {
   opacity: 0.55;
   filter: saturate(0.5);
+}
+
+.yt-theme-salon .yt-back {
+  border-color: #f6e2a4;
+  color: #f6e2a4;
+  letter-spacing: 0.06em;
+}
+
+.yt-theme-salon .yt-back-urgent {
+  border-color: transparent;
+  background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
+  color: #2a1d05;
+}
+
+.yt-theme-salon .yt-felt .yt-badge-watch {
+  border-color: #f6e2a4;
+  color: #f6e2a4;
 }
 
 .yt-theme-salon .yt-tray-note {
