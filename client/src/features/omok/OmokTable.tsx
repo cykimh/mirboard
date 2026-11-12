@@ -97,6 +97,8 @@ const RULE_LABEL = {
 const COLOR_LABEL: Record<OmokStone, string> = { BLACK: '흑', WHITE: '백' };
 /** D-193 — 강하게 둔 돌이 판에 닿는 때(CSS `om-slam-drop` 의 눌림 지점). 효과음·진동이 여기에 맞춘다. */
 export const SLAM_IMPACT_SEC = 0.32;
+/** D-193 — 발동 배너가 떠 있는 시간. 상태가 아니라 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
+export const SLAM_BANNER_MS = 1600;
 
 interface Props {
   roomId: string;
@@ -171,15 +173,30 @@ export function OmokTable({
 
   // D-193 — 강하게 둔 수가 판에 닿을 때 "쿵" + 진동. 내 수는 보낸 즉시(흐린 돌이 바로 내리친다), 남의 수는 STONE_PLACED.slam 을
   // 받은 때. 내 수가 확정되면 pendingSlam 이 slamMoves 로 옮겨 가 합이 그대로라 두 번 울리지 않는다.
+  // 발동 배너("흑 강하게 두기!")도 같은 때 — 내 화면·상대·관전자 모두 같은 크기.
   const slamCount = s.slamMoves.size + (s.pendingSlam ? 1 : 0);
   const lastSlamCount = useRef(slamCount);
+  const [banner, setBanner] = useState<{ id: number; seat: number; color: OmokStone } | null>(null);
   useEffect(() => {
     if (slamCount > lastSlamCount.current) {
       playSlam(SLAM_IMPACT_SEC);
       if (!muted) window.setTimeout(() => navigator.vibrate?.([70, 40, 110]), SLAM_IMPACT_SEC * 1000);
+      const st = useOmokStore.getState();
+      const lastMove = st.moves.length > 0 ? st.moves[st.moves.length - 1] : null;
+      const who = st.pendingSlam
+        ? { seat: mySeat, color: myColor }
+        : lastMove
+          ? { seat: lastMove.seat, color: (st.moves.length % 2 === 1 ? 'BLACK' : 'WHITE') as OmokStone }
+          : null;
+      if (who && who.color) setBanner({ id: slamCount, seat: who.seat, color: who.color });
     }
     lastSlamCount.current = slamCount;
-  }, [slamCount, playSlam, muted]);
+  }, [slamCount, playSlam, muted, mySeat, myColor]);
+  useEffect(() => {
+    if (!banner) return;
+    const t = window.setTimeout(() => setBanner(null), SLAM_BANNER_MS);
+    return () => window.clearTimeout(t);
+  }, [banner]);
 
   // 내 차례가 되면 알림음 + 휴대폰 진동 한 번(원카드 D-160 과 같다).
   const wasMyTurn = useRef(myTurn);
@@ -355,6 +372,17 @@ export function OmokTable({
                   {seat === mySeat ? ' (나)' : ''}
                 </span>
                 {isTurn && <OmokTurnCountdown turnSeconds={turnSeconds} />}
+                {/* D-193 — 좌석마다 강하게 두기 스킬: 남음(밝은 💥)·사용함(회색). */}
+                {s.slamsLeft.length > seat && (
+                  <span
+                    className={`om-seat-skill${(s.slamsLeft[seat] ?? 0) > 0 ? '' : ' om-seat-skill-used'}`}
+                    title={(s.slamsLeft[seat] ?? 0) > 0 ? '강하게 두기 남음' : '강하게 두기 사용함'}
+                    aria-label={(s.slamsLeft[seat] ?? 0) > 0 ? '강하게 두기 남음' : '강하게 두기 사용함'}
+                    data-testid="om-seat-skill"
+                  >
+                    💥
+                  </span>
+                )}
                 {s.disconnectedSeats.has(seat) && <span className="om-badge om-badge-warn">끊김</span>}
                 {onKick && !roomFinished && seat !== mySeat && s.disconnectedSeats.has(seat) && (
                   <button type="button" className="om-badge" onClick={() => onKick(uid)}>
@@ -419,6 +447,23 @@ export function OmokTable({
           {preview && myColor && !stones.has(key(preview)) && (
             <OmokLoupe preview={preview} moves={s.moves} myColor={myColor} forbidden={previewForbidden !== null} />
           )}
+          {/* D-193 — 강하게 두기 발동 배너(모두에게 같은 크기). 돌이 닿는 순간에 맞춰 튀어나온다. */}
+          {banner && (
+            <div
+              key={banner.id}
+              className={`om-slam-banner om-slam-banner-${banner.color === 'BLACK' ? 'black' : 'white'}`}
+              role="status"
+              data-testid="om-slam-banner"
+            >
+              <span className="om-slam-banner-icon" aria-hidden="true">
+                💥
+              </span>
+              <span className="om-slam-banner-text">
+                {COLOR_LABEL[banner.color]} 강하게 두기!
+                <span className="om-slam-banner-who">{nameOf(banner.seat)}</span>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -436,17 +481,25 @@ export function OmokTable({
       {!spectator && mySeat >= 0 && s.result === null && !roomFinished && (
         <div className="om-controls">
           <div className="om-place-row">
-            {/* D-193 — 한 판에 한 번 강하게 두기. 켜 두면 다음 착수(어느 방법으로 두든)가 강하게 나간다. */}
+            {/* D-193 — 스킬 슬롯: 한 판에 한 번 강하게 두기. 누르면 '장전', 장전된 채 두면(어느 방법으로 두든) 강하게 나간다. */}
             <button
               type="button"
-              className={`om-slam-toggle${slamOn ? ' om-slam-on' : ''}`}
+              className={`om-skill${slamOn ? ' om-skill-armed' : ''}${mySlamsLeft <= 0 ? ' om-skill-used' : ''}`}
               aria-pressed={slamOn}
+              aria-label={mySlamsLeft > 0 ? `강하게 두기 스킬 ${slamOn ? '장전됨' : '준비'} — 남은 ${mySlamsLeft}/1` : '강하게 두기 스킬 사용함'}
               disabled={mySlamsLeft <= 0 || s.pending !== null}
               onClick={() => setSlamArmed((v) => !v)}
               title="한 판에 한 번 — 돌을 쾅 내리쳐 둡니다(룰은 그대로)"
             >
-              <span aria-hidden="true">💥</span> 강하게
-              <span className="om-slam-left">{mySlamsLeft > 0 ? `${mySlamsLeft}회` : '다 씀'}</span>
+              <span className="om-skill-icon" aria-hidden="true">
+                💥
+              </span>
+              <span className="om-skill-text">
+                <span className="om-skill-name">강하게 두기</span>
+                <span className="om-skill-state">
+                  {mySlamsLeft <= 0 ? '사용함' : slamOn ? '장전됨!' : `${mySlamsLeft}/1`}
+                </span>
+              </span>
             </button>
             <button
               type="button"
