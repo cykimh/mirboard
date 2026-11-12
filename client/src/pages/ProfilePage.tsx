@@ -48,6 +48,8 @@ export function ProfilePage() {
   }, [token, user]);
 
   const primary = primaryGame(stats?.games ?? []);
+  // D-198 — 명예 계정은 어느 게임이든 같은 계급(한 판도 안 했어도).
+  const headerTier = stats?.fixedTier ?? primary?.tier;
 
   if (!user) return null;
 
@@ -69,7 +71,7 @@ export function ProfilePage() {
           </Avatar>
           <div className="flex flex-col gap-1">
             <span className="text-lg font-semibold">{user.username}</span>
-            {primary && <TierBadge tier={primary.tier} size={24} />}
+            {headerTier && <TierBadge tier={headerTier} size={24} />}
           </div>
           {/* D-117 — 게스트는 아바타를 못 바꾼다(서버도 403). 이유는 title 로. */}
           <Button

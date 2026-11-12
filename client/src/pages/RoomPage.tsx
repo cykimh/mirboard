@@ -6,7 +6,7 @@ import { errorText } from '@/api/errorText';
 import { roomsApi, type JoinOrReconnectResponse } from '@/api/rooms';
 import { usersApi, type GameRecord } from '@/api/users';
 import { headToHeadText } from '@/features/stats/headToHead';
-import { playerTiers } from '@/features/stats/playerTiers';
+import { gameRecordOf, playerTiers } from '@/features/stats/playerTiers';
 import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
@@ -292,7 +292,7 @@ export function RoomPage() {
         .then(() => usersApi.stats(token, id))
         .then((st) => {
           if (cancelled) return;
-          const rec = st.games.find((g) => g.gameType === gameType) ?? null;
+          const rec = gameRecordOf(st, gameType);
           setRecords((prev) => ({ ...prev, [id]: rec }));
         })
         .catch(() => {});

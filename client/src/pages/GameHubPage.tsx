@@ -154,10 +154,15 @@ export function GameHubPage() {
               </div>
             )}
             {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로. D-146 — 전적 합계는 뺐다(프로필에 있다). */}
-            {primary && (
-              <span title={`${gameName(primary.gameType)} 기준`}>
-                <TierBadge tier={primary.tier} size={24} />
-              </span>
+            {/* D-198 — 명예 계정은 어느 게임이든 같은 계급이라 기준 게임을 밝히지 않는다. */}
+            {stats?.fixedTier ? (
+              <TierBadge tier={stats.fixedTier} size={24} />
+            ) : (
+              primary && (
+                <span title={`${gameName(primary.gameType)} 기준`}>
+                  <TierBadge tier={primary.tier} size={24} />
+                </span>
+              )
             )}
             <ThemeToggle />
             <Button

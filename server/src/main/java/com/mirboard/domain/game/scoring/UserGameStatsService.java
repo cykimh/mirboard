@@ -22,10 +22,12 @@ public class UserGameStatsService {
 
     private final UserGameStatsRepository repo;
     private final UserRepository users;
+    private final HonoraryTierPolicy honorary;
 
-    public UserGameStatsService(UserGameStatsRepository repo, UserRepository users) {
+    public UserGameStatsService(UserGameStatsRepository repo, UserRepository users, HonoraryTierPolicy honorary) {
         this.repo = repo;
         this.users = users;
+        this.honorary = honorary;
     }
 
     public record GameStats(String gameType, int rating, int winCount, int loseCount, int desertCount) {
@@ -50,7 +52,8 @@ public class UserGameStatsService {
         }
     }
 
-    public record RankRow(int rank, long userId, String username, GameStats stats) {
+    /** @param tier 순위까지 본 계급(D-164) — 명예 계정이면 {@link HonoraryTierPolicy#HONORARY_TIER}(D-198). */
+    public record RankRow(int rank, long userId, String username, GameStats stats, String tier) {
     }
 
     /**
@@ -58,12 +61,24 @@ public class UserGameStatsService {
      * 조회가 없다.
      */
     @Transactional(readOnly = true)
-    public String tierOf(GameStats stats) {
+    public String tierOf(User user, GameStats stats) {
+        // D-198 — 명예 계정은 순위를 셀 것도 없이 별왕관(표시만 — 레이팅·순위는 그대로).
+        if (honorary.isHonorary(user)) {
+            return HonoraryTierPolicy.HONORARY_TIER.name();
+        }
         if (Tier.fromRating(stats.rating()) != Tier.GOLD_BADGE) {
             return stats.tier();
         }
         long above = repo.countRankedAbove(stats.gameType(), GuestPolicy.LIKE_PATTERN, stats.rating());
         return Tier.withRank(stats.rating(), (int) Math.min(above + 1, Integer.MAX_VALUE)).name();
+    }
+
+    /**
+     * D-198 — 게임과 상관없이 고정된 계급(명예 계정만, 아니면 null). 클라가 그 게임을 아직 안 해 본 사람(전적 줄 없음)에게도 같은 계급을
+     * 그리도록 전적 응답에 싣는다.
+     */
+    public String fixedTier(User user) {
+        return honorary.isHonorary(user) ? HonoraryTierPolicy.HONORARY_TIER.name() : null;
     }
 
     /** 안 해 본 게임이면 기본값. */
@@ -114,8 +129,14 @@ public class UserGameStatsService {
         Map<Long, String> names = users.findAllById(rows.stream().map(UserGameStats::getUserId).toList())
                 .stream().collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
         return IntStream.range(0, rows.size())
-                .mapToObj(i -> new RankRow(i + 1, rows.get(i).getUserId(),
-                        names.getOrDefault(rows.get(i).getUserId(), "?"), GameStats.of(rows.get(i))))
+                .mapToObj(i -> {
+                    int rank = i + 1;
+                    String name = names.getOrDefault(rows.get(i).getUserId(), "?");
+                    GameStats stats = GameStats.of(rows.get(i));
+                    // D-164 — 목록 순위로 왕관(금훈장 이상). D-198 — 명예 계정은 별왕관(순서는 그대로, 봇은 이 목록에 없다).
+                    String tier = honorary.apply(name, Tier.withRank(stats.rating(), rank).name());
+                    return new RankRow(rank, rows.get(i).getUserId(), name, stats, tier);
+                })
                 .toList();
     }
 }

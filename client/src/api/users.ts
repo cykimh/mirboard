@@ -44,6 +44,8 @@ export interface UserStats {
   tier: Tier;
   desertCount: number;
   games: GameRecord[];
+  /** D-198 — 명예 계정이면 모든 게임에서 보일 계급(`games` 에 없는 게임에도), 아니면 null. 옛 서버면 없다. */
+  fixedTier?: Tier | null;
 }
 
 export interface RankEntry {

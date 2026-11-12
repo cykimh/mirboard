@@ -108,6 +108,10 @@ mirboard:
     retention: 48h
     # 정리(생성 경로에서 10분에 1회) 한 번에 살펴볼 최대 행 수.
     sweep-batch: 100
+  tier:
+    # D-198 — 명예 계급: 여기 적힌 계정은 모든 게임에서 별왕관(STAR_CROWN)으로 보이기만 한다(레이팅·순위·ELO 불변).
+    # 콤마 구분, NFC 로 비교. 게스트(guest-)·봇은 적어도 대상이 아니다.
+    honorary-usernames: ${MIRBOARD_TIER_HONORARY_USERNAMES:창엽2}
   jwt:
     secret: ${MIRBOARD_JWT_SECRET:dev-only-secret-please-override-with-32-bytes-min}
     expires-in: 12h

@@ -105,8 +105,8 @@ public class UserController {
                         r.userId(),
                         r.username(),
                         r.stats().rating(),
-                        // D-164 — 목록 순위로 왕관(금훈장 이상).
-                        com.mirboard.domain.game.scoring.Tier.withRank(r.stats().rating(), r.rank()).name(),
+                        // D-164 목록 순위 왕관 + D-198 명예 계급 — 서비스가 정한다.
+                        r.tier(),
                         r.stats().winCount(),
                         r.stats().loseCount(),
                         r.stats().desertCount()))
@@ -153,13 +153,13 @@ public class UserController {
         Set<String> seen = new HashSet<>();
         for (GameStats g : gameStats.playedGames(u.getId())) {
             seen.add(g.gameType());
-            played.add(new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(g),
+            played.add(new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(u, g),
                     g.winCount(), g.loseCount(), g.desertCount(), best.get(g.gameType())));
         }
         best.forEach((gameType, score) -> {
             if (seen.add(gameType)) {
                 GameStats g = gameStats.get(u.getId(), gameType);
-                played.add(new GameRecord(gameType, g.rating(), gameStats.tierOf(g),
+                played.add(new GameRecord(gameType, g.rating(), gameStats.tierOf(u, g),
                         g.winCount(), g.loseCount(), g.desertCount(), score));
             }
         });
@@ -169,13 +169,15 @@ public class UserController {
                 legacy.winCount(),
                 legacy.loseCount(),
                 legacy.rating(),
-                gameStats.tierOf(legacy),
+                gameStats.tierOf(u, legacy),
                 legacy.desertCount(),
-                played);
+                played,
+                gameStats.fixedTier(u));
     }
 
     /**
      * @param games 한 판이라도 한 게임별 전적 (D-115) + 최고 점수만 있는 게임(D-201). 최상위 필드는 TICHU 호환 값.
+     * @param fixedTier D-198 — 모든 게임에서 이 계급으로 보이는 명예 계정이면 그 계급, 아니면 null. {@code games[]} 에 없는 게임에도 쓴다.
      */
     public record UserStatsResponse(
             long userId,
@@ -185,7 +187,8 @@ public class UserController {
             int rating,
             String tier,
             int desertCount,
-            List<GameRecord> games) {
+            List<GameRecord> games,
+            String fixedTier) {
     }
 
     /** @param bestScore D-201 — 개인 최고 점수. 점수를 겨루는 게임(요트)만, 셀 판이 없거나 게스트면 null. */
