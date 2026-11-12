@@ -271,6 +271,7 @@
   Asia/Seoul 1일 0시(`StatsMonth`, 주입 `Clock`). 랭킹 순서는 이번 달 승수 → 승률 → 판수, 계급은 누적 레이팅 그대로.
   메인 랭킹 카드는 전체·게임 선택 상자 + 등수·유저(계급 아이콘)·전적·승률·최근 5경기, 메인 목록 카드(랭킹·대기 중인 방)는
   높이 고정 + 안쪽 스크롤(`features/lobby/hubScroll`). 지난 기록 채우기는 `ops/db/backfill-monthly-stats.sql`(수동).
+- **계급표**(D-266): 메인 랭킹 카드 머리 줄·프로필 계급 옆 [계급표] → 16단계 표(아이콘·이름·필요 점수·왕관 순위, 내 계급 강조). 숫자는 `features/stats/tierTable.ts`(테스트가 서버 `Tier.java` 원문과 대조).
 
 관련 테스트: `EloCalculatorTest`, `StatsMonthTest`(달 경계·같이 쌓기), `UserGameStatsServiceIT`(이번 달 누적·정렬·최근 5·봇/게스트 제외), `V11UserGameStatsMigrationIT`,
 `SkullKingMatchRecorderIT`, `UserStatsIntegrationTest`, 클라 `RankingCard`·`GameRecords`.

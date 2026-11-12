@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RANKING_ALL, usersApi, type RankEntry } from '@/api/users';
+import { RANKING_ALL, usersApi, type RankEntry, type Tier, type UserStats } from '@/api/users';
 import type { GameSummary } from '@/types/api';
 import { TierBadge } from '@/components/TierBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import { cn } from '@/lib/utils';
+import { isGuestName, STARTING_TIER } from './playerTiers';
+import { primaryGame } from './primaryGame';
+import { TierTableButton } from './TierTableButton';
 
 interface Props {
   token: string;
@@ -47,6 +50,18 @@ function RecentDots({ recent }: { recent: string }) {
 }
 
 /**
+ * D-266 — 계급표에서 강조할 내 계급. 고른 게임의 계급, "전체"면 가장 많이 한 게임 것(프로필 헤더와 같은 규칙 — 서버 전체 랭킹의
+ * 계급도 같다). 안 해 본 게임은 시작 계급, 게스트는 없음.
+ */
+function myTierOf(stats: UserStats, gameType: string): Tier | null {
+  if (isGuestName(stats.username)) return null;
+  if (stats.fixedTier) return stats.fixedTier;
+  const records = stats.games ?? [];
+  const rec = gameType === RANKING_ALL ? primaryGame(records) : records.find((g) => g.gameType === gameType);
+  return rec?.tier ?? STARTING_TIER;
+}
+
+/**
  * D-199·D-209 — 이번 달 랭킹. 오른쪽 위에서 게임을 고른다 — 기본은 "전체"(모든 게임 합), 선택지는 많이 한 게임부터(D-160).
  * 순서는 서버가 정한다(이번 달 승수 → 승률 → 판수). 계급은 누적 레이팅 것이라 별명 왼쪽에 아이콘으로만 둔다.
  */
@@ -56,6 +71,8 @@ export function RankingCard({ token, games, myUserId }: Props) {
   const [entries, setEntries] = useState<RankEntry[] | null>(null);
   /** 게임별 판수. null = 아직 받는 중(카탈로그 순서로 둔다). */
   const [plays, setPlays] = useState<Record<string, number> | null>(null);
+  /** D-266 — 내 전적. 계급표를 열 때만 받는다(랭킹 20위 밖이어도 내 계급을 강조하게). */
+  const [myStats, setMyStats] = useState<UserStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +117,17 @@ export function RankingCard({ token, games, myUserId }: Props) {
 
   const gameName = (id: string) => games.find((g) => g.id === id)?.displayName ?? id;
 
+  // 내 전적을 받기 전에는 목록 속 내 줄의 계급으로.
+  const myEntryTier = entries?.find((e) => e.userId === myUserId)?.tier ?? null;
+  const myTier = myStats ? myTierOf(myStats, gameType) : myEntryTier;
+  const loadMyStats = () => {
+    if (myUserId === undefined) return;
+    usersApi
+      .stats(token, myUserId)
+      .then(setMyStats)
+      .catch(() => {});
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
@@ -107,19 +135,27 @@ export function RankingCard({ token, games, myUserId }: Props) {
           <CardTitle>랭킹</CardTitle>
           <p className="m-0 text-xs text-muted-foreground">이번 달 전적 · 매달 1일 0시 초기화</p>
         </div>
-        <select
-          aria-label="랭킹 게임"
-          value={gameType}
-          onChange={(e) => setGameType(e.target.value)}
-          className="h-9 max-w-[9.5rem] shrink-0 rounded-md border border-input bg-background px-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <option value={RANKING_ALL}>전체</option>
-          {ordered.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.displayName}
-            </option>
-          ))}
-        </select>
+        {/* D-266 — [계급표]는 게임 선택 상자 왼쪽. 휴대폰 폭에서 둘이 한 줄에 들도록 선택 상자 폭을 줄였다. */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <TierTableButton
+            myTier={myTier}
+            basis={gameType === RANKING_ALL ? '가장 많이 한 게임 기준' : `${gameName(gameType)} 기준`}
+            onOpen={loadMyStats}
+          />
+          <select
+            aria-label="랭킹 게임"
+            value={gameType}
+            onChange={(e) => setGameType(e.target.value)}
+            className="h-9 max-w-[7.5rem] shrink-0 rounded-md border border-input bg-background px-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring sm:max-w-[9.5rem]"
+          >
+            <option value={RANKING_ALL}>전체</option>
+            {ordered.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
       </CardHeader>
       <CardContent className="px-2 sm:px-6">
         {/* 받는 중·빈 목록·긴 목록 모두 같은 높이의 상자 안에서 — 카드 높이가 바뀌지 않는다. */}

@@ -80,3 +80,44 @@ describe('ProfilePage — 상대 전적 (D-154)', () => {
     expect(await screen.findByText('아직 함께한 사람이 없어요')).toBeInTheDocument();
   });
 });
+
+/** D-266 — 계급 옆 [계급표]: 헤더 계급(가장 많이 한 게임)을 강조한다. */
+describe('ProfilePage — 계급표 (D-266)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    catalog.mockResolvedValue({ games: [{ id: 'ONE_CARD', displayName: '원카드' }] });
+    headToHead.mockResolvedValue({ entries: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: '철수' } as never });
+  });
+
+  it('누르면 16단계 표가 열리고 내 계급 줄이 강조된다', async () => {
+    stats.mockResolvedValue({
+      userId: 1,
+      username: '철수',
+      games: [{ gameType: 'ONE_CARD', rating: 1130, tier: 'GOLD_STAR', winCount: 4, loseCount: 1, desertCount: 0 }],
+    });
+    renderProfile();
+    await screen.findAllByRole('img', { name: '금별' });
+
+    fireEvent.click(screen.getByRole('button', { name: '계급표' }));
+
+    const dialog = screen.getByRole('dialog', { name: '계급표' });
+    const rows = within(dialog).getAllByRole('listitem');
+    expect(rows).toHaveLength(16);
+    const mine = rows.filter((li) => li.getAttribute('aria-current') === 'true');
+    expect(mine.map((li) => li.getAttribute('data-tier'))).toEqual(['GOLD_STAR']);
+    expect(mine[0]).toHaveTextContent('1120점 이상');
+    expect(dialog).toHaveTextContent('원카드 기준');
+  });
+
+  it('게스트는 강조 없이 표만', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'guest-ab12cd34', guest: true } as never });
+    stats.mockResolvedValue({ userId: 2, username: 'guest-ab12cd34', games: [] });
+    renderProfile();
+
+    fireEvent.click(await screen.findByRole('button', { name: '계급표' }));
+    const rows = within(screen.getByRole('dialog', { name: '계급표' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(16);
+    expect(rows.some((li) => li.hasAttribute('aria-current'))).toBe(false);
+  });
+});
