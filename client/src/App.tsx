@@ -5,6 +5,7 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { GameHubPage } from '@/pages/GameHubPage';
 import { RoomPage } from '@/pages/RoomPage';
 import { ProfilePage } from '@/pages/ProfilePage';
+import { AdminSoundsPage } from '@/pages/AdminSoundsPage';
 import { Toaster } from '@/components/toast/Toaster';
 
 /**
@@ -40,6 +41,15 @@ export function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        {/* D-265 — 관리 화면(게임 음성). 화면 안에서 관리자인지 확인하고, 권한은 서버가 판정한다. */}
+        <Route
+          path="/admin/sounds"
+          element={
+            <ProtectedRoute>
+              <AdminSoundsPage />
             </ProtectedRoute>
           }
         />

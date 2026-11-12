@@ -1,5 +1,6 @@
 package com.mirboard.infra.rest.me;
 
+import com.mirboard.domain.admin.AdminAuthorization;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
@@ -26,9 +27,11 @@ public class MeController {
     private final UserRepository userRepository;
     private final AuthService authService;
     private final UserGameStatsService gameStats;
+    private final AdminAuthorization adminAuth;
 
     public MeController(UserRepository userRepository, AuthService authService,
-                        UserGameStatsService gameStats) {
+                        UserGameStatsService gameStats, AdminAuthorization adminAuth) {
+        this.adminAuth = adminAuth;
         this.userRepository = userRepository;
         this.authService = authService;
         this.gameStats = gameStats;
@@ -45,7 +48,9 @@ public class MeController {
         List<GameStats> played = gameStats.playedGames(user.getId());
         return new MeResponse(user.getId(), user.getUsername(),
                 played.stream().mapToInt(GameStats::winCount).sum(),
-                played.stream().mapToInt(GameStats::loseCount).sum());
+                played.stream().mapToInt(GameStats::loseCount).sum(),
+                // D-265 — 관리 화면(음성 클립) 버튼을 관리자에게만 보이게. 권한 판정 자체는 /api/admin/** 가 매번 한다.
+                adminAuth.isAdmin(user.getId()));
     }
 
     /** D-85 — 본인 비밀번호 변경. 현재 비번 재검증 후 갱신(스키마 무변경). */
@@ -59,7 +64,7 @@ public class MeController {
         authService.changePassword(principal.userId(), req.currentPassword(), req.newPassword());
     }
 
-    public record MeResponse(long userId, String username, int winCount, int loseCount) {
+    public record MeResponse(long userId, String username, int winCount, int loseCount, boolean admin) {
     }
 
     public record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {

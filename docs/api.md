@@ -113,8 +113,11 @@
 ### GET `/api/me`
 응답 `200`
 ```json
-{ "userId": 17, "username": "철수", "winCount": 3, "loseCount": 4 }
+{ "userId": 17, "username": "철수", "winCount": 3, "loseCount": 4, "admin": false }
 ```
+> D-265: `admin` 은 `admin_roles` 등록 여부다. 클라가 관리 화면(게임 음성) 버튼을 보일지 정하는 데만 쓴다 —
+> 권한 판정은 `/api/admin/**` 가 매 요청 한다.
+>
 > D-82: 내기 칩은 계정에 두지 않는다(방 단위 테이블 칩 — `room:{id}:chips`). `/api/me`
 > 응답에 칩 잔액 없음.
 >
@@ -786,6 +789,44 @@ multipart `file` — 서버가 128px PNG 로 정규화해 BYTEA 저장(upsert). 
 `image/png` 바이너리 (`Cache-Control: max-age=60`), 없으면 `404`. `<img>` 직접
 요청은 Bearer 를 못 실으므로 의도적으로 `/api/**` 밖(D-61 default-permit) —
 `users` 화이트리스트 불변(D-02).
+
+---
+
+## 게임 음성 클립 *(D-265 — 운영자가 올리는 음성, 별도 테이블 `sound_clips`)*
+
+얏추 족보·원카드 외침의 음성 파일. 키는 서버 허용 목록(`SoundClipKey`)뿐이다 —
+`yacht.made.SMALL_STRAIGHT`·`yacht.made.FULL_HOUSE`·`yacht.made.LARGE_STRAIGHT`·`yacht.made.FOUR_OF_A_KIND`·`yacht.made.YACHT`·
+`onecard.call`·`onecard.catch`. 올린 파일이 없는 키는 클라가 브라우저 읽어 주기(`speechSynthesis`)로 대신한다.
+
+### GET `/sounds` *(공개, 비-`/api`)*
+올라와 있는 키 → 버전(바뀐 시각 ms). `Cache-Control: no-cache`. 클라는 버전을 재생 주소에 붙인다(`/sounds/{key}?v=<버전>`).
+```json
+{ "clips": { "onecard.call": 1731456000000 } }
+```
+
+### GET `/sounds/{key}` *(공개, 비-`/api`)*
+오디오 바이너리(`Content-Type` 은 저장된 형식). `ETag` + `Cache-Control: max-age=60, must-revalidate` — `If-None-Match` 가 같으면
+`304`. 없는 키·모르는 키는 `404`. `<audio>` 요청은 Bearer 를 못 실으므로 `/api/**` 밖(아바타와 같은 이유).
+
+### GET `/api/admin/sounds` *(어드민)*
+```json
+{
+  "keys": ["onecard.call", "onecard.catch", "yacht.made.FOUR_OF_A_KIND", "..."],
+  "clips": [ { "key": "onecard.call", "contentType": "audio/mpeg", "byteSize": 20480, "updatedAt": 1731456000000 } ],
+  "maxBytes": 512000
+}
+```
+
+### PUT `/api/admin/sounds/{key}` *(어드민)*
+multipart `file`. 같은 키는 덮어쓴다(키마다 하나). 응답 `200` — 위 `clips[]` 한 항목과 같은 모양.
+형식은 요청의 Content-Type 이 아니라 **파일 앞머리 바이트**로 판정해 저장한다 — mp3(`audio/mpeg`)·ogg(`audio/ogg`)·
+wav(`audio/wav`)·m4a(`audio/mp4`)·aac(`audio/aac`)·webm(`audio/webm`). 레이트리밋 버킷은 고비용 쓰기.
+
+에러(모두 400): `UNKNOWN_SOUND_KEY`(허용 목록 밖), `INVALID_SOUND`(빈 파일), `SOUND_TOO_LARGE`(500KB 초과),
+`UNSUPPORTED_SOUND_TYPE`(오디오가 아니거나 모르는 형식). 비어드민 `NOT_ADMIN` (403).
+
+### DELETE `/api/admin/sounds/{key}` *(어드민)*
+응답 `204`(없어도 204) — 기본 음성(읽어 주기)으로 돌아간다. 에러: `UNKNOWN_SOUND_KEY` (400), `NOT_ADMIN` (403).
 
 ---
 

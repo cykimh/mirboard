@@ -37,6 +37,9 @@ let voiceHandler: ((m: unknown) => void) | null = null;
 let socketConnected = true;
 // D-159 — 음성 대화는 스위치로 꺼 두었다. 여기선 켜진 흐름(D-155·D-156)을 계속 본다 — 꺼진 모양은 VoiceControls.test.
 vi.mock('@/features/voice/voiceSwitch', () => ({ VOICE_ENABLED: true }));
+// D-265 — 외침 음성. 불렸는지만 본다(파일·읽어 주기·음소거는 `voiceClips.test`).
+const voiceClip = vi.hoisted(() => ({ playVoice: vi.fn() }));
+vi.mock('@/features/sound/voiceClips', () => voiceClip);
 vi.mock('@/ws/useStompRoom', () => ({
   useStompRoom: () => ({
     connected: socketConnected,
@@ -383,6 +386,45 @@ describe('OneCardTable — 원카드 경쟁', () => {
   });
   const turnChanged = { type: 'TURN_CHANGED', payload: { seat: 0, direction: 1, attackStack: 0 } };
   const bar = (container: HTMLElement) => container.querySelector('.oc-race-timer') as HTMLElement;
+
+  it.each([
+    ['CALLED', 1, 'onecard.call'],
+    ['CAUGHT', 2, 'onecard.catch'],
+  ] as const)('경쟁이 %s 로 닫히면 남의 누름이어도 외침 음성을 한 번 낸다 (D-265)', (outcome, bySeat, key) => {
+    voiceClip.playVoice.mockClear();
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(voiceClip.playVoice).not.toHaveBeenCalled();
+
+    act(() => {
+      onecardRoomSink.applyEvent(resolved(outcome, bySeat));
+      onecardRoomSink.applyEvent(turnChanged);
+    });
+
+    expect(voiceClip.playVoice).toHaveBeenCalledTimes(1);
+    expect(voiceClip.playVoice).toHaveBeenCalledWith(key);
+  });
+
+  it('아무도 못 누르고 닫히면(EXPIRED) 음성이 없고, 지난 결과가 남은 채 다시 그려도 울리지 않는다 (D-265)', () => {
+    voiceClip.playVoice.mockClear();
+    seed({ seatCount: 3, mySeat: 0, hand: [c('HEART', 3)], race: RACE });
+    const first = renderTable({ playerIds: [100, 101, 102] });
+    act(() => {
+      onecardRoomSink.applyEvent(resolved('EXPIRED', -1));
+    });
+    expect(voiceClip.playVoice).not.toHaveBeenCalled();
+
+    act(() => {
+      onecardRoomSink.applyEvent({ type: 'RACE_OPENED', payload: { ...RACE, raceId: 8 } } as never);
+      onecardRoomSink.applyEvent({ type: 'RACE_RESOLVED', payload: { raceId: 8, outcome: 'CALLED', bySeat: 1 } });
+    });
+    expect(voiceClip.playVoice).toHaveBeenCalledTimes(1);
+
+    // 스토어는 모듈 전역 — 게임판이 다시 마운트돼도 지난 결과로 또 외치지 않는다.
+    first.unmount();
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(voiceClip.playVoice).toHaveBeenCalledTimes(1);
+  });
 
   it('주인에게는 "원카드!" — 누르면 창 번호와 함께 CALL_ONE_CARD 를 보내고 다시 누를 수 없다', () => {
     seed({ seatCount: 3, mySeat: 1, hand: [c('HEART', 3)], race: RACE });

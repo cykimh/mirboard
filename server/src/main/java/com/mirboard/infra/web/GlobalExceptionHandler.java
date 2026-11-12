@@ -28,6 +28,7 @@ import com.mirboard.domain.lobby.room.StakedRoomNoBotsException;
 import com.mirboard.domain.lobby.room.ResyncNotAvailableException;
 import com.mirboard.domain.lobby.room.RoomFullException;
 import com.mirboard.domain.lobby.room.RoomNotFoundException;
+import com.mirboard.domain.sound.InvalidSoundClipException;
 import com.mirboard.infra.rest.me.InvalidAvatarException;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -241,6 +242,13 @@ public class GlobalExceptionHandler {
                 .body(ApiErrorEnvelope.of("RESYNC_NOT_AVAILABLE",
                         "No active game state to resync",
                         Map.of("roomId", e.roomId())));
+    }
+
+    /** D-265 — 음성 클립 요청 부적합(모르는 키·빈 파일·너무 큼·지원하지 않는 형식). 코드는 예외가 싣는다. */
+    @ExceptionHandler(InvalidSoundClipException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleInvalidSoundClip(InvalidSoundClipException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiErrorEnvelope.of(e.code(), e.getMessage()));
     }
 
     @ExceptionHandler(InvalidAvatarException.class)

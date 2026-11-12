@@ -50,6 +50,8 @@ public class HttpRateLimitFilter extends OncePerRequestFilter {
             new Route("POST", "/api/auth/", RateLimitProperties.AUTH, true),
             new Route(null, "/api/me/avatar", RateLimitProperties.EXPENSIVE_WRITE, false),
             new Route("PUT", "/api/me/password", RateLimitProperties.EXPENSIVE_WRITE, false),
+            // D-265 — 음성 클립 올리기(최대 500KB 를 DB 에 쓴다).
+            new Route("PUT", "/api/admin/sounds/", RateLimitProperties.EXPENSIVE_WRITE, false),
             // D-93 — 신고는 DB write + 링버퍼 스캔이라 고비용, 남용 여지도 크다.
             new Route("POST", "/api/chat/reports", RateLimitProperties.EXPENSIVE_WRITE, false),
             new Route("POST", "/api/rooms", RateLimitProperties.ROOM_CREATE, false));

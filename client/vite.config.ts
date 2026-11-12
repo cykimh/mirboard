@@ -34,6 +34,8 @@ export default defineConfig({
       '/api': DEV_API,
       // 아바타 조회는 비-/api 공개 경로(D-80) — dev 에서도 백엔드로 프록시해야 표시됨.
       '/avatars': DEV_API,
+      // 게임 음성 클립 재생도 비-/api 공개 경로(D-265).
+      '/sounds': DEV_API,
       '/ws': {
         target: DEV_API,
         ws: true,

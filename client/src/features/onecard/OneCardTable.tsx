@@ -14,6 +14,7 @@ import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
+import { playVoice } from '@/features/sound/voiceClips';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { cardKey, type OneCardCard } from '@/types/onecard';
 import type { RaceButtonSize, RaceButtonVisibility } from '@/types/api';
@@ -186,6 +187,18 @@ export function OneCardTable({
     }
     wasMyTurn.current = myTurn;
   }, [myTurn, playChime, muted]);
+
+  // D-265 — 경쟁이 누름으로 닫히면 외침 음성("원카드!"·"잡기!") — 외침이라 모두가 듣는다(구경꾼 포함). 창 번호가 바뀔 때만
+  // 반응한다 — 스토어는 모듈 전역이라 다시 마운트돼도 지난 값이 남는다. 음소거를 따른다(playVoice 가 읽는다).
+  const lastRace = s.lastRace;
+  const voicedRace = useRef(lastRace?.raceId ?? null);
+  useEffect(() => {
+    const raceId = lastRace?.raceId ?? null;
+    if (raceId === voicedRace.current) return;
+    voicedRace.current = raceId;
+    if (lastRace?.outcome === 'CALLED') playVoice('onecard.call');
+    else if (lastRace?.outcome === 'CAUGHT') playVoice('onecard.catch');
+  }, [lastRace]);
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
