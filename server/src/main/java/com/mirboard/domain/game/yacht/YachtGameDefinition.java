@@ -17,7 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * 요트의 카탈로그 메타데이터 + 엔진 팩토리 (S3, D-181~D-183). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정
+ * 얏추(코드 이름 요트/YACHT — D-207 표시 이름만 바꿈)의 카탈로그 메타데이터 + 엔진 팩토리 (S3, D-181~D-183). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정
  * 없이 이 Bean 등록으로 인게임까지 연결된다.
  *
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.yacht.status} = 환경 변수 {@code MIRBOARD_YACHT_STATUS}, 기본
@@ -53,9 +53,10 @@ public final class YachtGameDefinition implements GameDefinition {
         return ID;
     }
 
+    /** D-207 — 화면에 보이는 이름은 "얏추". 코드 이름(`YACHT`·패키지·테이블·환경 변수)은 그대로다. */
     @Override
     public String displayName() {
-        return "요트";
+        return "얏추";
     }
 
     @Override

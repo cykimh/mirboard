@@ -64,7 +64,7 @@ class GameCatalogIntegrationTest {
 
     /**
      * D-102 — 정렬은 status → displayName 이다. D-131 — 원카드가 공개돼(AVAILABLE) 게임이 모두 같은 상태라 이름순 —
-     * 구름항로(D-214) · 스컬킹 · 씨앗포(D-223) · 오목(D-190) · 요트(D-200) · 원카드 · 티츄. (닫는 설정의 원카드는 {@code OneCardClosedIntegrationTest}.)
+     * 구름항로(D-214) · 스컬킹 · 씨앗포(D-223) · 얏추(D-200, D-207 이름 바꿈 — 오목 앞으로) · 오목(D-190) · 원카드 · 티츄. (닫는 설정의 원카드는 {@code OneCardClosedIntegrationTest}.)
      */
     @Test
     void catalog_lists_every_game_when_authenticated() throws Exception {
@@ -113,34 +113,34 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[2].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[2].defaultTurnSeconds").value(30))
                 .andExpect(jsonPath("$.games[2].turnSecondsChoices").value(org.hamcrest.Matchers.contains(20, 30, 45, 60)))
-                .andExpect(jsonPath("$.games[3].id").value("OMOK"))
-                .andExpect(jsonPath("$.games[3].displayName").value("오목"))
-                .andExpect(jsonPath("$.games[3].minPlayers").value(2))
+                // D-181~D-183·D-200 — 얏추(D-207, 코드 이름은 YACHT 그대로): 1~4인(혼자 하기), 방 옵션 없음, 차례 전체 45초, 선택지 끔·20·30·45·60.
+                .andExpect(jsonPath("$.games[3].id").value("YACHT"))
+                .andExpect(jsonPath("$.games[3].displayName").value("얏추"))
+                .andExpect(jsonPath("$.games[3].minPlayers").value(1))
                 .andExpect(jsonPath("$.games[3].maxPlayers").value(4))
-                // D-176 — 모드·룰·봇 난이도(값을 가진 방 옵션). D-190 — 공개.
-                .andExpect(jsonPath("$.games[3].supportedRoomOptions").value(
-                        org.hamcrest.Matchers.contains("TEAM_MODE", "OMOK_RULE", "BOT_LEVEL")))
-                .andExpect(jsonPath("$.games[3].status").value("AVAILABLE"))
-                // D-196 — 할 수 있는 인원: 모드가 정원을 정해(1:1 → 2, 2:2 → 4) 3명은 없다. 나머지 게임은 min..max 그대로.
-                .andExpect(jsonPath("$.games[3].playerCounts").value(org.hamcrest.Matchers.contains(2, 4)))
-                .andExpect(jsonPath("$.games[3].defaultPlayers").value(2))
-                .andExpect(jsonPath("$.games[3].defaultTurnSeconds").value(30))
-                .andExpect(jsonPath("$.games[3].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 15, 30, 60)))
-                // D-181~D-183·D-200 — 요트: 1~4인(혼자 하기), 방 옵션 없음, 차례 전체 45초, 선택지 끔·20·30·45·60.
-                .andExpect(jsonPath("$.games[4].id").value("YACHT"))
-                .andExpect(jsonPath("$.games[4].displayName").value("요트"))
-                .andExpect(jsonPath("$.games[4].minPlayers").value(1))
-                .andExpect(jsonPath("$.games[4].maxPlayers").value(4))
                 // D-202 — 진행 방식(차례대로 / 모두 같이)
-                .andExpect(jsonPath("$.games[4].supportedRoomOptions.length()").value(1))
-                .andExpect(jsonPath("$.games[4].supportedRoomOptions[0]").value("TURN_MODE"))
-                .andExpect(jsonPath("$.games[4].roomOptionChoices[0].values").value(
+                .andExpect(jsonPath("$.games[3].supportedRoomOptions.length()").value(1))
+                .andExpect(jsonPath("$.games[3].supportedRoomOptions[0]").value("TURN_MODE"))
+                .andExpect(jsonPath("$.games[3].roomOptionChoices[0].values").value(
                         org.hamcrest.Matchers.contains("SEQUENTIAL", "SIMULTANEOUS")))
+                .andExpect(jsonPath("$.games[3].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.games[3].playerCounts").value(org.hamcrest.Matchers.contains(1, 2, 3, 4)))
+                .andExpect(jsonPath("$.games[3].defaultPlayers").value(4))
+                .andExpect(jsonPath("$.games[3].defaultTurnSeconds").value(45))
+                .andExpect(jsonPath("$.games[3].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 20, 30, 45, 60)))
+                .andExpect(jsonPath("$.games[4].id").value("OMOK"))
+                .andExpect(jsonPath("$.games[4].displayName").value("오목"))
+                .andExpect(jsonPath("$.games[4].minPlayers").value(2))
+                .andExpect(jsonPath("$.games[4].maxPlayers").value(4))
+                // D-176 — 모드·룰·봇 난이도(값을 가진 방 옵션). D-190 — 공개.
+                .andExpect(jsonPath("$.games[4].supportedRoomOptions").value(
+                        org.hamcrest.Matchers.contains("TEAM_MODE", "OMOK_RULE", "BOT_LEVEL")))
                 .andExpect(jsonPath("$.games[4].status").value("AVAILABLE"))
-                .andExpect(jsonPath("$.games[4].playerCounts").value(org.hamcrest.Matchers.contains(1, 2, 3, 4)))
-                .andExpect(jsonPath("$.games[4].defaultPlayers").value(4))
-                .andExpect(jsonPath("$.games[4].defaultTurnSeconds").value(45))
-                .andExpect(jsonPath("$.games[4].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 20, 30, 45, 60)))
+                // D-196 — 할 수 있는 인원: 모드가 정원을 정해(1:1 → 2, 2:2 → 4) 3명은 없다. 나머지 게임은 min..max 그대로.
+                .andExpect(jsonPath("$.games[4].playerCounts").value(org.hamcrest.Matchers.contains(2, 4)))
+                .andExpect(jsonPath("$.games[4].defaultPlayers").value(2))
+                .andExpect(jsonPath("$.games[4].defaultTurnSeconds").value(30))
+                .andExpect(jsonPath("$.games[4].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 15, 30, 60)))
                 .andExpect(jsonPath("$.games[5].id").value("ONE_CARD"))
                 .andExpect(jsonPath("$.games[5].displayName").value("원카드"))
                 .andExpect(jsonPath("$.games[5].minPlayers").value(2))

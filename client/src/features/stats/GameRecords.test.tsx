@@ -26,7 +26,7 @@ describe('GameRecords (D-115 — 프로필 게임별 전적)', () => {
         records={[
           { gameType: 'YACHT', rating: 1000, tier: 'MISSILE', winCount: 0, loseCount: 0, desertCount: 0, bestScore: 231 },
         ]}
-        names={{ YACHT: '요트' }}
+        names={{ YACHT: '얏추' }}
       />,
     );
     expect(screen.getByText('최고 231점')).toBeTruthy();

@@ -122,7 +122,7 @@ interface Party {
   category: Category;
   seat: number;
   points: number;
-  /** 현수막에 놓을 주사위(mid) — 기억한 굴림이 족보와 안 맞으면 null. */
+  /** 현수막에 놓을 주사위(mid·yacht) — 기억한 굴림이 족보와 안 맞으면 null. */
   dice: number[] | null;
   /** 펠트가 화면 밖이라 축하 층을 화면에 띄운다. */
   float: boolean;
@@ -154,7 +154,7 @@ interface Props {
 }
 
 /**
- * 요트 게임판 조립 루트(요트 S4, 설계 `docs/plans/yacht.md` §7). 원카드처럼 자기 소켓을 소유하고 자기 sink 를 주입한다(D-103).
+ * 얏추(코드 이름 요트 — D-207 표시 이름만 바꿈) 게임판 조립 루트(요트 S4, 설계 `docs/plans/yacht.md` §7). 원카드처럼 자기 소켓을 소유하고 자기 sink 를 주입한다(D-103).
  *
  * <p>순차 진행이라 화면의 중심은 <b>차례인 사람의 주사위</b>다 — 전원이 같은 주사위 판을 보고, 홀드(`DICE_HELD`)와 굴림이 실시간으로
  * 움직이며, 점수표의 차례 열에 서버가 계산한 후보 점수가 흐리게 뜬다(D-181 — 기다림을 구경으로). 좌석 띠는 점수표 열과 같은 좌석
@@ -181,7 +181,7 @@ export function YachtTable({
   const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef, requestResync } =
     useStompRoom(roomId, token, yachtRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
-  const { muted, toggleMute, playChime } = useSfx();
+  const { muted, toggleMute, playChime, playYacht } = useSfx();
   const liveReactions = useLiveReactions();
   const chatLines = useSeatChatLines(playerIds);
   const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
@@ -335,6 +335,8 @@ export function YachtTable({
     if (!last) return;
     if (last.seat !== mySeat) {
       if (last.category !== 'YACHT' || last.points <= 0) return;
+      // D-207 — 남의 요트는 작은 두 음만(명패 꼬리표와 같이). 연출 설정과 무관하게 음소거만 따른다.
+      playYacht(false);
       setSeatParty({ seat: last.seat, nonce: last.nonce, points: last.points });
       window.clearTimeout(seatPartyTimer.current);
       seatPartyTimer.current = window.setTimeout(() => setSeatParty(null), YACHT_PARTY_MS);
@@ -351,6 +353,8 @@ export function YachtTable({
             ? 'bonus'
             : null;
     if (!kind) return;
+    // D-207 — 내 요트는 팡파르. 움직임을 끈 화면에서도 소리는 난다(음소거만 따른다).
+    if (kind === 'yacht') playYacht(true);
     const f = feltRef.current?.getBoundingClientRect();
     const cell = rootRef.current?.querySelector(`[data-yt-bonus="${last.seat}"]`)?.getBoundingClientRect();
     // 펠트 한가운데가 화면 안에 있나 — 아니면 화면 위쪽에 띄운다.
@@ -362,7 +366,7 @@ export function YachtTable({
       category: last.category,
       seat: last.seat,
       points: kind === 'bonus' ? (seatNow?.bonus ?? 0) : last.points,
-      dice: kind === 'mid' ? celebrationDice(last.category, seenDice.current[last.seat]) : null,
+      dice: kind !== 'bonus' ? celebrationDice(last.category, seenDice.current[last.seat]) : null,
       cellX: cell ? cell.left + cell.width / 2 : 0,
       cellY: cell ? cell.top + cell.height / 2 : 0,
       x: f && !float ? f.left + f.width / 2 : window.innerWidth / 2,
@@ -499,9 +503,17 @@ export function YachtTable({
   const fxLayer = (
     <>
         {fx && fx.kind === 'yacht' && (
-          <div className={`yt-fx yt-fx-yacht${fx.float ? ' yt-fx-float' : ''}`} key={fx.nonce} aria-hidden="true">
+          <div
+            className={`yt-fx yt-fx-yacht${fx.dice ? ' yt-fx-yacht-dice' : ''}${fx.float ? ' yt-fx-float' : ''}`}
+            key={fx.nonce}
+            aria-hidden="true"
+          >
             <span className="yt-fx-rays" />
             <span className="yt-fx-flash" />
+            {/* D-207 — 다섯 음이 끝나는 박자에 두 번째 섬광과 금빛 충격 고리 둘. */}
+            <span className="yt-fx-flash yt-fx-flash-2" />
+            <span className="yt-fx-ring" />
+            <span className="yt-fx-ring yt-fx-ring-2" />
             <span className="yt-fx-sweep" />
             {/* D-204 — 샴페인 기포가 아래에서 올라오고, 금 리본이 두 모서리에서 풀리고, 금 띠 조각이 흩날린다. */}
             <span className="yt-fx-bubbles">
@@ -552,6 +564,16 @@ export function YachtTable({
             </span>
             <div className="yt-fx-banner">
               <b>요트</b>
+              {/* D-207 — 그 굴림의 같은 눈 다섯 개가 효과음 다섯 음과 같은 박자로 하나씩 놓인다. */}
+              {fx.dice && (
+                <span className="yt-fx-dice yt-fx-dice-five">
+                  {fx.dice.map((d, i) => (
+                    <span key={i} className="yt-fx-die" style={{ ['--yt-i' as string]: i } as CSSProperties}>
+                      <YachtDie face={d} mini />
+                    </span>
+                  ))}
+                </span>
+              )}
               <i>
                 {partyName} · {fx.points}점
               </i>
@@ -586,7 +608,7 @@ export function YachtTable({
       <header className="yt-header gm-header">
         <div className="yt-header-badges gm-header-info">
           <GameIcon gameId="YACHT" size={22} />
-          <span className="yt-badge yt-badge-title">요트</span>
+          <span className="yt-badge yt-badge-title">얏추</span>
           <span className="yt-badge">라운드 {Math.min(s.round, 12)}/12</span>
           {spectator && <span className="yt-badge">관전 모드</span>}
         </div>

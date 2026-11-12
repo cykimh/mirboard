@@ -23,6 +23,11 @@ vi.mock('@/ws/useStompRoom', () => ({
     requestResync: vi.fn(),
   }),
 }));
+// D-207 — 효과음은 훅을 모의로 두고 불렸는지만 본다(합성·음소거는 `useSfx.test`).
+const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn() }));
+vi.mock('@/features/sound/useSfx', () => ({
+  useSfx: () => ({ muted: false, toggleMute: vi.fn(), playChime: sfx.playChime, playYacht: sfx.playYacht }),
+}));
 vi.mock('@/api/users', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/users')>();
   return { ...actual, usersApi: { ...actual.usersApi, stats: () => Promise.resolve({ games: [] }) } };
@@ -76,6 +81,10 @@ function scored(seatNo: number, category: string, points: number, over: Record<s
     });
   });
 }
+
+beforeEach(() => {
+  sfx.playYacht.mockClear();
+});
 
 /** D-204 — 살롱 연출 고도화: 컵에서 쏟는 굴림, 족보 축하 두 단계, 숫자 비행, 보너스, 좌석 띠 따라 굴림, 순위 뒤집기. */
 describe('요트 연출 고도화 (D-204)', () => {
@@ -196,6 +205,13 @@ describe('요트 연출 고도화 (D-204)', () => {
       expect(fx!.querySelectorAll('.yt-fx-ribbon svg')).toHaveLength(2);
       expect(fx!.querySelectorAll('.yt-fx-coupe svg')).toHaveLength(2);
       expect(fx!.querySelector('.yt-fx-banner')?.textContent).toContain('나 · 50점');
+      // D-207 — 같은 눈 다섯 개가 현수막에 놓이고(6 다섯 개 = 눈 30개), 두 번째 섬광·충격 고리 둘이 붙는다. 내 요트는 팡파르 한 번.
+      expect(fx!.querySelectorAll('.yt-fx-dice-five .yt-fx-die')).toHaveLength(5);
+      expect(fx!.querySelectorAll('.yt-fx-dice-five circle')).toHaveLength(30);
+      expect(fx!.querySelectorAll('.yt-fx-ring')).toHaveLength(2);
+      expect(fx!.querySelector('.yt-fx-flash-2')).not.toBeNull();
+      expect(sfx.playYacht).toHaveBeenCalledTimes(1);
+      expect(sfx.playYacht).toHaveBeenCalledWith(true);
       expect(container.querySelector('.yt-felt-party')).not.toBeNull();
       act(() => {
         vi.advanceTimersByTime(YACHT_PARTY_MS);
@@ -209,6 +225,19 @@ describe('요트 연출 고도화 (D-204)', () => {
       const { container } = renderTable();
       scored(0, 'YACHT', 0);
       expect(container.querySelector('.yt-fx')).toBeNull();
+      expect(sfx.playYacht).not.toHaveBeenCalled();
+    });
+
+    it('D-207 — 연출을 꺼도 내 요트 효과음은 난다(움직임만 끈다), 라지 스트레이트는 팡파르가 없다', () => {
+      useCardAnimStore.setState({ enabled: false });
+      seed({ dice: [2, 2, 2, 2, 2], rolls: 3, candidates: { YACHT: 50 } });
+      const { container } = renderTable();
+      scored(0, 'LARGE_STRAIGHT', 30);
+      expect(sfx.playYacht).not.toHaveBeenCalled();
+      scored(0, 'YACHT', 50);
+      expect(container.querySelector('.yt-fx')).toBeNull();
+      expect(sfx.playYacht).toHaveBeenCalledTimes(1);
+      expect(sfx.playYacht).toHaveBeenCalledWith(true);
     });
 
     it('라지 스트레이트·풀 하우스는 중간 축하 — 그 굴림의 주사위 다섯 개가 현수막에 놓인다', () => {
@@ -270,8 +299,12 @@ describe('요트 연출 고도화 (D-204)', () => {
       expect(container.querySelector('[data-yt-seat="0"]')).not.toHaveClass('yt-seat-party');
       expect(container.querySelector('.yt-fx, .yt-felt-party, .yt-felt-cheer')).toBeNull();
       expect(screen.queryByText('🎉 요트!')).toBeNull();
+      // D-207 — 남의 요트는 작은 소리(팡파르 아님) 한 번.
+      expect(sfx.playYacht).toHaveBeenCalledTimes(1);
+      expect(sfx.playYacht).toHaveBeenCalledWith(false);
       // 그사이 축하 없는 다른 기록이 와도 제때 걷힌다.
       scored(1, 'ONES', 1);
+      expect(sfx.playYacht).toHaveBeenCalledTimes(1);
       expect(container.querySelector('.yt-seat-yacht')).not.toBeNull();
       act(() => {
         vi.advanceTimersByTime(YACHT_PARTY_MS);
@@ -284,6 +317,7 @@ describe('요트 연출 고도화 (D-204)', () => {
       const { container } = renderTable();
       scored(1, 'YACHT', 0);
       expect(container.querySelector('.yt-seat-yacht, .yt-seat-party')).toBeNull();
+      expect(sfx.playYacht).not.toHaveBeenCalled();
       useCardAnimStore.setState({ enabled: false });
       scored(1, 'YACHT', 50);
       expect(container.querySelector('.yt-seat-yacht')).not.toBeNull();
