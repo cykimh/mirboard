@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateRoomModal } from './CreateRoomModal';
 import { roomsApi } from '@/api/rooms';
 import type { GameSummary } from '@/types/api';
@@ -150,5 +150,36 @@ describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () =
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().capacity).toBeUndefined();
+  });
+});
+
+/** D-197 — 쉬던 서버(콜드 스타트 약 30초)라 오래 걸리면 버튼 글자로 알린다. */
+describe('CreateRoomModal — 서버 깨우는 중 안내 (D-197)', () => {
+  beforeEach(() => {
+    createMock.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('방 만들기가 2초를 넘기면 "서버 깨우는 중… (최대 30초)", 그 전에는 "생성 중..."', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let resolveCreate!: (r: { roomId: string }) => void;
+    createMock.mockReturnValue(new Promise((res) => (resolveCreate = res)));
+    openModal([VARIABLE]);
+
+    fireEvent.change(await screen.findByLabelText('방 이름'), { target: { value: '우리 방' } });
+    fireEvent.click(screen.getByRole('button', { name: '방 만들기' }));
+
+    const pending = await screen.findByRole('button', { name: '생성 중...' });
+    expect(pending).toBeDisabled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(pending).toHaveTextContent('서버 깨우는 중… (최대 30초)');
+
+    await act(async () => resolveCreate({ roomId: 'r1' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '방 만들기' })).toBeInTheDocument());
   });
 });
