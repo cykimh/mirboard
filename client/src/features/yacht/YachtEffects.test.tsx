@@ -231,15 +231,63 @@ describe('요트 연출 고도화 (D-204)', () => {
       expect(container.querySelector('.yt-fx')).toBeNull();
     });
 
-    it('남의 풀 하우스도 그 사람 이름으로 축하한다(차례대로 — 가운데 판이 그 사람 주사위)', () => {
-      seed({ turnSeat: 1, dice: [6, 2, 6, 2, 2], rolls: 3, candidates: { FULL_HOUSE: 18 } });
+    it('D-206 — 남의 라지 스트레이트·풀 하우스·보너스는 축하하지 않는다(펠트도, 상태 줄도, 명패도)', () => {
+      seed({
+        seats: [seat(0), seat(1, { upperSubtotal: 57, total: 57 })],
+        turnSeat: 1,
+        dice: [6, 2, 6, 2, 2],
+        rolls: 3,
+        candidates: { FULL_HOUSE: 18 },
+      });
       const { container } = renderTable();
       scored(1, 'FULL_HOUSE', 18);
-      const banner = container.querySelector('.yt-fx-mid .yt-fx-banner-mid');
-      expect(banner?.textContent).toContain('풀 하우스');
-      expect(banner?.textContent).toContain('준호 · 18점');
-      expect(container.querySelectorAll('.yt-fx-dice-house .yt-fx-die')).toHaveLength(5);
-      expect(screen.getByText('🎉 풀 하우스!')).toBeInTheDocument();
+      expect(container.querySelector('.yt-fx, .yt-felt-cheer, .yt-felt-party, .yt-seat-yacht, .yt-seat-party')).toBeNull();
+      expect(screen.queryByText('🎉 풀 하우스!')).toBeNull();
+      scored(1, 'LARGE_STRAIGHT', 30);
+      expect(container.querySelector('.yt-fx, .yt-felt-cheer, .yt-seat-yacht')).toBeNull();
+      scored(1, 'SIXES', 12, { upperSubtotal: 69, bonus: 35, total: 104 });
+      expect(container.querySelector('.yt-fx, .yt-cell-bonus-new, .yt-seat-yacht')).toBeNull();
+      expect(screen.queryByText('보너스 +35!')).toBeNull();
+      // 점수 자체는 그대로 적힌다.
+      expect(container.querySelector('[data-yt-bonus="1"]')?.textContent).toBe('+35');
+    });
+
+    it('D-206 — 남의 요트는 그 사람 좌석 명패에서만 알린다 — 내 펠트는 조용하고 YACHT_PARTY_MS 뒤 걷힌다', () => {
+      vi.useFakeTimers();
+      seed({
+        turnSeat: -1,
+        simultaneous: true,
+        turns: [
+          { seat: 0, dice: [1, 2, 3, 4, 6], held: NONE, rolls: 1, pending: true, candidates: {} },
+          { seat: 1, dice: [4, 4, 4, 4, 4], held: NONE, rolls: 2, pending: true, candidates: { YACHT: 50 } },
+        ],
+      });
+      const { container } = renderTable();
+      scored(1, 'YACHT', 50);
+      const li = container.querySelector('[data-yt-seat="1"]')!;
+      expect(li).toHaveClass('yt-seat-party');
+      expect(li.querySelector(':scope > .yt-seat-yacht')?.textContent).toBe('요트! 50점');
+      expect(container.querySelector('[data-yt-seat="0"]')).not.toHaveClass('yt-seat-party');
+      expect(container.querySelector('.yt-fx, .yt-felt-party, .yt-felt-cheer')).toBeNull();
+      expect(screen.queryByText('🎉 요트!')).toBeNull();
+      // 그사이 축하 없는 다른 기록이 와도 제때 걷힌다.
+      scored(1, 'ONES', 1);
+      expect(container.querySelector('.yt-seat-yacht')).not.toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(YACHT_PARTY_MS);
+      });
+      expect(container.querySelector('.yt-seat-yacht, .yt-seat-party')).toBeNull();
+    });
+
+    it('D-206 — 남의 요트 0점(버림)은 알리지 않고, 연출을 끄면 꼬리표만 뜬다', () => {
+      seed({ turnSeat: 1, dice: [1, 2, 3, 4, 6], rolls: 1, candidates: { YACHT: 0 } });
+      const { container } = renderTable();
+      scored(1, 'YACHT', 0);
+      expect(container.querySelector('.yt-seat-yacht, .yt-seat-party')).toBeNull();
+      useCardAnimStore.setState({ enabled: false });
+      scored(1, 'YACHT', 50);
+      expect(container.querySelector('.yt-seat-yacht')).not.toBeNull();
+      expect(container.querySelector('.yt-seat-party')).toBeNull();
     });
 
     it('날아가는 것은 점수 숫자다 — 잔상은 숫자가 없다', () => {
@@ -396,6 +444,8 @@ describe('요트 연출 고도화 (D-204)', () => {
         '.yt-theme-salon .yt-mini-die-rolling',
         '.yt-theme-salon .yt-cell-bonus-new .yt-num',
         '.yt-theme-salon .yt-end-reveal .yt-end-row',
+        '.yt-theme-salon .yt-seat-yacht',
+        '.yt-theme-salon .yt-seat-party',
       ]) {
         expect(responsiveCssSource, needle).toContain(needle);
       }

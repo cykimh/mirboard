@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MAX_ROLLS, type Dice, type Held } from '@/types/yacht';
 import { YachtDie, YachtDieCube } from './YachtDie';
 
@@ -58,6 +58,15 @@ interface Props {
   turnName: string | null;
   /** D-202 — 굴리기 버튼이 없을 때의 안내를 바꾼다(동시 진행의 기다림). */
   note?: string;
+  /**
+   * D-205 — 누구의 판을 비추나(남의 판 구경). 이 값이 바뀌어 `rollNonce` 가 달라진 것은 굴림이 아니다 — 구르지 않는다.
+   */
+  viewKey?: number;
+  /** D-205 — 남의 판을 보는 중이면 안내 옆에 돌아가는 버튼. */
+  onBack?: () => void;
+  backLabel?: string;
+  /** 아직 내 차례가 남았다 — 돌아가는 버튼을 굴리기 버튼처럼 눈에 띄게. */
+  backUrgent?: boolean;
 }
 
 /**
@@ -77,14 +86,25 @@ export function DiceTray({
   onRoll,
   turnName,
   note,
+  viewKey = -1,
+  onBack,
+  backLabel = '내 판으로',
+  backUrgent = false,
 }: Props) {
   const [rolling, setRolling] = useState(false);
+  const seenView = useRef(viewKey);
   useEffect(() => {
+    const switched = seenView.current !== viewKey;
+    seenView.current = viewKey;
+    if (switched) {
+      setRolling(false);
+      return;
+    }
     if (rollNonce === 0 || !animate) return;
     setRolling(true);
     const timer = window.setTimeout(() => setRolling(false), ROLL_ANIMATION_MS);
     return () => window.clearTimeout(timer);
-  }, [rollNonce, animate]);
+  }, [rollNonce, animate, viewKey]);
 
   const left = MAX_ROLLS - rolls;
   // D-203 — 다섯 개가 같게 멈추면 가벼운 반짝임(본 축하는 요트 칸에 기록할 때).
@@ -145,6 +165,11 @@ export function DiceTray({
           <span className="yt-tray-note">
             {note ?? (turnName ? `${turnName} 차례 · 굴림 ${rolls}/${MAX_ROLLS}` : '대기 중')}
           </span>
+        )}
+        {onBack && (
+          <button type="button" className={`yt-back${backUrgent ? ' yt-back-urgent' : ''}`} onClick={onBack}>
+            {backLabel}
+          </button>
         )}
       </div>
     </section>

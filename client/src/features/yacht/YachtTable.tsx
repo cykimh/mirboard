@@ -15,7 +15,7 @@ import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
-import { MAX_ROLLS, type Category, type Held } from '@/types/yacht';
+import { MAX_ROLLS, NO_HOLD, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
 import { useYachtStore } from './yachtStore';
 import { DiceTray } from './DiceTray';
@@ -30,6 +30,7 @@ import { useYachtBest } from './useYachtBest';
 import { isGuestName } from '@/features/stats/playerTiers';
 import { salonTheme, seatAccent, yachtThemeClass } from './yachtTheme';
 import { GoldBurst } from './GoldBurst';
+import { showToast } from '@/components/toast/toastStore';
 
 export { seatAccent };
 
@@ -51,6 +52,11 @@ export const BUSY_RETRY_DELAY_MS = 150;
 export const YACHT_PARTY_MS = 2600;
 /** D-204 — 중간 축하(라지 스트레이트·풀 하우스 현수막, 상단 보너스 명패)가 떠 있는 시간. */
 export const MID_PARTY_MS = 1800;
+/**
+ * D-205 — 남의 판을 구경하다가도 내 차례를 놓치지 않게: 아직 기록하지 않았는데 라운드 마감이 이만큼 남으면 내 판으로 되돌린다
+ * (이때부터는 남의 판을 열 수도 없다).
+ */
+export const WATCH_RETURN_BEFORE_MS = 10_000;
 /** 점수 숫자가 칸에 닿는 시점(비행 길이) — 칸의 금박·불티가 이때 시작한다. CSS `yt-salon-chip` 길이와 같다(D-204 — 숫자가 읽히게 조금 길게). */
 export const CHIP_FLIGHT_MS = 480;
 /** 숫자 뒤를 따르는 잔상 수. */
@@ -194,9 +200,17 @@ export function YachtTable({
   const simultaneous = s.simultaneous && !roomFinished;
   const myPending = simultaneous ? (s.seatTurns[mySeat]?.pending ?? false) : turnSeat === mySeat;
   const myTurn = !spectator && mySeat >= 0 && !iAmOut && s.result === null && myPending;
-  const canHold = myTurn && connected && s.rolls >= 1 && s.rolls < MAX_ROLLS;
-  const canRoll = myTurn && connected && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
-  const canScore = myTurn && connected && s.rolls >= 1;
+  // D-205 — 좌석을 눌러 그 사람 판 보기(모두 같이 굴릴 때만 — 차례대로면 가운데 판이 이미 차례인 사람 것이다). 보기만 한다:
+  // 구경하는 동안에는 내 굴리기·고정·기록을 아예 보내지 않는다. 쓰는 값은 전부 이미 받은 공개 상태(`seatTurns`)다.
+  const [watchSeat, setWatchSeat] = useState<number | null>(null);
+  const canWatch = simultaneous && s.result === null;
+  const watchable = (seat: number) =>
+    canWatch && seat !== mySeat && s.seatTurns[seat] !== undefined && !(s.seats.find((x) => x.seat === seat)?.deserted ?? false);
+  const watching = watchSeat !== null && watchable(watchSeat) ? watchSeat : null;
+  const watched = watching !== null ? s.seatTurns[watching] : null;
+  const canHold = myTurn && watching === null && connected && s.rolls >= 1 && s.rolls < MAX_ROLLS;
+  const canRoll = myTurn && watching === null && connected && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
+  const canScore = myTurn && watching === null && connected && s.rolls >= 1;
   // D-201 — 판 시작 때의 내 최고 점수(종료 화면이 "새 최고 기록!"을 가른다). 관전자·게스트는 묻지 않는다.
   const guest = isGuestName(usernames[myUserId]);
   const previousBest = useYachtBest(token, myUserId, !spectator && !guest);
@@ -216,6 +230,37 @@ export function YachtTable({
     }
     wasMyTurn.current = myTurn;
   }, [myTurn, playChime, muted]);
+
+  // D-205 — 구경하다 새 라운드가 시작되면(내가 다시 굴릴 차례) 바로 내 판으로 돌아온다. 위 알림음·진동과 같은 순간이다.
+  const wasMyTurnForWatch = useRef(myTurn);
+  useEffect(() => {
+    if (myTurn && !wasMyTurnForWatch.current) setWatchSeat(null);
+    wasMyTurnForWatch.current = myTurn;
+  }, [myTurn]);
+  // 아직 기록하지 않은 채 구경 중이면 마감 `WATCH_RETURN_BEFORE_MS` 전에 내 판으로 되돌리고 알린다(시간 제한이 없는 방은 버튼 문구로만 알린다).
+  const watchingOnMyTurn = watching !== null && myTurn;
+  const clockForWatch = s.turnClock;
+  useEffect(() => {
+    if (!watchingOnMyTurn || turnSeconds <= 0 || clockForWatch === null) return;
+    const fullTurnMs = turnSeconds * 1000;
+    const deadline = clockForWatch.since + Math.min(clockForWatch.remainingMs ?? fullTurnMs, fullTurnMs);
+    const timer = window.setTimeout(() => {
+      setWatchSeat(null);
+      showToast('시간이 얼마 남지 않아 내 판으로 돌아왔어요');
+    }, Math.max(0, deadline - WATCH_RETURN_BEFORE_MS - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [watchingOnMyTurn, clockForWatch, turnSeconds]);
+  // 구경하는 판의 굴림 신호 — 그 사람의 굴림 수가 오를 때만 가운데 주사위가 구른다(판을 바꿔 볼 때는 구르지 않는다).
+  const watchRoll = useRef({ seat: -1, rolls: 0, nonce: 0 });
+  if (watching !== null && watched) {
+    const w = watchRoll.current;
+    if (w.seat === watching && watched.rolls > w.rolls) w.nonce += 1;
+    w.seat = watching;
+    w.rolls = watched.rolls;
+  } else {
+    watchRoll.current.seat = -1;
+  }
+  const selectSeat = (seat: number) => setWatchSeat(seat === mySeat || seat === watching ? null : seat);
 
   // 기록 강조는 잠깐만. D-203 — 황동 칩이 주사위 자리(동시 진행의 남은 그 좌석 띠)에서 방금 적힌 칸으로 날아가 꽂힌다.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -269,11 +314,32 @@ export function YachtTable({
 
   // D-203 — 본 축하는 요트 칸에 점수를 적을 때(5개가 같게 멈춘 순간은 주사위 반짝임만). D-204 — 라지 스트레이트·풀 하우스는 중간 축하,
   // 상단 보너스가 처음 붙는 기록은 보너스 축하(위 칸 기록이라 족보 축하와 겹치지 않는다).
+  // D-206 — 펠트·가운데 판의 축하는 <b>내 기록</b>만이다. 남의 기록은 요트(0점 아님)일 때만 그 사람 좌석 명패에서 작게 알리고
+  // (`seatParty`), 남의 라지 스트레이트·풀 하우스·보너스는 축하하지 않는다.
   const feltRef = useRef<HTMLDivElement>(null);
   const [party, setParty] = useState<Party | null>(null);
+  const [seatParty, setSeatParty] = useState<{ seat: number; nonce: number; points: number } | null>(null);
+  // 걷는 타이머는 효과 정리에 맡기지 않는다 — 축하가 떠 있는 동안 축하 없는 다음 기록이 오면 정리가 타이머만 지워 축하가 남는다
+  // (모두 같이 굴리면 기록이 잇달아 온다).
+  const partyTimer = useRef(0);
+  const seatPartyTimer = useRef(0);
+  useEffect(
+    () => () => {
+      window.clearTimeout(partyTimer.current);
+      window.clearTimeout(seatPartyTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     const last = s.lastScore;
     if (!last) return;
+    if (last.seat !== mySeat) {
+      if (last.category !== 'YACHT' || last.points <= 0) return;
+      setSeatParty({ seat: last.seat, nonce: last.nonce, points: last.points });
+      window.clearTimeout(seatPartyTimer.current);
+      seatPartyTimer.current = window.setTimeout(() => setSeatParty(null), YACHT_PARTY_MS);
+      return;
+    }
     const seatNow = useYachtStore.getState().seats.find((x) => x.seat === last.seat);
     const bonusNew = seenBonus.current[last.seat] === 0 && (seatNow?.bonus ?? 0) > 0;
     const kind: Party['kind'] | null =
@@ -303,8 +369,10 @@ export function YachtTable({
       y: f && !float ? f.top + f.height * 0.45 : window.innerHeight * 0.3,
       width: f && !float ? f.width : window.innerWidth,
     });
-    const timer = window.setTimeout(() => setParty(null), kind === 'yacht' ? YACHT_PARTY_MS : MID_PARTY_MS);
-    return () => window.clearTimeout(timer);
+    window.clearTimeout(partyTimer.current);
+    partyTimer.current = window.setTimeout(() => setParty(null), kind === 'yacht' ? YACHT_PARTY_MS : MID_PARTY_MS);
+    // 기록 하나에 한 번만(위 기록 강조와 같다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.lastScore]);
   // 위 효과가 직전 값을 읽은 뒤에 갱신한다(같은 커밋에서 선언 순서대로 돈다).
   useEffect(() => {
@@ -418,6 +486,8 @@ export function YachtTable({
   };
 
   const bonusParty = party?.kind === 'bonus' ? party : null;
+  // 가운데 판이 비추는 굴림 수 — 구경 중이면 그 사람 것.
+  const trayRolls = watched ? watched.rolls : s.rolls;
   const announcement = flash
     ? `${nameOf(flash.seat)} ${CATEGORY_LABEL[flash.category]} ${flash.points}점${flash.auto ? ' (시간 초과 자동 기록)' : ''}${bonusParty ? ` · 상단 보너스 +${bonusParty.points}` : ''}`
     : '';
@@ -555,7 +625,9 @@ export function YachtTable({
         </p>
       )}
 
-      {/* 좌석 띠 — 점수표 열과 같은 좌석 순서. 차례인 좌석은 테두리. */}
+      {/* 좌석 띠 — 점수표 열과 같은 좌석 순서. 차례인 좌석은 테두리.
+          D-205 — 명패 높이는 늘 같다: 이름·점수 한 줄(+ 모두 같이면 주사위 줄 한 칸)뿐이고, "차례"·"끊김"·"탈주"·내보내기·채팅 한 줄은
+          전부 명패 모서리에 걸친 겹침 층이라 붙었다 사라져도 아래 주사위 판·점수표가 밀리지 않는다. "기록함 ✓" 는 주사위 줄 자리에 들어간다. */}
       <ol className="yt-seats" aria-label="좌석">
         {s.seats.map((seat) => {
           const uid = playerIds[seat.seat];
@@ -565,37 +637,80 @@ export function YachtTable({
           const done = simultaneous && !seat.deserted && seatTurn !== undefined && !seatTurn.pending;
           const disconnected = s.disconnectedSeats.has(seat.seat);
           const v = voiceStatusOf(voice, uid);
+          const isMe = seat.seat === mySeat;
+          const isWatched = seat.seat === watching;
+          // 누를 수 있는 명패 — 남의 명패는 그 사람 판 보기, 내 명패는 (구경 중일 때) 내 판으로.
+          const selectable = watchable(seat.seat) || (isMe && watching !== null);
+          const yachtParty = seatParty?.seat === seat.seat ? seatParty : null;
+          // 내 주사위는 가운데 판에 있다 — 남의 판을 구경하는 동안에만 내 명패에 작게 보인다.
+          const showDice = seatTurn?.pending && (!isMe || watching !== null);
+          const body = (
+            <>
+              <span className="yt-seat-head">
+                <span className="yt-seat-chip" aria-hidden="true" />
+                <span className="yt-seat-name">
+                  {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
+                  {nameOf(seat.seat)}
+                  {isMe ? ' (나)' : ''}
+                </span>
+                {v === 'on' && (
+                  <span className="yt-seat-voice" role="img" aria-label="음성 참여 중">
+                    🎧
+                  </span>
+                )}
+                <span className={`yt-seat-total${flash?.seat === seat.seat ? ' yt-seat-total-bump' : ''}`}>{seat.total}점</span>
+              </span>
+              {/* 동시 진행에서는 주사위 줄 자리를 늘 둔다 — 누가 기록해 줄이 사라질 때 좌석 띠 높이가 줄어 아래 주사위 판이 위로 밀리면
+                  누르려던 [굴리기]가 빗나간다. 기록한 좌석은 같은 자리에 "기록함 ✓". */}
+              {simultaneous &&
+                (showDice && seatTurn ? (
+                  <SeatDice turn={seatTurn} animate={animate} />
+                ) : done ? (
+                  <span className="yt-seat-dice yt-seat-dice-done">
+                    <span className="yt-seat-tag">기록함 ✓</span>
+                  </span>
+                ) : (
+                  <span className="yt-seat-dice yt-seat-dice-empty" aria-hidden="true" />
+                ))}
+            </>
+          );
           return (
             <li
               key={seat.seat}
-              className={`yt-seat${seat.seat === mySeat ? ' yt-seat-me' : ''}${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}${done ? ' yt-seat-done' : ''}`}
+              className={`yt-seat${isMe ? ' yt-seat-me' : ''}${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}${done ? ' yt-seat-done' : ''}${isWatched ? ' yt-seat-watch' : ''}${yachtParty && animate ? ' yt-seat-party' : ''}`}
               style={{ ['--yt-accent' as string]: seatAccent(seat.seat) }}
               data-yt-seat={seat.seat}
             >
-              <span className="yt-seat-chip" aria-hidden="true" />
-              <span className="yt-seat-name">
-                {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
-                {nameOf(seat.seat)}
-                {seat.seat === mySeat ? ' (나)' : ''}
-              </span>
-              <span className={`yt-seat-total${flash?.seat === seat.seat ? ' yt-seat-total-bump' : ''}`}>{seat.total}점</span>
-              {isTurn && <span className="yt-seat-tag yt-seat-tag-turn">차례</span>}
-              {done && <span className="yt-seat-tag">기록함 ✓</span>}
-              {seatTurn?.pending && seat.seat !== mySeat ? (
-                <SeatDice turn={seatTurn} animate={animate} />
-              ) : (
-                // 동시 진행에서는 주사위 줄 자리를 늘 비워 둔다 — 누가 기록해 줄이 사라질 때 좌석 띠 높이가 줄어 아래 주사위 판이
-                // 위로 밀리면 누르려던 [굴리기]가 빗나간다.
-                simultaneous && <span className="yt-seat-dice yt-seat-dice-empty" aria-hidden="true" />
-              )}
-              {seat.deserted && <span className="yt-seat-tag">탈주</span>}
-              {disconnected && !seat.deserted && <span className="yt-seat-tag">끊김</span>}
-              {v === 'on' && <span aria-label="음성 참여 중">🎧</span>}
-              {onKick && disconnected && !roomFinished && seat.seat !== mySeat && !seat.deserted && (
-                <button type="button" className="yt-seat-kick" onClick={() => onKick(uid)}>
-                  내보내기
+              {selectable ? (
+                <button
+                  type="button"
+                  className="yt-seat-view yt-seat-pick"
+                  aria-pressed={isMe ? false : isWatched}
+                  title={isMe ? '내 판으로 돌아가기' : isWatched ? '그만 보기' : `${nameOf(seat.seat)} 판 보기`}
+                  onClick={() => selectSeat(seat.seat)}
+                >
+                  {body}
                 </button>
+              ) : (
+                <div className="yt-seat-view">{body}</div>
               )}
+              {/* 겹침 층 — 줄을 차지하지 않는다(D-205). */}
+              {isTurn && <span className="yt-seat-tag yt-seat-tag-turn">차례</span>}
+              {yachtParty && (
+                <span key={yachtParty.nonce} className="yt-seat-tag yt-seat-yacht">
+                  요트! {yachtParty.points}점
+                </span>
+              )}
+              <span className="yt-seat-flags">
+                {isWatched && <span className="yt-seat-tag yt-seat-tag-watch">보는 중</span>}
+                {seat.deserted && <span className="yt-seat-tag">탈주</span>}
+                {disconnected && !seat.deserted && <span className="yt-seat-tag">끊김</span>}
+                {onKick && disconnected && !roomFinished && !isMe && !seat.deserted && (
+                  <button type="button" className="yt-seat-kick" onClick={() => onKick(uid)}>
+                    내보내기
+                  </button>
+                )}
+              </span>
               {chatLines[seat.seat] && (
                 <span key={chatLines[seat.seat].id} className="yt-seat-chat" title={chatLines[seat.seat].text}>
                   {chatLines[seat.seat].text}
@@ -613,8 +728,14 @@ export function YachtTable({
 
       <div
         ref={feltRef}
-        className={`yt-felt${myTurn ? ' yt-felt-myturn' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
-        style={myTurn ? { ['--yt-accent' as string]: seatAccent(mySeat) } : undefined}
+        className={`yt-felt${myTurn && watching === null ? ' yt-felt-myturn' : ''}${watching !== null ? ' yt-felt-watch' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
+        style={
+          watching !== null
+            ? { ['--yt-accent' as string]: seatAccent(watching) }
+            : myTurn
+              ? { ['--yt-accent' as string]: seatAccent(mySeat) }
+              : undefined
+        }
       >
         {salonTheme && (
           <span
@@ -626,47 +747,57 @@ export function YachtTable({
         <div className="yt-felt-status">
           {!roomFinished && (turnSeat >= 0 || simultaneous) && <YachtTurnCountdown turnSeconds={turnSeconds} />}
           {myTurn && <span className="yt-badge yt-badge-turn">내 차례</span>}
-          {flash && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
+          {watching !== null && <span className="yt-badge yt-badge-watch">{nameOf(watching)} 판 보는 중</span>}
+          {/* D-206 — 상태 줄 축하 배지도 내 기록만. */}
+          {flash && flash.seat === mySeat && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
             <span className="yt-badge yt-celebrate">🎉 {CATEGORY_LABEL[flash.category]}!</span>
           )}
           {bonusParty && <span className="yt-badge yt-celebrate">보너스 +{bonusParty.points}!</span>}
-          {!roomFinished && s.result === null && (turnSeat >= 0 || myTurn) && (
-            <span className="yt-rolls" aria-hidden="true" title={`굴림 ${s.rolls}/${MAX_ROLLS}`}>
+          {!roomFinished && s.result === null && (turnSeat >= 0 || myTurn || watched?.pending) && (
+            <span className="yt-rolls" aria-hidden="true" title={`굴림 ${trayRolls}/${MAX_ROLLS}`}>
               {Array.from({ length: MAX_ROLLS }, (_, i) => (
-                <span key={i} className={`yt-rolls-dot${i < s.rolls ? ' yt-rolls-dot-used' : ''}`} />
+                <span key={i} className={`yt-rolls-dot${i < trayRolls ? ' yt-rolls-dot-used' : ''}`} />
               ))}
             </span>
           )}
         </div>
         {fx && !fx.float && fxLayer}
         <DiceTray
-          dice={s.dice}
-          held={s.held}
-          rolls={s.rolls}
-          rollNonce={s.rollNonce}
+          dice={watched ? watched.dice : s.dice}
+          held={watched ? (watched.held ?? NO_HOLD) : s.held}
+          rolls={trayRolls}
+          rollNonce={watched ? watchRoll.current.nonce : s.rollNonce}
+          viewKey={watching ?? -1}
           canHold={canHold}
           canRoll={canRoll}
           animate={animate}
-          onToggle={toggleHold}
-          onRoll={myTurn ? roll : undefined}
+          onToggle={watching === null ? toggleHold : undefined}
+          onRoll={myTurn && watching === null ? roll : undefined}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           note={
             s.result !== null || roomFinished
               ? '판이 끝났습니다'
-              : simultaneous && !myTurn
-                ? mySeat >= 0 && !iAmOut
-                  ? '기록했어요 · 다른 사람을 기다리는 중'
-                  : '모두 같이 굴리는 중'
-                : undefined
+              : watching !== null && watched
+                ? watched.pending
+                  ? `${nameOf(watching)} · 굴림 ${watched.rolls}/${MAX_ROLLS}`
+                  : `${nameOf(watching)} · 기록함 ✓`
+                : simultaneous && !myTurn
+                  ? mySeat >= 0 && !iAmOut
+                    ? '기록했어요 · 다른 사람을 기다리는 중'
+                    : '모두 같이 굴리는 중 · 좌석을 누르면 그 판을 봐요'
+                  : undefined
           }
+          onBack={watching !== null ? () => setWatchSeat(null) : undefined}
+          backLabel={spectator || mySeat < 0 ? '그만 보기' : myTurn ? '내 차례 · 내 판으로' : '내 판으로'}
+          backUrgent={myTurn}
         />
       </div>
 
       <YachtScorecard
         seats={s.seats}
-        turnSeat={simultaneous ? (myTurn ? mySeat : -1) : turnSeat}
+        turnSeat={watching !== null ? watching : simultaneous ? (myTurn ? mySeat : -1) : turnSeat}
         mySeat={mySeat}
-        candidates={s.candidates}
+        candidates={watched ? (watched.pending ? watched.candidates : {}) : s.candidates}
         nameOf={nameOf}
         onScore={canScore ? score : undefined}
         lastScore={flash}
