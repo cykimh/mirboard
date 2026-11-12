@@ -10,4 +10,9 @@ public record Move(int seat, int x, int y, boolean timedOut) {
     public Point point() {
         return new Point(x, y);
     }
+
+    /** 15줄 시절 상태를 19줄 판 가운데로 옮길 때(D-193). */
+    public Move shifted(int d) {
+        return new Move(seat, x + d, y + d, timedOut);
+    }
 }

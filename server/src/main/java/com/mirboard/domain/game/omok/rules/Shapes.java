@@ -17,8 +17,8 @@ import java.util.Set;
  */
 public final class Shapes {
 
-    /** 돌 집합 비트마스크의 오프셋 기준 — 오프셋은 판 안에서 ±14 라 0..28 비트. */
-    private static final int BIT_OFFSET = 14;
+    /** 돌 집합 비트마스크의 오프셋 기준 — 오프셋은 판 안에서 ±(SIZE−1) 라 0..2(SIZE−1) 비트(19줄이면 0..36, long 안). */
+    private static final int BIT_OFFSET = Board.SIZE - 1;
 
     private Shapes() {
     }

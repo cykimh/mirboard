@@ -1,4 +1,4 @@
-import { BOARD_SIZE, type OmokForbiddenPoint, type OmokMove, type OmokPoint, type OmokStone } from '@/types/omok';
+import { BOARD_SIZE, COLUMN_LETTERS, type OmokForbiddenPoint, type OmokMove, type OmokPoint, type OmokStone } from '@/types/omok';
 
 /**
  * 오목 화면 계산 — 판정은 하지 않는다(Server-Authoritative). 금수 자리는 서버가 보낸 목록을 그대로 쓴다.
@@ -34,9 +34,9 @@ export const FORBIDDEN_LABEL: Record<OmokForbiddenPoint['kind'], string> = {
   OVERLINE: '장목(6목 이상) 금수예요',
 };
 
-/** 화면 좌표 글자 — 가로 A~O, 세로 15~1(아래가 1). 데스크톱 표시·보조기기 이름. */
+/** 화면 좌표 글자 — 가로 A~T(I 없음), 세로 19~1(아래가 1). 돋보기·데스크톱 표시·보조기기 이름. */
 export function coordName(p: OmokPoint): string {
-  return `${String.fromCharCode(65 + p.x)}${BOARD_SIZE - p.y}`;
+  return `${COLUMN_LETTERS[p.x] ?? '?'}${BOARD_SIZE - p.y}`;
 }
 
 export const TEAM_OF = (seat: number) => seat % 2;

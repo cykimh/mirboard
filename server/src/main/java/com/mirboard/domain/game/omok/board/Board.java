@@ -3,7 +3,7 @@ package com.mirboard.domain.game.omok.board;
 import java.util.Arrays;
 
 /**
- * 15×15 판 (룰 §1). 불변 — {@link #with} 는 새 판을 돌려준다. 상태에는 수순만 저장하고 판은 수순에서 다시 만든다
+ * 19×19 판 (룰 §1, D-193 — 15×15 에서 바둑판 크기로). 불변 — {@link #with} 는 새 판을 돌려준다. 상태에는 수순만 저장하고 판은 수순에서 다시 만든다
  * ({@code OmokState.board()}).
  *
  * <p>금수 판정처럼 돌을 놓았다 거두는 계산은 {@link #cells()} 사본(가변 {@code byte[]})에서 한다 — 판을 수천 번 복사하지
@@ -11,7 +11,9 @@ import java.util.Arrays;
  */
 public final class Board {
 
-    public static final int SIZE = 15;
+    public static final int SIZE = 19;
+    /** D-193 이전 판 크기 — 그때 저장된 상태(JSON 에 {@code boardSize} 없음)를 읽을 때만 쓴다. */
+    public static final int LEGACY_SIZE = 15;
     public static final int CELLS = SIZE * SIZE;
 
     public static final byte EMPTY = 0;

@@ -4,18 +4,18 @@ import { coordName, forbiddenAt, key, stonesOf } from './omokRules';
 import { GLINT_PATH, OmokDefs, StoneBody, StoneShadow, artId } from './OmokArt';
 import { useStonePicker } from './useStonePicker';
 
-const STARS: OmokPoint[] = [
-  { x: 3, y: 3 },
-  { x: 11, y: 3 },
-  { x: 7, y: 7 },
-  { x: 3, y: 11 },
-  { x: 11, y: 11 },
-];
+/** 화점 — 19줄 바둑판처럼 4·10·16 줄이 만나는 9곳(D-193). */
+const STAR_LINES = [3, 9, 15];
+const STARS: OmokPoint[] = STAR_LINES.flatMap((y) => STAR_LINES.map((x) => ({ x, y })));
+const CENTER: OmokPoint = { x: (BOARD_SIZE - 1) / 2, y: (BOARD_SIZE - 1) / 2 };
 const LINES = Array.from({ length: BOARD_SIZE }, (_, i) => i);
 
 /** 입자 수 상한(D-192) — 휴대폰에서도 가볍게. 돌 하나에 먼지 8, 5목에 금가루 26. */
 const DUST_COUNT = 8;
 const GOLD_COUNT = 26;
+/** D-193 강하게 두기 — 돌가루 18, 나뭇결 금 6줄. */
+const DEBRIS_COUNT = 18;
+const CRACK_COUNT = 6;
 
 /** 씨앗 고정 난수 — 입자 방향을 렌더마다 같게 한다(렌더는 순수해야 한다). */
 function seeded(seed: number) {
@@ -35,6 +35,39 @@ function dustOf(seed: number) {
       r: 0.022 + rnd() * 0.03,
       delay: rnd() * 0.07,
     };
+  });
+}
+
+/** 강하게 두기 — 돌가루·나무 조각이 멀리 튀었다가 떨어진다. 짝수는 가루(원), 홀수는 조각(사각). */
+function debrisOf(seed: number) {
+  const rnd = seeded(seed * 7 + 3);
+  return Array.from({ length: DEBRIS_COUNT }, (_, i) => {
+    const angle = (i / DEBRIS_COUNT) * Math.PI * 2 + rnd() * 0.5;
+    const dist = 1.1 + rnd() * 1.5;
+    return {
+      dx: Math.cos(angle) * dist,
+      dy: Math.sin(angle) * dist * 0.8,
+      r: 0.07 + rnd() * 0.07,
+      rot: Math.round(rnd() * 720 - 360),
+      delay: rnd() * 0.06,
+      chip: i % 2 === 1,
+    };
+  });
+}
+
+/** 강하게 두기 — 돌 둘레에서 뻗는 나뭇결 금(잠깐 그어졌다 사라진다). */
+function cracksOf(seed: number) {
+  const rnd = seeded(seed * 13 + 5);
+  return Array.from({ length: CRACK_COUNT }, (_, i) => {
+    const a = (i / CRACK_COUNT) * Math.PI * 2 + rnd() * 0.6;
+    const r0 = 0.5;
+    const r1 = 1.1 + rnd() * 0.7;
+    const bend = (rnd() - 0.5) * 0.5;
+    const mx = Math.cos(a + bend) * ((r0 + r1) / 2);
+    const my = Math.sin(a + bend) * ((r0 + r1) / 2);
+    return `M${(Math.cos(a) * r0).toFixed(3)} ${(Math.sin(a) * r0).toFixed(3)} L${mx.toFixed(3)} ${my.toFixed(3)} L${(
+      Math.cos(a) * r1
+    ).toFixed(3)} ${(Math.sin(a) * r1).toFixed(3)}`;
   });
 }
 
@@ -66,6 +99,12 @@ interface Props {
   forbiddenIsMine: boolean;
   preview: OmokPoint | null;
   pending: OmokPoint | null;
+  /** D-193 — 내가 보낸 수가 강하게 두기인가(응답 전에도 바로 내리친다). */
+  pendingSlam?: boolean;
+  /** D-193 — 이 세션에서 받은 강하게 둔 수의 번호(1부터). */
+  slamMoves?: ReadonlySet<number>;
+  /** D-193 — 강하게 두기를 골라 둔 상태(미리보기 돌이 달아오른다). */
+  slamArmed?: boolean;
   /** 미리보기·흐린 돌의 색 — 내 색. */
   myColor: OmokStone | null;
   winLine: OmokPoint[];
@@ -84,8 +123,8 @@ interface ShownStone extends OmokPoint {
 }
 
 /**
- * 오목 판 (D-180). SVG 하나 — 교차점 225개를 DOM 요소로 만들지 않고 누른 화면 좌표를 가장 가까운 교차점으로 맞춘다. 좌표계는 교차점
- * 간격 1, (0,0) 교차점이 원점이고 판 가장자리에 반 칸 여백이 있다(`viewBox` −0.5 … 14.5).
+ * 오목 판 (D-180, 19줄 D-193). SVG 하나 — 교차점 361개를 DOM 요소로 만들지 않고 누른 화면 좌표를 가장 가까운 교차점으로 맞춘다.
+ * 좌표계는 교차점 간격 1, (0,0) 교차점이 원점이고 판 가장자리에 반 칸 여백이 있다(`viewBox` −0.5 … 18.5).
  *
  * <p>두 단계 확정: 누르면 미리보기(뜬 돌 + 그 줄·열 안내선), 미리보기를 다시 누르면 확정. 끌면 미리보기가 따라온다
  * ({@link useStonePicker}). 키보드: 화살표로 미리보기를 옮기고 Enter·Space 로 확정한다.
@@ -100,6 +139,9 @@ export function OmokBoard({
   forbiddenIsMine,
   preview,
   pending,
+  pendingSlam = false,
+  slamMoves,
+  slamArmed = false,
   myColor,
   winLine,
   showNumbers,
@@ -140,7 +182,7 @@ export function OmokBoard({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!enabled) return;
-    const at = preview ?? last ?? { x: 7, y: 7 };
+    const at = preview ?? last ?? CENTER;
     const delta: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0],
       ArrowRight: [1, 0],
@@ -180,27 +222,36 @@ export function OmokBoard({
   // 렌더 중에 상태를 맞춘다(effect 로 미루면 돌이 한 프레임 먼저 보였다가 다시 떨어진다).
   const tail = shown.length > 0 ? shown[shown.length - 1] : null;
   const tailKey = tail ? key(tail) : null;
+  // D-193 — 강하게 두기면 같은 자리에서 더 크게(내 수는 보낸 즉시, 남의 수는 STONE_PLACED.slam 을 받은 때). 확정돼도 이어받아 다시
+  // 내리치지 않는다.
   const [track, setTrack] = useState<{
     len: number;
     tailKey: string | null;
     drop: OmokPoint | null;
     seq: number;
+    slam: boolean;
   }>({
     len: shown.length,
     tailKey,
     drop: null,
     seq: 0,
+    slam: false,
   });
   if (track.len !== shown.length || track.tailKey !== tailKey) {
     const grew = tail !== null && shown.length === track.len + 1;
+    const slam = grew && (tail.pending ? pendingSlam : (slamMoves?.has(moves.length) ?? false));
     setTrack({
       len: shown.length,
       tailKey,
       drop: grew ? { x: tail.x, y: tail.y } : null,
       seq: track.seq + (grew ? 1 : 0),
+      slam,
     });
   }
   const dropKey = track.drop ? key(track.drop) : null;
+  const slamAt = track.slam ? track.drop : null;
+  const debris = useMemo(() => (track.slam ? debrisOf(track.seq) : []), [track.slam, track.seq]);
+  const cracks = useMemo(() => (track.slam ? cracksOf(track.seq) : []), [track.slam, track.seq]);
 
   const winIndex = useMemo(() => new Map(winLine.map((p, i) => [key(p), i])), [winLine]);
   const dust = useMemo(() => dustOf(track.seq), [track.seq]);
@@ -218,9 +269,9 @@ export function OmokBoard({
   return (
     <svg
       ref={svgRef}
-      className={`om-board${enabled ? ' om-board-active' : ''}${track.seq > 0 ? ` om-thud-${track.seq % 2}` : ''}${
-        warn ? ' om-board-warn' : ''
-      }`}
+      className={`om-board${enabled ? ' om-board-active' : ''}${
+        track.seq > 0 ? ` om-${track.slam ? 'slam' : 'thud'}-${track.seq % 2}` : ''
+      }${warn ? ' om-board-warn' : ''}`}
       viewBox={`-0.5 -0.5 ${BOARD_SIZE} ${BOARD_SIZE}`}
       role="img"
       aria-label={label}
@@ -266,6 +317,27 @@ export function OmokBoard({
         </g>
       )}
 
+      {/* D-193 강하게 두기 — 판에 금이 가고 충격파 두 겹이 퍼진다(돌 아래 층). */}
+      {slamAt && (
+        <g
+          key={`s${track.seq}`}
+          className="om-slam-fx"
+          transform={`translate(${slamAt.x} ${slamAt.y})`}
+          aria-hidden="true"
+          data-testid="om-slam-fx"
+        >
+          <g className="om-art">
+            {cracks.map((d, i) => (
+              <path key={i} className="om-crack" d={d} pathLength={1} />
+            ))}
+            <circle className="om-slam-flash" r={1.3} fill={`url(#${id}-glow)`} />
+          </g>
+          <circle className="om-shock" r={0.5} />
+          <circle className="om-shock om-shock-2" r={0.5} />
+          <circle className="om-slam-calm" r={0.62} />
+        </g>
+      )}
+
       {forbidden.map((f) => {
         const warned = warn !== null && warn.x === f.x && warn.y === f.y;
         return (
@@ -288,7 +360,11 @@ export function OmokBoard({
       {/* 그림자는 돌보다 아래 층 — 옆 돌을 덮지 않게. */}
       <g aria-hidden="true">
         {shown.map((m) => (
-          <g key={key(m)} className={key(m) === dropKey ? 'om-drop' : undefined} transform={`translate(${m.x} ${m.y})`}>
+          <g
+            key={key(m)}
+            className={key(m) === dropKey ? (track.slam ? 'om-drop om-slam' : 'om-drop') : undefined}
+            transform={`translate(${m.x} ${m.y})`}
+          >
             <StoneShadow id={id} />
           </g>
         ))}
@@ -297,13 +373,21 @@ export function OmokBoard({
       {shown.map((m, i) => {
         const k = key(m);
         const won = winIndex.get(k);
+        const slammed = k === dropKey && track.slam;
+        // 강하게 두면 둘레 두 칸 안의 돌이 한 번 들썩인다 — 같은 연출을 다시 틀려고 이름 둘을 번갈아 쓴다.
+        const near =
+          slamAt && !slammed ? Math.max(Math.abs(m.x - slamAt.x), Math.abs(m.y - slamAt.y)) : Number.POSITIVE_INFINITY;
+        const jolt = near <= 2;
+        const style: Record<string, number> = {};
+        if (won !== undefined) style['--om-i'] = won;
+        if (jolt) style['--om-near'] = near;
         return (
           <g
             key={k}
             className={`om-stone om-stone-${m.color === 'BLACK' ? 'black' : 'white'}${k === dropKey ? ' om-drop' : ''}${
-              m.pending ? ' om-pending' : ''
-            }${won !== undefined ? ' om-won' : ''}`}
-            style={won !== undefined ? ({ '--om-i': won } as React.CSSProperties) : undefined}
+              slammed ? ' om-slam' : ''
+            }${jolt ? ` om-jolt-${track.seq % 2}` : ''}${m.pending ? ' om-pending' : ''}${won !== undefined ? ' om-won' : ''}`}
+            style={won !== undefined || jolt ? vars(style) : undefined}
             transform={`translate(${m.x} ${m.y})`}
             data-testid={m.pending ? 'om-pending' : 'om-stone'}
             data-color={m.color}
@@ -332,6 +416,37 @@ export function OmokBoard({
               style={vars({ '--om-dx': d.dx, '--om-dy': d.dy, '--om-delay': d.delay })}
             />
           ))}
+        </g>
+      )}
+
+      {/* D-193 강하게 두기 — 돌가루·나무 조각이 멀리 튀었다 떨어진다(돌 위 층). */}
+      {slamAt && (
+        <g
+          key={`b${track.seq}`}
+          className="om-art"
+          transform={`translate(${slamAt.x} ${slamAt.y})`}
+          aria-hidden="true"
+        >
+          {debris.map((d, i) =>
+            d.chip ? (
+              <rect
+                key={i}
+                className="om-debris om-debris-chip"
+                x={-d.r}
+                y={-d.r * 0.6}
+                width={d.r * 2}
+                height={d.r * 1.2}
+                style={vars({ '--om-dx': d.dx, '--om-dy': d.dy, '--om-rot': d.rot, '--om-delay': d.delay })}
+              />
+            ) : (
+              <circle
+                key={i}
+                className="om-debris"
+                r={d.r}
+                style={vars({ '--om-dx': d.dx, '--om-dy': d.dy, '--om-rot': d.rot, '--om-delay': d.delay })}
+              />
+            ),
+          )}
         </g>
       )}
 
@@ -421,7 +536,9 @@ export function OmokBoard({
       {showPreview && preview && myColor && (
         <g
           key={`p${key(preview)}`}
-          className={`om-stone om-stone-${myColor === 'BLACK' ? 'black' : 'white'} om-preview${warn ? ' om-preview-warn' : ''}`}
+          className={`om-stone om-stone-${myColor === 'BLACK' ? 'black' : 'white'} om-preview${warn ? ' om-preview-warn' : ''}${
+            slamArmed && !warn ? ' om-preview-slam' : ''
+          }`}
           transform={`translate(${preview.x} ${preview.y})`}
           data-testid="om-preview"
           aria-hidden="true"

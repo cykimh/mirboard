@@ -13,7 +13,7 @@ export const OMOK_TUTORIAL_STEPS: TutorialStep[] = [
     title: '오목에 오신 걸 환영합니다',
     body: (
       <>
-        <p>15×15 판에 흑과 백이 번갈아 한 수씩 둡니다. 가로·세로·대각선으로 <strong>다섯 개를 먼저 잇는 쪽</strong>이 이깁니다.</p>
+        <p>19×19 바둑판에 흑과 백이 번갈아 한 수씩 둡니다. 가로·세로·대각선으로 <strong>다섯 개를 먼저 잇는 쪽</strong>이 이깁니다.</p>
         <MiniBoard
           black={[
             { x: 2, y: 4 },

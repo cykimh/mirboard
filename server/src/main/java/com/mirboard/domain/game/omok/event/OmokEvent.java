@@ -46,8 +46,13 @@ public sealed interface OmokEvent extends GameEvent
         }
     }
 
-    /** 돌이 놓였다. {@code moveNumber} 는 1부터. */
-    record StonePlaced(int seat, Stone color, int x, int y, int moveNumber, boolean timedOut) implements OmokEvent {
+    /** 돌이 놓였다. {@code moveNumber} 는 1부터. {@code slam} 은 강하게 두기(연출 전용, D-193). */
+    record StonePlaced(int seat, Stone color, int x, int y, int moveNumber, boolean timedOut, boolean slam)
+            implements OmokEvent {
+
+        public StonePlaced(int seat, Stone color, int x, int y, int moveNumber, boolean timedOut) {
+            this(seat, color, x, y, moveNumber, timedOut, false);
+        }
     }
 
     /** 다음 차례. 흑 차례면 그 판의 금수 자리. */

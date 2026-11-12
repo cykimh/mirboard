@@ -43,7 +43,7 @@ class OmokJsonRoundTripTest {
         String json = mapper.writeValueAsString(s);
         assertThat(mapper.readValue(json, OmokState.class)).isEqualTo(s);
         assertThat(keys(mapper.readTree(json))).containsExactly(
-                "blackTeam", "firstSeat", "mode", "moves", "result", "rule", "timeouts", "turnSeat");
+                "blackTeam", "boardSize", "firstSeat", "mode", "moves", "result", "rule", "slams", "timeouts", "turnSeat");
         assertThat(keys(mapper.readTree(json).get("result"))).containsExactly(
                 "causeSeat", "reason", "winLine", "winnerColor", "winnerSeats");
     }
@@ -55,8 +55,42 @@ class OmokJsonRoundTripTest {
     }
 
     @Test
+    void a_fifteen_line_state_moves_to_the_middle_of_the_nineteen_line_board() throws Exception {
+        // D-193 이전 JSON — boardSize 없음. 흑 (7,7) 백 (0,0), 끝난 판은 승리 줄도 함께 옮긴다.
+        String json = "{\"mode\":\"SOLO\",\"rule\":\"RENJU\",\"blackTeam\":0,\"firstSeat\":0,\"moves\":["
+                + "{\"seat\":0,\"x\":7,\"y\":7,\"timedOut\":false},{\"seat\":1,\"x\":0,\"y\":0,\"timedOut\":false}],"
+                + "\"turnSeat\":0,\"timeouts\":[0,0]}";
+        OmokState old = mapper.readValue(json, OmokState.class);
+        assertThat(old.boardSize()).isEqualTo(19);
+        assertThat(old.moves()).extracting(m -> m.x() + "," + m.y()).containsExactly("9,9", "2,2");
+        OmokState next = ENGINE.apply(old, 0, new OmokAction.Place(18, 18)).newState();   // 새 가장자리까지 둘 수 있다
+        assertThat(next.moves()).hasSize(3);
+        assertThat(mapper.readValue(mapper.writeValueAsString(next), OmokState.class)).isEqualTo(next);   // 다시 옮기지 않는다
+        String ended = "{\"mode\":\"SOLO\",\"rule\":\"FREESTYLE\",\"blackTeam\":0,\"firstSeat\":0,\"moves\":[],"
+                + "\"turnSeat\":-1,\"result\":{\"winnerColor\":\"BLACK\",\"winnerSeats\":[0],\"reason\":\"FIVE\","
+                + "\"causeSeat\":-1,\"winLine\":[{\"x\":0,\"y\":0},{\"x\":4,\"y\":0}]}}";
+        assertThat(mapper.readValue(ended, OmokState.class).result().winLine())
+                .extracting(pt -> pt.x() + "," + pt.y()).containsExactly("2,2", "6,2");
+    }
+
+    @Test
+    void a_state_from_before_slams_gets_zeros_and_a_slammed_state_round_trips() throws Exception {
+        String json = "{\"mode\":\"TEAMS_2V2\",\"rule\":\"RENJU\",\"blackTeam\":0,\"firstSeat\":0,\"moves\":[],"
+                + "\"turnSeat\":0,\"timeouts\":[0,0,0,0]}";
+        OmokState old = mapper.readValue(json, OmokState.class);
+        assertThat(old.slams()).containsExactly(0, 0, 0, 0);
+        OmokState slammed = ENGINE.apply(old, 0, new OmokAction.Place(7, 7, true)).newState();
+        assertThat(mapper.readValue(mapper.writeValueAsString(slammed), OmokState.class)).isEqualTo(slammed);
+        assertThat(slammed.slams()).containsExactly(1, 0, 0, 0);
+    }
+
+    @Test
     void client_actions_deserialize_by_name() throws Exception {
         assertThat(mapper.readValue("{\"@action\":\"PLACE_STONE\",\"x\":3,\"y\":4}", OmokAction.class))
+                .isEqualTo(new OmokAction.Place(3, 4));
+        assertThat(mapper.readValue("{\"@action\":\"PLACE_STONE\",\"x\":3,\"y\":4,\"slam\":true}", OmokAction.class))
+                .isEqualTo(new OmokAction.Place(3, 4, true));
+        assertThat(mapper.readValue("{\"@action\":\"PLACE_STONE\",\"x\":3,\"y\":4,\"slam\":false}", OmokAction.class))
                 .isEqualTo(new OmokAction.Place(3, 4));
         assertThat(mapper.readValue("{\"@action\":\"RESIGN\"}", OmokAction.class)).isEqualTo(new OmokAction.Resign());
     }
@@ -73,7 +107,7 @@ class OmokJsonRoundTripTest {
     void events_carry_their_envelope_names_and_only_their_fields() throws Exception {
         List<OmokEvent> events = List.of(
                 new OmokEvent.MatchStarted(0, List.of(Stone.BLACK, Stone.WHITE)),
-                new OmokEvent.StonePlaced(1, Stone.WHITE, 3, 4, 2, false),
+                new OmokEvent.StonePlaced(1, Stone.WHITE, 3, 4, 2, false, true),
                 new OmokEvent.TurnChanged(0, Stone.BLACK, List.of(new ForbiddenPoint(7, 7, ForbiddenKind.DOUBLE_THREE))),
                 new OmokEvent.MatchEnded(null, List.of(), EndReason.BOARD_FULL, -1, List.of(), 225));
         assertThat(events).extracting(OmokEvent::envelopeType)
@@ -87,7 +121,7 @@ class OmokJsonRoundTripTest {
             assertThat(mapper.readValue(mapper.writeValueAsString(e), OmokEvent.class)).isEqualTo(e);
         }
         assertThat(keys(mapper.readTree(mapper.writeValueAsString(events.get(1))))).containsExactly(
-                "@event", "color", "moveNumber", "seat", "timedOut", "x", "y");
+                "@event", "color", "moveNumber", "seat", "slam", "timedOut", "x", "y");
     }
 
     @Test
@@ -95,7 +129,7 @@ class OmokJsonRoundTripTest {
         OmokState s = play(teams(OmokRule.RENJU), p(7, 7), p(0, 0));
         JsonNode view = mapper.readTree(mapper.writeValueAsString(ENGINE.publicView(s)));
         assertThat(keys(view)).containsExactly(
-                "forbidden", "mode", "moves", "result", "rule", "seatColors", "timeouts", "turnSeat");
+                "boardSize", "forbidden", "mode", "moves", "result", "rule", "seatColors", "slamsLeft", "timeouts", "turnSeat");
         assertThat(view.get("seatColors").toString()).isEqualTo("[\"BLACK\",\"WHITE\",\"BLACK\",\"WHITE\"]");
     }
 }

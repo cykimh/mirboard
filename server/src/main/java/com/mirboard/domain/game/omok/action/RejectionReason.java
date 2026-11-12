@@ -9,5 +9,7 @@ public enum RejectionReason {
     OUT_OF_BOARD,
     OCCUPIED,
     /** 흑 차례에 그 룰의 금수 자리 (룰 §6). 종류는 클라가 이미 받은 금수 목록에서 읽는다. */
-    FORBIDDEN_MOVE
+    FORBIDDEN_MOVE,
+    /** 강하게 두기(룰 §4.1, D-193)를 이 판에서 이미 썼다 — 착수 전체를 거절한다(상태 무변경). */
+    SLAM_USED
 }

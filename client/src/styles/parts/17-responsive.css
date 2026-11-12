@@ -232,6 +232,50 @@
   }
 }
 
+/* D-193 — 휴대폰 폭에서 오목판은 앱 틀(#root) 여백과 게임판 여백까지 걷어 내 화면 폭을 다 쓴다(판 틀 3px 만 남는다). 위아래 몫도
+   줄인다(틈 6px, 앱 틀 여백이 12px 라 판 말고 세로 몫이 260px 안쪽). */
+@media (max-width: 720px) {
+  .om-table {
+    --om-reserve: 260px;
+    gap: 6px;
+  }
+
+  .om-theme-grain .om-stage {
+    --om-bleed: calc(var(--space-3) + 2px);
+  }
+}
+
+/* D-193 — 손가락 화면에는 "마우스 한 번 클릭으로 두기" 설정이 뜻이 없다(그 설정은 마우스에만 듣는다). 그 줄만큼 판을 키운다. */
+@media (pointer: coarse) {
+  .om-single-click {
+    display: none;
+  }
+}
+
+/* D-193 — 가로로 눕힌 휴대폰: 판은 왼쪽에 화면 높이만큼, 차례 띠·상태·버튼은 오른쪽 열에. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .om-table {
+    --om-reserve: 84px;
+    display: grid;
+    grid-template-columns: auto minmax(200px, 1fr);
+    grid-auto-rows: min-content;
+    align-items: start;
+    column-gap: 14px;
+    max-width: none;
+  }
+
+  .om-table > * {
+    grid-column: 2;
+  }
+
+  .om-table > .om-stage {
+    grid-column: 1;
+    grid-row: 1 / span 12;
+    width: var(--om-board-max);
+    margin: 0;
+  }
+}
+
 /* 오목 "결" 테마(D-192) — 움직임 줄이기면 연출 없이 끝 상태로 바로. 21 은 미디어 0개 규칙이라 여기 둔다. 연출 조각(파문·먼지·
    금가루·잉크)은 바탕이 투명이라 애니메이션을 끄면 보이지 않고, 돌·5목 줄·현판·놋쇠 고리는 제자리에 바로 선다. */
 @media (prefers-reduced-motion: reduce) {
@@ -240,6 +284,25 @@
   .om-tokens *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* D-193 강하게 두기 — 흔들림·낙하·입자 없이 금빛 고리가 한 번 밝아졌다 사라지는 짧은 강조만(불투명도만). */
+  .om-tokens .om-slam-calm {
+    display: inline;
+    fill: none;
+    stroke: var(--om-gold, #f7d36a);
+    stroke-width: 0.12;
+    opacity: 0;
+    animation: om-slam-calm 0.9s ease-out !important;
+  }
+}
+
+@keyframes om-slam-calm {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

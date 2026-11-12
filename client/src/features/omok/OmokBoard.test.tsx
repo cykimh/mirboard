@@ -4,8 +4,8 @@ import './testPointerEvent';
 import { OmokBoard } from './OmokBoard';
 import type { OmokPoint } from '@/types/omok';
 
-/** 판은 300×300 px 로 둔다 — 교차점 간격 20px, (0,0) 교차점이 (10,10). */
-const SIZE = 300;
+/** 판은 380×380 px 로 둔다(19줄) — 교차점 간격 20px, (0,0) 교차점이 (10,10). */
+const SIZE = 380;
 const at = (p: OmokPoint) => ({ clientX: 10 + p.x * 20, clientY: 10 + p.y * 20 });
 
 function setup(over: Partial<React.ComponentProps<typeof OmokBoard>> = {}) {
@@ -95,13 +95,13 @@ describe('OmokBoard — 두 단계 확정 (D-180)', () => {
     expect(touch.onConfirm).not.toHaveBeenCalled();
   });
 
-  it('키보드: 화살표로 미리보기를 옮기고 Enter 로 확정한다', () => {
+  it('키보드: 화살표로 미리보기를 옮기고 Enter 로 확정한다(시작은 천원 9,9 — D-193)', () => {
     const { svg, setPreview, onConfirm, rerender, props } = setup();
     fireEvent.keyDown(svg, { key: 'ArrowRight' });
-    expect(setPreview).toHaveBeenLastCalledWith({ x: 8, y: 7 });
-    rerender(<OmokBoard {...props} preview={{ x: 8, y: 7 }} />);
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 10, y: 9 });
+    rerender(<OmokBoard {...props} preview={{ x: 10, y: 9 }} />);
     fireEvent.keyDown(svg, { key: 'Enter' });
-    expect(onConfirm).toHaveBeenCalledWith({ x: 8, y: 7 });
+    expect(onConfirm).toHaveBeenCalledWith({ x: 10, y: 9 });
   });
 
   it('돌·금수 ✕·승리 줄을 그린다', () => {
@@ -175,5 +175,60 @@ describe('OmokBoard — 연출 표시 (D-192, 그림만)', () => {
     const { container } = setup({ moves: moves.slice(0, 9), winLine: line });
     expect(container.querySelectorAll('.om-stone.om-won')).toHaveLength(5);
     expect(container.querySelectorAll('.om-gold').length).toBeLessThanOrEqual(26);
+  });
+});
+
+describe('OmokBoard — 강하게 두기 연출 (D-193, 그림만)', () => {
+  const B = { seat: 0, x: 7, y: 7, timedOut: false };
+  const W = { seat: 1, x: 8, y: 8, timedOut: false };
+
+  it('강하게 둔 수(slamMoves)가 들어오면 그 돌에 강한 연출·충격파·금·돌가루를 그리고 둘레 돌이 들썩인다', () => {
+    const { container, rerender, props } = setup({ moves: [B] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set([2])} />);
+    const slammed = container.querySelector('.om-stone.om-slam');
+    expect(slammed?.getAttribute('data-color')).toBe('WHITE');
+    expect(screen.getByTestId('om-slam-fx')).toBeInTheDocument();
+    expect(container.querySelectorAll('.om-shock')).toHaveLength(2);
+    expect(container.querySelectorAll('.om-crack')).toHaveLength(6);
+    expect(container.querySelectorAll('.om-debris')).toHaveLength(18);
+    expect(container.querySelector('svg.om-board')?.getAttribute('class')).toMatch(/om-slam-[01]/);
+    expect(container.querySelector('.om-stone[class*="om-jolt-"]')?.getAttribute('data-color')).toBe('BLACK');
+  });
+
+  it('보통 수에는 강한 연출이 없다', () => {
+    const { container, rerender, props } = setup({ moves: [B] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set()} />);
+    expect(container.querySelector('.om-slam')).toBeNull();
+    expect(screen.queryByTestId('om-slam-fx')).toBeNull();
+    expect(container.querySelector('svg.om-board')?.getAttribute('class')).toMatch(/om-thud-[01]/);
+  });
+
+  it('다시 받기로 여러 수가 한꺼번에 오면 강하게 둔 수여도 다시 내리치지 않는다', () => {
+    const { rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} moves={[B, W]} slamMoves={new Set([1, 2])} />);
+    expect(screen.queryByTestId('om-slam-fx')).toBeNull();
+  });
+
+  it('내가 강하게 보낸 수는 응답 전에 바로 내리치고, 확정돼도 같은 연출을 이어받는다', () => {
+    const { rerender, props } = setup({ moves: [] });
+    rerender(<OmokBoard {...props} pending={{ x: 7, y: 7 }} pendingSlam />);
+    const pending = screen.getByTestId('om-pending');
+    expect(pending.getAttribute('class')).toContain('om-slam');
+    const fx = screen.getByTestId('om-slam-fx');
+    rerender(<OmokBoard {...props} moves={[B]} pending={null} slamMoves={new Set([1])} />);
+    expect(screen.getByTestId('om-stone')).toBe(pending);
+    expect(screen.getByTestId('om-slam-fx')).toBe(fx); // 다시 터지지 않는다
+  });
+});
+
+describe('OmokBoard — 19줄 바둑판 (D-193)', () => {
+  it('19줄과 화점 9곳을 그리고, 가장 오른쪽 아래 교차점(18,18)을 누를 수 있다', () => {
+    const { container, svg, setPreview } = setup();
+    expect(container.querySelectorAll('.om-grid')).toHaveLength(38);
+    expect(container.querySelectorAll('.om-star')).toHaveLength(9);
+    expect(svg.getAttribute('viewBox')).toBe('-0.5 -0.5 19 19');
+    fireEvent.pointerDown(svg, { ...at({ x: 18, y: 18 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...at({ x: 18, y: 18 }), pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 18, y: 18 });
   });
 });

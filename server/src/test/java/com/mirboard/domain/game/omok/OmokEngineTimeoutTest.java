@@ -35,7 +35,7 @@ class OmokEngineTimeoutTest {
     @Test
     void first_move_timeout_goes_to_the_center() {
         OmokEngine.Result r = timeout(solo(OmokRule.RENJU));
-        assertThat(r.events().getFirst()).isEqualTo(new OmokEvent.StonePlaced(0, Stone.BLACK, 7, 7, 1, true));
+        assertThat(r.events().getFirst()).isEqualTo(new OmokEvent.StonePlaced(0, Stone.BLACK, 9, 9, 1, true));
         assertThat(r.newState().timeouts()).containsExactly(1, 0);
         assertThat(r.newState().moves().getFirst().timedOut()).isTrue();
     }
