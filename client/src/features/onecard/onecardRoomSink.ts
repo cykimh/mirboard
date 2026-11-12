@@ -2,6 +2,8 @@ import type { RoomEventSink } from '@/ws/roomEventSink';
 import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
 import type { HandPayload, OneCardPrivateView, OneCardTableView } from '@/types/onecard';
+import { playCues } from '@/features/sound/tableSfx';
+import { onecardCues } from './onecardSfx';
 import { useOneCardStore } from './onecardStore';
 
 interface ErrorPayload {
@@ -46,7 +48,11 @@ export const onecardRoomSink: RoomEventSink<OneCardTableView, OneCardPrivateView
   },
 
   applyEvent(envelope) {
-    return useOneCardStore.getState().applyEvent(envelope);
+    const before = useOneCardStore.getState();
+    const result = before.applyEvent(envelope);
+    // D-267 — 효과음은 실제로 적용한 공개 이벤트에서만(스냅샷은 applySnapshot 길이라 울리지 않는다).
+    if (result === 'applied') playCues(onecardCues(envelope, before, useOneCardStore.getState()));
+    return result;
   },
 
   applyPrivateEvent(envelope: StompEnvelope<unknown>) {

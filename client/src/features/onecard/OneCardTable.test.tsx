@@ -13,6 +13,7 @@ import {
 import { TURN_URGENT_SECONDS } from './OneCardTurnCountdown';
 import { onecardRoomSink } from './onecardRoomSink';
 import { useReactionStore } from '@/features/chat/reactionStore';
+import { FakeAudioContext, audioLog } from '@/features/sound/testAudio';
 import { useOneCardStore } from './onecardStore';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -1819,6 +1820,50 @@ describe('OneCardTable — 효과음·이모지 (D-154)', () => {
   });
 });
 
+
+/** D-267 — 내 차례 알림음(기존 playChime)은 이벤트로 차례가 넘어올 때만, 관전자에게는 없다. 일반 동작 효과음은 `onecardSfx.test`. */
+describe('OneCardTable — 내 차례 알림음 (D-267)', () => {
+  const turnTo = (seat: number) =>
+    act(() => {
+      useOneCardStore.getState().applyEvent({ type: 'TURN_CHANGED', seq: 99, payload: { seat, direction: 1, attackStack: 0 } });
+    });
+
+  beforeEach(() => {
+    localStorage.removeItem('mirboard.sfxMuted');
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    audioLog.reset();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.removeItem('mirboard.sfxMuted');
+  });
+
+  it('내 차례가 되면 두 음 — 첫 렌더(이미 내 차례)·남의 차례에는 울리지 않는다', () => {
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 0 });
+    renderTable({ playerIds: [100, 101, 102] });
+    expect(audioLog.voices).toBe(0);
+    turnTo(1);
+    expect(audioLog.voices).toBe(0);
+    turnTo(0);
+    expect(audioLog.tones.map((t) => t.freq)).toEqual([660, 880]);
+  });
+
+  it('관전자에게는 내 차례 알림음이 없다', () => {
+    seed({ seatCount: 3, mySeat: -1, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102], myUserId: 999, spectator: true });
+    turnTo(0);
+    turnTo(2);
+    expect(audioLog.voices).toBe(0);
+  });
+
+  it('음소거면 울리지 않는다', () => {
+    localStorage.setItem('mirboard.sfxMuted', '1');
+    seed({ seatCount: 3, mySeat: 0, turnSeat: 1 });
+    renderTable({ playerIds: [100, 101, 102] });
+    turnTo(0);
+    expect(audioLog.voices).toBe(0);
+  });
+});
 
 /** D-155 — 음성 대화: 🎧 로 참여(듣기, 마이크는 묻지 않음), 🎙 는 참여 중에만. 참여한 사람 좌석에 🎧. */
 describe('OneCardTable — 음성 대화 (D-155)', () => {

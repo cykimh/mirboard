@@ -77,7 +77,8 @@ function playClicks(ctx: AudioContext, buf: AudioBuffer, at: number, peak: numbe
 // 차례 알림용 합성음(#9). mp3 에셋이 없어 Web Audio 로 짧은 2음을 생성한다.
 // AudioContext 는 싱글톤(사용자 제스처 이후 resume).
 let audioCtx: AudioContext | null = null;
-function getAudioCtx(): AudioContext | null {
+/** D-267 — 다른 소리 모듈(`tableSfx`)이 같은 컨텍스트를 쓴다. */
+export function getAudioCtx(): AudioContext | null {
   try {
     if (typeof window === 'undefined') return null;
     if (!audioCtx) {
@@ -91,6 +92,15 @@ function getAudioCtx(): AudioContext | null {
     return audioCtx;
   } catch {
     return null;
+  }
+}
+
+/** D-267 — 훅 밖(게임 sink)에서 묻는 음소거 여부. 훅의 토글이 같은 키에 쓴다. */
+export function isSfxMuted(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.localStorage.getItem(MUTE_KEY) === '1';
+  } catch {
+    return false;
   }
 }
 
