@@ -4,17 +4,17 @@ import { ScoreQuiz } from './ScoreQuiz';
 const LIST = { lineHeight: 1.7, paddingLeft: 18 } as const;
 
 /**
- * 요트 튜토리얼 6단계. 콘텐츠 출처: `docs/rules-yacht.md`(요약). 룰을 바꾸면 같은 커밋으로 여기를 고친다 —
+ * 얏추(코드 이름 요트) 튜토리얼 6단계. D-207 — 게임 이름만 얏추이고 점수표의 "요트" 칸(다섯 개 같은 눈)은 그대로다. 콘텐츠 출처: `docs/rules-yacht.md`(요약). 룰을 바꾸면 같은 커밋으로 여기를 고친다 —
  * `yachtTutorial.test` 가 핵심 수치를 붙잡고 있다.
  */
 export const YACHT_TUTORIAL_STEPS: TutorialStep[] = [
   {
-    title: '요트에 오신 걸 환영합니다',
+    title: '얏추에 오신 걸 환영합니다',
     source: '§2·§3',
     body: (
       <>
         <p>
-          요트는 <strong>1~4명</strong>이 주사위 5개로 겨루는 게임입니다. <strong>12라운드</strong> 동안 차례마다 점수표의
+          얏추는 <strong>1~4명</strong>이 주사위 5개로 겨루는 게임입니다. <strong>12라운드</strong> 동안 차례마다 점수표의
           칸을 하나씩 채우고, <strong>총점이 가장 높은 사람</strong>이 이깁니다.
         </p>
         <p>혼자서도 할 수 있어요 — 혼자 한 판은 전적에 남지 않습니다.</p>
@@ -104,7 +104,7 @@ export const YACHT_TUTORIAL_STEPS: TutorialStep[] = [
 /** 요트 튜토리얼 선언 — 열람 키는 게임 전용(D-121). 다이얼로그는 body 포털이라 퀴즈 토큰을 `yt-tokens` 로 푼다. */
 export const YACHT_TUTORIAL: GameTutorial = {
   steps: YACHT_TUTORIAL_STEPS,
-  description: '요트 기본 규칙 안내 튜토리얼',
+  description: '얏추 기본 규칙 안내 튜토리얼',
   seenKey: 'mirboard.tutorial.yacht.seen.v1',
   bodyClassName: 'yt-tokens',
 };

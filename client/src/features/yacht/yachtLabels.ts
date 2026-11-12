@@ -13,6 +13,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   FULL_HOUSE: '풀 하우스',
   SMALL_STRAIGHT: '스몰 스트레이트',
   LARGE_STRAIGHT: '라지 스트레이트',
+  // D-207 — 게임 이름은 얏추로 바뀌었지만 이 칸(다섯 개 같은 눈)은 족보 이름 "요트" 그대로다.
   YACHT: '요트',
 };
 

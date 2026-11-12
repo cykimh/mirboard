@@ -97,6 +97,13 @@ describe('YachtTable', () => {
     vi.useRealTimers();
   });
 
+  it('D-207 — the header shows the game name 얏추 while the five-of-a-kind row keeps its name 요트', () => {
+    seed();
+    const { container } = renderTable();
+    expect(container.querySelector('.yt-badge-title')?.textContent).toBe('얏추');
+    expect(screen.getAllByText('요트').length).toBeGreaterThan(0);
+  });
+
   it('on my turn before rolling shows a roll button that rolls all five', () => {
     seed();
     renderTable();

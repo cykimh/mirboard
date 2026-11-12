@@ -12,7 +12,7 @@
 ## 0. 한눈에 보기
 
 플랫폼은 **동작하는 MVP** 상태다. 로비/방 → **게임 6종**(티츄 4인 2:2 팀전 / 스컬킹
-2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁 / 요트 1~4인 주사위 / 오목 2인 1:1·4인 2:2 / 구름항로 2~4인 주사위·부동산) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) →
+2~8인 개인전 / 원카드 2~6인 개인전 + 실시간 경쟁 / 얏추 1~4인 주사위 / 오목 2인 1:1·4인 2:2 / 구름항로 2~4인 주사위·부동산) 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) →
 재접속/탈주 처리 → UI(라이트/다크) 까지 end-to-end로 연결되어 있다.
 
 | # | 기능 | 상태 | 핵심 위치 |
@@ -24,7 +24,7 @@
 | 5 | 티츄 룰 엔진 (전 페이즈 + 특수 카드) | ✅ | `domain.game.tichu` |
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼·턴 카운트다운 — D-131 공개, `MIRBOARD_ONECARD_STATUS` 로 되돌림) | ✅ | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127~D-131, §17) |
-| 5d | 요트 (동시 진행 D-202 · 개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
+| 5d | 얏추(D-207 표시 이름 — 코드 이름 요트·`yacht`) (동시 진행 D-202 · 개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
 | 5e | 오목 (19×19 — D-193, 이전 15×15 — 1:1·2:2 팀전, 렌주·삼삼만 금지·자유 오목 금수, 봇 3단계, 휴대폰 두 단계 확정 착수, 기록·무승부 — 게임 중립 확장 3건 D-176, D-190 공개, `MIRBOARD_OMOK_STATUS` 로 되돌림) | ✅ | `domain.game.omok`, `client/src/features/omok`, `docs/rules-omok.md` (D-175~D-180·D-190, §19) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
@@ -477,7 +477,7 @@
 *문서 생성: 코드베이스 정적 분석 기반(서버 프로덕션 210 파일 / 테스트 81 파일, 마이그레이션 V1~V10 확인).*
 *최종 대조: 2026-08-01 (D-105, §12 배포·데모 계정 + 실측 수치 갱신). 본 문서는 정적 스냅샷이므로 `docs/plans/mvp-roadmap.md`·`docs/decisions.md`가 우선한다.*
 
-## 18. 요트 (S0~S5, D-181~D-183·D-200)
+## 18. 얏추 — 코드 이름 요트 (S0~S5, D-181~D-183·D-200·D-207)
 
 - **룰**: 주사위 5개·차례마다 최대 3번 굴림·12칸(상단 63 이상 +35, 풀 하우스에 5개 같음 인정), 1~4인 순차 진행, 혼자 하기 가능(승패 없음 — 총점은 개인 최고 점수로, D-201).
   정본 `docs/rules-yacht.md`, 설계 `docs/plans/yacht.md`.
@@ -494,6 +494,8 @@
 - **좌석 명패(D-205·D-206)**: 명패 높이 고정(이름·점수 한 줄 + 주사위 줄 한 칸 — "기록함 ✓" 는 주사위 줄 자리, "차례"·"끊김"·내보내기·채팅은 겹침 층).
   모두 같이일 때 남의 명패를 누르면 그 사람 주사위 판·후보 점수를 보기만 한다(내 액션 안 보냄, 새 라운드·마감 10초 전이면 내 판으로 복귀, 관전자도 같다).
   남의 축하는 요트만 그 사람 명패에서 — 펠트 축하는 내 기록만.
+- **이름·요트 칸 축하(D-207)**: 화면 이름은 얏추(카탈로그 `displayName`·머리 줄·튜토리얼), 코드 이름·점수표 "요트" 칸은 그대로. 내 요트 칸 기록은 현수막에 같은 눈
+  다섯 개 + 두 번째 섬광·충격 고리, 효과음은 `useSfx.playYacht`(Web Audio 합성 — 내 것은 팡파르 약 1.8초, 남의 것은 작은 두 음. 음소거를 따르고 연출 끄기와는 무관).
 - **클라**: `features/yacht` — 주사위 판(실시간 홀드·굴림), 점수표(차례 열 후보 점수, 내 차례면 칸 눌러 기록), 차례 카운트다운(`tableView.turnRemainingMs`),
   홀드 모아 보내기·`BUSY` 재전송(D-200), 튜토리얼 6단계 + 퀴즈. e2e `practice.e2e.ts` 에 요트 포함(데스크톱·휴대폰).
 - **테스트**: 요트 도메인 106건(점수 전수 7,776×12, 1~4인 시뮬레이션 각 2,000판) + Docker IT 5건(`YachtBotMatchSimulationIT`·`YachtRecorderFailureTest`),

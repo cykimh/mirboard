@@ -9,6 +9,15 @@ const SFX_URL: Record<SfxKey, string> = {
 
 const MUTE_KEY = 'mirboard.sfxMuted';
 
+/**
+ * D-207 얏추 — 요트 칸(다섯 개 같은 눈) 축하음의 박자. 게임판 현수막의 주사위 다섯 개가 같은 박자로 놓인다
+ * (CSS `yt-fx-dice-five` 의 지연과 같은 값 — 바꾸면 같이 고친다).
+ */
+export const YACHT_SFX_FIRST_NOTE_SEC = 0.22;
+export const YACHT_SFX_STEP_SEC = 0.09;
+/** 다섯 음 뒤 팡파르 화음이 터지는 때(두 번째 섬광·충격 고리와 같다). */
+export const YACHT_SFX_CHORD_SEC = 0.72;
+
 // 차례 알림용 합성음(#9). mp3 에셋이 없어 Web Audio 로 짧은 2음을 생성한다.
 // AudioContext 는 싱글톤(사용자 제스처 이후 resume).
 let audioCtx: AudioContext | null = null;
@@ -29,13 +38,20 @@ function getAudioCtx(): AudioContext | null {
   }
 }
 
-function blip(ctx: AudioContext, freq: number, start: number, dur: number) {
+function blip(
+  ctx: AudioContext,
+  freq: number,
+  start: number,
+  dur: number,
+  peak = 0.18,
+  type: OscillatorType = 'sine',
+) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = 'sine';
+  osc.type = type;
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.linearRampToValueAtTime(0.18, start + 0.012);
+  gain.gain.linearRampToValueAtTime(peak, start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
   osc.connect(gain).connect(ctx.destination);
   osc.start(start);
@@ -159,7 +175,72 @@ export function useSfx() {
     [muted],
   );
 
+  /**
+   * D-207 얏추 — 요트 칸(다섯 개 같은 눈)을 기록했을 때. 전부 합성이다(mp3·외부 음원 없음).
+   * `mine` 이면 팡파르: 낮은 "쿵" + 주사위 잡음 → 다섯 음 상승(주사위가 하나씩 놓이는 박자) → 장화음과 반짝임(약 1.8초).
+   * 남의 기록이면 작게 두 음만(내 판을 방해하지 않게). 음소거 시 무음.
+   */
+  const playYacht = useCallback(
+    (mine = true) => {
+      if (muted) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const t = ctx.currentTime;
+        if (!mine) {
+          blip(ctx, 783.99, t, 0.16, 0.07);
+          blip(ctx, 1046.5, t + 0.11, 0.3, 0.07);
+          return;
+        }
+        // 쿵 — 주사위 컵이 탁자를 치는 낮은 소리.
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(130, t);
+        osc.frequency.exponentialRampToValueAtTime(46, t + 0.24);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(0.32, t + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.32);
+        // 주사위 잡음 — 높은 쪽만 남긴 짧은 잡음 두 토막.
+        const len = Math.floor(ctx.sampleRate * 0.2);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+          const k = i / len;
+          const env = k < 0.5 ? (1 - k * 2) ** 2 : (1 - (k - 0.5) * 2) ** 2 * 0.6;
+          data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 3200;
+        const ng = ctx.createGain();
+        ng.gain.value = 0.16;
+        noise.connect(filter).connect(ng).connect(ctx.destination);
+        noise.start(t);
+        // 다섯 음 상승 — 도·미·솔·도·미(주사위 다섯 개).
+        const rise = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+        rise.forEach((f, i) => blip(ctx, f, t + YACHT_SFX_FIRST_NOTE_SEC + i * YACHT_SFX_STEP_SEC, 0.17, 0.13, 'triangle'));
+        // 팡파르 — 장화음을 길게, 그 위에 높은 반짝임 셋.
+        const c = t + YACHT_SFX_CHORD_SEC;
+        for (const f of [261.63, 523.25, 659.25, 783.99, 1046.5]) {
+          blip(ctx, f, c, 1.05, 0.085, 'triangle');
+          blip(ctx, f * 2, c, 0.7, 0.03);
+        }
+        [2093, 2637.02, 3135.96].forEach((f, i) => blip(ctx, f, c + 0.08 + i * 0.07, 0.4, 0.045));
+      } catch {
+        // 합성 실패 — silent.
+      }
+    },
+    [muted],
+  );
+
   const toggleMute = useCallback(() => setMuted((v) => !v), []);
 
-  return { play, playChime, playSlam, playFive, muted, toggleMute };
+  return { play, playChime, playSlam, playFive, playYacht, muted, toggleMute };
 }
