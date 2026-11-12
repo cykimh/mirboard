@@ -146,12 +146,12 @@ afterEach(() => {
 });
 
 describe('OneCardTable — 좌석', () => {
-  it.each([2, 4, 6])('%i인이면 상대 좌석을 (인원 - 1)개, 내 정보줄을 하나 그린다', (n) => {
+  it.each([2, 4, 6])('%i인이면 상대 좌석을 (인원 - 1)개, 내 자리를 하나 그린다', (n) => {
     seed({ seatCount: n, mySeat: 0 });
     const { container } = renderTable({ playerIds: playerIds(n) });
 
-    expect(container.querySelectorAll('.oc-seat')).toHaveLength(n - 1);
-    expect(container.querySelector('.oc-me')).not.toBeNull();
+    expect(container.querySelectorAll('.oc-seat:not(.oc-me)')).toHaveLength(n - 1);
+    expect(container.querySelectorAll('.oc-me')).toHaveLength(1);
   });
 
   it('상대 좌석은 이름과 장수만 보여 주고, 1장이면 표시를 세운다', () => {
@@ -292,7 +292,9 @@ describe('OneCardTable — 내기·먹기', () => {
     seed({ seatCount: 3, mySeat: 0, turnSeat: 0, hand: HAND, topCard: c('HEART', 2), attackStack: 4 });
     renderTable({ playerIds: [100, 101, 102] });
 
-    expect(screen.getByText('공격받는 중 +4')).toBeInTheDocument();
+    // D-262 — 공격 누적은 가운데 "공격 +N" 한 곳만(내 자리의 "공격받는 중 +N" 은 없앴다).
+    expect(screen.getAllByText('공격 +4')).toHaveLength(1);
+    expect(screen.queryByText(/공격받는 중/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '먹기 (4장)' }));
 
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'DRAW' });
@@ -1095,10 +1097,10 @@ describe('OneCardTable — 멈춘 차례 복구 (D-140)', () => {
   });
 });
 
-/** 좌석 배치 안 좌석들의 [좌석, 옆줄, 옆줄 안 순서] — DOM 순서 그대로. */
+/** 좌석 배치 안 상대 좌석들(내 자리 `.oc-me` 제외 — D-262)의 [좌석, 옆줄, 옆줄 안 순서] — DOM 순서 그대로. */
 function layoutOf(): [number, string | null, string | null][] {
   const felt = screen.getByRole('group', { name: '좌석 배치' });
-  return [...felt.querySelectorAll('.oc-seat')].map((el) => [
+  return [...felt.querySelectorAll('.oc-seat:not(.oc-me)')].map((el) => [
     Number(el.getAttribute('data-seat')),
     el.getAttribute('data-side'),
     el.getAttribute('data-slot'),
@@ -1144,14 +1146,65 @@ describe('OneCardTable — 테이블 좌석 배치 (D-132)', () => {
     ]);
   });
 
-  it('가운데(region "테이블")가 좌석 배치 안에 있고, 내 정보줄은 그 밖 아래다', () => {
-    seed({ seatCount: 4, mySeat: 0 });
-    const { container } = renderTable();
+  it('가운데(region "테이블")·내 자리·내 손패가 모두 좌석 배치(판) 안에 있다 — 내 자리는 아래 칸 (D-262)', () => {
+    seed({ seatCount: 4, mySeat: 0, hand: [c('HEART', 3), c('CLUB', 5)] });
+    renderTable();
 
     const felt = screen.getByRole('group', { name: '좌석 배치' });
     expect(within(felt).getByRole('region', { name: '테이블' })).toBeInTheDocument();
-    expect(felt.querySelector('.oc-me')).toBeNull();
-    expect(container.querySelector('.oc-me')).not.toBeNull();
+    const me = felt.querySelector('.oc-me') as HTMLElement;
+    expect(me.parentElement).toHaveClass('oc-felt-bottom');
+    expect(me).toHaveAttribute('data-side', 'bottom');
+    expect(me).toHaveAttribute('data-seat', '0');
+    expect(within(felt).getByRole('region', { name: '내 손패' })).toBeInTheDocument();
+    // 아래 칸 → 손패 순서(판 맨 아래가 손패).
+    expect(me.parentElement!.compareDocumentPosition(screen.getByRole('region', { name: '내 손패' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('내 자리는 다른 좌석과 같은 이름표다 — 아바타·이름 (나)·남은 장수 (D-262)', () => {
+    seed({ seatCount: 4, mySeat: 0, hand: [c('HEART', 3), c('CLUB', 5)] });
+    const { container } = renderTable({ usernames: { 100: '미르' } });
+
+    const me = container.querySelector('.oc-me') as HTMLElement;
+    const other = container.querySelector('[data-seat="1"]') as HTMLElement;
+    expect(me).toHaveClass('oc-seat');
+    // 같은 뼈대 — 좌석 컴포넌트 하나가 그린다.
+    for (const part of ['.oc-seat-top', '.oc-seat-avatar', '.oc-seat-name', '.oc-seat-count', '.oc-seat-hand']) {
+      expect(other.querySelector(part), `상대 ${part}`).not.toBeNull();
+      expect(me.querySelector(part), `나 ${part}`).not.toBeNull();
+    }
+    expect(me.querySelector('.oc-seat-name')).toHaveTextContent('미르 (나)');
+    // 장수는 내 손패에서 센다(좌석 뷰의 handCount 가 아니라).
+    expect(within(me).getByRole('img', { name: '남은 손패 2장' })).toBeInTheDocument();
+  });
+
+  it('내 차례 안내는 한 곳씩 — 내 자리에 "내 차례"·"차례" 배지가 없고 가운데는 내 이름 대신 "내 차례" (D-262)', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 0, hand: [c('HEART', 3)] });
+    const { container } = renderTable({ usernames: { 100: '미르' } });
+
+    const me = container.querySelector('.oc-me') as HTMLElement;
+    expect(me).not.toHaveClass('oc-seat-turn');
+    expect(within(me).queryByText('내 차례')).toBeNull();
+    expect(within(me).queryByText('차례')).toBeNull();
+    const center = screen.getByRole('region', { name: '테이블' });
+    expect(within(center).getByText('내 차례')).toBeInTheDocument();
+    expect(screen.getAllByText('내 차례')).toHaveLength(1);
+    expect(center).not.toHaveTextContent('미르 차례');
+    expect(screen.getByRole('group', { name: '좌석 배치' })).toHaveClass('oc-felt-myturn');
+  });
+
+  it('남의 차례·관전자에게는 가운데가 그 사람 이름으로 차례를 알린다', () => {
+    seed({ seatCount: 4, mySeat: 0, turnSeat: 1 });
+    const first = renderTable({ usernames: { 100: '미르', 101: '가람' } });
+    expect(screen.getByRole('region', { name: '테이블' })).toHaveTextContent('가람 차례');
+    first.unmount();
+
+    seed({ seatCount: 4, mySeat: -1, turnSeat: 0 });
+    renderTable({ spectator: true, usernames: { 100: '미르' } });
+    expect(screen.getByRole('region', { name: '테이블' })).toHaveTextContent('미르 차례');
+    expect(screen.queryByText('내 차례')).toBeNull();
   });
 
   it('관전자는 좌석 0 을 아래에 일반 좌석으로 두고 나머지를 0 기준으로 앉힌다 — "나" 줄은 없다', () => {

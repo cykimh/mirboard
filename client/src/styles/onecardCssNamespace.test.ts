@@ -269,6 +269,29 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
     expect(declared('.oc-felt-right .oc-seat', 'width')).toBe('clamp(64px, 22vw, 150px)');
   });
 
+  // D-262 — 판은 내용 높이만큼만. 늘어나는 행(1fr)이나 휴대폰 최소 높이를 다시 두면 가운데 칸 아래가 비고 손패가 화면 밖으로 밀린다.
+  it('판은 내용 높이다 — 늘어나는 행·휴대폰 최소 높이가 없고, 가운데 칸은 행 가운데에 놓인다 (D-262)', () => {
+    expect(lastDeclared('.oc-felt', 'grid-template-rows')).not.toMatch(/fr/);
+    expect(declared('.oc-felt', 'min-height')).toBeUndefined();
+    expect(declared('.oc-felt > .oc-center', 'align-self')).toBe('center');
+    const phoneFelt = [...responsiveCssSource.matchAll(/(^|\n)\s*\.oc-felt\s*\{([^}]*)\}/g)].map((m) => m[2]);
+    expect(phoneFelt.length).toBeGreaterThan(0);
+    for (const body of phoneFelt) expect(body).not.toMatch(/min-height/);
+  });
+
+  it('손패 칸은 판 안 맨 아래 행이고 천에서 이어지는 받침이다 — 라이트·다크 토큰 (D-262)', () => {
+    expect(declared('.oc-felt > .oc-hand', 'grid-area')).toBe('hand');
+    expect(declared('.oc-felt > .oc-hand', 'background')).toBe('var(--oc-hand-bg)');
+    expect(declared('.oc-felt > .oc-hand', 'box-shadow')).toBe('none');
+    expect(tokensOf('.oc-table').get('--oc-hand-bg')).toBeTruthy();
+    expect(tokensOf('html:not(.dark) .oc-table').get('--oc-hand-bg')).toBeTruthy();
+  });
+
+  it('내 자리 전용 띠 규칙(.oc-me)이 남아 있지 않다 — 좌석 이름표 규칙을 그대로 쓴다 (D-262)', () => {
+    expect(cssCode).not.toMatch(/\.oc-me[\s,{>]/);
+    expect(responsiveCssSource.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\.oc-me[\s,{>]/);
+  });
+
   it('옆줄 사이 가운데 칸이 좁아지면 더미와 맨 위 카드가 줄을 바꾼다 — 넘쳐 옆 좌석을 덮지 않는다', () => {
     expect(declared('.oc-felt .oc-piles', 'flex-wrap')).toBe('wrap');
   });
@@ -277,7 +300,7 @@ describe('19-onecard-table.css — 테이블 배치 (D-132)', () => {
   it('시계 방향 자리 — 왼쪽 옆줄은 왼쪽 칸에서 아래→위, 오른쪽 옆줄은 오른쪽 칸에서 위→아래', () => {
     // D-139 — 맨 위 상태 줄(왼쪽 남은 시간·오른쪽 방향)을 위해 status 행이 하나 더 있다.
     expect(lastDeclared('.oc-felt', 'grid-template-areas')).toBe(
-      "'status status status' 'top top top' 'left center right' 'bottom bottom bottom'",
+      "'status status status' 'top top top' 'left center right' 'bottom bottom bottom' 'hand hand hand'",
     );
     expect(lastDeclared('.oc-felt-status', 'grid-area')).toBe('status');
     expect(lastDeclared('.oc-felt-status', 'justify-content')).toBe('space-between');

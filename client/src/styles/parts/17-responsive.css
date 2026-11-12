@@ -526,7 +526,8 @@
    높이는 100dvh 기준이라 주소창 때문에 실제 보이는 높이가 작은 휴대폰에서는 예전 최소값으로 돌아간다(그보다 작아지지 않는다).
    좌우 여백도 줄여 폭이 정하는 경기장(구름항로 정사각 판·요트 주사위 줄)을 키운다. 기준 실측(375×812) — 머리 줄 81~151 → 44px.
    ① 스컬킹 천은 입찰(트릭 없음 212px)↔플레이(트릭 레일 344px)에서 높이가 뛰어 아래 "나" 줄·손패가 밀렸다 — 플레이 높이 이상을 최소로.
-   ② 원카드 "나" 줄·요트 차례 상태 줄은 한 줄 고정(넘치면 이름 말줄임) — "공격받는 중 +N"·남은 시간이 붙을 때 줄이 늘지 않게.
+   ② 요트 차례 상태 줄은 한 줄 고정(넘치면 말줄임) — 남은 시간이 붙을 때 줄이 늘지 않게. (원카드 "나" 줄 고정은 D-262 로 없앰 —
+      내 자리가 판 안 이름표가 됐다.)
    ③ 스컬킹 가운데 행만 늘어나게(1fr) — 맨 끝 D-132 블록(≤560px)보다 앞이라 `.sk-table` 접두로 특이도를 올린다. */
 @media (max-width: 480px) {
   #root:has(> .room-page) {
@@ -548,26 +549,14 @@
     min-height: max(394px, calc(100dvh - 338px));
   }
 
+  /* D-262 — 원카드 판은 최소 높이를 두지 않는다(내용 높이 — 손패까지 판 안이라 한 화면에 든다). 좁은 화면은 판 안쪽 여백을 줄여
+     손패 줄 폭을 지킨다. */
   .oc-felt {
-    box-sizing: border-box;
-    min-height: max(412px, calc(100dvh - 320px));
+    padding: 10px 6px;
   }
 
-  .oc-me {
-    flex-wrap: nowrap;
-    min-height: 34px;
-    box-sizing: border-box;
-    white-space: nowrap;
-  }
-
-  .oc-me > strong {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .oc-me > .oc-badge {
-    flex-shrink: 0;
+  .oc-felt > .oc-hand {
+    padding: 6px 4px;
   }
 
   .sk-table .sk-felt {
