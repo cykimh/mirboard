@@ -18,11 +18,19 @@ import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { MAX_ROLLS, NO_HOLD, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
 import { useYachtStore } from './yachtStore';
-import { DiceTray } from './DiceTray';
+import { DiceTray, ROLL_ANIMATION_MS } from './DiceTray';
 import { YachtScorecard } from './YachtScorecard';
 import { YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
-import { BIG_CATEGORIES, CATEGORY_LABEL, MID_CATEGORIES, celebrationDice } from './yachtLabels';
+import {
+  BIG_CATEGORIES,
+  CATEGORY_LABEL,
+  MID_CATEGORIES,
+  celebrationDice,
+  madeHand,
+  type MadeHand,
+  type MadeTier,
+} from './yachtLabels';
 import { YachtDie } from './YachtDie';
 import { YACHT_TUTORIAL } from './tutorial/yachtTutorial';
 import { SeatDice } from './SeatDice';
@@ -52,6 +60,8 @@ export const BUSY_RETRY_DELAY_MS = 150;
 export const YACHT_PARTY_MS = 2600;
 /** D-204 — 중간 축하(라지 스트레이트·풀 하우스 현수막, 상단 보너스 명패)가 떠 있는 시간. */
 export const MID_PARTY_MS = 1800;
+/** D-208 — 굴림이 족보로 멈췄을 때 고리·꼬리표가 떠 있는 시간(세기별). 조작을 막지 않는다. */
+export const MADE_FX_MS: Record<MadeTier, number> = { light: 1200, mid: 1500, big: 1800 };
 /**
  * D-205 — 남의 판을 구경하다가도 내 차례를 놓치지 않게: 아직 기록하지 않았는데 라운드 마감이 이만큼 남으면 내 판으로 되돌린다
  * (이때부터는 남의 판을 열 수도 없다).
@@ -181,7 +191,7 @@ export function YachtTable({
   const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef, requestResync } =
     useStompRoom(roomId, token, yachtRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
-  const { muted, toggleMute, playChime, playYacht } = useSfx();
+  const { muted, toggleMute, playChime, playYacht, playMade } = useSfx();
   const liveReactions = useLiveReactions();
   const chatLines = useSeatChatLines(playerIds);
   const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
@@ -319,6 +329,10 @@ export function YachtTable({
   const feltRef = useRef<HTMLDivElement>(null);
   const [party, setParty] = useState<Party | null>(null);
   const [seatParty, setSeatParty] = useState<{ seat: number; nonce: number; points: number } | null>(null);
+  // D-208 — 내 굴림이 족보로 멈춘 순간의 알림(고리·꼬리표·짧은 소리). 굴림 하나에 한 번.
+  const [made, setMade] = useState<(MadeHand & { nonce: number; x: number; y: number }) | null>(null);
+  const madeTimer = useRef(0);
+  const madeStopTimer = useRef(0);
   // 걷는 타이머는 효과 정리에 맡기지 않는다 — 축하가 떠 있는 동안 축하 없는 다음 기록이 오면 정리가 타이머만 지워 축하가 남는다
   // (모두 같이 굴리면 기록이 잇달아 온다).
   const partyTimer = useRef(0);
@@ -327,12 +341,62 @@ export function YachtTable({
     () => () => {
       window.clearTimeout(partyTimer.current);
       window.clearTimeout(seatPartyTimer.current);
+      window.clearTimeout(madeTimer.current);
+      window.clearTimeout(madeStopTimer.current);
     },
     [],
   );
+
+  // D-208 — 굴림 신호(`rollNonce`)가 <b>오를 때만</b> 반응한다. 스토어는 모듈 전역이라 다시 마운트돼도 지난 값이 남고(값이 아니라
+  // 변화에만), 고정 변경·다시 받기(resync)·다시 연결은 신호를 올리지 않는다. 굴림 연출이 끝나는 때에 스토어의 지금 값을 읽어 판정한다 —
+  // 그 사이 기록했거나(주사위가 빔) 다음 굴림이 왔으면 건너뛴다. 족보인지는 서버 후보 점수가 정한다(`madeHand`).
+  const rollNonce = s.rollNonce;
+  const handledRollNonce = useRef(rollNonce);
+  // 멈추는 순간의 나(좌석·구경 여부)를 읽는다 — 굴린 뒤 남의 판을 열었으면 알리지 않는다.
+  const madeGate = useRef({ mySeat, watching });
+  madeGate.current = { mySeat, watching };
+  useEffect(() => {
+    const before = handledRollNonce.current;
+    handledRollNonce.current = rollNonce;
+    if (rollNonce <= before) return;
+    window.clearTimeout(madeStopTimer.current);
+    window.clearTimeout(madeTimer.current);
+    setMade(null);
+    madeStopTimer.current = window.setTimeout(
+      () => {
+        const st = useYachtStore.getState();
+        const gate = madeGate.current;
+        if (st.rollNonce !== rollNonce || st.result !== null || !st.dice || st.rolls < 1) return;
+        // 내 굴림만 — 차례대로면 지금 차례가 나, 모두 같이면 가운데 판(굴림 신호)이 내 좌석 것.
+        if (gate.mySeat < 0 || gate.watching !== null) return;
+        if (st.simultaneous ? st.ownSeat !== gate.mySeat : st.turnSeat !== gate.mySeat) return;
+        const hand = madeHand(st.dice, st.candidates);
+        if (!hand) return;
+        // 소리는 연출 설정과 무관하게 음소거만 따른다(D-207 과 같다).
+        playMade(hand.tier);
+        const r = rootRef.current?.querySelector('.yt-dice')?.getBoundingClientRect();
+        setMade({
+          ...hand,
+          nonce: rollNonce,
+          x: r ? r.left + r.width / 2 : window.innerWidth / 2,
+          y: r ? r.top + r.height / 2 : window.innerHeight / 2,
+        });
+        madeTimer.current = window.setTimeout(() => setMade(null), MADE_FX_MS[hand.tier]);
+      },
+      animate ? ROLL_ANIMATION_MS : 0,
+    );
+    // 굴림 하나에 한 번만 — 타이머는 다음 굴림·언마운트가 걷는다(효과 정리에 맡기면 다른 값이 바뀔 때 알림이 사라진다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rollNonce]);
   useEffect(() => {
     const last = s.lastScore;
     if (!last) return;
+    // D-208 — 내가 기록하면 굴림 알림은 바로 걷는다(기록 축하와 겹치지 않게).
+    if (last.seat === mySeat) {
+      window.clearTimeout(madeStopTimer.current);
+      window.clearTimeout(madeTimer.current);
+      setMade(null);
+    }
     if (last.seat !== mySeat) {
       if (last.category !== 'YACHT' || last.points <= 0) return;
       // D-207 — 남의 요트는 작은 두 음만(명패 꼬리표와 같이). 연출 설정과 무관하게 음소거만 따른다.
@@ -490,11 +554,15 @@ export function YachtTable({
   };
 
   const bonusParty = party?.kind === 'bonus' ? party : null;
+  // D-208 — 그 굴림이 아직 내 판에 떠 있을 때만(다음 굴림·기록·남의 판 구경이면 걷힌다).
+  const madeShown = made && watching === null && myTurn && s.rollNonce === made.nonce && s.dice !== null ? made : null;
   // 가운데 판이 비추는 굴림 수 — 구경 중이면 그 사람 것.
   const trayRolls = watched ? watched.rolls : s.rolls;
   const announcement = flash
     ? `${nameOf(flash.seat)} ${CATEGORY_LABEL[flash.category]} ${flash.points}점${flash.auto ? ' (시간 초과 자동 기록)' : ''}${bonusParty ? ` · 상단 보너스 +${bonusParty.points}` : ''}`
-    : '';
+    : madeShown
+      ? `${CATEGORY_LABEL[madeShown.category]}!`
+      : '';
   const fx = salonTheme && animate ? party : null;
   const partyName = party ? (party.seat === mySeat ? '나' : nameOf(party.seat)) : '';
 
@@ -812,6 +880,17 @@ export function YachtTable({
           onBack={watching !== null ? () => setWatchSeat(null) : undefined}
           backLabel={spectator || mySeat < 0 ? '그만 보기' : myTurn ? '내 차례 · 내 판으로' : '내 판으로'}
           backUrgent={myTurn}
+          made={
+            madeShown
+              ? {
+                  nonce: madeShown.nonce,
+                  tier: madeShown.tier,
+                  label: `${CATEGORY_LABEL[madeShown.category]}!`,
+                  indices: madeShown.indices,
+                  ms: MADE_FX_MS[madeShown.tier],
+                }
+              : null
+          }
         />
       </div>
 
@@ -883,6 +962,10 @@ export function YachtTable({
           <GoldBurst key={`p2:${fx.nonce}`} x={fx.x + fx.width * 0.3} y={fx.y + 10} count={45} power={0.7} delayMs={460} />
           <GoldBurst key={`p3:${fx.nonce}`} x={fx.x} y={fx.y - 6} count={70} power={0.85} delayMs={900} />
         </>
+      )}
+      {/* D-208 — 요트로 멈춘 순간의 작은 금가루(기록할 때의 큰 폭발과 다르다). */}
+      {madeShown && madeShown.tier === 'big' && salonTheme && animate && (
+        <GoldBurst key={`made:${madeShown.nonce}`} x={madeShown.x} y={madeShown.y} count={28} power={0.45} />
       )}
       {/* 현수막 글자를 가리지 않게 조금 아래에서. */}
       {fx && fx.kind === 'mid' && <GoldBurst key={`m:${fx.nonce}`} x={fx.x} y={fx.y + 48} count={56} power={0.6} delayMs={120} />}
