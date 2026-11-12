@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameHubPage } from './GameHubPage';
 import { ApiError } from '@/api/client';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -12,15 +12,17 @@ import type { GameSummary, Room } from '@/types/api';
  * 첫 방문 자동 노출을 하지 않는다(자동 노출은 그 게임 대기실 첫 입장, RoomPage).
  */
 
-const { catalog, list, stats, spectate } = vi.hoisted(() => ({
+const { catalog, list, stats, spectate, create, stopSpectating } = vi.hoisted(() => ({
   catalog: vi.fn(),
   list: vi.fn(),
   stats: vi.fn(),
   spectate: vi.fn(),
+  create: vi.fn(),
+  stopSpectating: vi.fn(),
 }));
 
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
-vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate } }));
+vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate, create, stopSpectating } }));
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
 vi.mock('@/features/stats/RankingCard', () => ({ RankingCard: () => <section data-testid="ranking" /> }));
 
@@ -64,12 +66,17 @@ function room(roomId: string, gameType: string, capacity: number): Room {
   };
 }
 
+function RoomStub() {
+  return <div>ROOM_PAGE:{useParams().roomId}</div>;
+}
+
 function renderHub() {
   return render(
     <MemoryRouter initialEntries={['/games']}>
       <Routes>
         <Route path="/games" element={<GameHubPage />} />
         <Route path="/profile" element={<div>PROFILE_PAGE</div>} />
+        <Route path="/rooms/:roomId" element={<RoomStub />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -120,11 +127,12 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
     });
     renderHub();
 
-    expect(await screen.findByText('2·4인 플레이')).toBeInTheDocument();
-    expect(screen.getByText('4인 플레이')).toBeInTheDocument();
+    // D-189 — "플레이"를 뺀 짧은 표기(오른쪽 위 알약).
+    expect(await screen.findByText('2·4인')).toBeInTheDocument();
+    expect(screen.getByText('4인')).toBeInTheDocument();
     // playerCounts 없는 픽스처는 min..max.
-    expect(screen.getByText('2~8인 플레이')).toBeInTheDocument();
-    expect(screen.queryByText('2~4인 플레이')).toBeNull();
+    expect(screen.getByText('2~8인')).toBeInTheDocument();
+    expect(screen.queryByText('2~4인')).toBeNull();
   });
 
   it('빈 localStorage 로 마운트해도 허브는 튜토리얼을 자동으로 열지 않는다', async () => {
@@ -321,5 +329,200 @@ describe('GameHubPage — 배치와 아바타 (D-154)', () => {
     expect(screen.queryByRole('button', { name: 'me' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '내 프로필' }));
     expect(await screen.findByText('PROFILE_PAGE')).toBeInTheDocument();
+  });
+});
+
+/** D-189 — 게임 카드: 인원은 오른쪽 위 작은 알약, [참여하기]는 빈 대기실로 들어가거나 모달 없이 방을 만든다. */
+describe('GameHubPage — 게임 카드 인원 표기·참여하기 (D-189)', () => {
+  async function joinMock() {
+    const { roomsApi } = await import('@/api/rooms');
+    return vi.mocked(roomsApi.joinOrReconnect);
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    (await joinMock()).mockReset();
+    create.mockReset();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    stopSpectating.mockResolvedValue(undefined);
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('인원은 제목 줄 오른쪽에 작은 글자로 — 따로 줄을 쓰지 않는다', async () => {
+    renderHub();
+
+    const count = await screen.findByTestId('player-count-SKULL_KING');
+    expect(count).toHaveTextContent(/^2~8인$/);
+    expect(count.className).toContain('text-[11px]');
+    expect(count.className).toContain('whitespace-nowrap');
+    // 제목과 같은 줄(양 끝 정렬)의 오른쪽 칸.
+    const row = count.parentElement!;
+    expect(row.className).toContain('justify-between');
+    expect(within(row).getByText('스컬킹')).toBeInTheDocument();
+    expect(row.lastElementChild).toBe(count);
+    expect(screen.queryByText(/인 플레이$/)).toBeNull();
+  });
+
+  it('준비 중인 게임에는 [참여하기]가 없다', async () => {
+    renderHub();
+
+    expect(await screen.findByRole('button', { name: '스컬킹 참여하기' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '준비 중 게임 참여하기' })).toBeNull();
+  });
+
+  it('빈 대기실이 있으면 사람이 많은 방으로 들어간다 — 방을 만들지 않는다', async () => {
+    const join = await joinMock();
+    const few = { ...room('few', 'SKULL_KING', 8), playerCount: 1, createdAt: 1 };
+    const many = { ...room('many', 'SKULL_KING', 8), playerCount: 3, createdAt: 9 };
+    const full = { ...room('full', 'SKULL_KING', 4), playerCount: 4 };
+    const started = { ...room('started', 'SKULL_KING', 8), playerCount: 5, status: 'IN_GAME' as const };
+    const other = { ...room('other', 'TICHU', 4), playerCount: 3 };
+    list.mockResolvedValue({ rooms: [few, full, started, other, many] });
+    join.mockResolvedValue({ mode: 'JOINED', room: many });
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 참여하기' }));
+
+    expect(await screen.findByText('ROOM_PAGE:many')).toBeInTheDocument();
+    expect(join).toHaveBeenCalledTimes(1);
+    expect(join).toHaveBeenCalledWith('tok', 'many');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('빈 대기실이 없으면 모달 없이 방을 만들어 그 대기실로 간다', async () => {
+    const join = await joinMock();
+    list.mockResolvedValue({ rooms: [{ ...room('other', 'TICHU', 4), playerCount: 3 }] });
+    create.mockResolvedValue(room('new1', 'SKULL_KING', 8));
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 참여하기' }));
+
+    expect(await screen.findByText('ROOM_PAGE:new1')).toBeInTheDocument();
+    expect(join).not.toHaveBeenCalled();
+    // 이름은 "{별명}님의 {게임} 방", 정원은 모달과 같은 규칙(가변 인원 게임 = 최대 인원).
+    expect(create).toHaveBeenCalledWith('tok', 'me님의 스컬킹 방', 'SKULL_KING', { capacity: 8 });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('그사이 자리를 뺏기면(오류·관전으로 받아짐) 다음 방을 거쳐 방 만들기로 넘어간다', async () => {
+    const join = await joinMock();
+    const a = { ...room('a', 'SKULL_KING', 8), playerCount: 3 };
+    const b = { ...room('b', 'SKULL_KING', 8), playerCount: 2 };
+    list.mockResolvedValue({ rooms: [a, b] });
+    join
+      .mockRejectedValueOnce(new ApiError(404, { error: { code: 'ROOM_NOT_FOUND', message: 'Room not found' } }))
+      .mockResolvedValueOnce({ mode: 'SPECTATING', room: b });
+    create.mockResolvedValue(room('new2', 'SKULL_KING', 8));
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 참여하기' }));
+
+    expect(await screen.findByText('ROOM_PAGE:new2')).toBeInTheDocument();
+    expect(join.mock.calls.map((c) => c[1])).toEqual(['a', 'b']);
+    // 관전으로 받아진 방은 관전을 풀고 떠난다.
+    expect(stopSpectating).toHaveBeenCalledWith('tok', 'b');
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('방 만들기도 실패하면 오류 문구를 보여 주고 버튼이 돌아온다', async () => {
+    create.mockRejectedValue(new ApiError(500, { error: { code: 'INTERNAL', message: 'boom' } }));
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '스컬킹 참여하기' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: '스컬킹 참여하기' })).not.toBeDisabled());
+  });
+
+  it('진행 중에는 로딩 표시와 함께 모든 [참여하기]가 막힌다 — 두 번 눌러도 한 번만 만든다', async () => {
+    let resolveCreate!: (r: Room) => void;
+    create.mockReturnValue(new Promise<Room>((res) => (resolveCreate = res)));
+    renderHub();
+
+    const button = await screen.findByRole('button', { name: '스컬킹 참여하기' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('들어가는 중…');
+    expect(screen.getByRole('button', { name: '티츄 참여하기' })).toBeDisabled();
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: '티츄 참여하기' }));
+
+    await act(async () => resolveCreate(room('new3', 'SKULL_KING', 8)));
+    expect(await screen.findByText('ROOM_PAGE:new3')).toBeInTheDocument();
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** D-197 — 쉬던 서버(콜드 스타트 약 30초): 화면이 다시 보이면 미리 깨우고, 2초를 넘기면 버튼으로 알린다. */
+describe('GameHubPage — 쉬던 서버 깨우기 (D-197)', () => {
+  function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    create.mockReset();
+    catalog.mockResolvedValue({ games: CATALOG });
+    list.mockResolvedValue({ rooms: [] });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setVisibility('visible');
+  });
+
+  it('화면이 다시 보이거나 네트워크가 돌아오면 방 목록을 바로 받는다 — 숨을 때는 받지 않는다', async () => {
+    const { unmount } = renderHub();
+    await screen.findByRole('button', { name: '스컬킹 참여하기' });
+    const base = list.mock.calls.length;
+
+    setVisibility('hidden');
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
+    expect(list).toHaveBeenCalledTimes(base);
+
+    setVisibility('visible');
+    await act(async () => void document.dispatchEvent(new Event('visibilitychange')));
+    expect(list).toHaveBeenCalledTimes(base + 1);
+
+    await act(async () => void window.dispatchEvent(new Event('online')));
+    expect(list).toHaveBeenCalledTimes(base + 2);
+
+    // 화면을 떠나면 더 듣지 않는다.
+    unmount();
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('online'));
+    expect(list).toHaveBeenCalledTimes(base + 2);
+  });
+
+  it('[참여하기]가 2초를 넘기면 "서버 깨우는 중… (최대 30초)", 끝나면 원래 글자로', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let rejectCreate!: (e: unknown) => void;
+    create.mockReturnValue(new Promise<Room>((_, rej) => (rejectCreate = rej)));
+    renderHub();
+
+    const button = await screen.findByRole('button', { name: '스컬킹 참여하기' });
+    fireEvent.click(button);
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(button).toHaveTextContent('들어가는 중…');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(button).toHaveTextContent('서버 깨우는 중… (최대 30초)');
+
+    await act(async () => rejectCreate(new ApiError(500, { error: { code: 'INTERNAL', message: 'boom' } })));
+    await waitFor(() => expect(button).toHaveTextContent('참여하기'));
+    expect(button).not.toHaveTextContent('서버 깨우는 중');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 });

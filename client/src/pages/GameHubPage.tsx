@@ -1,7 +1,7 @@
 import { GameIcon } from '@/components/GameIcon';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, HelpCircle, LogOut, Plus } from 'lucide-react';
+import { ExternalLink, HelpCircle, Loader2, LogOut, Play, Plus } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { gamesApi } from '@/api/games';
@@ -13,6 +13,8 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { TierBadge } from '@/components/TierBadge';
 import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
+import { createCapacity, joinCandidates, quickRoomName } from '@/features/lobby/quickJoin';
+import { WAKING_LABEL, useSlowNotice } from '@/features/lobby/useSlowNotice';
 import { ROOM_STATUS_LABEL } from '@/features/lobby/roomStatusLabel';
 import { markSpectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import { t } from '@/i18n/messages';
@@ -96,6 +98,21 @@ export function GameHubPage() {
     return () => window.clearInterval(id);
   }, [token, refreshRooms]);
 
+  // D-197 — 운영 서버는 요청이 없으면 멈춘다(콜드 스타트 약 30초). 휴대폰은 뒤로 가 있는 동안 위 5초 타이머가 멈추므로,
+  // 화면이 다시 보이거나 네트워크가 돌아오면 방 목록을 바로 한 번 받아 서버를 미리 깨운다. 숨은 동안에는 따로 깨우지 않는다(비용 그대로).
+  useEffect(() => {
+    if (!token) return;
+    const wake = () => {
+      if (document.visibilityState === 'visible') refreshRooms();
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('online', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('online', wake);
+    };
+  }, [token, refreshRooms]);
+
   async function handleJoin(roomId: string) {
     if (!token) return;
     try {
@@ -105,6 +122,51 @@ export function GameHubPage() {
       navigate(`/rooms/${roomId}`);
     } catch (err) {
       if (err instanceof ApiError) setError(errorText(err, '방에 들어가지 못했어요'));
+    }
+  }
+
+  // D-189 — 게임 카드 [참여하기]. 그 게임의 빈 대기실에 들어가고, 없거나 그사이 자리를 뺏기면 모달 없이 방을 만들어 들어간다.
+  // 상태는 누른 게임 id(진행 중이면 모든 [참여하기]를 막는다), ref 는 같은 틱의 두 번째 클릭(상태 반영 전)을 막는다.
+  const [quickJoinGameId, setQuickJoinGameId] = useState<string | null>(null);
+  const quickJoinBusy = useRef(false);
+  // D-197 — 2초를 넘기면 쉬던 서버가 깨어나는 중이라고 버튼 글자로 알린다.
+  const quickJoinWaking = useSlowNotice(quickJoinGameId !== null);
+
+  async function handleQuickJoin(game: GameSummary) {
+    if (!token || !user || quickJoinBusy.current) return;
+    quickJoinBusy.current = true;
+    setQuickJoinGameId(game.id);
+    setError(null);
+    try {
+      // 화면의 목록은 5초까지 묵었을 수 있어 누른 순간 다시 받는다. 못 받으면 가진 목록으로.
+      let latest = rooms;
+      try {
+        latest = (await roomsApi.list(token)).rooms;
+      } catch {
+        /* 가진 목록으로 진행 */
+      }
+      for (const candidate of joinCandidates(latest, game.id, user.userId)) {
+        try {
+          const res = await roomsApi.joinOrReconnect(token, candidate.roomId);
+          if (res.mode !== 'SPECTATING') {
+            navigate(`/rooms/${candidate.roomId}`);
+            return;
+          }
+          // 그사이 자리가 찼거나 시작해서 관전으로 받아졌다(D-133) — 참여하려던 것이니 관전을 풀고 다음 방으로.
+          await roomsApi.stopSpectating(token, candidate.roomId).catch(() => {});
+        } catch {
+          /* 방이 없어졌거나 못 들어감 — 다음 방으로 */
+        }
+      }
+      const room = await roomsApi.create(token, quickRoomName(user.username, game), game.id.toUpperCase(), {
+        capacity: createCapacity(game),
+      });
+      navigate(`/rooms/${room.roomId}`);
+    } catch (err) {
+      setError(errorText(err, '방을 만들지 못했어요'));
+    } finally {
+      quickJoinBusy.current = false;
+      setQuickJoinGameId(null);
     }
   }
 
@@ -297,20 +359,26 @@ export function GameHubPage() {
                     )}
                   >
                     {/* D-154 — 작은 카드: 여백·글자를 줄이고 소개는 두 줄까지. */}
-                    <CardHeader className="flex flex-row items-start gap-3 space-y-0 p-4 pb-1">
-                      <GameIcon gameId={game.id} size={48} interactive />
-                      <div className="min-w-0 space-y-1">
-                        <CardTitle className="text-base">{game.displayName}</CardTitle>
+                    <CardHeader className="flex flex-row items-start gap-3 space-y-0 p-3 pb-1">
+                      <GameIcon gameId={game.id} size={40} interactive />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="min-w-0 text-base">{game.displayName}</CardTitle>
+                          {/* D-189 — 인원은 오른쪽 위에 작게(줄을 따로 쓰지 않는다). D-196 — 서버가 준 할 수 있는 인원으로(오목은 2·4인). */}
+                          <span
+                            data-testid={`player-count-${game.id}`}
+                            title={`${playerCountLabel(game)} 플레이`}
+                            className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium leading-4 text-muted-foreground"
+                          >
+                            {playerCountLabel(game)}
+                          </span>
+                        </div>
                         <CardDescription className="line-clamp-2 text-xs">
                           {game.shortDescription}
                         </CardDescription>
                       </div>
                     </CardHeader>
-                    <CardContent className="px-4 pb-1 text-xs text-muted-foreground">
-                      {/* D-196 — 서버가 준 할 수 있는 인원으로(오목은 2·4인). */}
-                      {`${playerCountLabel(game)} 플레이`}
-                    </CardContent>
-                    <CardFooter className="mt-auto gap-3 px-4 pb-3 pt-1">
+                    <CardFooter className="mt-auto flex-wrap gap-x-3 gap-y-2 px-3 pb-3 pt-1">
                       {!available && (
                         <Badge variant="secondary">Coming Soon</Badge>
                       )}
@@ -329,11 +397,35 @@ export function GameHubPage() {
                           type="button"
                           variant="outline"
                           size="sm"
+                          className="h-8 px-2.5"
                           onClick={() => setTutorialGameId(game.id)}
                           aria-label={`${game.displayName} 게임 방법`}
                         >
                           <HelpCircle className="h-4 w-4" />
                           게임 방법
+                        </Button>
+                      )}
+                      {/* D-189 — 빈 대기실이 있으면 들어가고 없으면 모달 없이 방을 만든다. 준비 중인 게임에는 없다. */}
+                      {available && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="ml-auto h-8 px-3"
+                          onClick={() => handleQuickJoin(game)}
+                          disabled={quickJoinGameId !== null}
+                          aria-busy={quickJoinGameId === game.id}
+                          aria-label={`${game.displayName} 참여하기`}
+                        >
+                          {quickJoinGameId === game.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                          {quickJoinGameId === game.id
+                            ? quickJoinWaking
+                              ? WAKING_LABEL
+                              : '들어가는 중…'
+                            : '참여하기'}
                         </Button>
                       )}
                     </CardFooter>

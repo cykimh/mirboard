@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { roomsApi } from '@/api/rooms';
+import { createCapacity } from '@/features/lobby/quickJoin';
+import { WAKING_LABEL, useSlowNotice } from '@/features/lobby/useSlowNotice';
 import type { GameSummary } from '@/types/api';
 import {
   Dialog,
@@ -48,6 +50,8 @@ export function CreateRoomModal({
   const [selectedGame, setSelectedGame] = useState('');
   const [roomName, setRoomName] = useState('');
   const [creating, setCreating] = useState(false);
+  // D-197 — 2초를 넘기면 쉬던 서버가 깨어나는 중이다(운영 콜드 스타트 약 30초). 버튼 글자로 알린다.
+  const waking = useSlowNotice(creating);
 
   // 모달이 열릴 때 기본 게임을 첫 AVAILABLE 로 맞춘다.
   useEffect(() => {
@@ -63,13 +67,10 @@ export function CreateRoomModal({
     if (!roomName.trim() || !selectedGame) return;
     setCreating(true);
     try {
-      // D-143 — 정원은 게임 최대 인원(대기실에서 방장이 지금 인원으로 시작한다). 인원 고정 게임(티츄)은 보내지 않는다.
       // D-161 — 턴 제한·목표 점수·판돈은 보내지 않는다(서버가 게임 선언 기본으로 열고 대기실에서 방장이 바꾼다).
-      // D-176 — 정원을 방 설정이 정하는 게임(값을 가진 방 옵션을 선언 — 오목의 1:1/2:2)도 보내지 않는다. 서버가 기본 설정의 정원으로 열고,
-      // 방장이 대기실에서 설정을 바꾸면 정원이 따라 바뀐다. 최대 인원을 보내면 기본 설정 정원(오목 1:1 = 2)을 넘어 거절된다.
-      const capacityBySettings = (game?.roomOptionChoices ?? []).length > 0;
+      // 정원 규칙(D-143·D-176)은 `createCapacity` — 메인 카드 [참여하기](D-189)와 같이 쓴다.
       const room = await roomsApi.create(token, roomName.trim(), selectedGame.toUpperCase(), {
-        capacity: game && !capacityBySettings && game.minPlayers < game.maxPlayers ? game.maxPlayers : undefined,
+        capacity: createCapacity(game),
       });
       navigate(`/rooms/${room.roomId}`);
     } catch (err) {
@@ -147,7 +148,7 @@ export function CreateRoomModal({
               type="submit"
               disabled={creating || !selectedGame || !roomName.trim()}
             >
-              {creating ? '생성 중...' : '방 만들기'}
+              {creating ? (waking ? WAKING_LABEL : '생성 중...') : '방 만들기'}
             </Button>
           </DialogFooter>
         </form>

@@ -285,6 +285,11 @@
 
 - 페이지: `LoginPage`, `RegisterPage`, `GameHubPage`(메인 — 방 생성/입장/관전/랭킹/로비채팅
   통합), `RoomPage`(대기실 + 게임판).
+- **메인 게임 카드 [참여하기](D-189)**: 인원은 카드 오른쪽 위 작은 알약(카드 높이 150 → 126px), [참여하기]는 그 게임의 빈 대기실에
+  `join-or-reconnect` 로 들어가고(내가 앉은 방 → 사람 많은 방 → 먼저 만든 방) 없거나 자리를 뺏기면 모달 없이 방을 만든다
+  (`features/lobby/quickJoin` — 이름 "{별명}님의 {게임} 방"). 준비 중 게임엔 버튼 없음. 서버 변경 0.
+- **쉬던 서버 알림(D-197)**: 메인이 다시 보일 때·`online` 에 방 목록을 바로 받아 서버를 미리 깨우고, 방 만들기 모달·[참여하기]가 2초를
+  넘기면 버튼이 "서버 깨우는 중… (최대 30초)"(`features/lobby/useSlowNotice`).
 - 게임판: `GameTable`, `SortableHand`(@dnd-kit 손패 정렬), `CardChip`, `SeatAvatar`,
   `EffectsOverlay`, 소원/드래곤 모달.
 - 상태: Zustand 스토어(`authStore`, `tichuStore`, `roomChatStore`, `themeStore`, `effectStore`).
