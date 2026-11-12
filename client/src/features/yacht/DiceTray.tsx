@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MAX_ROLLS, type Dice, type Held } from '@/types/yacht';
 import { YachtDie, YachtDieCube } from './YachtDie';
 import type { MadeTier } from './yachtLabels';
+import { showToast } from '@/components/toast/toastStore';
+import { useDeviceShake } from './useDeviceShake';
 
 /** D-208 — 내 굴림이 족보로 멈췄다(게임판이 굴림 하나에 한 번만 넘긴다). */
 export interface TrayMade {
@@ -55,6 +57,8 @@ export const ROLL_DIE_MS = 500;
  * 마지막 주사위가 `4 × ROLL_STAGGER_MS` 뒤에 출발한다.
  */
 export const LAND_ORDER = [2, 0, 3, 1, 4] as const;
+/** D-264 — [흔들기]를 이만큼은 누르고 있어야 떼었을 때 굴린다(스친 누름은 굴리지 않는다). */
+export const SHAKE_MIN_MS = 300;
 
 interface Props {
   dice: Dice | null;
@@ -83,6 +87,12 @@ interface Props {
   backUrgent?: boolean;
   /** D-208 — 족보로 멈춘 내 굴림(없으면 null). 고리·꼬리표는 `animate` 가 꺼져도 정지 상태로 뜬다. */
   made?: TrayMade | null;
+  /** D-264 — 가운데 판이 굴림 신호를 받은 순간(굴림 하나에 한 번, 판을 바꿔 볼 때는 아님). 연출을 꺼도 부른다 — 소리용. */
+  onRollSound?: () => void;
+  /** D-264 — 컵을 흔들기 시작했다. 돌려준 함수를 흔들기가 끝날 때 부른다(달그락 소리 끄기). */
+  onShakeSound?: () => (() => void) | void;
+  /** D-264 — 휴대폰 흔들기를 켜 두었다(게임판 ⋮ 메뉴). 굴릴 수 있을 때만 움직임을 듣는다. */
+  motionShake?: boolean;
 }
 
 /**
@@ -107,21 +117,78 @@ export function DiceTray({
   backLabel = '내 판으로',
   backUrgent = false,
   made = null,
+  onRollSound,
+  onShakeSound,
+  motionShake = false,
 }: Props) {
   const [rolling, setRolling] = useState(false);
   const seenView = useRef(viewKey);
+  // D-264 — 굴림 소리는 신호가 바뀔 때만(처음 그릴 때·연출 설정을 바꿀 때·판을 바꿔 볼 때는 울리지 않는다).
+  const soundedNonce = useRef(rollNonce);
+  const rollSound = useRef(onRollSound);
+  rollSound.current = onRollSound;
   useEffect(() => {
     const switched = seenView.current !== viewKey;
     seenView.current = viewKey;
     if (switched) {
+      soundedNonce.current = rollNonce;
       setRolling(false);
       return;
+    }
+    if (rollNonce !== soundedNonce.current) {
+      soundedNonce.current = rollNonce;
+      if (rollNonce > 0) rollSound.current?.();
     }
     if (rollNonce === 0 || !animate) return;
     setRolling(true);
     const timer = window.setTimeout(() => setRolling(false), ROLL_ANIMATION_MS);
     return () => window.clearTimeout(timer);
   }, [rollNonce, animate, viewKey]);
+
+  // D-264 — 흔들어 굴리기. [흔들기]를 누르고 있는 동안(또는 휴대폰을 흔드는 동안) 컵이 제자리에서 달그락거리고, 떼면(멎으면) 굴리기
+  // 버튼과 같은 `onRoll` 을 한 번 부른다. 흔들림은 화면·소리뿐이고 눈은 서버가 정한다. `onRoll` 이 없으면(남의 차례·관전·남의 판 구경)
+  // 버튼 자체가 없고, 흔드는 중에 굴릴 수 없게 되면(시간 초과·끊김) 굴리지 않고 걷는다.
+  const [shake, setShake] = useState<'press' | 'motion' | null>(null);
+  const shakeNow = useRef<{ since: number; stop: (() => void) | void } | null>(null);
+  const rollable = canRoll && onRoll !== undefined;
+  const live = useRef({ rollable, onRoll, onShakeSound });
+  live.current = { rollable, onRoll, onShakeSound };
+  const beginShake = (source: 'press' | 'motion') => {
+    if (shakeNow.current || !live.current.rollable) return;
+    shakeNow.current = { since: Date.now(), stop: live.current.onShakeSound?.() };
+    setShake(source);
+  };
+  const endShake = (roll: boolean, hint = false) => {
+    const now = shakeNow.current;
+    if (!now) return;
+    shakeNow.current = null;
+    now.stop?.();
+    setShake(null);
+    if (!roll || !live.current.rollable) return;
+    if (Date.now() - now.since < SHAKE_MIN_MS) {
+      if (hint) showToast('꾹 누른 채 흔들다가 떼면 굴러요');
+      return;
+    }
+    live.current.onRoll?.();
+  };
+  useEffect(() => {
+    if (!rollable) endShake(false);
+    // endShake 는 ref 만 읽는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rollable]);
+  useEffect(
+    () => () => {
+      shakeNow.current?.stop?.();
+      shakeNow.current = null;
+    },
+    [],
+  );
+  // 휴대폰 흔들기 — ⋮ 메뉴에서 켜 둔 사람만, 굴릴 수 있을 때만 듣는다.
+  useDeviceShake({
+    enabled: motionShake && rollable,
+    onStart: () => beginShake('motion'),
+    onStop: (roll) => endShake(roll),
+  });
 
   const left = MAX_ROLLS - rolls;
   // D-203 — 다섯 개가 같게 멈추면 가벼운 반짝임(본 축하는 요트 칸에 기록할 때).
@@ -131,7 +198,7 @@ export function DiceTray({
   return (
     <section className="yt-tray" aria-label="주사위">
       <div
-        className={`yt-dice${allSame ? ' yt-dice-same' : ''}${shown ? ` yt-dice-made yt-dice-made-${shown.tier}${animate ? ' yt-dice-made-live' : ''}` : ''}`}
+        className={`yt-dice${shake ? ` yt-dice-shaking${animate ? ' yt-dice-shaking-live' : ''}` : ''}${allSame ? ' yt-dice-same' : ''}${shown ? ` yt-dice-made yt-dice-made-${shown.tier}${animate ? ' yt-dice-made-live' : ''}` : ''}`}
         role="group"
         aria-label={dice ? `주사위 ${dice.join(', ')}` : '아직 굴리지 않음'}
       >
@@ -186,12 +253,49 @@ export function DiceTray({
             <DiceCup />
           </span>
         )}
+        {/* D-264 — 흔드는 동안 컵이 제자리에서 달그락거린다(쏟는 컵과 같은 자리). */}
+        {shake && !rolling && (
+          <span className="yt-cup yt-cup-shake" aria-hidden="true" key="shake">
+            <DiceCup />
+          </span>
+        )}
       </div>
       <div className="yt-tray-actions">
         {onRoll ? (
-          <button type="button" className="yt-roll" disabled={!canRoll} onClick={onRoll}>
-            굴리기 · {left}번 남음
-          </button>
+          <>
+            <button type="button" className="yt-roll" disabled={!canRoll} onClick={onRoll}>
+              굴리기 · {left}번 남음
+            </button>
+            {/* 누르고 있는 동안만 흔든다 — click 은 쓰지 않는다(떼는 순간이 굴림). 키보드는 스페이스·엔터를 누르고 있다가 뗀다. */}
+            <button
+              type="button"
+              className={`yt-shake${shake === 'press' ? ' yt-shake-on' : ''}`}
+              disabled={!canRoll}
+              aria-pressed={shake !== null}
+              title="꾹 누른 채 흔들다가 떼면 굴러요"
+              onPointerDown={(e) => {
+                if (e.button) return;
+                try {
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                } catch {
+                  // 포인터 잡기 실패 — 그대로 진행.
+                }
+                beginShake('press');
+              }}
+              onPointerUp={() => endShake(true, true)}
+              onPointerCancel={() => endShake(false)}
+              onContextMenu={(e) => e.preventDefault()}
+              onKeyDown={(e) => {
+                if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) beginShake('press');
+              }}
+              onKeyUp={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') endShake(true, true);
+              }}
+              onBlur={() => endShake(false)}
+            >
+              흔들기
+            </button>
+          </>
         ) : (
           <span className="yt-tray-note">
             {note ?? (turnName ? `${turnName} 차례 · 굴림 ${rolls}/${MAX_ROLLS}` : '대기 중')}

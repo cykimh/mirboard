@@ -26,7 +26,15 @@ vi.mock('@/ws/useStompRoom', () => ({
 // D-207 — 효과음은 훅을 모의로 두고 불렸는지만 본다(합성·음소거는 `useSfx.test`).
 const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade: vi.fn() }));
 vi.mock('@/features/sound/useSfx', () => ({
-  useSfx: () => ({ muted: false, toggleMute: vi.fn(), playChime: sfx.playChime, playYacht: sfx.playYacht, playMade: sfx.playMade }),
+  useSfx: () => ({
+    muted: false,
+    toggleMute: vi.fn(),
+    playChime: sfx.playChime,
+    playYacht: sfx.playYacht,
+    playMade: sfx.playMade,
+    playRoll: vi.fn(),
+    startShake: () => () => {},
+  }),
 }));
 vi.mock('@/api/users', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/users')>();

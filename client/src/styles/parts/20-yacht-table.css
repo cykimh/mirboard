@@ -521,6 +521,56 @@ button.yt-badge {
   opacity: 0.85;
 }
 
+/* D-264 — 흔들어 굴리기. [흔들기]는 누르고 있는 동안만 흔든다(떼면 굴림) — 길게 눌러도 글자 선택·길게 누르기 메뉴가 뜨지 않게 한다. */
+.yt-shake {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--yt-accent);
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.yt-shake:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.yt-shake-on {
+  background: var(--yt-accent);
+  color: #fff;
+}
+
+/* 흔드는 동안 고정 안 한 주사위가 제자리에서 떤다(주사위마다 박자를 어긋나게). */
+.yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face {
+  animation: yt-shake-jitter 0.16s linear infinite;
+  animation-delay: calc(var(--yt-i, 0) * -37ms);
+}
+
+@keyframes yt-shake-jitter {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(-2px, 1px) rotate(-5deg);
+  }
+  50% {
+    transform: translate(2px, -2px) rotate(4deg);
+  }
+  75% {
+    transform: translate(-1px, 2px) rotate(-3deg);
+  }
+}
+
 /* D-205 — 남의 판 구경: 굴리기 자리에 안내 + [내 판으로]. 굴리기 버튼과 같은 줄 높이라 판이 오르내리지 않는다. */
 .yt-tray-actions {
   display: flex;
@@ -879,8 +929,6 @@ button.yt-badge {
  * 글자 대비: 펠트 위 글자는 어두운 받침(배지·안내 알약) 위에만 놓고, 장부의 황동 글자는 테마별로 따로 고른 `--yt-s-brass-ink`(AA).
  */
 .yt-theme-salon {
-  --yt-s-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Noto Serif KR', 'Noto Serif CJK KR', 'Nanum Myeongjo',
-    AppleMyungjo, 'Apple SD Gothic Neo', Batang, Georgia, serif;
   --yt-s-page: linear-gradient(#f8f3e7, #ebe2ce);
   --yt-s-ink: #2a241a;
   --yt-s-ink-soft: #5c4f38;
@@ -958,7 +1006,6 @@ html.dark .yt-theme-salon {
   padding-left: 14px;
   border-color: var(--yt-s-brass);
   color: var(--yt-s-brass-ink);
-  font-family: var(--yt-s-serif);
   letter-spacing: 0.32em;
 }
 
@@ -1004,7 +1051,6 @@ html.dark .yt-theme-salon {
 }
 
 .yt-theme-salon .yt-seat-total {
-  font-family: var(--yt-s-serif);
   font-weight: 600;
   font-size: 14px;
 }
@@ -2048,7 +2094,6 @@ html.dark .yt-theme-salon {
   border-radius: 999px;
   background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
   color: #2a1d05;
-  font-family: var(--yt-s-serif);
   font-size: 16px;
   letter-spacing: 0.1em;
   box-shadow:
@@ -2117,6 +2162,69 @@ html.dark .yt-theme-salon {
 .yt-theme-salon .yt-roll:disabled {
   opacity: 0.55;
   filter: saturate(0.5);
+}
+
+/* D-264 — [흔들기]: 황동 테만 두른 어두운 버튼(굴리기보다 한 단계 낮게). 누르고 있는 동안은 황동으로 찬다. */
+.yt-theme-salon .yt-shake {
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1.5px solid #f6e2a4;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #f6e2a4;
+  letter-spacing: 0.06em;
+  transition:
+    transform 0.08s,
+    background 0.12s;
+}
+
+.yt-theme-salon .yt-shake:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.yt-theme-salon .yt-shake.yt-shake-on,
+.yt-theme-salon .yt-shake.yt-shake-on:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
+  color: #2a1d05;
+  transform: translateY(2px);
+}
+
+.yt-theme-salon .yt-shake:focus-visible {
+  outline: 2px solid #fff6d0;
+  outline-offset: 3px;
+}
+
+.yt-theme-salon .yt-shake:disabled {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+
+/* 흔드는 컵 — 쏟는 컵과 같은 자리에서 주둥이를 위로 한 채 달그락거린다(한 바퀴 0.32초 = 소리의 흔듦 두 번). */
+.yt-theme-salon .yt-cup.yt-cup-shake {
+  animation: yt-salon-cup-shake 0.32s ease-in-out infinite;
+}
+
+/* 연출을 끈 화면 — 컵은 기울어진 채 가만히 떠 있다(흔드는 중이라는 표시만). */
+.yt-theme-salon .yt-dice:not(.yt-dice-shaking-live) .yt-cup.yt-cup-shake {
+  transform: rotate(-14deg);
+  animation: none;
+}
+
+@keyframes yt-salon-cup-shake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-14deg);
+  }
+  25% {
+    transform: translate(-7%, 6%) rotate(-32deg);
+  }
+  50% {
+    transform: translate(3%, -5%) rotate(-6deg);
+  }
+  75% {
+    transform: translate(-6%, 5%) rotate(-28deg);
+  }
 }
 
 .yt-theme-salon .yt-back {
@@ -2191,7 +2299,6 @@ html.dark .yt-theme-salon {
 
 .yt-theme-salon .yt-cell,
 .yt-theme-salon .yt-pick {
-  font-family: var(--yt-s-serif);
 }
 
 .yt-theme-salon .yt-num {
@@ -2325,7 +2432,6 @@ html.dark .yt-theme-salon {
 
 .yt-theme-salon .yt-chip b {
   color: #2a1d05;
-  font-family: var(--yt-s-serif);
   font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -2428,7 +2534,6 @@ html.dark .yt-theme-salon {
   border-bottom: 1px solid #d6b25e;
   background: rgba(6, 18, 13, 0.88);
   color: #f6e2a4;
-  font-family: var(--yt-s-serif);
   text-align: center;
   white-space: nowrap;
   transform: translate(-50%, -50%);
@@ -3055,7 +3160,6 @@ html.dark .yt-theme-salon {
 .yt-theme-salon .yt-end-title {
   margin-right: -0.4em;
   color: var(--yt-s-brass-ink);
-  font-family: var(--yt-s-serif);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.4em;
@@ -3087,7 +3191,6 @@ html.dark .yt-theme-salon {
 
 .yt-theme-salon .yt-end-best-new {
   color: var(--yt-s-brass-ink);
-  font-family: var(--yt-s-serif);
   font-size: 16px;
 }
 
@@ -3108,7 +3211,6 @@ html.dark .yt-theme-salon {
 
 .yt-theme-salon .yt-end-rank {
   min-width: 44px;
-  font-family: var(--yt-s-serif);
 }
 
 .yt-theme-salon .yt-end-first .yt-end-rank {
@@ -3135,7 +3237,6 @@ html.dark .yt-theme-salon {
 }
 
 .yt-theme-salon .yt-end-total {
-  font-family: var(--yt-s-serif);
   font-size: 15px;
   white-space: nowrap;
 }

@@ -22,6 +22,58 @@ export const YACHT_SFX_CHORD_SEC = 0.72;
 export const MADE_SFX_MAX_SEC = 0.6;
 export type MadeSfxTier = 'light' | 'mid' | 'big';
 
+/**
+ * D-264 얏추 — 굴림 소리의 박자. 주사위 하나가 바닥에 닿는 때(쏟아진 뒤 첫 착지·큰 튐 뒤·작은 튐 뒤)와 주사위마다 엇갈리는 간격이다.
+ * 게임판 굴림 연출(CSS `yt-salon-throw` 500ms 의 42%·72%·94%, `--yt-o * 45ms`)과 같은 값 — 바꾸면 같이 고친다.
+ */
+export const ROLL_SFX_HITS_SEC = [0.21, 0.36, 0.47] as const;
+export const ROLL_SFX_STAGGER_SEC = 0.045;
+export const ROLL_SFX_DICE = 5;
+/** 굴림 소리 전체 길이(초) — 마지막 주사위의 마지막 착지 뒤 여운까지. */
+export const ROLL_SFX_SEC = 0.75;
+/** 컵을 흔드는 동안 되풀이하는 달그락 한 바퀴(초). */
+export const SHAKE_SFX_LOOP_SEC = 0.64;
+/** 굴림 소리 세기 — 내 굴림 / 가운데 판에 보이는 남의 굴림. */
+export const ROLL_SFX_PEAK = { mine: 0.5, other: 0.14 } as const;
+
+interface Click {
+  at: number;
+  amp: number;
+}
+
+/** 짧게 꺼지는 잡음 토막(딱 소리)을 `clicks` 자리마다 적은 버퍼 — 주사위 부딪는 소리의 재료. */
+function clickBuffer(ctx: AudioContext, clicks: Click[], durSec: number, clickSec = 0.035): AudioBuffer {
+  const len = Math.max(1, Math.floor(ctx.sampleRate * durSec));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  const n = Math.max(1, Math.floor(ctx.sampleRate * clickSec));
+  for (const c of clicks) {
+    const from = Math.floor(ctx.sampleRate * c.at);
+    for (let i = 0; i < n && from + i < len; i++) data[from + i] += (Math.random() * 2 - 1) * c.amp * (1 - i / n) ** 4;
+  }
+  return buf;
+}
+
+/** 딱 소리 버퍼를 "상아가 부딪는" 높은 띠 + "바닥을 치는" 낮은 띠 둘로 걸러 낸다. 끄는 데 쓸 소스·세기 노드를 돌려준다. */
+function playClicks(ctx: AudioContext, buf: AudioBuffer, at: number, peak: number, loop = false) {
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = loop;
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(peak, at);
+  const high = ctx.createBiquadFilter();
+  high.type = 'bandpass';
+  high.frequency.value = 2600;
+  const low = ctx.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 520;
+  src.connect(high).connect(out);
+  src.connect(low).connect(out);
+  out.connect(ctx.destination);
+  src.start(at);
+  return { src, out };
+}
+
 // 차례 알림용 합성음(#9). mp3 에셋이 없어 Web Audio 로 짧은 2음을 생성한다.
 // AudioContext 는 싱글톤(사용자 제스처 이후 resume).
 let audioCtx: AudioContext | null = null;
@@ -275,7 +327,73 @@ export function useSfx() {
     [muted],
   );
 
+  /**
+   * D-264 얏추 — 주사위 굴리는 소리. 전부 합성이다(잡음 토막을 착지 박자마다). 컵에서 쏟아지는 짧은 달그락 뒤, 주사위 다섯 개가
+   * `ROLL_SFX_STAGGER_SEC` 씩 엇갈려 세 번씩 바닥에 닿는다(뒤로 갈수록 작게) — 게임판 굴림 연출과 같은 박자.
+   * `mine` 이 아니면(가운데 판에서 보이는 남의 굴림) 훨씬 작게. 음소거 시 무음.
+   */
+  const playRoll = useCallback(
+    (mine = true) => {
+      if (muted) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const clicks: Click[] = [];
+        // 컵 주둥이에서 쏟아지는 달그락.
+        for (let i = 0; i < 6; i++) clicks.push({ at: 0.012 + i * 0.026 + Math.random() * 0.008, amp: 0.3 + Math.random() * 0.25 });
+        const amps = [1, 0.55, 0.28];
+        for (let d = 0; d < ROLL_SFX_DICE; d++) {
+          ROLL_SFX_HITS_SEC.forEach((hit, k) => {
+            clicks.push({ at: hit + d * ROLL_SFX_STAGGER_SEC, amp: amps[k] * (0.8 + Math.random() * 0.2) });
+          });
+        }
+        playClicks(ctx, clickBuffer(ctx, clicks, ROLL_SFX_SEC), ctx.currentTime, mine ? ROLL_SFX_PEAK.mine : ROLL_SFX_PEAK.other);
+      } catch {
+        // 합성 실패 — silent.
+      }
+    },
+    [muted],
+  );
+
+  /**
+   * D-264 얏추 — 컵을 흔드는 동안의 달그락(되풀이). 멈추는 함수를 돌려준다 — 부르면 짧게 잦아든 뒤 끝난다(두 번 불러도 된다).
+   * 음소거·Web Audio 없음이면 아무것도 하지 않는 함수를 돌려준다.
+   */
+  const startShake = useCallback((): (() => void) => {
+    if (muted) return () => {};
+    const ctx = getAudioCtx();
+    if (!ctx) return () => {};
+    try {
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const clicks: Click[] = [];
+      // 한 바퀴에 흔듦 네 번 — 흔들 때마다 주사위 두세 개가 컵 벽을 친다.
+      for (let beat = 0; beat < 4; beat++) {
+        const at = (beat * SHAKE_SFX_LOOP_SEC) / 4;
+        clicks.push({ at: at + 0.004, amp: 0.9 });
+        clicks.push({ at: at + 0.03 + Math.random() * 0.02, amp: 0.5 + Math.random() * 0.3 });
+        if (beat % 2 === 0) clicks.push({ at: at + 0.075 + Math.random() * 0.03, amp: 0.3 + Math.random() * 0.25 });
+      }
+      const { src, out } = playClicks(ctx, clickBuffer(ctx, clicks, SHAKE_SFX_LOOP_SEC, 0.028), ctx.currentTime, 0.3, true);
+      let stopped = false;
+      return () => {
+        if (stopped) return;
+        stopped = true;
+        try {
+          const t = ctx.currentTime;
+          out.gain.setValueAtTime(0.3, t);
+          out.gain.linearRampToValueAtTime(0.0001, t + 0.06);
+          src.stop(t + 0.08);
+        } catch {
+          // 이미 멈춤 — silent.
+        }
+      };
+    } catch {
+      return () => {};
+    }
+  }, [muted]);
+
   const toggleMute = useCallback(() => setMuted((v) => !v), []);
 
-  return { play, playChime, playSlam, playFive, playYacht, playMade, muted, toggleMute };
+  return { play, playChime, playSlam, playFive, playYacht, playMade, playRoll, startShake, muted, toggleMute };
 }

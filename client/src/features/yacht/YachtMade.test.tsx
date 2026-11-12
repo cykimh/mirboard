@@ -24,7 +24,7 @@ vi.mock('@/ws/useStompRoom', () => ({
 }));
 const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade: vi.fn() }));
 vi.mock('@/features/sound/useSfx', () => ({
-  useSfx: () => ({ muted: false, toggleMute: vi.fn(), ...sfx }),
+  useSfx: () => ({ muted: false, toggleMute: vi.fn(), playRoll: vi.fn(), startShake: () => () => {}, ...sfx }),
 }));
 vi.mock('@/api/users', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/users')>();

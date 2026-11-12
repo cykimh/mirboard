@@ -35,6 +35,9 @@ const PIPS: Record<number, ReadonlyArray<readonly [number, number]>> = {
   ],
 };
 
+/** 작은 주사위의 눈 색 — 여섯 면 모두 같다(D-264). 큰 주사위는 같은 검정의 그라데이션(`yt-pp-*`). */
+export const PIP_COLOR = '#1b1c1f';
+
 interface Props {
   /** 1~6, `null` 이면 빈 자리(아직 굴리지 않음). */
   face: number | null;
@@ -72,7 +75,7 @@ export function YachtDieCube({ face }: { face: number }) {
 
 /**
  * 상아 주사위(D-203). 가운데 판·좌석 띠·점수표 칸 이름·튜토리얼 퀴즈가 같은 그림을 쓴다. 꾸밈용이라 `aria-hidden` — 눈은 감싸는
- * 쪽의 `aria-label` 이 읽는다. 1 눈만 크고 붉다. 그라데이션 id 는 주사위마다 따로(`useId`) — 한 문서에 여러 개가 떠도 겹치지 않는다.
+ * 쪽의 `aria-label` 이 읽는다. 1 눈은 크기만 크고 색은 다른 눈과 같은 검정이다(D-264 — 붉은 눈을 없앴다). 그라데이션 id 는 주사위마다 따로(`useId`) — 한 문서에 여러 개가 떠도 겹치지 않는다.
  */
 export function YachtDie({ face, mini = false }: Props) {
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -91,20 +94,22 @@ export function YachtDie({ face, mini = false }: Props) {
           stroke="#a89972"
           strokeWidth="4"
         />
-        {pips.map(([x, y], i) =>
-          face === 1 ? (
-            <circle key={i} className="yt-die-svg-one" cx={x} cy={y} r="16" fill="#a8243c" />
-          ) : (
-            <circle key={i} className="yt-die-svg-pip" cx={x} cy={y} r="10.5" fill="#1b1c1f" />
-          ),
-        )}
+        {pips.map(([x, y], i) => (
+          <circle
+            key={i}
+            className={face === 1 ? 'yt-die-svg-pip yt-die-svg-one' : 'yt-die-svg-pip'}
+            cx={x}
+            cy={y}
+            r={face === 1 ? 16 : 10.5}
+            fill={PIP_COLOR}
+          />
+        ))}
       </svg>
     );
   }
   const ivory = `yt-iv-${uid}`;
   const shade = `yt-sh-${uid}`;
   const pip = `yt-pp-${uid}`;
-  const wine = `yt-wn-${uid}`;
   return (
     <svg className="yt-die-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
       <defs>
@@ -121,11 +126,6 @@ export function YachtDie({ face, mini = false }: Props) {
           <stop offset="0" stopColor="#4a4a4a" />
           <stop offset=".6" stopColor="#17181a" />
           <stop offset="1" stopColor="#000" />
-        </radialGradient>
-        <radialGradient id={wine} cx=".35" cy=".3" r=".8">
-          <stop offset="0" stopColor="#e06a7c" />
-          <stop offset=".55" stopColor="#a8243c" />
-          <stop offset="1" stopColor="#6d1324" />
         </radialGradient>
       </defs>
       <rect
@@ -156,11 +156,11 @@ export function YachtDie({ face, mini = false }: Props) {
             {/* 파인 눈 — 아래쪽 가장자리에 밝은 테가 살짝 비친다. */}
             <circle className="yt-die-svg-rim" cx={x} cy={y + 1.3} r={r + 0.4} fill="#fff" fillOpacity=".7" />
             <circle
-              className={face === 1 ? 'yt-die-svg-one' : 'yt-die-svg-pip'}
+              className={face === 1 ? 'yt-die-svg-pip yt-die-svg-one' : 'yt-die-svg-pip'}
               cx={x}
               cy={y}
               r={r}
-              fill={`url(#${face === 1 ? wine : pip})`}
+              fill={`url(#${pip})`}
             />
           </g>
         );
