@@ -19,7 +19,7 @@ public sealed interface OmokAction extends GameAction
         permits OmokAction.Place, OmokAction.Resign, OmokAction.TimeoutPlace {
 
     /**
-     * 돌 하나 두기 (룰 §4). {@code slam} 은 "강하게 두기"(룰 §4.1, D-193) — 연출 전용, 좌석마다 한 판에 한 번. JSON 에 없으면
+     * 돌 하나 두기 (룰 §4). {@code slam} 은 "강하게 두기"(룰 §4.1, D-193) — 연출 전용, 횟수 제한 없음(D-195 — 클라는 [두기] 길게 누르기). JSON 에 없으면
      * false.
      */
     record Place(int x, int y, boolean slam) implements OmokAction {

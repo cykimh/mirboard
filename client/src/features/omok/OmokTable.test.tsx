@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './testPointerEvent';
 import { OmokTable } from './OmokTable';
+import { SLAM_HOLD_MS } from './OmokPlaceButton';
 import { useOmokStore } from './omokStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import type { OmokMatchResult, OmokMove, OmokTableView } from '@/types/omok';
@@ -87,14 +88,15 @@ describe('OmokTable (S4)', () => {
     expect(useOmokStore.getState().pending).toEqual({ x: 7, y: 7 });
   });
 
-  it('[여기에 두기]는 미리보기가 있을 때만 켜지고 누르면 보낸다', () => {
+  it('[여기에 두기]는 미리보기가 있을 때만 켜지고 짧게 누르면 보통으로 보낸다', () => {
     seed();
     const { svg } = renderTable();
-    const button = screen.getByRole('button', { name: '여기에 두기' });
+    const button = screen.getByRole('button', { name: /여기에 두기/ });
     expect(button).toBeDisabled();
     tap(svg, 3, 4);
     expect(button).toBeEnabled();
-    fireEvent.click(button);
+    fireEvent.pointerDown(button, { pointerId: 2, pointerType: 'touch' });
+    fireEvent.pointerUp(button, { pointerId: 2, pointerType: 'touch' });
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 3, y: 4 });
   });
 
@@ -103,7 +105,7 @@ describe('OmokTable (S4)', () => {
     const { svg } = renderTable();
     tap(svg, 5, 5);
     expect(screen.getByText('33 금수예요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '여기에 두기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /여기에 두기/ })).toBeDisabled();
     tap(svg, 5, 5);
     expect(sendAction).not.toHaveBeenCalled();
   });
@@ -169,65 +171,87 @@ describe('OmokTable (S4)', () => {
     tap(svg, 7, 7);
     expect(sendAction).not.toHaveBeenCalled();
   });
-  it('D-193 — [강하게]를 켜고 두면 PLACE_STONE 에 slam:true 를 싣고 토글이 풀린다', () => {
-    seed({ slamsLeft: [1, 1] });
-    const { svg } = renderTable();
-    const toggle = screen.getByRole('button', { name: /강하게 두기 스킬/ });
-    expect(toggle).toHaveTextContent('1/1');
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(toggle).toHaveTextContent('장전됨!');
-    expect(screen.getByText('💥 강하게 둘 자리를 누르세요')).toBeInTheDocument();
-    tap(svg, 7, 7);
-    fireEvent.click(screen.getByRole('button', { name: '강하게 두기!' }));
-    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 7, y: 7, slam: true });
-    expect(useOmokStore.getState().pendingSlam).toBe(true);
-    expect(screen.getByRole('button', { name: /강하게 두기 스킬/ })).toHaveAttribute('aria-pressed', 'false');
-    // 내 화면에도 발동 배너가 바로 뜬다(상대 화면과 같은 배너).
-    expect(screen.getByTestId('om-slam-banner')).toHaveTextContent('흑 강하게 두기!');
+  describe('D-195 — [두기] 길게 누르기 = 강하게 두기(횟수 제한 없음)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('끝까지(SLAM_HOLD_MS) 누르고 있으면 게이지가 차는 순간 slam:true 로 보내고, 뗄 때 또 보내지 않는다', () => {
+      seed();
+      const { svg } = renderTable();
+      tap(svg, 9, 9);
+      const button = screen.getByRole('button', { name: /여기에 두기/ });
+      fireEvent.pointerDown(button, { pointerId: 2, pointerType: 'touch' });
+      expect(button.className).toContain('om-charging');
+      expect(screen.getByText(/끝까지 누르고 있으면 강하게!/)).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(SLAM_HOLD_MS - 1));
+      expect(sendAction).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 9, y: 9, slam: true });
+      expect(useOmokStore.getState().pendingSlam).toBe(true);
+      fireEvent.pointerUp(button, { pointerId: 2, pointerType: 'touch' });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      // 내 화면에도 발동 배너(상대 화면과 같은 배너).
+      expect(screen.getByTestId('om-slam-banner')).toHaveTextContent('흑 강하게 두기!');
+    });
+
+    it('다 차기 전에 떼면 보통 두기, 버튼 밖으로 빠지면 아무것도 두지 않는다', () => {
+      seed();
+      const { svg } = renderTable();
+      tap(svg, 9, 9);
+      const button = screen.getByRole('button', { name: /여기에 두기/ });
+      fireEvent.pointerDown(button, { pointerId: 2, pointerType: 'touch' });
+      fireEvent.pointerLeave(button, { pointerId: 2, pointerType: 'touch' });
+      act(() => vi.advanceTimersByTime(SLAM_HOLD_MS * 2));
+      expect(sendAction).not.toHaveBeenCalled();
+      fireEvent.pointerDown(button, { pointerId: 3, pointerType: 'touch' });
+      act(() => vi.advanceTimersByTime(SLAM_HOLD_MS / 2));
+      fireEvent.pointerUp(button, { pointerId: 3, pointerType: 'touch' });
+      expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 9, y: 9 });
+    });
+
+    it('키보드: Space 를 길게 누르면 강하게, 짧게 누르면 보통 — 문맥 메뉴는 막는다', () => {
+      seed({ moves: [], turnSeat: 0 });
+      const { svg } = renderTable();
+      tap(svg, 9, 9);
+      const button = screen.getByRole('button', { name: /여기에 두기/ });
+      expect(fireEvent.contextMenu(button)).toBe(false);
+      fireEvent.keyDown(button, { key: ' ' });
+      fireEvent.keyDown(button, { key: ' ', repeat: true });
+      act(() => vi.advanceTimersByTime(SLAM_HOLD_MS));
+      expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'PLACE_STONE', x: 9, y: 9, slam: true });
+    });
+
+    it('강하게 두기는 몇 번이든 된다 — 남은 횟수·스킬 표시가 없다', () => {
+      seed({ moves: [{ seat: 0, x: 0, y: 0, timedOut: false, }, { seat: 1, x: 1, y: 0, timedOut: false }], turnSeat: 0 });
+      act(() => useOmokStore.setState({ slamMoves: new Set([1, 2]) }));
+      const { svg } = renderTable();
+      expect(screen.queryByTestId('om-seat-skill')).toBeNull();
+      expect(screen.queryByText(/사용함|1\/1/)).toBeNull();
+      tap(svg, 9, 9);
+      const button = screen.getByRole('button', { name: /여기에 두기/ });
+      expect(button).toBeEnabled();
+      fireEvent.pointerDown(button, { pointerId: 2, pointerType: 'mouse', button: 0 });
+      act(() => vi.advanceTimersByTime(SLAM_HOLD_MS));
+      expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 9, y: 9, slam: true });
+    });
+
+    it('상대가 강하게 두면(STONE_PLACED.slam) 내 화면에도 발동 배너가 뜬다', () => {
+      seed({ moves: [{ seat: 0, x: 9, y: 9, timedOut: false }], turnSeat: 1 });
+      renderTable();
+      expect(screen.queryByTestId('om-slam-banner')).toBeNull();
+      act(() => {
+        useOmokStore.getState().applyEvent({
+          type: 'STONE_PLACED',
+          seq: 2,
+          payload: { seat: 1, color: 'WHITE', x: 10, y: 9, moveNumber: 2, timedOut: false, slam: true },
+        });
+      });
+      const banner = screen.getByTestId('om-slam-banner');
+      expect(banner).toHaveTextContent('백 강하게 두기!');
+      expect(banner).toHaveTextContent('나래');
+    });
   });
 
-  it('D-193 — 이미 썼으면 [강하게]가 막히고 보통 착수만 나간다', () => {
-    seed({ slamsLeft: [0, 1] });
-    const { svg } = renderTable();
-    const toggle = screen.getByRole('button', { name: /강하게 두기 스킬/ });
-    expect(toggle).toBeDisabled();
-    expect(toggle).toHaveTextContent('사용함');
-    tap(svg, 7, 7);
-    tap(svg, 7, 7);
-    expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 7, y: 7 });
-  });
-  it('D-193 — 미리보기를 두면 돋보기가 반대쪽 모서리에 좌표(A~T, I 없음)와 함께 뜬다', () => {
-    seed();
-    const { svg } = renderTable();
-    tap(svg, 2, 3); // 왼쪽 위 → 돋보기는 오른쪽 아래
-    const loupe = screen.getByTestId('om-loupe');
-    expect(loupe.getAttribute('class')).toContain('om-loupe-bottom-right');
-    expect(loupe).toHaveTextContent('C16');
-    tap(svg, 9, 9); // 다른 자리로 옮기면 돋보기도 따라간다(아직 확정 아님)
-    expect(screen.getByTestId('om-loupe')).toHaveTextContent('K10');
-    expect(sendAction).not.toHaveBeenCalled();
-  });
-  it('D-193 — 상대가 강하게 두면(STONE_PLACED.slam) 내 화면에도 발동 배너가 뜨고 상대 좌석 스킬이 "사용함"이 된다', () => {
-    seed({ slamsLeft: [1, 1], moves: [{ seat: 0, x: 9, y: 9, timedOut: false }], turnSeat: 1 });
-    renderTable();
-    expect(screen.queryByTestId('om-slam-banner')).toBeNull();
-    expect(screen.getAllByTestId('om-seat-skill').map((e) => e.getAttribute('aria-label'))).toEqual([
-      '강하게 두기 남음',
-      '강하게 두기 남음',
-    ]);
-    act(() => {
-      useOmokStore.getState().applyEvent({
-        type: 'STONE_PLACED',
-        seq: 2,
-        payload: { seat: 1, color: 'WHITE', x: 10, y: 9, moveNumber: 2, timedOut: false, slam: true },
-      });
-    });
-    const banner = screen.getByTestId('om-slam-banner');
-    expect(banner).toHaveTextContent('백 강하게 두기!');
-    expect(banner).toHaveTextContent('나래');
-    expect(screen.getAllByTestId('om-seat-skill')[1].getAttribute('aria-label')).toBe('강하게 두기 사용함');
-  });
   describe('D-194 — 종료 배너(모두에게 같은 배너)', () => {
     const FIVE = [0, 1, 2, 3, 4].map((x) => ({ x: 3 + x, y: 4 }));
     const end = (over: Partial<OmokMatchResult>) =>

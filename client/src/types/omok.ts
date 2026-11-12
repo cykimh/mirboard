@@ -40,8 +40,6 @@ export interface OmokTableView {
   forbidden: OmokForbiddenPoint[];
   timeouts: number[];
   result: OmokMatchResult | null;
-  /** D-193 — 좌석별 남은 강하게 두기 수(0 또는 1). 옛 서버면 없다. */
-  slamsLeft?: number[];
   /** D-193 — 판 줄 수(19). 옛 서버면 없다. */
   boardSize?: number;
 }

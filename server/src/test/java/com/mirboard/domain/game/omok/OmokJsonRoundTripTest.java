@@ -43,7 +43,7 @@ class OmokJsonRoundTripTest {
         String json = mapper.writeValueAsString(s);
         assertThat(mapper.readValue(json, OmokState.class)).isEqualTo(s);
         assertThat(keys(mapper.readTree(json))).containsExactly(
-                "blackTeam", "boardSize", "firstSeat", "mode", "moves", "result", "rule", "slams", "timeouts", "turnSeat");
+                "blackTeam", "boardSize", "firstSeat", "mode", "moves", "result", "rule", "timeouts", "turnSeat");
         assertThat(keys(mapper.readTree(json).get("result"))).containsExactly(
                 "causeSeat", "reason", "winLine", "winnerColor", "winnerSeats");
     }
@@ -74,14 +74,15 @@ class OmokJsonRoundTripTest {
     }
 
     @Test
-    void a_state_from_before_slams_gets_zeros_and_a_slammed_state_round_trips() throws Exception {
+    void a_d193_state_with_slam_counts_loads_and_drops_them() throws Exception {
+        // D-193 의 좌석별 강하게 두기 수(slams)는 D-195 로 없앴다 — 그때 저장된 JSON 도 읽힌다.
         String json = "{\"mode\":\"TEAMS_2V2\",\"rule\":\"RENJU\",\"blackTeam\":0,\"firstSeat\":0,\"moves\":[],"
-                + "\"turnSeat\":0,\"timeouts\":[0,0,0,0]}";
+                + "\"turnSeat\":0,\"timeouts\":[0,0,0,0],\"slams\":[1,0,0,0],\"boardSize\":19}";
         OmokState old = mapper.readValue(json, OmokState.class);
-        assertThat(old.slams()).containsExactly(0, 0, 0, 0);
-        OmokState slammed = ENGINE.apply(old, 0, new OmokAction.Place(7, 7, true)).newState();
+        assertThat(old.boardSize()).isEqualTo(19);
+        OmokState slammed = ENGINE.apply(old, 0, new OmokAction.Place(9, 9, true)).newState();
         assertThat(mapper.readValue(mapper.writeValueAsString(slammed), OmokState.class)).isEqualTo(slammed);
-        assertThat(slammed.slams()).containsExactly(1, 0, 0, 0);
+        assertThat(keys(mapper.readTree(mapper.writeValueAsString(slammed)))).doesNotContain("slams");
     }
 
     @Test
@@ -129,7 +130,7 @@ class OmokJsonRoundTripTest {
         OmokState s = play(teams(OmokRule.RENJU), p(7, 7), p(0, 0));
         JsonNode view = mapper.readTree(mapper.writeValueAsString(ENGINE.publicView(s)));
         assertThat(keys(view)).containsExactly(
-                "boardSize", "forbidden", "mode", "moves", "result", "rule", "seatColors", "slamsLeft", "timeouts", "turnSeat");
+                "boardSize", "forbidden", "mode", "moves", "result", "rule", "seatColors", "timeouts", "turnSeat");
         assertThat(view.get("seatColors").toString()).isEqualTo("[\"BLACK\",\"WHITE\",\"BLACK\",\"WHITE\"]");
     }
 }

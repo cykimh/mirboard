@@ -1,7 +1,7 @@
 /* 오목 게임판 (D-175·D-180, 테마 "결" D-192) — 원카드(19)와 같은 규칙을 따른다.
  *
  * ⚠ 캐스케이드: index.css 에서 19 다음, **17-responsive 앞**에 import 된다. 이 파일에는 폭 미디어가 **0개**다 — 판은 폭에 맞춰
- *   늘고 줄며(최대 폭·화면 높이 몫만 정한다) 차례 띠는 한 줄로 이름을 줄인다(D-193). 좌표 눈금·돋보기는 판 폭 컨테이너 쿼리로,
+ *   늘고 줄며(최대 폭·화면 높이 몫만 정한다) 차례 띠는 한 줄로 이름을 줄인다(D-193). 좌표 눈금은 판 폭 컨테이너 쿼리로,
  *   휴대폰 폭의 여백 걷어 내기·가로 화면 배치·손가락 화면·연출 끄기(prefers-reduced-motion)는 17-responsive 에 둔다.
  * ⚠ 네임스페이스: 모든 선택자는 `.om-` 클래스를 포함한다. 공용 클래스를 단독으로 재정의하지 않는다.
  * 구성: ① 기본 모습(납작한 판·돌) → ② 테마 층 `.om-theme-grain`(D-192). 테마 클래스를 떼면 ① 그대로다 — 그림 조각(`.om-art`)은
@@ -103,12 +103,11 @@ button.om-badge {
 }
 
 /* D-193 — 끊김·거절 안내는 판 위에 띄운다(흐름에 끼우면 판이 밀려 내려간다). */
-/* 판 자리 — 화면 높이가 허락하는 만큼(`--om-board-max`), 폭은 앱 틀 여백까지 걷어 낸 만큼(`--om-bleed`, 휴대폰 폭은 17 에서)
-   쓴다. % 는 쓰는 자리(게임판 폭)에서 풀린다. */
+/* 판 자리 — 화면 높이가 허락하는 만큼(`--om-board-max`), 폭은 게임판 폭까지(휴대폰 폭은 17 에서 화면 폭 기준으로 넓힌다 — D-195).
+   % 는 쓰는 자리(게임판 폭)에서 풀린다. 가운데 맞춤은 margin-left 로 — 판이 게임판보다 넓어도 양쪽으로 같이 나간다. */
 .om-stage {
   container-type: inline-size;
-  --om-bleed: 0px;
-  --om-stage-w: min(calc(100% + 2 * var(--om-bleed)), var(--om-board-max));
+  --om-stage-w: min(100%, var(--om-board-max));
   position: relative;
   width: var(--om-stage-w);
   margin: 0 0 0 calc((100% - var(--om-stage-w)) / 2);
@@ -395,7 +394,7 @@ button.om-badge {
 }
 
 /* ── 상태·조작 ─────────────────────────────────────────────────────── */
-/* 상태 줄은 한 줄 높이 고정(D-193) — 문구 길이가 바뀌어도 아래 버튼이 들썩이지 않게, 넘치면 말줄임(좌표는 돋보기에도 있다). */
+/* 상태 줄은 한 줄 높이 고정(D-193) — 문구 길이가 바뀌어도 아래 버튼이 들썩이지 않게, 넘치면 말줄임. */
 .om-status {
   margin: 0;
   height: 1.45em;
@@ -419,7 +418,7 @@ button.om-badge {
   gap: 6px;
 }
 
-/* D-193 — [💥 강하게] 토글 + [여기에 두기]. */
+/* D-195 — [두기] 한 개: 짧게 누르면 보통, 꾹 누르면 게이지가 차고 다 차면 강하게. 길게 눌러도 문맥 메뉴·글자 선택이 뜨지 않게. */
 .om-place-row {
   display: flex;
   gap: 8px;
@@ -429,93 +428,52 @@ button.om-badge {
   flex: 1 1 auto;
 }
 
-/* 스킬 슬롯(D-193) — 아이콘 + 이름 + 남은 수(1/1). 누르면 '장전됨!'(붉게 달아오르고 고리가 맥박), 쓰면 회색 "사용함". */
-.om-skill {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  min-height: 48px;
-  padding: 4px 12px 4px 6px;
-  border-radius: 12px;
-  border: 2px solid var(--om-accent);
-  background: var(--om-surface);
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.om-skill-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ffd48a, #ff7a2f 55%, #b8260f);
-  box-shadow:
-    inset 0 -2px 3px rgba(0, 0, 0, 0.3),
-    0 0 0 2px color-mix(in srgb, #ff7a2f 30%, transparent);
-  font-size: 18px;
-  line-height: 1;
-}
-
-.om-skill-text {
+.om-primary.om-place {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.om-skill-name {
-  font-size: 14px;
-  font-weight: 800;
+.om-place-label,
+.om-place-hint {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.om-skill-state {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--om-muted);
+.om-place-hint {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
 }
 
-.om-skill.om-skill-armed {
-  background: linear-gradient(180deg, #ff8a3d, #d9361e);
-  border-color: #8f1d0c;
+/* 게이지 — 왼쪽에서 오른쪽으로 `--om-hold-ms` 동안 찬다(버튼 상수 SLAM_HOLD_MS 를 그대로 받는다). */
+.om-hold-gauge {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(90deg, #ffb347, #ff6a2b 60%, #d9361e);
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}
+
+.om-place.om-charging .om-hold-gauge {
+  animation: om-hold-fill var(--om-hold-ms, 1500ms) linear forwards;
+}
+
+.om-place.om-charging {
   color: #fff;
-  animation: om-slam-armed 1.1s ease-in-out infinite;
-}
-
-.om-skill.om-skill-armed .om-skill-state {
-  color: #fff4d6;
-}
-
-.om-skill.om-skill-armed .om-skill-icon {
-  animation: om-skill-spark 0.9s ease-in-out infinite;
-}
-
-.om-skill:disabled {
-  cursor: not-allowed;
-}
-
-.om-skill.om-skill-used {
-  border-color: var(--om-border);
-  opacity: 0.55;
-}
-
-.om-skill.om-skill-used .om-skill-icon {
-  background: var(--om-surface-2);
-  box-shadow: none;
-  filter: grayscale(1);
-}
-
-/* 좌석의 스킬 표시 — 남음은 밝게, 사용함은 회색. */
-.om-seat-skill {
-  flex: 0 0 auto;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.om-seat-skill.om-seat-skill-used {
-  filter: grayscale(1);
-  opacity: 0.35;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff6a2b 40%, transparent);
 }
 
 /* 발동 배너 — 판 가운데 위쪽에 "흑 강하게 두기!" (모든 화면 같은 크기). */
@@ -564,10 +522,6 @@ button.om-badge {
   opacity: 0.85;
 }
 
-.om-primary.om-primary-slam:not(:disabled) {
-  background: linear-gradient(180deg, #ff7a2f, #c62a14);
-}
-
 /* D-193 강하게 두기 — 기본 모습(테마 없이도): 충격파 고리 두 겹. 움직임 줄이기 강조(om-slam-calm)는 17 에서만 보인다. */
 .om-shock {
   fill: none;
@@ -584,89 +538,6 @@ button.om-badge {
 
 .om-slam-calm {
   display: none;
-}
-
-/* D-193 돋보기 — 좁은 판(칸이 작을 때)에서만, 미리보기 반대쪽 모서리에. 그림만이라 입력을 막지 않는다. */
-.om-loupe {
-  display: none;
-  position: absolute;
-  z-index: 5;
-  margin: 0;
-  width: 34%;
-  max-width: 150px;
-  pointer-events: none;
-}
-
-@container (max-width: 560px) {
-  .om-loupe {
-    display: block;
-  }
-}
-
-.om-loupe-top-left {
-  top: 6px;
-  left: 6px;
-}
-
-.om-loupe-top-right {
-  top: 6px;
-  right: 6px;
-}
-
-.om-loupe-bottom-left {
-  bottom: 6px;
-  left: 6px;
-}
-
-.om-loupe-bottom-right {
-  bottom: 6px;
-  right: 6px;
-}
-
-.om-loupe svg {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 50%;
-  border: 3px solid var(--om-brass, var(--om-accent));
-  background: var(--om-wood);
-  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.55);
-}
-
-.om-loupe-bg {
-  fill: var(--om-wood);
-}
-
-.om-theme-grain .om-loupe-bg {
-  fill: var(--om-wood1);
-}
-
-.om-loupe-stone {
-  opacity: 0.75;
-}
-
-.om-loupe-ring {
-  fill: none;
-  stroke: var(--om-accent);
-  stroke-width: 0.06;
-}
-
-.om-loupe-no line {
-  stroke: var(--om-forbidden-mine);
-  stroke-width: 0.09;
-  stroke-linecap: round;
-}
-
-.om-loupe-label {
-  margin: 4px auto 0;
-  width: max-content;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--om-surface-2);
-  border: 1px solid var(--om-border);
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
 }
 
 .om-primary {
@@ -1976,15 +1847,9 @@ button.om-badge {
   }
 }
 
-@keyframes om-slam-armed {
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in srgb, #ff6a2b 22%, transparent);
-  }
-}
-
-@keyframes om-skill-spark {
-  50% {
-    transform: scale(1.12) rotate(-8deg);
+@keyframes om-hold-fill {
+  to {
+    transform: scaleX(1);
   }
 }
 

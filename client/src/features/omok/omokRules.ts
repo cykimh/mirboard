@@ -34,7 +34,7 @@ export const FORBIDDEN_LABEL: Record<OmokForbiddenPoint['kind'], string> = {
   OVERLINE: '장목(6목 이상) 금수예요',
 };
 
-/** 화면 좌표 글자 — 가로 A~T(I 없음), 세로 19~1(아래가 1). 돋보기·데스크톱 표시·보조기기 이름. */
+/** 화면 좌표 글자 — 가로 A~T(I 없음), 세로 19~1(아래가 1). 미리보기 상태 줄·데스크톱 표시·보조기기 이름. */
 export function coordName(p: OmokPoint): string {
   return `${COLUMN_LETTERS[p.x] ?? '?'}${BOARD_SIZE - p.y}`;
 }

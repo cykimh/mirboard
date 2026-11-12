@@ -31,8 +31,6 @@ export interface OmokRoomState {
   turnSeat: number;
   forbidden: OmokForbiddenPoint[];
   result: OmokMatchResult | null;
-  /** D-193 — 좌석별 남은 강하게 두기 수. */
-  slamsLeft: number[];
   /** D-193 — 이 세션에서 받은 강하게 둔 수의 번호(1부터). 연출만 본다 — resync 로 받은 판은 다시 내리치지 않는다. */
   slamMoves: ReadonlySet<number>;
 
@@ -66,8 +64,6 @@ export interface OmokActions {
   /** 서버가 거절했다 — 흐린 돌을 지운다. */
   clearPending: () => void;
   requestTurnResync: (turnEpoch: number) => void;
-  /** 권위 스냅샷을 한 번 청한다(게임판이 `resyncNonce` 를 보고 부른다). */
-  requestResync: () => void;
 }
 
 const INITIAL: OmokRoomState = {
@@ -79,7 +75,6 @@ const INITIAL: OmokRoomState = {
   turnSeat: -1,
   forbidden: [],
   result: null,
-  slamsLeft: [],
   slamMoves: new Set(),
   preview: null,
   pending: null,
@@ -119,7 +114,6 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
       turnSeat: t.result ? -1 : t.turnSeat,
       forbidden: t.forbidden,
       result: t.result,
-      slamsLeft: t.slamsLeft ?? t.seatColors.map(() => 0),
       // 판이 바뀌었을 수 있다 — 미리보기는 비우고, 보낸 자리는 아직 놓이지 않았으면 지킨다.
       preview: null,
       pending: t.result ? null : stillPending,
@@ -153,15 +147,9 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
         if (p.moveNumber <= state.moves.length) return 'applied'; // 이미 가진 수
         if (p.moveNumber !== state.moves.length + 1) return 'unhandled'; // 빈 수 — 권위 스냅샷으로
         const placedPending = state.pending !== null && state.pending.x === p.x && state.pending.y === p.y;
-        let slamsLeft = state.slamsLeft;
-        let slamMoves = state.slamMoves;
-        if (p.slam) {
-          slamsLeft = state.slamsLeft.map((n, seat) => (seat === p.seat ? Math.max(0, n - 1) : n));
-          slamMoves = new Set(state.slamMoves).add(p.moveNumber);
-        }
+        const slamMoves = p.slam ? new Set(state.slamMoves).add(p.moveNumber) : state.slamMoves;
         set({
           moves: [...state.moves, { seat: p.seat, x: p.x, y: p.y, timedOut: p.timedOut }],
-          slamsLeft,
           slamMoves,
           // 다음 차례는 TURN_CHANGED 가 정한다 — 그 사이 '내 차례'·카운트다운을 세우지 않는다.
           turnSeat: -1,
@@ -225,10 +213,6 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
 
   clearPending() {
     set({ pending: null, pendingSlam: false });
-  },
-
-  requestResync() {
-    set({ resyncNonce: get().resyncNonce + 1 });
   },
 
   requestTurnResync(turnEpoch) {
