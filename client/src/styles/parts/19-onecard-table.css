@@ -1331,7 +1331,7 @@ button.oc-pile-draw {
  *
  * 테마 클래스 `.oc-theme-neon` 하나를 게임판 루트(`.oc-table`)와 튜토리얼 포털 본문(`.oc-tokens`)에 얹는다
  * (`features/onecard/oneCardTheme.ts` — `'classic'` 한 줄이면 이 구역 전체가 꺼진다). 위의 기본 규칙은 건드리지 않고
- * 토큰을 다시 풀고 테마 접두로만 덧칠한다. 다크는 짙은 남색·보라에 형광 분홍·하늘·라임, 라이트는 파스텔 파티.
+ * 토큰을 다시 풀고 테마 접두로만 덧칠한다. D-261 — 판 표면(천·칸·손패 칸·버튼)은 기본 그대로, 카드·무늬·연출만 네온.
  * 연출 조각(`.oc-fx*`·`.oc-party*`)은 화면 전용 장식이고 transform·opacity 만 움직인다. 움직임 줄이기는 17 끝의 `.oc-` 블록.
  * ══════════════════════════════════════════════════════════════════════ */
 
@@ -1348,10 +1348,6 @@ button.oc-pile-draw {
   --oc-face-ink: #f4f1ff;
   --oc-face-atk: #ff8a3d;
   --oc-neon-select: #ffffff;
-  --oc-panel-bg: rgba(12, 10, 38, 0.6);
-  --oc-panel-solid: #1b1746;
-  --oc-tray-bg: linear-gradient(180deg, #1a1548, #0e0c2a);
-  --oc-room-bg: linear-gradient(180deg, #0d0b26, #17103f);
   --oc-back-a: #2a1a66;
   --oc-back-b: #120f30;
   --oc-card-bg: linear-gradient(160deg, #241d58, #130f33);
@@ -1371,11 +1367,6 @@ button.oc-pile-draw {
   --oc-accent-3: #ffc94d;
   --oc-accent-4: #b388ff;
   --oc-accent-5: #2fe0d8;
-  --oc-felt-bg:
-    radial-gradient(60% 40% at 18% 12%, rgba(255, 95, 178, 0.2), transparent 70%),
-    radial-gradient(55% 40% at 85% 88%, rgba(79, 216, 255, 0.18), transparent 70%),
-    radial-gradient(120% 90% at 50% 0%, #2c1b66 0%, #17123f 55%, #0c0a26 100%);
-  --oc-felt-edge: #ff5fb2;
 }
 
 /* 라이트 — 파스텔 파티. 카드 면은 밝은 종이색, 무늬 색은 한 톤 짙게(대비). */
@@ -1391,10 +1382,6 @@ html:not(.dark) .oc-theme-neon {
   --oc-face-ink: #2a2350;
   --oc-face-atk: #e2460b;
   --oc-neon-select: #2a2350;
-  --oc-panel-bg: rgba(255, 255, 255, 0.72);
-  --oc-panel-solid: #ffffff;
-  --oc-tray-bg: linear-gradient(180deg, #fbe9ff, #e6f3ff);
-  --oc-room-bg: linear-gradient(180deg, #fff6fc, #f0f6ff);
   --oc-back-a: #ffd3ec;
   --oc-back-b: #d6ecff;
   --oc-card-bg: linear-gradient(160deg, #ffffff, #fff4fb);
@@ -1405,11 +1392,6 @@ html:not(.dark) .oc-theme-neon {
     linear-gradient(160deg, #ffffff, #fff1fa) padding-box,
     linear-gradient(135deg, #f0379b, #e89412 35%, #58b712 65%, #1c9be6) border-box;
   --oc-joker-color-fg: #2a2350;
-  --oc-felt-bg:
-    radial-gradient(60% 40% at 18% 12%, rgba(255, 143, 205, 0.4), transparent 70%),
-    radial-gradient(55% 40% at 85% 88%, rgba(120, 205, 255, 0.4), transparent 70%),
-    linear-gradient(160deg, #ffe6f5, #e9f3ff 50%, #f0ffdf);
-  --oc-felt-edge: #f0379b;
 }
 
 /* 무늬 네 색 — 칩·이전 카드 줄·무늬 고르기·지정 배지·연출이 같이 쓴다. */
@@ -1427,105 +1409,6 @@ html:not(.dark) .oc-theme-neon {
 
 .oc-theme-neon .oc-s-club {
   color: var(--oc-suit-club);
-}
-
-/* ── 판 질감 ── */
-.oc-table.oc-theme-neon {
-  border-radius: 16px;
-  background: var(--oc-room-bg);
-}
-
-.oc-theme-neon .oc-badge-title {
-  border-color: var(--oc-neon-pink);
-  color: var(--oc-neon-pink);
-  text-shadow: 0 0 8px color-mix(in srgb, var(--oc-neon-pink) 60%, transparent);
-}
-
-/* 네온 테두리 경기장. 반짝이는 파티 조명 점은 ::before(천 뒤, opacity 만 깜빡인다). */
-.oc-theme-neon .oc-felt {
-  position: relative;
-  isolation: isolate;
-  box-shadow:
-    inset 0 0 0 1px var(--oc-neon-sky),
-    0 0 16px -2px var(--oc-neon-pink),
-    inset 0 0 30px -10px var(--oc-neon-sky);
-}
-
-.oc-theme-neon .oc-felt::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    radial-gradient(circle 3px at 12% 22%, var(--oc-neon-pink) 0 55%, transparent 100%),
-    radial-gradient(circle 2px at 31% 9%, var(--oc-neon-lime) 0 55%, transparent 100%),
-    radial-gradient(circle 3px at 68% 15%, var(--oc-neon-sky) 0 55%, transparent 100%),
-    radial-gradient(circle 2px at 90% 34%, var(--oc-neon-amber) 0 55%, transparent 100%),
-    radial-gradient(circle 3px at 8% 71%, var(--oc-neon-sky) 0 55%, transparent 100%),
-    radial-gradient(circle 2px at 26% 92%, var(--oc-neon-amber) 0 55%, transparent 100%),
-    radial-gradient(circle 3px at 74% 90%, var(--oc-neon-pink) 0 55%, transparent 100%),
-    radial-gradient(circle 2px at 93% 66%, var(--oc-neon-lime) 0 55%, transparent 100%);
-  opacity: 0.55;
-  animation: oc-neon-twinkle 2.8s ease-in-out infinite;
-}
-
-@keyframes oc-neon-twinkle {
-  0%,
-  100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-/* D-173 의 내 차례 빛을 네온으로 — 테두리는 켜 두고 바깥·안쪽 빛은 ::after 의 opacity 로 숨 쉰다(box-shadow 를 매 프레임 다시 그리지 않는다). */
-.oc-theme-neon .oc-felt-myturn {
-  border-color: var(--oc-accent);
-  box-shadow:
-    inset 0 0 0 1px #ffffff,
-    0 0 0 2px var(--oc-accent);
-  animation: none;
-}
-
-.oc-theme-neon .oc-felt-myturn::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  box-shadow:
-    0 0 22px 5px var(--oc-accent),
-    inset 0 0 30px -4px var(--oc-accent);
-  animation: oc-neon-breathe 1.4s ease-in-out infinite;
-}
-
-@keyframes oc-neon-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.oc-theme-neon .oc-center {
-  border: 1px solid color-mix(in srgb, var(--oc-neon-sky) 45%, transparent);
-  background: var(--oc-panel-bg);
-}
-
-.oc-theme-neon .oc-seat {
-  border-color: color-mix(in srgb, var(--oc-accent) 55%, transparent);
-  border-left-color: var(--oc-accent);
-  background: var(--oc-panel-solid);
-}
-
-.oc-theme-neon .oc-me {
-  background: var(--oc-panel-solid);
 }
 
 /* 탈락 좌석은 흑백으로 가라앉는다. */
@@ -1716,11 +1599,6 @@ html:not(.dark) .oc-theme-neon {
   border-color: transparent;
 }
 
-.oc-theme-neon .oc-declared {
-  border-color: currentColor;
-  background: var(--oc-panel-solid);
-}
-
 .oc-theme-neon .oc-suits {
   border-color: var(--oc-neon-pink);
 }
@@ -1763,23 +1641,6 @@ html:not(.dark) .oc-theme-neon {
   background:
     repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--oc-neon-sky) 80%, transparent) 3px 4px),
     linear-gradient(160deg, var(--oc-back-a), var(--oc-back-b));
-}
-
-/* ── 손패 칸·버튼 ── */
-.oc-theme-neon .oc-hand {
-  border-color: color-mix(in srgb, var(--oc-neon-sky) 55%, transparent);
-  background: var(--oc-tray-bg);
-  box-shadow: inset 0 0 30px -12px var(--oc-neon-pink);
-}
-
-.oc-theme-neon .oc-play:not(:disabled) {
-  background: linear-gradient(135deg, #e0218a, #7b3ff2);
-  box-shadow: 0 0 12px -2px #e0218a;
-}
-
-.oc-theme-neon .oc-draw:not(:disabled) {
-  background: linear-gradient(135deg, #0b74c4, #0e9488);
-  box-shadow: 0 0 12px -2px #0b74c4;
 }
 
 /* ── 공격 누적 — 숫자가 커지고 불꽃 테두리를 두른다 ── */
@@ -2358,17 +2219,6 @@ html:not(.dark) .oc-theme-neon {
     opacity: 0;
     transform: translate(-50%, -50%) scale(2);
   }
-}
-
-/* ── 판 종료 — 파티 조명(모두)과 색종이(내가 1위일 때). 한 번 돌고 사라진다 ── */
-.oc-theme-neon .oc-match-end {
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 2px solid var(--oc-neon-pink);
-  background: var(--oc-panel-solid);
-  box-shadow:
-    0 0 18px -2px var(--oc-neon-pink),
-    inset 0 0 24px -10px var(--oc-neon-sky);
 }
 
 .oc-theme-neon .oc-standings li.oc-standing-win {
