@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class HonoraryTierPolicy {
 
-    /** 명예 계정이 모든 게임에서 받는 계급 — 가장 높은 계급. */
-    public static final Tier HONORARY_TIER = Tier.STAR_CROWN;
+    /** 명예 계정이 모든 게임에서 받는 계급 — D-263 으로 별왕관에서 금메달로 낮춤. */
+    public static final Tier HONORARY_TIER = Tier.GOLD_MEDAL;
 
     private final Set<String> usernames;
 

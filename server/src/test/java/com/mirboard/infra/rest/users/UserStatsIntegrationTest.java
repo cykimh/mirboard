@@ -233,10 +233,10 @@ class UserStatsIntegrationTest {
         mockMvc.perform(get("/api/users/" + hon + "/stats").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("창엽2"))
-                .andExpect(jsonPath("$.tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.tier").value("GOLD_MEDAL"))
                 .andExpect(jsonPath("$.rating").value(1000))
-                .andExpect(jsonPath("$.fixedTier").value("STAR_CROWN"))
-                .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.fixedTier").value("GOLD_MEDAL"))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("GOLD_MEDAL"))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].rating").value(950));
 
         // 보통 계정은 그대로, fixedTier 없음.
@@ -247,7 +247,7 @@ class UserStatsIntegrationTest {
         // 랭킹: 순서는 이번 달 승수 그대로(1승이 먼저), 계급 표시만 별왕관.
         mockMvc.perform(get("/api/users/ranking?gameType=YACHT&limit=100").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].tier").value("GOLD_MEDAL"))
                 .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].rating").value(950))
                 .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].rank").value(2))
                 .andExpect(jsonPath("$.entries[?(@.username == 'hnother')].rank").value(1))

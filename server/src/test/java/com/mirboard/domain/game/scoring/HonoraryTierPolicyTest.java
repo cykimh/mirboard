@@ -29,8 +29,8 @@ class HonoraryTierPolicyTest {
     void only_listed_users_wear_the_star_crown() {
         HonoraryTierPolicy policy = new HonoraryTierPolicy(List.of(NFC));
 
-        assertThat(policy.apply(NFC, Tier.SKULL.name())).isEqualTo("STAR_CROWN");
-        assertThat(policy.apply(user(NFC, false), Tier.MISSILE.name())).isEqualTo("STAR_CROWN");
+        assertThat(policy.apply(NFC, Tier.SKULL.name())).isEqualTo("GOLD_MEDAL");
+        assertThat(policy.apply(user(NFC, false), Tier.MISSILE.name())).isEqualTo("GOLD_MEDAL");
         assertThat(policy.apply("창엽", Tier.MISSILE.name())).isEqualTo("MISSILE");
         assertThat(policy.apply("창엽3", Tier.GOLD_CROWN.name())).isEqualTo("GOLD_CROWN");
         assertThat(policy.apply((String) null, Tier.MISSILE.name())).isEqualTo("MISSILE");

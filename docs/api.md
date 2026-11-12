@@ -468,7 +468,7 @@ tier 는 derived 값이다(D-164·D-167 — 포트리스2식 16단계, 서버 `T
 
 **D-198 — 명예 계급**: 설정 `mirboard.tier.honorary-usernames`(기본 `창엽2`, NFC 비교, 게스트·봇 제외)에 든 계정은 모든 게임에서
 `tier` 가 `STAR_CROWN` 이다 — 전적 `games[]`·최상위 `tier`·랭킹 `entries[].tier` 모두. 레이팅·랭킹 순서·다른 사람의 왕관 순위는 그대로다.
-전적 응답의 `fixedTier` 는 그런 계정이면 `"STAR_CROWN"`, 아니면 `null` — 클라가 `games[]` 에 없는 게임(안 해 본 게임)에도 같은 계급을 그린다.
+전적 응답의 `fixedTier` 는 그런 계정이면 `"GOLD_MEDAL"`(D-263), 아니면 `null` — 클라가 `games[]` 에 없는 게임(안 해 본 게임)에도 같은 계급을 그린다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115, 이번 달 D-199·D-209)*
 **이번 달**(Asia/Seoul 달력, 매달 1일 0시에 새로 시작) 랭킹. 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` — 생략 또는
