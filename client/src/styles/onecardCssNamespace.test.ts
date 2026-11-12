@@ -339,7 +339,6 @@ describe('19-onecard-table.css — 네온 파티 테마 (D-260)', () => {
     }
     for (const t of [
       '--oc-card-bg',
-      '--oc-felt-bg',
       '--oc-suit-spade',
       '--oc-suit-heart',
       '--oc-suit-diamond',
@@ -348,6 +347,11 @@ describe('19-onecard-table.css — 네온 파티 테마 (D-260)', () => {
     ]) {
       expect(light.get(t), `라이트 ${t}`).toBeTruthy();
       expect(light.get(t), t).not.toBe(dark.get(t));
+    }
+    // D-261 — 판 표면(천·칸·손패 칸) 토큰은 다시 풀지 않는다: 기본 초록 천 그대로.
+    for (const t of ['--oc-felt-bg', '--oc-felt-edge', '--oc-room-bg', '--oc-tray-bg', '--oc-panel-bg', '--oc-panel-solid']) {
+      expect(dark.get(t), `다크 ${t}`).toBeUndefined();
+      expect(light.get(t), `라이트 ${t}`).toBeUndefined();
     }
   });
 
@@ -386,9 +390,23 @@ describe('19-onecard-table.css — 네온 파티 테마 (D-260)', () => {
     expect(flicker).not.toMatch(/opacity|transform/);
   });
 
-  it('내 차례 빛(D-173)은 경기장 테두리에 남는다 — 네온은 ::after 의 opacity 로 숨 쉰다', () => {
-    expect(declared('.oc-theme-neon .oc-felt-myturn', 'border-color')).toBe('var(--oc-accent)');
-    expect(declared('.oc-theme-neon .oc-felt-myturn::after', 'animation')).toContain('oc-neon-breathe');
+  it('판 표면은 기본 모습 그대로다 (D-261) — 경기장·손패 칸·좌석·버튼을 덧칠하지 않는다', () => {
+    for (const sel of [
+      '.oc-table.oc-theme-neon',
+      '.oc-theme-neon .oc-felt',
+      '.oc-theme-neon .oc-felt::before',
+      '.oc-theme-neon .oc-felt-myturn',
+      '.oc-theme-neon .oc-felt-myturn::after',
+      '.oc-theme-neon .oc-center',
+      '.oc-theme-neon .oc-seat',
+      '.oc-theme-neon .oc-me',
+      '.oc-theme-neon .oc-hand',
+      '.oc-theme-neon .oc-match-end',
+    ]) {
+      expect(groups, sel).not.toContain(sel);
+    }
+    // 내 차례 빛(D-173)은 기본 규칙의 경기장 테두리 맥박 그대로.
+    expect(declared('.oc-felt-myturn', 'border-color')).toBe('var(--oc-accent)');
   });
 
   it('탈락 좌석은 흑백이다', () => {
@@ -414,8 +432,7 @@ describe('19-onecard-table.css — 네온 파티 테마 (D-260)', () => {
     const block =
       /D-260[\s\S]*?@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}\n/.exec(responsiveCssSource)?.[1] ?? '';
     for (const sel of [
-      '.oc-theme-neon .oc-felt::before',
-      '.oc-theme-neon .oc-felt-myturn::after',
+      '.oc-theme-neon .oc-direction-arrow',
       '.oc-fx',
       '.oc-party',
     ]) {
