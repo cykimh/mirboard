@@ -194,6 +194,44 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.entries[0].tier").value("STAR_CROWN"));
     }
 
+    /**
+     * D-198 — 명예 계정(기본 설정 `창엽2`)은 모든 게임에서 별왕관으로 보이기만 한다. 레이팅·순위는 그대로이고 다른 사람의 계급도 그대로다.
+     * 가입은 자모가 풀린(NFD) 이름으로 해서 NFC 비교까지 끝에서 끝으로 본다.
+     */
+    @Test
+    void honorary_user_wears_the_star_crown_everywhere_without_touching_rating_or_order() throws Exception {
+        String nfd = java.text.Normalizer.normalize("창엽2", java.text.Normalizer.Form.NFD);
+        long hon = registerAndGetId(nfd, "validpass1");
+        long other = registerAndGetId("hnother", "validpass1");
+        String token = login(nfd, "validpass1");
+        gameStats.record(hon, "YACHT", false, 950, false);    // 점수로는 총알
+        gameStats.record(other, "YACHT", true, 1100, false);  // 점수로는 은별
+
+        // 전적: 한 게임 줄·최상위(TICHU 호환, 안 해 봤다)·fixedTier 모두 별왕관, 레이팅은 그대로.
+        mockMvc.perform(get("/api/users/" + hon + "/stats").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("창엽2"))
+                .andExpect(jsonPath("$.tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.rating").value(1000))
+                .andExpect(jsonPath("$.fixedTier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].rating").value(950));
+
+        // 보통 계정은 그대로, fixedTier 없음.
+        mockMvc.perform(get("/api/users/" + other + "/stats").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.fixedTier").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("SILVER_STAR"));
+
+        // 랭킹: 순서는 점수 그대로(은별이 먼저), 계급 표시만 별왕관.
+        mockMvc.perform(get("/api/users/ranking?gameType=YACHT&limit=100").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].tier").value("STAR_CROWN"))
+                .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].rating").value(950))
+                .andExpect(jsonPath("$.entries[?(@.username == '창엽2')].rank").value(2))
+                .andExpect(jsonPath("$.entries[?(@.username == 'hnother')].rank").value(1))
+                .andExpect(jsonPath("$.entries[?(@.username == 'hnother')].tier").value("SILVER_STAR"));
+    }
+
     // ---------- helpers ----------
 
     private long registerAndGetId(String username, String password) throws Exception {

@@ -436,7 +436,8 @@ schema constraint 유지.
       "winCount": 0, "loseCount": 2, "desertCount": 0, "bestScore": null },
     { "gameType": "YACHT", "rating": 1000, "tier": "MISSILE",
       "winCount": 0, "loseCount": 0, "desertCount": 0, "bestScore": 231 }
-  ]
+  ],
+  "fixedTier": null
 }
 ```
 
@@ -464,6 +465,10 @@ tier 는 derived 값이다(D-164·D-167 — 포트리스2식 16단계, 서버 `T
 
 금훈장(1400+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
 11~30위 `BRONZE_CROWN`. 랭킹은 목록 순위를 쓰고, 전적 조회는 나보다 점수가 높은 사람 수 +1 을 쓴다.
+
+**D-198 — 명예 계급**: 설정 `mirboard.tier.honorary-usernames`(기본 `창엽2`, NFC 비교, 게스트·봇 제외)에 든 계정은 모든 게임에서
+`tier` 가 `STAR_CROWN` 이다 — 전적 `games[]`·최상위 `tier`·랭킹 `entries[].tier` 모두. 레이팅·랭킹 순서·다른 사람의 왕관 순위는 그대로다.
+전적 응답의 `fixedTier` 는 그런 계정이면 `"STAR_CROWN"`, 아니면 `null` — 클라가 `games[]` 에 없는 게임(안 해 본 게임)에도 같은 계급을 그린다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115)*
 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` (기본 `TICHU`). 봇·게스트(D-117) 제외, 그 게임의
