@@ -228,4 +228,57 @@ describe('OmokTable (S4)', () => {
     expect(banner).toHaveTextContent('나래');
     expect(screen.getAllByTestId('om-seat-skill')[1].getAttribute('aria-label')).toBe('강하게 두기 사용함');
   });
+  describe('D-194 — 종료 배너(모두에게 같은 배너)', () => {
+    const FIVE = [0, 1, 2, 3, 4].map((x) => ({ x: 3 + x, y: 4 }));
+    const end = (over: Partial<OmokMatchResult>) =>
+      act(() => {
+        useOmokStore.getState().applyEvent({
+          type: 'MATCH_ENDED',
+          seq: 2,
+          payload: { winnerColor: 'WHITE', winnerSeats: [1], reason: 'FIVE', causeSeat: -1, winLine: FIVE, ...over },
+        });
+      });
+
+    it('진 쪽 화면에도 "백 5목!"과 이긴 사람 이름이 뜨고, 승리 줄이 위쪽이면 아래에 뜬다', () => {
+      seed({ turnSeat: 1 });
+      renderTable(); // 나는 흑(가람) — 진 쪽
+      expect(screen.queryByTestId('om-end-banner')).toBeNull();
+      end({});
+      const banner = screen.getByTestId('om-end-banner');
+      expect(banner).toHaveTextContent('백 5목!');
+      expect(banner).toHaveTextContent('나래');
+      expect(banner.getAttribute('class')).toContain('om-end-banner-five');
+      expect(banner.getAttribute('class')).toContain('om-end-banner-white');
+      expect(banner.getAttribute('class')).toContain('om-end-banner-low');
+    });
+
+    it('기권은 작은 띠("흑 승" + 누가 기권), 무승부는 "무승부" — 5목 배너 모양이 아니다', () => {
+      seed({ turnSeat: 1 });
+      const first = renderTable();
+      end({ winnerColor: 'BLACK', winnerSeats: [0], reason: 'RESIGN', causeSeat: 1, winLine: [] });
+      const quiet = screen.getByTestId('om-end-banner');
+      expect(quiet).toHaveTextContent('흑 승');
+      expect(quiet).toHaveTextContent('나래 기권');
+      expect(quiet.getAttribute('class')).toContain('om-end-banner-quiet');
+      expect(quiet.getAttribute('class')).not.toContain('om-end-banner-five');
+      first.unmount();
+
+      seed({ turnSeat: 1 });
+      renderTable();
+      end({ winnerColor: null, winnerSeats: [], reason: 'BOARD_FULL', causeSeat: -1, winLine: [] });
+      const draw = screen.getByTestId('om-end-banner');
+      expect(draw).toHaveTextContent('무승부');
+      expect(draw.getAttribute('class')).toContain('om-end-banner-draw');
+    });
+
+    it('이미 끝난 판에 들어오면 배너 없이 현판만 보인다', () => {
+      seed({
+        turnSeat: -1,
+        result: { winnerColor: 'WHITE', winnerSeats: [1], reason: 'FIVE', causeSeat: -1, winLine: FIVE },
+      });
+      renderTable();
+      expect(screen.queryByTestId('om-end-banner')).toBeNull();
+      expect(screen.getByRole('status', { name: '판 결과' })).toBeInTheDocument();
+    });
+  });
 });

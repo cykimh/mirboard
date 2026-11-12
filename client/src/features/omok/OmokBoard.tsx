@@ -16,6 +16,11 @@ const GOLD_COUNT = 26;
 /** D-193 강하게 두기 — 돌가루 18, 나뭇결 금 6줄. */
 const DEBRIS_COUNT = 18;
 const CRACK_COUNT = 6;
+/** D-194 — 강하게 두기 방사 빛살 10줄. */
+const RAY_COUNT = 10;
+/** D-194 — 5목 연출이 시작하는 때(초): 마지막 돌이 내려앉은 뒤. 강하게 둔 수로 끝나면 그 연출이 가라앉은 뒤. */
+const WIN_START_SEC = 0.35;
+const WIN_START_AFTER_SLAM_SEC = 0.7;
 
 /** 씨앗 고정 난수 — 입자 방향을 렌더마다 같게 한다(렌더는 순수해야 한다). */
 function seeded(seed: number) {
@@ -68,6 +73,22 @@ function cracksOf(seed: number) {
     return `M${(Math.cos(a) * r0).toFixed(3)} ${(Math.sin(a) * r0).toFixed(3)} L${mx.toFixed(3)} ${my.toFixed(3)} L${(
       Math.cos(a) * r1
     ).toFixed(3)} ${(Math.sin(a) * r1).toFixed(3)}`;
+  });
+}
+
+/** 강하게 두기 — 닿는 순간 사방으로 뻗는 짧은 빛살(D-194). 길이만 흩는다. */
+function raysOf(seed: number) {
+  const rnd = seeded(seed * 17 + 11);
+  return Array.from({ length: RAY_COUNT }, (_, i) => {
+    const a = (i / RAY_COUNT) * Math.PI * 2 + rnd() * 0.3;
+    const r0 = 0.75;
+    const r1 = 1.5 + rnd() * 0.9;
+    return {
+      x1: Math.cos(a) * r0,
+      y1: Math.sin(a) * r0,
+      x2: Math.cos(a) * r1,
+      y2: Math.sin(a) * r1,
+    };
   });
 }
 
@@ -252,6 +273,7 @@ export function OmokBoard({
   const slamAt = track.slam ? track.drop : null;
   const debris = useMemo(() => (track.slam ? debrisOf(track.seq) : []), [track.slam, track.seq]);
   const cracks = useMemo(() => (track.slam ? cracksOf(track.seq) : []), [track.slam, track.seq]);
+  const rays = useMemo(() => (track.slam ? raysOf(track.seq) : []), [track.slam, track.seq]);
 
   const winIndex = useMemo(() => new Map(winLine.map((p, i) => [key(p), i])), [winLine]);
   const dust = useMemo(() => dustOf(track.seq), [track.seq]);
@@ -272,6 +294,11 @@ export function OmokBoard({
       className={`om-board${enabled ? ' om-board-active' : ''}${
         track.seq > 0 ? ` om-${track.slam ? 'slam' : 'thud'}-${track.seq % 2}` : ''
       }${warn ? ' om-board-warn' : ''}`}
+      style={
+        winLine.length >= 2
+          ? vars({ '--om-n': winLine.length, '--om-t0': track.slam ? WIN_START_AFTER_SLAM_SEC : WIN_START_SEC })
+          : undefined
+      }
       viewBox={`-0.5 -0.5 ${BOARD_SIZE} ${BOARD_SIZE}`}
       role="img"
       aria-label={label}
@@ -314,6 +341,8 @@ export function OmokBoard({
           <circle className="om-ripple" r={0.46} />
           <circle className="om-ripple om-ripple-2" r={0.46} />
           <circle className="om-ripple om-ripple-3" r={0.46} />
+          {/* D-194 — 물결 마루가 등불을 받는 쪽(왼쪽 위)만 밝은 호. */}
+          <circle className="om-fx om-ripple-light" r={0.46} pathLength={1} />
         </g>
       )}
 
@@ -334,8 +363,29 @@ export function OmokBoard({
           </g>
           <circle className="om-shock" r={0.5} />
           <circle className="om-shock om-shock-2" r={0.5} />
+          {/* D-194 — 멀리 번지는 가는 충격파 + 방사 빛살 + 낙하 잔상. */}
+          <circle className="om-fx om-shock-far" r={0.5} />
+          <g className="om-fx om-slam-rays">
+            {rays.map((r, i) => (
+              <line key={i} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
+            ))}
+          </g>
+          <line className="om-fx om-slam-trail" x1={0.1} y1={-3.2} x2={0} y2={-0.3} />
           <circle className="om-slam-calm" r={0.62} />
         </g>
+      )}
+
+      {/* D-194 강하게 두기 — 닿는 순간 판 전체가 주홍빛으로 한 번 번쩍인다(돌 아래 층, 불투명도만). */}
+      {slamAt && (
+        <rect
+          key={`t${track.seq}`}
+          className="om-fx om-slam-tint"
+          x={-0.5}
+          y={-0.5}
+          width={BOARD_SIZE}
+          height={BOARD_SIZE}
+          aria-hidden="true"
+        />
       )}
 
       {forbidden.map((f) => {
@@ -458,6 +508,8 @@ export function OmokBoard({
           aria-hidden="true"
         >
           <circle className="om-art om-last-ring" r={0.11} />
+          {/* D-194 — 번짐이 끝나면 가는 고리 하나로 멈춘다. */}
+          <circle className="om-fx om-last-halo" r={0.2} />
           <circle className="om-last-dot" r={0.11} />
         </g>
       )}
@@ -487,6 +539,26 @@ export function OmokBoard({
             y2={winLine[winLine.length - 1].y}
             pathLength={1}
           />
+          {/* D-194 — 구간 빛줄기가 돌에서 돌로 차례로 켜졌다 스러진다(금 상감 줄은 남는다). */}
+          {winLine.slice(1).map((p, i) => (
+            <g key={`b${key(p)}`} className="om-fx om-beam" style={{ '--om-i': i } as React.CSSProperties}>
+              <line className="om-beam-wide" x1={winLine[i].x} y1={winLine[i].y} x2={p.x} y2={p.y} pathLength={1} />
+              <line className="om-beam-core" x1={winLine[i].x} y1={winLine[i].y} x2={p.x} y2={p.y} pathLength={1} />
+            </g>
+          ))}
+          {/* D-194 — 빛이 닿는 돌마다 고리가 한 번 번지고, 끝나면 이긴 돌 둘레에 가는 금 고리가 남는다. */}
+          {winLine.map((p, i) => (
+            <g
+              key={`h${key(p)}`}
+              className="om-fx om-win-mark"
+              transform={`translate(${p.x} ${p.y})`}
+              style={{ '--om-i': i } as React.CSSProperties}
+            >
+              <circle className="om-win-burst" r={0.5} />
+              <circle className="om-win-ring-groove" r={0.49} />
+              <circle className="om-win-ring" r={0.49} />
+            </g>
+          ))}
           {winLine.map((p, i) => (
             <g key={`g${key(p)}`} className="om-art" transform={`translate(${p.x - 0.2} ${p.y - 0.22})`}>
               <path className="om-glint" style={{ '--om-i': i } as React.CSSProperties} d={GLINT_PATH} />

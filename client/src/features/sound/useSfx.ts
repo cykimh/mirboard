@@ -135,7 +135,31 @@ export function useSfx() {
     [muted],
   );
 
+  /**
+   * D-194 오목 5목 — 빛줄기가 돌에 닿는 박자(`stepSec`)마다 한 음씩 올라가는 맑은 음 `count` 개를 합성한다(5음 음계, 작게).
+   * `delaySec` 뒤에 시작한다. 음소거 시 무음.
+   */
+  const playFive = useCallback(
+    (delaySec = 0, stepSec = 0.14, count = 5) => {
+      if (muted) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const t = ctx.currentTime + delaySec;
+        const scale = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+        for (let i = 0; i < count; i++) {
+          const last = i === count - 1;
+          blip(ctx, scale[Math.min(i, scale.length - 1)], t + i * stepSec, last ? 0.5 : 0.2);
+        }
+      } catch {
+        // 합성 실패 — silent.
+      }
+    },
+    [muted],
+  );
+
   const toggleMute = useCallback(() => setMuted((v) => !v), []);
 
-  return { play, playChime, playSlam, muted, toggleMute };
+  return { play, playChime, playSlam, playFive, muted, toggleMute };
 }

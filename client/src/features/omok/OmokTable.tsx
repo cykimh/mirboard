@@ -21,7 +21,7 @@ import { OmokMatchEnd } from './OmokMatchEnd';
 import { OmokLoupe } from './OmokLoupe';
 import { OmokTurnCountdown } from './OmokTurnCountdown';
 import { OMOK_TUTORIAL } from './tutorial/omokTutorial';
-import { OMOK_TOKENS_CLASS } from './omokTheme';
+import { OMOK_FX, OMOK_TOKENS_CLASS } from './omokTheme';
 
 /** D-140 — 원카드와 같은 멈춘 차례 복구 유예·지터. */
 export const STALE_TURN_GRACE_MS = 2000;
@@ -102,6 +102,23 @@ export const SLAM_IMPACT_SEC = 0.32;
 /** D-193 — 발동 배너가 떠 있는 시간. 상태가 아니라 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
 export const SLAM_BANNER_MS = 1600;
 
+/** D-194 — 5목 연출의 박자(CSS `--om-step` 과 같은 값)와 시작 시각(`OmokBoard` 의 `--om-t0` 과 같은 값). 효과음·배너가 맞춘다. */
+export const WIN_STEP_SEC = 0.14;
+export const WIN_START_SEC = 0.35;
+export const WIN_START_AFTER_SLAM_SEC = 0.7;
+/** D-194 — 종료 배너가 떠 있는 시간(5목 / 그 밖). 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
+export const END_BANNER_FIVE_MS = 2600;
+export const END_BANNER_QUIET_MS = 2200;
+
+const END_BANNER_REASON = {
+  FIVE: '',
+  RESIGN: '기권',
+  TIMEOUT: '시간 초과',
+  DESERTED: '나감',
+  BOARD_FULL: '판이 가득 찼어요',
+  NO_LEGAL_MOVE: '흑이 둘 곳이 금수뿐',
+} as const;
+
 interface Props {
   roomId: string;
   playerIds: number[];
@@ -157,7 +174,7 @@ export function OmokTable({
   const [singleClick, setSingleClick] = useState(readSingleClick);
   /** D-193 — 다음 착수를 강하게 둘지(한 번 두면 풀린다). */
   const [slamArmed, setSlamArmed] = useState(false);
-  const { muted, toggleMute, playChime, playSlam } = useSfx();
+  const { muted, toggleMute, playChime, playSlam, playFive } = useSfx();
   const chatLines = useSeatChatLines(playerIds);
   const chatUnread = useRoomChatStore((st) => st.unreadCount);
   const rules = useTutorialGate(OMOK_TUTORIAL.seenKey, false);
@@ -201,6 +218,37 @@ export function OmokTable({
   }, [banner]);
 
   // 내 차례가 되면 알림음 + 휴대폰 진동 한 번(원카드 D-160 과 같다).
+  // D-194 — 종료 배너: 이 세션이 판이 끝나는 순간을 봤을 때만(끝난 판에 들어오면 현판만). 이긴 쪽·진 쪽·관전자 모두 같은 배너를
+  // 같은 크기로 본다. 5목이면 빛줄기가 다 켜진 뒤에 뜨고 박자에 맞춰 음이 올라간다. 화면만 — 상태·타이머와 무관하다.
+  const result = s.result;
+  const hadResult = useRef(result !== null);
+  const [endBanner, setEndBanner] = useState<{ delayMs: number; ms: number } | null>(null);
+  useEffect(() => {
+    if (result && !hadResult.current && OMOK_FX === 'rich') {
+      const five = result.reason === 'FIVE' && result.winLine.length >= 2;
+      if (five) {
+        const st = useOmokStore.getState();
+        const bySlam = st.slamMoves.has(st.moves.length) || st.pendingSlam;
+        const start = bySlam ? WIN_START_AFTER_SLAM_SEC : WIN_START_SEC;
+        playFive(start, WIN_STEP_SEC, result.winLine.length);
+        // 강하게 둔 수로 끝났으면 발동 배너가 사라진 뒤에 뜬다(두 배너가 겹치지 않게).
+        const lineDone = Math.round((start + (result.winLine.length - 1) * WIN_STEP_SEC + 0.1) * 1000);
+        setEndBanner({ delayMs: bySlam ? Math.max(lineDone, SLAM_BANNER_MS + 50) : lineDone, ms: END_BANNER_FIVE_MS });
+      } else {
+        // 기권·나감이 발동 배너와 겹치면 발동 배너를 걷는다(드문 경우 — 결과가 먼저다).
+        setBanner(null);
+        setEndBanner({ delayMs: 150, ms: END_BANNER_QUIET_MS });
+      }
+    }
+    if (!result) setEndBanner(null);
+    hadResult.current = result !== null;
+  }, [result, playFive]);
+  useEffect(() => {
+    if (!endBanner) return;
+    const t = window.setTimeout(() => setEndBanner(null), endBanner.delayMs + endBanner.ms);
+    return () => window.clearTimeout(t);
+  }, [endBanner]);
+
   const wasMyTurn = useRef(myTurn);
   useEffect(() => {
     if (myTurn && !wasMyTurn.current) {
@@ -454,6 +502,44 @@ export function OmokTable({
               <span className="om-slam-banner-text">
                 {COLOR_LABEL[banner.color]} 강하게 두기!
                 <span className="om-slam-banner-who">{nameOf(banner.seat)}</span>
+              </span>
+            </div>
+          )}
+          {/* D-194 — 종료 배너(모두에게 같은 크기). 승리 줄을 가리지 않게 줄 반대쪽 절반에 뜬다. 결과는 아래 현판이 읽어 준다. */}
+          {endBanner && s.result && (
+            <div
+              className={`om-end-banner om-end-banner-${
+                s.result.winnerColor === null ? 'draw' : s.result.reason === 'FIVE' ? 'five' : 'quiet'
+              }${s.result.winnerColor ? ` om-end-banner-${s.result.winnerColor === 'BLACK' ? 'black' : 'white'}` : ''}${
+                winLine.length >= 2 && winLine.reduce((sum, p) => sum + p.y, 0) / winLine.length < (BOARD_SIZE - 1) / 2
+                  ? ' om-end-banner-low'
+                  : ''
+              }`}
+              style={{ animationDelay: `${endBanner.delayMs}ms`, animationDuration: `${endBanner.ms}ms` }}
+              aria-hidden="true"
+              data-testid="om-end-banner"
+            >
+              {s.result.winnerColor === null ? (
+                <span className="om-end-banner-dots">
+                  <span className="om-dot om-dot-black" />
+                  <span className="om-dot om-dot-white" />
+                </span>
+              ) : (
+                <span className={`om-dot om-dot-${s.result.winnerColor === 'BLACK' ? 'black' : 'white'}`} />
+              )}
+              <span className="om-end-banner-text">
+                {s.result.winnerColor === null
+                  ? '무승부'
+                  : s.result.reason === 'FIVE'
+                    ? `${COLOR_LABEL[s.result.winnerColor]} 5목!`
+                    : `${COLOR_LABEL[s.result.winnerColor]} 승`}
+                <span className="om-end-banner-who">
+                  {s.result.reason === 'FIVE'
+                    ? s.result.winnerSeats.map(nameOf).join(' · ')
+                    : s.result.causeSeat >= 0 && s.result.winnerColor !== null
+                      ? `${nameOf(s.result.causeSeat)} ${END_BANNER_REASON[s.result.reason]}`
+                      : END_BANNER_REASON[s.result.reason]}
+                </span>
               </span>
             </div>
           )}
