@@ -12,6 +12,8 @@ import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useSfx } from '@/features/sound/useSfx';
+import { playTableSfx } from '@/features/sound/tableSfx';
+import { setOmokSfxSeat } from './omokSfx';
 import { BOARD_SIZE, COLUMN_LETTERS, type OmokPoint, type OmokStone } from '@/types/omok';
 import { omokRoomSink } from './omokRoomSink';
 import { useOmokStore } from './omokStore';
@@ -189,6 +191,12 @@ export function OmokTable({
   const myTurn = !spectator && mySeat >= 0 && s.result === null && !roomFinished && turnSeat === mySeat;
   const canPlace = myTurn && connected && s.pending === null;
 
+  // D-267 — 일반 동작 효과음(sink 가 이벤트마다 울린다)에 듣는 사람 좌석을 알려 준다: 내 수는 또렷하게, 남의 수는 작게, 승패는 내 편 기준.
+  useEffect(() => {
+    setOmokSfxSeat(mySeat);
+    return () => setOmokSfxSeat(-1);
+  }, [mySeat]);
+
   // D-193 — 강하게 둔 수가 판에 닿을 때 "쿵" + 진동. 내 수는 보낸 즉시(흐린 돌이 바로 내리친다), 남의 수는 STONE_PLACED.slam 을
   // 받은 때. 내 수가 확정되면 pendingSlam 이 slamMoves 로 옮겨 가 합이 그대로라 두 번 울리지 않는다.
   // 발동 배너("흑 강하게 두기!")도 같은 때 — 내 화면·상대·관전자 모두 같은 크기.
@@ -298,6 +306,7 @@ export function OmokTable({
     if (stones.has(key(p))) return;
     if (myColor === 'BLACK' && forbiddenAt(s.forbidden, p)) {
       s.setPreview(p); // 확정하지 않고 이유를 보여 준다
+      playTableSfx('move.rejected'); // D-267 — 금수는 서버에 보내지 않으므로 여기서 "툭"
       return;
     }
     s.markPending(p, slam);

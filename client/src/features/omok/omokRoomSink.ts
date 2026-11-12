@@ -2,6 +2,8 @@ import type { RoomEventSink } from '@/ws/roomEventSink';
 import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
 import type { OmokTableView } from '@/types/omok';
+import { playCues } from '@/features/sound/tableSfx';
+import { omokCues, omokErrorCues, omokSfxSeat } from './omokSfx';
 import { useOmokStore } from './omokStore';
 
 interface ErrorPayload {
@@ -33,7 +35,11 @@ export const omokRoomSink: RoomEventSink<OmokTableView, unknown> = {
   },
 
   applyEvent(envelope) {
-    return useOmokStore.getState().applyEvent(envelope);
+    const before = useOmokStore.getState();
+    const result = before.applyEvent(envelope);
+    // D-267 — 효과음은 실제로 적용한 공개 이벤트에서만(스냅샷은 applySnapshot 길이라 울리지 않는다).
+    if (result === 'applied') playCues(omokCues(envelope, before, useOmokStore.getState(), omokSfxSeat()));
+    return result;
   },
 
   applyPrivateEvent(envelope: StompEnvelope<unknown>) {
@@ -42,6 +48,7 @@ export const omokRoomSink: RoomEventSink<OmokTableView, unknown> = {
     const p = envelope.payload as ErrorPayload;
     store.clearPending();
     store.setError(errorText(p.code, p.message, ERROR_LABEL));
+    playCues(omokErrorCues(p.code));
   },
 
   setError(message) {

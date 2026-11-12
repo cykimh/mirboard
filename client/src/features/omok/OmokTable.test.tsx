@@ -5,6 +5,8 @@ import './testPointerEvent';
 import { OmokTable } from './OmokTable';
 import { SLAM_HOLD_MS } from './OmokPlaceButton';
 import { useOmokStore } from './omokStore';
+import { omokSfxSeat } from './omokSfx';
+import { FakeAudioContext, audioLog } from '@/features/sound/testAudio';
 import { useAuthStore } from '@/features/auth/authStore';
 import type { OmokMatchResult, OmokMove, OmokTableView } from '@/types/omok';
 
@@ -304,5 +306,74 @@ describe('OmokTable (S4)', () => {
       expect(screen.queryByTestId('om-end-banner')).toBeNull();
       expect(screen.getByRole('status', { name: '판 결과' })).toBeInTheDocument();
     });
+  });
+});
+
+/** D-267 — 게임판 쪽 효과음: 내 차례 알림음(기존 playChime)은 관전자에게 없고, 금수 자리는 보내지 않고 "툭", 듣는 사람 좌석을 sink 에 알린다. */
+describe('OmokTable — 효과음 (D-267)', () => {
+  const turnToBlack = () =>
+    act(() => {
+      useOmokStore.getState().applyEvent({ type: 'TURN_CHANGED', seq: 2, payload: { seat: 0, color: 'BLACK', forbidden: [] } });
+    });
+
+  beforeEach(() => {
+    sendAction.mockClear();
+    socketConnected = true;
+    useAuthStore.setState({ token: 't' } as never);
+    window.localStorage.removeItem('mirboard.sfxMuted');
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    audioLog.reset();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.removeItem('mirboard.sfxMuted');
+  });
+
+  it('내 차례가 되면 알림음 두 음 — 첫 렌더(이미 내 차례)에는 울리지 않는다', () => {
+    seed({ turnSeat: 0 });
+    renderTable();
+    expect(audioLog.voices).toBe(0);
+
+    act(() => {
+      useOmokStore.getState().applyEvent({ type: 'TURN_CHANGED', seq: 2, payload: { seat: 1, color: 'WHITE', forbidden: [] } });
+    });
+    expect(audioLog.voices).toBe(0);
+    turnToBlack();
+    expect(audioLog.tones.map((t) => t.freq)).toEqual([660, 880]);
+  });
+
+  it('관전자에게는 내 차례 알림음이 없다', () => {
+    seed({ turnSeat: 1 });
+    renderTable({ spectator: true, myUserId: 99 });
+    turnToBlack();
+    expect(audioLog.voices).toBe(0);
+  });
+
+  it('음소거면 내 차례 알림음도 없다', () => {
+    window.localStorage.setItem('mirboard.sfxMuted', '1');
+    seed({ turnSeat: 1 });
+    renderTable();
+    turnToBlack();
+    expect(audioLog.voices).toBe(0);
+  });
+
+  it('금수 자리를 확정하려 하면 보내지 않고 낮은 "툭"', () => {
+    seed({ forbidden: [{ x: 5, y: 5, kind: 'DOUBLE_THREE' }] });
+    const { svg } = renderTable();
+    tap(svg, 5, 5);
+    tap(svg, 5, 5);
+    expect(sendAction).not.toHaveBeenCalled();
+    expect(audioLog.tones.length).toBeGreaterThan(0);
+    expect(audioLog.tones.every((t) => t.freq < 200)).toBe(true);
+  });
+
+  it('듣는 사람 좌석을 알린다 — 플레이어는 자기 좌석, 관전자·나간 뒤는 −1', () => {
+    seed();
+    const player = renderTable({ myUserId: 20 });
+    expect(omokSfxSeat()).toBe(1);
+    player.unmount();
+    expect(omokSfxSeat()).toBe(-1);
+    renderTable({ spectator: true, myUserId: 20 });
+    expect(omokSfxSeat()).toBe(-1);
   });
 });
