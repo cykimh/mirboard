@@ -231,7 +231,9 @@ export function GameHubPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="icon"
+              aria-label="로그아웃"
+              title="로그아웃"
               onClick={() => {
                 // D-117 — 게스트는 비밀번호가 없어 로그아웃하면 같은 신원으로 못 돌아온다.
                 if (user?.guest && !window.confirm(t('hub.guest.logoutConfirm'))) return;
@@ -239,8 +241,7 @@ export function GameHubPage() {
                 navigate('/login');
               }}
             >
-              <LogOut className="h-4 w-4" />
-              로그아웃
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         </header>
