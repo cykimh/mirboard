@@ -18,6 +18,10 @@ export const YACHT_SFX_STEP_SEC = 0.09;
 /** 다섯 음 뒤 팡파르 화음이 터지는 때(두 번째 섬광·충격 고리와 같다). */
 export const YACHT_SFX_CHORD_SEC = 0.72;
 
+/** D-208 얏추 — 굴림이 족보로 멈춘 순간의 짧은 알림음이 끝나는 상한(초). 기록 축하(팡파르)보다 훨씬 짧다. */
+export const MADE_SFX_MAX_SEC = 0.6;
+export type MadeSfxTier = 'light' | 'mid' | 'big';
+
 // 차례 알림용 합성음(#9). mp3 에셋이 없어 Web Audio 로 짧은 2음을 생성한다.
 // AudioContext 는 싱글톤(사용자 제스처 이후 resume).
 let audioCtx: AudioContext | null = null;
@@ -240,7 +244,38 @@ export function useSfx() {
     [muted],
   );
 
+  /**
+   * D-208 얏추 — 내 굴림이 족보로 멈춘 순간의 "됐다" 알림음. 전부 합성이고 `MADE_SFX_MAX_SEC` 안에 끝난다.
+   * 약(스몰 스트레이트·풀 하우스) 두 음 · 중(라지 스트레이트·포 카드) 세 음 · 강(요트) 네 음 종소리 + 반짝임 하나.
+   * 요트 칸 기록의 팡파르(`playYacht`)와 달리 쿵·잡음·화음이 없다 — 곧이어 기록해도 다투지 않는다. 음소거 시 무음.
+   */
+  const playMade = useCallback(
+    (tier: MadeSfxTier) => {
+      if (muted) return;
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const t = ctx.currentTime;
+        if (tier === 'light') {
+          blip(ctx, 659.25, t, 0.12, 0.09);
+          blip(ctx, 880, t + 0.08, 0.2, 0.09);
+        } else if (tier === 'mid') {
+          blip(ctx, 659.25, t, 0.12, 0.11, 'triangle');
+          blip(ctx, 880, t + 0.075, 0.12, 0.11, 'triangle');
+          blip(ctx, 1174.66, t + 0.15, 0.28, 0.11, 'triangle');
+        } else {
+          [783.99, 1046.5, 1318.51, 1567.98].forEach((f, i) => blip(ctx, f, t + i * 0.07, i === 3 ? 0.34 : 0.14, 0.13));
+          blip(ctx, 3135.96, t + 0.24, 0.3, 0.04);
+        }
+      } catch {
+        // 합성 실패 — silent.
+      }
+    },
+    [muted],
+  );
+
   const toggleMute = useCallback(() => setMuted((v) => !v), []);
 
-  return { play, playChime, playSlam, playFive, playYacht, muted, toggleMute };
+  return { play, playChime, playSlam, playFive, playYacht, playMade, muted, toggleMute };
 }

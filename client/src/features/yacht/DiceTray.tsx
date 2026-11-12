@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MAX_ROLLS, type Dice, type Held } from '@/types/yacht';
 import { YachtDie, YachtDieCube } from './YachtDie';
+import type { MadeTier } from './yachtLabels';
+
+/** D-208 — 내 굴림이 족보로 멈췄다(게임판이 굴림 하나에 한 번만 넘긴다). */
+export interface TrayMade {
+  /** 굴림 신호 값 — 꼬리표·고리의 key(같은 굴림에는 다시 돌지 않는다). */
+  nonce: number;
+  tier: MadeTier;
+  /** 꼬리표 글("풀 하우스!"). */
+  label: string;
+  /** 금빛 고리를 두를 주사위 자리. */
+  indices: number[];
+  /** 꼬리표가 떠 있는 시간(ms) — CSS 가 이 길이로 나타났다 사라진다. */
+  ms: number;
+}
 
 /** D-204 — 주사위를 쏟는 가죽 컵(직접 그린 SVG, 꾸밈). 굴리는 동안만 판 오른쪽 위에 기울어 나왔다 물러난다. */
 function DiceCup() {
@@ -67,6 +81,8 @@ interface Props {
   backLabel?: string;
   /** 아직 내 차례가 남았다 — 돌아가는 버튼을 굴리기 버튼처럼 눈에 띄게. */
   backUrgent?: boolean;
+  /** D-208 — 족보로 멈춘 내 굴림(없으면 null). 고리·꼬리표는 `animate` 가 꺼져도 정지 상태로 뜬다. */
+  made?: TrayMade | null;
 }
 
 /**
@@ -90,6 +106,7 @@ export function DiceTray({
   onBack,
   backLabel = '내 판으로',
   backUrgent = false,
+  made = null,
 }: Props) {
   const [rolling, setRolling] = useState(false);
   const seenView = useRef(viewKey);
@@ -109,10 +126,12 @@ export function DiceTray({
   const left = MAX_ROLLS - rolls;
   // D-203 — 다섯 개가 같게 멈추면 가벼운 반짝임(본 축하는 요트 칸에 기록할 때).
   const allSame = dice !== null && rolls > 0 && !rolling && dice.every((d) => d === dice[0]);
+  // D-208 — 구르는 동안에는 띄우지 않는다(멈춘 뒤의 알림이다).
+  const shown = made && dice !== null && !rolling ? made : null;
   return (
     <section className="yt-tray" aria-label="주사위">
       <div
-        className={`yt-dice${allSame ? ' yt-dice-same' : ''}`}
+        className={`yt-dice${allSame ? ' yt-dice-same' : ''}${shown ? ` yt-dice-made yt-dice-made-${shown.tier}${animate ? ' yt-dice-made-live' : ''}` : ''}`}
         role="group"
         aria-label={dice ? `주사위 ${dice.join(', ')}` : '아직 굴리지 않음'}
       >
@@ -123,11 +142,12 @@ export function DiceTray({
           const shaking = rolling && !isHeld && face !== null;
           // D-204 — 굴리는 동안 고정한 주사위는 제자리에서 금빛이 훑고 고리가 퍼진다(잠김).
           const locked = rolling && isHeld && face !== null;
+          const inMade = shown !== null && shown.indices.includes(i);
           return (
             <button
               type="button"
               key={i}
-              className={`yt-die${isHeld ? ' yt-die-held' : ''}${shaking ? ' yt-die-rolling' : ''}${face === null ? ' yt-die-empty' : ''}${locked ? ' yt-die-lock' : ''}`}
+              className={`yt-die${isHeld ? ' yt-die-held' : ''}${shaking ? ' yt-die-rolling' : ''}${face === null ? ' yt-die-empty' : ''}${locked ? ' yt-die-lock' : ''}${inMade ? ' yt-die-made' : ''}`}
               style={{ ['--yt-i' as string]: i, ['--yt-o' as string]: LAND_ORDER[i] } as CSSProperties}
               disabled={!canHold || face === null}
               aria-pressed={isHeld}
@@ -145,11 +165,22 @@ export function DiceTray({
                     <span className="yt-die-lockring" />
                   </>
                 )}
+                {inMade && <span className="yt-die-madering" key={`m${shown.nonce}`} />}
               </span>
               {isHeld && <span className="yt-die-tag">고정</span>}
             </button>
           );
         })}
+        {shown && (
+          <span
+            className={`yt-made-tag yt-made-tag-${shown.tier}`}
+            key={`made${shown.nonce}`}
+            aria-hidden="true"
+            style={{ ['--yt-made-ms' as string]: `${shown.ms}ms` } as CSSProperties}
+          >
+            {shown.label}
+          </span>
+        )}
         {rolling && dice && (
           <span className="yt-cup" aria-hidden="true" key={rollNonce}>
             <DiceCup />

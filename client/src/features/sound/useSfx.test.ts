@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { YACHT_SFX_CHORD_SEC, YACHT_SFX_FIRST_NOTE_SEC, YACHT_SFX_STEP_SEC } from './useSfx';
+import { MADE_SFX_MAX_SEC, YACHT_SFX_CHORD_SEC, YACHT_SFX_FIRST_NOTE_SEC, YACHT_SFX_STEP_SEC } from './useSfx';
 import { YACHT_PARTY_MS } from '@/features/yacht/YachtTable';
 
 /** D-207 — 얏추 요트 칸 효과음(Web Audio 합성). 가짜 AudioContext 로 무엇을 몇 개 울렸는지만 센다. */
@@ -156,6 +156,69 @@ describe('useSfx.playYacht (D-207)', () => {
     vi.stubGlobal('AudioContext', undefined);
     const { result } = await freshHook();
     expect(() => act(() => result.current.playYacht(true))).not.toThrow();
+    expect(tones).toHaveLength(0);
+  });
+});
+
+/** D-208 — 얏추 굴림이 족보로 멈춘 순간의 알림음(세 단계). */
+describe('useSfx.playMade (D-208)', () => {
+  beforeEach(() => {
+    tones = [];
+    noises = 0;
+    contexts = 0;
+    window.localStorage.removeItem(MUTE_KEY);
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.removeItem(MUTE_KEY);
+  });
+
+  it('세기가 오를수록 음이 많고 길다 — 약 2음 · 중 3음 · 강 4음 + 반짝임, 모두 MADE_SFX_MAX_SEC 안', async () => {
+    const { result } = await freshHook();
+    const measure = (tier: 'light' | 'mid' | 'big') => {
+      tones = [];
+      act(() => result.current.playMade(tier));
+      return { count: tones.length, end: Math.max(...tones.map((t) => t.stop)) - 10, freqs: tones.map((t) => t.freq) };
+    };
+    const light = measure('light');
+    const mid = measure('mid');
+    const big = measure('big');
+    expect([light.count, mid.count, big.count]).toEqual([2, 3, 5]);
+    expect(light.end).toBeLessThan(mid.end);
+    expect(mid.end).toBeLessThan(big.end);
+    expect(big.end).toBeLessThanOrEqual(MADE_SFX_MAX_SEC);
+    // 음이 차례로 올라간다.
+    for (const m of [light, mid, big]) expect(m.freqs).toEqual([...m.freqs].sort((a, b) => a - b));
+  });
+
+  it('요트로 멈춘 종소리는 기록 팡파르와 다르다 — 쿵·잡음·화음이 없고 훨씬 짧다', async () => {
+    const { result } = await freshHook();
+    act(() => result.current.playMade('big'));
+    expect(noises).toBe(0);
+    expect(tones.every((t) => t.freq > 500)).toBe(true);
+    const madeEnd = Math.max(...tones.map((t) => t.stop)) - 10;
+    tones = [];
+    act(() => result.current.playYacht(true));
+    const fanfareEnd = Math.max(...tones.map((t) => t.stop)) - 10;
+    expect(madeEnd).toBeLessThan(fanfareEnd / 2);
+  });
+
+  it('음소거면 울리지 않고(오디오 컨텍스트도 만들지 않는다), 다시 켜면 울린다', async () => {
+    window.localStorage.setItem(MUTE_KEY, '1');
+    const { result } = await freshHook();
+    for (const tier of ['light', 'mid', 'big'] as const) act(() => result.current.playMade(tier));
+    expect(tones).toHaveLength(0);
+    expect(contexts).toBe(0);
+    act(() => result.current.toggleMute());
+    act(() => result.current.playMade('light'));
+    expect(tones).toHaveLength(2);
+  });
+
+  it('Web Audio 가 없는 환경에서는 조용히 넘어간다', async () => {
+    vi.stubGlobal('AudioContext', undefined);
+    const { result } = await freshHook();
+    expect(() => act(() => result.current.playMade('big'))).not.toThrow();
     expect(tones).toHaveLength(0);
   });
 });
