@@ -124,6 +124,8 @@ async function playNow(key: VoiceKey, force: boolean): Promise<void> {
   } catch (e) {
     // 사용자 동작 전이라 브라우저가 막았으면 조용히 넘어간다. 그 밖(파일이 지워졌거나 못 읽음)은 기본 음성으로 읽고 목록을 다시 받는다.
     if ((e as { name?: string } | null)?.name === 'NotAllowedError') return;
+    // 한 번 실패한 요소는 같은 src 로 다시 재생해도 바로 실패한다(미디어 오류 상태가 남는다) — 버려서 다음엔 새로 받게 한다.
+    audios.delete(soundSrc(key, version));
     speak(clip.phrase);
     void loadVoiceClips(true);
   }

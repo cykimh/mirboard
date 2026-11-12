@@ -146,6 +146,15 @@ describe('playVoice (D-265)', () => {
     playVoice('onecard.call');
     await settle();
     expect((synth.speak.mock.calls[0][0] as FakeUtterance).text).toBe('원카드!');
+
+    // 실패한 요소는 버린다 — 다음 재생은 새 요소로 다시 받는다.
+    FakeAudio.playError = null;
+    const before = FakeAudio.made.filter((a) => a.src === '/sounds/onecard.call?v=1').length;
+    playVoice('onecard.call');
+    await settle();
+    const after = FakeAudio.made.filter((a) => a.src === '/sounds/onecard.call?v=1');
+    expect(after.length).toBe(before + 1);
+    expect(after[after.length - 1].play).toHaveBeenCalledTimes(1);
   });
 
   it('delayMs 만큼 늦게 낸다(합성 알림음 뒤에 붙인다)', async () => {

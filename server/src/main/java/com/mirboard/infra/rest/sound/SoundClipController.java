@@ -92,9 +92,12 @@ public class SoundClipController {
                 .body(new PublicSoundsResponse(clips));
     }
 
-    /** 공개 — 클립 파일. ETag 가 같으면 304. */
+    /**
+     * 공개 — 클립 파일. ETag 가 같으면 304. 본문을 {@code Resource} 로 돌려줘야 Spring 이 Range 요청에 206 으로 답한다 — Safari·iOS 의
+     * {@code <audio>} 는 {@code Range: bytes=0-1} 로 먼저 묻고 206 이 아니면 재생하지 못한다(byte[] 본문은 늘 200 전체).
+     */
     @GetMapping("/sounds/{key}")
-    public ResponseEntity<byte[]> publicGet(@PathVariable String key, WebRequest request) {
+    public ResponseEntity<org.springframework.core.io.Resource> publicGet(@PathVariable String key, WebRequest request) {
         SoundClip clip = sounds.find(key).orElse(null);
         if (clip == null) {
             return ResponseEntity.notFound().build();
@@ -108,7 +111,7 @@ public class SoundClipController {
                 .contentType(MediaType.parseMediaType(clip.getContentType()))
                 .eTag(etag)
                 .cacheControl(cache)
-                .body(clip.getData());
+                .body(new org.springframework.core.io.ByteArrayResource(clip.getData()));
     }
 
     private static SoundClipView view(SoundClipRepository.Summary s) {

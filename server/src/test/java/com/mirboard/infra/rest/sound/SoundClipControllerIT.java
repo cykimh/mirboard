@@ -206,6 +206,12 @@ class SoundClipControllerIT {
                 .andExpect(header().string("Cache-Control", "max-age=60, must-revalidate"))
                 .andReturn().getResponse().getHeader("ETag");
 
+        // Range 요청에는 206 부분 응답(Safari·iOS <audio> 가 bytes=0-1 로 먼저 묻는다).
+        mockMvc.perform(get("/sounds/" + KEY).header("Range", "bytes=0-1"))
+                .andExpect(status().isPartialContent())
+                .andExpect(header().string("Content-Range", "bytes 0-1/" + data.length))
+                .andExpect(content().bytes(java.util.Arrays.copyOfRange(data, 0, 2)));
+
         // 같은 ETag 면 304, 본문 없음.
         mockMvc.perform(get("/sounds/" + KEY).header("If-None-Match", etag))
                 .andExpect(status().isNotModified())
