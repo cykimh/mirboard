@@ -46,6 +46,8 @@
   gap: 10px;
   padding: 10px 16px;
   min-height: 100vh;
+  /* 폭을 내용에 맞춰 줄이지 않는다(방 화면은 flex 열이라 margin:auto 면 헤더 폭으로 쪼그라든다) — 판이 % 로 커지려면 정해진 폭이 필요하다. */
+  width: 100%;
   max-width: max(640px, var(--om-board-max));
   margin: 0 auto;
 }

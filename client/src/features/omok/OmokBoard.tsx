@@ -50,7 +50,7 @@ function debrisOf(seed: number) {
     return {
       dx: Math.cos(angle) * dist,
       dy: Math.sin(angle) * dist * 0.8,
-      r: 0.04 + rnd() * 0.05,
+      r: 0.07 + rnd() * 0.07,
       rot: Math.round(rnd() * 720 - 360),
       delay: rnd() * 0.06,
       chip: i % 2 === 1,

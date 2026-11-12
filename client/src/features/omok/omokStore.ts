@@ -66,6 +66,8 @@ export interface OmokActions {
   /** 서버가 거절했다 — 흐린 돌을 지운다. */
   clearPending: () => void;
   requestTurnResync: (turnEpoch: number) => void;
+  /** 권위 스냅샷을 한 번 청한다(게임판이 `resyncNonce` 를 보고 부른다). */
+  requestResync: () => void;
 }
 
 const INITIAL: OmokRoomState = {
@@ -223,6 +225,10 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
 
   clearPending() {
     set({ pending: null, pendingSlam: false });
+  },
+
+  requestResync() {
+    set({ resyncNonce: get().resyncNonce + 1 });
   },
 
   requestTurnResync(turnEpoch) {

@@ -146,5 +146,6 @@ describe('omokStore — 강하게 두기 (D-193)', () => {
     expect(useOmokStore.getState().pending).toBeNull();
     expect(useOmokStore.getState().pendingSlam).toBe(false);
     expect(useOmokStore.getState().errorMessage).toContain('강하게 두기');
+    expect(useOmokStore.getState().resyncNonce).toBe(1); // 남은 수를 서버 값으로 맞춘다
   });
 });

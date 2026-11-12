@@ -43,6 +43,8 @@ export const omokRoomSink: RoomEventSink<OmokTableView, unknown> = {
     const p = envelope.payload as ErrorPayload;
     store.clearPending();
     store.setError(errorText(p.code, p.message, ERROR_LABEL));
+    // D-193 — 남은 강하게 두기 수가 서버와 어긋났다(다른 탭에서 썼다 등) — 권위 스냅샷으로 맞춘다.
+    if (p.code === 'SLAM_USED') store.requestResync();
   },
 
   setError(message) {
