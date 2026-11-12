@@ -266,6 +266,13 @@
 - 엔드포인트: `GET /api/users/{id}/stats`(`games[]`), `GET /api/users/ranking?gameType=`
   (이번 달 — 기본 전체 `ALL`, 게임 id 면 그 게임), `GET /api/me`(승패 = 전 게임 합). 클라는 랭킹 게임 선택 상자·프로필
   게임별 전적·헤더 대표 티어(가장 많이 한 게임).
+- ✅ **게임 음성 클립**(D-265): 얏추 내 굴림이 족보로 멈춘 순간(`yacht.made.*` 5종, 알림음 0.3초 뒤)·원카드 경쟁이 누름으로 닫힌
+  순간(`onecard.call`·`onecard.catch`, 모두가 듣는다)에 음성. 운영자가 `/admin/sounds`(메인 위쪽 설정 버튼 — 관리자만)에서 올린
+  파일(`sound_clips` V20, 허용 키 7개·500KB·앞머리 바이트로 형식 판정)을 쓰고, 없으면 `speechSynthesis`(ko-KR)로 문구를 읽는다.
+  서버 `SoundClipController`(어드민 `/api/admin/sounds`, 공개 `/sounds`·`/sounds/{key}` ETag)·`SoundClipService`, 클라
+  `features/sound/voiceClips.playVoice`·`pages/AdminSoundsPage`·`features/auth/useIsAdmin`(`GET /api/me` 의 `admin`).
+  테스트: `SoundClipControllerIT`(5 — 권한·키·크기·형식·왕복·ETag, V20 기동 검증)·`SoundClipSniffTest`(2), 클라 `voiceClips.test`(9)·
+  `AdminSoundsPage.test`(6)·`useIsAdmin.test`(3) + 얏추·원카드 게임판 테스트에 호출 검증.
 - **이번 달 전적·랭킹**(D-199·D-209): `user_monthly_stats`(V19, `user_id+game_type+stat_month`, 전체 행 `game_type='*'`,
   `recent` 최근 5결과)에 `UserGameStatsService.record`·`recordDraw` 가 누적 전적과 같은 트랜잭션에서 쌓는다. 달 경계는
   Asia/Seoul 1일 0시(`StatsMonth`, 주입 `Clock`). 랭킹 순서는 이번 달 승수 → 승률 → 판수, 계급은 누적 레이팅 그대로.

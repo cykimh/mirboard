@@ -14,6 +14,7 @@ import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
+import { playVoice, type VoiceKey } from '@/features/sound/voiceClips';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { MAX_ROLLS, NO_HOLD, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
@@ -374,6 +375,8 @@ export function YachtTable({
         if (!hand) return;
         // 소리는 연출 설정과 무관하게 음소거만 따른다(D-207 과 같다).
         playMade(hand.tier);
+        // D-265 — 족보 이름 음성(올린 파일, 없으면 브라우저 읽어 주기). 알림음이 먼저 울리고 0.3초 뒤에.
+        playVoice(`yacht.made.${hand.category}` as VoiceKey, { delayMs: 300 });
         const r = rootRef.current?.querySelector('.yt-dice')?.getBoundingClientRect();
         setMade({
           ...hand,

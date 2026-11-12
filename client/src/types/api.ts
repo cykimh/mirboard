@@ -130,6 +130,8 @@ export interface MeResponse {
   username: string;
   winCount: number;
   loseCount: number;
+  /** D-265 — 관리자(`admin_roles`)인가. 관리 버튼 표시용 — 예전 서버 응답엔 없다. */
+  admin?: boolean;
 }
 
 export interface ApiErrorEnvelope {

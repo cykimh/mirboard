@@ -1,7 +1,7 @@
 import { GameIcon } from '@/components/GameIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, HelpCircle, Loader2, LogOut, Play, Plus } from 'lucide-react';
+import { ExternalLink, HelpCircle, Loader2, LogOut, Play, Plus, Settings } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { errorText } from '@/api/errorText';
 import { gamesApi } from '@/api/games';
@@ -11,6 +11,7 @@ import { RankingCard } from '@/features/stats/RankingCard';
 import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import { primaryGame } from '@/features/stats/primaryGame';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useIsAdmin } from '@/features/auth/useIsAdmin';
 import { TierBadge } from '@/components/TierBadge';
 import { CreateRoomModal } from '@/features/lobby/CreateRoomModal';
 import { gameWikiUrl } from '@/features/lobby/gameWiki';
@@ -55,6 +56,8 @@ export function GameHubPage() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  // D-265 — 관리자에게만 관리 화면(게임 음성) 버튼을 보인다.
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -226,6 +229,18 @@ export function GameHubPage() {
                   <TierBadge tier={primary.tier} size={24} />
                 </span>
               )
+            )}
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="관리"
+                title="관리 — 게임 음성"
+                onClick={() => navigate('/admin/sounds')}
+              >
+                <Settings className="h-4 w-4" aria-hidden="true" />
+              </Button>
             )}
             <ThemeToggle />
             <Button

@@ -24,6 +24,9 @@ const { catalog, list, stats, spectate, create, stopSpectating } = vi.hoisted(()
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
 vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate, create, stopSpectating } }));
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
+// D-265 — 관리자 여부(`GET /api/me`). 기본은 관리자 아님.
+const isAdmin = vi.hoisted(() => vi.fn<() => boolean | null>(() => false));
+vi.mock('@/features/auth/useIsAdmin', () => ({ useIsAdmin: () => isAdmin() }));
 vi.mock('@/features/stats/RankingCard', () => ({ RankingCard: () => <section data-testid="ranking" /> }));
 
 function game(id: string, displayName: string, status: GameSummary['status'] = 'AVAILABLE'): GameSummary {
@@ -90,6 +93,27 @@ describe('GameHubPage — 게임별 튜토리얼 (D-121)', () => {
     list.mockResolvedValue({ rooms: [] });
     stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('관리 버튼은 관리자에게만 보이고 음성 관리 화면으로 간다 (D-265)', async () => {
+    isAdmin.mockReturnValue(false);
+    const plain = renderHub();
+    await screen.findByRole('button', { name: '티츄 게임 방법' });
+    expect(screen.queryByRole('button', { name: '관리' })).toBeNull();
+    plain.unmount();
+
+    isAdmin.mockReturnValue(true);
+    render(
+      <MemoryRouter initialEntries={['/games']}>
+        <Routes>
+          <Route path="/games" element={<GameHubPage />} />
+          <Route path="/admin/sounds" element={<div>ADMIN_SOUNDS_PAGE</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '관리' }));
+    expect(await screen.findByText('ADMIN_SOUNDS_PAGE')).toBeInTheDocument();
+    isAdmin.mockReturnValue(false);
   });
 
   it('튜토리얼이 등록된 게임 카드에만 "게임 방법" 버튼이 달린다', async () => {

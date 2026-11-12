@@ -26,6 +26,9 @@ const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade
 vi.mock('@/features/sound/useSfx', () => ({
   useSfx: () => ({ muted: false, toggleMute: vi.fn(), ...sfx }),
 }));
+// D-265 — 족보 이름 음성. 불렸는지만 본다(파일·읽어 주기·음소거는 `voiceClips.test`).
+const voice = vi.hoisted(() => ({ playVoice: vi.fn() }));
+vi.mock('@/features/sound/voiceClips', () => voice);
 vi.mock('@/api/users', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/users')>();
   return { ...actual, usersApi: { ...actual.usersApi, stats: () => Promise.resolve({ games: [] }) } };
@@ -150,6 +153,7 @@ describe('굴림이 족보로 멈춘 순간 (D-208)', () => {
     vi.useFakeTimers();
     sfx.playMade.mockClear();
     sfx.playYacht.mockClear();
+    voice.playVoice.mockClear();
     useAuthStore.setState({ token: 't' } as never);
     useCardAnimStore.setState({ enabled: true });
   });
@@ -161,17 +165,21 @@ describe('굴림이 족보로 멈춘 순간 (D-208)', () => {
     ['LARGE_STRAIGHT', 'mid', [2, 3, 4, 5, 6], { LARGE_STRAIGHT: 30, SMALL_STRAIGHT: 15 }, '라지 스트레이트!', 5],
     ['FOUR_OF_A_KIND', 'mid', [4, 4, 2, 4, 4], { FOUR_OF_A_KIND: 18 }, '포 카드!', 4],
     ['YACHT', 'big', [6, 6, 6, 6, 6], { YACHT: 50, FOUR_OF_A_KIND: 30, FULL_HOUSE: 30 }, '요트!', 5],
-  ] as const)('%s — %s 단계 소리 한 번 + 꼬리표 + 족보 주사위 고리', (_category, tier, dice, candidates, label, ringed) => {
+  ] as const)('%s — %s 단계 소리 한 번 + 꼬리표 + 족보 주사위 고리', (category, tier, dice, candidates, label, ringed) => {
     seed();
     const { container } = renderTable();
     rolled(0, [...dice] as Dice, candidates);
     // 구르는 동안에는 아직 없다.
     stop(ROLL_ANIMATION_MS - 1);
     expect(sfx.playMade).not.toHaveBeenCalled();
+    expect(voice.playVoice).not.toHaveBeenCalled();
     expect(container.querySelector('.yt-made-tag')).toBeNull();
     stop(1);
     expect(sfx.playMade).toHaveBeenCalledTimes(1);
     expect(sfx.playMade).toHaveBeenCalledWith(tier);
+    // D-265 — 족보 이름 음성도 한 번, 알림음 0.3초 뒤에.
+    expect(voice.playVoice).toHaveBeenCalledTimes(1);
+    expect(voice.playVoice).toHaveBeenCalledWith(`yacht.made.${category}`, { delayMs: 300 });
     expect(container.querySelector(`.yt-dice-made-${tier}.yt-dice-made-live .yt-made-tag-${tier}`)?.textContent).toBe(label);
     expect(container.querySelectorAll('.yt-die-made .yt-die-madering')).toHaveLength(ringed);
     // 낭독.
