@@ -26,6 +26,12 @@ public record MatchResult(Stone winnerColor,
         winLine = winLine == null ? List.of() : List.copyOf(winLine);
     }
 
+    /** 15줄 시절 결과를 19줄 판 가운데로 옮길 때(D-193). */
+    public MatchResult shifted(int d) {
+        return new MatchResult(winnerColor, winnerSeats, reason, causeSeat,
+                winLine.stream().map(p -> new Point(p.x() + d, p.y() + d)).toList());
+    }
+
     public boolean isDraw() {
         return winnerColor == null;
     }

@@ -29,8 +29,8 @@ import java.util.stream.IntStream;
  */
 public final class OmokEngine {
 
-    /** 시간 초과 자동 수의 첫 수 자리 — 천원 (룰 §8). */
-    public static final Point CENTER = new Point(7, 7);
+    /** 시간 초과 자동 수·봇 첫 수 자리 — 천원 (룰 §8). 19줄이면 (9,9). */
+    public static final Point CENTER = new Point(Board.SIZE / 2, Board.SIZE / 2);
 
     public record Result(OmokState newState, List<OmokEvent> events) {
         public Result {
@@ -254,6 +254,6 @@ public final class OmokEngine {
         List<Stone> colors = IntStream.range(0, state.seatCount()).mapToObj(state::colorOf).toList();
         return new OmokPublicView(state.mode(), state.rule(), colors, state.moves(), state.turnSeat(),
                 forbiddenPoints(state), state.timeouts(), state.result(),
-                IntStream.range(0, state.seatCount()).mapToObj(state::slamsLeft).toList());
+                IntStream.range(0, state.seatCount()).mapToObj(state::slamsLeft).toList(), state.boardSize());
     }
 }

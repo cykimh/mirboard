@@ -55,7 +55,7 @@ function renderTable(props: Partial<React.ComponentProps<typeof OmokTable>> = {}
     <OmokTable roomId="r1" playerIds={PLAYERS} myUserId={10} usernames={NAMES} turnSeconds={30} onExit={vi.fn()} {...props} />,
   );
   const svg = utils.container.querySelector('svg.om-board') as SVGSVGElement;
-  svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 300, right: 300, bottom: 300, x: 0, y: 0, toJSON: () => ({}) });
+  svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 380, height: 380, right: 380, bottom: 380, x: 0, y: 0, toJSON: () => ({}) });
   return { ...utils, svg };
 }
 
@@ -192,5 +192,16 @@ describe('OmokTable (S4)', () => {
     tap(svg, 7, 7);
     tap(svg, 7, 7);
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', x: 7, y: 7 });
+  });
+  it('D-193 — 미리보기를 두면 돋보기가 반대쪽 모서리에 좌표(A~T, I 없음)와 함께 뜬다', () => {
+    seed();
+    const { svg } = renderTable();
+    tap(svg, 2, 3); // 왼쪽 위 → 돋보기는 오른쪽 아래
+    const loupe = screen.getByTestId('om-loupe');
+    expect(loupe.getAttribute('class')).toContain('om-loupe-bottom-right');
+    expect(loupe).toHaveTextContent('C16');
+    tap(svg, 9, 9); // 다른 자리로 옮기면 돋보기도 따라간다(아직 확정 아님)
+    expect(screen.getByTestId('om-loupe')).toHaveTextContent('K10');
+    expect(sendAction).not.toHaveBeenCalled();
   });
 });

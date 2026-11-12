@@ -42,6 +42,8 @@ export interface OmokTableView {
   result: OmokMatchResult | null;
   /** D-193 — 좌석별 남은 강하게 두기 수(0 또는 1). 옛 서버면 없다. */
   slamsLeft?: number[];
+  /** D-193 — 판 줄 수(19). 옛 서버면 없다. */
+  boardSize?: number;
 }
 
 export interface StonePlacedPayload extends OmokPoint {
@@ -63,4 +65,7 @@ export interface OmokMatchEndedPayload extends OmokMatchResult {
   totalMoves: number;
 }
 
-export const BOARD_SIZE = 15;
+/** D-193 — 바둑판 크기 19줄(이전 15). 서버 resync `boardSize` 와 같다. */
+export const BOARD_SIZE = 19;
+/** 가로 좌표 글자 — 바둑 관례대로 I 를 뺀 A~T(1·l 과 헷갈리지 않게). */
+export const COLUMN_LETTERS = 'ABCDEFGHJKLMNOPQRST';

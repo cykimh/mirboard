@@ -23,6 +23,8 @@ import java.util.stream.IntStream;
  * @param timeouts  좌석별 연속 시간 초과 수 (룰 §8)
  * @param result    끝나기 전에는 null
  * @param slams     좌석별 강하게 두기 사용 수 (룰 §4.1, D-193) — 옛 JSON 에 없으면 0
+ * @param boardSize 판 줄 수 — 늘 {@link Board#SIZE}(19). 옛 JSON(15줄 시절)에는 없다: 그 판은 수순을 19줄 판 가운데로 옮겨 이어 둔다
+ *                  (D-193 — 배포 순간에 진행 중이던 판만 해당, 가장자리가 넓어지는 것 말고는 그대로)
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -34,7 +36,8 @@ public record OmokState(OmokMode mode,
                         int turnSeat,
                         List<Integer> timeouts,
                         MatchResult result,
-                        List<Integer> slams) implements GameState {
+                        List<Integer> slams,
+                        Integer boardSize) implements GameState {
 
     /** 좌석마다 한 판에 쓸 수 있는 강하게 두기 수 (룰 §4.1, D-193). */
     public static final int SLAMS_PER_MATCH = 1;
@@ -43,12 +46,27 @@ public record OmokState(OmokMode mode,
         moves = moves == null ? List.of() : List.copyOf(moves);
         timeouts = timeouts == null ? zeros(mode.seatCount()) : List.copyOf(timeouts);
         slams = slams == null ? zeros(mode.seatCount()) : List.copyOf(slams);
+        if (boardSize == null) {                       // 15줄 시절 JSON — 19줄 판 가운데로 옮긴다
+            int shift = (Board.SIZE - Board.LEGACY_SIZE) / 2;
+            moves = moves.stream().map(m -> m.shifted(shift)).toList();
+            result = result == null ? null : result.shifted(shift);
+            boardSize = Board.SIZE;
+        }
+        if (boardSize != Board.SIZE) {
+            throw new IllegalArgumentException("Unsupported omok board size " + boardSize);
+        }
+    }
+
+    /** 이 판의 상태 — 판 크기는 늘 지금 판({@link Board#SIZE}). */
+    public OmokState(OmokMode mode, OmokRule rule, int blackTeam, int firstSeat, List<Move> moves, int turnSeat,
+                     List<Integer> timeouts, MatchResult result, List<Integer> slams) {
+        this(mode, rule, blackTeam, firstSeat, moves, turnSeat, timeouts, result, slams, Board.SIZE);
     }
 
     /** 강하게 두기 이전의 모양 — 사용 수는 0 으로 시작한다. */
     public OmokState(OmokMode mode, OmokRule rule, int blackTeam, int firstSeat, List<Move> moves, int turnSeat,
                      List<Integer> timeouts, MatchResult result) {
-        this(mode, rule, blackTeam, firstSeat, moves, turnSeat, timeouts, result, null);
+        this(mode, rule, blackTeam, firstSeat, moves, turnSeat, timeouts, result, null, Board.SIZE);
     }
 
     private static List<Integer> zeros(int n) {

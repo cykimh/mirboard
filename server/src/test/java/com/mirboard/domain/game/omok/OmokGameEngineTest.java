@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.mirboard.domain.game.omok.board.Board;
 import com.mirboard.domain.game.core.GameContext;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameEvent;
@@ -146,8 +147,8 @@ class OmokGameEngineTest {
         assertThat(action).isInstanceOf(OmokAction.Place.class);
         OmokState next = (OmokState) e.apply(s, 0, action).newState();
         assertThat(next.timeouts()).containsExactly(0, 0);              // 봇의 시간 초과 수가 오르지 않는다
-        assertThat(e.chooseBotAction(s, 0, (view, legal) -> new OmokAction.Place(14, 14 + 1)))
-                .as("합법수 밖").isInstanceOf(OmokAction.Place.class).isNotEqualTo(new OmokAction.Place(14, 15));
+        assertThat(e.chooseBotAction(s, 0, (view, legal) -> new OmokAction.Place(Board.SIZE - 1, Board.SIZE)))
+                .as("합법수 밖").isInstanceOf(OmokAction.Place.class).isNotEqualTo(new OmokAction.Place(Board.SIZE - 1, Board.SIZE));
     }
 
     @Test

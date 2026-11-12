@@ -4,8 +4,8 @@ import './testPointerEvent';
 import { OmokBoard } from './OmokBoard';
 import type { OmokPoint } from '@/types/omok';
 
-/** 판은 300×300 px 로 둔다 — 교차점 간격 20px, (0,0) 교차점이 (10,10). */
-const SIZE = 300;
+/** 판은 380×380 px 로 둔다(19줄) — 교차점 간격 20px, (0,0) 교차점이 (10,10). */
+const SIZE = 380;
 const at = (p: OmokPoint) => ({ clientX: 10 + p.x * 20, clientY: 10 + p.y * 20 });
 
 function setup(over: Partial<React.ComponentProps<typeof OmokBoard>> = {}) {
@@ -95,13 +95,13 @@ describe('OmokBoard — 두 단계 확정 (D-180)', () => {
     expect(touch.onConfirm).not.toHaveBeenCalled();
   });
 
-  it('키보드: 화살표로 미리보기를 옮기고 Enter 로 확정한다', () => {
+  it('키보드: 화살표로 미리보기를 옮기고 Enter 로 확정한다(시작은 천원 9,9 — D-193)', () => {
     const { svg, setPreview, onConfirm, rerender, props } = setup();
     fireEvent.keyDown(svg, { key: 'ArrowRight' });
-    expect(setPreview).toHaveBeenLastCalledWith({ x: 8, y: 7 });
-    rerender(<OmokBoard {...props} preview={{ x: 8, y: 7 }} />);
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 10, y: 9 });
+    rerender(<OmokBoard {...props} preview={{ x: 10, y: 9 }} />);
     fireEvent.keyDown(svg, { key: 'Enter' });
-    expect(onConfirm).toHaveBeenCalledWith({ x: 8, y: 7 });
+    expect(onConfirm).toHaveBeenCalledWith({ x: 10, y: 9 });
   });
 
   it('돌·금수 ✕·승리 줄을 그린다', () => {
@@ -218,5 +218,17 @@ describe('OmokBoard — 강하게 두기 연출 (D-193, 그림만)', () => {
     rerender(<OmokBoard {...props} moves={[B]} pending={null} slamMoves={new Set([1])} />);
     expect(screen.getByTestId('om-stone')).toBe(pending);
     expect(screen.getByTestId('om-slam-fx')).toBe(fx); // 다시 터지지 않는다
+  });
+});
+
+describe('OmokBoard — 19줄 바둑판 (D-193)', () => {
+  it('19줄과 화점 9곳을 그리고, 가장 오른쪽 아래 교차점(18,18)을 누를 수 있다', () => {
+    const { container, svg, setPreview } = setup();
+    expect(container.querySelectorAll('.om-grid')).toHaveLength(38);
+    expect(container.querySelectorAll('.om-star')).toHaveLength(9);
+    expect(svg.getAttribute('viewBox')).toBe('-0.5 -0.5 19 19');
+    fireEvent.pointerDown(svg, { ...at({ x: 18, y: 18 }), pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { ...at({ x: 18, y: 18 }), pointerId: 1, pointerType: 'touch' });
+    expect(setPreview).toHaveBeenLastCalledWith({ x: 18, y: 18 });
   });
 });

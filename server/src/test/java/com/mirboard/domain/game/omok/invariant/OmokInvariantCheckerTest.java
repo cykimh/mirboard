@@ -8,6 +8,7 @@ import static com.mirboard.domain.game.omok.OmokStates.teams;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.mirboard.domain.game.omok.board.Board;
 import com.mirboard.domain.game.omok.OmokMode;
 import com.mirboard.domain.game.omok.OmokRule;
 import com.mirboard.domain.game.omok.action.OmokAction;
@@ -130,7 +131,7 @@ class OmokInvariantCheckerTest {
     @Test
     void a_point_off_the_board_is_caught() {
         List<Move> m = new ArrayList<>(FIVE_MOVES.moves());
-        m.add(new Move(1, 15, 0, false));
+        m.add(new Move(1, Board.SIZE, 0, false));
         violates(with(FIVE_MOVES, m, 0, null, null), "off board");
     }
 

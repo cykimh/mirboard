@@ -38,7 +38,7 @@
 
 .om-table {
   /* D-193 — 판 말고 세로로 차지하는 몫(앱 틀 여백·헤더·차례 띠·상태·버튼·틈). 판은 화면 높이에서 이만큼 뺀 크기까지 커진다. */
-  --om-reserve: 300px;
+  --om-reserve: 280px;
   --om-board-max: max(300px, calc(100dvh - var(--om-reserve)));
   position: relative;
   display: flex;
@@ -106,6 +106,7 @@ button.om-badge {
 /* 판 자리 — 화면 높이가 허락하는 만큼(`--om-board-max`), 폭은 앱 틀 여백까지 걷어 낸 만큼(`--om-bleed`, 휴대폰 폭은 17 에서)
    쓴다. % 는 쓰는 자리(게임판 폭)에서 풀린다. */
 .om-stage {
+  container-type: inline-size;
   --om-bleed: 0px;
   --om-stage-w: min(calc(100% + 2 * var(--om-bleed)), var(--om-board-max));
   position: relative;
@@ -394,12 +395,14 @@ button.om-badge {
 }
 
 /* ── 상태·조작 ─────────────────────────────────────────────────────── */
-/* 상태 줄은 두 줄 높이 고정(D-193) — 문구 길이가 바뀌어도 아래 버튼이 들썩이지 않게. */
+/* 상태 줄은 한 줄 높이 고정(D-193) — 문구 길이가 바뀌어도 아래 버튼이 들썩이지 않게, 넘치면 말줄임(좌표는 돋보기에도 있다). */
 .om-status {
   margin: 0;
-  height: 2.6em;
-  line-height: 1.3;
+  height: 1.45em;
+  line-height: 1.45;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 14px;
   text-align: center;
 }
@@ -484,6 +487,89 @@ button.om-badge {
 
 .om-slam-calm {
   display: none;
+}
+
+/* D-193 돋보기 — 좁은 판(칸이 작을 때)에서만, 미리보기 반대쪽 모서리에. 그림만이라 입력을 막지 않는다. */
+.om-loupe {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  margin: 0;
+  width: 34%;
+  max-width: 150px;
+  pointer-events: none;
+}
+
+@container (max-width: 560px) {
+  .om-loupe {
+    display: block;
+  }
+}
+
+.om-loupe-top-left {
+  top: 6px;
+  left: 6px;
+}
+
+.om-loupe-top-right {
+  top: 6px;
+  right: 6px;
+}
+
+.om-loupe-bottom-left {
+  bottom: 6px;
+  left: 6px;
+}
+
+.om-loupe-bottom-right {
+  bottom: 6px;
+  right: 6px;
+}
+
+.om-loupe svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 3px solid var(--om-brass, var(--om-accent));
+  background: var(--om-wood);
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.55);
+}
+
+.om-loupe-bg {
+  fill: var(--om-wood);
+}
+
+.om-theme-grain .om-loupe-bg {
+  fill: var(--om-wood1);
+}
+
+.om-loupe-stone {
+  opacity: 0.75;
+}
+
+.om-loupe-ring {
+  fill: none;
+  stroke: var(--om-accent);
+  stroke-width: 0.06;
+}
+
+.om-loupe-no line {
+  stroke: var(--om-forbidden-mine);
+  stroke-width: 0.09;
+  stroke-linecap: round;
+}
+
+.om-loupe-label {
+  margin: 4px auto 0;
+  width: max-content;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--om-surface-2);
+  border: 1px solid var(--om-border);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .om-primary {
@@ -823,7 +909,7 @@ button.om-badge {
   top: var(--om-pad);
   bottom: var(--om-pad);
   width: var(--om-pad);
-  grid-template-rows: repeat(15, 1fr);
+  grid-template-rows: repeat(19, 1fr);
 }
 
 .om-theme-grain .om-ruler-x {
@@ -831,7 +917,7 @@ button.om-badge {
   right: var(--om-pad);
   bottom: 0;
   height: var(--om-pad);
-  grid-template-columns: repeat(15, 1fr);
+  grid-template-columns: repeat(19, 1fr);
 }
 
 /* 좌표 눈금은 판이 넓을 때만 — 휴대폰에서는 틀을 얇게 두어 칸을 줄이지 않는다. */

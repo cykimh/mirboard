@@ -6,6 +6,7 @@ import static com.mirboard.domain.game.omok.OmokStates.play;
 import static com.mirboard.domain.game.omok.OmokStates.solo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mirboard.domain.game.omok.OmokEngine;
 import com.mirboard.domain.game.omok.OmokMode;
 import com.mirboard.domain.game.omok.OmokRule;
 import com.mirboard.domain.game.omok.action.OmokAction;
@@ -32,7 +33,7 @@ class OmokBotPolicyTest {
     @ParameterizedTest
     @EnumSource(BotLevel.class)
     void the_first_move_is_the_center(BotLevel level) {
-        assertThat(choose(solo(OmokRule.RENJU), level)).isEqualTo(p(7, 7));
+        assertThat(choose(solo(OmokRule.RENJU), level)).isEqualTo(OmokEngine.CENTER);
     }
 
     @ParameterizedTest

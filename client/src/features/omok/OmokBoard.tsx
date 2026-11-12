@@ -4,13 +4,10 @@ import { coordName, forbiddenAt, key, stonesOf } from './omokRules';
 import { GLINT_PATH, OmokDefs, StoneBody, StoneShadow, artId } from './OmokArt';
 import { useStonePicker } from './useStonePicker';
 
-const STARS: OmokPoint[] = [
-  { x: 3, y: 3 },
-  { x: 11, y: 3 },
-  { x: 7, y: 7 },
-  { x: 3, y: 11 },
-  { x: 11, y: 11 },
-];
+/** 화점 — 19줄 바둑판처럼 4·10·16 줄이 만나는 9곳(D-193). */
+const STAR_LINES = [3, 9, 15];
+const STARS: OmokPoint[] = STAR_LINES.flatMap((y) => STAR_LINES.map((x) => ({ x, y })));
+const CENTER: OmokPoint = { x: (BOARD_SIZE - 1) / 2, y: (BOARD_SIZE - 1) / 2 };
 const LINES = Array.from({ length: BOARD_SIZE }, (_, i) => i);
 
 /** 입자 수 상한(D-192) — 휴대폰에서도 가볍게. 돌 하나에 먼지 8, 5목에 금가루 26. */
@@ -126,8 +123,8 @@ interface ShownStone extends OmokPoint {
 }
 
 /**
- * 오목 판 (D-180). SVG 하나 — 교차점 225개를 DOM 요소로 만들지 않고 누른 화면 좌표를 가장 가까운 교차점으로 맞춘다. 좌표계는 교차점
- * 간격 1, (0,0) 교차점이 원점이고 판 가장자리에 반 칸 여백이 있다(`viewBox` −0.5 … 14.5).
+ * 오목 판 (D-180, 19줄 D-193). SVG 하나 — 교차점 361개를 DOM 요소로 만들지 않고 누른 화면 좌표를 가장 가까운 교차점으로 맞춘다.
+ * 좌표계는 교차점 간격 1, (0,0) 교차점이 원점이고 판 가장자리에 반 칸 여백이 있다(`viewBox` −0.5 … 18.5).
  *
  * <p>두 단계 확정: 누르면 미리보기(뜬 돌 + 그 줄·열 안내선), 미리보기를 다시 누르면 확정. 끌면 미리보기가 따라온다
  * ({@link useStonePicker}). 키보드: 화살표로 미리보기를 옮기고 Enter·Space 로 확정한다.
@@ -185,7 +182,7 @@ export function OmokBoard({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!enabled) return;
-    const at = preview ?? last ?? { x: 7, y: 7 };
+    const at = preview ?? last ?? CENTER;
     const delta: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0],
       ArrowRight: [1, 0],

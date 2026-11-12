@@ -159,7 +159,7 @@
     {
       "id": "OMOK",
       "displayName": "오목",
-      "shortDescription": "15×15 판에 다섯 개를 먼저 잇는다. 1:1 이나 2:2 팀전(같은 팀이 같은 색을 번갈아), 렌주 금수를 고를 수 있다.",
+      "shortDescription": "19×19 바둑판에 다섯 개를 먼저 잇는다. 1:1 이나 2:2 팀전(같은 팀이 같은 색을 번갈아), 렌주 금수를 고를 수 있다.",
       "minPlayers": 2,
       "maxPlayers": 4,
       "status": "AVAILABLE",

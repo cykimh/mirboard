@@ -25,7 +25,7 @@
 | 5b | 스컬킹 (룰 엔진 + 배선 + 클라 게임판) | ✅ | `domain.game.skullking`, `features/skullking` (§16) |
 | 5c | 원카드 (룰 엔진 + 서버 배선·봇·기록 + 클라 게임판·경쟁 버튼·튜토리얼·턴 카운트다운 — D-131 공개, `MIRBOARD_ONECARD_STATUS` 로 되돌림) | ✅ | `domain.game.onecard`, `infra.bot.EngineTimerScheduler`, `client/src/features/onecard`, `docs/rules-onecard.md` (D-127~D-131, §17) |
 | 5d | 요트 (동시 진행 D-202 · 개인 최고 점수 D-201 · 순수 엔진 + 포트 확장 `GameContext.turnSeconds`·차례 전체 타이머·봇·기록 + 클라 주사위 판·점수표·튜토리얼 — D-200 공개, `MIRBOARD_YACHT_STATUS` 로 되돌림) | ✅ | `domain.game.yacht`, `client/src/features/yacht`, `docs/rules-yacht.md` (D-181~D-183·D-200, §18) |
-| 5e | 오목 (15×15 — 1:1·2:2 팀전, 렌주·삼삼만 금지·자유 오목 금수, 봇 3단계, 휴대폰 두 단계 확정 착수, 기록·무승부 — 게임 중립 확장 3건 D-176, D-190 공개, `MIRBOARD_OMOK_STATUS` 로 되돌림) | ✅ | `domain.game.omok`, `client/src/features/omok`, `docs/rules-omok.md` (D-175~D-180·D-190, §19) |
+| 5e | 오목 (19×19 — D-193, 이전 15×15 — 1:1·2:2 팀전, 렌주·삼삼만 금지·자유 오목 금수, 봇 3단계, 휴대폰 두 단계 확정 착수, 기록·무승부 — 게임 중립 확장 3건 D-176, D-190 공개, `MIRBOARD_OMOK_STATUS` 로 되돌림) | ✅ | `domain.game.omok`, `client/src/features/omok`, `docs/rules-omok.md` (D-175~D-180·D-190, §19) |
 | 6 | 봇 플레이어 (빈 좌석 자동 채움) | ✅ | `infra.bot`, `domain.game.tichu.bot` |
 | 7 | 재접속 동기화 (resync) | ✅ | `RoomService`, `GET /rooms/{id}/resync` |
 | 8 | 탈주/끊김 처리 (유예→패널티) | ✅ | `infra.ws` 탈주 핸들러, `DesertionService` |
@@ -485,7 +485,7 @@
 
 ## 19. 오목 (S0~S4, D-175~D-180·D-190·D-193)
 
-- **룰**: 15×15, 1:1(2인)·2:2 팀전(4인 — 좌석 0·2 대 1·3, 좌석 +1 순으로 같은 팀이 같은 색을 번갈아). 방장이 대기실에서 룰을 고른다 — 렌주(기본,
+- **룰**: 19×19 바둑판(D-193 — 이전 15×15), 1:1(2인)·2:2 팀전(4인 — 좌석 0·2 대 1·3, 좌석 +1 순으로 같은 팀이 같은 색을 번갈아). 방장이 대기실에서 룰을 고른다 — 렌주(기본,
   흑만 33·44·장목 금지, 흑 정확히 5·백 5 이상)·삼삼만 금지·자유 오목. 5목이 되는 수는 금수여도 승, 금수 자리는 서버가 계산해 공개 뷰·`TURN_CHANGED` 에
   싣는다(클라 이중 구현 없음). 시간 초과는 결정적 자동 한 수, 같은 사람 연속 2번이면 그 편 패. 기권·탈주는 그 편 패(2:2 는 팀 패), 무승부(판이 가득·흑에게
   금수만)는 ELO 없이 기록 행만. 정본 `docs/rules-omok.md`, 설계 `docs/plans/omok.md`.

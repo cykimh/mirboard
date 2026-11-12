@@ -10,12 +10,13 @@ import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useSfx } from '@/features/sound/useSfx';
-import { BOARD_SIZE, type OmokPoint, type OmokStone } from '@/types/omok';
+import { BOARD_SIZE, COLUMN_LETTERS, type OmokPoint, type OmokStone } from '@/types/omok';
 import { omokRoomSink } from './omokRoomSink';
 import { useOmokStore } from './omokStore';
 import { FORBIDDEN_LABEL, coordName, forbiddenAt, key, stonesOf } from './omokRules';
 import { OmokBoard } from './OmokBoard';
 import { OmokMatchEnd } from './OmokMatchEnd';
+import { OmokLoupe } from './OmokLoupe';
 import { OmokTurnCountdown } from './OmokTurnCountdown';
 import { OMOK_TUTORIAL } from './tutorial/omokTutorial';
 import { OMOK_TOKENS_CLASS } from './omokTheme';
@@ -42,8 +43,8 @@ function writeSingleClick(on: boolean) {
   }
 }
 
-/** 판 틀의 좌표 눈금(D-192) — 넓은 판에서만 보인다(CSS 컨테이너 쿼리). 가로 A~O, 세로 15~1. */
-const RULER_X = Array.from({ length: BOARD_SIZE }, (_, i) => String.fromCharCode(65 + i));
+/** 판 틀의 좌표 눈금(D-192) — 넓은 판에서만 보인다(CSS 컨테이너 쿼리). 가로 A~T(I 없음), 세로 19~1(D-193). */
+const RULER_X = COLUMN_LETTERS.split('');
 const RULER_Y = Array.from({ length: BOARD_SIZE }, (_, i) => BOARD_SIZE - i);
 
 interface MarkerBox {
@@ -414,6 +415,10 @@ export function OmokTable({
             setPreview={s.setPreview}
             onConfirm={place}
           />
+          {/* D-193 돋보기 — 좁은 판에서 미리보기 둘레를 손가락 반대쪽 모서리에 크게. */}
+          {preview && myColor && !stones.has(key(preview)) && (
+            <OmokLoupe preview={preview} moves={s.moves} myColor={myColor} forbidden={previewForbidden !== null} />
+          )}
         </div>
       </div>
 

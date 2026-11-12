@@ -25,7 +25,7 @@ public record OmokBotView(Board board, OmokRule rule, Stone me, List<Move> moves
     public int movesHash() {
         int h = 17;
         for (Move m : moves) {
-            h = h * 31 + m.x() * 15 + m.y();
+            h = h * 31 + m.x() * Board.SIZE + m.y();
         }
         return h & 0x7fffffff;
     }

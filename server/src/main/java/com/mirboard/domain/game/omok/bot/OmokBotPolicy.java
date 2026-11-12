@@ -2,6 +2,7 @@ package com.mirboard.domain.game.omok.bot;
 
 import com.mirboard.domain.game.omok.OmokRule;
 import com.mirboard.domain.game.omok.action.OmokAction;
+import com.mirboard.domain.game.omok.OmokEngine;
 import com.mirboard.domain.game.omok.board.Board;
 import com.mirboard.domain.game.omok.board.Point;
 import com.mirboard.domain.game.omok.board.Stone;
@@ -57,7 +58,7 @@ public final class OmokBotPolicy {
             }
         }
         if (view.board().stoneCount() == 0) {
-            Point center = new Point(7, 7);
+            Point center = OmokEngine.CENTER;
             return new Decision(place(legalPoints.contains(center) ? center : first(legalPoints)), 0);
         }
         if (level == BotLevel.HARD) {

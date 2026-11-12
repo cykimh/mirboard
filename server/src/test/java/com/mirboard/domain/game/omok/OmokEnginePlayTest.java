@@ -124,7 +124,7 @@ class OmokEnginePlayTest {
         OmokState s = play(solo(OmokRule.RENJU), p(7, 7));
         rejected(s, 0, new OmokAction.Place(1, 1), RejectionReason.NOT_YOUR_TURN);
         rejected(s, 5, new OmokAction.Place(1, 1), RejectionReason.NOT_YOUR_TURN);
-        rejected(s, 1, new OmokAction.Place(15, 0), RejectionReason.OUT_OF_BOARD);
+        rejected(s, 1, new OmokAction.Place(Board.SIZE, 0), RejectionReason.OUT_OF_BOARD);
         rejected(s, 1, new OmokAction.Place(-1, 3), RejectionReason.OUT_OF_BOARD);
         rejected(s, 1, new OmokAction.Place(7, 7), RejectionReason.OCCUPIED);
     }
@@ -237,12 +237,12 @@ class OmokEnginePlayTest {
     void filling_the_last_point_without_a_five_is_a_draw() {
         Point last = p(0, 0);                                         // 줄무늬에서 흑 칸
         OmokState s = fromBoard(OmokRule.FREESTYLE, stripes(), last);
-        assertThat(s.moves()).hasSize(224);
+        assertThat(s.moves()).hasSize(Board.CELLS - 1);
         OmokEngine.Result r = place(s, 0, last.x(), last.y());
         assertThat(r.newState().result().reason()).isEqualTo(EndReason.BOARD_FULL);
         assertThat(r.newState().result().isDraw()).isTrue();
         assertThat(r.events().getLast()).isEqualTo(new OmokEvent.MatchEnded(null, List.of(), EndReason.BOARD_FULL, -1,
-                List.of(), 225));
+                List.of(), Board.CELLS));
     }
 
     @Test

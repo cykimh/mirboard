@@ -13,6 +13,7 @@ import java.util.List;
  * @param seatColors 좌석별 색
  * @param forbidden  흑 차례일 때 금수 자리, 그 밖은 빈 목록
  * @param slamsLeft  좌석별 남은 강하게 두기 수 (룰 §4.1, D-193)
+ * @param boardSize  판 줄 수 — 19 (D-193)
  */
 public record OmokPublicView(OmokMode mode,
                              OmokRule rule,
@@ -22,7 +23,8 @@ public record OmokPublicView(OmokMode mode,
                              List<ForbiddenPoint> forbidden,
                              List<Integer> timeouts,
                              MatchResult result,
-                             List<Integer> slamsLeft) {
+                             List<Integer> slamsLeft,
+                             int boardSize) {
 
     public OmokPublicView {
         seatColors = List.copyOf(seatColors);
