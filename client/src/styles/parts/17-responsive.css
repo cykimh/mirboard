@@ -371,6 +371,24 @@
   }
 }
 
+/* D-264 — 흔들어 굴리기: 움직임 줄이기면 주사위 떨림·컵 흔들림을 멈춘다. 컵은 기울어진 채 가만히 보여 "흔드는 중"만 알리고
+   소리는 그대로 난다(위 블록이 컵을 감추므로 같은 명시도 이상으로 다시 보인다). */
+@media (prefers-reduced-motion: reduce) {
+  .yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+  .yt-theme-salon .yt-cup.yt-cup-shake {
+    animation: none;
+  }
+
+  .yt-theme-salon .yt-cup.yt-cup-shake {
+    display: block;
+    transform: rotate(-14deg);
+  }
+
+  .yt-theme-salon .yt-shake {
+    transition: none;
+  }
+}
+
 /* D-203 — 마우스가 있는 기기에서만 떠오르는 주사위·채워지는 후보 칸(터치에서는 눌린 채 남는 :hover 를 피한다). */
 @media (hover: hover) {
   .yt-theme-salon .yt-die:not(:disabled):not(.yt-die-held):hover .yt-die-face {

@@ -24,7 +24,7 @@ vi.mock('@/ws/useStompRoom', () => ({
 }));
 const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade: vi.fn() }));
 vi.mock('@/features/sound/useSfx', () => ({
-  useSfx: () => ({ muted: false, toggleMute: vi.fn(), ...sfx }),
+  useSfx: () => ({ muted: false, toggleMute: vi.fn(), playRoll: vi.fn(), startShake: () => () => {}, ...sfx }),
 }));
 // D-265 — 족보 이름 음성. 불렸는지만 본다(파일·읽어 주기·음소거는 `voiceClips.test`).
 const voice = vi.hoisted(() => ({ playVoice: vi.fn() }));

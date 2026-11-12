@@ -40,6 +40,12 @@ import { isGuestName } from '@/features/stats/playerTiers';
 import { salonTheme, seatAccent, yachtThemeClass } from './yachtTheme';
 import { GoldBurst } from './GoldBurst';
 import { showToast } from '@/components/toast/toastStore';
+import {
+  loadMotionPreference,
+  motionShakeSupported,
+  requestMotionPermission,
+  saveMotionPreference,
+} from './useDeviceShake';
 
 export { seatAccent };
 
@@ -192,7 +198,7 @@ export function YachtTable({
   const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef, requestResync } =
     useStompRoom(roomId, token, yachtRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
-  const { muted, toggleMute, playChime, playYacht, playMade } = useSfx();
+  const { muted, toggleMute, playChime, playYacht, playMade, playRoll, startShake } = useSfx();
   const liveReactions = useLiveReactions();
   const chatLines = useSeatChatLines(playerIds);
   const voice = useVoiceChat({ myUserId, connected, send: sendVoice, subscribe: subscribeVoice });
@@ -225,6 +231,27 @@ export function YachtTable({
   // D-201 — 판 시작 때의 내 최고 점수(종료 화면이 "새 최고 기록!"을 가른다). 관전자·게스트는 묻지 않는다.
   const guest = isGuestName(usernames[myUserId]);
   const previousBest = useYachtBest(token, myUserId, !spectator && !guest);
+
+  // D-264 — 휴대폰 흔들어 굴리기는 ⋮ 메뉴에서 켠다(터치 기기 + DeviceMotion 이 있고 내가 앉아 있을 때만 항목이 있다). iOS 는 그 항목을
+  // 누른 자리에서 권한을 묻는다 — 거절·미지원이면 안내만 하고 [흔들기]·[굴리기]는 그대로다.
+  const [motionShake, setMotionShake] = useState(loadMotionPreference);
+  const motionOffered = !spectator && mySeat >= 0 && motionShakeSupported();
+  const toggleMotionShake = () => {
+    if (motionShake) {
+      setMotionShake(false);
+      saveMotionPreference(false);
+      return;
+    }
+    void requestMotionPermission().then((ok) => {
+      if (!ok) {
+        showToast('이 기기에서는 휴대폰 흔들기를 쓸 수 없어요 · [흔들기]를 꾹 눌러 주세요');
+        return;
+      }
+      setMotionShake(true);
+      saveMotionPreference(true);
+      showToast('내 차례에 휴대폰을 흔들다 멈추면 주사위를 굴려요');
+    });
+  };
 
   const nameOf = (seat: number) => {
     const uid = playerIds[seat];
@@ -699,6 +726,11 @@ export function YachtTable({
               connected ? '연결됨' : '연결 끊김',
             ]}
             sound={{ muted, onToggle: toggleMute }}
+            toggles={
+              motionOffered
+                ? [{ key: 'motion-shake', label: '휴대폰 흔들어 굴리기', checked: motionShake, onToggle: toggleMotionShake }]
+                : undefined
+            }
             onRules={rules.show}
             onReaction={spectator ? undefined : sendReaction}
             voice={voice}
@@ -866,6 +898,11 @@ export function YachtTable({
           animate={animate}
           onToggle={watching === null ? toggleHold : undefined}
           onRoll={myTurn && watching === null ? roll : undefined}
+          // D-264 — 가운데 판에서 구르는 굴림의 소리. 내 굴림은 또렷하게, 가운데 판에 보이는 남의 굴림(차례대로의 남의 차례·남의 판
+          // 구경)은 작게. 모두 같이 굴릴 때 좌석 띠에서만 구르는 남의 굴림은 소리가 없다. 연출 설정과 무관하게 음소거만 따른다.
+          onRollSound={() => playRoll(mySeat >= 0 && watching === null && (simultaneous || turnSeat === mySeat))}
+          onShakeSound={startShake}
+          motionShake={motionOffered && motionShake}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           note={
             s.result !== null || roomFinished

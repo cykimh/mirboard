@@ -80,6 +80,24 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     }
   });
 
+  it('D-264 — 글꼴을 따로 정하지 않는다(굴리기·점수표·현수막·좌석 모두 앱 기본 글꼴). 숫자 줄맞춤은 남는다', () => {
+    expect(yachtCssSource).not.toMatch(/font-family/);
+    expect(yachtCssSource).not.toMatch(/serif|Palatino|Myeongjo|Myungjo|Batang|Georgia|--yt-s-serif/i);
+    expect(cssCode).not.toMatch(/@font-face|@import/);
+    expect(cssCode).toContain('font-variant-numeric: tabular-nums');
+    // 축약 속성으로 글꼴을 바꾸는 곳도 없다(버튼의 `font: inherit` 만).
+    const shorthands = [...cssCode.matchAll(/[\s;{]font\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(shorthands.every((v) => v === 'inherit')).toBe(true);
+  });
+
+  it('D-264 — 흔들어 굴리기의 떨림·컵 흔들림은 움직임 줄이기에서 멈추고, 컵은 가만히 남는다', () => {
+    expect(cssCode).toContain('.yt-theme-salon .yt-cup.yt-cup-shake');
+    const block = /D-264[\s\S]*?@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(responsiveCssSource)?.[1] ?? '';
+    expect(block).toContain('.yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face');
+    expect(block).toMatch(/\.yt-theme-salon \.yt-cup\.yt-cup-shake \{\s*display: block;/);
+    expect(block).toContain('animation: none');
+  });
+
   it('튜토리얼 포털 토큰(.yt-tokens)이 게임판 토큰과 같은 값이다', () => {
     const table = tokensOf('.yt-table');
     const portal = tokensOf('.yt-tokens');
