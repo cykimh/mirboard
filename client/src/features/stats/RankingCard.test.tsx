@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RankingCard } from './RankingCard';
+import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import type { GameSummary } from '@/types/api';
 
 const { ranking, rankingGames } = vi.hoisted(() => ({ ranking: vi.fn(), rankingGames: vi.fn() }));
-vi.mock('@/api/users', () => ({ usersApi: { ranking, rankingGames } }));
+vi.mock('@/api/users', () => ({ RANKING_ALL: 'ALL', usersApi: { ranking, rankingGames } }));
 
 const game = (id: string, displayName: string): GameSummary => ({
   id,
@@ -16,18 +17,26 @@ const game = (id: string, displayName: string): GameSummary => ({
   supportedRoomOptions: [],
 });
 
-const entry = (userId: number, username: string, rating: number) => ({
+const entry = (userId: number, username: string, over: Record<string, unknown> = {}) => ({
   rank: 1,
   userId,
   username,
-  rating,
+  rating: 1000,
   tier: 'MISSILE' as const,
+  tierGameType: 'TICHU',
   winCount: 1,
   loseCount: 0,
   desertCount: 0,
+  winRate: 100,
+  recent: 'W',
+  ...over,
 });
 
-describe('RankingCard (D-115 — 게임별 랭킹)', () => {
+const CATALOG = [game('SKULL_KING', '스컬킹'), game('ONE_CARD', '원카드'), game('TICHU', '티츄')];
+
+const select = () => screen.getByRole('combobox', { name: '랭킹 게임' }) as HTMLSelectElement;
+
+describe('RankingCard (D-199 — 이번 달 랭킹, 전체·게임별)', () => {
   beforeEach(() => {
     rankingGames.mockReset();
     rankingGames.mockResolvedValue({ games: [] });
@@ -35,68 +44,126 @@ describe('RankingCard (D-115 — 게임별 랭킹)', () => {
     ranking.mockImplementation((_t: string, _l: number, gameType: string) =>
       Promise.resolve({
         gameType,
-        entries: gameType === 'SKULL_KING' ? [entry(1, 'sk_king', 1300)] : [entry(2, 'tichu_pro', 1400)],
+        month: '2026-11',
+        entries:
+          gameType === 'ALL'
+            ? [entry(1, 'all_top', { winCount: 5, loseCount: 3, winRate: 63, recent: 'WLWWL' })]
+            : [entry(2, `top_${gameType}`)],
       }),
     );
   });
 
-  it('카탈로그 게임마다 탭을 만들고 첫 게임 랭킹부터 보여 준다', async () => {
-    render(<RankingCard token="tok" games={[game('SKULL_KING', '스컬킹'), game('TICHU', '티츄')]} />);
+  it('처음에는 "전체" 랭킹을 받는다 — 게임 탭은 없고 오른쪽 위 선택 상자다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} />);
 
-    expect(screen.getByRole('tab', { name: '스컬킹' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: '티츄' })).toBeTruthy();
-    expect(await screen.findByText('sk_king')).toBeTruthy();
-    expect(ranking).toHaveBeenCalledWith('tok', 20, 'SKULL_KING');
+    expect(await screen.findByText('all_top')).toBeTruthy();
+    expect(select().value).toBe('ALL');
+    expect(ranking).toHaveBeenCalledTimes(1);
+    expect(ranking).toHaveBeenCalledWith('tok', 20, 'ALL');
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getByText('이번 달 전적 · 매달 1일 0시 초기화')).toBeTruthy();
   });
 
-  it('탭을 바꾸면 그 게임 랭킹을 다시 받는다', async () => {
-    render(<RankingCard token="tok" games={[game('SKULL_KING', '스컬킹'), game('TICHU', '티츄')]} />);
-    await screen.findByText('sk_king');
+  it('게임을 고르면 그 게임 랭킹을 다시 받는다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} />);
+    await screen.findByText('all_top');
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: '티츄' }));
-    fireEvent.click(screen.getByRole('tab', { name: '티츄' }));
-
-    expect(await screen.findByText('tichu_pro')).toBeTruthy();
-    await waitFor(() => expect(ranking).toHaveBeenLastCalledWith('tok', 20, 'TICHU'));
-    expect(screen.queryByText('sk_king')).toBeNull();
-  });
-
-  it('기록이 없으면 빈 안내', async () => {
-    ranking.mockResolvedValue({ gameType: 'TICHU', entries: [] });
-    render(<RankingCard token="tok" games={[game('TICHU', '티츄')]} />);
-
-    expect(await screen.findByText(/아직 랭킹 데이터가 없습니다/)).toBeTruthy();
-  });
-});
-
-/** D-160 — 탭은 전체에서 많이 한 게임부터. 판수가 없는 게임은 카탈로그 순서로 뒤에. */
-describe('RankingCard — 많이 한 게임부터 (D-160)', () => {
-  const catalog = [game('SKULL_KING', '스컬킹'), game('ONE_CARD', '원카드'), game('TICHU', '티츄')];
-
-  beforeEach(() => {
-    ranking.mockReset();
-    ranking.mockImplementation((_t: string, _l: number, gameType: string) =>
-      Promise.resolve({ gameType, entries: [entry(3, `top_${gameType}`, 1200)] }),
-    );
-    rankingGames.mockReset();
-  });
-
-  it('판수가 많은 게임이 앞이고 처음 탭이 된다 — 판수 없는 게임은 카탈로그 순서로 뒤에', async () => {
-    rankingGames.mockResolvedValue({ games: [{ gameType: 'TICHU', plays: 40 }, { gameType: 'ONE_CARD', plays: 12 }] });
-    render(<RankingCard token="tok" games={catalog} />);
+    fireEvent.change(select(), { target: { value: 'TICHU' } });
 
     expect(await screen.findByText('top_TICHU')).toBeTruthy();
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['티츄', '원카드', '스컬킹']);
-    expect(screen.getByRole('tab', { name: '티츄' })).toHaveAttribute('aria-selected', 'true');
-    // 순서를 받기 전에 카탈로그 첫 게임 랭킹을 먼저 받아 깜빡이지 않는다.
-    expect(ranking).toHaveBeenCalledTimes(1);
+    expect(ranking).toHaveBeenLastCalledWith('tok', 20, 'TICHU');
+    expect(screen.queryByText('all_top')).toBeNull();
+  });
+
+  it('선택지는 "전체" 다음에 많이 한 게임부터 — 판수 없는 게임은 카탈로그 순서로 뒤에 (D-160)', async () => {
+    rankingGames.mockResolvedValue({ games: [{ gameType: 'TICHU', plays: 40 }, { gameType: 'ONE_CARD', plays: 12 }] });
+    render(<RankingCard token="tok" games={CATALOG} />);
+
+    await waitFor(() =>
+      expect(Array.from(select().options).map((o) => o.textContent)).toEqual(['전체', '티츄', '원카드', '스컬킹']),
+    );
+    // 순서를 받아도 고른 것은 "전체" 그대로다.
+    expect(select().value).toBe('ALL');
   });
 
   it('판수를 못 받으면 카탈로그 순서 그대로', async () => {
     rankingGames.mockRejectedValue(new Error('down'));
-    render(<RankingCard token="tok" games={catalog} />);
+    render(<RankingCard token="tok" games={CATALOG} />);
 
-    expect(await screen.findByText('top_SKULL_KING')).toBeTruthy();
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['스컬킹', '원카드', '티츄']);
+    await screen.findByText('all_top');
+    expect(Array.from(select().options).map((o) => o.textContent)).toEqual(['전체', '스컬킹', '원카드', '티츄']);
+  });
+
+  it('머리 줄은 등수·유저·전적·승률·최근 5경기 — "#"·계급 칸이 없다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} />);
+    await screen.findByText('all_top');
+
+    const heads = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(heads).toEqual(['등수', '유저', '전적', '승률', '최근 5경기', '탈주']);
+    expect(screen.getByRole('columnheader', { name: '최근 5경기' })).toHaveAttribute(
+      'title',
+      '왼쪽이 오래된 경기, 오른쪽이 가장 최근 경기',
+    );
+  });
+
+  it('계급 아이콘은 별명 왼쪽, 같은 칸 안에 있다 — 전체에서는 기준 게임을 밝힌다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} />);
+    const name = await screen.findByText('all_top');
+
+    const cell = name.closest('td')!;
+    const icon = within(cell).getByRole('img', { name: '미사일' });
+    expect(icon.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name).toHaveAttribute('title', 'all_top · 계급은 티츄 기준');
+  });
+
+  it('승률과 최근 5경기 점(오래된 것 → 최근)을 그린다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} />);
+    const row = (await screen.findByText('all_top')).closest('tr')!;
+
+    expect(within(row).getByText('5승 3패')).toBeTruthy();
+    expect(within(row).getByText('63%')).toBeTruthy();
+    const dots = within(row).getByRole('img', { name: /최근 5경기\(왼쪽이 오래된 경기\): 승 패 승 승 패/ });
+    expect(Array.from(dots.children).map((d) => d.getAttribute('data-result'))).toEqual(['W', 'L', 'W', 'W', 'L']);
+  });
+
+  it('다섯 판이 안 되면 왼쪽부터 채우고 빈 칸을 남긴다 — 승·패가 없으면 승률은 "-"', async () => {
+    ranking.mockResolvedValue({
+      gameType: 'ALL',
+      entries: [entry(1, 'draw_only', { winCount: 0, loseCount: 0, winRate: null, recent: 'DW' })],
+    });
+    render(<RankingCard token="tok" games={CATALOG} />);
+    const row = (await screen.findByText('draw_only')).closest('tr')!;
+
+    expect(within(row).getByText('-')).toBeTruthy();
+    const dots = within(row).getByRole('img', { name: /최근 2경기.*: 무 승/ });
+    expect(Array.from(dots.children).map((d) => d.getAttribute('data-result'))).toEqual(['D', 'W', '', '', '']);
+  });
+
+  it('기록이 없으면 빈 안내', async () => {
+    ranking.mockResolvedValue({ gameType: 'ALL', entries: [] });
+    render(<RankingCard token="tok" games={CATALOG} />);
+
+    expect(await screen.findByText('이번 달 아직 기록이 없어요')).toBeTruthy();
+  });
+
+  it('받는 중·빈 목록·목록 모두 같은 고정 높이 스크롤 상자 안이다 — 카드 높이가 바뀌지 않는다', async () => {
+    render(<RankingCard token="tok" games={[]} />);
+
+    // 받는 중 — 카탈로그(게임 목록)가 아직 없어도 자리를 잡는다.
+    const box = screen.getByTestId('ranking-scroll');
+    expect(within(box).getByText('불러오는 중…')).toBeTruthy();
+    for (const cls of ['h-64', ...HUB_SCROLL.split(' ')]) expect(box).toHaveClass(cls);
+    expect(HUB_SCROLL).toContain('overflow-y-auto');
+    expect(HUB_SCROLL).toContain('[scrollbar-width:thin]');
+
+    await screen.findByText('all_top');
+    expect(screen.getByTestId('ranking-scroll')).toBe(box);
+    expect(within(box).getByRole('table')).toBeTruthy();
+  });
+
+  it('내 줄은 강조한다', async () => {
+    render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
+
+    expect((await screen.findByText('all_top')).closest('tr')).toHaveClass('bg-accent');
   });
 });

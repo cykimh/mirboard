@@ -12,6 +12,7 @@ DELETE FROM skullking_match_results;
 DELETE FROM onecard_match_participants;
 DELETE FROM onecard_match_results;
 DELETE FROM user_game_stats;
+DELETE FROM user_monthly_stats;
 DELETE FROM user_avatars;
 DELETE FROM users WHERE is_bot = false;
 SELECT count(*) AS remaining_users, count(*) FILTER (WHERE is_bot) AS bots FROM users;

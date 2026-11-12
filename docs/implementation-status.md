@@ -264,10 +264,15 @@
 - 스컬킹 매치는 `skullking_match_results/participants` 에 남는다(`SkullKingMatchRecorder`).
 - **tier** 는 컬럼이 아니라 rating 구간에서 계산(BRONZE→…→MASTER, derived).
 - 엔드포인트: `GET /api/users/{id}/stats`(`games[]`), `GET /api/users/ranking?gameType=`
-  (게임별, 기본 TICHU), `GET /api/me`(승패 = 전 게임 합). 클라는 랭킹 게임 탭·프로필
+  (이번 달 — 기본 전체 `ALL`, 게임 id 면 그 게임), `GET /api/me`(승패 = 전 게임 합). 클라는 랭킹 게임 선택 상자·프로필
   게임별 전적·헤더 대표 티어(가장 많이 한 게임).
+- **이번 달 전적·랭킹**(D-199·D-209): `user_monthly_stats`(V19, `user_id+game_type+stat_month`, 전체 행 `game_type='*'`,
+  `recent` 최근 5결과)에 `UserGameStatsService.record`·`recordDraw` 가 누적 전적과 같은 트랜잭션에서 쌓는다. 달 경계는
+  Asia/Seoul 1일 0시(`StatsMonth`, 주입 `Clock`). 랭킹 순서는 이번 달 승수 → 승률 → 판수, 계급은 누적 레이팅 그대로.
+  메인 랭킹 카드는 전체·게임 선택 상자 + 등수·유저(계급 아이콘)·전적·승률·최근 5경기, 메인 목록 카드(랭킹·대기 중인 방)는
+  높이 고정 + 안쪽 스크롤(`features/lobby/hubScroll`). 지난 기록 채우기는 `ops/db/backfill-monthly-stats.sql`(수동).
 
-관련 테스트: `EloCalculatorTest`, `UserGameStatsServiceIT`, `V11UserGameStatsMigrationIT`,
+관련 테스트: `EloCalculatorTest`, `StatsMonthTest`(달 경계·같이 쌓기), `UserGameStatsServiceIT`(이번 달 누적·정렬·최근 5·봇/게스트 제외), `V11UserGameStatsMigrationIT`,
 `SkullKingMatchRecorderIT`, `UserStatsIntegrationTest`, 클라 `RankingCard`·`GameRecords`.
 
 ---

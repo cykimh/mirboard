@@ -3,10 +3,13 @@ package com.mirboard.domain.game.scoring;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
+import com.mirboard.domain.game.scoring.UserGameStatsService.MonthlyRankRow;
+import com.mirboard.domain.game.scoring.UserGameStatsService.Outcome;
 import com.mirboard.domain.lobby.auth.GuestPolicy;
 import com.mirboard.domain.lobby.auth.User;
 import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.SplittableRandom;
 import java.util.UUID;
@@ -23,7 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** D-115 — 게임별 전적 저장소의 읽기 기본값·누적·랭킹 계약. */
+/** D-115 — 게임별 전적 저장소의 읽기 기본값·누적 계약. D-199·D-209 — 이번 달 전적·랭킹(V19 는 이 컨텍스트 기동이 Flyway + validate 로 대조). */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -97,39 +100,163 @@ class UserGameStatsServiceIT {
         assertThat(stats.get(me, game).rating()).isEqualTo(1000);
     }
 
+    // ---------- D-199·D-209 — 이번 달 전적·랭킹 ----------
+
+    /** 다른 테스트(와 같은 DB 를 쓰는 전체 행)와 겹치지 않게 테스트마다 고유한 달을 쓴다. */
+    private static LocalDate freshMonth() {
+        return LocalDate.of(1900 + MONTH_SEQ.incrementAndGet(), 1, 1);
+    }
+
+    private static final java.util.concurrent.atomic.AtomicInteger MONTH_SEQ =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    private void play(long userId, String game, LocalDate month, String results) {
+        for (char c : results.toCharArray()) {
+            stats.recordMonthly(userId, game, month, c == 'W' ? Outcome.WIN : c == 'L' ? Outcome.LOSS : Outcome.DRAW,
+                    false);
+        }
+    }
+
     @Test
-    void ranking_is_per_game_ordered_by_rating_and_excludes_bots() {
+    void recording_a_result_also_adds_to_this_months_game_row_and_all_games_row() {
+        long me = newUser();
+        String gameA = freshGame();
+        String gameB = freshGame();
+
+        stats.record(me, gameA, true, 1016, false);
+        stats.record(me, gameB, false, null, true);
+        stats.recordDraw(me, gameA);
+
+        LocalDate month = stats.currentMonth();
+        MonthlyRankRow a = stats.monthlyRanking(gameA, month, 100).stream()
+                .filter(r -> r.userId() == me).findFirst().orElseThrow();
+        assertThat(a.winCount()).isEqualTo(1);
+        assertThat(a.loseCount()).isZero();
+        assertThat(a.recent()).isEqualTo("WD");   // 무승부는 승·패에 세지 않고 최근 결과에만
+        MonthlyRankRow all = stats.monthlyRanking(null, month, 100).stream()
+                .filter(r -> r.userId() == me).findFirst().orElseThrow();
+        assertThat(all.winCount()).isEqualTo(1);
+        assertThat(all.loseCount()).isEqualTo(1);
+        assertThat(all.desertCount()).isEqualTo(1);
+        assertThat(all.winRate()).isEqualTo(50);
+        assertThat(all.recent()).isEqualTo("WLD");   // 게임을 넘나들어 기록된 순서
+        // 누적 전적은 그대로 쌓인다.
+        assertThat(stats.get(me, gameA).winCount()).isEqualTo(1);
+    }
+
+    @Test
+    void a_new_month_starts_from_zero_and_keeps_the_cumulative_record() {
+        long me = newUser();
         String game = freshGame();
-        long low = newUser();
-        long high = newUser();
+        LocalDate october = freshMonth();
+        LocalDate november = october.plusMonths(1);
+        stats.record(me, game, true, 1100, false);   // 누적(계급 근거)
+        play(me, game, october, "WWL");
+        play(me, game, november, "L");
+
+        assertThat(stats.monthlyRanking(game, october, 10)).singleElement().satisfies(r -> {
+            assertThat(r.winCount()).isEqualTo(2);
+            assertThat(r.loseCount()).isEqualTo(1);
+            assertThat(r.recent()).isEqualTo("WWL");
+        });
+        assertThat(stats.monthlyRanking(game, november, 10)).singleElement().satisfies(r -> {
+            assertThat(r.winCount()).isZero();
+            assertThat(r.loseCount()).isEqualTo(1);
+            assertThat(r.recent()).isEqualTo("L");
+            // 계급·레이팅은 달과 상관없이 누적에서.
+            assertThat(r.rating()).isEqualTo(1100);
+            assertThat(r.tier()).isEqualTo(Tier.fromRating(1100).name());
+            assertThat(r.tierGameType()).isEqualTo(game);
+        });
+        assertThat(stats.monthlyRanking(game, november.plusMonths(1), 10)).isEmpty();
+    }
+
+    @Test
+    void recent_keeps_the_last_five_oldest_first() {
+        long me = newUser();
+        String game = freshGame();
+        LocalDate month = freshMonth();
+
+        play(me, game, month, "WWLLWLW");
+
+        assertThat(stats.monthlyRanking(game, month, 10).getFirst().recent()).isEqualTo("LLWLW");
+        assertThat(stats.monthlyRanking(null, month, 10).getFirst().recent()).isEqualTo("LLWLW");
+    }
+
+    @Test
+    void per_game_ranking_orders_by_wins_then_win_rate_then_games() {
+        String game = freshGame();
+        LocalDate month = freshMonth();
+        long threeWins = newUser();
+        long twoWinsClean = newUser();
+        long twoWinsOneLoss = newUser();
+        long noWinManyGames = newUser();
+        long noWinOneGame = newUser();
         long otherGameOnly = newUser();
-        long bot = users.findBots().getFirst().getId();
-        stats.record(low, game, false, 990, false);
-        stats.record(high, game, true, 1010, false);
-        stats.record(bot, game, true, 2000, false);
-        stats.record(otherGameOnly, freshGame(), true, 1500, false);
+        play(noWinOneGame, game, month, "L");
+        play(twoWinsOneLoss, game, month, "WLW");
+        play(threeWins, game, month, "WLLLWW");
+        play(noWinManyGames, game, month, "LLL");
+        play(twoWinsClean, game, month, "WW");
+        play(otherGameOnly, freshGame(), month, "WWWWW");
 
-        List<UserGameStatsService.RankRow> rows = stats.ranking(game, 10);
+        List<MonthlyRankRow> rows = stats.monthlyRanking(game, month, 10);
 
-        assertThat(rows).extracting(UserGameStatsService.RankRow::userId).containsExactly(high, low);
+        // 승수 → (같으면) 승률 → (승률도 같으면) 판수가 많은 쪽.
+        assertThat(rows).extracting(MonthlyRankRow::userId)
+                .containsExactly(threeWins, twoWinsClean, twoWinsOneLoss, noWinManyGames, noWinOneGame);
+        assertThat(rows).extracting(MonthlyRankRow::rank).containsExactly(1, 2, 3, 4, 5);
+        assertThat(rows).extracting(MonthlyRankRow::winRate).containsExactly(50, 100, 67, 0, 0);
         assertThat(rows.getFirst().username()).isNotBlank();
     }
 
     @Test
-    void ranking_excludes_guests() {
-        // D-117 — 일회용 게스트는 랭킹에 오르지 않는다(레이팅이 움직일 일도 없지만, 방어선 둘).
+    void all_games_ranking_sums_every_game_and_takes_the_tier_from_the_most_played_game() {
+        LocalDate month = freshMonth();
+        String gameA = freshGame();
+        String gameB = freshGame();
+        long spread = newUser();     // 두 게임에 3승
+        long focused = newUser();    // 한 게임에 2승
+        play(focused, gameA, month, "WW");
+        play(spread, gameA, month, "WL");
+        play(spread, gameB, month, "WW");
+        // 누적: spread 는 gameB 를 더 많이 했다(3판 > 1판).
+        stats.record(spread, gameA, true, 1050, false);
+        stats.record(spread, gameB, true, 1210, false);
+        stats.record(spread, gameB, true, 1220, false);
+        stats.record(spread, gameB, false, 1205, false);
+
+        List<MonthlyRankRow> rows = stats.monthlyRanking(null, month, 10);
+
+        assertThat(rows).extracting(MonthlyRankRow::userId).containsExactly(spread, focused);
+        assertThat(rows.getFirst().winCount()).isEqualTo(3);
+        assertThat(rows.getFirst().loseCount()).isEqualTo(1);
+        assertThat(rows.getFirst().tierGameType()).isEqualTo(gameB);
+        assertThat(rows.getFirst().rating()).isEqualTo(1205);
+        assertThat(rows.getFirst().tier()).isEqualTo(Tier.fromRating(1205).name());
+        // 누적 승·패가 없는 사람(이 테스트는 달만 직접 썼다)은 시작 계급.
+        assertThat(rows.get(1).tierGameType()).isNull();
+        assertThat(rows.get(1).tier()).isEqualTo(Tier.fromRating(1000).name());
+    }
+
+    @Test
+    void monthly_ranking_excludes_bots_and_guests() {
+        // D-117 — 일회용 게스트는 랭킹에 오르지 않는다. 봇은 기록기가 부르지 않지만 방어선 둘.
         String game = freshGame();
+        LocalDate month = freshMonth();
         long low = newUser();
         long high = newUser();
+        long bot = users.findBots().getFirst().getId();
         long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
                 GuestPolicy.NO_LOGIN_HASH, Clock.systemUTC())).getId();
-        stats.record(low, game, false, 990, false);
-        stats.record(high, game, true, 1010, false);
-        stats.record(guest, game, true, 1500, false);
+        play(low, game, month, "L");
+        play(high, game, month, "W");
+        play(bot, game, month, "WWWW");
+        play(guest, game, month, "WWW");
 
-        List<UserGameStatsService.RankRow> rows = stats.ranking(game, 10);
-
-        assertThat(rows).extracting(UserGameStatsService.RankRow::userId).containsExactly(high, low);
-        assertThat(rows).extracting(UserGameStatsService.RankRow::rank).containsExactly(1, 2);
+        assertThat(stats.monthlyRanking(game, month, 10)).extracting(MonthlyRankRow::userId)
+                .containsExactly(high, low);
+        assertThat(stats.monthlyRanking(null, month, 10)).extracting(MonthlyRankRow::userId)
+                .containsExactly(high, low);
     }
 }
