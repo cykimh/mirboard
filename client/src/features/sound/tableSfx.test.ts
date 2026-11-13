@@ -55,13 +55,23 @@ describe('tableSfx — 소리', () => {
     const sfx = await fresh();
     expect(sfx.playTableSfx(cue)).toBe(true);
     expect(audioLog.voices).toBeGreaterThan(0);
-    // 길어야 1초 남짓, 크기는 작게(강하게 두기 "쿵" 0.55 의 절반 아래).
+    // 길어야 1초 남짓, 크기는 강하게 두기 "쿵"(0.55)보다 뚜렷이 아래(D-271 — 조금 키웠다. 겹침은 출구 압축기가 누른다).
     for (const t of audioLog.tones) {
       expect(t.stop - 10).toBeLessThan(1.1);
       expect(t.peak).toBeGreaterThan(0);
-      expect(t.peak).toBeLessThan(0.25);
+      expect(t.peak).toBeLessThan(0.3);
     }
     expect(audioLog.contexts).toBe(1);
+  });
+
+  it('D-271 — 둥근 소리만 쓴다: 흰 잡음·거친 파형(sawtooth·square)이 없다', async () => {
+    const sfx = await fresh();
+    for (const cue of ALL_CUES) {
+      sfx.resetTableSfx();
+      sfx.playTableSfx(cue, { count: 3, level: 3 });
+    }
+    expect(audioLog.noises).toHaveLength(0);
+    expect(new Set(audioLog.tones.map((t) => t.type))).toEqual(new Set(['sine', 'triangle']));
   });
 
   it('여러 장 먹기는 장수만큼 반복하되 4번까지만', async () => {
@@ -70,7 +80,7 @@ describe('tableSfx — 소리', () => {
       audioLog.reset();
       sfx.resetTableSfx();
       sfx.playTableSfx('card.draw', { count: n });
-      return audioLog.noises.length;
+      return audioLog.tones.length;
     };
     expect([count(1), count(2), count(3), count(7)]).toEqual([1, 2, 3, sfx.DRAW_REPEAT_MAX]);
   });
@@ -83,7 +93,7 @@ describe('tableSfx — 소리', () => {
       sfx.playTableSfx('card.attack', { level });
       return audioLog.tones.length;
     };
-    expect([measure(1), measure(2), measure(3)]).toEqual([1, 2, 3]);
+    expect([measure(1), measure(2), measure(3)]).toEqual([2, 3, 4]);
     const attackPeak = Math.max(...audioLog.tones.map((t) => t.peak));
     audioLog.reset();
     sfx.resetTableSfx();
@@ -102,15 +112,27 @@ describe('tableSfx — 소리', () => {
     expect(Math.min(...audioLog.tones.map((t) => t.start))).toBeCloseTo(10.5, 5);
   });
 
-  it('돌 소리는 잡음이 섞인 "딱", 거절은 잡음 없는 낮은 "툭"', async () => {
+  it('돌 소리는 둥근 "똑"(가운데 음역), 거절은 낮고 순한 "봉-봉"(두 번)', async () => {
     const sfx = await fresh();
     sfx.playTableSfx('move.rejected');
-    expect(audioLog.tones).toHaveLength(1);
-    expect(audioLog.tones[0].freq).toBeLessThan(200);
-    expect(audioLog.noises).toHaveLength(0);
+    expect(audioLog.tones).toHaveLength(2);
+    expect(audioLog.tones.every((t) => t.freq < 200)).toBe(true);
     audioLog.reset();
     sfx.playTableSfx('stone.place');
-    expect(audioLog.noises).toHaveLength(1);
+    expect(Math.min(...audioLog.tones.map((t) => t.freq))).toBeGreaterThan(400);
+  });
+
+  it('버튼 "뽁"은 아래에서 위로 튀고, 주사위 고정은 내려앉고 풀기는 올라간다', async () => {
+    const sfx = await fresh();
+    const first = (cue: TableCue) => {
+      audioLog.reset();
+      sfx.resetTableSfx();
+      sfx.playTableSfx(cue);
+      return audioLog.tones[0].freq;
+    };
+    // 기록되는 값은 시작 주파수 — 뽁은 목표음(780)보다 낮게 시작한다.
+    expect(first('ui.tap')).toBeLessThan(780);
+    expect(first('die.hold')).toBeGreaterThan(first('die.release'));
   });
 });
 
