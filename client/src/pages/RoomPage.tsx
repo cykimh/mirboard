@@ -124,13 +124,11 @@ export function RoomPage() {
   const [gameMeta, setGameMeta] = useState<GameSummary | null>(null);
   const [settingsPending, setSettingsPending] = useState(false);
   const [readyPending, setReadyPending] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(false);
   // D-174 — [빈자리 봇으로 채우기]·[봇 빼기] 요청 중.
   const [botsPending, setBotsPending] = useState(false);
   // D-137 — 관전자 [자리에 앉기].
   const [sitPending, setSitPending] = useState(false);
-  const [sitError, setSitError] = useState<string | null>(null);
 
   // D-106 — 방의 gameType 을 알게 되면 그 게임의 옵션 집합을 받아 온다. 캐시되므로
   // 같은 게임의 방을 여러 번 드나들어도 요청은 한 번이다.
@@ -389,22 +387,22 @@ export function RoomPage() {
     }
   }
 
-  // D-136·D-143 — 서버 거절은 원문 대신 할 일을 알린다(확인과 누름 사이의 경합 — 누가 나갔다).
+  // D-136·D-143 — 서버 거절은 원문 대신 할 일을 알린다(확인과 누름 사이의 경합 — 누가 나갔다). D-269 — 안내는 토스트로.
   async function handleStartNow() {
     if (!token || startPending) return;
-    setStartError(null);
     setStartPending(true);
     try {
       const started = await roomsApi.startNow(token, roomId);
       setRoom(started);
     } catch (err) {
       if (!(err instanceof ApiError)) {
-        setStartError('시작하지 못했어요 — 다시 눌러 주세요'); // 네트워크 등
+        showToast('시작하지 못했어요 — 다시 눌러 주세요', 'error'); // 네트워크 등
         return;
       }
       if (err.code === 'GAME_ALREADY_STARTED') return; // 이미 시작 — 메타가 게임판으로 옮긴다.
-      setStartError(
+      showToast(
         err.code === 'NOT_ENOUGH_PLAYERS' ? `${minPlayers ?? 2}명 이상 모여야 해요` : '시작하지 못했어요 — 다시 눌러 주세요',
+        'error',
       );
     } finally {
       setStartPending(false);
@@ -457,29 +455,22 @@ export function RoomPage() {
   // D-137 — 대기실 관전자가 빈자리에 앉는다. 서버가 같은 원자 구간에서 관전자 목록에서 뺀다(room_join.lua).
   async function handleSit() {
     if (!token || sitPending) return;
-    setSitError(null);
     setSitPending(true);
     try {
       const seated = await roomsApi.join(token, roomId);
       setRoom(seated);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
-      setSitError(
+      showToast(
         err instanceof ApiError && err.code === 'ROOM_FULL'
           ? '자리가 방금 찼어요 — 관전을 이어 가요'
           : '앉지 못했어요 — 다시 눌러 주세요',
+        'error',
       );
     } finally {
       setSitPending(false);
     }
   }
-
-  // D-136 최종 리뷰 FR-4 — 거절 안내는 그때의 사정이다. 사람이 바뀌면 지운다(다시 누를지 버튼 조건이 알려 준다).
-  const startSituation = room ? room.playerIds.join(',') : '';
-  useEffect(() => {
-    setStartError(null);
-    setSitError(null);
-  }, [startSituation]);
 
   async function handleTeamPolicyChange(next: TeamPolicy) {
     if (!token) return;
@@ -786,11 +777,6 @@ export function RoomPage() {
             </AlertDescription>
           </Alert>
         )}
-        {sitError && (
-          <p role="alert" className="text-sm text-destructive">
-            {sitError}
-          </p>
-        )}
 
         {room.status === 'WAITING' && (
           <Card>
@@ -924,11 +910,6 @@ export function RoomPage() {
                     </Button>
                   )}
                 </div>
-              )}
-              {startError && (
-                <p role="alert" className="text-sm text-destructive">
-                  {startError}
-                </p>
               )}
             </CardContent>
           </Card>

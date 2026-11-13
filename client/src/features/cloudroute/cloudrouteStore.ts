@@ -26,6 +26,7 @@ import type {
   WhirlpoolLeft,
   DiceRolled,
 } from '@/types/cloudroute';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** "방금 일어난 일" 한 줄의 원본 — 글자는 게임판이 이름을 붙여 만든다(`describe`). */
 export interface LogEntry {
@@ -63,6 +64,9 @@ export interface CloudRouteRoomState {
   log: LogEntry[];
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   turnClock: TurnClock | null;
   /** 턴 시계를 다시 셀 때마다 오른다 — 멈춘 차례 복구(D-140 방식)가 같은 차례인지 본다. */
   turnEpoch: number;
@@ -76,7 +80,7 @@ export interface CloudRouteActions {
   reset: (roomId: string) => void;
   applySnapshot: (snapshot: ResyncEnvelope<CloudRouteTableView, unknown>) => void;
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   /** 멈춘 차례 — 이 차례에서 처음이면 resync 신호를 올린다. */
   requestTurnResync: (epoch: number) => void;
 }
@@ -99,6 +103,8 @@ const INITIAL: Omit<CloudRouteRoomState, 'disconnectedSeats'> = {
   lastLetter: null,
   log: [],
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   turnClock: null,
   turnEpoch: 0,
   resyncNonce: 0,
@@ -318,8 +324,8 @@ export const useCloudRouteStore = create<CloudRouteRoomState & CloudRouteActions
       }
     },
 
-    setError(message) {
-      set({ errorMessage: message });
+    setError(message, sticky) {
+      set((s) => errorNoticePatch(s, message, sticky));
     },
 
     requestTurnResync(epoch) {

@@ -13,6 +13,7 @@ import { useSfx } from '@/features/sound/useSfx';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { ErrorNotice } from '@/components/notice/FloatingNotice';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useGameTableModel } from './useGameTableModel';
@@ -268,11 +269,7 @@ export function GameTable({
         />
       )}
 
-      {m.errorMessage && (
-        <p className="error" onClick={() => m.setError(null)}>
-          {m.errorMessage}
-        </p>
-      )}
+      <ErrorNotice message={m.errorMessage} seq={m.errorSeq} sticky={m.errorSticky} onClose={() => m.setError(null)} />
 
       {live && m.lastReceived && m.lastReceived.length > 0 && (
         <PassReceivedModal

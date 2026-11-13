@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { ErrorNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -329,9 +330,7 @@ export function ArtilleryTable({
         </div>
       </header>
 
-      <div className="ar-reconnect">
-        <ReconnectBanner connected={connected} />
-      </div>
+      <ReconnectBanner connected={connected} />
 
       <ol className="ar-seats" aria-label="좌석">
         {s.units.map((u) => {
@@ -446,14 +445,7 @@ export function ArtilleryTable({
                 </span>
               )}
             </div>
-            {s.errorMessage && (
-              <p className="ar-error" role="alert">
-                <span>{s.errorMessage}</span>
-                <button type="button" className="ar-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-                  ×
-                </button>
-              </p>
-            )}
+            <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={s.dismissError} />
             {myTurn && (
               <ArtilleryLoadout
                 shell={shell}

@@ -657,14 +657,6 @@ button.sk-card {
   font-weight: 700;
 }
 
-.sk-error {
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(232, 93, 117, 0.18);
-  border: 1px solid rgba(232, 93, 117, 0.5);
-  font-size: 13px;
-}
-
 /* D-120 ─ 라운드 결과 · 점수표 · 종료 후 게임판 ─────────────────────── */
 
 /* 적중/실패 색과 고정 열 배경은 **컨테이너가 변수로 주입**한다. 같은 표가 게임판과 portal

@@ -1,4 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { noticeButtonGuards } from '@/components/notice/FloatingNotice';
+import { noticeLayer } from '@/components/notice/noticeLayer';
 import type { JoinOrReconnectResponse } from '@/api/rooms';
 import type { Room } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -66,8 +69,7 @@ interface SpectateNoticeProps {
 }
 
 /**
- * D-133 결정 A — "…관전으로 들어왔어요" 안내. 방 화면 맨 위에 떠 있다(게임판 채팅 100 위, 원카드 경쟁 레이어 150·패스 받은 카드 200
- * 아래). 게임판은 `.app-shell` 밖이라 카드 자체에 `app-shell` 을 붙여 색·테두리 토큰을 쓴다(바깥 줄에 붙이면 전체 폭이 칠해진다).
+ * D-133 결정 A — "…관전으로 들어왔어요" 안내. 방 화면 맨 위에 떠 있다(D-269 — 공용 안내 층 `noticeLayer`). 게임판은 `.app-shell` 밖이라 카드 자체에 `app-shell` 을 붙여 색·테두리 토큰을 쓴다(바깥 줄에 붙이면 전체 폭이 칠해진다).
  * 바깥 줄은 클릭을 통과시킨다. 8초 뒤 저절로 내린다.
  *
  * <p>FR-5 — 카드는 상태 영역(`role="status"`)이 아니다. 안내와 함께 삽입되는 영역은 일부 스크린 리더가 읽지 않으므로, 읽어 주는 것은
@@ -83,14 +85,21 @@ export function SpectateNotice({ kind, onClose }: SpectateNoticeProps) {
     return () => clearTimeout(timer);
   }, [kind]);
 
-  return (
-    <div className="pointer-events-none fixed inset-x-0 top-3 z-[120] flex justify-center px-4">
-      <div className="app-shell pointer-events-auto flex max-w-md items-center gap-3 rounded-lg border bg-background px-4 py-2 text-sm shadow-lg">
-        <span aria-hidden="true">{MESSAGES[kind]}</span>
-        <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-          닫기
-        </Button>
-      </div>
-    </div>
+  // D-269 — 재연결·오류 안내·토스트와 같은 층에 쌓는다(따로 고정하면 서로 겹친다). 카드 본문은 눌림을 통과시키고 [닫기]만 눌린다.
+  return createPortal(
+    <div className="app-shell pointer-events-none mb-2 flex max-w-md items-center gap-3 rounded-lg border bg-background px-4 py-2 text-sm shadow-lg">
+      <span aria-hidden="true">{MESSAGES[kind]}</span>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="pointer-events-auto"
+        {...noticeButtonGuards}
+        onClick={onClose}
+      >
+        닫기
+      </Button>
+    </div>,
+    noticeLayer(),
   );
 }

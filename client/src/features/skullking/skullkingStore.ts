@@ -22,6 +22,7 @@ import type {
   TrickTakenPayload,
   TurnChangedPayload,
 } from '@/types/skullking';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** 방금 정산된 트릭 — 승자 왕관을 잠시 유지하기 위한 스냅샷. */
 export interface SettledTrick {
@@ -67,6 +68,9 @@ export interface SkullKingRoomState {
   // ── 메타 ──
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   matchEnded: MatchEndedPayload | null;
   turnStartedAt: number;
 }
@@ -82,7 +86,7 @@ export interface SkullKingActions {
     seq?: number;
     payload: unknown;
   }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   selectCard: (index: number | null) => void;
   setTigressDeclaration: (mode: TigressMode | null) => void;
 }
@@ -108,6 +112,8 @@ const INITIAL: SkullKingRoomState = {
   tigressDeclaration: null,
   disconnectedSeats: new Set(),
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   matchEnded: null,
   turnStartedAt: 0,
 };
@@ -432,8 +438,8 @@ export const useSkullKingStore = create<SkullKingRoomState & SkullKingActions>(
       }
     },
 
-    setError(message) {
-      set({ errorMessage: message });
+    setError(message, sticky) {
+      set((s) => errorNoticePatch(s, message, sticky));
     },
 
     selectCard(index) {

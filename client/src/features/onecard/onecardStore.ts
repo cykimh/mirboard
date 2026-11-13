@@ -20,6 +20,7 @@ import {
   type RaceResolvedPayload,
   type TurnChangedPayload,
 } from '@/types/onecard';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** 경쟁 창 — 서버 값에 이 클라 시계 기준 마감 시각을 더한다(진행 막대·BUSY 재시도 판단). */
 export interface OneCardClientRace {
@@ -147,6 +148,9 @@ export interface OneCardRoomState {
   // ── 메타 ──
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   /**
    * D-131 — 턴 카운트다운 기준. null 이면 세지 않는다 — 경쟁 창이 열렸거나(다음 차례는 창이 닫힌 뒤 시작된다) 카드가 막 놓였거나
    * (다음 차례 미정) 매치가 끝났거나 서버가 남은 시간을 주지 않았다(턴 제한 끔·데드라인 없음).
@@ -159,7 +163,7 @@ export interface OneCardActions {
   applySnapshot: (snapshot: ResyncEnvelope<OneCardTableView, OneCardPrivateView>) => void;
   applyPrivateHand: (payload: HandPayload) => void;
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   selectCard: (key: string | null) => void;
   setSuitChoice: (suit: OneCardSuit | null) => void;
   startPress: (raceId: number, action: PressAction) => void;
@@ -219,6 +223,8 @@ const INITIAL: OneCardRoomState = {
   staleTurnResyncFor: null,
   disconnectedSeats: new Set(),
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   turnClock: null,
 };
 
@@ -490,8 +496,8 @@ export const useOneCardStore = create<OneCardRoomState & OneCardActions>((set, g
     }
   },
 
-  setError(message) {
-    set({ errorMessage: message });
+  setError(message, sticky) {
+    set((s) => errorNoticePatch(s, message, sticky));
   },
 
   selectCard(key) {
