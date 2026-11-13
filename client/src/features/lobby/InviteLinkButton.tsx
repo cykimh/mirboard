@@ -85,6 +85,7 @@ export function InviteLinkButton({ roomId, roomName, gameName, full = false, env
       <Button
         type="button"
         variant="outline"
+        className="h-10 px-3"
         onClick={handleClick}
         disabled={busy}
         title={full ? '자리가 다 찼어요 — 링크를 받은 친구는 관전으로 들어와요' : '링크를 보내면 친구가 바로 이 방에 들어와요'}

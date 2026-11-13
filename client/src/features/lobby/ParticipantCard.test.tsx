@@ -48,3 +48,21 @@ describe('ParticipantCard — 계급은 이름 왼쪽 (D-174)', () => {
     expect(screen.queryByText('0승 0패')).toBeNull();
   });
 });
+
+/** D-272 — 방장 표시는 이름 아래 배지가 아니라 방장 카드 맨 위 띠다. */
+describe('ParticipantCard — 방장 띠 (D-272)', () => {
+  it('방장 카드는 맨 위(첫 자식)에 "방장" 띠가 있고 이름은 그 아래다', () => {
+    const row = renderCard({ host: true });
+    const card = screen.getByRole('listitem', { name: '철수' });
+    const strip = screen.getByTestId('host-strip');
+    expect(card.firstElementChild).toBe(strip);
+    expect(strip).toHaveTextContent('방장');
+    expect(strip.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('방장이 아니면 띠가 없다', () => {
+    renderCard({ ready: true });
+    expect(screen.queryByTestId('host-strip')).toBeNull();
+    expect(screen.getByText('준비')).toBeInTheDocument();
+  });
+});
