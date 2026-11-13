@@ -27,6 +27,11 @@ export type TableCue =
   // 돌
   | 'stone.place'
   | 'move.rejected'
+  // 주사위·점수표·버튼(D-268 얏추) — 누른 사람 손끝의 짧은 딸깍.
+  | 'die.hold'
+  | 'die.release'
+  | 'score.commit'
+  | 'ui.tap'
   // 좌석·판
   | 'seat.out'
   | 'match.win'
@@ -196,6 +201,27 @@ const RECIPES: Record<TableCue, Recipe> = {
   'move.rejected': (ctx, t, g) => {
     tone(ctx, { f: 150, to: 95, at: t, dur: 0.11, peak: 0.16 * g });
     return 0.11;
+  },
+  // 주사위 고정 — 나무 판에 톡 내려앉는다(낮게 떨어지는 짧은 음 + 아주 짧은 잡음).
+  'die.hold': (ctx, t, g) => {
+    noise(ctx, { at: t, dur: 0.025, peak: 0.07 * g, filter: 'lowpass', f: 1800 });
+    tone(ctx, { f: 520, to: 300, at: t, dur: 0.045, peak: 0.09 * g });
+    return 0.05;
+  },
+  // 고정 풀기 — 같은 딸깍이 위로 가볍게 튄다.
+  'die.release': (ctx, t, g) => {
+    tone(ctx, { f: 360, to: 560, at: t, dur: 0.04, peak: 0.07 * g });
+    return 0.04;
+  },
+  // 점수 칸에 적기 — 펜이 긋고(짧은 스침) 맑은 두 음이 또각.
+  'score.commit': (ctx, t, g) => {
+    noise(ctx, { at: t, dur: 0.04, peak: 0.06 * g, filter: 'bandpass', f: 3200, to: 2000 });
+    return 0.03 + notes(ctx, t + 0.03, [659.25, 880], 0.06, 0.06, 0.07 * g, 'triangle', 0.1);
+  },
+  // 그 밖의 버튼 — 아주 작은 딸깍 하나.
+  'ui.tap': (ctx, t, g) => {
+    tone(ctx, { f: 680, to: 500, at: t, dur: 0.03, peak: 0.05 * g, type: 'triangle' });
+    return 0.03;
   },
   'seat.out': (ctx, t, g) => notes(ctx, t, [440, 349.23, 261.63], 0.1, 0.11, 0.08 * g, 'sine', 0.2),
   'match.win': (ctx, t, g) => notes(ctx, t, [523.25, 659.25, 783.99, 1046.5], 0.09, 0.12, 0.1 * g, 'triangle', 0.4),

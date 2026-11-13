@@ -35,6 +35,8 @@ import org.springframework.context.ApplicationEventPublisher;
  * {@link #onTimer} 가 자동 기록한다. 인프라 턴 데드라인(마지막 액션 + 같은 시간)은 항상 더 늦어 {@link #timeoutAction} 은
  * 폴백으로만 남는다.
  *
+ * <p>D-268: 컵 흔들기는 포트 ⑧ {@link #preview} 로만 — 상태를 바꾸지 않는다(씨앗포 조준 미리보기에 이은 두 번째 구현).
+ *
  * <p>비공개 뷰가 없다({@link #privateView} = empty). 숨길 정보가 없다(`docs/rules-yacht.md` §9.2).
  */
 public final class YachtGameEngine implements GameEngine {
@@ -90,6 +92,17 @@ public final class YachtGameEngine implements GameEngine {
     public Result apply(GameState state, int seat, GameAction action) {
         YachtEngine.Result result = rules.apply(yState(state), seat, yAction(action), roller, clock.millis());
         return new Result(result.newState(), List.<GameEvent>copyOf(result.events()));
+    }
+
+    // ---------- 컵 흔들기 미리보기 (D-268) ----------
+
+    /** 포트 ⑧ — 흔들기 입력만. 굴릴 수 있는 좌석인지는 순수 엔진이 본다. 그 밖의 입력(굴리기·고정·기록)은 없음. */
+    @Override
+    public Optional<GameEvent> preview(GameState state, int seat, GameAction input) {
+        if (!(state instanceof YachtState s) || !(input instanceof YachtAction.Shake shake)) {
+            return Optional.empty();
+        }
+        return rules.preview(s, seat, shake).map(GameEvent.class::cast);
     }
 
     // ---------- 단계 / 진행 질의 ----------

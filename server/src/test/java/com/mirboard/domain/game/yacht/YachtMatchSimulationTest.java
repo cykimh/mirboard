@@ -192,6 +192,9 @@ class YachtMatchSimulationTest {
                     candidates = Map.of();
                 }
                 case YachtEvent.RoundStarted r -> round = r.round(); // 이 재생기는 차례대로 판만 본다(D-202 동시 진행은 따로)
+                case YachtEvent.DiceShaking __ -> {
+                    // D-268 — 미리보기(상태 아님). 액션 경로의 이벤트에는 나오지 않는다.
+                }
                 case YachtEvent.DiceHeld h -> held = h.held();
                 case YachtEvent.DiceRolled r -> {
                     dice = r.dice();

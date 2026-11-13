@@ -1,7 +1,7 @@
 import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
@@ -15,11 +15,12 @@ import { useLiveReactions } from '@/features/chat/reactionStore';
 import { useSeatChatLines } from '@/features/chat/useSeatChatLines';
 import { useSfx } from '@/features/sound/useSfx';
 import { playVoice, type VoiceKey } from '@/features/sound/voiceClips';
+import { playTableSfx } from '@/features/sound/tableSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { MAX_ROLLS, NO_HOLD, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
-import { useYachtStore } from './yachtStore';
-import { DiceTray, ROLL_ANIMATION_MS } from './DiceTray';
+import { SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
+import { DiceCup, DiceTray, ROLL_ANIMATION_MS } from './DiceTray';
 import { YachtScorecard } from './YachtScorecard';
 import { YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
@@ -78,6 +79,8 @@ export const WATCH_RETURN_BEFORE_MS = 10_000;
 export const CHIP_FLIGHT_MS = 480;
 /** 숫자 뒤를 따르는 잔상 수. */
 const CHIP_GHOSTS = 3;
+/** D-268 — 남의 기록에 울리는 점수 딸깍의 크기(내 것 대비). 남의 요트는 작은 두 음(D-207)이 대신한다. */
+export const OTHER_SCORE_SFX_GAIN = 0.4;
 /** D-204 — 샴페인 기포·금 띠 조각 수(요트 축하, CSS transform 만). */
 const BUBBLES = 16;
 const STREAMERS = 8;
@@ -195,8 +198,17 @@ export function YachtTable({
   tiers = {},
 }: Props) {
   const token = useAuthStore((st) => st.token);
-  const { connected, sendAction, sendChat, sendReaction, sendVoice, subscribeVoice, chatPanelOpenRef, requestResync } =
-    useStompRoom(roomId, token, yachtRoomSink);
+  const {
+    connected,
+    sendAction,
+    sendPreview,
+    sendChat,
+    sendReaction,
+    sendVoice,
+    subscribeVoice,
+    chatPanelOpenRef,
+    requestResync,
+  } = useStompRoom(roomId, token, yachtRoomSink);
   const [chatOpen, setChatOpen] = useState(false);
   const { muted, toggleMute, playChime, playYacht, playMade, playRoll, startShake } = useSfx();
   const liveReactions = useLiveReactions();
@@ -233,7 +245,7 @@ export function YachtTable({
   const previousBest = useYachtBest(token, myUserId, !spectator && !guest);
 
   // D-264 — 휴대폰 흔들어 굴리기는 ⋮ 메뉴에서 켠다(터치 기기 + DeviceMotion 이 있고 내가 앉아 있을 때만 항목이 있다). iOS 는 그 항목을
-  // 누른 자리에서 권한을 묻는다 — 거절·미지원이면 안내만 하고 [흔들기]·[굴리기]는 그대로다.
+  // 누른 자리에서 권한을 묻는다 — 거절·미지원이면 안내만 하고 [굴리기](톡·꾹 누르기)는 그대로다.
   const [motionShake, setMotionShake] = useState(loadMotionPreference);
   const motionOffered = !spectator && mySeat >= 0 && motionShakeSupported();
   const toggleMotionShake = () => {
@@ -244,7 +256,7 @@ export function YachtTable({
     }
     void requestMotionPermission().then((ok) => {
       if (!ok) {
-        showToast('이 기기에서는 휴대폰 흔들기를 쓸 수 없어요 · [흔들기]를 꾹 눌러 주세요');
+        showToast('이 기기에서는 휴대폰 흔들기를 쓸 수 없어요 · [굴리기]를 꾹 눌러 흔들어 주세요');
         return;
       }
       setMotionShake(true);
@@ -299,6 +311,45 @@ export function YachtTable({
     watchRoll.current.seat = -1;
   }
   const selectSeat = (seat: number) => setWatchSeat(seat === mySeat || seat === watching ? null : seat);
+
+  // D-268 — 내가 컵을 흔드는 동안 남들도 본다(포트 ⑧ 미리보기 — 상태가 아니라 표시일 뿐). 시작·멈춤을 알리고, 흔드는 동안에는
+  // `SHAKE_KEEPALIVE_MS` 마다 다시 알린다(받는 쪽은 `SHAKE_STALE_MS` 동안 소식이 없으면 스스로 걷는다 — 멈춤 프레임을 놓쳐도 된다).
+  const shakeBeat = useRef(0);
+  const sendShake = useCallback(
+    (shaking: boolean) => {
+      window.clearInterval(shakeBeat.current);
+      shakeBeat.current = 0;
+      sendPreview({ '@action': 'SHAKE', shaking });
+      if (shaking) {
+        shakeBeat.current = window.setInterval(() => sendPreview({ '@action': 'SHAKE', shaking: true }), SHAKE_KEEPALIVE_MS);
+      }
+    },
+    [sendPreview],
+  );
+  useEffect(() => () => window.clearInterval(shakeBeat.current), []);
+  // 남의 흔들기 — 소식이 끊긴 것은 걷는다(가장 오래된 것의 만기에 한 번, 남은 것이 있으면 다시 건다).
+  const shakingSeats = s.shaking;
+  const expireShaking = s.expireShaking;
+  useEffect(() => {
+    const times = Object.values(shakingSeats);
+    if (times.length === 0) return;
+    const timer = window.setTimeout(
+      () => expireShaking(Date.now() - SHAKE_STALE_MS + 1),
+      Math.max(0, Math.min(...times) + SHAKE_STALE_MS - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [shakingSeats, expireShaking]);
+  // 가운데 판이 남의 주사위를 비출 때(차례대로의 남의 차례·남의 판 구경) 그 사람이 흔들면 가운데 컵도 흔들린다.
+  const trayOwner = watching !== null ? watching : !simultaneous && turnSeat !== mySeat ? turnSeat : -1;
+  const trayRemoteShake = trayOwner >= 0 && shakingSeats[trayOwner] !== undefined;
+
+  // D-268 — 버튼 딸깍. 게임판 안의 버튼·메뉴 항목을 누르면 아주 작은 소리 하나(내가 누른 것만 — 화면의 클릭이니 늘 내 것이다).
+  // 제 소리가 따로 있는 것(`data-yt-quiet` — 주사위 고정·점수 칸·굴리기)은 건너뛴다. 음소거·간격·동시 재생은 `tableSfx` 가 맡는다.
+  const tapSound = (e: MouseEvent) => {
+    const el = (e.target as Element | null)?.closest?.('button, [role^="menuitem"]');
+    if (!el || el.hasAttribute('data-yt-quiet') || (el as HTMLButtonElement).disabled) return;
+    playTableSfx('ui.tap');
+  };
 
   // 기록 강조는 잠깐만. D-203 — 황동 칩이 주사위 자리(동시 진행의 남은 그 좌석 띠)에서 방금 적힌 칸으로 날아가 꽂힌다.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -427,6 +478,11 @@ export function YachtTable({
       window.clearTimeout(madeTimer.current);
       setMade(null);
     }
+    // D-268 — 점수 딸깍. 내가 고른 기록은 누르는 순간에 이미 울렸다(`score`) — 여기서는 시간 초과로 대신 적힌 내 기록과
+    // 남의 기록(작게)만. 남의 요트는 아래 두 음이 대신한다.
+    if (last.seat === mySeat ? last.auto : last.category !== 'YACHT' || last.points <= 0) {
+      playTableSfx('score.commit', last.seat === mySeat ? {} : { gain: OTHER_SCORE_SFX_GAIN });
+    }
     if (last.seat !== mySeat) {
       if (last.category !== 'YACHT' || last.points <= 0) return;
       // D-207 — 남의 요트는 작은 두 음만(명패 꼬리표와 같이). 연출 설정과 무관하게 음소거만 따른다.
@@ -528,6 +584,8 @@ export function YachtTable({
     const current = useYachtStore.getState().held;
     const next = current.map((h, i) => (i === index ? !h : h)) as Held;
     s.setHeldLocal(next);
+    // D-268 — 고정·풀기 딸깍(내가 누른 것만 — 남의 고정은 소리가 없다).
+    playTableSfx(next[index] ? 'die.hold' : 'die.release');
     cancelHoldSend();
     holdTimer.current = window.setTimeout(() => {
       holdTimer.current = null;
@@ -566,6 +624,8 @@ export function YachtTable({
     cancelHoldSend();
     const points = s.candidates[category];
     if (points === 0 && !window.confirm(`${CATEGORY_LABEL[category]} 칸에 0점으로 버릴까요?`)) return;
+    // D-268 — 칸에 적는 딸깍(누른 순간). 요트·족보 축하음은 서버의 기록이 온 뒤에 따로 울린다.
+    playTableSfx('score.commit');
     sendTracked({ '@action': 'SCORE', category });
   };
 
@@ -702,7 +762,7 @@ export function YachtTable({
   );
 
   return (
-    <div className={`yt-table${yachtThemeClass}`} ref={rootRef}>
+    <div className={`yt-table${yachtThemeClass}`} ref={rootRef} onClickCapture={tapSound}>
       <header className="yt-header gm-header">
         <div className="yt-header-badges gm-header-info">
           <GameIcon gameId="YACHT" size={22} />
@@ -769,6 +829,8 @@ export function YachtTable({
           const yachtParty = seatParty?.seat === seat.seat ? seatParty : null;
           // 내 주사위는 가운데 판에 있다 — 남의 판을 구경하는 동안에만 내 명패에 작게 보인다.
           const showDice = seatTurn?.pending && (!isMe || watching !== null);
+          // D-268 — 그 사람이 지금 컵을 흔드는 중(내 흔들기는 가운데 판에 있다).
+          const seatShaking = !isMe && shakingSeats[seat.seat] !== undefined;
           const body = (
             <>
               <span className="yt-seat-head">
@@ -789,7 +851,7 @@ export function YachtTable({
                   누르려던 [굴리기]가 빗나간다. 기록한 좌석은 같은 자리에 "기록함 ✓". */}
               {simultaneous &&
                 (showDice && seatTurn ? (
-                  <SeatDice turn={seatTurn} animate={animate} />
+                  <SeatDice turn={seatTurn} animate={animate} shaking={seatShaking} />
                 ) : done ? (
                   <span className="yt-seat-dice yt-seat-dice-done">
                     <span className="yt-seat-tag">기록함 ✓</span>
@@ -802,7 +864,7 @@ export function YachtTable({
           return (
             <li
               key={seat.seat}
-              className={`yt-seat${isMe ? ' yt-seat-me' : ''}${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}${done ? ' yt-seat-done' : ''}${isWatched ? ' yt-seat-watch' : ''}${yachtParty && animate ? ' yt-seat-party' : ''}`}
+              className={`yt-seat${isMe ? ' yt-seat-me' : ''}${isTurn ? ' yt-seat-turn' : ''}${seat.deserted ? ' yt-seat-out' : ''}${done ? ' yt-seat-done' : ''}${isWatched ? ' yt-seat-watch' : ''}${yachtParty && animate ? ' yt-seat-party' : ''}${seatShaking ? ' yt-seat-shaking' : ''}`}
               style={{ ['--yt-accent' as string]: seatAccent(seat.seat) }}
               data-yt-seat={seat.seat}
             >
@@ -821,6 +883,16 @@ export function YachtTable({
               )}
               {/* 겹침 층 — 줄을 차지하지 않는다(D-205). */}
               {isTurn && <span className="yt-seat-tag yt-seat-tag-turn">차례</span>}
+              {/* D-268 — 흔드는 컵(명패 모서리에 걸친다 — 줄을 차지하지 않는다). */}
+              {seatShaking && (
+                <span
+                  className={`yt-seat-cup${animate ? ' yt-seat-cup-live' : ''}`}
+                  role="img"
+                  aria-label="컵 흔드는 중"
+                >
+                  <DiceCup />
+                </span>
+              )}
               {yachtParty && (
                 <span key={yachtParty.nonce} className="yt-seat-tag yt-seat-yacht">
                   요트! {yachtParty.points}점
@@ -902,6 +974,9 @@ export function YachtTable({
           // 구경)은 작게. 모두 같이 굴릴 때 좌석 띠에서만 구르는 남의 굴림은 소리가 없다. 연출 설정과 무관하게 음소거만 따른다.
           onRollSound={() => playRoll(mySeat >= 0 && watching === null && (simultaneous || turnSeat === mySeat))}
           onShakeSound={startShake}
+          // D-268 — 내 흔들기를 남들에게 알리고, 가운데 판이 남의 것이면 그 사람의 흔들기를 비춘다(소리는 내 것만).
+          onShakeChange={sendShake}
+          remoteShake={trayRemoteShake}
           motionShake={motionOffered && motionShake}
           turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
           note={

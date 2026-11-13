@@ -64,7 +64,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   인스턴스로 재발행하지 않는다. 리스너 부수효과(매치 기록·ELO·칩 정산·라운드 딜링)는 공유
   저장소에 쓰이고 클라 프레임은 `StompPublisher` 가 이미 모든 인스턴스로 fan-out 하므로,
   다른 인스턴스에서 또 돌면 중복 기록이 된다(구 `DomainEventBus` 의 결함).
-- **실시간 미리보기는 포트 ⑧ `preview` (D-229)**: 상태를 바꾸지 않는 표시(씨앗포 포신 각도·탄)는 `/app/room/{id}/preview` →
+- **실시간 미리보기는 포트 ⑧ `preview` (D-229)**: 상태를 바꾸지 않는 표시(씨앗포 포신 각도·탄, 얏추 컵 흔들기 D-268)는 `/app/room/{id}/preview` →
   게임 중립 `infra.ws.GamePreviewController`(락·저장·턴 시계 없음, 버킷 `game-preview`) → 엔진 `preview`(기본 empty). 돌려주는 이벤트는
   **공개·순번 없음**이어야 한다(어기면 WARN 후 버림), 받을 수 없는 프레임은 ERROR 없이 버린다. 상태를 바꾸는 것은 미리보기가 아니라 액션이다
   (씨앗포 걷기 `MOVE` — 한 차례가 여러 액션이 되면 차례 전체 마감은 D-183 처럼 엔진 타이머로).
@@ -158,7 +158,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   요트 1인 판은 기록·전적을 남기지 않는다(D-181) — 끝까지 친 판의 총점만 개인 최고 점수 `yacht_solo_scores`(V17)에, 최고 = 1인 판 + 끝까지 친 여럿 판(게스트·봇 제외, 포트 `BestScoreSource` → stats `games[].bestScore`, D-201).
 - D-207: **화면 이름 "얏추"** — 코드 이름(`YACHT`·`yacht`·`.yt-`·`MIRBOARD_YACHT_STATUS`)과 점수표 "요트" 칸(다섯 개 같은 눈)은 그대로, 카탈로그가 이름순이라 오목 앞. 요트 칸 축하음은 `useSfx.playYacht(mine)`(Web Audio 합성 — 내 것 팡파르·남의 것 작은 두 음, 박자 상수 `YACHT_SFX_*` 는 CSS `yt-fx-dice-five` 지연과 같은 값). 소리는 음소거만 따르고 연출 끄기·동작 줄이기와 무관.
 - D-265: **게임 음성 클립** — 음성은 `features/sound/voiceClips.playVoice(key)` 한 곳으로만 낸다(올린 파일 → 없으면 `speechSynthesis` ko-KR → 없으면 무음, 음소거 `mirboard.sfxMuted`). 파일은 저장소에 싣지 않고 운영자가 `/admin/sounds`(관리자에게만 메인 위쪽 설정 버튼 — `GET /api/me` 의 `admin`)에서 올린다: `sound_clips`(V20), 어드민 `/api/admin/sounds`, 공개 재생 `/sounds`·`/sounds/{key}`(비-`/api`). 키는 서버 `SoundClipKey` 허용 목록과 클라 `VOICE_CLIPS` 를 **같이** 고친다(지금 `yacht.made.*` 5·`onecard.call`·`onecard.catch`), 형식은 앞머리 바이트로 판정·500KB. 얏추는 내 굴림만(D-208 알림음 0.3초 뒤), 원카드 외침은 모두가 듣는다.
-- D-264: **얏추 손맛** — 주사위 1 눈도 검정, 살롱 명조 글꼴 걷고 앱 기본 글꼴 하나(`20-yacht-table.css` 에 `font-family` 금지 — `yachtCssNamespace.test`). 굴림 소리 `useSfx.playRoll`(박자 상수 `ROLL_SFX_*` 는 CSS `yt-salon-throw` 착지와 같은 값)은 가운데 판의 굴림만(내 것 또렷·남의 것 작게·모두 같이의 좌석 띠 굴림 무음). **흔들어 굴리기** = [흔들기] 꾹 눌렀다 떼기(`DiceTray.SHAKE_MIN_MS`) 또는 ⋮ 메뉴 "휴대폰 흔들어 굴리기"(`useDeviceShake`, iOS 는 그 항목에서 권한) — 둘 다 굴리기 버튼과 같은 `onRoll` 한 번, 눈은 서버.
+- D-264: **얏추 손맛** — 주사위 1 눈도 검정, 살롱 명조 글꼴 걷고 앱 기본 글꼴 하나(`20-yacht-table.css` 에 `font-family` 금지 — `yachtCssNamespace.test`). 굴림 소리 `useSfx.playRoll`(박자 상수 `ROLL_SFX_*` 는 CSS `yt-salon-throw` 착지와 같은 값)은 가운데 판의 굴림만(내 것 또렷·남의 것 작게·모두 같이의 좌석 띠 굴림 무음). **흔들어 굴리기** = [굴리기] 꾹 눌렀다 떼기(D-268 로 버튼을 합침) 또는 ⋮ 메뉴 "휴대폰 흔들어 굴리기"(`useDeviceShake`, iOS 는 그 항목에서 권한) — 둘 다 굴리기 버튼과 같은 `onRoll` 한 번, 눈은 서버.
+- D-268: **얏추 굴리기 버튼 하나** — 톡 = 굴림, `DiceTray.SHAKE_HOLD_MS` 넘게 누르면 흔들다 **떼는 순간 한 번** 굴림(누름 한 번은 `startPress`/`finishPress` — 뒤따르는 click 은 삼키고, 누르는 사이 새 굴림이 오면 그 누름은 버린다. 이 가드를 풀지 말 것). 남은 굴림 수는 둥근 숫자 표(`.yt-roll-left`, 이름은 `aria-label="굴리기, N번 남음"`). 버튼 딸깍은 `tableSfx` 의 `die.hold`·`die.release`·`score.commit`·`ui.tap` — 게임판 루트의 `onClickCapture` 가 일반 버튼에 `ui.tap` 을 내고, 제 소리가 있는 버튼은 `data-yt-quiet` 로 뺀다. **흔들기는 남들도 본다** — 포트 ⑧ 두 번째 구현: `SHAKE{shaking}` → 순번 없는 공개 `DICE_SHAKING{seat, shaking}`(굴릴 수 있는 좌석만), 스토어 `shaking`(남의 좌석만, 유지 `SHAKE_KEEPALIVE_MS`·만기 `SHAKE_STALE_MS`), 좌석 명패 `.yt-seat-cup` + 가운데 판 `remoteShake`. 남의 흔들기는 소리 없음.
 - D-199·D-209: **메인 랭킹 = 이번 달 전적** — 오른쪽 위 선택 상자(기본 "전체" = 모든 게임 합, 그다음 많이 한 게임부터), 순서는 이번 달 승수 → 승률 → 판수, 칸은 등수·유저(계급 아이콘이 별명 왼쪽 — 계급은 누적 레이팅 그대로)·전적·승률·최근 5경기. `GET /api/users/ranking?gameType=`(생략·`ALL` = 전체). 이번 달 전적은 `user_monthly_stats`(V19, 전체 행 `game_type='*'`, `recent` 최근 5결과)에 `UserGameStatsService.record`·`recordDraw` 가 누적 전적과 **같은 곳에서 같이** 쌓는다(따로 쓰는 경로를 만들지 말 것). 달 경계는 **Asia/Seoul 1일 0시**(`StatsMonth` + 주입 `Clock` — 서버 시계는 UTC), 지우는 배치는 없다(새 달의 행이 0 에서 시작). 메인 목록 카드(랭킹 표·대기 중인 방)는 **높이 고정 + 안쪽 스크롤**(`features/lobby/hubScroll.HUB_SCROLL`) — 목록 길이로 아래 카드를 밀지 말 것.
 - D-241: 티츄 **"옻칠 찻집" 테마 층** — `features/tichu/tichuTheme.TICHU_THEME`(되돌리기 `'classic'` 한 줄), 꾸밈은 `25-tichu-lacquer.css`(`.tc-` 접두·미디어 0개, 폭·동작 줄이기는 17 의 `.tc-` 블록 — 스컬킹 맨 끝 두 블록 앞). 카드·특수 카드 그림은 인라인 SVG(`tichuArt.tsx`, id 금지), 경기장 연출은 `effectStore.arenaFx` 줄 → `ArenaFxLayer`(화면만, 좌석 방향은 `viewPosOf` + 컨테이너 단위).
 - D-174: **방 종류 없음** — 방 만들기는 게임·이름만, 봇은 대기실에서 방장이 **[빈자리 봇으로 채우기]**(`POST /api/rooms/{id}/bots`, 정원까지·준비 없음)·**[봇 빼기]**(`DELETE …/bots`). 봇이 낀 판도 정상 종료면 **봇과 함께 대기실로**(`MatchProgressService` — `fillWithBots` 방만 FINISHED, 봇에겐 끊김 유예 없음). 봇만 남으면 방 소멸·방장은 사람에게(`RoomService.settleBotsAfterHumanChange`). 대기실 시작 줄은 문구 왼쪽·버튼 오른쪽, 참가자 카드 계급은 이름 왼쪽, 원카드! 버튼은 원형.
@@ -325,7 +326,7 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 티츄: `PLAYED`, `PASSED`, `TURN_CHANGED`, `TRICK_TAKEN`, `TICHU_DECLARED`, `WISH_MADE`, `WISH_CLEARED`(D-126), `ROUND_ENDED`, `MATCH_ENDED` 등
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128·D-129, D-131 공개): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
-  - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `ROUND_STARTED`(D-202 동시 진행 — 방 옵션 `TURN_MODE`, 라운드마다 모두 같이·제한은 라운드 전체), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null)
+  - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `ROUND_STARTED`(D-202 동시 진행 — 방 옵션 `TURN_MODE`, 라운드마다 모두 같이·제한은 라운드 전체), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null). `DICE_SHAKING`(D-268 — 컵 흔드는 중, 포트 ⑧ 미리보기라 **순번 없음**·resync 에 없음)
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
@@ -335,7 +336,7 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
   - 원카드: `PLAY_CARD`(7 은 `declaredSuit`), `DRAW`, `CALL_ONE_CARD`·`CATCH`(`raceId`). 봇 누름·창 만료는 서버의 엔진 타이머(D-128)
-  - 요트: `ROLL`(`held?`), `HOLD`(`held`), `SCORE`(`category`). 차례 만기 자동 기록은 서버의 엔진 타이머(D-183)
+  - 요트: `ROLL`(`held?`), `HOLD`(`held`), `SCORE`(`category`). 차례 만기 자동 기록은 서버의 엔진 타이머(D-183). 미리보기 `/app/room/{id}/preview` 로 `SHAKE`(`shaking`, D-268 — 액션 아님)
 
 전체 카탈로그: `docs/stomp-protocol.md`.
 

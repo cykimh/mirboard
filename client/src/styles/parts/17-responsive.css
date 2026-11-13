@@ -384,8 +384,10 @@
     transform: rotate(-14deg);
   }
 
-  .yt-theme-salon .yt-shake {
-    transition: none;
+  /* D-268 — 남의 흔들기(명패의 작은 컵·작은 주사위)도 멈춘다. 컵은 기울어진 채 남아 "흔드는 중"만 알린다. */
+  .yt-seat-cup-live,
+  .yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
+    animation: none;
   }
 }
 

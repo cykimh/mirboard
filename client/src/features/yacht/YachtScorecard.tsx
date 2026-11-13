@@ -46,6 +46,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
           <button
             type="button"
             className={`yt-pick${candidate === 0 ? ' yt-pick-zero' : ''}`}
+            data-yt-quiet=""
             onClick={() => onScore(c)}
             aria-label={`${CATEGORY_LABEL[c]}에 ${candidate}점 기록`}
           >

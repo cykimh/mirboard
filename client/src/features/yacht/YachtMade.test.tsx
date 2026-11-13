@@ -24,6 +24,9 @@ vi.mock('@/ws/useStompRoom', () => ({
 }));
 const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade: vi.fn() }));
 vi.mock('@/features/sound/useSfx', () => ({
+  // D-268 — 버튼 딸깍(`tableSfx`)이 읽는다. 이 파일은 딸깍을 보지 않으니 음소거로 둔다.
+  isSfxMuted: () => true,
+  getAudioCtx: () => null,
   useSfx: () => ({ muted: false, toggleMute: vi.fn(), playRoll: vi.fn(), startShake: () => () => {}, ...sfx }),
 }));
 // D-265 — 족보 이름 음성. 불렸는지만 본다(파일·읽어 주기·음소거는 `voiceClips.test`).

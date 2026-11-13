@@ -16,10 +16,11 @@ import com.mirboard.domain.game.yacht.score.Category;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = YachtAction.Roll.class, name = "ROLL"),
         @JsonSubTypes.Type(value = YachtAction.Hold.class, name = "HOLD"),
-        @JsonSubTypes.Type(value = YachtAction.Score.class, name = "SCORE")
+        @JsonSubTypes.Type(value = YachtAction.Score.class, name = "SCORE"),
+        @JsonSubTypes.Type(value = YachtAction.Shake.class, name = "SHAKE")
 })
 public sealed interface YachtAction extends GameAction
-        permits YachtAction.Roll, YachtAction.Hold, YachtAction.Score {
+        permits YachtAction.Roll, YachtAction.Hold, YachtAction.Score, YachtAction.Shake {
 
     /**
      * 굴리기 (§4-1·2). 홀드하지 않은 주사위만 굴린다.
@@ -39,5 +40,14 @@ public sealed interface YachtAction extends GameAction
 
     /** 기록하기 (§4-5) — 빈 칸 하나, 1번 이상 굴린 뒤. */
     record Score(Category category) implements YachtAction {
+    }
+
+    /**
+     * D-268 — 컵 흔들기 미리보기 입력(포트 ⑧). <b>액션이 아니다</b>: {@code /app/room/{id}/preview} 로만 오고 상태를 바꾸지 않는다.
+     * {@code /action} 으로 오면 엔진이 {@code INVALID_ACTION} 으로 거절하고, 합법 수·봇에는 나오지 않는다.
+     *
+     * @param shaking 흔들기 시작·유지(true) / 멈춤(false)
+     */
+    record Shake(boolean shaking) implements YachtAction {
     }
 }

@@ -16,8 +16,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-229 — 포트 ⑧ 미리보기는 옵트인이다. 기본 구현은 아무것도 내지 않고, 씨앗포 말고는 어느 어댑터도 덮어쓰지 않는다(다른 여섯 게임의 동작 0
- * 변화 — `docs/plans/artillery-s6.md` §5.1 근거 ①②).
+ * D-229 — 포트 ⑧ 미리보기는 옵트인이다. 기본 구현은 아무것도 내지 않고, 구현한 게임 말고는 어느 어댑터도 덮어쓰지 않는다(`docs/plans/
+ * artillery-s6.md` §5.1 근거 ①②). 구현 게임은 씨앗포(조준, D-229)와 얏추(컵 흔들기, D-268) 둘이다 — 나머지 다섯 게임의 동작 0 변화.
  */
 class GameEnginePreviewDefaultTest {
 
@@ -29,14 +29,17 @@ class GameEnginePreviewDefaultTest {
     }
 
     @Test
-    void only_artillery_overrides_preview() throws Exception {
+    void only_artillery_and_yacht_override_preview() throws Exception {
         for (Class<?> adapter : List.of(TichuGameEngine.class, SkullKingGameEngine.class, OneCardGameEngine.class,
-                YachtGameEngine.class, OmokGameEngine.class, CloudRouteGameEngine.class)) {
+                OmokGameEngine.class, CloudRouteGameEngine.class)) {
             assertThatThrownBy(() -> adapter.getDeclaredMethod("preview", GameState.class, int.class, GameAction.class))
                     .as(adapter.getSimpleName())
                     .isInstanceOf(NoSuchMethodException.class);
         }
-        assertThat(ArtilleryGameEngine.class.getDeclaredMethod("preview", GameState.class, int.class, GameAction.class))
-                .isNotNull();
+        for (Class<?> adapter : List.of(ArtilleryGameEngine.class, YachtGameEngine.class)) {
+            assertThat(adapter.getDeclaredMethod("preview", GameState.class, int.class, GameAction.class))
+                    .as(adapter.getSimpleName())
+                    .isNotNull();
+        }
     }
 }
