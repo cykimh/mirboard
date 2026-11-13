@@ -78,6 +78,11 @@ interface Props {
   /** 내 차례면 홀드를 바꿀 수 있다(굴림 1·2번째 뒤). */
   canHold: boolean;
   canRoll: boolean;
+  /**
+   * D-270 — 보낸 굴리기의 결과를 기다리는 중(게임판이 `canRoll` 을 끄면서 같이 켠다). 버튼이 "굴리는 중…" 이 되고 컵이 제자리에서
+   * 달그락거리며 기다린다 — 눈은 서버 결과가 와야 바뀐다.
+   */
+  rollPending?: boolean;
   animate: boolean;
   onToggle?: (index: number) => void;
   onRoll?: () => void;
@@ -120,6 +125,7 @@ export function DiceTray({
   rollNonce,
   canHold,
   canRoll,
+  rollPending = false,
   animate,
   onToggle,
   onRoll,
@@ -140,6 +146,9 @@ export function DiceTray({
   const seenView = useRef(viewKey);
   // D-264 — 굴림 소리는 신호가 바뀔 때만(처음 그릴 때·연출 설정을 바꿀 때·판을 바꿔 볼 때는 울리지 않는다).
   const soundedNonce = useRef(rollNonce);
+  // D-270 — 새 굴림이 막 도착한 렌더(아래 효과가 `rolling` 을 켜기 직전). 이 한 박자에 "모두 고정" 모습이 번쩍이거나 기다리던 컵이
+  // 사라졌다 다시 뜨지 않게 굴리는 중으로 친다. 효과가 곧 `rolling` 을 켜 다시 그리는 경우에만 참이다.
+  const arriving = animate && rollNonce > 0 && seenView.current === viewKey && rollNonce !== soundedNonce.current;
   const rollSound = useRef(onRollSound);
   rollSound.current = onRollSound;
   useEffect(() => {
@@ -206,7 +215,12 @@ export function DiceTray({
     if (press.current && !press.current.cancelled) return;
     if (press.current) window.clearTimeout(press.current.timer);
     press.current = null;
-    if (!live.current.rollable) return;
+    if (!live.current.rollable) {
+      // D-270 — 굴릴 수 없을 때(굴림 결과를 기다리는 중) 시작한 누름은 버린 누름으로 기억한다 — 그 사이 결과가 와 굴릴 수 있게 돼도
+      // 떼는 순간·뒤따르는 click 으로 굴리지 않는다.
+      press.current = { cancelled: true, ripe: false, timer: 0 };
+      return;
+    }
     disarmSwallow();
     const p = { cancelled: false, ripe: false, timer: 0 };
     p.timer = window.setTimeout(() => {
@@ -247,6 +261,8 @@ export function DiceTray({
     // 누르는 중에 온 click(엔터는 누르는 순간·누르고 있는 동안 click 을 낸다) — 떼는 순간이 굴림이다.
     if (p && !p.cancelled) return;
     press.current = null;
+    // D-270 — 굴림 결과를 기다리는 중에는 버튼이 눌리기는 하지만(aria-disabled) 굴리지 않는다.
+    if (!live.current.rollable) return;
     // 휴대폰을 흔드는 중에 눌렀으면 그 흔들기는 굴리지 않고 걷는다(멎으면서 한 번 더 가지 않게).
     endShake(false);
     onRoll?.();
@@ -293,10 +309,16 @@ export function DiceTray({
   const shown = made && dice !== null && !rolling ? made : null;
   // D-268 — 내가 흔드는 중이거나, 이 판의 주인(남)이 흔드는 중.
   const shaking = shake !== null || remoteShake;
+  // D-270 — 굴리기를 보내고 결과를 기다리는 중: 컵이 같은 자리에서 계속 달그락거린다(뗀 순간 바로 반응이 보이게).
+  const waiting = rollPending && !shaking;
+  // D-270 — 마지막 굴림이 멈춘 뒤에는 더 굴릴 수 없으니 다섯 개 모두 고정 모습으로 보인다. 표시일 뿐이다 — 실제 고정(`held`)·보내는
+  // 값·읽어 주는 이름은 그대로고, 차례·라운드가 넘어가 굴림 수가 0 이 되면 저절로 걷힌다.
+  const finalLock = dice !== null && rolls >= MAX_ROLLS && !rolling && !arriving;
+  const rollState = shake !== null ? 'shaking' : rollPending ? 'pending' : 'idle';
   return (
     <section className="yt-tray" aria-label="주사위">
       <div
-        className={`yt-dice${shaking ? ` yt-dice-shaking${animate ? ' yt-dice-shaking-live' : ''}` : ''}${allSame ? ' yt-dice-same' : ''}${shown ? ` yt-dice-made yt-dice-made-${shown.tier}${animate ? ' yt-dice-made-live' : ''}` : ''}`}
+        className={`yt-dice${shaking ? ` yt-dice-shaking${animate ? ' yt-dice-shaking-live' : ''}` : ''}${waiting ? ` yt-dice-waiting${animate ? ' yt-dice-waiting-live' : ''}` : ''}${allSame ? ' yt-dice-same' : ''}${shown ? ` yt-dice-made yt-dice-made-${shown.tier}${animate ? ' yt-dice-made-live' : ''}` : ''}`}
         role="group"
         aria-label={dice ? `주사위 ${dice.join(', ')}` : '아직 굴리지 않음'}
       >
@@ -308,11 +330,13 @@ export function DiceTray({
           // D-204 — 굴리는 동안 고정한 주사위는 제자리에서 금빛이 훑고 고리가 퍼진다(잠김).
           const locked = rolling && isHeld && face !== null;
           const inMade = shown !== null && shown.indices.includes(i);
+          // D-270 — 고정 모습(진짜 고정이거나 마지막 굴림 뒤).
+          const lookHeld = isHeld || (finalLock && face !== null);
           return (
             <button
               type="button"
               key={i}
-              className={`yt-die${isHeld ? ' yt-die-held' : ''}${shaking ? ' yt-die-rolling' : ''}${face === null ? ' yt-die-empty' : ''}${locked ? ' yt-die-lock' : ''}${inMade ? ' yt-die-made' : ''}`}
+              className={`yt-die${lookHeld ? ' yt-die-held' : ''}${lookHeld && !isHeld ? ' yt-die-final' : ''}${shaking ? ' yt-die-rolling' : ''}${face === null ? ' yt-die-empty' : ''}${locked ? ' yt-die-lock' : ''}${inMade ? ' yt-die-made' : ''}`}
               style={{ ['--yt-i' as string]: i, ['--yt-o' as string]: LAND_ORDER[i] } as CSSProperties}
               disabled={!canHold || face === null}
               aria-pressed={isHeld}
@@ -325,7 +349,7 @@ export function DiceTray({
               {shaking && <span aria-hidden="true" className="yt-die-impact" />}
               <span aria-hidden="true" className="yt-die-face" key={`f${rollNonce}`}>
                 {shaking && face !== null ? <YachtDieCube face={face} /> : <YachtDie face={face} />}
-                {isHeld && face !== null && (
+                {lookHeld && face !== null && (
                   <>
                     <span className="yt-die-sheen" />
                     <span className="yt-die-lockring" />
@@ -333,7 +357,7 @@ export function DiceTray({
                 )}
                 {inMade && <span className="yt-die-madering" key={`m${shown.nonce}`} />}
               </span>
-              {isHeld && <span className="yt-die-tag">고정</span>}
+              {lookHeld && <span className="yt-die-tag">고정</span>}
             </button>
           );
         })}
@@ -353,8 +377,8 @@ export function DiceTray({
           </span>
         )}
         {/* D-264 — 흔드는 동안 컵이 제자리에서 달그락거린다(쏟는 컵과 같은 자리). */}
-        {shaking && !rolling && (
-          <span className="yt-cup yt-cup-shake" aria-hidden="true" key="shake">
+        {(shaking || waiting || arriving) && !rolling && (
+          <span className={`yt-cup ${shaking ? 'yt-cup-shake' : 'yt-cup-wait'}`} aria-hidden="true" key="shake">
             <DiceCup />
           </span>
         )}
@@ -365,8 +389,11 @@ export function DiceTray({
           // 길게 눌러도 글자 선택·길게 누르기 메뉴가 뜨지 않게 한다(CSS + contextmenu 막기).
           <button
             type="button"
-            className={`yt-roll yt-roll-main${shake === 'press' ? ' yt-roll-shaking' : ''}`}
-            disabled={!canRoll}
+            className={`yt-roll yt-roll-main${rollState === 'shaking' ? ` yt-roll-shaking${animate ? ' yt-roll-shaking-live' : ''}` : ''}${rollState === 'pending' ? ' yt-roll-pending' : ''}`}
+            // D-270 — 결과를 기다리는 동안에는 `disabled` 대신 aria-disabled: 초점을 잃지 않고, 이때 시작한 누름을 기억해 버린다.
+            disabled={!canRoll && !rollPending}
+            aria-disabled={rollPending || undefined}
+            aria-busy={rollPending || undefined}
             aria-label={`굴리기, ${left}번 남음`}
             title="누르면 굴려요 · 꾹 누르면 컵을 흔들다가 떼면 굴러요"
             data-yt-quiet=""
@@ -391,7 +418,13 @@ export function DiceTray({
             onBlur={() => cancelPress(false)}
             onClick={clickRoll}
           >
-            <span className="yt-roll-label">굴리기</span>
+            {/* D-270 — 흔드는 동안·결과를 기다리는 동안 글이 바뀐다(연출을 꺼도). 읽어 주는 이름(aria-label)과 숫자 표는 그대로. */}
+            <span className="yt-roll-label">
+              {rollState === 'shaking' ? '흔드는 중…' : rollState === 'pending' ? '굴리는 중…' : '굴리기'}
+              {rollState === 'shaking' && (
+                <span className="yt-roll-hint">{shake === 'motion' ? '멈추면 굴려요' : '떼면 굴려요'}</span>
+              )}
+            </span>
             <span className="yt-roll-left" aria-hidden="true">
               {left}
             </span>

@@ -1,12 +1,15 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { closeGameMenu, getMenuItem, queryMenuItem } from '@/test/gameMenu';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OTHER_SCORE_SFX_GAIN, YachtTable } from './YachtTable';
-import { CLICK_SWALLOW_MS, SHAKE_HOLD_MS } from './DiceTray';
+import { BUSY_RETRY_DELAY_MS, OTHER_SCORE_SFX_GAIN, YachtTable } from './YachtTable';
+import { CLICK_SWALLOW_MS, ROLL_ANIMATION_MS, SHAKE_HOLD_MS } from './DiceTray';
+import { SEAT_ROLL_MS } from './SeatDice';
+import { yachtRoomSink } from './yachtRoomSink';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { YachtDie, PIP_COLOR } from './YachtDie';
 import { MOTION_MIN_JOLTS, MOTION_QUIET_MS } from './useDeviceShake';
 import { useToastStore } from '@/components/toast/toastStore';
-import { SHAKE_AFTER_ROLL_QUIET_MS, SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
+import { ROLL_GUARD_MS, SHAKE_AFTER_ROLL_QUIET_MS, SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import type { Held, YachtSeatView, YachtTableView } from '@/types/yacht';
 
@@ -294,6 +297,8 @@ describe('얏추 D-264', () => {
       renderTable();
       fireEvent.click(rollButton());
       expect(sendAction).toHaveBeenCalledTimes(1);
+      // D-270 — 다음 굴림은 앞선 굴림의 결과가 온 뒤에.
+      rolled(0, 2);
       fireEvent.click(rollButton());
       expect(sendAction).toHaveBeenCalledTimes(2);
     });
@@ -305,6 +310,7 @@ describe('얏추 D-264', () => {
       fireEvent.pointerUp(rollButton());
       expect(sendAction).toHaveBeenCalledTimes(1);
       // click 이 따라오지 않은 누름(포인터를 버튼 밖에서 뗌) — 한참 뒤의 click 은 새 굴림이다.
+      rolled(0, 2);
       act(() => {
         vi.advanceTimersByTime(CLICK_SWALLOW_MS + 10);
       });
@@ -397,6 +403,7 @@ describe('얏추 D-264', () => {
       fireEvent.click(rollButton());
       expect(sendAction).toHaveBeenCalledTimes(1);
       expect(startShake).not.toHaveBeenCalled();
+      rolled(0, 2);
 
       // 꾹: 되풀이 keydown 은 누름을 새로 시작하지 않는다.
       fireEvent.keyDown(rollButton(), { key: ' ' });
@@ -491,6 +498,10 @@ describe('얏추 D-264', () => {
       const { container } = renderTable();
       fireEvent.click(rollButton());
       expect(sendAction).toHaveBeenCalledTimes(1);
+      // D-270 — 결과를 기다리는 동안에는 흔들 수도 없다. 결과가 끝내 늦어 막음이 풀린 뒤(안전장치)에 누르고 있는 경우다.
+      act(() => {
+        vi.advanceTimersByTime(ROLL_GUARD_MS);
+      });
       hold();
       expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
       rolled(0, 2);
@@ -527,6 +538,7 @@ describe('얏추 D-264', () => {
       fireEvent.pointerDown(rollButton(), { button: 0 });
       release();
       expect(sendPreview).not.toHaveBeenCalled();
+      rolled(0, 2);
       act(() => {
         vi.advanceTimersByTime(CLICK_SWALLOW_MS + 10);
       });
@@ -1042,6 +1054,313 @@ describe('얏추 D-264', () => {
       });
       expect(startShake).not.toHaveBeenCalled();
       expect(sendAction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('D-270 — 굴림 결과가 오기 전에는 또 굴리지 않는다·흔드는 동안 버튼이 바뀐다·마지막 굴림 뒤 모두 고정 모습', () => {
+    const busy = () =>
+      act(() => {
+        yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'busy' } } as never);
+      });
+    const label = () => rollButton().querySelector('.yt-roll-label');
+
+    it('결과가 오기 전의 연속 누름 — ROLL 은 한 번만 나간다(톡톡톡·누름 없는 click 모두)', () => {
+      seed();
+      renderTable();
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      release();
+      // 아무 일도 없어 보여 다시 누른다 — 서버 결과는 아직 오지 않았다.
+      for (let i = 0; i < 3; i++) {
+        act(() => {
+          vi.advanceTimersByTime(CLICK_SWALLOW_MS + 50);
+        });
+        fireEvent.pointerDown(rollButton(), { button: 0 });
+        release();
+        fireEvent.click(rollButton());
+      }
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      // 결과가 오면 다시 굴릴 수 있다.
+      rolled(0, 2);
+      act(() => {
+        vi.advanceTimersByTime(CLICK_SWALLOW_MS + 50);
+      });
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('같은 렌더 안에서 겹친 click 도 한 번만 — 렌더 값이 아니라 스토어의 지금 값으로 막는다', () => {
+      seed();
+      renderTable();
+      const button = rollButton();
+      act(() => {
+        button.click();
+        button.click();
+        button.click();
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('꾹 눌렀다 뗀 뒤 결과가 오기 전에 다시 꾹 눌렀다 떼도 ROLL 은 한 번 — 흔들기도 시작하지 않는다', () => {
+      seed();
+      renderTable();
+      hold();
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      expect(startShake).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(CLICK_SWALLOW_MS + 50);
+      });
+      hold();
+      expect(startShake).toHaveBeenCalledTimes(1);
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('결과를 기다리는 동안 누르기 시작한 누름은 결과가 온 뒤에 떼어도 굴리지 않는다(뒤따르는 click 도 삼킨다)', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      rolled(0, 2);
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('떼는 순간 바로 "굴리는 중…" — 버튼·컵이 결과를 기다리고, 눈은 서버 결과가 와야 바뀐다', () => {
+      seed({ dice: [1, 1, 2, 2, 3], rolls: 1 });
+      const { container } = renderTable();
+      expect(label()).toHaveTextContent('굴리기');
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      release();
+      expect(label()).toHaveTextContent('굴리는 중…');
+      expect(rollButton()).toHaveClass('yt-roll-pending');
+      expect(rollButton()).toHaveAttribute('aria-disabled', 'true');
+      expect(rollButton().querySelector('.yt-roll-left')).toHaveTextContent(/^2$/);
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-waiting');
+      expect(container.querySelector('.yt-cup-wait')).not.toBeNull();
+      // 눈은 그대로다(지어내지 않는다).
+      expect(screen.getByRole('group', { name: '주사위 1, 1, 2, 2, 3' })).toBeInTheDocument();
+      rolled(0, 2, 2);
+      expect(label()).toHaveTextContent('굴리기');
+      expect(rollButton()).not.toHaveClass('yt-roll-pending');
+      expect(rollButton()).not.toHaveAttribute('aria-disabled');
+      expect(container.querySelector('.yt-dice')).not.toHaveClass('yt-dice-waiting');
+      expect(container.querySelector('.yt-cup-wait')).toBeNull();
+      expect(screen.getByRole('group', { name: '주사위 1, 2, 3, 4, 6' })).toBeInTheDocument();
+    });
+
+    it('BUSY 한 번 재전송 동안에도 막음이 유지된다 — 재전송은 한 번 가고, 그 사이의 누름은 나가지 않는다', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      busy();
+      fireEvent.click(rollButton());
+      act(() => {
+        vi.advanceTimersByTime(BUSY_RETRY_DELAY_MS);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      expect(label()).toHaveTextContent('굴리는 중…');
+      // 두 번째 BUSY 는 오류 문구 — 막음이 풀려 다시 굴릴 수 있다.
+      busy();
+      expect(label()).toHaveTextContent('굴리기');
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(3);
+    });
+
+    it('거절(오류)·다시 받기·차례 넘어감이 막음을 푼다', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      act(() => {
+        yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'INVALID_ACTION', message: 'x' } } as never);
+      });
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      // 다시 받기(스냅샷).
+      act(() => seed());
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(3);
+      act(() => {
+        useYachtStore.getState().applyEvent({ type: 'TURN_CHANGED', seq: 5, payload: { seat: 1, round: 1, turnSeconds: 0 } });
+      });
+      expect(useYachtStore.getState().rollInFlight).toBe(false);
+    });
+
+    it('아무 소식이 없으면 잠깐 뒤에 스스로 풀린다(안전장치)', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      act(() => {
+        vi.advanceTimersByTime(ROLL_GUARD_MS - 100);
+      });
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(label()).toHaveTextContent('굴리기');
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('결과를 기다리는 동안에는 고정·기록도 보내지 않는다 — 모으던 HOLD 가 굴림 뒤에 따로 나가지도 않는다', () => {
+      seed({ dice: [1, 2, 3, 4, 6], rolls: 1, candidates: { CHOICE: 16 } });
+      renderTable();
+      fireEvent.click(screen.getByRole('button', { name: '주사위 2: 2' }));
+      fireEvent.click(rollButton());
+      fireEvent.click(screen.getByRole('button', { name: '주사위 3: 3' }));
+      fireEvent.click(screen.getByRole('button', { name: '초이스에 16점 기록' }));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      expect(sendAction).toHaveBeenCalledWith({ '@action': 'ROLL', held: [false, true, false, false, false] });
+    });
+
+    it('모두 같이 — 내 판의 굴림도 결과가 오기 전에는 한 번만, 남의 굴림은 막음을 풀지 않는다', () => {
+      simul();
+      renderTable();
+      fireEvent.click(rollButton());
+      rolled(1, 2, 2);
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      rolled(0, 3);
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('휴대폰 흔들기 — 흔드는 동안 버튼이 바뀌고, 결과를 기다리는 동안 또 흔들어도 굴리지 않는다', async () => {
+      vi.stubGlobal('DeviceMotionEvent', {});
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+      window.localStorage.setItem('mirboard.yachtMotionShake', '1');
+      const jolt = (n: number) => {
+        for (let i = 0; i < n; i++) {
+          const e = new Event('devicemotion');
+          Object.assign(e, { acceleration: { x: 14, y: 6, z: 3 }, accelerationIncludingGravity: null });
+          act(() => {
+            window.dispatchEvent(e);
+          });
+        }
+      };
+      try {
+        seed();
+        renderTable();
+        jolt(MOTION_MIN_JOLTS);
+        expect(label()).toHaveTextContent('흔드는 중…');
+        expect(rollButton().querySelector('.yt-roll-hint')).toHaveTextContent('멈추면 굴려요');
+        expect(rollButton()).toHaveClass('yt-roll-shaking');
+        act(() => {
+          vi.advanceTimersByTime(MOTION_QUIET_MS);
+        });
+        expect(sendAction).toHaveBeenCalledTimes(1);
+        expect(label()).toHaveTextContent('굴리는 중…');
+        jolt(MOTION_MIN_JOLTS);
+        act(() => {
+          vi.advanceTimersByTime(MOTION_QUIET_MS);
+        });
+        expect(sendAction).toHaveBeenCalledTimes(1);
+        expect(startShake).toHaveBeenCalledTimes(1);
+      } finally {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 0, configurable: true });
+      }
+    });
+
+    it('꾹 누르는 동안 버튼 글·모습이 바뀐다 — "흔드는 중…·떼면 굴려요", 숫자 표는 그대로. 연출을 꺼도 글·색은 바뀐다', () => {
+      seed({ dice: [1, 2, 3, 4, 6], rolls: 1 });
+      renderTable();
+      expect(rollButton().querySelector('.yt-roll-hint')).toBeNull();
+      hold();
+      expect(label()).toHaveTextContent('흔드는 중…');
+      expect(rollButton().querySelector('.yt-roll-hint')).toHaveTextContent('떼면 굴려요');
+      expect(rollButton()).toHaveClass('yt-roll-shaking', 'yt-roll-shaking-live');
+      expect(rollButton().querySelector('.yt-roll-left')).toHaveTextContent(/^2$/);
+      expect(rollButton()).toHaveAccessibleName('굴리기, 2번 남음');
+      fireEvent.pointerCancel(rollButton());
+      expect(label()).toHaveTextContent('굴리기');
+      expect(rollButton()).not.toHaveClass('yt-roll-shaking');
+
+      act(() => useCardAnimStore.setState({ enabled: false }));
+      try {
+        hold();
+        expect(label()).toHaveTextContent('흔드는 중…');
+        expect(rollButton()).toHaveClass('yt-roll-shaking');
+        expect(rollButton()).not.toHaveClass('yt-roll-shaking-live');
+      } finally {
+        act(() => useCardAnimStore.setState({ enabled: true }));
+      }
+    });
+
+    it('세 번째 굴림 뒤에는 다섯 개 모두 고정 모습 — 표시일 뿐 HOLD 를 보내지 않고 스토어의 고정도 그대로다', () => {
+      seed({ dice: [1, 2, 3, 4, 6], rolls: 2, held: [true, false, false, false, false] });
+      const { container } = renderTable();
+      expect(container.querySelectorAll('.yt-die-held')).toHaveLength(1);
+      fireEvent.click(rollButton());
+      act(() => {
+        useYachtStore.getState().applyEvent({
+          type: 'DICE_ROLLED',
+          seq: 2,
+          payload: { seat: 0, dice: [1, 5, 5, 2, 6], held: [true, false, false, false, false], rolls: 3, candidates: {} },
+        });
+      });
+      // 구르는 동안에는 굴린 주사위가 고정 모습이 아니다(쏟아져 멈춘 뒤에 잠긴다).
+      expect(container.querySelectorAll('.yt-die-held')).toHaveLength(1);
+      expect(container.querySelectorAll('.yt-die-rolling')).toHaveLength(4);
+      act(() => {
+        vi.advanceTimersByTime(ROLL_ANIMATION_MS);
+      });
+      expect(container.querySelectorAll('.yt-die-held')).toHaveLength(5);
+      expect(container.querySelectorAll('.yt-die-final')).toHaveLength(4);
+      expect(container.querySelectorAll('.yt-die-tag')).toHaveLength(5);
+      // 실제 고정 상태(읽어 주는 이름·눌림)는 그대로.
+      expect(container.querySelectorAll('.yt-die[aria-pressed="true"]')).toHaveLength(1);
+      expect(useYachtStore.getState().held).toEqual([true, false, false, false, false]);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      // 차례가 넘어가면 걷힌다.
+      act(() => {
+        useYachtStore.getState().applyEvent({ type: 'TURN_CHANGED', seq: 3, payload: { seat: 1, round: 1, turnSeconds: 0 } });
+      });
+      expect(container.querySelectorAll('.yt-die-held')).toHaveLength(0);
+    });
+
+    it('남의 판도 같다 — 가운데 판에 비친 남의 세 번째 굴림·좌석 띠의 작은 주사위(모두 같이)', () => {
+      seed({ turnSeat: 1, dice: [2, 2, 3, 4, 6], rolls: 3 });
+      const a = renderTable();
+      expect(a.container.querySelectorAll('.yt-die-held')).toHaveLength(5);
+      a.unmount();
+
+      seed({
+        turnSeat: -1,
+        simultaneous: true,
+        turns: [
+          { seat: 0, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+          { seat: 1, dice: [6, 6, 5, 5, 1], held: [true, true, false, false, false], rolls: 2, pending: true, candidates: {} },
+        ],
+      });
+      const { container } = renderTable();
+      expect(container.querySelectorAll('.yt-mini-die-held')).toHaveLength(2);
+      act(() => {
+        useYachtStore.getState().applyEvent({
+          type: 'DICE_ROLLED',
+          seq: 2,
+          payload: { seat: 1, dice: [6, 6, 5, 4, 1], held: [true, true, false, false, false], rolls: 3, candidates: {} },
+        });
+      });
+      expect(container.querySelectorAll('.yt-mini-die-held')).toHaveLength(2);
+      act(() => {
+        vi.advanceTimersByTime(SEAT_ROLL_MS);
+      });
+      expect(container.querySelectorAll('.yt-mini-die-held')).toHaveLength(5);
+      // 새 라운드면 걷힌다.
+      act(() => {
+        useYachtStore.getState().applyEvent({ type: 'ROUND_STARTED', seq: 3, payload: { round: 2, turnSeconds: 0 } });
+      });
+      expect(container.querySelectorAll('.yt-mini-die-held')).toHaveLength(0);
     });
   });
 });

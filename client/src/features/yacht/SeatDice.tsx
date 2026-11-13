@@ -33,6 +33,8 @@ export function SeatDice({ turn, animate = true, shaking = false }: Props) {
     const timer = window.setTimeout(() => setRolling(false), SEAT_ROLL_MS);
     return () => window.clearTimeout(timer);
   }, [turn.rolls, animate]);
+  // D-270 — 세 번째 굴림이 멈춘 뒤에는 다섯 개 모두 고정 모습(가운데 판과 같다 — 표시일 뿐).
+  const finalLock = turn.dice !== null && turn.rolls >= MAX_ROLLS && !rolling && !(animate && turn.rolls > seenRolls.current);
   return (
     <span
       className={`yt-seat-dice${shaking ? ` yt-seat-dice-shaking${animate ? ' yt-seat-dice-shaking-live' : ''}` : ''}`}
@@ -45,7 +47,7 @@ export function SeatDice({ turn, animate = true, shaking = false }: Props) {
         return (
           <span
             key={spin ? `${i}:${rollKey}` : i}
-            className={`yt-mini-die${turn.held[i] ? ' yt-mini-die-held' : ''}${face === null ? ' yt-mini-die-empty' : ''}${spin ? ' yt-mini-die-rolling' : ''}`}
+            className={`yt-mini-die${turn.held[i] || (finalLock && face !== null) ? ' yt-mini-die-held' : ''}${face === null ? ' yt-mini-die-empty' : ''}${spin ? ' yt-mini-die-rolling' : ''}`}
             style={{ ['--yt-i' as string]: i } as CSSProperties}
             aria-hidden="true"
           >

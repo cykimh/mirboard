@@ -69,6 +69,12 @@ export interface YachtRoomState {
   lastSent: SentAction | null;
   retryNonce: number;
   /**
+   * D-270 — 보낸 `ROLL` 의 결과를 아직 받지 못했다. 이 동안에는 굴리기를 또 보내지 않는다 — 결과가 오기 전의 누름마다 `ROLL` 이 나가
+   * 서버가 그대로 받아 한 번 누른 것이 두세 번 굴러가던 결함을 막는다. 내 굴림 결과(`DICE_ROLLED`)·기록·차례/라운드 넘어감·거절
+   * (오류 문구)·다시 받기가 풀고, 아무 소식이 없으면 게임판이 {@link ROLL_GUARD_MS} 뒤에 푼다. `BUSY` 한 번 재전송 동안에는 그대로 둔다.
+   */
+  rollInFlight: boolean;
+  /**
    * D-202 — 동시 진행. 이때 `turnSeat` 는 −1 이고 좌석별 주사위는 `seatTurns` 에 있다. 위의 `dice`·`held`·`rolls`·`candidates` 는 늘
    * <b>가운데 주사위 판</b>의 값이라 동시 진행이면 내 좌석(`ownSeat`) 것을 비춘다 — 게임판의 홀드·굴림 코드가 두 방식에서 같다.
    */
@@ -100,6 +106,9 @@ export const SHAKE_STALE_MS = 4000;
 /** D-268 — 흔드는 동안 이 간격으로 다시 알린다(오래 흔들어도 남의 화면에서 걷히지 않게, 나중에 들어온 사람도 보게). */
 export const SHAKE_KEEPALIVE_MS = 1500;
 
+/** D-270 — 굴리기 결과가 이만큼 오지 않으면 막아 둔 굴리기를 푼다(프레임을 잃었을 때의 안전장치). */
+export const ROLL_GUARD_MS = 3000;
+
 export interface SentAction {
   action: Record<string, unknown>;
   at: number;
@@ -120,6 +129,8 @@ export interface YachtActions {
   noteSent: (action: Record<string, unknown>) => void;
   /** BUSY 를 받았다 — 다시 보낼 것이 있으면 신호를 올리고 true(오류를 보이지 않는다). */
   noteBusy: () => boolean;
+  /** D-270 — 굴리기 막음을 푼다(안전 시간 초과). */
+  clearRollInFlight: () => void;
   /** D-268 — 소식이 끊긴 흔들기를 걷는다(`before` 보다 먼저 받은 것만). */
   expireShaking: (before: number) => void;
 }
@@ -144,6 +155,7 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   ownSeat: -1,
   lastSent: null,
   retryNonce: 0,
+  rollInFlight: false,
   simultaneous: false,
   seatTurns: {},
   shaking: {},
@@ -209,6 +221,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       lastScore: null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
+      rollInFlight: false,
       // D-183 — 차례 기준 남은 시간은 엔진이 tableView 에 싣는다(바깥 turnRemainingMs 는 마지막 액션 기준이라 쓰지 않는다).
       turnClock: typeof t.turnRemainingMs === 'number' ? { since: Date.now(), remainingMs: t.turnRemainingMs } : null,
       simultaneous,
@@ -248,6 +261,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           shakeSeen: {},
           shakeQuietUntil: {},
           lastSent: null,
+          rollInFlight: false,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
         });
@@ -267,6 +281,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           shakeSeen: {},
           shakeQuietUntil: {},
           lastSent: null,
+          rollInFlight: false,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
         });
@@ -337,6 +352,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             candidates: p.candidates,
             rollNonce: state.rollNonce + 1,
             lastSent: null,
+            rollInFlight: false,
           });
           return 'applied';
         }
@@ -350,6 +366,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           candidates: p.candidates,
           rollNonce: state.rollNonce + 1,
           lastSent: null,
+          rollInFlight: false,
         });
         return 'applied';
       }
@@ -375,7 +392,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             ? { seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) } }
             : {}),
           // 동시 진행이면 남의 기록은 가운데 판(내 주사위)을 건드리지 않는다.
-          ...(mine ? { candidates: {}, lastSent: null } : {}),
+          ...(mine ? { candidates: {}, lastSent: null, rollInFlight: false } : {}),
           ...(state.simultaneous && mine ? freshTurn() : {}),
           lastScore: {
             seat: p.seat,
@@ -396,17 +413,17 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             seats,
             shaking: withoutShaking(state.shaking, p.seat),
             seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) },
-            ...(p.seat === state.ownSeat ? freshTurn() : {}),
+            ...(p.seat === state.ownSeat ? { ...freshTurn(), rollInFlight: false } : {}),
           });
           return 'applied';
         }
-        set({ seats, shaking: withoutShaking(state.shaking, p.seat), ...(p.seat === state.turnSeat ? freshTurn() : {}) });
+        set({ seats, shaking: withoutShaking(state.shaking, p.seat), ...(p.seat === state.turnSeat ? { ...freshTurn(), rollInFlight: false } : {}) });
         return 'applied';
       }
 
       case 'MATCH_ENDED': {
         const p = payload as MatchEndedPayload;
-        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), turnClock: null, seatTurns: {}, shaking: {} });
+        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), rollInFlight: false, turnClock: null, seatTurns: {}, shaking: {} });
         return 'applied';
       }
 
@@ -416,7 +433,8 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
   },
 
   setError(message, sticky) {
-    set((s) => errorNoticePatch(s, message, sticky));
+    // D-270 — 오류 문구가 뜬다는 것은 보낸 것이 거절됐다는 뜻이다(재전송하는 BUSY 는 여기 오지 않는다) — 굴리기 막음을 푼다.
+    set((s) => ({ ...errorNoticePatch(s, message, sticky), ...(message ? { rollInFlight: false } : {}) }));
   },
 
   setHeldLocal(held) {
@@ -431,7 +449,10 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
   },
 
   noteSent(action) {
-    set({ lastSent: { action, at: Date.now(), retried: false } });
+    set({
+      lastSent: { action, at: Date.now(), retried: false },
+      ...(action['@action'] === 'ROLL' ? { rollInFlight: true } : {}),
+    });
   },
 
   expireShaking(before) {
@@ -439,6 +460,10 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
     const kept = Object.entries(shaking).filter(([, at]) => at >= before);
     if (kept.length === Object.keys(shaking).length) return;
     set({ shaking: Object.fromEntries(kept) });
+  },
+
+  clearRollInFlight() {
+    if (get().rollInFlight) set({ rollInFlight: false });
   },
 
   noteBusy() {

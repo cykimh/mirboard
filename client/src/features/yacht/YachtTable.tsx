@@ -20,7 +20,7 @@ import { playTableSfx } from '@/features/sound/tableSfx';
 import { useVoiceChat, voiceStatusOf } from '@/features/voice/useVoiceChat';
 import { MAX_ROLLS, NO_HOLD, type Category, type Held } from '@/types/yacht';
 import { yachtRoomSink } from './yachtRoomSink';
-import { SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
+import { ROLL_GUARD_MS, SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
 import { DiceCup, DiceTray, ROLL_ANIMATION_MS } from './DiceTray';
 import { YachtScorecard } from './YachtScorecard';
 import { YachtTurnCountdown } from './YachtTurnCountdown';
@@ -239,7 +239,10 @@ export function YachtTable({
   const watching = watchSeat !== null && watchable(watchSeat) ? watchSeat : null;
   const watched = watching !== null ? s.seatTurns[watching] : null;
   const canHold = myTurn && watching === null && connected && s.rolls >= 1 && s.rolls < MAX_ROLLS;
-  const canRoll = myTurn && watching === null && connected && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
+  // D-270 — 보낸 굴리기의 결과를 기다리는 중에는 굴리기가 꺼진다(결과 전의 누름마다 ROLL 이 나가 여러 번 굴러가던 결함).
+  const rollPending = s.rollInFlight && myTurn && watching === null;
+  const canRoll =
+    myTurn && watching === null && connected && !s.rollInFlight && s.rolls < MAX_ROLLS && !(s.rolls > 0 && s.held.every(Boolean));
   const canScore = myTurn && watching === null && connected && s.rolls >= 1;
   // D-201 — 판 시작 때의 내 최고 점수(종료 화면이 "새 최고 기록!"을 가른다). 관전자·게스트는 묻지 않는다.
   const guest = isGuestName(usernames[myUserId]);
@@ -588,7 +591,8 @@ export function YachtTable({
   };
   useEffect(() => cancelHoldSend, []);
   const toggleHold = (index: number) => {
-    if (!canHold) return;
+    // D-270 — 굴림 결과를 기다리는 동안의 고정은 받지 않는다(그 굴림은 이미 떠났고, 결과가 고정을 다시 정한다).
+    if (!canHold || useYachtStore.getState().rollInFlight) return;
     // 렌더 사이의 연속 탭도 서로 덮지 않게 스토어의 지금 값에서 뒤집는다(렌더 값 s.held 는 한 박자 늦을 수 있다).
     const current = useYachtStore.getState().held;
     const next = current.map((h, i) => (i === index ? !h : h)) as Held;
@@ -620,16 +624,28 @@ export function YachtTable({
     return () => window.clearTimeout(timer);
   }, [retryNonce, sendAction]);
 
+  // D-270 — 굴리기 막음의 안전장치: 결과도 거절도 오지 않으면(프레임을 잃음) `ROLL_GUARD_MS` 뒤에 푼다. BUSY 재전송은 같은 막음
+  // 안에서 간다(시계를 다시 재지 않는다).
+  const rollInFlight = s.rollInFlight;
+  const clearRollInFlight = s.clearRollInFlight;
+  useEffect(() => {
+    if (!rollInFlight) return;
+    const timer = window.setTimeout(clearRollInFlight, ROLL_GUARD_MS);
+    return () => window.clearTimeout(timer);
+  }, [rollInFlight, clearRollInFlight]);
+
   // 굴림에 지금 홀드를 실어 보낸다 — 모으던 HOLD 는 보내지 않는다(서버가 굴림의 홀드를 먼저 적용하고 DICE_HELD 를 낸다, 룰 §4-2).
+  // D-270 — 스토어의 지금 값으로 한 번 더 막는다(렌더 값 canRoll 은 한 박자 늦다 — 같은 렌더 안의 연속 누름).
   const roll = () => {
-    if (!canRoll) return;
+    if (!canRoll || useYachtStore.getState().rollInFlight) return;
     cancelHoldSend();
     const { rolls, held } = useYachtStore.getState();
     sendTracked(rolls === 0 ? { '@action': 'ROLL' } : { '@action': 'ROLL', held });
   };
 
   const score = (category: Category) => {
-    if (!canScore) return;
+    // D-270 — 굴림 결과를 기다리는 동안에는 기록하지 않는다(아직 보지 못한 눈으로 적히지 않게).
+    if (!canScore || useYachtStore.getState().rollInFlight) return;
     cancelHoldSend();
     const points = s.candidates[category];
     if (points === 0 && !window.confirm(`${CATEGORY_LABEL[category]} 칸에 0점으로 버릴까요?`)) return;
@@ -969,6 +985,7 @@ export function YachtTable({
           viewKey={watching ?? -1}
           canHold={canHold}
           canRoll={canRoll}
+          rollPending={rollPending}
           animate={animate}
           onToggle={watching === null ? toggleHold : undefined}
           onRoll={myTurn && watching === null ? roll : undefined}

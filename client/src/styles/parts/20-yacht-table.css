@@ -537,6 +537,70 @@ button.yt-badge {
   filter: brightness(0.92);
 }
 
+/* D-270 — 흔드는 동안·굴림 결과를 기다리는 동안 버튼 글이 바뀐다("흔드는 중… / 떼면 굴려요", "굴리는 중…"). 글이 바뀌어도 버튼
+   너비가 출렁이지 않게 가장 긴 글에 맞춘 최소 너비를 준다. 색·글은 연출 설정·움직임 줄이기와 무관하게 바뀌고, 떨림만 따른다. */
+.yt-roll-main {
+  min-width: 164px;
+}
+
+.yt-roll-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.yt-roll-hint {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.yt-roll-shaking,
+.yt-roll-pending {
+  filter: brightness(0.8);
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.45);
+  transform: translateY(2px);
+}
+
+.yt-roll-shaking .yt-roll-label,
+.yt-roll-pending .yt-roll-label {
+  font-size: 14px;
+}
+
+.yt-roll-pending {
+  cursor: progress;
+}
+
+/* 컵의 달그락(0.32초 한 바퀴)과 같은 박자로 버튼도 떤다. */
+.yt-roll-shaking-live {
+  animation: yt-roll-rattle 0.32s ease-in-out infinite;
+}
+
+@keyframes yt-roll-rattle {
+  0%,
+  100% {
+    transform: translate(0, 2px) rotate(0deg);
+  }
+  25% {
+    transform: translate(-2px, 3px) rotate(-1.6deg);
+  }
+  50% {
+    transform: translate(1px, 1px) rotate(1.2deg);
+  }
+  75% {
+    transform: translate(-1px, 3px) rotate(-0.8deg);
+  }
+}
+
+/* D-270 — 굴림 결과를 기다리는 동안: 흔들 때와 같이 고정 안 한 주사위가 떨고 컵이 달그락거린다(눈은 그대로 — 서버 결과가 와야 바뀐다). */
+.yt-dice-waiting-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face {
+  animation: yt-shake-jitter 0.16s linear infinite;
+  animation-delay: calc(var(--yt-i, 0) * -37ms);
+}
+
 /* 흔드는 동안 고정 안 한 주사위가 제자리에서 떤다(주사위마다 박자를 어긋나게). */
 .yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face {
   animation: yt-shake-jitter 0.16s linear infinite;
@@ -2211,18 +2275,39 @@ html.dark .yt-theme-salon {
   padding: 0 18px 0 26px;
 }
 
-.yt-theme-salon .yt-roll.yt-roll-shaking {
+.yt-theme-salon .yt-roll.yt-roll-shaking,
+.yt-theme-salon .yt-roll.yt-roll-pending {
   transform: translateY(2px);
-  filter: brightness(0.95);
+  /* D-270 — 눌려 들어간 어두운 황동: 흔드는 중·굴리는 중이 한눈에 보이게. */
+  filter: brightness(0.78) saturate(1.15);
+  background: linear-gradient(#c9a24b, #a8842f 55%, #7d6120);
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* 흔드는 컵 — 쏟는 컵과 같은 자리에서 주둥이를 위로 한 채 달그락거린다(한 바퀴 0.32초 = 소리의 흔듦 두 번). */
-.yt-theme-salon .yt-cup.yt-cup-shake {
+.yt-theme-salon .yt-roll.yt-roll-shaking .yt-roll-label,
+.yt-theme-salon .yt-roll.yt-roll-pending .yt-roll-label {
+  letter-spacing: 0.04em;
+}
+
+/* 흔드는 중·굴리는 중에는 "누를 수 있음" 광택 줄을 감춘다. */
+.yt-theme-salon .yt-roll.yt-roll-shaking::after,
+.yt-theme-salon .yt-roll.yt-roll-pending::after {
+  display: none;
+}
+
+/* 흔드는 컵 — 쏟는 컵과 같은 자리에서 주둥이를 위로 한 채 달그락거린다(한 바퀴 0.32초 = 소리의 흔듦 두 번).
+   D-270 — 굴림 결과를 기다리는 컵(`yt-cup-wait`)도 같은 몸짓이다(뗀 순간부터 쏟아질 때까지 이어진다). */
+.yt-theme-salon .yt-cup.yt-cup-shake,
+.yt-theme-salon .yt-cup.yt-cup-wait {
   animation: yt-salon-cup-shake 0.32s ease-in-out infinite;
 }
 
 /* 연출을 끈 화면 — 컵은 기울어진 채 가만히 떠 있다(흔드는 중이라는 표시만). */
-.yt-theme-salon .yt-dice:not(.yt-dice-shaking-live) .yt-cup.yt-cup-shake {
+.yt-theme-salon .yt-dice:not(.yt-dice-shaking-live) .yt-cup.yt-cup-shake,
+.yt-theme-salon .yt-dice:not(.yt-dice-waiting-live) .yt-cup.yt-cup-wait {
   transform: rotate(-14deg);
   animation: none;
 }
