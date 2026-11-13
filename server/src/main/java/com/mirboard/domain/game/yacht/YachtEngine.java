@@ -123,10 +123,10 @@ public final class YachtEngine {
     /**
      * D-268 — 컵 흔들기 미리보기(포트 ⑧). 상태를 바꾸지 않는다. 시작·유지는 그 좌석이 <b>지금 굴릴 수 있을 때만</b>(둘 차례 — 동시
      * 진행이면 아직 기록하지 않은 사람 각자 — 이고 굴림이 남았고 다 고정하지 않음). 멈춤은 살아 있는 좌석이면 받는다(굴린 직후의 멈춤
-     * 프레임이 버려져 남의 화면에 컵이 남지 않게). 그 밖에는 없음.
+     * 프레임이 버려져 남의 화면에 컵이 남지 않게). 번호 {@code n} 은 범위만 보고 그대로 실어 보낸다(서버는 기억하지 않는다). 그 밖에는 없음.
      */
     public Optional<YachtEvent.DiceShaking> preview(YachtState state, int seat, YachtAction.Shake input) {
-        if (input == null || state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
+        if (input == null || !input.validNumber() || state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
             return Optional.empty();
         }
         if (input.shaking()) {
@@ -138,7 +138,7 @@ public final class YachtEngine {
                 return Optional.empty();
             }
         }
-        return Optional.of(new YachtEvent.DiceShaking(seat, input.shaking()));
+        return Optional.of(new YachtEvent.DiceShaking(seat, input.shaking(), input.n()));
     }
 
     private Result roll(YachtState state, int seat, HoldMask requested, DiceRoller roller) {

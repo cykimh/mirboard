@@ -314,15 +314,20 @@ export function YachtTable({
 
   // D-268 — 내가 컵을 흔드는 동안 남들도 본다(포트 ⑧ 미리보기 — 상태가 아니라 표시일 뿐). 시작·멈춤을 알리고, 흔드는 동안에는
   // `SHAKE_KEEPALIVE_MS` 마다 다시 알린다(받는 쪽은 `SHAKE_STALE_MS` 동안 소식이 없으면 스스로 걷는다 — 멈춤 프레임을 놓쳐도 된다).
+  // 프레임마다 번호 `n` 을 올려 싣는다 — 서버 인바운드 채널이 수신 순서를 보장하지 않아, 받는 쪽이 낡은 프레임을 이 번호로 버린다.
+  // 시각에서 시작해(새로고침·다른 기기로 다시 들어와도 앞선 번호보다 크다) 늘 1 이상 오른다.
   const shakeBeat = useRef(0);
+  const shakeN = useRef(0);
   const sendShake = useCallback(
     (shaking: boolean) => {
+      const frame = (on: boolean) => {
+        shakeN.current = Math.max(shakeN.current + 1, Date.now());
+        sendPreview({ '@action': 'SHAKE', shaking: on, n: shakeN.current });
+      };
       window.clearInterval(shakeBeat.current);
       shakeBeat.current = 0;
-      sendPreview({ '@action': 'SHAKE', shaking });
-      if (shaking) {
-        shakeBeat.current = window.setInterval(() => sendPreview({ '@action': 'SHAKE', shaking: true }), SHAKE_KEEPALIVE_MS);
-      }
+      frame(shaking);
+      if (shaking) shakeBeat.current = window.setInterval(() => frame(true), SHAKE_KEEPALIVE_MS);
     },
     [sendPreview],
   );
@@ -353,11 +358,14 @@ export function YachtTable({
 
   // 기록 강조는 잠깐만. D-203 — 황동 칩이 주사위 자리(동시 진행의 남은 그 좌석 띠)에서 방금 적힌 칸으로 날아가 꽂힌다.
   const rootRef = useRef<HTMLDivElement>(null);
+  // 스토어는 모듈 전역이라 다시 마운트되면(대기실에 다녀온 다음 판 — D-153) 지난 판의 마지막 기록이 첫 렌더에 남아 있다. 마운트 때의
+  // 값은 이미 지난 기록이다 — 강조·칩·축하·소리 어느 것도 다시 내지 않는다(굴림 신호 `rollNonce` 와 같은 방어).
+  const staleScore = useRef(s.lastScore);
   const [flash, setFlash] = useState<typeof s.lastScore>(null);
   const [chip, setChip] = useState<ChipFlight | null>(null);
   useEffect(() => {
     const last = s.lastScore;
-    if (!last) return;
+    if (!last || last === staleScore.current) return;
     setFlash(last);
     const root = rootRef.current;
     if (salonTheme && animate && root) {
@@ -471,7 +479,7 @@ export function YachtTable({
   }, [rollNonce]);
   useEffect(() => {
     const last = s.lastScore;
-    if (!last) return;
+    if (!last || last === staleScore.current) return;
     // D-208 — 내가 기록하면 굴림 알림은 바로 걷는다(기록 축하와 겹치지 않게).
     if (last.seat === mySeat) {
       window.clearTimeout(madeStopTimer.current);

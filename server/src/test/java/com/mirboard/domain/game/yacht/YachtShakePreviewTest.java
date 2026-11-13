@@ -28,8 +28,8 @@ import org.junit.jupiter.api.Test;
  */
 class YachtShakePreviewTest {
 
-    private static final YachtAction.Shake START = new YachtAction.Shake(true);
-    private static final YachtAction.Shake STOP = new YachtAction.Shake(false);
+    private static final YachtAction.Shake START = new YachtAction.Shake(true, 7);
+    private static final YachtAction.Shake STOP = new YachtAction.Shake(false, 8);
     private static final ObjectMapper JSON = new ObjectMapper();
     private final DiceRoller ones = () -> 1;
 
@@ -38,11 +38,11 @@ class YachtShakePreviewTest {
         YachtEngine engine = engine(2);
         YachtState s = openState(2, 1, 0);
         YachtEvent.DiceShaking e = engine.preview(s, 0, START).orElseThrow();
-        assertThat(e).isEqualTo(new YachtEvent.DiceShaking(0, true));
+        assertThat(e).isEqualTo(new YachtEvent.DiceShaking(0, true, 7));
         assertThat(e.sequenced()).isFalse();
         assertThat(e.privateSeat()).isEqualTo(-1);
         assertThat(e.envelopeType()).isEqualTo("DICE_SHAKING");
-        assertThat(engine.preview(s, 0, STOP)).contains(new YachtEvent.DiceShaking(0, false));
+        assertThat(engine.preview(s, 0, STOP)).contains(new YachtEvent.DiceShaking(0, false, 8));
         // 순수 — 같은 상태 그대로(레코드 동등성).
         assertThat(s).isEqualTo(openState(2, 1, 0));
     }
@@ -68,8 +68,8 @@ class YachtShakePreviewTest {
         YachtEngine engine = engine(2);
         YachtState s = openState(2, 1, 0);
         assertThat(engine.preview(withTurn(s, Dice.of(1, 2, 3, 4, 5), HoldMask.NONE, 3), 0, STOP))
-                .contains(new YachtEvent.DiceShaking(0, false));
-        assertThat(engine.preview(s, 1, STOP)).contains(new YachtEvent.DiceShaking(1, false));
+                .contains(new YachtEvent.DiceShaking(0, false, 8));
+        assertThat(engine.preview(s, 1, STOP)).contains(new YachtEvent.DiceShaking(1, false, 8));
         assertThat(engine.preview(withDeserted(s, 1), 1, STOP)).isEmpty();
         YachtEngine solo = engine(1);
         YachtState ended = solo.start(T0).newState();
@@ -86,13 +86,29 @@ class YachtShakePreviewTest {
     void in_simultaneous_mode_each_pending_seat_shakes_its_own_board() {
         YachtEngine engine = simultaneousEngine(3, 0);
         YachtState s = engine.start(T0).newState();
-        assertThat(engine.preview(s, 0, START)).contains(new YachtEvent.DiceShaking(0, true));
-        assertThat(engine.preview(s, 2, START)).contains(new YachtEvent.DiceShaking(2, true));
+        assertThat(engine.preview(s, 0, START)).contains(new YachtEvent.DiceShaking(0, true, 7));
+        assertThat(engine.preview(s, 2, START)).contains(new YachtEvent.DiceShaking(2, true, 7));
         // 이번 라운드를 기록한 좌석은 더 굴릴 것이 없다.
         s = engine.apply(s, 1, YachtAction.Roll.plain(), ones, T0 + 1).newState();
         s = engine.apply(s, 1, new YachtAction.Score(Category.ONES), ones, T0 + 2).newState();
         assertThat(engine.preview(s, 1, START)).isEmpty();
         assertThat(engine.preview(s, 0, START)).isPresent();
+    }
+
+    /** 번호는 그대로 실어 보내고(서버는 기억하지 않는다 — 낡은 번호도 통과), 범위 밖·빠진 번호(0)는 버린다. */
+    @Test
+    void the_frame_number_is_echoed_untouched_and_only_range_checked() {
+        YachtEngine engine = engine(2);
+        YachtState s = openState(2, 1, 0);
+        long big = YachtAction.Shake.MAX_N;
+        assertThat(engine.preview(s, 0, new YachtAction.Shake(true, big))).contains(new YachtEvent.DiceShaking(0, true, big));
+        assertThat(engine.preview(s, 0, new YachtAction.Shake(true, 1))).as("상태 없음 — 더 작은 번호도 그대로")
+                .contains(new YachtEvent.DiceShaking(0, true, 1));
+        assertThat(engine.preview(s, 0, new YachtAction.Shake(true, 0))).isEmpty();
+        assertThat(engine.preview(s, 0, new YachtAction.Shake(false, -3))).isEmpty();
+        assertThat(engine.preview(s, 0, new YachtAction.Shake(true, big + 1))).isEmpty();
+        GameAction missing = JSON.convertValue(Map.of("@action", "SHAKE", "shaking", true), YachtAction.class);
+        assertThat(engine.preview(s, 0, (YachtAction.Shake) missing)).isEmpty();
     }
 
     @Test
@@ -109,10 +125,11 @@ class YachtShakePreviewTest {
 
     @Test
     void the_wire_shapes_are_SHAKE_in_and_seat_plus_flag_out() throws Exception {
-        GameAction input = JSON.convertValue(Map.of("@action", "SHAKE", "shaking", true), YachtAction.class);
+        GameAction input = JSON.convertValue(Map.of("@action", "SHAKE", "shaking", true, "n", 7), YachtAction.class);
         assertThat(input).isEqualTo(START);
-        String json = JSON.writeValueAsString(new YachtEvent.DiceShaking(1, true));
-        assertThat(json).contains("\"seat\":1").contains("\"shaking\":true").doesNotContain("private")
+        String json = JSON.writeValueAsString(new YachtEvent.DiceShaking(1, true, 1_794_533_649_971L));
+        assertThat(json).contains("\"seat\":1").contains("\"shaking\":true").contains("\"n\":1794533649971")
+                .doesNotContain("private")
                 .doesNotContain("sequenced");
     }
 }

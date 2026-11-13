@@ -6,7 +6,7 @@ import { CLICK_SWALLOW_MS, SHAKE_HOLD_MS } from './DiceTray';
 import { YachtDie, PIP_COLOR } from './YachtDie';
 import { MOTION_MIN_JOLTS, MOTION_QUIET_MS } from './useDeviceShake';
 import { useToastStore } from '@/components/toast/toastStore';
-import { SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
+import { SHAKE_AFTER_ROLL_QUIET_MS, SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
 import { useAuthStore } from '@/features/auth/authStore';
 import type { Held, YachtSeatView, YachtTableView } from '@/types/yacht';
 
@@ -133,9 +133,11 @@ const release = () => {
   fireEvent.pointerUp(rollButton());
   fireEvent.click(rollButton());
 };
-const shakingEvent = (seatNo: number, shaking: boolean) =>
+let shakeSeq = 0;
+/** 번호를 주지 않으면 늘 새 번호(보낸 순서대로 닿은 프레임). */
+const shakingEvent = (seatNo: number, shaking: boolean, n = ++shakeSeq) =>
   act(() => {
-    useYachtStore.getState().applyEvent({ type: 'DICE_SHAKING', payload: { seat: seatNo, shaking } });
+    useYachtStore.getState().applyEvent({ type: 'DICE_SHAKING', payload: { seat: seatNo, shaking, n } });
   });
 const rolled = (seatNo: number, seq: number, rolls = 1) =>
   act(() => {
@@ -516,8 +518,8 @@ describe('얏추 D-264', () => {
   });
 
   describe('흔들기를 남들도 본다 — 미리보기(D-268)', () => {
-    const START = { '@action': 'SHAKE', shaking: true };
-    const STOP = { '@action': 'SHAKE', shaking: false };
+    const START = expect.objectContaining({ '@action': 'SHAKE', shaking: true, n: expect.any(Number) });
+    const STOP = expect.objectContaining({ '@action': 'SHAKE', shaking: false, n: expect.any(Number) });
 
     it('흔들기 시작·멈춤을 미리보기로 알린다 — 톡 누른 굴림은 알리지 않는다', () => {
       seed();
@@ -653,11 +655,61 @@ describe('얏추 D-264', () => {
       expect(container.querySelector('.yt-cup-shake')).toBeNull();
     });
 
+    it('보내는 프레임마다 번호가 오른다(시작·유지·멈춤 모두)', () => {
+      seed();
+      renderTable();
+      hold(SHAKE_HOLD_MS);
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_KEEPALIVE_MS + 10);
+      });
+      release();
+      const ns = sendPreview.mock.calls.map(([p]) => p.n as number);
+      expect(ns).toHaveLength(3);
+      expect(ns.every((n) => Number.isSafeInteger(n) && n >= 1)).toBe(true);
+      expect(ns[1]).toBeGreaterThan(ns[0]);
+      expect(ns[2]).toBeGreaterThan(ns[1]);
+    });
+
+    it('순서가 뒤바뀐 프레임 — 멈춤 뒤에 닿은 그 전의 시작은 버린다(유령 컵 없음), 번호 없는 프레임도 버린다', () => {
+      seed({ turnSeat: 1 });
+      const { container } = renderTable();
+      shakingEvent(1, false, 1001);
+      shakingEvent(1, true, 1000);
+      expect(container.querySelector('.yt-seat-cup')).toBeNull();
+      expect(useYachtStore.getState().shaking).toEqual({});
+      // 새 시작 뒤에 닿은 옛 멈춤도 버린다 — 컵이 남는다.
+      shakingEvent(1, true, 1003);
+      shakingEvent(1, false, 1002);
+      expect(container.querySelector('.yt-seat-cup')).not.toBeNull();
+      // 같은 번호가 두 번 와도 한 번만.
+      shakingEvent(1, false, 1004);
+      shakingEvent(1, true, 1004);
+      expect(container.querySelector('.yt-seat-cup')).toBeNull();
+      act(() => {
+        useYachtStore.getState().applyEvent({ type: 'DICE_SHAKING', payload: { seat: 1, shaking: true } });
+      });
+      expect(container.querySelector('.yt-seat-cup')).toBeNull();
+    });
+
+    it('굴림보다 늦게 닿은 그 굴림 전의 시작(멈춤도 아직 안 옴)은 컵을 다시 세우지 않는다 — 잠깐 뒤의 새 흔들기는 보인다', () => {
+      seed({ turnSeat: 1 });
+      const { container } = renderTable();
+      rolled(1, 2);
+      shakingEvent(1, true, 2000);
+      expect(container.querySelector('.yt-seat-cup')).toBeNull();
+      expect(container.querySelector('.yt-cup-shake')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_AFTER_ROLL_QUIET_MS + 10);
+      });
+      shakingEvent(1, true, 2001);
+      expect(container.querySelector('.yt-seat-cup')).not.toBeNull();
+    });
+
     it('내 흔들기의 메아리·차례가 아닌 좌석의 낡은 시작은 담지 않고, 순번 없는 프레임이라 다시 받기를 부르지 않는다', () => {
       seed();
       useYachtStore.getState().setOwnSeat(0);
       const apply = (seatNo: number, shaking: boolean) =>
-        useYachtStore.getState().applyEvent({ type: 'DICE_SHAKING', payload: { seat: seatNo, shaking } });
+        useYachtStore.getState().applyEvent({ type: 'DICE_SHAKING', payload: { seat: seatNo, shaking, n: ++shakeSeq } });
       expect(apply(0, true)).toBe('ignored');
       expect(apply(1, true)).toBe('ignored');
       expect(useYachtStore.getState().shaking).toEqual({});
@@ -677,6 +729,40 @@ describe('얏추 D-264', () => {
 
   describe('버튼 딸깍(D-268)', () => {
     const cues = () => playTableSfx.mock.calls.map(([cue]) => cue);
+
+    it('다시 마운트된 게임판(대기실에 다녀온 다음 판)은 스토어에 남은 지난 기록으로 소리·강조·축하를 다시 내지 않는다', () => {
+      const scoredRaw = (seatNo: number, seq: number, category: string, points: number, auto = false) =>
+        useYachtStore.getState().applyEvent({
+          type: 'SCORED',
+          seq,
+          payload: { seat: seatNo, category, points, upperSubtotal: 0, bonus: 0, total: points, auto },
+        });
+      // 내 자동 기록이 마지막이었던 판.
+      seed({ dice: [2, 2, 2, 2, 2], rolls: 1 });
+      scoredRaw(0, 2, 'YACHT', 50, true);
+      const a = renderTable();
+      expect(cues()).toEqual([]);
+      expect(a.container.querySelector('.yt-cell-flash')).toBeNull();
+      expect(a.container.querySelector('.yt-chip')).toBeNull();
+      expect(a.container.querySelector('.yt-fx')).toBeNull();
+      expect(a.container.querySelector('.yt-seat-total-bump')).toBeNull();
+      // 그 뒤의 새 기록은 평소대로.
+      act(() => {
+        scoredRaw(1, 3, 'CHOICE', 10);
+      });
+      expect(playTableSfx.mock.calls).toEqual([['score.commit', { gain: OTHER_SCORE_SFX_GAIN }]]);
+      expect(a.container.querySelector('.yt-cell-flash')).not.toBeNull();
+      a.unmount();
+
+      // 남의 요트가 마지막이었던 판 — 명패 축하도 다시 뜨지 않는다.
+      playTableSfx.mockReset();
+      seed({ turnSeat: 1, dice: [2, 2, 2, 2, 2], rolls: 1 });
+      scoredRaw(1, 2, 'YACHT', 50);
+      const b = renderTable();
+      expect(cues()).toEqual([]);
+      expect(b.container.querySelector('.yt-seat-yacht')).toBeNull();
+      expect(b.container.querySelector('.yt-cell-flash')).toBeNull();
+    });
 
     it('주사위 고정은 톡, 풀기는 다른 톡 — 일반 버튼 딸깍과 겹치지 않는다', () => {
       seed({ dice: [1, 2, 3, 4, 6], rolls: 1 });
@@ -832,6 +918,57 @@ describe('얏추 D-264', () => {
       expect(sendAction).toHaveBeenCalledTimes(1);
       act(() => {
         vi.advanceTimersByTime(MOTION_QUIET_MS + 50);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('누르자마자(흔들기가 되기 전에) 휴대폰을 흔들다 멈추고 계속 누르다 떼어도 ROLL 은 한 번 — 흔들기는 누름이 이어받는다', async () => {
+      touchDevice();
+      seed();
+      const { container } = renderTable();
+      await turnOn();
+      closeGameMenu();
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      jolt(MOTION_MIN_JOLTS);
+      expect(startShake).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS + 50);
+      });
+      // 휴대폰은 멎었지만 손은 아직 누르고 있다 — 굴리지 않고 계속 흔든다.
+      expect(sendAction).not.toHaveBeenCalled();
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('.yt-dice')).not.toHaveClass('yt-dice-shaking');
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS + 500);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      // 남들에게도 시작과 멈춤이 짝이 맞게 간다(마지막은 멈춤).
+      const sent = sendPreview.mock.calls.map(([p]) => p.shaking);
+      expect(sent[sent.length - 1]).toBe(false);
+      expect(sent.filter(Boolean).length).toBe(sent.filter((x: boolean) => !x).length);
+    });
+
+    it('아주 짧게 누른 사이(흔들기가 되기 전)에 휴대폰이 멎어도 ROLL 은 떼는 순간 한 번', async () => {
+      touchDevice();
+      seed();
+      renderTable();
+      await turnOn();
+      closeGameMenu();
+      jolt(MOTION_MIN_JOLTS);
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS - 100);
+      });
+      fireEvent.pointerDown(rollButton(), { button: 0 });
+      act(() => {
+        vi.advanceTimersByTime(120);
+      });
+      expect(sendAction).not.toHaveBeenCalled();
+      release();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS + 500);
       });
       expect(sendAction).toHaveBeenCalledTimes(1);
     });

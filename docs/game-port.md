@@ -452,8 +452,10 @@ default Optional<GameEvent> preview(GameState state, int seat, GameAction input)
   `YachtAction.Shake(shaking)` 한 갈래를 더하고(`apply` 는 `INVALID_ACTION`, `legalActions`·봇에 없음 — 계약 ⑤), 어댑터 `preview` 가 순수 엔진
   `YachtEngine.preview` 에 넘긴다 — 시작·유지는 **지금 굴릴 수 있는 좌석**만(둘 차례·굴림 남음·다 고정 아님, 모두 같이면 각자), 멈춤은 살아 있는
   좌석이면 받는다(굴린 직후의 멈춤이 버려져 남의 화면에 컵이 남지 않게). 이벤트 `YachtEvent.DiceShaking(seat, shaking)` 은 `sequenced() == false`
-  — 요트에서 순번을 쓰지 않는 유일한 이벤트다. 씨앗포와 다른 점: 값이 켬/끔 하나라 낡은 프레임을 거르는 번호가 없고, 대신 받는 쪽이
-  **유지 프레임(1.5초) + 무소식 만기(4초)** 로 놓친 멈춤을 메운다(그 좌석의 굴림·기록·차례 넘어감·resync 도 지운다). 근거:
+  — 요트에서 순번을 쓰지 않는 유일한 이벤트다. 인바운드 채널은 수신 순서를 보장하지 않으므로(전역
+  `setPreserveReceiveOrder` 는 다른 게임에 영향이 있어 쓰지 않는다) 씨앗포처럼 보낸 쪽 번호 `n` 을 싣는다 — 서버는 범위만 보고 그대로 돌려주고
+  (상태 없음), 받는 쪽이 좌석별 마지막 `n` 보다 낡은 프레임을 버리며 그 좌석의 굴림 직후 0.8초는 시작을 받지 않는다. 놓친 멈춤은
+  **유지 프레임(1.5초) + 무소식 만기(4초)** 가 메운다(그 좌석의 굴림·기록·차례 넘어감·resync 도 지운다). 근거:
   `YachtShakePreviewTest`·`YachtGameEngineTest.preview_…`, `GameEnginePreviewDefaultTest`(이제 씨앗포·얏추 둘만 override — 나머지 다섯은 그대로),
   인프라 `grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra` 0건 유지.
 

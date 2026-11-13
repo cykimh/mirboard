@@ -88,12 +88,12 @@ class YachtGameEngineTest {
     void preview_passes_only_a_shake_from_a_seat_that_can_roll_and_never_touches_the_store() {
         YachtState s = openState(2, 1, 0);
         YachtGameEngine a = adapter(45, T0, publisher);
-        GameEvent e = a.preview(s, 0, new YachtAction.Shake(true)).orElseThrow();
-        assertThat(e).isEqualTo(new YachtEvent.DiceShaking(0, true));
+        GameEvent e = a.preview(s, 0, new YachtAction.Shake(true, 3)).orElseThrow();
+        assertThat(e).isEqualTo(new YachtEvent.DiceShaking(0, true, 3));
         assertThat(e.sequenced()).isFalse();
         assertThat(e.privateSeat()).isLessThan(0);
         assertThat(e.envelopeType()).isEqualTo("DICE_SHAKING");
-        assertThat(a.preview(s, 1, new YachtAction.Shake(true))).as("남의 차례").isEmpty();
+        assertThat(a.preview(s, 1, new YachtAction.Shake(true, 3))).as("남의 차례").isEmpty();
         assertThat(a.preview(s, 0, YachtAction.Roll.plain())).as("미리보기 입력이 아니다").isEmpty();
         assertThat(a.preview(s, 0, new YachtAction.Score(Category.ONES))).isEmpty();
         assertThat(a.preview(s, 0, null)).isEmpty();

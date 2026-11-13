@@ -379,8 +379,10 @@ D-200 부터 공개(`AVAILABLE`) — 되돌리기는 설정 `mirboard.yacht.stat
 
 `held` 길이가 5 가 아니거나 모르는 칸이면 역직렬화 실패 → `INVALID_ACTION`. 주사위 직렬화는 정수 5개 배열(`[3,3,4,1,5]`).
 
-**클라 → 서버 미리보기**(`/app/room/{roomId}/preview`, D-268 — 액션 아님): `{ "@action": "SHAKE", "shaking": true|false }` — 컵을 흔들기
-시작했다·멈췄다. 흔드는 동안 1.5초마다 `shaking:true` 를 다시 보낸다(유지). 시작·유지는 그 좌석이 **지금 굴릴 수 있을 때만**(둘 차례 —
+**클라 → 서버 미리보기**(`/app/room/{roomId}/preview`, D-268 — 액션 아님): `{ "@action": "SHAKE", "shaking": true|false, "n": 번호 }` — 컵을 흔들기
+시작했다·멈췄다. 흔드는 동안 1.5초마다 `shaking:true` 를 다시 보낸다(유지). `n` 은 보낸 쪽이 **프레임마다 올리는** 정수(1 ~ 2^53−1, 클라는
+시각에서 시작) — 인바운드 채널이 수신 순서를 보장하지 않아 받는 쪽이 낡은 프레임을 버리는 기준이다. 서버는 범위만 보고 그대로 실어 보낸다
+(기억하지 않는다, 빠졌거나 범위 밖이면 버림). 시작·유지는 그 좌석이 **지금 굴릴 수 있을 때만**(둘 차례 —
 모두 같이면 아직 기록하지 않은 각자 — 이고 굴림이 남았고 다섯 개를 다 고정하지 않음) `DICE_SHAKING` 이 나가고, 멈춤은 살아 있는 좌석이면
 나간다. 그 밖에는 조용히 버려진다. `/action` 으로 보내면 `INVALID_ACTION`.
 
@@ -394,7 +396,7 @@ D-200 부터 공개(`AVAILABLE`) — 되돌리기는 설정 `mirboard.yacht.stat
 | `ROUND_STARTED` | `{ round, turnSeconds }` | **D-202 동시 진행**의 라운드 시작 — 살아 있는 모두의 주사위가 빈다(차례대로 진행의 `TURN_CHANGED` 자리). `turnSeconds` 는 라운드 전체 제한 |
 | `DICE_HELD` | `{ seat, held }` | 홀드 실시간 공개(D-181) |
 | `DICE_ROLLED` | `{ seat, dice, held, rolls, candidates }` | `rolls` 1~3. `candidates` = 그 좌석의 빈 칸 → 지금 주사위 점수(0 포함, 서버 계산 — 클라는 점수를 계산하지 않는다) |
-| `DICE_SHAKING` | `{ seat, shaking }` | D-268 — 그 좌석이 컵을 흔드는 중(포트 ⑧ 미리보기). **순번 없음**(`seq` 필드 없음, 상태 무변경, resync `tableView` 에 없음). 받는 쪽은 멈춤(`shaking:false`)·그 좌석의 `DICE_ROLLED`·`SCORED`·차례 넘어감에 걷고, 4초 동안 소식이 없으면 스스로 걷는다 |
+| `DICE_SHAKING` | `{ seat, shaking, n }` | D-268 — 그 좌석이 컵을 흔드는 중(포트 ⑧ 미리보기). **순번 없음**(`seq` 필드 없음, 상태 무변경, resync `tableView` 에 없음). 받는 쪽은 멈춤(`shaking:false`)·그 좌석의 `DICE_ROLLED`·`SCORED`·차례 넘어감에 걷고, 4초 동안 소식이 없으면 스스로 걷는다. 좌석별 마지막 `n` 보다 크지 않은 프레임은 버리고(순서 역전), 그 좌석의 `DICE_ROLLED` 뒤 0.8초 동안은 시작을 받지 않는다(굴림보다 늦게 닿은 그 전의 시작) |
 | `SCORED` | `{ seat, category, points, upperSubtotal, bonus, total, auto }` | 기록 뒤 그 좌석의 소계·보너스·총점. `auto` 는 차례 제한 만기 자동 기록 |
 | `PLAYER_ELIMINATED` | `{ seat, total }` | 탈주 — 점수표가 멈춘다. 그 좌석의 차례였으면 뒤에 `TURN_CHANGED` 가 온다 |
 | `MATCH_ENDED` | `{ reason, placements: [{seat, rank, total, deserted}] }` | `reason`: `FINISHED`·`NO_HUMANS`·`ACTION_LIMIT`. 순위는 1, 1, 3 식, 탈주자는 모두 같은 최하위 |

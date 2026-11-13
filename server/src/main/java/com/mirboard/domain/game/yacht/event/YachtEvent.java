@@ -116,8 +116,10 @@ public sealed interface YachtEvent extends GameEvent
     /**
      * D-268 — 그 좌석이 컵을 흔드는 중(포트 ⑧ 미리보기). 상태가 아니라 표시일 뿐이라 <b>순번을 쓰지 않는다</b>(D-126) — 놓쳐도 되고,
      * 받는 쪽은 멈춤 프레임을 놓쳐도 몇 초 뒤 스스로 걷는다. resync 스냅샷에는 없다.
+     *
+     * @param n 보낸 쪽 번호 그대로 — 받는 쪽이 순서가 뒤바뀐 낡은 프레임을 버리는 기준
      */
-    record DiceShaking(int seat, boolean shaking) implements YachtEvent {
+    record DiceShaking(int seat, boolean shaking, long n) implements YachtEvent {
         @Override
         public boolean sequenced() {
             return false;

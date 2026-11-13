@@ -195,7 +195,8 @@ export function DiceTray({
   // D-268 — 버튼 누름 한 번(포인터 또는 키보드). 누른 뒤 `SHAKE_HOLD_MS` 가 지나면 흔들기가 되고, 떼는 순간 정확히 한 번 굴린다.
   // 브라우저는 떼고 나서 click 도 보낸다 — 그 click 은 삼킨다. 누름 없이 온 click(보조기기·스크립트)은 그대로 한 번 굴린다.
   // `cancelled` — 누르는 사이에 새 굴림이 오거나 굴릴 수 없게 됐다: 떼어도 굴리지 않는다(뒤따르는 click 도 삼킨다).
-  const press = useRef<{ timer: number; cancelled: boolean } | null>(null);
+  // `ripe` — 누른 지 `SHAKE_HOLD_MS` 가 지났다(흔들 만큼 눌렀다).
+  const press = useRef<{ timer: number; cancelled: boolean; ripe: boolean } | null>(null);
   const swallow = useRef(0);
   const disarmSwallow = () => {
     window.clearTimeout(swallow.current);
@@ -207,8 +208,9 @@ export function DiceTray({
     press.current = null;
     if (!live.current.rollable) return;
     disarmSwallow();
-    const p = { cancelled: false, timer: 0 };
+    const p = { cancelled: false, ripe: false, timer: 0 };
     p.timer = window.setTimeout(() => {
+      p.ripe = true;
       if (press.current === p && !p.cancelled) beginShake('press');
     }, SHAKE_HOLD_MS);
     press.current = p;
@@ -274,7 +276,14 @@ export function DiceTray({
   useDeviceShake({
     enabled: motionShake && rollable,
     onStart: () => beginShake('motion'),
-    onStop: (roll) => endShake(roll, 'motion'),
+    // 버튼을 누르고 있는 동안에는 휴대폰이 멎어도 굴리지 않는다 — 굴리는 것은 떼는 순간 하나뿐이다. 누름 타이머보다 휴대폰 흔들기가
+    // 먼저 흔들기를 차지했을 때도 그렇다(여기서 굴리면 떼면서 한 번 더 가 ROLL 이 두 번이었다, 리뷰 지적). 흔들기는 누름이 이어받는다.
+    onStop: (roll) => {
+      const p = press.current;
+      const held = p !== null && !p.cancelled;
+      endShake(roll && !held, 'motion');
+      if (held && p.ripe) beginShake('press');
+    },
   });
 
   const left = MAX_ROLLS - rolls;

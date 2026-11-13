@@ -76,7 +76,20 @@ export interface YachtRoomState {
    * 내 좌석은 담지 않는다(내 흔들기는 내 화면이 기준).
    */
   shaking: Record<number, number>;
+  /**
+   * D-268 — 좌석별로 마지막에 받아들인 흔들기 프레임 번호(`n`). 서버 인바운드 채널은 수신 순서를 보장하지 않아 시작이 멈춤보다 늦게 올 수
+   * 있다 — 이보다 크지 않은 번호는 버린다. 차례·라운드가 바뀌면 비운다.
+   */
+  shakeSeen: Record<number, number>;
+  /**
+   * D-268 — 좌석별 "이때까지는 흔들기 시작을 받지 않는다"(ms). 그 좌석의 굴림이 온 직후 잠깐 — 굴림보다 늦게 닿은 그 굴림 전의 시작(멈춤도
+   * 아직 안 온 경우)이 컵을 다시 세우지 않게.
+   */
+  shakeQuietUntil: Record<number, number>;
 }
+
+/** D-268 — 그 좌석의 굴림 뒤 이만큼은 흔들기 시작을 받지 않는다(굴림 연출이 도는 동안. 진짜 새 흔들기는 다음 유지 프레임이 살린다). */
+export const SHAKE_AFTER_ROLL_QUIET_MS = 800;
 
 /** D-268 — 흔들기 소식이 이만큼 끊기면 멈춘 것으로 본다(보내는 쪽은 {@link SHAKE_KEEPALIVE_MS} 마다 다시 알린다). */
 export const SHAKE_STALE_MS = 4000;
@@ -128,6 +141,8 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   simultaneous: false,
   seatTurns: {},
   shaking: {},
+  shakeSeen: {},
+  shakeQuietUntil: {},
 };
 
 /** 그 좌석의 흔들기 표시를 지운 새 표(없으면 같은 객체 그대로 — 쓸데없는 다시 그리기를 피한다). */
@@ -194,6 +209,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       seatTurns,
       // 스냅샷에는 흔들기가 없다 — 흔드는 중이면 다음 유지 프레임이 다시 채운다.
       shaking: {},
+      shakeQuietUntil: {},
       ...(simultaneous ? ownTray(seatTurns, get().ownSeat) : {}),
     });
   },
@@ -223,6 +239,8 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           turnSeat: p.seat,
           round: p.round,
           shaking: {},
+          shakeSeen: {},
+          shakeQuietUntil: {},
           lastSent: null,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
@@ -240,6 +258,8 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           round: p.round,
           seatTurns,
           shaking: {},
+          shakeSeen: {},
+          shakeQuietUntil: {},
           lastSent: null,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
@@ -266,19 +286,27 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         // D-268 — 순번 없는 미리보기. 락 밖에서 만들어져 낡은 것이 섞일 수 있다 — 지금 굴릴 차례가 아닌 좌석의 시작은 버린다.
         const p = payload as DiceShakingPayload;
         if (p.seat === state.ownSeat) return 'ignored';
+        // 수신 순서가 뒤바뀐 낡은 프레임(멈춤 뒤에 닿은 시작, 새 시작 뒤에 닿은 옛 멈춤)은 버린다.
+        if (typeof p.n !== 'number' || p.n <= (state.shakeSeen[p.seat] ?? 0)) return 'ignored';
+        const shakeSeen = { ...state.shakeSeen, [p.seat]: p.n };
         if (!p.shaking) {
-          set({ shaking: withoutShaking(state.shaking, p.seat) });
+          set({ shakeSeen, shaking: withoutShaking(state.shaking, p.seat) });
           return 'applied';
         }
         const live = state.simultaneous ? (state.seatTurns[p.seat]?.pending ?? false) : p.seat === state.turnSeat;
-        if (!live) return 'ignored';
-        set({ shaking: { ...state.shaking, [p.seat]: Date.now() } });
+        const now = Date.now();
+        if (!live || now < (state.shakeQuietUntil[p.seat] ?? 0)) {
+          set({ shakeSeen });
+          return 'ignored';
+        }
+        set({ shakeSeen, shaking: { ...state.shaking, [p.seat]: now } });
         return 'applied';
       }
 
       case 'DICE_ROLLED': {
         const p = payload as DiceRolledPayload;
         const shaking = withoutShaking(state.shaking, p.seat);
+        const shakeQuietUntil = { ...state.shakeQuietUntil, [p.seat]: Date.now() + SHAKE_AFTER_ROLL_QUIET_MS };
         if (state.simultaneous) {
           const turn: YachtSeatTurn = {
             seat: p.seat,
@@ -290,12 +318,13 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           };
           const seatTurns = { ...state.seatTurns, [p.seat]: turn };
           if (p.seat !== state.ownSeat) {
-            set({ seatTurns, shaking });
+            set({ seatTurns, shaking, shakeQuietUntil });
             return 'applied';
           }
           set({
             seatTurns,
             shaking,
+            shakeQuietUntil,
             dice: p.dice,
             held: p.held,
             rolls: p.rolls,
@@ -308,6 +337,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         if (p.seat !== state.turnSeat) return 'unhandled';
         set({
           shaking,
+          shakeQuietUntil,
           dice: p.dice,
           held: p.held,
           rolls: p.rolls,

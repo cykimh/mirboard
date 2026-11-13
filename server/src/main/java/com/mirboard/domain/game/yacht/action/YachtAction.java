@@ -47,7 +47,16 @@ public sealed interface YachtAction extends GameAction
      * {@code /action} 으로 오면 엔진이 {@code INVALID_ACTION} 으로 거절하고, 합법 수·봇에는 나오지 않는다.
      *
      * @param shaking 흔들기 시작·유지(true) / 멈춤(false)
+     * @param n       보낸 쪽이 프레임마다 올리는 번호(1 ~ {@link #MAX_N}). 인바운드 채널은 수신 순서를 보장하지 않는다 — 서버는 범위만 보고
+     *                그대로 실어 보내며(상태 없음), 받는 쪽이 좌석별 마지막 번호보다 낡은 프레임을 버린다
      */
-    record Shake(boolean shaking) implements YachtAction {
+    record Shake(boolean shaking, long n) implements YachtAction {
+
+        /** JS 가 정확히 다루는 가장 큰 정수(2^53 − 1). */
+        public static final long MAX_N = 9_007_199_254_740_991L;
+
+        public boolean validNumber() {
+            return n >= 1 && n <= MAX_N;
+        }
     }
 }
