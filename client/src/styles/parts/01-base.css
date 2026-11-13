@@ -48,13 +48,6 @@ a {
   color: var(--color-accent-link);
 }
 
-.error {
-  color: var(--color-danger);
-  background: var(--color-danger-bg);
-  padding: 10px;
-  border-radius: 6px;
-}
-
 .room-page {
   display: flex;
   flex-direction: column;

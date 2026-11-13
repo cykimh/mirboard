@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -438,18 +439,13 @@ export function OmokTable({
       </div>
 
       <div className="om-stage">
-        {/* D-193 — 끊김·거절 안내는 판 위에 띄운다(흐름에 끼우면 판이 밀려 내려간다). */}
-        <div className="om-notices">
-          <ReconnectBanner connected={connected} />
-          {s.errorMessage && (
-            <p className="om-error" role="alert">
-              <span>{s.errorMessage}</span>
-              <button type="button" className="om-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-                ×
-              </button>
-            </p>
-          )}
-        </div>
+        {/* D-269 — 끊김·거절 안내는 화면 위에 뜬다(FloatingNotice — 흐름에 끼우면 판이 밀려 내려간다, D-193). */}
+        <ReconnectBanner connected={connected} />
+        {s.errorMessage && (
+          <FloatingNotice tone="error" onClose={() => s.setError(null)}>
+            {s.errorMessage}
+          </FloatingNotice>
+        )}
         <div className={`om-board-wrap${myTurn ? ' om-board-myturn' : ''}`}>
           <div className="om-ruler om-ruler-y" aria-hidden="true">
             {RULER_Y.map((n) => (

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -742,12 +743,9 @@ export function YachtTable({
 
       <ReconnectBanner connected={connected} />
       {s.errorMessage && (
-        <p className="yt-error" role="alert">
-          <span>{s.errorMessage}</span>
-          <button type="button" className="yt-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-            ×
-          </button>
-        </p>
+        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
+          {s.errorMessage}
+        </FloatingNotice>
       )}
 
       {/* 좌석 띠 — 점수표 열과 같은 좌석 순서. 차례인 좌석은 테두리.

@@ -18,7 +18,7 @@
 @import './tokens.css';
 @import './theme.css';
 
-/* 전역 리셋·토큰·기본 엘리먼트(button/input/a)·.error·.room-page */
+/* 전역 리셋·토큰·기본 엘리먼트(button/input/a)·.room-page */
 @import './parts/01-base.css';
 /* 게임판 셸 + 헤더(상태 배지·연결점·컨트롤) */
 @import './parts/02-game-table-header.css';

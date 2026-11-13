@@ -1115,7 +1115,6 @@ describe('RoomPage — 게임판 강제 종료 (D-135)', () => {
  * 시작하지 않는다 — 티츄도 같다), 방장이 아닌 사람에게는 방장이 시작한다고 알린다. 서버도 같은 조건 — room_start_now.lua.
  */
 describe('RoomPage — 방장 시작 (D-143)', () => {
-  const metaCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1194,7 +1193,8 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
     expect(screen.queryByRole('button', { name: /명으로 시작/ })).toBeNull();
   });
 
-  it('인원이 모자라 거절되면 서버 문구가 아니라 한국어로 알리고, 사람이 바뀌면 지운다', async () => {
+  // D-269 — 버튼 결과 오류는 대기실 흐름에 끼우지 않고 토스트로 띄운다(여기선 스토어로 본다 — 스스로 내려간다).
+  it('인원이 모자라 거절되면 서버 문구가 아니라 한국어로, 토스트로 알린다', async () => {
     const { roomsApi } = await import('@/api/rooms');
     vi.mocked(roomsApi.startNow).mockRejectedValue(new ApiError(409, { error: { code: 'NOT_ENOUGH_PLAYERS', message: 'Not enough players to start' } }));
     loadGame.mockResolvedValue(oneCard);
@@ -1203,13 +1203,10 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
     await act(async () => {
       fireEvent.click(button);
     });
-    expect(screen.getByText('2명 이상 모여야 해요')).toBeInTheDocument();
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('2명 이상 모여야 해요');
+    expect(useToastStore.getState().toasts.at(-1)?.tone).toBe('error');
     expect(screen.queryByText('Not enough players to start')).toBeNull();
-
-    act(() => {
-      metaCallback()(waiting({ playerIds: [1, 2], playerCount: 2 }));
-    });
-    expect(screen.queryByText('2명 이상 모여야 해요')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull(); // 흐름 안 안내 줄은 없다
   });
 
   it('네트워크 오류도 알린다', async () => {
@@ -1222,7 +1219,7 @@ describe('RoomPage — 방장 시작 (D-143)', () => {
       fireEvent.click(button);
     });
 
-    expect(screen.getByText('시작하지 못했어요 — 다시 눌러 주세요')).toBeInTheDocument();
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('시작하지 못했어요 — 다시 눌러 주세요');
   });
 
   it('요청 중에는 버튼이 잠긴다', async () => {
@@ -1323,7 +1320,7 @@ describe('RoomPage — 관전자 자리에 앉기 (D-137)', () => {
       fireEvent.click(sit);
     });
 
-    expect(screen.getByText('자리가 방금 찼어요 — 관전을 이어 가요')).toBeInTheDocument();
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('자리가 방금 찼어요 — 관전을 이어 가요');
     expect(screen.queryByText('Room is full')).toBeNull();
     expect(screen.getByText(/관전 중/)).toBeInTheDocument();
   });

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { seatMinWidth, tableLayout, type TableSide } from '@/components/seatOrder';
 import { RoomChat } from '@/features/chat/RoomChat';
@@ -378,12 +379,9 @@ export function OneCardTable({
 
       <ReconnectBanner connected={connected} />
       {s.errorMessage && (
-        <p className="oc-error" role="alert">
-          <span>{s.errorMessage}</span>
-          <button type="button" className="oc-error-close" aria-label="닫기" onClick={() => s.setError(null)}>
-            ×
-          </button>
-        </p>
+        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
+          {s.errorMessage}
+        </FloatingNotice>
       )}
 
       {/* D-132 — 테이블. 내 자리는 아래 칸(D-262 — 판 안의 이름표)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}

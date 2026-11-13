@@ -113,45 +113,6 @@ button.om-badge {
   margin: 0 0 0 calc((100% - var(--om-stage-w)) / 2);
 }
 
-.om-notices {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-}
-
-.om-notices > * {
-  pointer-events: auto;
-  margin: 0 !important;
-  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.45);
-}
-
-.om-error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--om-warn-text);
-  background: var(--om-surface);
-  font-size: 13px;
-}
-
-.om-error-close {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 18px;
-  cursor: pointer;
-}
-
 /* ── 차례 띠 ───────────────────────────────────────────────────────── */
 /* 차례 띠는 한 줄 고정(D-193) — 이름이 길거나 배지가 붙어도 줄바꿈하지 않고 이름을 줄여 판이 내려가지 않게. */
 .om-strip-wrap {

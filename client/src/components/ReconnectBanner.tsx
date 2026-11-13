@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 
 interface ReconnectBannerProps {
   connected: boolean;
@@ -7,6 +8,7 @@ interface ReconnectBannerProps {
 /**
  * Phase 8A — STOMP 끊김이 1초 이상 지속되면 노란 배너, 1분 이상이면 추가 안내(D-135 — 방장 강제 종료가 봇 판만이 돼 탈주 유예
  * 안내로). D-158 — 유예가 3분이 됐고, 안내는 유예가 끝나기 전에 보여야 쓸모가 있어 1분에 띄운다(예전엔 3분에 "2분"을 알렸다).
+ * D-269 — 게임판 흐름에 끼우지 않고 화면 위에 띄운다(`FloatingNotice` — 뜰 때 판이 밀려 내려가지 않게).
  * 끊김 시각화로 사용자가 "내 차례인데 왜 안 가지?" 같은 혼동을 피한다.
  */
 export function ReconnectBanner({ connected }: ReconnectBannerProps) {
@@ -38,24 +40,13 @@ export function ReconnectBanner({ connected }: ReconnectBannerProps) {
   const longDisconnect = elapsedMs >= 60 * 1000;
 
   return (
-    <div
-      role="status"
-      style={{
-        background: '#3b3000',
-        color: '#ffe69c',
-        padding: '8px 12px',
-        borderRadius: 6,
-        border: '1px solid #6b5300',
-        marginBottom: 12,
-        fontSize: 14,
-      }}
-    >
+    <FloatingNotice tone="warning">
       재연결 중... ({elapsedSec}s)
       {longDisconnect && (
         <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
           장시간 끊김 — 게임 중 3분 넘게 끊기면 탈주로 처리됩니다. 네트워크를 확인해 주세요.
         </div>
       )}
-    </div>
+    </FloatingNotice>
   );
 }

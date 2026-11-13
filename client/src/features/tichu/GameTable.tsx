@@ -13,6 +13,7 @@ import { useSfx } from '@/features/sound/useSfx';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { Button } from '@/components/ui/button';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useGameTableModel } from './useGameTableModel';
@@ -269,9 +270,9 @@ export function GameTable({
       )}
 
       {m.errorMessage && (
-        <p className="error" onClick={() => m.setError(null)}>
+        <FloatingNotice tone="error" onClose={() => m.setError(null)}>
           {m.errorMessage}
-        </p>
+        </FloatingNotice>
       )}
 
       {live && m.lastReceived && m.lastReceived.length > 0 && (

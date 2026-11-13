@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
+import { FloatingNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -257,7 +258,11 @@ export function SkullKingTable({
       </header>
 
       <ReconnectBanner connected={connected} />
-      {s.errorMessage && <p className="sk-error">{s.errorMessage}</p>}
+      {s.errorMessage && (
+        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
+          {s.errorMessage}
+        </FloatingNotice>
+      )}
 
       {/* D-132 — 테이블. 내 자리는 아래(아래의 "나" 줄)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
       <div className="sk-felt" role="group" aria-label="좌석 배치">

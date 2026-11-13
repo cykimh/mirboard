@@ -101,18 +101,6 @@ button.cr-badge {
   font-weight: 700;
 }
 
-.cr-error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
 .cr-error-close {
   min-width: 32px;
   min-height: 32px;
@@ -1297,14 +1285,6 @@ html.dark .cr-table.cr-storybook {
 .cr-storybook .cr-countdown.cr-countdown-urgent {
   color: var(--cr-bad);
   box-shadow: 0 2px 0 var(--cr-bad);
-}
-
-.cr-storybook .cr-error {
-  border-radius: 14px;
-  background: var(--cr-paper);
-  box-shadow: 0 2px 0 var(--cr-bad);
-  color: var(--cr-bad);
-  font-weight: 700;
 }
 
 /* ── 좌석 ── */
