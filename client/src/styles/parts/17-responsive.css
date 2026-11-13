@@ -384,6 +384,19 @@
     transform: rotate(-14deg);
   }
 
+  /* D-270 — 버튼 떨림·결과를 기다리는 떨림도 멈춘다. 버튼의 글("흔드는 중…"·"굴리는 중…")과 눌린 색은 그대로 바뀐다. */
+  .yt-roll-shaking-live,
+  .yt-theme-salon .yt-roll.yt-roll-shaking-live,
+  .yt-dice-waiting-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+  .yt-theme-salon .yt-cup.yt-cup-wait {
+    animation: none;
+  }
+
+  .yt-theme-salon .yt-cup.yt-cup-wait {
+    display: block;
+    transform: rotate(-14deg);
+  }
+
   /* D-268 — 남의 흔들기(명패의 작은 컵·작은 주사위)도 멈춘다. 컵은 기울어진 채 남아 "흔드는 중"만 알린다. */
   .yt-seat-cup-live,
   .yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
