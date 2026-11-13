@@ -121,4 +121,20 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(portal.size).toBeGreaterThan(0);
     for (const [name, value] of portal) expect(value, name).toBe(table.get(name));
   });
+
+  it('D-270 — 살롱의 흔드는 중·굴리는 중 버튼 모습은 hover·active 규칙(명시도 0,4,0)보다 세다', () => {
+    // 이겨야 하는 규칙들 — 전부 클래스·의사 클래스 넷(0,4,0)이고 일부는 17 에 있어 뒤에 온다. 순서가 아니라 명시도로 이겨야 한다.
+    expect(cssCode).toContain('.yt-theme-salon .yt-roll:hover:not(:disabled)');
+    expect(cssCode).toContain('.yt-theme-salon .yt-roll:not(:disabled):active');
+    expect(responsiveCssSource).toContain('.yt-theme-salon .yt-roll:not(:disabled):hover');
+    const rule =
+      /\.yt-theme-salon \.yt-roll\.yt-roll-main\.yt-roll-shaking:not\(:disabled\),\s*\.yt-theme-salon \.yt-roll\.yt-roll-main\.yt-roll-pending:not\(:disabled\) \{([^}]*)\}/.exec(
+        cssCode,
+      )?.[1] ?? '';
+    expect(rule).toContain('filter:');
+    expect(rule).toContain('background:');
+    expect(rule).toContain('transform:');
+    // 약한 선택자(0,3,0)로 같은 모습을 정하는 규칙은 남아 있지 않다.
+    expect(cssCode).not.toMatch(/\.yt-theme-salon \.yt-roll\.yt-roll-(shaking|pending)[\s,{]/);
+  });
 });

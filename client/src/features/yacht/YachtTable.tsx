@@ -626,13 +626,15 @@ export function YachtTable({
 
   // D-270 — 굴리기 막음의 안전장치: 결과도 거절도 오지 않으면(프레임을 잃음) `ROLL_GUARD_MS` 뒤에 푼다. BUSY 재전송은 같은 막음
   // 안에서 간다(시계를 다시 재지 않는다).
+  // 타이머는 비행마다 따로다(번호 `rollFlight.id`) — 앞선 비행의 타이머가 새 비행을 풀지 않는다.
   const rollInFlight = s.rollInFlight;
+  const rollFlightId = s.rollFlight?.id ?? 0;
   const clearRollInFlight = s.clearRollInFlight;
   useEffect(() => {
     if (!rollInFlight) return;
-    const timer = window.setTimeout(clearRollInFlight, ROLL_GUARD_MS);
+    const timer = window.setTimeout(() => clearRollInFlight(rollFlightId), ROLL_GUARD_MS);
     return () => window.clearTimeout(timer);
-  }, [rollInFlight, clearRollInFlight]);
+  }, [rollInFlight, rollFlightId, clearRollInFlight]);
 
   // 굴림에 지금 홀드를 실어 보낸다 — 모으던 HOLD 는 보내지 않는다(서버가 굴림의 홀드를 먼저 적용하고 DICE_HELD 를 낸다, 룰 §4-2).
   // D-270 — 스토어의 지금 값으로 한 번 더 막는다(렌더 값 canRoll 은 한 박자 늦다 — 같은 렌더 안의 연속 누름).

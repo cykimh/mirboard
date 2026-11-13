@@ -2275,8 +2275,11 @@ html.dark .yt-theme-salon {
   padding: 0 18px 0 26px;
 }
 
-.yt-theme-salon .yt-roll.yt-roll-shaking,
-.yt-theme-salon .yt-roll.yt-roll-pending {
+/* 명시도 — `.yt-roll-main` + `:not(:disabled)` 를 붙여 (0,5,0): 위의 hover 바탕·`:active` 필터와 17 의 hover 밝기(모두 0,4,0)를
+   순서와 무관하게 이긴다(마우스를 올린 채·누르는 중·터치의 남은 hover 에서도 흔드는 중·굴리는 중 모습이 보인다). 두 상태 모두
+   `disabled` 가 아니다(굴리는 중은 aria-disabled). */
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking:not(:disabled),
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-pending:not(:disabled) {
   transform: translateY(2px);
   /* D-270 — 눌려 들어간 어두운 황동: 흔드는 중·굴리는 중이 한눈에 보이게. */
   filter: brightness(0.78) saturate(1.15);
@@ -2287,14 +2290,14 @@ html.dark .yt-theme-salon {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-.yt-theme-salon .yt-roll.yt-roll-shaking .yt-roll-label,
-.yt-theme-salon .yt-roll.yt-roll-pending .yt-roll-label {
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking:not(:disabled) .yt-roll-label,
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-pending:not(:disabled) .yt-roll-label {
   letter-spacing: 0.04em;
 }
 
 /* 흔드는 중·굴리는 중에는 "누를 수 있음" 광택 줄을 감춘다. */
-.yt-theme-salon .yt-roll.yt-roll-shaking::after,
-.yt-theme-salon .yt-roll.yt-roll-pending::after {
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking:not(:disabled)::after,
+.yt-theme-salon .yt-roll.yt-roll-main.yt-roll-pending:not(:disabled)::after {
   display: none;
 }
 
