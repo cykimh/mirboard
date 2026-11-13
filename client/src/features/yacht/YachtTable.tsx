@@ -6,7 +6,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
-import { FloatingNotice } from '@/components/notice/FloatingNotice';
+import { ErrorNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -742,11 +742,7 @@ export function YachtTable({
       </header>
 
       <ReconnectBanner connected={connected} />
-      {s.errorMessage && (
-        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
-          {s.errorMessage}
-        </FloatingNotice>
-      )}
+      <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={() => s.setError(null)} />
 
       {/* 좌석 띠 — 점수표 열과 같은 좌석 순서. 차례인 좌석은 테두리.
           D-205 — 명패 높이는 늘 같다: 이름·점수 한 줄(+ 모두 같이면 주사위 줄 한 칸)뿐이고, "차례"·"끊김"·"탈주"·내보내기·채팅 한 줄은

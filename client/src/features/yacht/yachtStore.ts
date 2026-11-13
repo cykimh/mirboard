@@ -18,6 +18,7 @@ import {
   type YachtSeatView,
   type YachtTableView,
 } from '@/types/yacht';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** 차례 전체 마감 기준 — `since` 에 `remainingMs` 가 남았다(null 이면 방의 턴 제한 전부). */
 export interface TurnClock {
@@ -51,6 +52,9 @@ export interface YachtRoomState {
   turnClock: TurnClock | null;
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   /**
    * 이 화면의 내 좌석(관전자 −1). 비공개 뷰가 없어 게임판이 알려 준다. 내 차례의 홀드는 화면이 기준이다 — 빠르게 여러 개를 누르면
    * 서버의 `DICE_HELD` 메아리가 한 박자 늦게 와 방금 누른 것을 되돌리므로, 내 좌석의 `DICE_HELD` 는 반영하지 않는다(굴림은 홀드를 함께
@@ -84,7 +88,7 @@ export interface YachtActions {
   reset: (roomId: string) => void;
   applySnapshot: (snapshot: ResyncEnvelope<YachtTableView, YachtPrivateView>) => void;
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   /** 내 차례에 홀드를 미리 바꾼다(서버 확인 전) — 서버가 같은 값을 `DICE_HELD` 로 돌려준다. */
   setHeldLocal: (held: Held) => void;
   setOwnSeat: (seat: number) => void;
@@ -108,6 +112,8 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   result: null,
   turnClock: null,
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   ownSeat: -1,
   lastSent: null,
   retryNonce: 0,
@@ -333,8 +339,8 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
     }
   },
 
-  setError(message) {
-    set({ errorMessage: message });
+  setError(message, sticky) {
+    set((s) => errorNoticePatch(s, message, sticky));
   },
 
   setHeldLocal(held) {

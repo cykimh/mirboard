@@ -35,6 +35,8 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
   const reorderHand = useTichuStore((s) => s.reorderHand);
   const orderedHand = useTichuStore(sortedHand);
   const errorMessage = useTichuStore((s) => s.errorMessage);
+  const errorSeq = useTichuStore((s) => s.errorSeq);
+  const errorSticky = useTichuStore((s) => s.errorSticky);
   const roundEnded = useTichuStore((s) => s.roundEnded);
   const matchEnded = useTichuStore((s) => s.matchEnded);
   const roundHistory = useTichuStore((s) => s.roundHistory);
@@ -141,6 +143,8 @@ export function useGameTableModel({ playerIds, myUserId }: UseGameTableModelArgs
     passSelection,
     pendingPassCardKey,
     errorMessage,
+    errorSeq,
+    errorSticky,
     roundEnded,
     matchEnded,
     roundHistory,

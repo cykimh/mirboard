@@ -5,7 +5,7 @@ import { useAuthStore } from '@/features/auth/authStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
-import { FloatingNotice } from '@/components/notice/FloatingNotice';
+import { ErrorNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { seatMinWidth, tableLayout, type TableSide } from '@/components/seatOrder';
 import { RoomChat } from '@/features/chat/RoomChat';
@@ -378,11 +378,7 @@ export function OneCardTable({
       </header>
 
       <ReconnectBanner connected={connected} />
-      {s.errorMessage && (
-        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
-          {s.errorMessage}
-        </FloatingNotice>
-      )}
+      <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={() => s.setError(null)} />
 
       {/* D-132 — 테이블. 내 자리는 아래 칸(D-262 — 판 안의 이름표)이고, 관전자는 좌석 0 을 아래 칸에 일반 좌석으로 둔다. */}
       {/* D-173 — 내 차례면 경기장 테두리가 내 색으로 맥박친다(손패 칸·나 줄 대신 — 빛나는 곳은 한 곳). */}

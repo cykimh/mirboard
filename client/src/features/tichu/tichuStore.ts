@@ -3,6 +3,7 @@ import type { Card, Hand, PrivateHand, TableView, TichuDeclaration } from '@/typ
 import { cardKey } from '@/types/tichu';
 import type { ApplyEventResult } from '@/types/stomp';
 import { effectForHandType, useEffectStore } from './effectStore';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /**
  * 패스 단계에서 좌석별 슬롯. UI 가 카드를 클릭할 때 활성 슬롯에 카드 키를 저장.
@@ -24,6 +25,9 @@ export interface TichuRoomState {
   /** Phase 5e: 손패의 클라이언트 정렬 순서. 빈 배열이면 서버 분배 순서 사용. */
   sortOrder: string[];
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   roundEnded: { teamAScore: number; teamBScore: number; firstFinisherSeat: number } | null;
   matchEnded: {
     winningTeam: 'A' | 'B';
@@ -71,7 +75,7 @@ export interface TichuActions {
    *   'unhandled'  — 본 이벤트 타입은 reducer 가 없음, 훅이 /resync 한다.
    */
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   setRoundEnded: (info: TichuRoomState['roundEnded']) => void;
   setMatchEnded: (info: TichuRoomState['matchEnded']) => void;
   setReceived: (items: { card: Card; fromSeat: number }[]) => void;
@@ -205,6 +209,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
   pendingPassCardKey: null,
   sortOrder: [],
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   roundEnded: null,
   matchEnded: null,
   roundHistory: [],
@@ -465,8 +471,8 @@ export const useTichuStore = create<TichuRoomState & TichuActions>((set, get) =>
     }
   },
 
-  setError(message) {
-    set({ errorMessage: message });
+  setError(message, sticky) {
+    set((s) => errorNoticePatch(s, message, sticky));
   },
 
   setRoundEnded(info) {

@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
-import { FloatingNotice } from '@/components/notice/FloatingNotice';
+import { ErrorNotice } from '@/components/notice/FloatingNotice';
 import { GameMenu } from '@/components/GameMenu';
 import { RoomChat } from '@/features/chat/RoomChat';
 import { useRoomChatStore } from '@/features/chat/roomChatStore';
@@ -349,11 +349,7 @@ export function CloudRouteTable({
       </header>
 
       <ReconnectBanner connected={connected} />
-      {s.errorMessage && (
-        <FloatingNotice tone="error" onClose={() => s.setError(null)}>
-          {s.errorMessage}
-        </FloatingNotice>
-      )}
+      <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={() => s.setError(null)} />
 
       <div className="cr-layout">
         <div className="cr-board-wrap">

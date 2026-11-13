@@ -13,6 +13,7 @@ import type {
   OmokTurnChangedPayload,
   StonePlacedPayload,
 } from '@/types/omok';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** D-131 — 턴 카운트다운 기준(원카드와 같은 모양). remainingMs null 이면 한 턴 전체. */
 export interface TurnClock {
@@ -51,13 +52,16 @@ export interface OmokRoomState {
   // ── 메타 ──
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
 }
 
 export interface OmokActions {
   reset: (roomId: string) => void;
   applySnapshot: (snapshot: ResyncEnvelope<OmokTableView, unknown>) => void;
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
   setPreview: (p: OmokPoint | null) => void;
   /** 확정 — 미리보기를 보낸 자리로 옮긴다. `slam` 은 강하게 두기(D-193). */
   markPending: (p: OmokPoint, slam?: boolean) => void;
@@ -85,6 +89,8 @@ const INITIAL: OmokRoomState = {
   resyncNonce: 0,
   disconnectedSeats: new Set(),
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
 };
 
 /**
@@ -199,8 +205,8 @@ export const useOmokStore = create<OmokRoomState & OmokActions>((set, get) => ({
     }
   },
 
-  setError(message) {
-    set({ errorMessage: message });
+  setError(message, sticky) {
+    set((s) => errorNoticePatch(s, message, sticky));
   },
 
   setPreview(p) {

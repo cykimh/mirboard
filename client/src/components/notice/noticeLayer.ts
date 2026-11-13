@@ -16,6 +16,10 @@ export function noticeLayer(): HTMLElement {
   layer.id = NOTICE_LAYER_ID;
   layer.className = LAYER_CLASS;
   // 노치·상태 막대 아래로(iOS 안전 영역) + 위 여백 12px.
+  // Radix 모달은 열릴 때 body 의 다른 자식에 aria-hidden 을 붙이는데(aria-hidden 패키지), `[aria-live]` 요소는 건너뛴다.
+  // 층에 aria-live 를 적어 두면 대화상자가 열려 있어도 안내가 읽힌다. "off" 는 div 의 기본값이라 층 자체는 읽지 않는다
+  // (읽는 것은 안의 role="alert"·"status").
+  layer.setAttribute('aria-live', 'off');
   layer.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 12px)';
   document.body.appendChild(layer);
   return layer;

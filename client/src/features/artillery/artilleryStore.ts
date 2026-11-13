@@ -21,6 +21,7 @@ import type {
 import { applyOp, maskFromRuns, type Mask } from './terrain';
 import { terrainOps, type FrameUnit } from './replay';
 import type { WalkFollow } from './liveMove';
+import { errorNoticePatch } from '@/components/notice/errorNotice';
 
 /** 남의 조준 미리보기(D-229) — 받은 시각과 함께. 지금 차례 것만 둔다. */
 export interface AimPreview extends AimPreviewPayload {
@@ -61,6 +62,9 @@ export interface ArtilleryRoomState {
   turnClock: TurnClock | null;
   disconnectedSeats: Set<number>;
   errorMessage: string | null;
+  /** D-269 — `components/notice/errorNotice` 참고(같은 문구 재발생·지속 오류). */
+  errorSeq: number;
+  errorSticky: boolean;
   /** 짧은 알림(넘김·시간 초과·밀물) — 낭독·상태 줄. */
   notice: { text: string; nonce: number } | null;
   /** 보낸 액션이 아직 답을 못 받았다(연타 방지). */
@@ -93,7 +97,9 @@ export interface ArtilleryActions {
   reset: (roomId: string) => void;
   applySnapshot: (snapshot: ResyncEnvelope<ArtilleryTableView, ArtilleryPrivateView>) => void;
   applyEvent: (envelope: { type: string; seq?: number; payload: unknown }) => ApplyEventResult;
-  setError: (message: string | null) => void;
+  setError: (message: string | null, sticky?: boolean) => void;
+  /** 오류 안내만 닫는다 — pending 은 건드리지 않는다(D-269). */
+  dismissError: () => void;
   setPending: (pending: boolean) => void;
   /** 재생을 끝까지 건너뛴다(탭이 숨었다 돌아옴·움직임 줄이기). */
   finishReplay: () => void;
@@ -119,6 +125,8 @@ const INITIAL: Omit<ArtilleryRoomState, 'disconnectedSeats'> = {
   result: null,
   turnClock: null,
   errorMessage: null,
+  errorSeq: 0,
+  errorSticky: false,
   notice: null,
   pending: false,
   pickClock: null,
@@ -375,8 +383,14 @@ export const useArtilleryStore = create<ArtilleryRoomState & ArtilleryActions>((
     }
   },
 
-  setError(message) {
-    set({ errorMessage: message, pending: false });
+  setError(message, sticky) {
+    set((s) => ({ ...errorNoticePatch(s, message, sticky), pending: false }));
+  },
+
+  dismissError() {
+    // D-269 — 안내를 닫는 것(자동 닫힘·[닫기])은 문구만 지운다. `setError(null)` 처럼 pending 까지 풀면 진행 중인 FIRE/MOVE 의
+    // 잠금이 풀려 [넘기기] 등이 다시 눌린다.
+    set((s) => errorNoticePatch(s, null));
   },
 
   setPending(pending) {

@@ -66,7 +66,7 @@ export const skullkingRoomSink: RoomEventSink<
   },
 
   setError(message) {
-    useSkullKingStore.getState().setError(message);
+    useSkullKingStore.getState().setError(message, true); // resync 실패는 지속 상태 — 자동으로 닫지 않는다(D-269)
   },
 };
 
