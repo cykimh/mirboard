@@ -260,6 +260,19 @@ describe('얏추 D-264', () => {
       expect(sendAction).toHaveBeenCalledWith({ '@action': 'ROLL', held: [false, true, false, false, false] });
     });
 
+    it('흔드는 중에 [굴리기]를 누르면 흔들기는 걷고, 떼도 또 굴리지 않는다', () => {
+      seed();
+      renderTable();
+      fireEvent.pointerDown(shakeButton(), { button: 0 });
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_MIN_MS + 50);
+      });
+      fireEvent.click(screen.getByRole('button', { name: /굴리기/ }));
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      fireEvent.pointerUp(shakeButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
     it('너무 짧게 누르면 굴리지 않고 방법을 알려 준다', () => {
       seed();
       renderTable();
@@ -432,6 +445,27 @@ describe('얏추 D-264', () => {
       });
       expect(sendAction).toHaveBeenCalledTimes(1);
       expect(sendAction).toHaveBeenCalledWith({ '@action': 'ROLL' });
+    });
+
+    it('[흔들기]를 누른 채 휴대폰을 흔들다 잠깐 멎어도 굴리지 않는다 — 떼야 한 번만 간다(이중 ROLL 방지)', async () => {
+      touchDevice();
+      seed();
+      renderTable();
+      await turnOn();
+      closeGameMenu();
+      fireEvent.pointerDown(shakeButton(), { button: 0 });
+      jolt(MOTION_MIN_JOLTS);
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS + 50);
+      });
+      expect(sendAction).not.toHaveBeenCalled();
+      jolt(MOTION_MIN_JOLTS);
+      fireEvent.pointerUp(shakeButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      act(() => {
+        vi.advanceTimersByTime(MOTION_QUIET_MS + 50);
+      });
+      expect(sendAction).toHaveBeenCalledTimes(1);
     });
 
     it('권한을 거절하면 켜지지 않고 안내만 한다', async () => {

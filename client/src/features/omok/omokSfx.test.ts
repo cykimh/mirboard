@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableCueCall } from '@/features/sound/tableSfx';
 import { omokRoomSink } from './omokRoomSink';
 import {
-  FIVE_OUTCOME_DELAY_SEC,
+  fiveOutcomeDelaySec,
   OTHERS_STONE_GAIN,
   QUIT_OUTCOME_DELAY_SEC,
   setOmokSfxSeat,
@@ -93,7 +93,14 @@ describe('오목 효과음 — 이벤트마다 맞는 소리', () => {
     omokRoomSink.reset('r1');
     omokRoomSink.applySnapshot(snapshot());
     send('MATCH_ENDED', ended('FIVE', [1], { winLine: LINE }));
-    expect(played).toEqual([{ cue: 'match.lose', delaySec: FIVE_OUTCOME_DELAY_SEC }]);
+    expect(played).toEqual([{ cue: 'match.lose', delaySec: fiveOutcomeDelaySec(LINE.length, false) }]);
+  });
+
+  it('진 쪽 소리는 상승음이 다 끝난 뒤 — 강하게 둔 수로 끝나면 더 늦고, 줄이 길면 더 늦다', () => {
+    // 강하게 둔 5목: 0.7 + 4×0.14 + 꼬리 — 마지막 상승음(1.26초)보다 늦다(예전 고정 1.2초는 겹쳤다).
+    expect(fiveOutcomeDelaySec(5, true)).toBeCloseTo(0.7 + 4 * 0.14 + 0.35);
+    expect(fiveOutcomeDelaySec(5, true)).toBeGreaterThan(0.7 + 4 * 0.14);
+    expect(fiveOutcomeDelaySec(6, false)).toBeGreaterThan(fiveOutcomeDelaySec(5, false));
   });
 
   it.each(['RESIGN', 'TIMEOUT', 'DESERTED'] as const)('%s — 낮은 소리 뒤에 승리음/패배음', (reason) => {

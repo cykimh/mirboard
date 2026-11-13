@@ -137,6 +137,12 @@ export function DiceTray({
     }
     if (rollNonce !== soundedNonce.current) {
       soundedNonce.current = rollNonce;
+      // 새 굴림이 왔다 — 아직 이어지는 흔들기는 그 굴림 전에 시작한 것이라 굴리지 않고 걷는다(이중 ROLL 방지).
+      if (shakeNow.current) {
+        shakeNow.current.stop?.();
+        shakeNow.current = null;
+        setShake(null);
+      }
       if (rollNonce > 0) rollSound.current?.();
     }
     if (rollNonce === 0 || !animate) return;
@@ -149,18 +155,21 @@ export function DiceTray({
   // 버튼과 같은 `onRoll` 을 한 번 부른다. 흔들림은 화면·소리뿐이고 눈은 서버가 정한다. `onRoll` 이 없으면(남의 차례·관전·남의 판 구경)
   // 버튼 자체가 없고, 흔드는 중에 굴릴 수 없게 되면(시간 초과·끊김) 굴리지 않고 걷는다.
   const [shake, setShake] = useState<'press' | 'motion' | null>(null);
-  const shakeNow = useRef<{ since: number; stop: (() => void) | void } | null>(null);
+  const shakeNow = useRef<{ since: number; source: 'press' | 'motion'; stop: (() => void) | void } | null>(null);
   const rollable = canRoll && onRoll !== undefined;
   const live = useRef({ rollable, onRoll, onShakeSound });
   live.current = { rollable, onRoll, onShakeSound };
   const beginShake = (source: 'press' | 'motion') => {
     if (shakeNow.current || !live.current.rollable) return;
-    shakeNow.current = { since: Date.now(), stop: live.current.onShakeSound?.() };
+    shakeNow.current = { since: Date.now(), source, stop: live.current.onShakeSound?.() };
     setShake(source);
   };
-  const endShake = (roll: boolean, hint = false) => {
+  // `source` 를 주면 그 갈래가 시작한 흔들기만 끝낸다 — [흔들기]를 누른 채 휴대폰을 흔들다 잠깐 멎어도(움직임 갈래) 누름 흔들기를
+  // 굴리지 않는다(한 번 던지는데 ROLL 이 두 번 가던 결함, 리뷰 지적).
+  const endShake = (roll: boolean, hint = false, source?: 'press' | 'motion') => {
     const now = shakeNow.current;
     if (!now) return;
+    if (source && now.source !== source) return;
     shakeNow.current = null;
     now.stop?.();
     setShake(null);
@@ -187,7 +196,7 @@ export function DiceTray({
   useDeviceShake({
     enabled: motionShake && rollable,
     onStart: () => beginShake('motion'),
-    onStop: (roll) => endShake(roll),
+    onStop: (roll) => endShake(roll, false, 'motion'),
   });
 
   const left = MAX_ROLLS - rolls;
@@ -263,7 +272,16 @@ export function DiceTray({
       <div className="yt-tray-actions">
         {onRoll ? (
           <>
-            <button type="button" className="yt-roll" disabled={!canRoll} onClick={onRoll}>
+            <button
+              type="button"
+              className="yt-roll"
+              disabled={!canRoll}
+              onClick={() => {
+                // 흔드는 중에 [굴리기]를 눌렀으면 흔들기는 굴리지 않고 걷는다(떼면서 한 번 더 가지 않게).
+                endShake(false);
+                onRoll?.();
+              }}
+            >
               굴리기 · {left}번 남음
             </button>
             {/* 누르고 있는 동안만 흔든다 — click 은 쓰지 않는다(떼는 순간이 굴림). 키보드는 스페이스·엔터를 누르고 있다가 뗀다. */}
@@ -282,14 +300,14 @@ export function DiceTray({
                 }
                 beginShake('press');
               }}
-              onPointerUp={() => endShake(true, true)}
+              onPointerUp={() => endShake(true, true, 'press')}
               onPointerCancel={() => endShake(false)}
               onContextMenu={(e) => e.preventDefault()}
               onKeyDown={(e) => {
                 if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) beginShake('press');
               }}
               onKeyUp={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') endShake(true, true);
+                if (e.key === ' ' || e.key === 'Enter') endShake(true, true, 'press');
               }}
               onBlur={() => endShake(false)}
             >

@@ -13,7 +13,7 @@ import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useSfx } from '@/features/sound/useSfx';
 import { playTableSfx } from '@/features/sound/tableSfx';
-import { setOmokSfxSeat } from './omokSfx';
+import { WIN_START_AFTER_SLAM_SEC, WIN_START_SEC, WIN_STEP_SEC, setOmokSfxSeat } from './omokSfx';
 import { BOARD_SIZE, COLUMN_LETTERS, type OmokPoint, type OmokStone } from '@/types/omok';
 import { omokRoomSink } from './omokRoomSink';
 import { useOmokStore } from './omokStore';
@@ -105,9 +105,8 @@ export const SLAM_IMPACT_SEC = 0.32;
 export const SLAM_BANNER_MS = 1600;
 
 /** D-194 — 5목 연출의 박자(CSS `--om-step` 과 같은 값)와 시작 시각(`OmokBoard` 의 `--om-t0` 과 같은 값). 효과음·배너가 맞춘다. */
-export const WIN_STEP_SEC = 0.14;
-export const WIN_START_SEC = 0.35;
-export const WIN_START_AFTER_SLAM_SEC = 0.7;
+// 값은 효과음 쪽(omokSfx)이 같이 쓰므로 거기 둔다 — 진 쪽 소리가 상승음 끝을 기다려야 한다(D-267 리뷰).
+export { WIN_STEP_SEC, WIN_START_SEC, WIN_START_AFTER_SLAM_SEC } from './omokSfx';
 /** D-194 — 종료 배너가 떠 있는 시간(5목 / 그 밖). 화면 타이머라 움직임 줄이기에서도 같은 시간 뒤 사라진다. */
 export const END_BANNER_FIVE_MS = 2600;
 export const END_BANNER_QUIET_MS = 2200;

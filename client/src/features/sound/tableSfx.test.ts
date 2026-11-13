@@ -153,6 +153,18 @@ describe('tableSfx — 재생 규칙', () => {
     expect(() => sfx.playCues([{ cue: 'match.win' }, { cue: 'stone.place' }])).not.toThrow();
   });
 
+  it('사용자 동작 전이라 컨텍스트가 멈춰 있으면 예약하지 않는다 — 첫 탭에 몰아서 터지지 않게', async () => {
+    class Suspended extends FakeAudioContext {
+      state = 'suspended';
+    }
+    vi.stubGlobal('AudioContext', Suspended);
+    const sfx = await fresh();
+    const before = audioLog.voices;
+    expect(sfx.playTableSfx('card.play')).toBe(false);
+    expect(sfx.playTableSfx('stone.place')).toBe(false);
+    expect(audioLog.voices).toBe(before);
+  });
+
   it('playCues 는 이벤트 하나의 소리들을 순서대로 울린다', async () => {
     const sfx = await fresh();
     sfx.playCues([{ cue: 'match.resign' }, { cue: 'match.lose', delaySec: 0.25 }]);

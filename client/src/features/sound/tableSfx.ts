@@ -233,6 +233,9 @@ export function playTableSfx(cue: TableCue, opts: Omit<TableCueCall, 'cue'> = {}
   if (!ctx) return false;
   try {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    // 사용자 동작 전(새 탭·새로고침 직후)이면 컨텍스트가 멈춰 있다 — 그대로 예약하면 시계가 멈춘 채 쌓였다가 첫 탭에 한꺼번에 터지고,
+    // 관전자는 노드가 계속 쌓인다(리뷰 지적). 돌고 있을 때만 울린다.
+    if (ctx.state !== 'running') return false;
     const delay = Math.max(0, opts.delaySec ?? 0);
     const call: TableCueCall = { cue, ...opts };
     const dur = RECIPES[cue](ctx, ctx.currentTime + delay, MASTER * (opts.gain ?? 1), call);
