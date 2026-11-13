@@ -75,6 +75,12 @@ export interface YachtRoomState {
    */
   rollInFlight: boolean;
   /**
+   * D-270 — 그 비행의 표식. `after` = 이 굴림 수<b>보다 큰</b> `DICE_ROLLED.rolls` 가 와야 이 비행의 결과다 — 안전장치가 풀린 뒤 보낸
+   * 두 번째 `ROLL` 이 늦게 온 첫 번째 결과로 풀리지 않게 한다. 안전장치로 풀려도(`rollInFlight` false) 표식은 남겨 둔다: 그 굴림이 아직
+   * 닿을 수 있으니 다음 비행은 그보다 하나 뒤의 결과를 기다린다. `id` 는 안전 타이머가 제 비행만 풀게 하는 번호다.
+   */
+  rollFlight: { id: number; after: number } | null;
+  /**
    * D-202 — 동시 진행. 이때 `turnSeat` 는 −1 이고 좌석별 주사위는 `seatTurns` 에 있다. 위의 `dice`·`held`·`rolls`·`candidates` 는 늘
    * <b>가운데 주사위 판</b>의 값이라 동시 진행이면 내 좌석(`ownSeat`) 것을 비춘다 — 게임판의 홀드·굴림 코드가 두 방식에서 같다.
    */
@@ -130,7 +136,7 @@ export interface YachtActions {
   /** BUSY 를 받았다 — 다시 보낼 것이 있으면 신호를 올리고 true(오류를 보이지 않는다). */
   noteBusy: () => boolean;
   /** D-270 — 굴리기 막음을 푼다(안전 시간 초과). */
-  clearRollInFlight: () => void;
+  clearRollInFlight: (id: number) => void;
   /** D-268 — 소식이 끊긴 흔들기를 걷는다(`before` 보다 먼저 받은 것만). */
   expireShaking: (before: number) => void;
 }
@@ -156,6 +162,7 @@ const INITIAL: Omit<YachtRoomState, 'disconnectedSeats'> = {
   lastSent: null,
   retryNonce: 0,
   rollInFlight: false,
+  rollFlight: null,
   simultaneous: false,
   seatTurns: {},
   shaking: {},
@@ -170,6 +177,9 @@ function withoutShaking(shaking: Record<number, number>, seat: number): Record<n
   delete next[seat];
   return next;
 }
+
+/** D-270 — 굴리기 비행 번호(늘 오른다 — 끝난 비행의 번호를 다시 쓰지 않는다). */
+let rollFlightSeq = 0;
 
 function freshTurn(): Partial<YachtRoomState> {
   return { dice: null, held: NO_HOLD, rolls: 0, candidates: {} };
@@ -222,6 +232,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
       rollInFlight: false,
+      rollFlight: null,
       // D-183 — 차례 기준 남은 시간은 엔진이 tableView 에 싣는다(바깥 turnRemainingMs 는 마지막 액션 기준이라 쓰지 않는다).
       turnClock: typeof t.turnRemainingMs === 'number' ? { since: Date.now(), remainingMs: t.turnRemainingMs } : null,
       simultaneous,
@@ -262,6 +273,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           shakeQuietUntil: {},
           lastSent: null,
           rollInFlight: false,
+          rollFlight: null,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
         });
@@ -282,6 +294,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           shakeQuietUntil: {},
           lastSent: null,
           rollInFlight: false,
+          rollFlight: null,
           ...freshTurn(),
           turnClock: p.turnSeconds > 0 ? { since: Date.now(), remainingMs: null } : null,
         });
@@ -328,6 +341,9 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
         const p = payload as DiceRolledPayload;
         const shaking = withoutShaking(state.shaking, p.seat);
         const shakeQuietUntil = { ...state.shakeQuietUntil, [p.seat]: Date.now() + SHAKE_AFTER_ROLL_QUIET_MS };
+        // D-270 — 이 결과가 지금 떠 있는 비행의 것일 때만 막음을 푼다(굴림 수가 표식보다 커야 한다). 앞선 비행의 늦은 결과면 그대로 둔다.
+        const flight = state.rollFlight;
+        const landed = flight === null || p.rolls > flight.after ? { rollInFlight: false, rollFlight: null } : {};
         if (state.simultaneous) {
           const turn: YachtSeatTurn = {
             seat: p.seat,
@@ -352,7 +368,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             candidates: p.candidates,
             rollNonce: state.rollNonce + 1,
             lastSent: null,
-            rollInFlight: false,
+            ...landed,
           });
           return 'applied';
         }
@@ -366,7 +382,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
           candidates: p.candidates,
           rollNonce: state.rollNonce + 1,
           lastSent: null,
-          rollInFlight: false,
+          ...landed,
         });
         return 'applied';
       }
@@ -392,7 +408,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             ? { seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) } }
             : {}),
           // 동시 진행이면 남의 기록은 가운데 판(내 주사위)을 건드리지 않는다.
-          ...(mine ? { candidates: {}, lastSent: null, rollInFlight: false } : {}),
+          ...(mine ? { candidates: {}, lastSent: null, rollInFlight: false, rollFlight: null } : {}),
           ...(state.simultaneous && mine ? freshTurn() : {}),
           lastScore: {
             seat: p.seat,
@@ -413,17 +429,17 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
             seats,
             shaking: withoutShaking(state.shaking, p.seat),
             seatTurns: { ...state.seatTurns, [p.seat]: emptySeatTurn(p.seat, false) },
-            ...(p.seat === state.ownSeat ? { ...freshTurn(), rollInFlight: false } : {}),
+            ...(p.seat === state.ownSeat ? { ...freshTurn(), rollInFlight: false, rollFlight: null } : {}),
           });
           return 'applied';
         }
-        set({ seats, shaking: withoutShaking(state.shaking, p.seat), ...(p.seat === state.turnSeat ? { ...freshTurn(), rollInFlight: false } : {}) });
+        set({ seats, shaking: withoutShaking(state.shaking, p.seat), ...(p.seat === state.turnSeat ? { ...freshTurn(), rollInFlight: false, rollFlight: null } : {}) });
         return 'applied';
       }
 
       case 'MATCH_ENDED': {
         const p = payload as MatchEndedPayload;
-        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), rollInFlight: false, turnClock: null, seatTurns: {}, shaking: {} });
+        set({ phase: 'ENDED', result: p, turnSeat: -1, ...freshTurn(), rollInFlight: false, rollFlight: null, turnClock: null, seatTurns: {}, shaking: {} });
         return 'applied';
       }
 
@@ -434,7 +450,7 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
 
   setError(message, sticky) {
     // D-270 — 오류 문구가 뜬다는 것은 보낸 것이 거절됐다는 뜻이다(재전송하는 BUSY 는 여기 오지 않는다) — 굴리기 막음을 푼다.
-    set((s) => ({ ...errorNoticePatch(s, message, sticky), ...(message ? { rollInFlight: false } : {}) }));
+    set((s) => ({ ...errorNoticePatch(s, message, sticky), ...(message ? { rollInFlight: false, rollFlight: null } : {}) }));
   },
 
   setHeldLocal(held) {
@@ -449,9 +465,12 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
   },
 
   noteSent(action) {
+    const { rolls, rollFlight } = get();
+    // D-270 — 앞선 비행의 표식이 남아 있으면(안전장치로 풀림 — 그 굴림이 아직 닿을 수 있다) 이 비행은 그보다 하나 뒤의 결과를 기다린다.
+    const flight = { id: ++rollFlightSeq, after: Math.max(rolls, rollFlight ? rollFlight.after + 1 : 0) };
     set({
       lastSent: { action, at: Date.now(), retried: false },
-      ...(action['@action'] === 'ROLL' ? { rollInFlight: true } : {}),
+      ...(action['@action'] === 'ROLL' ? { rollInFlight: true, rollFlight: flight } : {}),
     });
   },
 
@@ -462,8 +481,10 @@ export const useYachtStore = create<YachtRoomState & YachtActions>((set, get) =>
     set({ shaking: Object.fromEntries(kept) });
   },
 
-  clearRollInFlight() {
-    if (get().rollInFlight) set({ rollInFlight: false });
+  clearRollInFlight(id) {
+    // 제 비행만 푼다 — 표식(`rollFlight`)은 남긴다(위 필드 설명).
+    const { rollInFlight, rollFlight } = get();
+    if (rollInFlight && rollFlight?.id === id) set({ rollInFlight: false });
   },
 
   noteBusy() {

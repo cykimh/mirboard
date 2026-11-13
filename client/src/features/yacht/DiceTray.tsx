@@ -257,10 +257,10 @@ export function DiceTray({
       disarmSwallow();
       return;
     }
-    const p = press.current;
-    // 누르는 중에 온 click(엔터는 누르는 순간·누르고 있는 동안 click 을 낸다) — 떼는 순간이 굴림이다.
-    if (p && !p.cancelled) return;
-    press.current = null;
+    // 누르는 중에 온 click(엔터는 누르는 순간·누르고 있는 동안 click 을 낸다) — 떼는 순간이 굴림이다. 버린 누름(`cancelled`)도
+    // 마찬가지로 여기서 지우지 않는다: 지우면 계속 누르고 있는 엔터의 자동 반복 click 이 새 굴림이 된다(D-270 리뷰). 누름은
+    // 떼기(`finishPress`)·취소·초점 잃음만 끝낸다.
+    if (press.current) return;
     // D-270 — 굴림 결과를 기다리는 중에는 버튼이 눌리기는 하지만(aria-disabled) 굴리지 않는다.
     if (!live.current.rollable) return;
     // 휴대폰을 흔드는 중에 눌렀으면 그 흔들기는 굴리지 않고 걷는다(멎으면서 한 번 더 가지 않게).
@@ -410,7 +410,11 @@ export function DiceTray({
             onPointerCancel={() => cancelPress(false)}
             onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => {
-              if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) startPress();
+              if (e.key !== ' ' && e.key !== 'Enter') return;
+              if (!e.repeat) startPress();
+              // D-270 — 누름의 시작을 못 본 채 이미 눌려 있는 키(꺼져 있던 버튼이 켜짐·누른 채 초점이 옴): 버린 누름으로 친다 —
+              // 자동 반복 click 으로 굴리지 않고, 떼면 끝난다.
+              else if (!press.current) press.current = { cancelled: true, ripe: false, timer: 0 };
             }}
             onKeyUp={(e) => {
               if (e.key === ' ' || e.key === 'Enter') finishPress();

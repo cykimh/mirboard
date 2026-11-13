@@ -1362,5 +1362,84 @@ describe('얏추 D-264', () => {
       });
       expect(container.querySelectorAll('.yt-mini-die-held')).toHaveLength(0);
     });
+
+    it('리뷰 — 안전장치가 풀린 뒤 보낸 두 번째 ROLL 은 늦게 온 첫 번째 결과로 풀리지 않는다(제 결과가 와야 풀린다)', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      act(() => {
+        vi.advanceTimersByTime(ROLL_GUARD_MS);
+      });
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      // 늦게 닿은 첫 번째 굴림의 결과(굴림 수 1) — 두 번째는 아직 떠 있다.
+      rolled(0, 2, 1);
+      expect(label()).toHaveTextContent('굴리는 중…');
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(2);
+      // 두 번째의 결과(굴림 수 2)가 와야 풀린다.
+      rolled(0, 3, 2);
+      expect(label()).toHaveTextContent('굴리기');
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(3);
+    });
+
+    it('리뷰 — 안전 타이머는 제 비행만 푼다(앞선 비행의 번호로는 새 비행이 풀리지 않는다)', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      const first = useYachtStore.getState().rollFlight!.id;
+      rolled(0, 2, 1);
+      fireEvent.click(rollButton());
+      expect(useYachtStore.getState().rollFlight!.id).not.toBe(first);
+      act(() => useYachtStore.getState().clearRollInFlight(first));
+      expect(useYachtStore.getState().rollInFlight).toBe(true);
+      // 새 비행의 시계는 보낸 때부터 다시 잰다.
+      act(() => {
+        vi.advanceTimersByTime(ROLL_GUARD_MS - 100);
+      });
+      expect(useYachtStore.getState().rollInFlight).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(useYachtStore.getState().rollInFlight).toBe(false);
+    });
+
+    it('리뷰 — 결과를 기다리는 동안 누르기 시작한 엔터를 계속 누르고 있어도, 결과가 온 뒤의 자동 반복 click 은 굴리지 않는다', () => {
+      seed();
+      renderTable();
+      fireEvent.click(rollButton());
+      fireEvent.keyDown(rollButton(), { key: 'Enter' });
+      fireEvent.click(rollButton());
+      rolled(0, 2);
+      for (let i = 0; i < 4; i++) {
+        fireEvent.keyDown(rollButton(), { key: 'Enter', repeat: true });
+        fireEvent.click(rollButton());
+      }
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      fireEvent.keyUp(rollButton(), { key: 'Enter' });
+      expect(sendAction).toHaveBeenCalledTimes(1);
+      // 떼고 난 다음의 새 누름은 굴린다.
+      act(() => {
+        vi.advanceTimersByTime(CLICK_SWALLOW_MS + 50);
+      });
+      fireEvent.keyDown(rollButton(), { key: 'Enter' });
+      fireEvent.click(rollButton());
+      fireEvent.keyUp(rollButton(), { key: 'Enter' });
+      expect(sendAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('리뷰 — 누름의 시작을 못 본 채 이미 눌려 있는 키(자동 반복)의 click 도 굴리지 않는다', () => {
+      seed();
+      renderTable();
+      for (let i = 0; i < 3; i++) {
+        fireEvent.keyDown(rollButton(), { key: 'Enter', repeat: true });
+        fireEvent.click(rollButton());
+      }
+      expect(sendAction).not.toHaveBeenCalled();
+      expect(startShake).not.toHaveBeenCalled();
+      fireEvent.keyUp(rollButton(), { key: 'Enter' });
+      expect(sendAction).not.toHaveBeenCalled();
+    });
   });
 });
