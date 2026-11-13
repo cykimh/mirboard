@@ -20,6 +20,7 @@ import com.mirboard.domain.game.yacht.state.YachtState;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
@@ -113,8 +114,31 @@ public final class YachtEngine {
             case YachtAction.Roll roll -> roll(state, seat, roll.held(), roller);
             case YachtAction.Hold hold -> hold(state, seat, hold.held());
             case YachtAction.Score score -> score(state, seat, score.category(), false, now, List.of());
+            // D-268 — 흔들기는 미리보기 입력이다(포트 ⑧ 계약 5). 액션 경로로 오면 거절한다.
+            case YachtAction.Shake __ -> throw reject(RejectionReason.INVALID_ACTION);
         };
         return countAction(result);
+    }
+
+    /**
+     * D-268 — 컵 흔들기 미리보기(포트 ⑧). 상태를 바꾸지 않는다. 시작·유지는 그 좌석이 <b>지금 굴릴 수 있을 때만</b>(둘 차례 — 동시
+     * 진행이면 아직 기록하지 않은 사람 각자 — 이고 굴림이 남았고 다 고정하지 않음). 멈춤은 살아 있는 좌석이면 받는다(굴린 직후의 멈춤
+     * 프레임이 버려져 남의 화면에 컵이 남지 않게). 번호 {@code n} 은 범위만 보고 그대로 실어 보낸다(서버는 기억하지 않는다). 그 밖에는 없음.
+     */
+    public Optional<YachtEvent.DiceShaking> preview(YachtState state, int seat, YachtAction.Shake input) {
+        if (input == null || !input.validNumber() || state.ended() || seat < 0 || seat >= state.seatCount() || !state.alive(seat)) {
+            return Optional.empty();
+        }
+        if (input.shaking()) {
+            if (!state.pending(seat)) {
+                return Optional.empty();
+            }
+            TurnState turn = state.turnOf(seat);
+            if (turn.rolls() >= TurnState.MAX_ROLLS || (turn.rolls() > 0 && turn.held().all())) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(new YachtEvent.DiceShaking(seat, input.shaking(), input.n()));
     }
 
     private Result roll(YachtState state, int seat, HoldMask requested, DiceRoller roller) {

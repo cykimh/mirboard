@@ -18,7 +18,8 @@ import java.util.Map;
  * 요트 엔진이 발행하는 이벤트 sealed 계층 (`docs/rules-yacht.md` §9.1).
  *
  * <p><b>전부 공개다.</b> 숨길 정보가 없고, 거절({@code ERROR})은 인프라가 예외 코드로 본인 큐에 보낸다. 그래서
- * {@code privateSeat}·{@code sequenced} 를 재정의하지 않는다(기본: 공개·순번 있음).
+ * {@code privateSeat} 를 재정의하지 않는다. 순번도 기본(있음)이고, 예외는 상태를 바꾸지 않는 미리보기 {@link DiceShaking}(D-268,
+ * 포트 ⑧) 하나뿐이다 — 순번을 쓰지 않는다.
  *
  * <p><b>payload 는 증감이 아니라 결과값</b>이다 — 주사위 전체·홀드·굴린 횟수, 기록 뒤 소계·보너스·총점. 두 번 적용해도 같고
  * 하나가 빠져도 다음 이벤트가 맞춘다(원카드 원칙).
@@ -34,7 +35,8 @@ import java.util.Map;
         @JsonSubTypes.Type(value = YachtEvent.DiceRolled.class, name = "DICE_ROLLED"),
         @JsonSubTypes.Type(value = YachtEvent.Scored.class, name = "SCORED"),
         @JsonSubTypes.Type(value = YachtEvent.PlayerEliminated.class, name = "PLAYER_ELIMINATED"),
-        @JsonSubTypes.Type(value = YachtEvent.MatchEnded.class, name = "MATCH_ENDED")
+        @JsonSubTypes.Type(value = YachtEvent.MatchEnded.class, name = "MATCH_ENDED"),
+        @JsonSubTypes.Type(value = YachtEvent.DiceShaking.class, name = "DICE_SHAKING")
 })
 public sealed interface YachtEvent extends GameEvent
         permits YachtEvent.TurnChanged,
@@ -43,7 +45,8 @@ public sealed interface YachtEvent extends GameEvent
                 YachtEvent.DiceRolled,
                 YachtEvent.Scored,
                 YachtEvent.PlayerEliminated,
-                YachtEvent.MatchEnded {
+                YachtEvent.MatchEnded,
+                YachtEvent.DiceShaking {
 
     @Override
     default String envelopeType() {
@@ -55,6 +58,7 @@ public sealed interface YachtEvent extends GameEvent
             case Scored __ -> "SCORED";
             case PlayerEliminated __ -> "PLAYER_ELIMINATED";
             case MatchEnded __ -> "MATCH_ENDED";
+            case DiceShaking __ -> "DICE_SHAKING";
         };
     }
 
@@ -106,6 +110,19 @@ public sealed interface YachtEvent extends GameEvent
 
         public MatchEnded {
             placements = List.copyOf(placements);
+        }
+    }
+
+    /**
+     * D-268 — 그 좌석이 컵을 흔드는 중(포트 ⑧ 미리보기). 상태가 아니라 표시일 뿐이라 <b>순번을 쓰지 않는다</b>(D-126) — 놓쳐도 되고,
+     * 받는 쪽은 멈춤 프레임을 놓쳐도 몇 초 뒤 스스로 걷는다. resync 스냅샷에는 없다.
+     *
+     * @param n 보낸 쪽 번호 그대로 — 받는 쪽이 순서가 뒤바뀐 낡은 프레임을 버리는 기준
+     */
+    record DiceShaking(int seat, boolean shaking, long n) implements YachtEvent {
+        @Override
+        public boolean sequenced() {
+            return false;
         }
     }
 }

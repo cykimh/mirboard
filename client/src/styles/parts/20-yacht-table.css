@@ -521,32 +521,43 @@ button.yt-badge {
   opacity: 0.85;
 }
 
-/* D-264 — 흔들어 굴리기. [흔들기]는 누르고 있는 동안만 흔든다(떼면 굴림) — 길게 눌러도 글자 선택·길게 누르기 메뉴가 뜨지 않게 한다. */
-.yt-shake {
+/* D-268 — [굴리기] 하나로: 톡 누르면 굴리고, 꾹 누르면 컵을 흔들다가 떼면 굴린다(D-264 의 따로 있던 [흔들기]를 합쳤다).
+   길게 눌러도 글자 선택·길게 누르기 메뉴가 뜨지 않게 하고, 누른 채 손가락이 조금 움직여도 스크롤로 넘어가 취소되지 않게 한다. */
+.yt-roll-main {
+  display: inline-flex;
   flex: none;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 12px;
-  border: 1px solid var(--yt-accent);
-  background: transparent;
-  color: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.yt-shake:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.yt-shake-on {
-  background: var(--yt-accent);
+/* 남은 굴림 수 — 글 대신 둥근 숫자 표 하나(3·2·1·0). 읽어 주는 이름은 버튼의 aria-label("굴리기, 3번 남음"). */
+.yt-roll-left {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
   color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* 꾹 눌러 흔드는 동안 — 눌린 채로 보인다(키보드로 누르고 있을 때도). */
+.yt-roll-shaking {
+  filter: brightness(0.92);
 }
 
 /* 흔드는 동안 고정 안 한 주사위가 제자리에서 떤다(주사위마다 박자를 어긋나게). */
@@ -569,6 +580,51 @@ button.yt-badge {
   75% {
     transform: translate(-1px, 2px) rotate(-3deg);
   }
+}
+
+/* D-268 — 남이 컵을 흔드는 중: 그 사람 명패 왼쪽 위 모서리에 작은 컵이 걸쳐 달그락거리고(줄을 차지하지 않는다 — D-205),
+   모두 같이 굴릴 때는 명패의 작은 주사위도 같이 떤다. 소리는 없다. */
+.yt-seat-cup {
+  position: absolute;
+  top: -15px;
+  left: -5px;
+  z-index: 3;
+  width: 20px;
+  transform: rotate(-14deg);
+  transform-origin: 50% 35%;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+  pointer-events: none;
+}
+
+.yt-seat-cup svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.yt-seat-cup-live {
+  animation: yt-seat-cup-shake 0.32s ease-in-out infinite;
+}
+
+@keyframes yt-seat-cup-shake {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-14deg);
+  }
+  25% {
+    transform: translate(-7%, 6%) rotate(-32deg);
+  }
+  50% {
+    transform: translate(3%, -5%) rotate(-6deg);
+  }
+  75% {
+    transform: translate(-6%, 5%) rotate(-28deg);
+  }
+}
+
+.yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
+  animation: yt-shake-jitter 0.16s linear infinite;
+  animation-delay: calc(var(--yt-i, 0) * -37ms);
 }
 
 /* D-205 — 남의 판 구경: 굴리기 자리에 안내 + [내 판으로]. 굴리기 버튼과 같은 줄 높이라 판이 오르내리지 않는다. */
@@ -2164,40 +2220,24 @@ html.dark .yt-theme-salon {
   filter: saturate(0.5);
 }
 
-/* D-264 — [흔들기]: 황동 테만 두른 어두운 버튼(굴리기보다 한 단계 낮게). 누르고 있는 동안은 황동으로 찬다. */
-.yt-theme-salon .yt-shake {
-  min-height: 46px;
-  padding: 0 20px;
-  border: 1.5px solid #f6e2a4;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #f6e2a4;
-  letter-spacing: 0.06em;
-  transition:
-    transform 0.08s,
-    background 0.12s;
+/* D-268 — 남은 굴림 수 표: 황동 버튼 위의 어두운 잉크 원반에 금빛 숫자. */
+.yt-theme-salon .yt-roll-left {
+  min-width: 24px;
+  height: 24px;
+  background: #2a1d05;
+  color: #f8e7b0;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-.yt-theme-salon .yt-shake:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.3);
+.yt-theme-salon .yt-roll-main {
+  padding: 0 18px 0 26px;
 }
 
-.yt-theme-salon .yt-shake.yt-shake-on,
-.yt-theme-salon .yt-shake.yt-shake-on:hover:not(:disabled) {
-  border-color: transparent;
-  background: linear-gradient(#f8e7b0, #d6b25e 55%, #a8842f);
-  color: #2a1d05;
+.yt-theme-salon .yt-roll.yt-roll-shaking {
   transform: translateY(2px);
-}
-
-.yt-theme-salon .yt-shake:focus-visible {
-  outline: 2px solid #fff6d0;
-  outline-offset: 3px;
-}
-
-.yt-theme-salon .yt-shake:disabled {
-  opacity: 0.55;
-  filter: saturate(0.5);
+  filter: brightness(0.95);
 }
 
 /* 흔드는 컵 — 쏟는 컵과 같은 자리에서 주둥이를 위로 한 채 달그락거린다(한 바퀴 0.32초 = 소리의 흔듦 두 번). */

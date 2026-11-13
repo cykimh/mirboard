@@ -107,7 +107,7 @@ describe('YachtTable', () => {
   it('on my turn before rolling shows a roll button that rolls all five', () => {
     seed();
     renderTable();
-    fireEvent.click(screen.getByRole('button', { name: /굴리기 · 3번 남음/ }));
+    fireEvent.click(screen.getByRole('button', { name: /굴리기, 3번 남음/ }));
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'ROLL' });
     expect(screen.getByText('내 차례')).toBeInTheDocument();
   });
@@ -149,7 +149,7 @@ describe('YachtTable', () => {
     seed({ dice: [6, 6, 1, 2, 6], rolls: 1 });
     renderTable();
     fireEvent.click(screen.getByRole('button', { name: '주사위 1: 6' }));
-    fireEvent.click(screen.getByRole('button', { name: /굴리기 · 2번 남음/ }));
+    fireEvent.click(screen.getByRole('button', { name: /굴리기, 2번 남음/ }));
     act(() => {
       vi.advanceTimersByTime(HOLD_SEND_DELAY_MS * 2);
     });
@@ -276,7 +276,7 @@ describe('YachtTable', () => {
     vi.useFakeTimers();
     seed({ dice: [1, 2, 3, 4, 5], rolls: 1 });
     renderTable();
-    fireEvent.click(screen.getByRole('button', { name: /굴리기 · 2번 남음/ }));
+    fireEvent.click(screen.getByRole('button', { name: /굴리기, 2번 남음/ }));
     expect(sendAction).toHaveBeenCalledTimes(1);
     act(() => {
       yachtRoomSink.applyPrivateEvent({ type: 'ERROR', payload: { code: 'BUSY', message: 'busy' } } as never);
@@ -544,7 +544,7 @@ describe('YachtTable', () => {
       });
       expect(screen.queryByText('준호 판 보는 중')).toBeNull();
       expect(screen.getByText('내 차례')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /굴리기 · 3번 남음/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /굴리기, 3번 남음/ })).toBeInTheDocument();
     });
 
     it('아직 기록하지 않았는데 마감이 다가오면 내 판으로 되돌리고 알린다', () => {

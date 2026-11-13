@@ -26,6 +26,9 @@ vi.mock('@/ws/useStompRoom', () => ({
 // D-207 — 효과음은 훅을 모의로 두고 불렸는지만 본다(합성·음소거는 `useSfx.test`).
 const sfx = vi.hoisted(() => ({ playYacht: vi.fn(), playChime: vi.fn(), playMade: vi.fn() }));
 vi.mock('@/features/sound/useSfx', () => ({
+  // D-268 — 버튼 딸깍(`tableSfx`)이 읽는다. 이 파일은 딸깍을 보지 않으니 음소거로 둔다.
+  isSfxMuted: () => true,
+  getAudioCtx: () => null,
   useSfx: () => ({
     muted: false,
     toggleMute: vi.fn(),

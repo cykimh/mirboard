@@ -98,6 +98,23 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(block).toContain('animation: none');
   });
 
+  it('D-268 — [굴리기]는 길게 눌러도 글자 선택·길게 누르기 메뉴·스크롤 취소가 없고, [흔들기] 버튼 규칙은 남아 있지 않다', () => {
+    const main = /\n\.yt-roll-main \{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(main).toContain('touch-action: none');
+    expect(main).toContain('user-select: none');
+    expect(main).toContain('-webkit-user-select: none');
+    expect(main).toContain('-webkit-touch-callout: none');
+    expect(cssCode).toContain('.yt-roll-left');
+    expect(cssCode).not.toMatch(/\.yt-shake[\s,.:{]/);
+    expect(responsiveCssSource).not.toMatch(/\.yt-shake[\s,.:{]/);
+  });
+
+  it('D-268 — 남의 흔들기(명패의 작은 컵·작은 주사위 떨림)도 움직임 줄이기에서 멈춘다', () => {
+    expect(cssCode).toContain('.yt-seat-cup-live');
+    const block = /D-264[\s\S]*?@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(responsiveCssSource)?.[1] ?? '';
+    expect(block).toMatch(/\.yt-seat-cup-live,\s*\.yt-seat-dice-shaking-live \.yt-mini-die[^{]*\{\s*animation: none;/);
+  });
+
   it('튜토리얼 포털 토큰(.yt-tokens)이 게임판 토큰과 같은 값이다', () => {
     const table = tokensOf('.yt-table');
     const portal = tokensOf('.yt-tokens');

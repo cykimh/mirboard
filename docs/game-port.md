@@ -21,7 +21,7 @@ CLAUDE.md 의 "새 게임 = Bean 추가" 문구는 이제 **인게임까지 참*
 
 ## 1. 포트 표면 — 티츄 구현에서 역산
 
-지금 인게임이 실제로 요구하는 것은 6가지이고, 기본값이 있는 **선택형 확장** 둘(⑦ 엔진 타이머 D-128, ⑧ 미리보기 D-229)이 붙었다.
+지금 인게임이 실제로 요구하는 것은 6가지이고, 기본값이 있는 **선택형 확장** 둘(⑦ 엔진 타이머 D-128, ⑧ 미리보기 D-229 — 구현 게임은 씨앗포·얏추 D-268)이 붙었다.
 각각의 현재 구현과 "요트가 깨는 지점"을 같이 적는다 — **포트는 두 번째 게임이 아니라 세 번째 게임에서
 검증**되기 때문이다.
 
@@ -426,7 +426,7 @@ default Optional<Result> onTimer(GameState state) { return Optional.empty(); }
 - **라운드 시작에도 같은 값(오목 S3b)**: `GameStartingEvent.options` — 라운드 스타터는 엔진이 아니라 시작 이벤트를 받으므로, `RoomService` 가
   발행할 때 `effectiveOptions(def, room)` 를 싣는다(4인자 생성자는 빈 맵으로 남겼다). 오목 라운드 스타터가 모드·룰을 여기서 읽는다.
 
-### 상태를 바꾸지 않는 실시간 미리보기 ⑧ `preview` (D-229) — 구현 씨앗포 S6a
+### 상태를 바꾸지 않는 실시간 미리보기 ⑧ `preview` (D-229) — 구현 씨앗포 S6a · 얏추 D-268
 
 씨앗포 S6(실시간 이동·조준 공유)에서 처음 필요해졌다. 확정하는 이동은 새 엔진 액션 + 차례 전체 마감(D-183)으로 포트 변경 없이 풀고(D-228),
 쏘기 전까지 바뀌는 포신 각도·탄만 이 확장으로 흘린다. 설계서 `docs/plans/artillery-s6.md` §5.
@@ -448,6 +448,16 @@ default Optional<GameEvent> preview(GameState state, int seat, GameAction input)
   override 없음(같은 테스트가 리플렉션으로 확인), 컨트롤러는 empty 면 방송하지 않음·계약 위반 이벤트는 WARN 후 버림(`GamePreviewControllerTest`),
   인프라 `grep -rniE 'artillery|씨앗포' server/src/main/java/com/mirboard/infra` 0건, 서버 전체 스위트 회귀 0. 실제 STOMP 경로는
   `ArtilleryLiveMoveIT`. 씨앗포 이동은 ⑦ + `GameContext.turnSeconds`(D-183 과 같은 쓰임) — 이동 쪽 포트 변경은 0 이다.
+- **두 번째 구현 — 얏추 컵 흔들기(D-268)**: 포트·인프라 변경 0(컨트롤러·버킷·클라 훅 `sendPreview` 그대로). 얏추 `actionType()` 에 미리보기 입력
+  `YachtAction.Shake(shaking)` 한 갈래를 더하고(`apply` 는 `INVALID_ACTION`, `legalActions`·봇에 없음 — 계약 ⑤), 어댑터 `preview` 가 순수 엔진
+  `YachtEngine.preview` 에 넘긴다 — 시작·유지는 **지금 굴릴 수 있는 좌석**만(둘 차례·굴림 남음·다 고정 아님, 모두 같이면 각자), 멈춤은 살아 있는
+  좌석이면 받는다(굴린 직후의 멈춤이 버려져 남의 화면에 컵이 남지 않게). 이벤트 `YachtEvent.DiceShaking(seat, shaking)` 은 `sequenced() == false`
+  — 요트에서 순번을 쓰지 않는 유일한 이벤트다. 인바운드 채널은 수신 순서를 보장하지 않으므로(전역
+  `setPreserveReceiveOrder` 는 다른 게임에 영향이 있어 쓰지 않는다) 씨앗포처럼 보낸 쪽 번호 `n` 을 싣는다 — 서버는 범위만 보고 그대로 돌려주고
+  (상태 없음), 받는 쪽이 좌석별 마지막 `n` 보다 낡은 프레임을 버리며 그 좌석의 굴림 직후 0.8초는 시작을 받지 않는다. 놓친 멈춤은
+  **유지 프레임(1.5초) + 무소식 만기(4초)** 가 메운다(그 좌석의 굴림·기록·차례 넘어감·resync 도 지운다). 근거:
+  `YachtShakePreviewTest`·`YachtGameEngineTest.preview_…`, `GameEnginePreviewDefaultTest`(이제 씨앗포·얏추 둘만 override — 나머지 다섯은 그대로),
+  인프라 `grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra` 0건 유지.
 
 ### 비공개 뷰 없음 — 오목에서 실증 (D-175)
 

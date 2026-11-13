@@ -102,6 +102,14 @@ export interface DiceHeldPayload {
   held: Held;
 }
 
+/** D-268 — 그 좌석이 컵을 흔드는 중(포트 ⑧ 미리보기, 순번 없음 — 상태가 아니라 표시일 뿐). */
+export interface DiceShakingPayload {
+  seat: number;
+  shaking: boolean;
+  /** 보낸 쪽이 프레임마다 올리는 번호 — 좌석별 마지막 번호보다 낡은 프레임은 버린다(수신 순서가 뒤바뀔 수 있다). */
+  n: number;
+}
+
 export interface DiceRolledPayload {
   seat: number;
   dice: Dice;
