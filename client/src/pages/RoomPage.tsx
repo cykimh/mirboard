@@ -41,13 +41,9 @@ import type { GameSummary, Room, RoomOption, RoomSettingsUpdate, TeamPolicy } fr
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -724,16 +720,25 @@ export function RoomPage() {
     );
   }
 
+  // D-161 — 준비 수(표시만). D-272 — 시작 줄 문구 위에 붙는다.
+  const readyLine = guests.length > 0 && (
+    <p className="m-0 text-xs font-medium leading-4 text-foreground" data-testid="ready-count">
+      준비 {readyGuests}/{guests.length}
+      {allGuestsReady && ' — 모두 준비됐어요'}
+    </p>
+  );
+
   return withLiveRegion(
     <div className="app-shell min-h-screen bg-background text-foreground">
       {notice}
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <GameIcon gameId={room.gameType} size={44} />
+      {/* D-272 — 대기실은 촘촘하게: 휴대폰(375×812) 한 화면에 참가자·설정·시작 줄이 들어오게 여백·머리 줄을 줄인다. 누르는 것은 높이 40px. */}
+      <div className="mx-auto flex max-w-3xl flex-col gap-2.5 px-3 py-3 sm:gap-3 sm:px-4 sm:py-4">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <GameIcon gameId={room.gameType} size={36} />
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight">{room.name}</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="m-0 break-words text-lg font-bold leading-6 tracking-tight">{room.name}</h1>
+              <p className="m-0 text-xs leading-4 text-muted-foreground">
                 {gameName ?? room.gameType} ·{' '}
                 {ROOM_STATUS_LABEL[room.status] ?? room.status} · {room.playerCount}/
                 {room.capacity}
@@ -742,9 +747,9 @@ export function RoomPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {tutorial && (
-              <Button type="button" variant="outline" onClick={tutorialGate.show}>
+              <Button type="button" variant="outline" className="h-10 px-3" onClick={tutorialGate.show}>
                 게임 방법
               </Button>
             )}
@@ -758,19 +763,19 @@ export function RoomPage() {
                 full={room.playerCount >= room.capacity}
               />
             )}
-            <Button type="button" variant="outline" onClick={handleLeave}>
+            <Button type="button" variant="outline" className="h-10 px-3" onClick={handleLeave}>
               나가기
             </Button>
           </div>
         </header>
 
         {iAmSpectator && (
-          <Alert>
-            <AlertDescription className="flex flex-wrap items-center gap-2">
+          <Alert className="px-3 py-2">
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
               <span>관전 중 — 본인 손패는 표시되지 않습니다.</span>
               {/* D-137 — 대기실에 빈자리가 있으면 관전자가 앉는다(꽉 찬 방 링크로 관전하게 된 친구). */}
               {room.status === 'WAITING' && room.playerCount < room.capacity && (
-                <Button type="button" size="sm" onClick={handleSit} disabled={sitPending}>
+                <Button type="button" className="h-10 px-3" onClick={handleSit} disabled={sitPending}>
                   자리에 앉기
                 </Button>
               )}
@@ -780,12 +785,50 @@ export function RoomPage() {
 
         {room.status === 'WAITING' && (
           <Card>
-            <CardHeader>
-              <CardTitle>참가자</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {/* D-146 — 목록 줄 대신 카드(아바타·이름·방장/봇·이 방 게임의 계급·전적). */}
-              <ul aria-label="참가자" className="m-0 grid list-none grid-cols-2 gap-2 p-0 sm:grid-cols-3">
+            <CardContent className="flex flex-col gap-2.5 p-3 sm:p-4">
+              {/* D-272 — 머리 줄 하나: "참가자 N/정원" 왼쪽, 방장의 봇 버튼 오른쪽(D-174 — 빈자리를 봇으로 채우거나 모두 뺀다. 시작은
+                  아래 [N명으로 시작]). */}
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <h2 className="m-0 text-sm font-semibold leading-5">
+                  참가자{' '}
+                  <span className="font-normal text-muted-foreground">
+                    {room.playerCount}/{room.capacity}
+                  </span>
+                </h2>
+                {iAmPlayer && iAmHost && (emptySeats > 0 || botCount > 0) && (
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {stakedRoom && emptySeats > 0 && (
+                      <span className="text-xs text-muted-foreground">판돈 방에는 봇을 앉힐 수 없어요</span>
+                    )}
+                    {emptySeats > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 px-3 text-xs"
+                        onClick={() => handleBots(true)}
+                        disabled={botsPending || stakedRoom}
+                      >
+                        빈자리 봇으로 채우기
+                      </Button>
+                    )}
+                    {botCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 px-3 text-xs"
+                        onClick={() => handleBots(false)}
+                        disabled={botsPending}
+                      >
+                        봇 빼기
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* D-146 — 목록 줄 대신 카드(아바타·이름·봇/준비·이 방 게임의 계급·전적). D-272 — 가로 배치 카드 2열(넓으면 3열), 방장은
+                  카드 맨 위 띠. */}
+              <ul aria-label="참가자" className="m-0 grid list-none grid-cols-2 gap-1.5 p-0 sm:grid-cols-3">
                 {room.playerIds.map((id, seat) => {
                   const isBot = (room.botSeats ?? []).includes(seat);
                   return (
@@ -803,111 +846,85 @@ export function RoomPage() {
                 })}
               </ul>
 
-              {/* D-174 — 방장만: 빈자리를 봇으로 채우거나 봇을 모두 뺀다(시작은 아래 [N명으로 시작]). */}
-              {iAmPlayer && iAmHost && (emptySeats > 0 || botCount > 0) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {emptySeats > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBots(true)}
-                      disabled={botsPending || stakedRoom}
-                    >
-                      빈자리 봇으로 채우기
-                    </Button>
-                  )}
-                  {botCount > 0 && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleBots(false)} disabled={botsPending}>
-                      봇 빼기
-                    </Button>
-                  )}
-                  {stakedRoom && emptySeats > 0 && (
-                    <span className="text-xs text-muted-foreground">판돈 방에는 봇을 앉힐 수 없어요</span>
-                  )}
-                </div>
-              )}
-
-              {roomOptions !== null && (
-              <>
-              <Separator />
-
-              <div className="flex items-center gap-3">
-                <span className="text-sm">{seatPolicyLabel}</span>
-                {iAmHost ? (
-                  <Select
-                    value={room.teamPolicy}
-                    onValueChange={(v) =>
-                      handleTeamPolicyChange(v as TeamPolicy)
+              {/* D-272 — 좌석 정책과 게임 설정은 한 묶음: "이름 왼쪽 · 고르는 것 오른쪽" 한 줄씩. */}
+              <div className="flex flex-col gap-1.5 border-t pt-2.5">
+                {roomOptions !== null && (
+                  <div
+                    className={
+                      iAmHost ? 'flex items-center justify-between gap-3' : 'flex items-baseline gap-1.5'
                     }
                   >
-                    <SelectTrigger className="w-40" aria-label={seatPolicyLabel}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="app-shell">
-                      <SelectItem value="SEQUENTIAL">입장 순서</SelectItem>
-                      <SelectItem value="RANDOM">랜덤 셔플</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge
-                    variant={
-                      room.teamPolicy === 'RANDOM' ? 'secondary' : 'default'
-                    }
-                  >
-                    {room.teamPolicy === 'RANDOM' ? '랜덤 셔플' : '입장 순서'}
-                  </Badge>
+                    <span className="text-xs font-medium text-muted-foreground">{seatPolicyLabel}</span>
+                    {iAmHost ? (
+                      <Select
+                        value={room.teamPolicy}
+                        onValueChange={(v) =>
+                          handleTeamPolicyChange(v as TeamPolicy)
+                        }
+                      >
+                        <SelectTrigger className="h-10 w-32" aria-label={seatPolicyLabel}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="app-shell">
+                          <SelectItem value="SEQUENTIAL">입장 순서</SelectItem>
+                          <SelectItem value="RANDOM">랜덤 셔플</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-sm font-medium">
+                        {room.teamPolicy === 'RANDOM' ? '랜덤 셔플' : '입장 순서'}
+                      </span>
+                    )}
+                  </div>
                 )}
+                <RoomSettingsPanel
+                  room={room}
+                  game={gameMeta}
+                  canEdit={iAmHost}
+                  onChange={handleSettingsChange}
+                  pending={settingsPending}
+                />
               </div>
-              </>
-              )}
 
-              <Separator />
-              <RoomSettingsPanel
-                room={room}
-                game={gameMeta}
-                canEdit={iAmHost}
-                onChange={handleSettingsChange}
-                pending={settingsPending}
-              />
-              <Separator />
-
-              {/* D-161 — 준비는 표시만 한다. 방장은 준비와 상관없이 시작하고, 다 준비되면 시작 버튼을 알린다. */}
-              {guests.length > 0 && (
-                <p className="text-sm text-muted-foreground" data-testid="ready-count">
-                  준비 {readyGuests}/{guests.length}
-                  {allGuestsReady && ' — 모두 준비됐어요'}
-                </p>
-              )}
-              {/* D-174 — 시작 줄: 안내 문구는 왼쪽, 버튼(방장 [N명으로 시작] / 손님 [준비])은 같은 줄 오른쪽. */}
-              {iAmPlayer && (
-                <div data-testid="start-row" className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm text-muted-foreground">
-                    {iAmHost
-                      ? canStart || minPlayers === null
-                        ? `지금 ${room.playerCount}명 · 최대 ${room.capacity}명`
-                        : `${startMin}명 이상 모이면 시작할 수 있어요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`
-                      : `방장이 시작하면 게임이 시작돼요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`}
-                  </p>
-                  {iAmHost ? (
-                    <Button
-                      type="button"
-                      className={`ml-auto${allGuestsReady && canStart ? ' ring-2 ring-emerald-500 ring-offset-2' : ''}`}
-                      onClick={handleStartNow}
-                      disabled={!canStart || startPending}
-                    >
-                      {room.playerCount}명으로 시작
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="ml-auto"
-                      variant={iAmReady ? 'outline' : 'default'}
-                      onClick={() => handleReady(!iAmReady)}
-                      disabled={readyPending}
-                    >
-                      {iAmReady ? '준비 취소' : '준비'}
-                    </Button>
+              {/* D-161 — 준비는 표시만 한다. 방장은 준비와 상관없이 시작하고, 다 준비되면 시작 버튼을 알린다. D-272 — 준비 수는 시작 줄
+                  문구 위에 붙인다(관전자에게는 그 줄만). */}
+              {(iAmPlayer || guests.length > 0) && (
+                <div className="border-t pt-2.5">
+                  {!iAmPlayer && readyLine}
+                  {/* D-174 — 시작 줄: 안내 문구는 왼쪽, 버튼(방장 [N명으로 시작] / 손님 [준비])은 같은 줄 오른쪽. */}
+                  {iAmPlayer && (
+                    <div data-testid="start-row" className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        {readyLine}
+                        <p className="m-0 text-xs leading-4 text-muted-foreground">
+                          {iAmHost
+                            ? canStart || minPlayers === null
+                              ? `지금 ${room.playerCount}명 · 최대 ${room.capacity}명`
+                              : `${startMin}명 이상 모이면 시작할 수 있어요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`
+                            : `방장이 시작하면 게임이 시작돼요 (지금 ${room.playerCount}명 · 최대 ${room.capacity}명)`}
+                        </p>
+                      </div>
+                      {iAmHost ? (
+                        <Button
+                          type="button"
+                          className={`ml-auto h-10 shrink-0 px-4${allGuestsReady && canStart ? ' ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+                          onClick={handleStartNow}
+                          disabled={!canStart || startPending}
+                        >
+                          {room.playerCount}명으로 시작
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="ml-auto h-10 shrink-0 px-4"
+                          variant={iAmReady ? 'outline' : 'default'}
+                          onClick={() => handleReady(!iAmReady)}
+                          disabled={readyPending}
+                        >
+                          {iAmReady ? '준비 취소' : '준비'}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

@@ -114,32 +114,44 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
     });
   }
 
+  // D-272 — 촘촘하게: 방장은 "이름 왼쪽 · 선택지 오른쪽" 한 줄씩(좁아 안 들어가면 선택지만 아랫줄로), 손님은 값만 한 줄 요약.
+  if (!canEdit) {
+    return (
+      <section aria-label="게임 설정" className="flex flex-col gap-1">
+        <dl className="m-0 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          {rows.map((row) => (
+            <div key={row.label} className="flex items-baseline gap-1.5">
+              <dt className="text-xs text-muted-foreground">{row.label}</dt>
+              <dd className="m-0 font-medium">{row.choices.find((c) => c.value === row.value)?.text ?? row.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="m-0 text-xs text-muted-foreground">게임 설정은 방장이 바꿔요.</p>
+      </section>
+    );
+  }
+
   return (
-    <section aria-label="게임 설정" className="flex flex-col gap-3">
+    <section aria-label="게임 설정" className="flex flex-col gap-1.5">
       {rows.map((row) => (
-        <div key={row.label} className="flex flex-col gap-1.5">
-          <Label>{row.label}</Label>
-          {canEdit ? (
-            <ToggleGroup
-              type="single"
-              aria-label={row.label}
-              value={row.value}
-              onValueChange={(v) => v !== '' && v !== row.value && onChange(row.send(v))}
-              className="flex-wrap justify-start"
-              disabled={pending}
-            >
-              {row.choices.map((c) => (
-                <ToggleGroupItem key={c.value} value={c.value}>
-                  {c.text}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          ) : (
-            <span className="text-sm">{row.choices.find((c) => c.value === row.value)?.text ?? row.value}</span>
-          )}
+        <div key={row.label} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+          <Label className="text-xs font-medium text-muted-foreground">{row.label}</Label>
+          <ToggleGroup
+            type="single"
+            aria-label={row.label}
+            value={row.value}
+            onValueChange={(v) => v !== '' && v !== row.value && onChange(row.send(v))}
+            className="flex-wrap justify-end"
+            disabled={pending}
+          >
+            {row.choices.map((c) => (
+              <ToggleGroupItem key={c.value} value={c.value} className="h-10 min-w-10 px-2.5">
+                {c.text}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
       ))}
-      {!canEdit && <p className="text-xs text-muted-foreground">게임 설정은 방장이 바꿔요.</p>}
     </section>
   );
 }
