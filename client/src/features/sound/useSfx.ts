@@ -34,7 +34,9 @@ export const ROLL_SFX_SEC = 0.75;
 /** 컵을 흔드는 동안 되풀이하는 달그락 한 바퀴(초). */
 export const SHAKE_SFX_LOOP_SEC = 0.64;
 /** 굴림 소리 세기 — 내 굴림 / 가운데 판에 보이는 남의 굴림. */
-export const ROLL_SFX_PEAK = { mine: 0.5, other: 0.14 } as const;
+export const ROLL_SFX_PEAK = { mine: 0.62, other: 0.18 } as const;
+/** 컵 흔드는 소리 세기. */
+const SHAKE_SFX_PEAK = 0.36;
 
 interface Click {
   at: number;
@@ -54,7 +56,10 @@ function clickBuffer(ctx: AudioContext, clicks: Click[], durSec: number, clickSe
   return buf;
 }
 
-/** 딱 소리 버퍼를 "상아가 부딪는" 높은 띠 + "바닥을 치는" 낮은 띠 둘로 걸러 낸다. 끄는 데 쓸 소스·세기 노드를 돌려준다. */
+/**
+ * 딱 소리 버퍼를 울림 있는 두 띠로 걸러 낸다 — D-271: 날카로운 상아 딸깍 대신 나무토막 같은 둥근 "톡·통"(가운데 띠 + 낮은 띠, 둘 다 공명).
+ * 끄는 데 쓸 소스·세기 노드를 돌려준다.
+ */
 function playClicks(ctx: AudioContext, buf: AudioBuffer, at: number, peak: number, loop = false) {
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -63,13 +68,15 @@ function playClicks(ctx: AudioContext, buf: AudioBuffer, at: number, peak: numbe
   out.gain.setValueAtTime(peak, at);
   const high = ctx.createBiquadFilter();
   high.type = 'bandpass';
-  high.frequency.value = 2600;
+  high.frequency.value = 1700;
+  high.Q.value = 2.2;
   const low = ctx.createBiquadFilter();
-  low.type = 'lowpass';
-  low.frequency.value = 520;
+  low.type = 'bandpass';
+  low.frequency.value = 620;
+  low.Q.value = 3;
   src.connect(high).connect(out);
   src.connect(low).connect(out);
-  out.connect(ctx.destination);
+  out.connect(sfxOut(ctx));
   src.start(at);
   return { src, out };
 }
@@ -93,6 +100,39 @@ export function getAudioCtx(): AudioContext | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * D-271 — 합성 효과음이 모두 지나는 출구. 압축기 하나로 묶어 전체를 조금 키우면서(실측 — 소리 하나 기준 약 1.4배, +3dB) 여러 소리가 겹칠 때의
+ * 꼭대기를 누른다(찢어지지 않게). 브라우저 압축기는 눌린 만큼 자동으로 보정 증폭을 하므로 키우는 몫은 그 보정이고, `post` 는 여유다
+ * (실측: 큰 소리 셋 + 승리음이 한꺼번에 겹쳐도 꼭대기 0.75 아래).
+ * 압축기가 없는 환경(낡은 브라우저·테스트)은 그대로 스피커로 간다.
+ */
+export const SFX_BUS = { threshold: -12, knee: 8, ratio: 4, attack: 0.002, release: 0.12, post: 0.95 } as const;
+let sfxBus: { ctx: AudioContext; node: AudioNode } | null = null;
+export function sfxOut(ctx: AudioContext): AudioNode {
+  if (sfxBus?.ctx === ctx) return sfxBus.node;
+  let node: AudioNode = ctx.destination;
+  try {
+    if (typeof ctx.createDynamicsCompressor === 'function') {
+      const input = ctx.createGain();
+      input.gain.value = 1;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = SFX_BUS.threshold;
+      comp.knee.value = SFX_BUS.knee;
+      comp.ratio.value = SFX_BUS.ratio;
+      comp.attack.value = SFX_BUS.attack;
+      comp.release.value = SFX_BUS.release;
+      const post = ctx.createGain();
+      post.gain.value = SFX_BUS.post;
+      input.connect(comp).connect(post).connect(ctx.destination);
+      node = input;
+    }
+  } catch {
+    node = ctx.destination;
+  }
+  sfxBus = { ctx, node };
+  return node;
 }
 
 /** D-267 — 훅 밖(게임 sink)에서 묻는 음소거 여부. 훅의 토글이 같은 키에 쓴다. */
@@ -119,9 +159,14 @@ function blip(
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.linearRampToValueAtTime(peak, start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(sfxOut(ctx));
   osc.start(start);
   osc.stop(start + dur);
+}
+
+/** D-271 — 마림바풍 윗소리: 음 위 두 옥타브에 짧게 꺼지는 작은 사인을 얹어 통통 튀게 한다. */
+function shimmer(ctx: AudioContext, freq: number, start: number, dur: number, peak: number) {
+  blip(ctx, freq * 4, start, Math.max(0.04, dur * 0.3), peak * 0.2);
 }
 
 /**
@@ -148,7 +193,7 @@ export function useSfx() {
     if (muted) return;
     try {
       const audio = new Audio(SFX_URL[key]);
-      audio.volume = 0.6;
+      audio.volume = 0.75;
       audio.play().catch(() => {
         // 자동재생 차단 또는 파일 없음 — silent.
       });
@@ -193,7 +238,7 @@ export function useSfx() {
         gain.gain.setValueAtTime(0.0001, t);
         gain.gain.linearRampToValueAtTime(0.55, t + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-        osc.connect(gain).connect(ctx.destination);
+        osc.connect(gain).connect(sfxOut(ctx));
         osc.start(t);
         osc.stop(t + 0.52);
         // 딱 — 잡음 한 토막을 낮은 쪽만 남겨 나무를 치는 소리로.
@@ -208,7 +253,7 @@ export function useSfx() {
         filter.frequency.value = 1800;
         const ng = ctx.createGain();
         ng.gain.value = 0.5;
-        noise.connect(filter).connect(ng).connect(ctx.destination);
+        noise.connect(filter).connect(ng).connect(sfxOut(ctx));
         noise.start(t);
       } catch {
         // 합성 실패 — silent.
@@ -232,7 +277,9 @@ export function useSfx() {
         const scale = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
         for (let i = 0; i < count; i++) {
           const last = i === count - 1;
-          blip(ctx, scale[Math.min(i, scale.length - 1)], t + i * stepSec, last ? 0.5 : 0.2);
+          const f = scale[Math.min(i, scale.length - 1)];
+          blip(ctx, f, t + i * stepSec, last ? 0.5 : 0.2, 0.2);
+          shimmer(ctx, f, t + i * stepSec, last ? 0.5 : 0.2, 0.2);
         }
       } catch {
         // 합성 실패 — silent.
@@ -243,7 +290,7 @@ export function useSfx() {
 
   /**
    * D-207 얏추 — 요트 칸(다섯 개 같은 눈)을 기록했을 때. 전부 합성이다(mp3·외부 음원 없음).
-   * `mine` 이면 팡파르: 낮은 "쿵" + 주사위 잡음 → 다섯 음 상승(주사위가 하나씩 놓이는 박자) → 장화음과 반짝임(약 1.8초).
+   * `mine` 이면 팡파르: 통통 튀는 "보잉" + 색종이 같은 짧은 잡음 → 다섯 음 상승(주사위가 하나씩 놓이는 박자) → 장화음과 반짝임(약 1.8초).
    * 남의 기록이면 작게 두 음만(내 판을 방해하지 않게). 음소거 시 무음.
    */
   const playYacht = useCallback(
@@ -259,16 +306,17 @@ export function useSfx() {
           blip(ctx, 1046.5, t + 0.11, 0.3, 0.07);
           return;
         }
-        // 쿵 — 주사위 컵이 탁자를 치는 낮은 소리.
+        // 보잉 — 통통 튀어 오르는 낮은 소리(D-271: 묵직한 "쿵" 대신).
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(130, t);
-        osc.frequency.exponentialRampToValueAtTime(46, t + 0.24);
+        osc.frequency.setValueAtTime(150, t);
+        osc.frequency.exponentialRampToValueAtTime(300, t + 0.07);
+        osc.frequency.exponentialRampToValueAtTime(110, t + 0.26);
         gain.gain.setValueAtTime(0.0001, t);
         gain.gain.linearRampToValueAtTime(0.32, t + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-        osc.connect(gain).connect(ctx.destination);
+        osc.connect(gain).connect(sfxOut(ctx));
         osc.start(t);
         osc.stop(t + 0.32);
         // 주사위 잡음 — 높은 쪽만 남긴 짧은 잡음 두 토막.
@@ -284,21 +332,25 @@ export function useSfx() {
         noise.buffer = buf;
         const filter = ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.value = 3200;
+        filter.frequency.value = 4200;
         const ng = ctx.createGain();
-        ng.gain.value = 0.16;
-        noise.connect(filter).connect(ng).connect(ctx.destination);
+        ng.gain.value = 0.1;
+        noise.connect(filter).connect(ng).connect(sfxOut(ctx));
         noise.start(t);
         // 다섯 음 상승 — 도·미·솔·도·미(주사위 다섯 개).
         const rise = [523.25, 659.25, 783.99, 1046.5, 1318.51];
-        rise.forEach((f, i) => blip(ctx, f, t + YACHT_SFX_FIRST_NOTE_SEC + i * YACHT_SFX_STEP_SEC, 0.17, 0.13, 'triangle'));
+        rise.forEach((f, i) => {
+          const at = t + YACHT_SFX_FIRST_NOTE_SEC + i * YACHT_SFX_STEP_SEC;
+          blip(ctx, f, at, 0.17, 0.14, 'triangle');
+          shimmer(ctx, f, at, 0.17, 0.14);
+        });
         // 팡파르 — 장화음을 길게, 그 위에 높은 반짝임 셋.
         const c = t + YACHT_SFX_CHORD_SEC;
         for (const f of [261.63, 523.25, 659.25, 783.99, 1046.5]) {
           blip(ctx, f, c, 1.05, 0.085, 'triangle');
           blip(ctx, f * 2, c, 0.7, 0.03);
         }
-        [2093, 2637.02, 3135.96].forEach((f, i) => blip(ctx, f, c + 0.08 + i * 0.07, 0.4, 0.045));
+        [2093, 2637.02, 3135.96, 2637.02, 3135.96, 4186.01].forEach((f, i) => blip(ctx, f, c + 0.08 + i * 0.07, 0.36, 0.045));
       } catch {
         // 합성 실패 — silent.
       }
@@ -384,14 +436,14 @@ export function useSfx() {
         clicks.push({ at: at + 0.03 + Math.random() * 0.02, amp: 0.5 + Math.random() * 0.3 });
         if (beat % 2 === 0) clicks.push({ at: at + 0.075 + Math.random() * 0.03, amp: 0.3 + Math.random() * 0.25 });
       }
-      const { src, out } = playClicks(ctx, clickBuffer(ctx, clicks, SHAKE_SFX_LOOP_SEC, 0.028), ctx.currentTime, 0.3, true);
+      const { src, out } = playClicks(ctx, clickBuffer(ctx, clicks, SHAKE_SFX_LOOP_SEC, 0.028), ctx.currentTime, SHAKE_SFX_PEAK, true);
       let stopped = false;
       return () => {
         if (stopped) return;
         stopped = true;
         try {
           const t = ctx.currentTime;
-          out.gain.setValueAtTime(0.3, t);
+          out.gain.setValueAtTime(SHAKE_SFX_PEAK, t);
           out.gain.linearRampToValueAtTime(0.0001, t + 0.06);
           src.stop(t + 0.08);
         } catch {

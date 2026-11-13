@@ -89,7 +89,17 @@ export class FakeAudioContext {
     return Object.assign(new FakeNode(), { gain: new FakeParam() });
   }
   createBiquadFilter() {
-    return Object.assign(new FakeNode(), { type: '', frequency: new FakeParam() });
+    return Object.assign(new FakeNode(), { type: '', frequency: new FakeParam(), Q: new FakeParam() });
+  }
+  /** D-271 — 효과음 출구의 압축기. */
+  createDynamicsCompressor() {
+    return Object.assign(new FakeNode(), {
+      threshold: new FakeParam(),
+      knee: new FakeParam(),
+      ratio: new FakeParam(),
+      attack: new FakeParam(),
+      release: new FakeParam(),
+    });
   }
   createBuffer(_channels: number, length: number) {
     return { getChannelData: () => new Float32Array(length) };

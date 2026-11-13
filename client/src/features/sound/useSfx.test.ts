@@ -95,7 +95,16 @@ class FakeAudioContext {
     return Object.assign(new FakeNode(), { gain });
   }
   createBiquadFilter() {
-    return Object.assign(new FakeNode(), { type: '', frequency: new FakeParam() });
+    return Object.assign(new FakeNode(), { type: '', frequency: new FakeParam(), Q: new FakeParam() });
+  }
+  createDynamicsCompressor() {
+    return Object.assign(new FakeNode(), {
+      threshold: new FakeParam(),
+      knee: new FakeParam(),
+      ratio: new FakeParam(),
+      attack: new FakeParam(),
+      release: new FakeParam(),
+    });
   }
   createBuffer(_channels: number, length: number) {
     const data = new Float32Array(length);
