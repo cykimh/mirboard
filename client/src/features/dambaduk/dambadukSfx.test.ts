@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useDambadukStore } from './dambadukStore';
-import { OTHERS_GAIN, WALL_AFTER_SLIDE_SEC, dambadukCues, dambadukErrorCues } from './dambadukSfx';
-import { playingView, snapshot } from './dambadukFixtures';
+import { HOME_AFTER_SLIDE_SEC, OTHERS_GAIN, WALL_AFTER_SLIDE_SEC, dambadukCues, dambadukErrorCues } from './dambadukSfx';
+import { placingView, playingView, snapshot } from './dambadukFixtures';
 
 const run = (ev: { type: string; seq?: number; payload: unknown }, mySeat: number) => {
   const before = useDambadukStore.getState();
@@ -26,6 +26,22 @@ describe('dambadukCues — 공개 이벤트 → 효과음(순수 함수)', () =>
       { cue: 'wall.build', gain: OTHERS_GAIN, delaySec: WALL_AFTER_SLIDE_SEC },
     ]);
     expect(run(ev, 0)).toEqual([]); // 이미 적용한 이벤트는 조용하다
+  });
+
+  it('집이 새로 생기면 터를 싣는 TURN_CHANGED 에서 "퐁" — 내 집은 크게, 남의 집은 작게, 배치 단계는 조용하다', () => {
+    const territory = (scores: number[]) => ({ regions: [], scores, largest: scores });
+    const turn = (scores: number[], phase = 'PLAYING') => ({
+      type: 'TURN_CHANGED',
+      seq: 2,
+      payload: { seat: 1, phase, territory: territory(scores), placeKinds: [], options: [] },
+    });
+    expect(run(turn([0, 0]), 0)).toEqual([]);
+    expect(run(turn([5, 0]), 0)).toEqual([{ cue: 'home.made', gain: 1, delaySec: HOME_AFTER_SLIDE_SEC }]);
+    expect(run(turn([5, 3]), 0)).toEqual([{ cue: 'home.made', gain: OTHERS_GAIN, delaySec: HOME_AFTER_SLIDE_SEC }]);
+    expect(run(turn([5, 3]), 0)).toEqual([]);
+    useDambadukStore.getState().reset('r1');
+    useDambadukStore.getState().applySnapshot(snapshot(placingView()));
+    expect(run(turn([49, 0], 'PLACING'), 0)).toEqual([]);
   });
 
   it('판 끝 — 진 사람은 패배음, 이긴 사람·관전자는 승리음, 무승부는 무승부음', () => {

@@ -194,6 +194,8 @@ export function DambadukBoard({
           <WallArt {...scaled(segmentOf(pendingMove.wallFace))} pending />
         )}
         <rect className="db-frame" x="4" y="4" width={SIZE - 8} height={SIZE - 8} rx="16" />
+        {/* 바깥담 장식 — 테 안쪽의 가는 그늘(테마 층에서만 보인다). 돌 테는 CSS(`.db-board::before`)가 판 밖에 두른다. */}
+        <rect className="db-frame-lip" x="9.5" y="9.5" width={SIZE - 19} height={SIZE - 19} rx="11" />
       </svg>
 
       <div className="db-stones" aria-hidden="true">

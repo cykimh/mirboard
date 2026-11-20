@@ -20,6 +20,7 @@ const ALL_CUES: TableCue[] = [
   'stone.place',
   'stone.slide',
   'wall.build',
+  'home.made',
   'move.rejected',
   'die.hold',
   'die.release',

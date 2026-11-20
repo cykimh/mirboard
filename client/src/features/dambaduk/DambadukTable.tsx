@@ -203,9 +203,16 @@ export function DambadukTable({
 
   // ── 옮김 ──
   const myOptions = myTurn && !placing ? s.options : [];
-  const movable = useMemo(() => new Set(myOptions.map((o) => o.stoneId)), [myOptions]);
   const canJump = mySeat >= 0 && (s.jumpsLeft[mySeat] ?? 0) > 0 && myOptions.some((o) => o.jump);
-  const visibleOptions = myOptions.filter((o) => o.stoneId === s.selectedStoneId && o.jump === (s.jumpMode && canJump));
+  // 담을 넘어야만 옮길 수 있으면 넘기를 저절로 켠다(끈 채로는 고를 돌이 없다 — e2e 가 잡은 막힘).
+  const jumpOnly = canJump && !myOptions.some((o) => !o.jump);
+  const jumping = canJump && (s.jumpMode || jumpOnly);
+  // 고를 수 있는 돌은 지금 모드(넘기 켬/끔)에서 갈 칸이 있는 돌뿐이다 — 눌렀는데 갈 칸이 하나도 없는 돌을 띄우지 않는다.
+  const movable = useMemo(
+    () => new Set(myOptions.filter((o) => o.jump === jumping).map((o) => o.stoneId)),
+    [myOptions, jumping],
+  );
+  const visibleOptions = myOptions.filter((o) => o.stoneId === s.selectedStoneId && o.jump === jumping);
   const destinations = groupByDestination(visibleOptions);
   const routes = s.choice
     ? distinctRoutes(visibleOptions.filter((o) => o.toX === s.choice!.toX && o.toY === s.choice!.toY))
@@ -272,7 +279,7 @@ export function DambadukTable({
   else if (myTurn && placing) status = `내 차례 — ${placeKind ? KIND_NAME[placeKind] : '돌'}을 놓을 빈 칸을 누르세요`;
   else if (myTurn && s.choice) status = `${cellName({ x: s.choice.toX, y: s.choice.toY })} — 담을 세울 면을 고르세요`;
   else if (myTurn && selected)
-    status = s.jumpMode && canJump ? '담을 넘어 갈 칸을 누르세요' : '갈 칸을 누르세요';
+    status = jumping ? '담을 넘어 갈 칸을 누르세요' : '갈 칸을 누르세요';
   else if (myTurn) status = '내 차례 — 옮길 돌을 누르세요';
   else status = `${nameOf(turnSeat)}(${COLOR_NAME[colorOf(turnSeat)]}) 차례`;
 
@@ -335,13 +342,16 @@ export function DambadukTable({
                   `돌 ${s.stones.filter((x) => x.seat === seat).length}개`
                 ) : (
                   <>
-                    집 <b>{score}</b>칸 · 큰 집 {largest}
+                    <span className="db-seat-home">
+                      집 <b>{score}</b>칸
+                    </span>
+                    <span className="db-seat-sep">{' · '}</span>
+                    <span className="db-seat-large">큰 집 {largest}</span>
                   </>
                 )}
                 {seatCount === 3 && !exit && (
                   <span className="db-seat-jump" title="담 넘기(한 판에 한 번)">
-                    {' '}
-                    · 넘기 {s.jumpsLeft[seat] ?? 0}
+                    <span className="db-seat-sep">{' · '}</span>넘기 {s.jumpsLeft[seat] ?? 0}
                   </span>
                 )}
               </span>
@@ -366,7 +376,7 @@ export function DambadukTable({
         {/* D-269 — 끊김·거절 안내는 화면 위에 뜬다(FloatingNotice). 게임판 흐름에 오류 줄을 끼우지 않는다. */}
         <ReconnectBanner connected={connected} />
         <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={() => s.setError(null)} />
-        <div className={`db-board-wrap${myTurn ? ' db-board-myturn' : ''}`}>
+        <div className={`db-board-wrap${myTurn ? ' db-board-myturn' : ''}${placing ? ' db-board-placing' : ''}`}>
           <DambadukBoard
             stones={s.stones}
             walls={s.walls}
@@ -453,11 +463,12 @@ export function DambadukTable({
           {canJump && (
             <button
               type="button"
-              className={`db-jump${s.jumpMode ? ' db-jump-on' : ''}`}
-              aria-pressed={s.jumpMode}
+              className={`db-jump${jumping ? ' db-jump-on' : ''}`}
+              aria-pressed={jumping}
+              disabled={jumpOnly}
               onClick={() => s.setJumpMode(!s.jumpMode)}
             >
-              담 넘기 {s.jumpMode ? '켜짐' : '(한 번 남음)'}
+              담 넘기 {jumpOnly ? '— 넘어야만 옮길 수 있어요' : jumping ? '켜짐' : '(한 번 남음)'}
             </button>
           )}
           {s.choice && routes.length > 1 && (

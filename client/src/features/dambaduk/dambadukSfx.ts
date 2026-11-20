@@ -7,6 +7,17 @@ export const OTHERS_GAIN = 0.6;
 /** 담이 쌓이는 소리는 돌이 닿은 뒤(CSS 돌 미끄러짐 `--db-slide` 와 같은 값, 초). */
 export const WALL_AFTER_SLIDE_SEC = 0.22;
 
+/** 새 집 소리는 담이 다 쌓인 뒤(CSS `db-home-bloom` 지연 `--db-slide + 0.4s` 와 같은 값, 초). */
+export const HOME_AFTER_SLIDE_SEC = WALL_AFTER_SLIDE_SEC + 0.4;
+
+/** 좌석별 집 칸 수가 늘었는지 — 서버가 계산한 `territory.scores` 만 견준다(판정하지 않는다). */
+function homeGrowth(before: DambadukRoomState, after: DambadukRoomState) {
+  const was = before.territory?.scores ?? [];
+  const now = after.territory?.scores ?? [];
+  const grown = now.map((n, seat) => n > (was[seat] ?? 0));
+  return { any: grown.some(Boolean), mine: (seat: number) => seat >= 0 && grown[seat] === true };
+}
+
 /** 서버가 수를 거절한 사유 — 낮은 "툭". 락 경합 같은 인프라 거절은 조용하다. */
 const REJECTED_MOVE = new Set([
   'NOT_YOUR_TURN',
@@ -56,6 +67,15 @@ export function dambadukCues(
         { cue: 'stone.slide', gain },
         { cue: 'wall.build', gain, delaySec: WALL_AFTER_SLIDE_SEC },
       ];
+    }
+    case 'TURN_CHANGED': {
+      // 터·점수는 옮김(STONE_MOVED) 뒤에 따라오는 TURN_CHANGED 가 싣는다 — 그 수로 집이 새로 생기거나 넓어졌으면(누구의 집이든)
+      // 담이 다 쌓인 뒤 "퐁~"(CSS 집 번짐과 같은 박자). 배치 단계는 담이 없어 판 전체가 한 사람 집으로 잡히므로 듣지 않는다.
+      if (before.phase !== 'PLAYING' || after.phase !== 'PLAYING') return [];
+      const grew = homeGrowth(before, after);
+      return grew.any
+        ? [{ cue: 'home.made', gain: grew.mine(mySeat) ? 1 : OTHERS_GAIN, delaySec: HOME_AFTER_SLIDE_SEC }]
+        : [];
     }
     case 'SEAT_OUT': {
       if (after.exits.length === before.exits.length) return [];

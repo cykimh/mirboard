@@ -160,6 +160,32 @@ describe('DambadukTable (S3)', () => {
     });
   });
 
+  it('담을 넘어야만 옮길 수 있으면 넘기가 저절로 켜지고, 넘기 수가 없는 돌은 고를 수 없다', () => {
+    const only: DambadukMoveOption = { stoneId: 4, path: ['UP'], toX: 2, toY: 2, jump: true, jumpedFace: 59, walls: ['UP', 'DOWN'] };
+    seed(
+      playingView({
+        seatCount: 3,
+        seatColors: [0, 1, 2],
+        jumpsLeft: [1, 1, 1],
+        stones: [
+          { id: 4, seat: 0, kind: 'STRAIGHT', x: 2, y: 3 },
+          { id: 9, seat: 0, kind: 'BENT', x: 6, y: 6 },
+        ],
+        options: [only],
+      }),
+    );
+    renderTable({ playerIds: [10, 20, 30] });
+    const toggle = screen.getByRole('button', { name: /넘어야만 옮길 수 있어요/ });
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(cell('G7')).toHaveAttribute('aria-disabled', 'true');                   // 갈 칸이 없는 돌
+    fireEvent.click(cell('C4'));
+    expect(cell('C3')).toHaveAccessibleName(/담 넘어 갈 수 있는 칸/);
+    fireEvent.click(cell('C3'));
+    fireEvent.click(within(screen.getByRole('group', { name: '담을 세울 면' })).getByRole('button', { name: '아래 담' }));
+    expect(sendAction).toHaveBeenCalledWith({ '@action': 'MOVE_STONE', stoneId: 4, path: ['UP'], wall: 'DOWN', jump: true });
+  });
+
   it('좌석 띠는 서버가 계산한 집·가장 큰 집을 보이고, 빠진 좌석을 알린다', () => {
     seed(
       playingView({
