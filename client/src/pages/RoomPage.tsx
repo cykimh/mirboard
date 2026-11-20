@@ -43,6 +43,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { setHiddenIdleInGame } from '@/ws/hiddenIdle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
@@ -338,6 +339,12 @@ export function RoomPage() {
   }, [token, playersKey]);
 
   const iAmPlayer = !!(room && user && room.playerIds.includes(user.userId));
+  // D-273 — 진행 중인 판에 앉아 있으면 숨긴 탭의 연결을 더 오래(60분) 유지한다 — 다른 탭을 잠깐 보다 탈주로 지지 않게.
+  const inGameSeat = iAmPlayer && room?.status === 'IN_GAME';
+  useEffect(() => {
+    setHiddenIdleInGame(inGameSeat);
+  }, [inGameSeat]);
+  useEffect(() => () => setHiddenIdleInGame(false), []);
   const iAmSpectator = !!(
     room &&
     user &&

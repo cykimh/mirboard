@@ -9,6 +9,7 @@ const { clients } = vi.hoisted(() => ({
     subscriptions: string[];
     handlers: Map<string, (frame: { body: string }) => void>;
     deactivated: boolean;
+    activations: number;
   }>,
 }));
 
@@ -18,11 +19,15 @@ vi.mock('@stomp/stompjs', () => ({
     subscriptions: string[] = [];
     handlers = new Map<string, (frame: { body: string }) => void>();
     deactivated = false;
+    activations = 0;
     constructor(cfg: { onConnect: () => void }) {
       this.cfg = cfg;
       clients.push(this);
     }
-    activate() {}
+    activate() {
+      this.activations += 1;
+      this.deactivated = false;
+    }
     subscribe(dest: string, cb: (frame: { body: string }) => void) {
       this.subscriptions.push(dest);
       this.handlers.set(dest, cb);
@@ -35,6 +40,7 @@ vi.mock('@stomp/stompjs', () => ({
 }));
 
 import { useRoomMeta } from './useRoomMeta';
+import { HIDDEN_IDLE_MS } from './hiddenIdle';
 
 const META = '/topic/room/r1/meta';
 
@@ -161,5 +167,63 @@ describe('useRoomMeta — 다시 맞추기 알림 (D-134)', () => {
 
     expect(onMeta).toHaveBeenCalledWith(room);
     expect(onDestroyed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useRoomMeta — 오래 숨긴 탭은 끊는다 (D-273)', () => {
+  beforeEach(() => {
+    clients.length = 0;
+    vi.useFakeTimers();
+    setVisibility('visible');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setVisibility('visible');
+  });
+
+  it('숨긴 채 10분이 지나면 소켓을 끊고, 다시 보이면 다시 붙여 맞춘다', () => {
+    const onResync = vi.fn();
+    renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, onResync));
+    const client = clients.at(-1)!;
+    act(() => client.cfg.onConnect());
+    const before = client.activations;
+
+    setVisibility('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    act(() => {
+      vi.advanceTimersByTime(HIDDEN_IDLE_MS - 1);
+    });
+    expect(client.deactivated).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(client.deactivated).toBe(true);
+
+    setVisibility('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(client.activations).toBe(before + 1);
+    expect(client.deactivated).toBe(false);
+    expect(onResync).toHaveBeenCalledTimes(1);
+  });
+
+  it('잠깐 숨겼다 보이면 끊지 않는다', () => {
+    renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, vi.fn()));
+    const client = clients.at(-1)!;
+    setVisibility('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      vi.advanceTimersByTime(HIDDEN_IDLE_MS - 1000);
+    });
+    setVisibility('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      vi.advanceTimersByTime(HIDDEN_IDLE_MS);
+    });
+    expect(client.deactivated).toBe(false);
   });
 });

@@ -46,6 +46,7 @@ vi.mock('@/api/rooms', () => ({
 }));
 
 import { useStompRoom } from './useStompRoom';
+import { HIDDEN_IDLE_MS } from './hiddenIdle';
 
 const sink: RoomEventSink = {
   reset() {},
@@ -88,5 +89,58 @@ describe('갑작스러운 끊김 (D-130)', () => {
     dropAbruptly(sockets[0]);
 
     expect(result.current.connected).toBe(false);
+  });
+});
+
+/**
+ * D-273 — 오래 숨긴 탭은 방 소켓을 스스로 끊어 운영 서버가 잠들게 한다. 진짜 stompjs 로 — 끊기는 DISCONNECT(영수증)로 가고,
+ * 다시 보이면 새 소켓으로 다시 붙는다.
+ */
+describe('오래 숨긴 탭 (D-273)', () => {
+  function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  });
+
+  it('방 소켓 — 숨긴 채 10분이면 DISCONNECT 로 닫고, 다시 보이면 새 소켓으로 붙는다', async () => {
+    const { result } = renderHook(() => useStompRoom('r-1', 'tok', sink));
+    await waitFor(() => expect(sockets).toHaveLength(1));
+    accept(sockets[0]);
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    vi.useFakeTimers();
+    setVisibility('hidden');
+    act(() => {
+      vi.advanceTimersByTime(HIDDEN_IDLE_MS - 1);
+    });
+    expect(sockets[0].sent.some((f) => f.startsWith('DISCONNECT'))).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    const disconnect = sockets[0].sent.find((f) => f.startsWith('DISCONNECT'));
+    expect(disconnect).toBeDefined();
+    // 서버가 영수증으로 답하면 소켓이 닫힌다.
+    const receipt = /receipt:([^\n]+)/.exec(disconnect!)![1];
+    act(() => {
+      sockets[0].onmessage?.({ data: `RECEIPT\nreceipt-id:${receipt}\n\n\0` });
+    });
+    expect(result.current.connected).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(sockets).toHaveLength(1); // 숨긴 동안은 다시 붙지 않는다
+    vi.useRealTimers();
+
+    setVisibility('visible');
+    await waitFor(() => expect(sockets).toHaveLength(2));
+    accept(sockets[1]);
+    await waitFor(() => expect(result.current.connected).toBe(true));
   });
 });

@@ -5,6 +5,7 @@ import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import type { RoomEventSink } from './roomEventSink';
 import { judgeSeq } from './seqGate';
+import { watchHiddenIdle } from './hiddenIdle';
 import type { VoiceMessage, VoiceSignal } from '@/features/voice/useVoiceChat';
 import type { ResyncEnvelope, StompEnvelope } from '@/types/stomp';
 
@@ -220,9 +221,14 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     };
     document.addEventListener('visibilitychange', onResume);
     window.addEventListener('online', onResume);
+    // D-273 — 오래 숨긴 탭은 스스로 끊어 운영 서버가 잠들게 한다. 다시 보이면 위 onResume 이 다시 붙이고 resync 한다.
+    const stopIdleWatch = watchHiddenIdle(() => {
+      if (!disposed) void client.deactivate();
+    });
 
     return () => {
       disposed = true;
+      stopIdleWatch();
       // 언마운트·전환·토큰 변경 — 이미 날아간 resync 의 늦은 응답(언마운트 직전에 보낸 것 포함)도 이제 낡았다.
       epochRef.current += 1;
       document.removeEventListener('visibilitychange', onResume);

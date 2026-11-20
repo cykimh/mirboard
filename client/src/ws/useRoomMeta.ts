@@ -2,6 +2,7 @@ import { Client } from '@stomp/stompjs';
 import { useEffect, useRef } from 'react';
 import type { StompEnvelope } from '@/types/stomp';
 import type { Room } from '@/types/api';
+import { watchHiddenIdle } from './hiddenIdle';
 
 /**
  * Phase 13C(#3) — RoomPage 의 2초 `GET /api/rooms/{id}` 폴링을 대체하는 경량 STOMP
@@ -58,14 +59,23 @@ export function useRoomMeta(
 
     client.activate();
 
+    let disposed = false;
     const onResume = () => {
       if (document.visibilityState !== 'visible') return;
+      // D-273 — 숨긴 동안 끊었으면 다시 붙인다(이미 active 면 no-op). 다시 연결되면 onConnect 가 한 번 더 onResync 한다.
+      client.activate();
       onResyncRef.current?.();
     };
     document.addEventListener('visibilitychange', onResume);
     window.addEventListener('online', onResume);
+    // D-273 — 오래 숨긴 탭은 스스로 끊어 운영 서버가 잠들게 한다.
+    const stopIdleWatch = watchHiddenIdle(() => {
+      if (!disposed) void client.deactivate();
+    });
 
     return () => {
+      disposed = true;
+      stopIdleWatch();
       document.removeEventListener('visibilitychange', onResume);
       window.removeEventListener('online', onResume);
       client.deactivate();

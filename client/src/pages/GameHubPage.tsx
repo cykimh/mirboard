@@ -98,7 +98,10 @@ export function GameHubPage() {
   useEffect(() => {
     if (!token) return;
     refreshRooms();
-    const id = window.setInterval(refreshRooms, 5000);
+    // D-273 — 숨긴 동안은 묻지 않는다(브라우저가 늦춰도 1분마다 요청이 가면 운영 서버가 잠들지 못한다). 다시 보이면 아래 깨우기가 한 번 받는다.
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'hidden') refreshRooms();
+    }, 5000);
     return () => window.clearInterval(id);
   }, [token, refreshRooms]);
 
