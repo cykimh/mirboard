@@ -79,11 +79,12 @@ class StarSquareEngineBotTest {
 
     @Test
     void a_bot_slower_than_the_limit_never_solves_and_is_ranked_by_what_it_filled() {
-        StarSquareEngine e = engine(2, Set.of(1), BotLevel.EASY, 30);
+        StarSquareEngine e = engine(2, Set.of(1), BotLevel.EASY, 120);
         StarSquareState s = playing(e, loShuPuzzles(1));
         long start = s.phaseStartedAt();
-        assertThat(s.board(1).pace().solveAfterMs()).isGreaterThan(30_000);
-        var end = e.onTimer(s, start + 30_000);
+        assertThat(s.board(1).pace().solveAfterMs()).isGreaterThan(120_000);
+        assertThat(s.board(1).pace().milestoneAt(1)).isLessThan(120_000);
+        var end = e.onTimer(s, start + 120_000);
         assertThat(end.newState().ended()).isTrue();
         var ended = (StarSquareEvent.PuzzleEnded) end.events().stream()
                 .filter(ev -> ev instanceof StarSquareEvent.PuzzleEnded).findFirst().orElseThrow();

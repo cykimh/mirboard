@@ -4,8 +4,8 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/starsquare/` 기준, 위치는 메서드 이름으로 적는다.
 
-> **상태:** 채택(D-282) · 룰 v1(D-283) · S1 순수 엔진·퍼즐 은행(D-284) — 2026-11-20. 공개 설정 `MIRBOARD_STAR_SQUARE_STATUS` 는 S4 전까지 `DISABLED`.
-> S1 의 코드·테스트 위치는 각 절 끝, 실측은 §15.
+> **상태:** 채택(D-282) · 룰 v1(D-283) · S1 순수 엔진·퍼즐 은행(D-284) · S1.5 사람 측정·S2 포트 어댑터·기록(D-285) — 2026-11-20.
+> 공개 설정 `MIRBOARD_STAR_SQUARE_STATUS` 는 S4 전까지 `DISABLED`. 코드·테스트 위치는 각 절 끝(**코드(S2):** 는 어댑터 쪽), 실측은 §15.
 > 설계 배경은 `docs/plans/wall-magic-games.md` §3(게임 B)·§10(사용자 결정).
 >
 > **독창 게임.** 마방진(1~N² 을 한 번씩 넣어 모든 가로·세로·두 대각선의 합을 같게 만드는 수천 년 된 공용 수학 퍼즐)만 가져오고,
@@ -230,9 +230,11 @@
 
 ## 9. 시간 — 퍼즐 제한과 엔진 타이머
 
-1. **퍼즐 제한** = 방의 턴 제한 값(`GameContext.turnSeconds`, D-183). 선택지 **3·5·10분, 기본 5분** **[수치]**(`turnSecondsChoices` 180·300·600,
-   `defaultTurnSeconds` 300). 대기실 라벨은 "턴 제한"이 아니라 게임이 선언한 "퍼즐 제한"으로 보인다(설계서 M7 — S3).
-2. **[결정]** 끔(0)은 선택지에 없다. 선택지 밖 0 이 오면(테스트·API) 기본 300초로 본다 — 아무도 완성하지 못한 퍼즐이 끝나지 않는 판을 없앤다.
+1. **퍼즐 제한** = 방의 턴 제한 값(`GameContext.turnSeconds`, D-183). 선택지 **자동·3·5·8·10·15·20분, 기본 자동** **[수치]**(D-285 —
+   `turnSecondsChoices` 0·180·300·480·600·900·1200, `defaultTurnSeconds` 0). 대기실 라벨은 "턴 제한"이 아니라 게임이 선언한 "퍼즐 제한"으로,
+   0 은 "끔"이 아니라 "자동"으로 보인다(설계서 M7 — S3).
+2. **[결정]** 끔은 없다 — 0 은 **자동 = 난이도별 권장 제한**(쉬움 8분 · 보통 7분 · 어려움 20분, `Difficulty.autoLimitSeconds`)이다. 사람 풀이 시간
+   추정(§15.2)의 약 3배를 분 단위로 반올림했다(쉬움은 3×3 8분·4×4 4분 중 긴 쪽). 아무도 완성하지 못한 퍼즐이 끝나지 않는 판도 이것이 막는다.
 3. 시간 전이는 전부 **포트 ⑦ 엔진 타이머**다(`timer`/`onTimer`, D-128·D-183) — 클라가 만들 수 없는 시스템 전이다. 타이머 = 다음 중 가장 이른 것:
    준비 끝(§6.1) · 지금 마감(§6.3 ②③) · 다음 봇 이정표(§10) · 결과 보기 끝(§6.4). 시작 시각들을 상태에 두고 남은 시간을 돌려주므로 재무장해도
    처음부터 세지 않는다(⑦ 계약).
@@ -245,8 +247,13 @@
 7. 공개 뷰에 엔진이 계산한 남은 시간(`remainingMs` — 지금 단계의 끝까지)을 싣는다. resync 바깥의 인프라 `turnRemainingMs`(마지막 액션 기준)는 이 게임에서
    뜻이 없다(D-183 의 얏추와 같다).
 
-- **코드:** `StarSquareEngine.timer(state, now)`·`onTimer(state, now)`·`remainingMillis`·`pendingSeats`·`fallbackAction`·`legalActions`, 설정 `StarSquareConfig`(제한 0 이하 → 300초, `puzzleCountFor(MATCH_LENGTH)`). 포트 ⑦ 연결은 S2.
-- **테스트:** `StarSquareEngineTest.a_zero_limit_means_the_default_five_minutes_and_the_timer_is_not_reset_by_syncs`(SYNC 를 몇 번 보내도 남은 시간은 줄기만, 폴백은 받되 무변화).
+8. **시간 배율**(`mirboard.starsquare.time-scale`, 운영 1.0): 준비·첫 완성 뒤 마감·결과 보기·봇 페이스에만 곱한다(퍼즐 제한은 방 설정이라 그대로).
+   봇끼리 도는 통합 테스트만 줄인다 — 씨앗포 `resolve-cap-millis` 와 같은 손잡이.
+
+- **코드:** `StarSquareEngine.timer(state, now)`·`onTimer(state, now)`·`remainingMillis`·`pendingSeats`·`fallbackAction`·`legalActions`, 설정 `StarSquareConfig`(제한 0 이하 → 난이도별 자동, `puzzleCountFor(MATCH_LENGTH)`, `timeScale`).
+- **코드(S2):** `StarSquareGameEngine.timer`·`onTimer`(포트 ⑦ — 닿은 것이 없으면 empty), `timeoutAction` = `fallbackAction`, `StarSquareConfig.from(GameContext, timeScale)`.
+- **테스트:** `StarSquareEngineTest.a_zero_limit_means_the_difficulty_limit_and_the_timer_is_not_reset_by_syncs`(SYNC 를 몇 번 보내도 남은 시간은 줄기만, 폴백은 받되 무변화)·`the_time_scale_shrinks_intro_close_result_and_bot_pace_but_not_the_puzzle_limit`,
+  `StarSquareGameEngineTest.the_engine_timer_counts_from_the_stored_start_so_rearming_never_restarts_it`.
 
 ## 10. 봇 — 페이스 모델 (`BOT_LEVEL`)
 
@@ -258,18 +265,19 @@
 
    | 띠 | 기준 시간 **[수치]** |
    | --- | --- |
-   | 3-easy | 45초 |
-   | 4-easy | 90초 |
-   | 4-normal | 180초 |
-   | 5-hard | 360초 |
+   | 3-easy | 165초 |
+   | 4-easy | 77초 |
+   | 4-normal | 140초 |
+   | 5-hard | 400초 |
 
    | `BOT_LEVEL` | 배수 **[수치]** |
    | --- | --- |
-   | 쉬움 `EASY` | 1.6 |
-   | 보통 `NORMAL` | 1.1 |
-   | 어려움 `HARD` | 0.75 |
+   | 쉬움 `EASY` | 1.5 |
+   | 보통 `NORMAL` | 1.0 |
+   | 어려움 `HARD` | 0.7 |
 
-   기준 시간은 사람 측정이 없어 잠정값이다 — S1.5 사람 측정으로 "어려움 봇 ≈ 보통 사람 중앙값보다 조금 빠르게"가 되도록 맞추고, 운영 뒤 다시 본다.
+   기준 시간 = 사람 풀이 시간 추정(§15.2, D-285)이라 **보통 봇 ≈ 사람 기준점**, 쉬움은 더 느리게, 어려움은 더 빠르게 둔다. 표본 1판의 외삽이라
+   운영 뒤 실제 판 길이로 다시 맞춘다.
 2. 봇은 단서 아닌 칸을 시드 순서로 섞어 **최대 6번의 이정표**에 나눠 정답 값으로 채운다(k번째 이정표 = T × k / 이정표 수). 마지막 이정표가 완성(`SOLVED`)이다.
    이정표마다 진행도가 바뀌므로 `PROGRESS` 가 나간다(봇 판도 실제 판이라 진행도 계산이 사람과 같다).
 3. T 가 마감보다 늦으면 봇은 그 퍼즐을 못 끝내고, 마감까지 채운 만큼으로 순위가 매겨진다.
@@ -323,10 +331,23 @@
 ### 12.2 기록 (S2)
 
 - **여럿 판**: 매치 기록기 계약(`docs/game-port.md` "매치 기록기 계약") 그대로 — 새 테이블 2개(V22, 결과·참가자 — 점수 합·1등 횟수·순위·탈주),
-  비봇 참가자마다 전적, 봇·게스트가 끼면 ELO 미적용(`RatedMatchPolicy.eloApplies`), ELO 는 개인전 `applyFreeForAll`(점수 = 좌석 수 − 순위),
-  동순위 1위는 무승부 처리 방식을 S2 에서 오목·구름항로와 맞춘다. 상대 전적(`HeadToHeadSource`)은 최종 순위로 센다.
+  비봇 참가자마다 전적, 봇·게스트가 끼면 ELO 미적용(`RatedMatchPolicy.eloApplies`), ELO 는 개인전 `applyFreeForAll`(점수 = 좌석 수 − 순위 —
+  같은 순위는 같은 점수라 서로 무승부로 계산된다), 승 = 1위(동순위면 모두 — 얏추와 같다). 상대 전적(`HeadToHeadSource`)은 최종 순위로 센다.
 - **1인 판**: 결과·참가자·`user_game_stats` 를 쓰지 않는다(D-181 과 같다). 혼자 판 최단 시간 기록은 v1 에 없다(설계서 M5 — 후속).
 - `users` 는 바꾸지 않는다(D-02).
+- **코드(S2):** `persistence/StarSquareMatchRecorder`(로컬 발행 `event/StarSquareMatchCompleted` 리스너 하나, 1인 판은 바로 반환), `persistence/StarSquareHeadToHead`,
+  마이그레이션 `V22__star_square_match.sql`(`star_square_match_results`·`star_square_match_participants` — 별자리 수판 테이블만). 어댑터 `StarSquareGameEngine.advance`·`desert`
+  가 `MATCH_ENDED` 때 한 번 발행하고, 기록 실패는 발행 지점에서 잡아 ERROR 로 남긴다(`docs/game-port.md` "매치 기록기 계약" 3).
+- **테스트(S2):** `StarSquareGameEngineTest`(기록 발행 한 번·실패해도 진행, 탈주 3치), `infra/bot/StarSquareBotMatchSimulationIT`(아래 §15.3).
+
+## 12b. 포트 어댑터·시작·정의 (S2)
+
+- **정의** `StarSquareGameDefinition`(ID `STAR_SQUARE`, 1~4인, 방 옵션 `BOT_LEVEL`·`MATCH_LENGTH`·`DIFFICULTY`, 퍼즐 제한 §9, 공개 상태 `mirboard.starsquare.status`
+  기본 `DISABLED` — `application.yml` 과 `@Value` 두 곳). `RoomOption.DIFFICULTY("NORMAL","EASY","NORMAL","HARD")` 는 게임 중립 맵 옵션 상수(포트 확장 아님).
+- **시작** `lifecycle/StarSquareRoundStarter` — `GameStartingEvent` 의 옵션으로 난이도·퍼즐 수를 정해 은행(`persistence/StarSquarePuzzles` — 기동 때 자원 4개를 읽음)에서
+  SecureRandom 으로 고르고, 준비 단계로 저장한 뒤 턴·엔진 타이머를 건다(시작 이벤트 없음 — resync).
+- **어댑터** `StarSquareGameEngine` — 상태 `persistence/StarSquareStateStore`(`room:{id}:state`), 비공개 뷰 = 내 판(`PrivateBoard`), 봇은 대기 좌석이 아니라
+  `botAction` 은 대기 좌석일 때만 폴백(그 밖 null). 인프라에 게임 이름 0(`grep -rniE 'starsquare|star_square|별자리' server/src/main/java/com/mirboard/infra` → 0건).
 
 ## 13. 클라 (S3에서 채운다)
 
@@ -354,7 +375,7 @@
 | 8 | 준비 | 시작 3초 숨김 | 레이스 공정성 |
 | 9 | 마감 | 모두 완성 / 첫 완성 + 30초 / 퍼즐 제한 | M4 — 판 길이 상한 |
 | 10 | 마감 판정 | 서버 처리 시각, 마감 뒤 판은 거절 | 단순·결정적 |
-| 11 | 퍼즐 제한 | 턴 제한 값 = 퍼즐 제한, 3·5·10분 기본 5분, 0 은 300초 | 끝나지 않는 판 방지 |
+| 11 | 퍼즐 제한 | 턴 제한 값 = 퍼즐 제한, 자동(난이도별 8·7·20분)·3·5·8·10·15·20분, 기본 자동 | 끝나지 않는 판 방지, D-285 |
 | 12 | 결과 보기 | 8초, 마지막 퍼즐은 없음 | |
 | 13 | 액션 | 판 전체 `SYNC` + 버전, 0.4초 모아 보내기 | 방 락 `BUSY` 억제·멱등 |
 | 14 | 순위 | 완성 순 / 줄 → 칸 / 동순위 / 탈주 맨 아래 | |
@@ -404,6 +425,35 @@
   전부 끝났고 매 전이 불변식·이벤트만 듣는 클라 대조를 통과했다. 같은 시드면 같은 결과(재현 테스트).
 - **코드:** `invariant/StarSquareInvariantChecker`. **테스트:** `invariant/StarSquareInvariantCheckerTest`(통과 1 + 고의 위반 14), `StarSquareMatchSimulationTest`(인원별 1,000매치 + 재현).
   `./gradlew :server:test --tests "com.mirboard.domain.game.starsquare.*"`(Docker 불필요).
+
+### 15.2 S1.5 사람 측정과 외삽 (2026-11-20 — **표본 1판, 운영 뒤 재조정**)
+
+측정 페이지 `scripts/starsquare-trial`(운영 번들 밖)로 사용자가 한 판을 했다:
+
+| 퍼즐 | 단서 | 줄 채우기 | 완성 | 시간 | 첫 줄 | 입력·지움·되돌림 | 체감 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 4-easy#144 / 대칭 8 | 8 | 1.0 | ✓ | **76.7초** | 16.2초 | 20 · 0 · 0 | 적당 |
+
+이 한 점을 사람 기준점으로 두고 나머지 띠는 S1 측정값으로 외삽했다 — 추정 = 77초 × (빈 칸 / 8) × (풀이 노드 중앙값 / 9) × (2 − 줄 채우기 비율 중앙값).
+
+| 띠 | 빈 칸 | 노드 중앙 | 줄 채우기 중앙 | 추정 사람 시간 | 봇 기준 시간(§10) | 제한 ≈ 3배 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3-easy | 7 | 12 | 0.14 | 약 166초 | 165초 | 8분 |
+| 4-easy | 8 | 9 | 1.00 | 77초(측정) | 77초 | 4분 |
+| 4-normal | 9 | 10 | 0.56 | 약 138초 | 140초 | 7분 |
+| 5-hard | 13 | 17 | 0.31 | 약 398초 | 400초 | 20분 |
+
+- 퍼즐 제한 "자동"은 쉬움 8분(3×3 과 4×4 중 긴 쪽)·보통 7분·어려움 20분(§9-2), 대기실에서 3·5·8·10·15·20분을 직접 고를 수도 있다.
+- **Gate 판정**(관제, 2026-11-20): 재미 확인은 운영 뒤로 미룬다 — 형식(같은 퍼즐 동시 풀기) 유지. 재미 점수는 비었다.
+
+### 15.3 S2 검증 (D-285)
+
+- **단위**(Docker 불필요): `StarSquareGameDefinitionTest` 3(메타·옵션·퍼즐 제한 선택지, 공개 상태 기본 `DISABLED` = yml), `StarSquareGameEngineTest` 7(방 설정 → 엔진 설정,
+  엔진 타이머가 저장된 시작 기준이라 재무장해도 처음부터 세지 않음, 준비 끝 → 첫 퍼즐, **공개 뷰·이벤트 JSON 에 정답·남의 판 없음**·비공개 뷰는 내 판만, **낡은 SYNC 는 조용히 거절**·폴백 무변화,
+  기록 발행 한 번·기록기 실패에도 진행, 탈주 3치).
+- **통합**(Docker, `infra/bot/StarSquareBotMatchSimulationIT` 5 — 시간 배율 0.005): 봇 2·4명 완주 + 기록, 손 놓은 사람 + 봇 2 — 봇의 첫 완성 마감으로 퍼즐마다 끝나고
+  사람 전적은 남되 ELO 제외, **1인 판 기록 0행·전적 없음·대기실 복귀**, 사람 둘 중 탈주 → `LAST_SEAT`·남은 사람 승·탈주자 표시·방 FINISHED.
+- 공용 테스트 갱신: `GameSummaryOrderTest`(`RoomOption` 선언 순서에 `DIFFICULTY`), `GameEnginePreviewDefaultTest`(미리보기를 쓰지 않는 어댑터 목록에 추가).
 
 ## 16. 범위 밖 (v1)
 

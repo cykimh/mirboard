@@ -149,9 +149,6 @@ public final class StarSquareInvariantChecker {
             if (state.outcomes().size() != state.index()) {
                 v.add("playing puzzle " + state.index() + " with " + state.outcomes().size() + " outcomes");
             }
-            if (state.aliveSeats().stream().noneMatch(s -> !engine.config().bot(s))) {
-                v.add("playing with no live human");
-            }
         } else if (!pending.isEmpty()) {
             v.add("pending seats outside PLAYING: " + pending);
         }

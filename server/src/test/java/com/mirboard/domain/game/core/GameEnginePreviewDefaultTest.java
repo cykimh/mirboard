@@ -31,7 +31,8 @@ class GameEnginePreviewDefaultTest {
     @Test
     void only_artillery_and_yacht_override_preview() throws Exception {
         for (Class<?> adapter : List.of(TichuGameEngine.class, SkullKingGameEngine.class, OneCardGameEngine.class,
-                OmokGameEngine.class, CloudRouteGameEngine.class)) {
+                OmokGameEngine.class, CloudRouteGameEngine.class,
+                com.mirboard.domain.game.starsquare.StarSquareGameEngine.class)) {
             assertThatThrownBy(() -> adapter.getDeclaredMethod("preview", GameState.class, int.class, GameAction.class))
                     .as(adapter.getSimpleName())
                     .isInstanceOf(NoSuchMethodException.class);

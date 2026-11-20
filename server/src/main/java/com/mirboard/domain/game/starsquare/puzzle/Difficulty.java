@@ -20,6 +20,18 @@ public enum Difficulty {
         };
     }
 
+    /**
+     * 대기실 퍼즐 제한 "자동"(턴 제한 0)일 때의 퍼즐 제한(초) [수치] — 사람 풀이 시간 추정(D-285)의 약 3배를 분 단위로 반올림:
+     * 3×3 8분·4×4 쉬움 4분 → 쉬움 8분, 4×4 보통 7분, 5×5 어려움 20분.
+     */
+    public int autoLimitSeconds() {
+        return switch (this) {
+            case EASY -> 480;
+            case NORMAL -> 420;
+            case HARD -> 1_200;
+        };
+    }
+
     /** 방 옵션 값 → 난이도. 모르는 값·null 은 기본 보통. */
     public static Difficulty fromOption(String value) {
         if (value == null) {

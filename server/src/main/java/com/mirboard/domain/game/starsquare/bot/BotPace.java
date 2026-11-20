@@ -22,20 +22,30 @@ public final class BotPace {
     private BotPace() {
     }
 
-    /** 띠 기준 시간(ms) [수치] — 사람 측정이 없어 잠정값(S1.5 에서 확정). */
+    /**
+     * 띠 기준 시간(ms) [수치] — 사람 풀이 시간 추정(S1.5, D-285): 사람 기준점 4×4 쉬움 77초(표본 1판)를 띠마다
+     * (빈 칸 수 / 8) × (풀이 노드 중앙값 / 9) × (2 − 줄 채우기 비율 중앙값) 으로 외삽했다. 보통 봇(배수 1)이 이 시간 근처에 푼다.
+     * 운영 뒤 실제 판 길이로 다시 맞춘다.
+     */
     public static long baseMillis(Band band) {
         return switch (band) {
-            case THREE_EASY -> 45_000L;
-            case FOUR_EASY -> 90_000L;
-            case FOUR_NORMAL -> 180_000L;
-            case FIVE_HARD -> 360_000L;
+            case THREE_EASY -> 165_000L;
+            case FOUR_EASY -> 77_000L;
+            case FOUR_NORMAL -> 140_000L;
+            case FIVE_HARD -> 400_000L;
         };
     }
 
     public static BotPlan plan(long matchSeed, int puzzleIndex, int seat, Band band, BotLevel level, Grid clues) {
+        return plan(matchSeed, puzzleIndex, seat, band, level, clues, 1.0);
+    }
+
+    /** @param timeScale 시간 배율(운영 1 — 통합 테스트만 줄인다, {@code StarSquareConfig#timeScale}) */
+    public static BotPlan plan(long matchSeed, int puzzleIndex, int seat, Band band, BotLevel level, Grid clues,
+                               double timeScale) {
         SplittableRandom rng = new SplittableRandom(mix(matchSeed, puzzleIndex, seat));
         double jitter = JITTER_MIN + (JITTER_MAX - JITTER_MIN) * rng.nextDouble();
-        long solveAfter = Math.max(1_000L, Math.round(baseMillis(band) * level.factor() * jitter));
+        long solveAfter = Math.max(1L, Math.round(baseMillis(band) * level.factor() * jitter * timeScale));
         List<Integer> order = new ArrayList<>();
         for (int i = 0; i < clues.size(); i++) {
             if (clues.isEmpty(i)) {

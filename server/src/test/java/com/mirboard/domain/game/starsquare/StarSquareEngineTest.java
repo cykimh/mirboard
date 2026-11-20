@@ -14,9 +14,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.mirboard.domain.game.starsquare.action.RejectionReason;
 import com.mirboard.domain.game.starsquare.action.StarSquareAction;
 import com.mirboard.domain.game.starsquare.action.StarSquareActionRejectedException;
+import com.mirboard.domain.game.starsquare.bot.BotLevel;
 import com.mirboard.domain.game.starsquare.event.StarSquareEvent;
 import com.mirboard.domain.game.starsquare.invariant.StarSquareInvariantChecker;
 import com.mirboard.domain.game.starsquare.puzzle.Band;
+import com.mirboard.domain.game.starsquare.puzzle.Difficulty;
 import com.mirboard.domain.game.starsquare.puzzle.Grid;
 import com.mirboard.domain.game.starsquare.puzzle.MagicCheck;
 import com.mirboard.domain.game.starsquare.puzzle.PuzzleBank;
@@ -265,21 +267,40 @@ class StarSquareEngineTest {
     }
 
     @Test
-    void a_zero_limit_means_the_default_five_minutes_and_the_timer_is_not_reset_by_syncs() {
+    void a_zero_limit_means_the_difficulty_limit_and_the_timer_is_not_reset_by_syncs() {
+        // 0 = 대기실 "자동" — 난이도별 권장 제한(쉬움 8분 · 보통 7분 · 어려움 20분, D-285)
+        assertThat(new StarSquareConfig(1, Set.of(), 1, Difficulty.NORMAL, BotLevel.NORMAL, 0).limitSeconds()).isEqualTo(420);
+        assertThat(new StarSquareConfig(1, Set.of(), 1, Difficulty.HARD, BotLevel.NORMAL, 0).limitSeconds()).isEqualTo(1_200);
         StarSquareEngine e = engine(1, Set.of(), 1, 0);
-        assertThat(e.config().limitSeconds()).isEqualTo(300);
+        assertThat(e.config().limitSeconds()).isEqualTo(480);
         StarSquareState s = playing(e, loShuPuzzles(1));
         long start = s.phaseStartedAt();
         for (int v = 1; v <= 5; v++) {
             s = e.apply(s, 0, sync(0, v, 2, v % 2 == 0 ? 7 : 0, 0, 0, 0, 1, 0, 0, 0), start + v * 10_000L).newState();
-            assertThat(e.timer(s, start + v * 10_000L)).hasValue(300_000 - v * 10_000L);
+            assertThat(e.timer(s, start + v * 10_000L)).hasValue(480_000 - v * 10_000L);
         }
-        assertThat(e.remainingMillis(s, start + 299_000)).isEqualTo(1_000);
+        assertThat(e.remainingMillis(s, start + 479_000)).isEqualTo(1_000);
         assertThat(e.fallbackAction(s, 0)).isEqualTo(new StarSquareAction.Sync(0, 5, s.board(0).grid().toList()));
         // 폴백은 받되 무변화
         assertThat(e.apply(s, 0, e.fallbackAction(s, 0), start + 60_000).newState()).isEqualTo(s);
         assertThat(e.legalActions(s, 0)).containsExactly(e.fallbackAction(s, 0));
         assertThat(MagicCheck.isMagic(LO_SHU, LO_SHU_CLUES)).isTrue();
+    }
+
+    @Test
+    void the_time_scale_shrinks_intro_close_result_and_bot_pace_but_not_the_puzzle_limit() {
+        StarSquareEngine e = new StarSquareEngine(new StarSquareConfig(2, Set.of(1), 2, Difficulty.EASY,
+                BotLevel.NORMAL, 60, 0.01));
+        StarSquareState intro = e.start(loShuPuzzles(2), 3L, T0).newState();
+        assertThat(e.timer(intro, T0)).hasValue(30);
+        StarSquareState s = e.onTimer(intro, T0 + 30).newState();
+        assertThat(s.phase()).isEqualTo(Phase.PLAYING);
+        assertThat(s.board(1).pace().solveAfterMs()).isLessThan(3_000);
+        assertThat(e.deadline(s)).isEqualTo(s.phaseStartedAt() + 60_000);
+        var r = e.apply(s, 0, sync(0, 1, LO_SHU.toArray()), s.phaseStartedAt() + 10);
+        assertThat(r.events()).contains(new StarSquareEvent.Closing(300));
+        assertThatThrownBy(() -> new StarSquareConfig(1, Set.of(), 1, Difficulty.EASY, BotLevel.NORMAL, 60, 0))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static Runnable sOf(StarSquareState s, StarSquareEngine e, int seat, long at) {

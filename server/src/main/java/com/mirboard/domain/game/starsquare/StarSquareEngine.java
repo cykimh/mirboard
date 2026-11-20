@@ -33,7 +33,7 @@ import java.util.OptionalLong;
  */
 public final class StarSquareEngine {
 
-    /** 시작 준비(§6.1) [결정]. */
+    /** 시작 준비(§6.1) [결정] — 운영값. 실제로는 {@link StarSquareConfig#introMillis()}(배율). */
     public static final long INTRO_MS = 3_000L;
     /** 첫 완성 뒤 마감(§6.3 ②) [수치]. */
     public static final long CLOSE_AFTER_FIRST_MS = 30_000L;
@@ -194,7 +194,7 @@ public final class StarSquareEngine {
                 state.firstSolvedAt(), state.boards(), state.deserted(), outcomes, state.matchSeed(), null);
         boolean last = state.index() == state.puzzleCount() - 1;
         events.add(new StarSquareEvent.PuzzleEnded(state.index(), reason, results, grids, state.puzzle().solution(),
-                done.totals(), last ? 0 : RESULT_MS));
+                done.totals(), last ? 0 : config.resultMillis()));
         return last ? finishMatch(done, MatchResult.EndReason.FINISHED, now, events) : done;
     }
 
@@ -211,7 +211,8 @@ public final class StarSquareEngine {
         List<SeatBoard> boards = new ArrayList<>(state.seatCount());
         for (int seat = 0; seat < state.seatCount(); seat++) {
             BotPlan pace = state.alive(seat) && config.bot(seat)
-                    ? BotPace.plan(state.matchSeed(), index, seat, spec.band(), config.botLevel(), spec.clues())
+                    ? BotPace.plan(state.matchSeed(), index, seat, spec.band(), config.botLevel(), spec.clues(),
+                            config.timeScale())
                     : null;
             boards.add(SeatBoard.fresh(spec.clues(), pace));
         }
@@ -228,15 +229,15 @@ public final class StarSquareEngine {
     /** 지금 퍼즐의 마감 시각 — 퍼즐 시작 + 제한, 첫 완성이 있으면 그 + 30초와 더 이른 쪽. 푸는 단계에서만 뜻이 있다. */
     public long deadline(StarSquareState state) {
         long limit = state.phaseStartedAt() + config.limitMillis();
-        return state.firstSolvedAt() < 0 ? limit : Math.min(limit, state.firstSolvedAt() + CLOSE_AFTER_FIRST_MS);
+        return state.firstSolvedAt() < 0 ? limit : Math.min(limit, state.firstSolvedAt() + config.closeAfterFirstMillis());
     }
 
     /** 지금 단계가 끝날 때까지 남은 시간(ms, 0 이상) — 공개 뷰용(봇 이정표는 넣지 않는다). 끝난 매치는 0. */
     public long remainingMillis(StarSquareState state, long now) {
         long end = switch (state.phase()) {
-            case INTRO -> state.phaseStartedAt() + INTRO_MS;
+            case INTRO -> state.phaseStartedAt() + config.introMillis();
             case PLAYING -> deadline(state);
-            case RESULT -> state.phaseStartedAt() + RESULT_MS;
+            case RESULT -> state.phaseStartedAt() + config.resultMillis();
             case ENDED -> now;
         };
         return Math.max(0, end - now);
@@ -250,13 +251,13 @@ public final class StarSquareEngine {
 
     private OptionalLong nextDue(StarSquareState state) {
         return switch (state.phase()) {
-            case INTRO -> OptionalLong.of(state.phaseStartedAt() + INTRO_MS);
+            case INTRO -> OptionalLong.of(state.phaseStartedAt() + config.introMillis());
             case PLAYING -> {
                 long at = deadline(state);
                 BotDue bot = nextBot(state);
                 yield OptionalLong.of(bot == null ? at : Math.min(at, bot.at()));
             }
-            case RESULT -> OptionalLong.of(state.phaseStartedAt() + RESULT_MS);
+            case RESULT -> OptionalLong.of(state.phaseStartedAt() + config.resultMillis());
             case ENDED -> OptionalLong.empty();
         };
     }
@@ -288,12 +289,12 @@ public final class StarSquareEngine {
         StarSquareState cur = state;
         for (int guard = 0; guard < 1_000 && !cur.ended(); guard++) {
             if (cur.phase() == Phase.INTRO) {
-                if (cur.phaseStartedAt() + INTRO_MS > now) {
+                if (cur.phaseStartedAt() + config.introMillis() > now) {
                     break;
                 }
                 cur = startPuzzle(cur, 0, now, events);
             } else if (cur.phase() == Phase.RESULT) {
-                if (cur.phaseStartedAt() + RESULT_MS > now) {
+                if (cur.phaseStartedAt() + config.resultMillis() > now) {
                     break;
                 }
                 cur = startPuzzle(cur, cur.index() + 1, now, events);
@@ -314,7 +315,7 @@ public final class StarSquareEngine {
 
     private PuzzleOutcome.EndReason closedReason(StarSquareState state) {
         long limit = state.phaseStartedAt() + config.limitMillis();
-        return state.firstSolvedAt() >= 0 && state.firstSolvedAt() + CLOSE_AFTER_FIRST_MS <= limit
+        return state.firstSolvedAt() >= 0 && state.firstSolvedAt() + config.closeAfterFirstMillis() <= limit
                 ? PuzzleOutcome.EndReason.CLOSED
                 : PuzzleOutcome.EndReason.TIME_UP;
     }

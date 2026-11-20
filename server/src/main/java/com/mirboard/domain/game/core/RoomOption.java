@@ -73,7 +73,13 @@ public enum RoomOption {
      * D-202 — 진행 방식(차례대로 / 모두 같이). 게임 중립 — 한 사람씩 차례를 도는 대신 모두가 동시에 둘 수 있는 게임은 누구나 선언하고,
      * "동시"가 무엇인지(요트: 라운드마다 맞춰 같이 굴림)는 게임이 정한다.
      */
-    TURN_MODE("SEQUENTIAL", "SEQUENTIAL", "SIMULTANEOUS");
+    TURN_MODE("SEQUENTIAL", "SEQUENTIAL", "SIMULTANEOUS"),
+
+    /**
+     * D-283 — 퍼즐 난이도(쉬움·보통·어려움). 게임 중립 — 같은 판에서 난이도를 고르는 게임은 누구나 선언하고, 값이 무엇을 뜻하는지(별자리 수판:
+     * 퍼즐 크기·단서 띠)는 게임이 정한다.
+     */
+    DIFFICULTY("NORMAL", "EASY", "NORMAL", "HARD");
 
     /** Redis {@code room:{id}} 해시에서 맵 옵션 필드의 접두. */
     public static final String HASH_FIELD_PREFIX = "opt:";
