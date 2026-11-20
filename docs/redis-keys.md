@@ -35,6 +35,9 @@
 | `chatlog:lobby` / `chatlog:room:{roomId}` | LIST(JSON) | 2h | 최근 채팅 100개 `{eventId,userId,username,message,ts}` | D-93. **신고 시 서버가 원문·작성자를 확정하기 위한 근거** — 클라가 본문을 제출하면 무고가 가능하므로(Server-Authoritative). 상시 채팅 로그 영속화가 아니다: 여기서 휘발되고 **신고된 것만** `chat_reports`(V9)로 승격. `message` 는 D-86 마스킹 적용 후 본문 |
 | `suspend:user:{userId}` | STRING | 정지 기간(TTL) | 어드민 유저 정지 마커 | D-86. 존재 시 로그인/CONNECT 차단(403 ACCOUNT_SUSPENDED). users 스키마 비침범(휘발) |
 
+> **담바둑(D-276·D-278)**: `room:{roomId}:state` 는 `DambadukState`(돌·담 면 번호·남은 배치 순서·담 넘기 남음·좌석별 연속 시간 초과 수·
+> 빠진 좌석·결과) — 숨길 정보가 없고 수순은 남기지 않는다. 1판 = 1매치라 `match:` 키 없음. 새 키는 없다.
+
 > **D-96**: 세션→방 매핑은 Redis `presence:*` 다. D-75 가 도입했던 in-memory
 > `WsSessionRegistry` 는 **삭제됐고**(클래스 없음), 같은 역할을 `RoomPresence` 가
 > Redis 로 수행한다. 단일 인스턴스 전제(D-03)는 D-96 이 번복 — 인스턴스 A 에 붙은

@@ -5,7 +5,7 @@
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/dambaduk/` 기준, 위치는 메서드 이름으로 적는다.
 클라는 판정하지 않는다 — 갈 수 있는 칸·담 자리·터·점수는 모두 서버가 계산해 보낸 것을 그린다.
 
-> **상태:** 채택(D-274) · 룰 v1(D-275) · S1 순수 엔진(D-276) — 2026-11-20. 포트 어댑터·봇·기록은 S2. 설계 배경은 `docs/plans/wall-magic-games.md`(게임 A 와 §10 사용자 결정).
+> **상태:** 채택(D-274) · 룰 v1(D-275) · S1 순수 엔진(D-276) · S2 봇(D-277)·어댑터·기록 V21(D-278) — 2026-11-20. **공개 전**(`DISABLED`, S4 에서 공개). 클라는 S3. 설계 배경은 `docs/plans/wall-magic-games.md`(게임 A 와 §10 사용자 결정).
 > **독창 게임.** 격자에서 돌을 옮기고 담을 세워 땅을 나누는 **일반 메커니즘**만 따른다. 출발점이 된 방송 프로그램의 이름·그림·연출과,
 > 그것을 웹으로 옮긴 다른 사이트의 화면·코드·그림·문구는 쓰지 않는다. 이름 **담바둑**과 돌·담·집의 말은 이 문서에서 새로 지었다.
 > 원작 판(계획서 §1.1 의 "2" 판)에서 그대로 온 것은 판 크기·두 가지 이동·돌 수·뱀 순서 배치·담 넘기·점수 방식이고, 원작이 답하지 않거나
@@ -42,8 +42,8 @@
 - 매 판 선을 새로 뽑는다 — 지난 판 결과를 보지 않는다(오목 D-177 과 같다). **[결정]**
 - 모든 순서(배치·차례)는 선부터 좌석 +1 이다. 시작된 게임의 좌석은 바뀌지 않는다(D-122).
 - 1판 = 1매치. 판이 끝나면 대기실로 돌아간다(D-153).
-- **갭:** 봇 채우기(D-174)는 정원(3)까지 채우므로, 혼자서 봇 하나와 **2인 판**을 할 방법이 지금 없다(사람 1 + 봇 2 = 3인 판만).
-  2인이 원작의 주력 구성이라 S2 에서 정한다(예: 오목 `TEAM_MODE` 처럼 정원을 바꾸는 게임 중립 옵션, 또는 봇 하나만 앉히기).
+- **갭:** 봇 채우기(D-174)는 정원(3)까지 채우므로, 화면에서는 혼자서 봇 하나와 **2인 판**을 할 방법이 없다(사람 1 + 봇 2 = 3인 판만).
+  서버 API(`fillWithBots` + 정원 2)로는 열린다(S2 IT 가 그렇게 쓴다). 구름항로·스컬킹도 같은 제약이라 관제 결정으로 남겼다(D-278).
 
 ## 3. 배치 (단계 `PLACING`)
 
@@ -222,13 +222,32 @@ MOVE_STONE { stoneId, path: [방향…], wall: 방향, jump: false }
 
 **코드:** `event/DambadukEvent`(sealed, 전부 공개·순번) · `state/DambadukPublicView` · `action/DambadukAction` · **테스트:** `DambadukJsonRoundTripTest`(6건 — 상태 키 집합·구 JSON 기본값·클라 액션 이름·`TimeoutAct` 역직렬화 거절·이벤트 envelope·공개 뷰 키)
 
-## 11. 기록·봇 (개요 — S2)
+## 11. 기록·봇
 
-- **기록**: Flyway **V21** `dambaduk_match_results`·`dambaduk_match_participants`(점수·가장 큰 집·순위·빠짐 사유). `users` 무변경.
-  레이팅은 담바둑 하나(`game_type = 'DAMBADUK'`) — 2인·3인을 나누지 않는다. **[결정]** 상대 전적(`HeadToHeadSource`)은 순위로 센다(같으면 무).
-- **봇**: 방 옵션 `BOT_LEVEL`(쉬움·보통·어려움, W7). 공개 정보만 담은 뷰를 받는 결정적 정책(`random` 미사용), 방 락 2초 안 — 노드 상한으로
-  p99 를 맞춘다. 정책이 예외·비합법 수를 내면 ERROR 로그 후 `timeoutAction` 으로 폴백(D-118). 세부(평가 함수·탐색 깊이)는 S2 결정(D-276 예정).
+- **기록(D-278)**: Flyway **V21** `dambaduk_match_results`(좌석 수·끝 사유·옮김 수·무승부·끝난 판 JSON)·`dambaduk_match_participants`(색 번호·
+  순위·집·가장 큰 집·빠진 까닭·승·무·탈주). `users` 무변경. 레이팅은 담바둑 하나(`game_type = 'DAMBADUK'`) — 2인·3인을 나누지 않는다. **[결정]**
+  승·패·무와 ELO 는 §7 그대로(`applyFreeForAll` 의 점수 = 좌석 수 − 순위, 빠진 사람은 이미 맨 아래), 봇·게스트가 끼면 ELO 미적용, 시간패로 빠진
+  사람은 패만(탈주 수는 탈주만). 상대 전적(`HeadToHeadSource`)은 최종 순위로 센다(같으면 무).
+- **봇(D-277)**: 방 옵션 `BOT_LEVEL`(쉬움·보통·어려움, W7). 공개 정보만 담은 뷰를 받는 결정적 정책(`random` 미사용 — 동점은 판 해시), 평가 횟수
+  상한 2만으로 방 락 2초 안. 평가 = **영향권**(담을 따라 잰 최단 거리로 가장 가까운 사람의 칸, 거리가 같으면 아무의 것도 아님) + 지금 집.
+  쉬움은 남을 보지 않는 거친 값, 보통은 1수 전수(남 = 가장 앞선 상대), 어려움은 보통 상위 40수에 다음 사람의 응수까지(2인 최소화, 3인은 그 사람의
+  자기 평가). 정책이 예외·비합법 수를 내면 ERROR 로그 후 시간 초과 수와 같은 수를 **보통 액션**으로 둔다(D-118 — `TimeoutAct` 로 떨어지면 연속
+  시간 초과로 봇이 빠진다). 봇은 담 넘기를 아끼지 않는다(평가가 더 좋으면 쓴다).
 - 방 옵션은 `BOT_LEVEL` 하나뿐이다. 목표 점수·팀·내기는 쓰지 않는다(D-106). 담 넘기는 인원에 묶여 옵션이 아니다.
+
+**코드:** `DambadukGameDefinition`·`DambadukGameEngine`(포트 어댑터)·`DambadukSettings` · `lifecycle/DambadukRoundStarter` · `persistence/`(`DambadukStateStore`·
+`DambadukMatchRecorder`·`DambadukHeadToHead`) · `bot/`(`DambadukBotPolicy`·`Influence`·`BotBoard`·`DambadukBotView`·`DambadukBotLevel`)
+- **테스트(S2):** `DambadukGameDefinitionTest`(4)·`DambadukGameEngineTest`(8 — 안전망·기록 한 번·탈주 결과)·`DambadukRoundStarterTest`(3)·
+  `bot/DambadukBotPolicyTest`(7 — 합법·결정적·이기는 마무리·지는 마무리 피함)·`bot/DambadukBotStrengthTest`(6)·`bot/DambadukBotBudgetTest`(2) — Docker 불필요.
+  `infra.ws.DambadukRecorderFailureTest`(기록 실패에도 방송·대기실 복귀), Docker: `persistence/DambadukMatchRecorderIT`(5 — 2인 ELO ±20·무승부 행만·
+  3인 시간패와 탈주·봇 판·상대 전적), `infra.bot.DambadukServerFlowIT`(5 — 봇 2인·3인 완주, 3인 사람 탈주 뒤 봇이 끝냄, 2인 손 놓은 사람 두 번째
+  시간 초과 패, resync 모양).
+- **봇 실측(`MIRBOARD_BOT_EVAL=1`, 200판, 시드 고정, 첫 두 수 무작위 — `server/build/dambaduk-bot-strength.txt`):**
+
+| 판 | 쉬움 대 무작위 | 보통 대 쉬움 | 어려움 대 보통 | 어려움 한 수 p50 / p99 / 최대 |
+| --- | --- | --- | --- | --- |
+| 2인 | 0.960 | 0.890 | 0.835 | 4.4 / 13.2 / 15.1ms (평가 ≤ 4,651) |
+| 3인 (한 단계 하나 대 다른 단계 둘, 기준선 0.333) | 0.815 | 0.713 | 0.422 | 2.2 / 9.7 / 10.0ms (평가 ≤ 3,019) |
 
 ## 12. 예시 그림
 
