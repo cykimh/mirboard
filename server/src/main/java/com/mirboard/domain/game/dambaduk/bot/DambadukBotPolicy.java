@@ -23,7 +23,8 @@ import java.util.List;
  *       남게 갇히는 수는 깎는다.</li>
  *   <li><b>보통</b> — 1수 전수 × 평가 = 영향권 차 × 10 + 집 차 × 3 (남 = 가장 앞선 상대). 판이 끝나는 수(엔진과 같은 끝 판정 —
  *       모두 갈라짐·굳음)는 엔진과 같은 순위 규칙(점수 → 가장 큰 집)으로 승·무·패를 매긴다({@link #terminalValue}).</li>
- *   <li><b>어려움</b> — 보통 평가로 내 수 상위 {@link #HARD_WIDTH}개를 고르고, 다음에 옮길 사람의 응수까지 본다. 2인은 상대가 나에게
+ *   <li><b>어려움</b> — 보통 평가로 내 수 상위 {@link #HARD_WIDTH}개를 고르고, 다음에 옮길 사람의 응수까지 본다(읽지 못한 후보는 비교에서 뺀다 —
+ *       끝난 판이 되는 수만 예외로 늘 넣는다). 2인은 상대가 나에게
  *       가장 나쁜 수(최소화), 3인은 다음 사람이 <i>자기</i> 평가로 고르는 수(그 사람의 보통)를 가정한다 — 3인 평가의 "남 = 가장 앞선
  *       상대"가 곧 1등 견제다.</li>
  * </ul>
@@ -204,8 +205,13 @@ public final class DambadukBotPolicy {
         List<Scored> deep = new ArrayList<>();
         for (int i = 0; i < ordered.size(); i++) {
             Scored s = ordered.get(i);
-            if (i >= HARD_WIDTH || nodes >= NODE_BUDGET || s.terminal()) {
-                deep.add(s);                                    // 예산 밖·끝난 판이 되는 수는 1수 평가 그대로
+            if (s.terminal()) {
+                deep.add(s);                                    // 끝난 판이 되는 수 — 엔진 순위로 매긴 값이 곧 결과다
+                continue;
+            }
+            if (i >= HARD_WIDTH || nodes >= NODE_BUDGET) {
+                // 응수를 읽지 못한 후보는 비교에서 뺀다 — 1수 낙관값이 응수까지 읽은 값과 같은 줄에 서면 최고값을 가로챈다(S3 리뷰: 2인 336국면 중
+                // 35국면). 읽은 후보가 하나도 없을 때만 아래에서 1수 평가로 돌아간다.
                 continue;
             }
             BotBoard after = s.candidate().after();
@@ -238,7 +244,7 @@ public final class DambadukBotPolicy {
             int value = view.seatCount() == 2 ? (worst == Integer.MAX_VALUE ? s.value() : worst) : mineAtTheirBest;
             deep.add(new Scored(s.candidate(), value, false, spent));
         }
-        return deep;
+        return deep.isEmpty() ? ordered : deep;
     }
 
     /** 후보 하나의 값 — {@code terminal} 은 그 수로 판이 끝나는가(엔진 판정), {@code nodes} 는 이 후보에 쓴 응수 평가 수. */

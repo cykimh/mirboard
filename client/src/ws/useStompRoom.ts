@@ -246,13 +246,15 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
   }, [token, roomId, resync]);
 
   const sendAction = useCallback(
-    (action: Record<string, unknown>) => {
+    (action: Record<string, unknown>): boolean => {
       const client = clientRef.current;
-      if (!client?.connected) return;
+      // 보냈는지 돌려준다 — 끊긴 사이에 누른 수는 보내지 못하므로 게임판이 "응답 대기"를 걸지 않게(담바둑 S3 리뷰).
+      if (!client?.connected) return false;
       client.publish({
         destination: `/app/room/${roomId}/action`,
         body: JSON.stringify(action),
       });
+      return true;
     },
     [roomId],
   );

@@ -150,6 +150,36 @@ class DambadukBotTerminalTest {
         assertThat(drawMove.nodes()).as("응수를 읽지 않았다").isZero();
     }
 
+    /** S3 리뷰 — 어려움은 응수까지 읽은 후보·끝난 판이 되는 후보만 견준다(읽지 못한 1수 낙관값이 최고값을 가로채지 않게). */
+    @Test
+    void hard_compares_only_candidates_it_read_or_that_end_the_match() {
+        java.util.Random rng = new java.util.Random(7);
+        int positions = 0;
+        for (int game = 0; game < 30; game++) {
+            DambadukState s = ENGINE.startMatch(2, game % 2);
+            while (!s.isOver()) {
+                int seat = s.turnSeat();
+                List<DambadukAction> legal = ENGINE.legalActions(s, seat);
+                if (s.phase() == com.mirboard.domain.game.dambaduk.state.Phase.PLAYING) {
+                    DambadukBotView view = DambadukBotView.of(s, seat);
+                    List<DambadukBotPolicy.Candidate> cands = DambadukBotPolicy.candidates(view, BotBoard.of(view), legal);
+                    List<DambadukBotPolicy.Scored> scores = DambadukBotPolicy.hardScores(view, cands);
+                    long terminal = scores.stream().filter(DambadukBotPolicy.Scored::terminal).count();
+                    assertThat(scores.size()).isLessThanOrEqualTo((int) terminal + DambadukBotPolicy.HARD_WIDTH);
+                    for (DambadukBotPolicy.Scored x : scores) {
+                        if (!x.terminal() && x.nodes() == 0) {
+                            int next = x.candidate().after().nextMover(seat);
+                            assertThat(next < 0 || next == seat).as("응수를 읽지 않은 후보는 응수가 없는 수뿐").isTrue();
+                        }
+                    }
+                    positions++;
+                }
+                s = ENGINE.apply(s, seat, legal.get(rng.nextInt(legal.size()))).newState();
+            }
+        }
+        assertThat(positions).isGreaterThan(300);
+    }
+
     @Test
     void placement_is_never_treated_as_an_ended_board() {
         // 3인 첫 돌 — 돌이 하나뿐이라 다툼 터가 없지만 배치 단계는 끝 판정이 없다.

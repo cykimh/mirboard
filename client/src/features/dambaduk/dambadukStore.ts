@@ -24,9 +24,22 @@ export interface TurnClock {
   remainingMs: number | null;
 }
 
-/** 보낸 액션 — 서버 응답(이벤트·ERROR) 전까지 흐리게 그린다(낙관적 표시). `at` 은 보낼 때의 판 크기(이미 적용됐는지 가린다). */
+/**
+ * 응답을 기다리는 상한(ms) — 보낸 수가 이만큼 소식이 없으면(반쯤 끊긴 망 등) 흐린 수를 풀고 다시 맞춘다(얏추 D-270 `ROLL_GUARD_MS` 와 같은
+ * 생각). 그대로 두면 `canAct` 가 꺼진 채 시간 초과로 빠지거나, 턴 제한이 꺼진 방에서는 영원히 막힌다(S3 리뷰).
+ */
+export const PENDING_GUARD_MS = 3000;
+
+/** 보낸 판 크기와 보낸 시각 — 이미 적용됐는지, 너무 오래 기다렸는지 가린다. */
+export interface PendingAt {
+  moveCount: number;
+  stoneCount: number;
+  sentAt: number;
+}
+
+/** 보낸 액션 — 서버 응답(이벤트·ERROR) 전까지 흐리게 그린다(낙관적 표시). */
 export type DambadukPending =
-  | { type: 'place'; x: number; y: number; kind: DambadukStoneKind; at: { moveCount: number; stoneCount: number } }
+  | { type: 'place'; x: number; y: number; kind: DambadukStoneKind; at: PendingAt }
   | {
       type: 'move';
       stoneId: number;
@@ -34,7 +47,7 @@ export type DambadukPending =
       toY: number;
       wallFace: number;
       jumpedFace: number;
-      at: { moveCount: number; stoneCount: number };
+      at: PendingAt;
     };
 
 const EMPTY_TERRITORY: DambadukTerritory = { regions: [], scores: [], largest: [] };
@@ -66,8 +79,11 @@ export interface DambadukRoomState {
   lastPlaced: StonePlacedPayload | null;
   /** 연출 열쇠 — 받은 배치·옮김마다 오른다. */
   fxSeq: number;
-  /** 마지막 건너뜀(좌석·번호). */
-  skipped: { seat: number; n: number } | null;
+  /**
+   * 건너뛴 좌석들 — 건너뜀 바로 다음 차례 동안만 보인다(그다음 `TURN_CHANGED`·스냅샷에서 비운다 — 판 끝까지 매 차례 붙어 다시 읽히던 것,
+   * S3 리뷰). `fresh` 는 "이번 차례 넘김에서 생긴 건너뜀"이라 바로 뒤따르는 `TURN_CHANGED` 가 지우지 않게 한다.
+   */
+  skipped: { seats: number[]; fresh: boolean } | null;
 
   // ── UI 로컬 ──
   /** 옮김 단계 — 고른 내 돌. */
@@ -152,10 +168,19 @@ const INITIAL: DambadukRoomState = {
   errorSticky: false,
 };
 
-/** 보낸 액션이 아직 판에 없나 — 판 크기(옮김 수·돌 수)가 보낼 때와 같으면 아직이다. */
-function stillPending(p: DambadukPending | null, moveCount: number, stoneCount: number): DambadukPending | null {
+/**
+ * 보낸 액션을 계속 기다리나 — 판 크기(옮김 수·돌 수)가 보낼 때와 다르면 이미 적용됐고, 같아도 {@link PENDING_GUARD_MS} 를 넘겼으면 닿지 않은
+ * 것으로 보고 푼다(권위 스냅샷이 "판 무변화"를 확인했다).
+ */
+function stillPending(
+  p: DambadukPending | null,
+  moveCount: number,
+  stoneCount: number,
+  now: number,
+): DambadukPending | null {
   if (!p) return null;
-  return p.at.moveCount === moveCount && p.at.stoneCount === stoneCount ? p : null;
+  if (p.at.moveCount !== moveCount || p.at.stoneCount !== stoneCount) return null;
+  return now - p.at.sentAt < PENDING_GUARD_MS ? p : null;
 }
 
 /**
@@ -193,7 +218,8 @@ export const useDambadukStore = create<DambadukRoomState & DambadukActions>((set
       result: t.result,
       // 판이 바뀌었을 수 있다 — 고르던 것은 비우고, 보낸 것은 아직 판에 없으면 지킨다.
       ...NO_SELECTION,
-      pending: over ? null : stillPending(state.pending, t.moveCount, t.stones.length),
+      pending: over ? null : stillPending(state.pending, t.moveCount, t.stones.length, Date.now()),
+      skipped: null,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
       turnClock:
@@ -274,6 +300,7 @@ export const useDambadukStore = create<DambadukRoomState & DambadukActions>((set
       case 'TURN_CHANGED': {
         const p = payload as DambadukTurnChangedPayload;
         set({
+          skipped: state.skipped?.fresh ? { seats: state.skipped.seats, fresh: false } : null,
           turnSeat: p.seat,
           phase: p.phase,
           territory: p.territory,
@@ -289,7 +316,8 @@ export const useDambadukStore = create<DambadukRoomState & DambadukActions>((set
 
       case 'TURN_SKIPPED': {
         const { seat } = payload as { seat: number };
-        set({ skipped: { seat, n: (state.skipped?.n ?? 0) + 1 } });
+        const seats = state.skipped?.fresh ? state.skipped.seats.filter((x) => x !== seat) : [];
+        set({ skipped: { seats: [...seats, seat], fresh: true } });
         return 'applied';
       }
 
@@ -340,7 +368,8 @@ export const useDambadukStore = create<DambadukRoomState & DambadukActions>((set
   },
 
   setJumpMode(on) {
-    set({ jumpMode: on, choice: null });
+    // 모드가 바뀌면 고른 돌도 비운다 — 새 모드에서 갈 칸이 없는 돌이 '고름'으로 남아 멈추던 것(S3 리뷰).
+    set({ jumpMode: on, choice: null, selectedStoneId: null });
   },
 
   setPlaceCell(cell) {

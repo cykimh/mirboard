@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DambadukTable } from './DambadukTable';
-import { useDambadukStore } from './dambadukStore';
+import { PENDING_GUARD_MS, useDambadukStore } from './dambadukStore';
 import { dambadukRoomSink } from './dambadukRoomSink';
 import { dambadukSfxSeat } from './dambadukSfx';
 import { useAuthStore } from '@/features/auth/authStore';
@@ -146,6 +146,8 @@ describe('DambadukTable (S3)', () => {
     expect(cell('C3')).toHaveAccessibleName(/갈 수 있는 칸/);
     fireEvent.click(screen.getByRole('button', { name: /담 넘기/ }));
     expect(useDambadukStore.getState().jumpMode).toBe(true);
+    expect(useDambadukStore.getState().selectedStoneId).toBeNull();            // 모드가 바뀌면 다시 고른다
+    fireEvent.click(cell('C4'));
     expect(cell('D3')).toHaveAccessibleName(/담 넘어 갈 수 있는 칸/);
     fireEvent.click(cell('D3'));
     const routes = screen.getByRole('group', { name: '어느 길로 갈까요' });
@@ -230,6 +232,65 @@ describe('DambadukTable (S3)', () => {
     expect(onBackToRoom).toHaveBeenCalled();
   });
 
+  it('보낸 수가 기다림 상한 동안 소식이 없으면 흐린 수를 풀고 다시 맞춘다', () => {
+    vi.useFakeTimers();
+    try {
+      seed(playingView());
+      renderTable();
+      fireEvent.click(cell('C4'));
+      fireEvent.click(cell('C3'));
+      fireEvent.click(within(screen.getByRole('group', { name: '담을 세울 면' })).getByRole('button', { name: '위 담' }));
+      expect(useDambadukStore.getState().pending).not.toBeNull();
+      expect(screen.getByText('보내는 중…')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(PENDING_GUARD_MS);
+      });
+      expect(useDambadukStore.getState().pending).toBeNull();
+      expect(requestResync).toHaveBeenCalled();
+      expect(screen.getByText('내 차례 — 옮길 돌을 누르세요')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('끊겨서 보내지 못한 수는 기다림을 걸지 않고 알린다', () => {
+    seed(playingView());
+    renderTable();
+    sendAction.mockReturnValueOnce(false);
+    fireEvent.click(cell('C4'));
+    fireEvent.click(cell('C3'));
+    fireEvent.click(within(screen.getByRole('group', { name: '담을 세울 면' })).getByRole('button', { name: '위 담' }));
+    expect(useDambadukStore.getState().pending).toBeNull();
+    expect(useDambadukStore.getState().errorMessage).toMatch(/보내지 못했어요/);
+  });
+
+  it('건너뜀 안내는 바로 다음 차례에만 붙는다', () => {
+    seed(playingView({ seatCount: 3, seatColors: [0, 1, 2], turnSeat: 2, options: [] }));
+    renderTable({ playerIds: [10, 20, 30] });
+    const turn = (seat: number, seq: number) => ({
+      type: 'TURN_CHANGED',
+      seq,
+      payload: { seat, phase: 'PLAYING', territory: ONE_REGION, placeKinds: [], options: [] },
+    });
+    act(() => {
+      useDambadukStore.getState().applyEvent({ type: 'TURN_SKIPPED', seq: 2, payload: { seat: 1 } });
+      useDambadukStore.getState().applyEvent(turn(2, 3));
+    });
+    expect(screen.getByText(/나래 — 옮길 돌이 없어 건너뜀/)).toBeInTheDocument();
+    act(() => {
+      useDambadukStore.getState().applyEvent(turn(0, 4));
+    });
+    expect(screen.queryByText(/옮길 돌이 없어 건너뜀/)).toBeNull();
+  });
+
+  it('좌석 색은 화면 읽기에 글자로 읽힌다', () => {
+    seed(playingView());
+    renderTable();
+    const me = within(screen.getByRole('list', { name: '차례 순서와 점수' })).getByText('가람 (나)').closest('li')!;
+    expect(me.querySelector('.db-dot')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(me).getByText('흑', { exact: false, selector: '.db-sr' })).toBeInTheDocument();
+  });
+
   it('효과음 좌석을 알려 주고, 거절 ERROR 는 흐린 수를 지우고 안내를 띄운다', () => {
     seed(playingView());
     const { unmount } = renderTable();
@@ -242,7 +303,7 @@ describe('DambadukTable (S3)', () => {
         toY: 2,
         wallFace: 51,
         jumpedFace: -1,
-        at: { moveCount: 0, stoneCount: 8 },
+        at: { moveCount: 0, stoneCount: 8, sentAt: Date.now() },
       });
       dambadukRoomSink.applyPrivateEvent({ eventId: 'e', type: 'ERROR', ts: 0, payload: { code: 'WALL_IN_PATH', message: 'x' } });
     });

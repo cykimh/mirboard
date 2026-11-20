@@ -15,7 +15,7 @@ import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useSfx } from '@/features/sound/useSfx';
 import type { DambadukCell, DambadukDir, DambadukMoveOption, DambadukStoneKind } from '@/types/dambaduk';
 import { dambadukRoomSink } from './dambadukRoomSink';
-import { useDambadukStore } from './dambadukStore';
+import { PENDING_GUARD_MS, useDambadukStore, type PendingAt } from './dambadukStore';
 import { setDambadukSfxSeat } from './dambadukSfx';
 import { DambadukBoard, KIND_NAME, type Destination } from './DambadukBoard';
 import { DambadukMatchEnd, END_REASON_TEXT } from './DambadukMatchEnd';
@@ -189,16 +189,21 @@ export function DambadukTable({
     s.placeKind && s.placeKinds.includes(s.placeKind) ? s.placeKind : (s.placeKinds[0] ?? null);
   const occupied = useMemo(() => new Set(s.stones.map(cellIndex)), [s.stones]);
 
+  /** 보내고, 보냈을 때만 응답 대기(흐린 수)를 건다 — 끊긴 사이에 누른 수는 대기를 걸지 않고 알린다(S3 리뷰). */
+  const send = (action: Record<string, unknown>, onSent: (at: PendingAt) => void) => {
+    const at = { moveCount: s.moveCount, stoneCount: s.stones.length, sentAt: Date.now() };
+    if (sendAction(action) === false) {
+      s.setError('연결이 끊겨 보내지 못했어요. 다시 연결되면 한 번 더 눌러 주세요.');
+      return;
+    }
+    onSent(at);
+  };
+
   const confirmPlace = (cell: DambadukCell) => {
     if (!canAct || !placing || !placeKind || occupied.has(cellIndex(cell))) return;
-    s.markPending({
-      type: 'place',
-      x: cell.x,
-      y: cell.y,
-      kind: placeKind,
-      at: { moveCount: s.moveCount, stoneCount: s.stones.length },
-    });
-    sendAction({ '@action': 'PLACE_STONE', kind: placeKind, x: cell.x, y: cell.y });
+    send({ '@action': 'PLACE_STONE', kind: placeKind, x: cell.x, y: cell.y }, (at) =>
+      s.markPending({ type: 'place', x: cell.x, y: cell.y, kind: placeKind, at }),
+    );
   };
 
   // ── 옮김 ──
@@ -212,7 +217,9 @@ export function DambadukTable({
     () => new Set(myOptions.filter((o) => o.jump === jumping).map((o) => o.stoneId)),
     [myOptions, jumping],
   );
-  const visibleOptions = myOptions.filter((o) => o.stoneId === s.selectedStoneId && o.jump === jumping);
+  // 고른 돌이 지금 모드에서 갈 칸이 없으면 고르지 않은 것으로 본다(넘기 모드가 바뀐 뒤 '고름'으로 멈추지 않게 — S3 리뷰).
+  const selectedId = s.selectedStoneId !== null && movable.has(s.selectedStoneId) ? s.selectedStoneId : null;
+  const visibleOptions = myOptions.filter((o) => o.stoneId === selectedId && o.jump === jumping);
   const destinations = groupByDestination(visibleOptions);
   const routes = s.choice
     ? distinctRoutes(visibleOptions.filter((o) => o.toX === s.choice!.toX && o.toY === s.choice!.toY))
@@ -228,7 +235,7 @@ export function DambadukTable({
     }
     const st = s.stones.find((x) => x.x === cell.x && x.y === cell.y);
     if (st && movable.has(st.id)) {
-      s.selectStone(st.id === s.selectedStoneId ? null : st.id);
+      s.selectStone(st.id === selectedId ? null : st.id);
       return;
     }
     const dest = destinations.find((d) => d.cell.x === cell.x && d.cell.y === cell.y);
@@ -242,17 +249,35 @@ export function DambadukTable({
   const sendMove = (option: DambadukMoveOption, wall: DambadukDir) => {
     if (!canAct) return;
     const to = { x: option.toX, y: option.toY };
-    s.markPending({
-      type: 'move',
-      stoneId: option.stoneId,
-      toX: to.x,
-      toY: to.y,
-      wallFace: faceOf(to, wall),
-      jumpedFace: option.jumpedFace,
-      at: { moveCount: s.moveCount, stoneCount: s.stones.length },
-    });
-    sendAction({ '@action': 'MOVE_STONE', stoneId: option.stoneId, path: option.path, wall, jump: option.jump });
+    send({ '@action': 'MOVE_STONE', stoneId: option.stoneId, path: option.path, wall, jump: option.jump }, (at) =>
+      s.markPending({
+        type: 'move',
+        stoneId: option.stoneId,
+        toX: to.x,
+        toY: to.y,
+        wallFace: faceOf(to, wall),
+        jumpedFace: option.jumpedFace,
+        at,
+      }),
+    );
   };
+
+  // 보낸 수가 PENDING_GUARD_MS 동안 소식이 없으면(반쯤 끊긴 망) 흐린 수를 풀고 권위 스냅샷으로 맞춘다 — 대기를 그대로 두면 canAct 가 꺼진 채
+  // 시간 초과로 빠지거나, 턴 제한이 꺼진 방에서는 영원히 막힌다(S3 리뷰, 얏추 D-270 과 같은 생각).
+  const pending = s.pending;
+  useEffect(() => {
+    if (!pending) return;
+    const timer = window.setTimeout(
+      () => {
+        const st = useDambadukStore.getState();
+        if (st.pending !== pending) return;
+        st.clearPending();
+        requestResync();
+      },
+      Math.max(0, pending.at.sentAt + PENDING_GUARD_MS - Date.now()),
+    );
+    return () => window.clearTimeout(timer);
+  }, [pending, requestResync]);
 
   const onWall = (dir: DambadukDir) => {
     if (s.choice && s.choice.walls.includes(dir)) sendMove(s.choice, dir);
@@ -269,7 +294,7 @@ export function DambadukTable({
   };
 
   // ── 안내 줄 ──
-  const selected = s.stones.find((x) => x.id === s.selectedStoneId) ?? null;
+  const selected = s.stones.find((x) => x.id === selectedId) ?? null;
   let status: string;
   if (s.result) status = END_REASON_TEXT[s.result.reason];
   else if (roomFinished) status = '게임이 종료되었습니다.';
@@ -283,8 +308,9 @@ export function DambadukTable({
   else if (myTurn) status = '내 차례 — 옮길 돌을 누르세요';
   else status = `${nameOf(turnSeat)}(${COLOR_NAME[colorOf(turnSeat)]}) 차례`;
 
+  // 건너뜀은 바로 다음 차례 동안만(스토어가 그다음 차례 넘김에 비운다).
   const skippedNote =
-    s.skipped && !s.result ? `${nameOf(s.skipped.seat)} — 옮길 돌이 없어 건너뜀` : null;
+    s.skipped && !s.result ? `${s.skipped.seats.map(nameOf).join('·')} — 옮길 돌이 없어 건너뜀` : null;
 
   const seats = Array.from({ length: seatCount }, (_, i) => i);
 
@@ -329,7 +355,9 @@ export function DambadukTable({
               aria-current={isTurn ? 'step' : undefined}
             >
               <span className="db-seat-top">
-                <span className={`db-dot db-c-${COLOR_KEY[colorOf(seat)]}`} aria-label={COLOR_NAME[colorOf(seat)]} />
+                {/* 색 점은 그림이라 화면 읽기에는 숨긴 글자로 색을 읽힌다(결과표와 같다 — aria-label 만으로는 읽히지 않는다). */}
+                <span className={`db-dot db-c-${COLOR_KEY[colorOf(seat)]}`} aria-hidden="true" />
+                <span className="db-sr">{COLOR_NAME[colorOf(seat)]} </span>
                 {tiers[uid] && <TierBadge tier={tiers[uid]} size={16} />}
                 <span className="db-seat-name">
                   {nameOf(seat)}
@@ -387,7 +415,7 @@ export function DambadukTable({
             placeCell={canAct && placing ? s.placeCell : null}
             placeKind={placeKind}
             movableStoneIds={canAct ? movable : undefined}
-            selectedStoneId={canAct ? s.selectedStoneId : null}
+            selectedStoneId={canAct ? selectedId : null}
             destinations={canAct ? destinations : []}
             choice={canAct ? s.choice : null}
             pendingPlace={s.pending?.type === 'place' ? { ...s.pending, seat: mySeat } : null}
@@ -504,7 +532,7 @@ export function DambadukTable({
               </span>
             </div>
           )}
-          {(s.selectedStoneId !== null || s.choice) && (
+          {(selectedId !== null || s.choice) && (
             <button type="button" className="db-secondary" onClick={() => s.selectStone(null)}>
               다시 고르기
             </button>

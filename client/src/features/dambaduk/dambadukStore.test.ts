@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useDambadukStore } from './dambadukStore';
+import { PENDING_GUARD_MS, useDambadukStore } from './dambadukStore';
 import { ONE_REGION, OPTIONS_C4, placingView, playingView, snapshot } from './dambadukFixtures';
 
 const store = () => useDambadukStore.getState();
@@ -80,7 +80,33 @@ describe('dambadukStore — 공개 이벤트 거울(순수 리듀서)', () => {
     expect(store().exits).toEqual([{ seat: 1, reason: 'DESERTED' }]);
     expect(store().stones.map((s) => s.id)).not.toContain(2);
     store().applyEvent({ type: 'TURN_SKIPPED', seq: 3, payload: { seat: 2 } });
-    expect(store().skipped).toEqual({ seat: 2, n: 1 });
+    expect(store().skipped).toEqual({ seats: [2], fresh: true });
+  });
+
+  it('건너뜀은 바로 다음 차례 동안만 남고, 그다음 차례 넘김·스냅샷에서 비운다', () => {
+    store().applySnapshot(snapshot(playingView({ seatCount: 3, seatColors: [0, 1, 2] })));
+    const turn = (seat: number, seq: number) => ({
+      type: 'TURN_CHANGED',
+      seq,
+      payload: { seat, phase: 'PLAYING', territory: ONE_REGION, placeKinds: [], options: [] },
+    });
+    store().applyEvent({ type: 'TURN_SKIPPED', seq: 2, payload: { seat: 1 } });
+    store().applyEvent({ type: 'TURN_SKIPPED', seq: 3, payload: { seat: 2 } });
+    store().applyEvent(turn(0, 4));
+    expect(store().skipped).toEqual({ seats: [1, 2], fresh: false });          // 건너뜀 바로 다음 차례 — 보인다
+    store().applyEvent(turn(1, 5));
+    expect(store().skipped).toBeNull();                                         // 그다음 차례 — 비운다
+    store().applyEvent({ type: 'TURN_SKIPPED', seq: 6, payload: { seat: 2 } });
+    store().applySnapshot(snapshot(playingView()));
+    expect(store().skipped).toBeNull();
+  });
+
+  it('넘기 모드를 바꾸면 고른 돌도 비운다', () => {
+    store().applySnapshot(snapshot(playingView()));
+    store().selectStone(4);
+    store().setJumpMode(true);
+    expect(store().selectedStoneId).toBeNull();
+    expect(store().choice).toBeNull();
   });
 
   it('MATCH_ENDED 뒤에는 판 이벤트를 무시한다', () => {
@@ -106,12 +132,16 @@ describe('dambadukStore — 공개 이벤트 거울(순수 리듀서)', () => {
     expect(store().applyEvent({ type: 'TURN_SKIPPED', seq: 3, payload: { seat: 1 } })).toBe('ignored');
   });
 
-  it('보낸 수는 판에 반영될 때까지 스냅샷을 넘어 남는다', () => {
+  it('보낸 수는 판에 반영될 때까지 스냅샷을 넘어 남되, 기다림 상한을 넘긴 무변화 스냅샷이면 푼다', () => {
     store().applySnapshot(snapshot(playingView()));
-    store().markPending({ type: 'move', stoneId: 4, toX: 2, toY: 2, wallFace: 51, jumpedFace: -1, at: { moveCount: 0, stoneCount: 8 } });
+    const pending = { type: 'move' as const, stoneId: 4, toX: 2, toY: 2, wallFace: 51, jumpedFace: -1 };
+    store().markPending({ ...pending, at: { moveCount: 0, stoneCount: 8, sentAt: Date.now() } });
     store().applySnapshot(snapshot(playingView()));
-    expect(store().pending).not.toBeNull();
+    expect(store().pending).not.toBeNull();                                     // 막 보낸 수 — 아직 기다린다
     store().applySnapshot(snapshot(playingView({ moveCount: 1 })));
-    expect(store().pending).toBeNull();
+    expect(store().pending).toBeNull();                                         // 판에 반영됐다
+    store().markPending({ ...pending, at: { moveCount: 0, stoneCount: 8, sentAt: Date.now() - PENDING_GUARD_MS - 1 } });
+    store().applySnapshot(snapshot(playingView()));
+    expect(store().pending).toBeNull();                                         // 오래 소식이 없고 판도 그대로 — 닿지 않은 수
   });
 });
