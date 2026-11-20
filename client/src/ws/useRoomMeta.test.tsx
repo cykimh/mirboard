@@ -40,7 +40,7 @@ vi.mock('@stomp/stompjs', () => ({
 }));
 
 import { useRoomMeta } from './useRoomMeta';
-import { HIDDEN_IDLE_MS, setResumeGate } from './hiddenIdle';
+import { HIDDEN_IDLE_MS, RESUME_GATE_TIMEOUT_MS } from './hiddenIdle';
 
 const META = '/topic/room/r1/meta';
 
@@ -206,38 +206,47 @@ describe('useRoomMeta — 오래 숨긴 탭은 끊는다 (D-273)', () => {
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
+    expect(onResync).toHaveBeenCalledTimes(1);
     expect(client.activations).toBe(before + 1);
     expect(client.deactivated).toBe(false);
-    // 다시 맞추기는 다시 붙은 뒤(onConnect) 한 번 — 보이는 순간 따로 부르지 않는다(관문이 이미 맞췄다).
-    expect(onResync).not.toHaveBeenCalled();
-    act(() => client.cfg.onConnect());
-    expect(onResync).toHaveBeenCalledTimes(1);
   });
 
-  it('다시 붙이기 전에 관문(방 화면 재동기화 — 관전 목록 복귀)을 기다린다', async () => {
+  it('다시 붙이기 전에 방 화면 재동기화(관전 목록 복귀)를 기다린다 — 기다리는 사이 다시 숨겨져도 붙인다', async () => {
     let release!: () => void;
-    const gate = vi.fn(() => new Promise<void>((r) => (release = r)));
-    setResumeGate(gate);
-    try {
-      renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, vi.fn()));
-      const client = clients.at(-1)!;
-      const before = client.activations;
-      setVisibility('hidden');
-      act(() => {
-        document.dispatchEvent(new Event('visibilitychange'));
-        vi.advanceTimersByTime(HIDDEN_IDLE_MS);
-      });
-      setVisibility('visible');
-      await act(async () => {
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-      expect(gate).toHaveBeenCalledTimes(1);
-      expect(client.activations).toBe(before);
-      await act(async () => release());
-      expect(client.activations).toBe(before + 1);
-    } finally {
-      setResumeGate(null);
-    }
+    const onResync = vi.fn(() => new Promise<void>((r) => (release = r)));
+    renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, onResync));
+    const client = clients.at(-1)!;
+    const before = client.activations;
+    setVisibility('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      vi.advanceTimersByTime(HIDDEN_IDLE_MS);
+    });
+    expect(client.deactivated).toBe(true);
+    setVisibility('visible');
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(onResync).toHaveBeenCalledTimes(1);
+    expect(client.activations).toBe(before);
+    setVisibility('hidden');
+    await act(async () => release());
+    expect(client.activations).toBe(before + 1);
+  });
+
+  it('재동기화가 매달려도 30초 뒤에는 붙인다', async () => {
+    const onResync = vi.fn(() => new Promise<void>(() => {}));
+    renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, onResync));
+    const client = clients.at(-1)!;
+    const before = client.activations;
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(client.activations).toBe(before);
+    await act(async () => {
+      vi.advanceTimersByTime(RESUME_GATE_TIMEOUT_MS);
+    });
+    expect(client.activations).toBe(before + 1);
   });
 
   it('잠깐 숨겼다 보이면 끊지 않는다', () => {

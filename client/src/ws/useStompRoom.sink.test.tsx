@@ -293,7 +293,8 @@ describe('useStompRoom — RoomEventSink 주입 (D-103)', () => {
     const beforeActivate = activateCount;
     const beforeResync = resyncMock.mock.calls.length;
 
-    act(() => {
+    // D-273 — 방 화면 재동기화(관문)를 기다린 뒤에 붙인다(관문이 없으면 바로 다음 틱).
+    await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
 

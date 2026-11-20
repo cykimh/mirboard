@@ -230,10 +230,11 @@ export function RoomPage() {
   const resyncingRef = useRef<Promise<void> | null>(null);
   const roomIdRef = useRef(roomId);
   roomIdRef.current = roomId;
+  // 끝난 판(FINISHED)은 맞추지 않는다 — 결과 화면을 유지하고(D-120), 방 키는 곧 만료돼(600초) 읽으면 "방이 없어졌어요"가 결과를 덮는다.
   function resyncRoom(): Promise<void> {
     if (resyncingRef.current) return resyncingRef.current;
     const current = roomRef.current;
-    if (!token || !current || joinBlock || error) return Promise.resolve();
+    if (!token || !current || joinBlock || error || current.status === 'FINISHED') return Promise.resolve();
     const requested = roomId;
     // D-137 — 관전자는 관전으로 돌려놓는다(D-134 끊김에 관전 목록에서 빠졌어도). join-or-reconnect 는 빈자리면 앉혀 버린다 — 앉는 것은
     // [자리에 앉기]로만.
@@ -241,7 +242,19 @@ export function RoomPage() {
     const run = async () => {
       try {
         if (wasSpectator) {
-          const watched = await roomsApi.spectate(token, requested);
+          let watched: Room;
+          try {
+            watched = await roomsApi.spectate(token, requested);
+          } catch (err) {
+            // 끊긴 사이 판이 끝나 다음 판 자리에 앉았다(D-153) — 방을 읽어 맞춘다.
+            if (!(err instanceof ApiError && err.code === 'ALREADY_IN_ROOM')) throw err;
+            watched = await roomsApi.get(token, requested);
+          }
+          if (!mountedRef.current) {
+            // 기다리는 사이 방 화면을 떠났다 — 다시 넣은 관전을 거둔다(세션 없는 관전자가 남지 않게).
+            if (watched.spectatorIds?.includes(user!.userId)) void roomsApi.stopSpectating(token, requested).catch(() => {});
+            return;
+          }
           if (roomIdRef.current === requested) applyRoomMeta(watched);
         } else if (current.status === 'WAITING') {
           const r = await roomsApi.joinOrReconnect(token, requested);
@@ -261,6 +274,13 @@ export function RoomPage() {
     resyncingRef.current = run();
     return resyncingRef.current;
   }
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const resyncRoomRef = useRef(resyncRoom);
   resyncRoomRef.current = resyncRoom;
   useEffect(() => {

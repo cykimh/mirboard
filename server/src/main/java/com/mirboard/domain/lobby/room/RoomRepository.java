@@ -368,10 +368,17 @@ public class RoomRepository {
         }
         Long added = redis.opsForSet().add(spectatorsKey(roomId), Long.toString(userId));
         redis.expire(spectatorsKey(roomId), java.time.Duration.ofHours(6));
-        // D-153 — 들어온 순서(다음 판 자동 착석 순서). 다시 관전하면 시각이 새로 찍힌다. 나간 관전자는 SET 과 맞춰 걸러진다.
-        redis.opsForZSet().add(spectatorsSinceKey(roomId), Long.toString(userId), System.currentTimeMillis());
+        // D-153 — 들어온 순서(다음 판 자동 착석 순서). 나갔다 다시 관전하면 시각이 새로 찍힌다. 나간 관전자는 SET 과 맞춰 걸러진다.
+        // D-273 — 이미 관전 중이면(새로 추가되지 않으면) 시각을 그대로 둔다 — 화면 재동기화가 탭 전환마다 spectate 를 다시 불러도
+        // 먼저 온 사람이 뒤로 밀리지 않게.
+        boolean isNew = added != null && added > 0;
+        if (isNew) {
+            redis.opsForZSet().add(spectatorsSinceKey(roomId), Long.toString(userId), System.currentTimeMillis());
+        } else {
+            redis.opsForZSet().addIfAbsent(spectatorsSinceKey(roomId), Long.toString(userId), System.currentTimeMillis());
+        }
         redis.expire(spectatorsSinceKey(roomId), java.time.Duration.ofHours(6));
-        return added != null && added > 0;
+        return isNew;
     }
 
     /** 관전자 제거. 존재하지 않으면 no-op. */

@@ -103,6 +103,29 @@ class RoomReturnWaitingIT {
         assertThat(back.playerIds()).containsExactly(121L, 122L, 224L);
     }
 
+    /** D-273 — 화면 재동기화가 탭 전환마다 spectate 를 다시 불러도 먼저 온 관전자가 뒤로 밀리지 않는다. 나갔다 오면 새로 찍힌다. */
+    @Test
+    void spectating_again_while_watching_keeps_the_arrival_order() throws Exception {
+        Room room = started("ONE_CARD", List.of(141L, 142L));
+        spectateInOrder(room.roomId(), 243L, 244L, 243L);
+
+        Room back = roomService.returnToWaiting(room.roomId());
+
+        assertThat(back.playerIds()).containsExactly(141L, 142L, 243L, 244L);
+    }
+
+    @Test
+    void a_spectator_who_left_and_came_back_goes_to_the_end() throws Exception {
+        Room room = started("ONE_CARD", List.of(151L, 152L));
+        spectateInOrder(room.roomId(), 253L, 254L);
+        roomService.stopSpectating(room.roomId(), 253L);
+        spectateInOrder(room.roomId(), 253L);
+
+        Room back = roomService.returnToWaiting(room.roomId());
+
+        assertThat(back.playerIds()).containsExactly(151L, 152L, 254L, 253L);
+    }
+
     @Test
     void only_a_room_in_game_goes_back() {
         Room waiting = roomService.createRoom(131L, "not-started", "ONE_CARD");

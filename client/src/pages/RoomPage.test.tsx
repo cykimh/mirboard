@@ -1021,6 +1021,63 @@ describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
     expect(spectate).toHaveBeenCalledTimes(1);
   });
 
+  it('끝난 판(FINISHED)은 맞추지 않는다 — 결과 화면을 "방이 없어졌어요"로 덮지 않게', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'FINISHED', playerIds: [1, 2], playerCount: 2 });
+    await screen.findByText('테스트 방');
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(roomsApi.get).not.toHaveBeenCalled();
+    expect(joinOrReconnect).toHaveBeenCalledTimes(1);
+    expect(spectate).not.toHaveBeenCalled();
+  });
+
+  it('관전하던 사이 다음 판 자리에 앉았으면(ALREADY_IN_ROOM) 방을 읽어 맞춘다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [2, 3], playerCount: 2, spectatorIds: [1] }, 'SPECTATING');
+    await screen.findByTestId('onecard-table');
+    spectate.mockRejectedValue(apiError(409, 'ALREADY_IN_ROOM', 'already'));
+    vi.mocked(roomsApi.get).mockResolvedValue({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'WAITING',
+      playerIds: [2, 3, 1],
+      playerCount: 3,
+      spectatorIds: [],
+    } as Room);
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(roomsApi.get).toHaveBeenCalledWith('tok', 'r1');
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
+  });
+
+  it('관전 복귀를 기다리는 사이 방 화면을 떠났으면 다시 넣은 관전을 거둔다', async () => {
+    const view = renderRoom(
+      { gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [2, 3], playerCount: 2, spectatorIds: [1] },
+      'SPECTATING',
+    );
+    await screen.findByTestId('onecard-table');
+    let resolve!: (r: Room) => void;
+    spectate.mockReturnValue(new Promise<Room>((r) => (resolve = r)));
+    vi.mocked(roomsApi.stopSpectating).mockResolvedValue(undefined);
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = resync()() as Promise<void>;
+    });
+    view.unmount();
+    await act(async () => {
+      resolve({ ...ROOM, gameType: 'ONE_CARD', status: 'IN_GAME', spectatorIds: [1] } as Room);
+      await pending;
+    });
+
+    expect(roomsApi.stopSpectating).toHaveBeenCalledWith('tok', 'r1');
+  });
+
   it('게임 중 방이 없어졌으면 "방이 없어졌어요"', async () => {
     renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 });
     await screen.findByTestId('onecard-table');
