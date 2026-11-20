@@ -1,0 +1,584 @@
+/* 담바둑 게임판 (D-274·D-279) — 오목(21)·씨앗포(23)와 같은 규칙을 따른다.
+ *
+ * ⚠ 캐스케이드: index.css 에서 25 다음, **17-responsive 앞**에 import 된다. 이 파일에는 미디어 쿼리가 **0개**다(폭·동작 줄이기는
+ *   17-responsive 의 `.db-` 블록).
+ * ⚠ 네임스페이스: 모든 선택자는 `.db-` 클래스를 포함한다. 공용 클래스를 단독으로 재정의하지 않는다.
+ * 구성: ① 배치(판 세 겹 — 그림·돌·누르는 칸) → ② 테마 층 `.db-theme-classic`(나무 바둑판·먹선·돌담 결) → ③ 연출 `.db-fx-rich`.
+ */
+
+.db-table,
+.db-table *,
+.db-table *::before,
+.db-table *::after {
+  box-sizing: border-box;
+}
+
+/* ── 토큰 (튜토리얼 포털도 쓰도록 .db-tokens) ───────────────────────── */
+.db-tokens {
+  --db-wood: #e2b877;
+  --db-wood-deep: #b8833f;
+  --db-ink: #3b2a17;
+  --db-line: rgba(59, 42, 23, 0.55);
+  --db-wall: #7c7266;
+  --db-wall-stone: #a39a8c;
+  --db-wall-edge: #3f382f;
+  --db-black: #18191c;
+  --db-white: #fbfaf5;
+  --db-blue: #2f6f8f;
+  --db-black-wash: rgba(24, 25, 28, 0.22);
+  --db-white-wash: rgba(255, 255, 255, 0.5);
+  --db-blue-wash: rgba(47, 111, 143, 0.3);
+  --db-accent: #c2410c;
+  --db-on-accent: #ffffff;
+  --db-dest: rgba(194, 65, 12, 0.85);
+  --db-border: var(--color-border);
+  --db-muted: var(--color-text-muted);
+  --db-surface: var(--color-bg-surface);
+  --db-surface-2: var(--color-bg-surface-elevated);
+  --db-slide: 0.22s;
+}
+
+.db-table {
+  --db-reserve: 330px;
+  --db-board-max: min(560px, max(280px, calc(100dvh - var(--db-reserve))));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.db-header,
+.db-strip,
+.db-status,
+.db-controls,
+.db-end {
+  width: 100%;
+}
+
+/* ── 머리 줄 배지·버튼 ── */
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--db-border);
+  border-radius: 999px;
+  background: var(--db-surface);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.db-badge-title {
+  font-weight: 700;
+}
+.db-badge-warn {
+  border-color: var(--db-accent);
+  color: var(--db-accent);
+}
+.db-header-badges,
+.db-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* ── 좌석 띠 ── */
+.db-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.db-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--db-border);
+  border-radius: 10px;
+  background: var(--db-surface);
+}
+.db-seat-turn {
+  border-color: var(--db-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-accent) 35%, transparent);
+}
+.db-seat-out {
+  opacity: 0.55;
+}
+.db-seat-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.db-seat-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+}
+.db-seat-score {
+  font-size: 12px;
+  color: var(--db-muted);
+  white-space: nowrap;
+}
+.db-seat-score b {
+  color: var(--color-text, inherit);
+  font-size: 14px;
+}
+.db-seat-chat {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: var(--db-surface-2);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.db-dot {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+.db-dot.db-c-black {
+  background: var(--db-black);
+}
+.db-dot.db-c-white {
+  background: var(--db-white);
+}
+.db-dot.db-c-blue {
+  background: var(--db-blue);
+}
+.db-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── 판: 세 겹(그림·돌·누르는 칸) ── */
+.db-stage {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.db-board-wrap {
+  position: relative;
+  width: 100%;
+  max-width: var(--db-board-max);
+}
+.db-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.db-board-mini {
+  width: min(100%, 240px);
+  margin: 8px auto;
+}
+.db-board-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.db-wood {
+  fill: var(--db-wood);
+}
+.db-frame {
+  fill: none;
+  stroke: var(--db-wood-deep);
+  stroke-width: 8;
+}
+.db-line {
+  stroke: var(--db-line);
+  stroke-width: 2;
+}
+.db-home.db-c-black {
+  fill: var(--db-black-wash);
+}
+.db-home.db-c-white {
+  fill: var(--db-white-wash);
+}
+.db-home.db-c-blue {
+  fill: var(--db-blue-wash);
+}
+.db-trail {
+  stroke: var(--db-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 2 14;
+  opacity: 0.6;
+}
+.db-wall-candidate {
+  stroke: var(--db-accent);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 10 10;
+}
+.db-wall-base {
+  fill: var(--db-wall);
+  stroke: var(--db-wall-edge);
+  stroke-width: 2;
+}
+.db-wall-stone {
+  fill: var(--db-wall-stone);
+}
+.db-wall-pending {
+  opacity: 0.5;
+}
+
+.db-stones,
+.db-cells {
+  position: absolute;
+  inset: 0;
+}
+.db-stones {
+  pointer-events: none;
+}
+.db-stone,
+.db-dest,
+.db-cell,
+.db-wall-pick {
+  position: absolute;
+  left: calc(var(--db-x) * 100% / 7);
+  top: calc(var(--db-y) * 100% / 7);
+  width: calc(100% / 7);
+  height: calc(100% / 7);
+}
+.db-stone {
+  /* 백분율 여백은 칸이 아니라 판 폭 기준이라 칸 몫으로 나눈다(칸의 9%). */
+  padding: calc(100% / 7 * 0.09);
+  transition:
+    left var(--db-slide) ease-out,
+    top var(--db-slide) ease-out;
+}
+.db-stone-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.db-stone-shadow {
+  fill: rgba(0, 0, 0, 0.25);
+}
+.db-stone-body {
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 3;
+}
+.db-stone-gloss {
+  fill: rgba(255, 255, 255, 0.25);
+}
+.db-stone-mark {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.db-c-black .db-stone-body {
+  fill: var(--db-black);
+}
+.db-c-black .db-stone-mark {
+  stroke: rgba(255, 255, 255, 0.55);
+}
+.db-c-white .db-stone-body {
+  fill: var(--db-white);
+}
+.db-c-white .db-stone-mark {
+  stroke: rgba(0, 0, 0, 0.45);
+}
+.db-c-blue .db-stone-body {
+  fill: var(--db-blue);
+}
+.db-c-blue .db-stone-mark {
+  stroke: rgba(255, 255, 255, 0.6);
+}
+.db-stone-ghost,
+.db-stone-pending {
+  opacity: 0.5;
+}
+.db-stone-selected .db-stone-body {
+  stroke: var(--db-accent);
+  stroke-width: 8;
+}
+.db-stone-movable .db-stone-body {
+  stroke: var(--db-accent);
+  stroke-width: 5;
+}
+.db-dest::after {
+  content: '';
+  position: absolute;
+  left: 38%;
+  top: 38%;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: var(--db-dest);
+}
+.db-dest-jump::after {
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+.db-dest-chosen::after {
+  opacity: 0;
+}
+
+.db-cell,
+.db-cells .db-cell:hover:not(:disabled) {
+  /* 공용 button:hover 바탕(01-base)이 칸을 덮지 않게 — 칸은 늘 투명한 누름 판이다. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.db-cell-on {
+  cursor: pointer;
+}
+.db-cell:focus-visible {
+  outline: 3px solid var(--db-accent);
+  outline-offset: -3px;
+}
+/* 담 고르기 손잡이 — 도착 칸의 면 위에 길쭉하게(면 길이의 60%·두께 22px). 네 개가 서로 겹치지 않는다. */
+.db-wall-pick {
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--db-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--db-accent) 25%, transparent);
+  cursor: pointer;
+}
+.db-wall-pick-up,
+.db-wall-pick-down {
+  width: calc(100% / 7 * 0.6);
+  height: 22px;
+  margin-left: calc(100% / 7 * 0.2);
+}
+.db-wall-pick-up {
+  margin-top: -11px;
+}
+.db-wall-pick-down {
+  margin-top: calc(100% / 7 - 11px);
+}
+.db-wall-pick-left,
+.db-wall-pick-right {
+  width: 22px;
+  height: calc(100% / 7 * 0.6);
+  margin-top: calc(100% / 7 * 0.2);
+}
+.db-wall-pick-left {
+  margin-left: -11px;
+}
+.db-wall-pick-right {
+  margin-left: calc(100% / 7 - 11px);
+}
+
+/* ── 안내·조작 ── */
+.db-status {
+  margin: 0;
+  min-height: 1.5em;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+.db-status-note {
+  font-weight: 400;
+  color: var(--db-muted);
+}
+.db-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.db-primary,
+.db-secondary,
+.db-jump,
+.db-route,
+.db-kind,
+.db-wall-btn {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--db-border);
+  background: var(--db-surface);
+  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.db-primary {
+  border-color: var(--db-accent);
+  background: var(--db-accent);
+  color: var(--db-on-accent);
+}
+.db-primary:disabled,
+.db-wall-btn:disabled,
+.db-kind:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.db-jump-on,
+.db-route[aria-pressed='true'],
+.db-kind[aria-pressed='true'] {
+  border-color: var(--db-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-accent) 35%, transparent);
+}
+.db-kind-pick,
+.db-routes {
+  display: flex;
+  gap: 8px;
+}
+.db-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-kind-art {
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+}
+.db-wall-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, auto));
+  grid-template-areas:
+    '. up .'
+    'left center right'
+    '. down .';
+  gap: 4px;
+  align-items: center;
+  justify-items: stretch;
+}
+.db-wall-btn-up {
+  grid-area: up;
+}
+.db-wall-btn-left {
+  grid-area: left;
+}
+.db-wall-btn-right {
+  grid-area: right;
+}
+.db-wall-btn-down {
+  grid-area: down;
+}
+.db-wall-pad-center {
+  grid-area: center;
+  justify-self: center;
+  width: 40px;
+  height: 40px;
+}
+
+/* ── 끝 ── */
+.db-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--db-border);
+  border-radius: 12px;
+  background: var(--db-surface);
+}
+.db-end-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+.db-end-line {
+  margin: 0;
+}
+.db-end-muted {
+  color: var(--db-muted);
+  font-size: 14px;
+}
+.db-end-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.db-end-table th,
+.db-end-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--db-border);
+  text-align: left;
+}
+.db-end-winner td {
+  font-weight: 700;
+}
+.db-end-me td:first-child {
+  color: var(--db-accent);
+}
+.db-end-out td {
+  opacity: 0.6;
+}
+.db-end-actions {
+  display: flex;
+  gap: 8px;
+}
+.db-end-banner {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 22px;
+  border-radius: 14px;
+  background: var(--db-surface-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+.db-end-banner-text {
+  font-size: 24px;
+  font-weight: 800;
+}
+.db-end-banner-who {
+  font-size: 14px;
+  color: var(--db-muted);
+}
+
+/* ── 튜토리얼 ── */
+.db-tut-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.db-tut-pair .db-board-mini {
+  width: 100%;
+}
+.db-mark::after {
+  background: var(--db-accent);
+}

@@ -13,6 +13,7 @@ const imports = {
   OMOK: () => import('@/features/omok/OmokTable'),
   CLOUD_ROUTE: () => import('@/features/cloudroute/CloudRouteTable'),
   ARTILLERY: () => import('@/features/artillery/ArtilleryTable'),
+  DAMBADUK: () => import('@/features/dambaduk/DambadukTable'),
 };
 
 // 게임판에 들어갈 때만 "못 받으면 한 번 새로고침" — 배포 전에 연 탭이 사라진 조각을 찾는 경우(lazyWithReload).
@@ -30,6 +31,9 @@ export const CloudRouteTable = lazy(() =>
 );
 export const ArtilleryTable = lazy(() =>
   loadWithReload('artillery', imports.ARTILLERY).then((m) => ({ default: m.ArtilleryTable })),
+);
+export const DambadukTable = lazy(() =>
+  loadWithReload('dambaduk', imports.DAMBADUK).then((m) => ({ default: m.DambadukTable })),
 );
 
 /**

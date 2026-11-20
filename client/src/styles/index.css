@@ -68,5 +68,7 @@
 @import './parts/24-game-menu.css';
 /* 티츄 "옻칠 찻집" 테마 층(D-241) — `.tc-` 접두 전용, 공용 part(03~16) 뒤에서 덧칠만 한다. 미디어 0개(폭·동작 줄이기는 17). */
 @import './parts/25-tichu-lacquer.css';
+/* 담바둑 게임판(D-279) — `.db-` 접두 전용, 같은 규칙(공용 클래스 재정의 금지, 미디어 0개 — 폭·동작 줄이기는 17). */
+@import './parts/26-dambaduk-table.css';
 /* ⚠ 폭 미디어 전량(720/768/480/440) + 터치 — 반드시 마지막 */
 @import './parts/17-responsive.css';

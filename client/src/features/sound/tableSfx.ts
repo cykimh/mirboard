@@ -27,6 +27,9 @@ export type TableCue =
   // 돌
   | 'stone.place'
   | 'move.rejected'
+  // 담바둑(D-279) — 돌이 판 위를 미끄러지는 소리, 담 한 칸이 쌓이는 소리.
+  | 'stone.slide'
+  | 'wall.build'
   // 주사위·점수표·버튼(D-268 얏추) — 누른 사람 손끝의 짧은 "뽁".
   | 'die.hold'
   | 'die.release'
@@ -177,6 +180,13 @@ const RECIPES: Record<TableCue, Recipe> = {
     tone(ctx, { f: 1280, to: 960, at: t, dur: 0.03, peak: 0.08 * g, type: 'triangle' });
     return 0.08;
   },
+  // 담바둑 돌 미끄러짐 — 아래로 짧게 미끄러지는 둥근 휘파람(잡음 없이 "스윽").
+  'stone.slide': (ctx, t, g) => {
+    tone(ctx, { f: 560, to: 360, at: t, dur: 0.13, peak: 0.11 * g });
+    return 0.13;
+  },
+  // 담바둑 담 쌓기 — 마림바풍 "통-똑"(낮은 음 위에 짧은 윗음).
+  'wall.build': (ctx, t, g) => plucks(ctx, t, [329.63, 493.88], 0.05, 0.07, 0.17 * g, 0.12),
   // 둘 수 없는 자리 — 낮고 순한 "봉-봉"(두 번).
   'move.rejected': (ctx, t, g) => {
     tone(ctx, { f: 190, to: 135, at: t, dur: 0.09, peak: 0.22 * g, type: 'triangle' });

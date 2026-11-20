@@ -18,6 +18,8 @@ const ALL_CUES: TableCue[] = [
   'race.called',
   'race.caught',
   'stone.place',
+  'stone.slide',
+  'wall.build',
   'move.rejected',
   'die.hold',
   'die.release',
