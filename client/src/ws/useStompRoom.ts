@@ -5,7 +5,7 @@ import { useRoomChatStore } from '@/features/chat/roomChatStore';
 import { useReactionStore } from '@/features/chat/reactionStore';
 import type { RoomEventSink } from './roomEventSink';
 import { judgeSeq } from './seqGate';
-import { watchHiddenIdle } from './hiddenIdle';
+import { runResumeGate, watchHiddenIdle } from './hiddenIdle';
 import type { VoiceMessage, VoiceSignal } from '@/features/voice/useVoiceChat';
 import type { ResyncEnvelope, StompEnvelope } from '@/types/stomp';
 
@@ -214,8 +214,19 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     // 타이머가 늦춰지므로 기다리지 않는다. 포그라운드 복귀/네트워크 회복 때
     // 소켓을 즉시 재가동하고 권위 스냅샷으로 화면을 곧바로 최신화(resync 는 REST 라
     // 소켓 상태와 무관). 이렇게 해야 탈주 유예가 끝나기 전에 빠르게 재접속된다.
+    // D-273 — 숨긴 탭이라 스스로 끊었는가. 그렇다면 다시 붙이기 전에 방 화면 재동기화(관전 목록 복귀)를 기다린다 — 다시 붙으면
+    // onConnect 가 구독 뒤 resync 한다.
+    let idleDropped = false;
     const onResume = () => {
       if (document.visibilityState !== 'visible') return;
+      if (idleDropped) {
+        idleDropped = false;
+        void runResumeGate().then(() => {
+          if (!disposed && document.visibilityState === 'visible') client.activate();
+          else if (!disposed) idleDropped = true; // 기다리는 사이 다시 숨겼다 — 다음에 보일 때 다시
+        });
+        return;
+      }
       client.activate(); // 이미 active 면 no-op, 끊겼으면 재연결을 앞당김
       resync();
     };
@@ -223,7 +234,9 @@ export function useStompRoom<TTable = unknown, TPrivate = unknown>(
     window.addEventListener('online', onResume);
     // D-273 — 오래 숨긴 탭은 스스로 끊어 운영 서버가 잠들게 한다. 다시 보이면 위 onResume 이 다시 붙이고 resync 한다.
     const stopIdleWatch = watchHiddenIdle(() => {
-      if (!disposed) void client.deactivate();
+      if (disposed) return;
+      idleDropped = true;
+      void client.deactivate();
     });
 
     return () => {

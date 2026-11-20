@@ -43,7 +43,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { setHiddenIdleInGame } from '@/ws/hiddenIdle';
+import { setHiddenIdleInGame, setResumeGate } from '@/ws/hiddenIdle';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
@@ -218,38 +218,55 @@ export function RoomPage() {
   const roomRef = useRef<Room | null>(null);
   roomRef.current = room;
 
-  // D-134 — 대기실 화면 재동기화. 메타 소켓이 다시 연결되거나 화면이 다시 보이거나 온라인이 되면(useRoomMeta) 첫 입장과 같은
+  // D-134 — 방 화면 재동기화. 메타 소켓이 다시 연결되거나 화면이 다시 보이거나 온라인이 되면(useRoomMeta) 첫 입장과 같은
   // `join-or-reconnect` 로 방을 다시 맞춘다. 휴대폰이 백그라운드에 있던 동안 서버가 준비를 풀었거나, 유예가 지나 자리를 잃었거나
-  // (꽉 찼으면 관전 + 안내), 방이 없어졌을 수 있다 — 소켓은 놓친 메타를 다시 주지 않는다. 대기실일 때만 — 게임판은 자기 resync 가
-  // 있다(D-79). 방 없음은 "방이 없어졌어요", 그 밖의 오류는 조용히 넘긴다(다음 알림에 다시 — 네트워크 실패로 화면을 오류로 바꾸지
+  // (꽉 찼으면 관전 + 안내), 방이 없어졌을 수 있다 — 소켓은 놓친 메타를 다시 주지 않는다(게임 상태는 게임판의 resync 가 따로 — D-79). 방 없음은 "방이 없어졌어요", 그 밖의 오류는 조용히 넘긴다(다음 알림에 다시 — 네트워크 실패로 화면을 오류로 바꾸지
   // 않는다). 진행 중이면 겹쳐 부르지 않는다.
-  const resyncingRef = useRef(false);
+  // D-273 — 진행 중인 판도 다시 맞춘다. 숨긴 탭은 10분(앉은 자리 60분) 뒤 두 소켓을 끊으므로(`ws/hiddenIdle`) 그동안의 메타(판 종료·
+  // 대기실 복귀·방 소멸)를 놓치고, 진행 중인 판의 관전자는 끊기자마자 관전 목록에서 빠진다(서버 IN_GAME 끊김 갈래). 관전자는 다시
+  // 관전으로 넣고, 플레이어는 방을 한 번 읽어 `applyRoomMeta` 로 넣는다(놓친 IN_GAME→FINISHED·WAITING 전이도 결과 유지로 처리).
+  // 겹쳐 부르면 진행 중인 같은 약속을 돌려준다 — 끊긴 소켓을 다시 붙이기 전에 이것을 기다린다(`setResumeGate`, 관전 목록에 다시
+  // 들어간 뒤 구독·resync 하도록).
+  const resyncingRef = useRef<Promise<void> | null>(null);
   const roomIdRef = useRef(roomId);
   roomIdRef.current = roomId;
-  async function resyncWaitingRoom() {
-    if (!token || resyncingRef.current) return;
-    if (room?.status !== 'WAITING' || joinBlock || error) return;
+  function resyncRoom(): Promise<void> {
+    if (resyncingRef.current) return resyncingRef.current;
+    const current = roomRef.current;
+    if (!token || !current || joinBlock || error) return Promise.resolve();
     const requested = roomId;
-    resyncingRef.current = true;
     // D-137 — 관전자는 관전으로 돌려놓는다(D-134 끊김에 관전 목록에서 빠졌어도). join-or-reconnect 는 빈자리면 앉혀 버린다 — 앉는 것은
     // [자리에 앉기]로만.
-    const wasSpectator = !!user && (room.spectatorIds ?? []).includes(user.userId);
-    try {
-      if (wasSpectator) {
-        const watched = await roomsApi.spectate(token, requested);
-        if (roomIdRef.current === requested) setRoom(watched);
-      } else {
-        const r = await roomsApi.joinOrReconnect(token, requested);
-        if (roomIdRef.current === requested) applyJoinResult(r);
+    const wasSpectator = !!user && (current.spectatorIds ?? []).includes(user.userId);
+    const run = async () => {
+      try {
+        if (wasSpectator) {
+          const watched = await roomsApi.spectate(token, requested);
+          if (roomIdRef.current === requested) applyRoomMeta(watched);
+        } else if (current.status === 'WAITING') {
+          const r = await roomsApi.joinOrReconnect(token, requested);
+          if (roomIdRef.current === requested) applyJoinResult(r);
+        } else {
+          const r = await roomsApi.get(token, requested);
+          if (roomIdRef.current === requested) applyRoomMeta(r);
+        }
+      } catch (err) {
+        if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
+          setJoinBlock('gone');
+        }
+      } finally {
+        resyncingRef.current = null;
       }
-    } catch (err) {
-      if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
-        setJoinBlock('gone');
-      }
-    } finally {
-      resyncingRef.current = false;
-    }
+    };
+    resyncingRef.current = run();
+    return resyncingRef.current;
   }
+  const resyncRoomRef = useRef(resyncRoom);
+  resyncRoomRef.current = resyncRoom;
+  useEffect(() => {
+    setResumeGate(() => resyncRoomRef.current());
+    return () => setResumeGate(null);
+  }, []);
 
   // Phase 13C(#3) — 2초 폴링 제거. join-or-reconnect 1회로 초기 room 확보 후
   // 방 메타 변경(참가/IN_GAME 전이/팀정책/관전/목표점수)은 WS 로 즉시 반영.
@@ -269,7 +286,7 @@ export function RoomPage() {
     token,
     applyRoomMeta,
     () => setError('방이 종료되었습니다.'),
-    resyncWaitingRoom,
+    resyncRoom,
   );
 
   // D-146 — 대기실 참가자 카드의 계급·전적(이 방 게임 기준). 사람만 묻고, 참가자 집합·게임이 바뀔 때만 다시 묻는다.

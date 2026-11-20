@@ -46,7 +46,7 @@ vi.mock('@/api/rooms', () => ({
 }));
 
 import { useStompRoom } from './useStompRoom';
-import { HIDDEN_IDLE_MS } from './hiddenIdle';
+import { HIDDEN_IDLE_MS, setResumeGate } from './hiddenIdle';
 
 const sink: RoomEventSink = {
   reset() {},
@@ -142,5 +142,36 @@ describe('오래 숨긴 탭 (D-273)', () => {
     await waitFor(() => expect(sockets).toHaveLength(2));
     accept(sockets[1]);
     await waitFor(() => expect(result.current.connected).toBe(true));
+  });
+
+  it('방 소켓 — 다시 붙이기 전에 관문(관전 목록 복귀)을 기다린다', async () => {
+    let release!: () => void;
+    setResumeGate(() => new Promise<void>((r) => (release = r)));
+    try {
+      const { result } = renderHook(() => useStompRoom('r-1', 'tok', sink));
+      await waitFor(() => expect(sockets).toHaveLength(1));
+      accept(sockets[0]);
+      await waitFor(() => expect(result.current.connected).toBe(true));
+
+      vi.useFakeTimers();
+      setVisibility('hidden');
+      act(() => {
+        vi.advanceTimersByTime(HIDDEN_IDLE_MS);
+      });
+      const disconnect = sockets[0].sent.find((f) => f.startsWith('DISCONNECT'))!;
+      const receipt = /receipt:([^\n]+)/.exec(disconnect)![1];
+      act(() => {
+        sockets[0].onmessage?.({ data: `RECEIPT\nreceipt-id:${receipt}\n\n\0` });
+      });
+      vi.useRealTimers();
+
+      setVisibility('visible');
+      await new Promise((r) => setTimeout(r, 30));
+      expect(sockets).toHaveLength(1); // 관문이 끝나기 전에는 붙지 않는다
+      await act(async () => release());
+      await waitFor(() => expect(sockets).toHaveLength(2));
+    } finally {
+      setResumeGate(null);
+    }
   });
 });

@@ -10,6 +10,8 @@ import { markSpectateNoticeSeen } from '@/features/lobby/SpectateNotice';
 import { GAME_TUTORIALS } from '@/features/tutorial/gameTutorials';
 import { markTutorialSeen } from '@/features/tutorial/useTutorialGate';
 import { useRoomMeta } from '@/ws/useRoomMeta';
+import { runResumeGate } from '@/ws/hiddenIdle';
+import { roomsApi } from '@/api/rooms';
 import type { GameSummary, Room, RoomOption } from '@/types/api';
 
 /**
@@ -880,7 +882,7 @@ describe('RoomPage — 관전으로 받아졌을 때 안내 (D-133 결정 A)', (
  * D-134 — 대기실 화면 재동기화. 휴대폰 방장이 초대 링크를 카톡으로 보내고 기다리는 동안 소켓이 죽으면(D-79) 그 사이 서버가 준비를
  * 풀었거나, 유예가 지나 자리를 잃었거나, 방이 없어졌을 수 있다 — 메타 소켓은 다시 구독만 해서 놓친 것을 받을 길이 없다. 그래서
  * `useRoomMeta` 가 다시 연결·다시 보이기·온라인 때 알리면(5번째 인자) 대기실은 첫 입장과 같은 `join-or-reconnect` 로 방을 다시
- * 맞춘다. 게임판은 자기 resync 가 있어(D-79) 부르지 않는다. 네트워크 실패로 화면을 오류로 바꾸지 않는다.
+ * 맞춘다. 게임 중에는 방을 다시 읽거나 관전으로 다시 넣는다(D-273). 네트워크 실패로 화면을 오류로 바꾸지 않는다.
  */
 describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
   const resync = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![4]!;
@@ -960,15 +962,75 @@ describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
     expect(screen.queryByText('Failed to fetch')).toBeNull();
   });
 
-  it('게임 중(IN_GAME)에는 부르지 않는다 — 게임판이 자기 resync 를 한다', async () => {
-    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME' });
+  /**
+   * D-273 — 숨긴 탭은 10분(앉은 자리 60분) 뒤 소켓을 끊으므로 게임 중에도 방 메타를 놓친다. 게임 중에는 join-or-reconnect 대신 방을
+   * 한 번 읽어(`get`) 메타로 넣는다 — 놓친 IN_GAME→FINISHED 전이도 결과 유지로 처리된다.
+   */
+  it('게임 중(IN_GAME) 플레이어는 방을 다시 읽어 놓친 판 종료를 반영한다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 });
     await screen.findByTestId('onecard-table');
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(false);
+    vi.mocked(roomsApi.get).mockResolvedValue({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'FINISHED',
+      playerIds: [1, 2],
+      playerCount: 2,
+    } as Room);
 
     await act(async () => {
       await resync()();
     });
 
     expect(joinOrReconnect).toHaveBeenCalledTimes(1);
+    expect(roomsApi.get).toHaveBeenCalledWith('tok', 'r1');
+    expect(screen.getByTestId('onecard-table')).toBeInTheDocument();
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
+  });
+
+  it('게임 중(IN_GAME) 관전자는 관전으로 다시 넣는다 — 끊기자마자 관전 목록에서 빠졌다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [2, 3], playerCount: 2, spectatorIds: [1] }, 'SPECTATING');
+    await screen.findByTestId('onecard-table');
+    spectate.mockResolvedValue({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'IN_GAME',
+      playerIds: [2, 3],
+      playerCount: 2,
+      spectatorIds: [1],
+    });
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(spectate).toHaveBeenCalledWith('tok', 'r1');
+    expect(joinOrReconnect).toHaveBeenCalledTimes(1);
+    expect(roomsApi.get).not.toHaveBeenCalled();
+  });
+
+  it('소켓을 다시 붙이기 전의 관문(`setResumeGate`)으로 같은 재동기화를 건다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [2, 3], playerCount: 2, spectatorIds: [1] }, 'SPECTATING');
+    await screen.findByTestId('onecard-table');
+    spectate.mockResolvedValue({ ...ROOM, gameType: 'ONE_CARD', status: 'IN_GAME', spectatorIds: [1] });
+
+    await act(async () => {
+      await runResumeGate();
+    });
+
+    expect(spectate).toHaveBeenCalledTimes(1);
+  });
+
+  it('게임 중 방이 없어졌으면 "방이 없어졌어요"', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 });
+    await screen.findByTestId('onecard-table');
+    vi.mocked(roomsApi.get).mockRejectedValue(apiError(404, 'ROOM_NOT_FOUND', 'Room not found'));
+
+    await act(async () => {
+      await resync()();
+    });
+
+    expect(await screen.findByText('방이 없어졌어요')).toBeInTheDocument();
   });
 
   it('진행 중이면 겹쳐 부르지 않는다', async () => {

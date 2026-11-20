@@ -11,6 +11,24 @@ export const HIDDEN_IDLE_IN_GAME_MS = 60 * 60_000;
 
 let inGameSeat = false;
 const rearmers = new Set<() => void>();
+let resumeGate: (() => Promise<void>) | null = null;
+
+/**
+ * 숨긴 동안 끊었던 소켓을 다시 붙이기 **전에** 기다릴 일. `RoomPage` 가 방 화면 재동기화를 건다 — 진행 중인 판의 관전자는 끊기자마자
+ * 서버 관전 목록에서 빠지므로, 다시 관전으로 넣은 뒤에 구독·resync 해야 `NOT_IN_ROOM` 이 나지 않는다.
+ */
+export function setResumeGate(gate: (() => Promise<void>) | null): void {
+  resumeGate = gate;
+}
+
+/** 걸린 일을 기다린다. 실패해도 다시 붙이기는 막지 않는다. */
+export async function runResumeGate(): Promise<void> {
+  try {
+    await resumeGate?.();
+  } catch {
+    // 무시 — 다시 붙은 뒤의 resync·다음 알림이 맞춘다.
+  }
+}
 
 /** 지금 이 탭이 진행 중인 판의 플레이어 자리인가. 숨긴 동안 바뀌면 남은 시간을 다시 잰다. */
 export function setHiddenIdleInGame(value: boolean): void {

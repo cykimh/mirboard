@@ -40,7 +40,7 @@ vi.mock('@stomp/stompjs', () => ({
 }));
 
 import { useRoomMeta } from './useRoomMeta';
-import { HIDDEN_IDLE_MS } from './hiddenIdle';
+import { HIDDEN_IDLE_MS, setResumeGate } from './hiddenIdle';
 
 const META = '/topic/room/r1/meta';
 
@@ -182,7 +182,7 @@ describe('useRoomMeta — 오래 숨긴 탭은 끊는다 (D-273)', () => {
     setVisibility('visible');
   });
 
-  it('숨긴 채 10분이 지나면 소켓을 끊고, 다시 보이면 다시 붙여 맞춘다', () => {
+  it('숨긴 채 10분이 지나면 소켓을 끊고, 다시 보이면 다시 붙여 맞춘다', async () => {
     const onResync = vi.fn();
     renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, onResync));
     const client = clients.at(-1)!;
@@ -203,12 +203,41 @@ describe('useRoomMeta — 오래 숨긴 탭은 끊는다 (D-273)', () => {
     expect(client.deactivated).toBe(true);
 
     setVisibility('visible');
-    act(() => {
+    await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     expect(client.activations).toBe(before + 1);
     expect(client.deactivated).toBe(false);
+    // 다시 맞추기는 다시 붙은 뒤(onConnect) 한 번 — 보이는 순간 따로 부르지 않는다(관문이 이미 맞췄다).
+    expect(onResync).not.toHaveBeenCalled();
+    act(() => client.cfg.onConnect());
     expect(onResync).toHaveBeenCalledTimes(1);
+  });
+
+  it('다시 붙이기 전에 관문(방 화면 재동기화 — 관전 목록 복귀)을 기다린다', async () => {
+    let release!: () => void;
+    const gate = vi.fn(() => new Promise<void>((r) => (release = r)));
+    setResumeGate(gate);
+    try {
+      renderHook(() => useRoomMeta('r1', 'tok', vi.fn(), undefined, vi.fn()));
+      const client = clients.at(-1)!;
+      const before = client.activations;
+      setVisibility('hidden');
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        vi.advanceTimersByTime(HIDDEN_IDLE_MS);
+      });
+      setVisibility('visible');
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      expect(gate).toHaveBeenCalledTimes(1);
+      expect(client.activations).toBe(before);
+      await act(async () => release());
+      expect(client.activations).toBe(before + 1);
+    } finally {
+      setResumeGate(null);
+    }
   });
 
   it('잠깐 숨겼다 보이면 끊지 않는다', () => {
