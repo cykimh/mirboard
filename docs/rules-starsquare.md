@@ -4,7 +4,8 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/starsquare/` 기준, 위치는 메서드 이름으로 적는다.
 
-> **상태:** 채택(D-282) · 룰 v1(D-283) — 2026-11-20, 구현 없음(S0). 공개 설정 `MIRBOARD_STAR_SQUARE_STATUS` 는 S4 전까지 `DISABLED`.
+> **상태:** 채택(D-282) · 룰 v1(D-283) · S1 순수 엔진·퍼즐 은행(D-284) — 2026-11-20. 공개 설정 `MIRBOARD_STAR_SQUARE_STATUS` 는 S4 전까지 `DISABLED`.
+> S1 의 코드·테스트 위치는 각 절 끝, 실측은 §15.
 > 설계 배경은 `docs/plans/wall-magic-games.md` §3(게임 B)·§10(사용자 결정).
 >
 > **독창 게임.** 마방진(1~N² 을 한 번씩 넣어 모든 가로·세로·두 대각선의 합을 같게 만드는 수천 년 된 공용 수학 퍼즐)만 가져오고,
@@ -27,6 +28,7 @@
 
 - **마방진**: 모든 칸이 1~N² 이고 서로 다르며, 2N+2 줄의 합이 모두 M 인 판.
 - 해의 수(회전·반사를 같은 것으로 보지 않을 때): 3×3 **8개**, 4×4 **7,040개**, 5×5 약 22억 개. 단서와 맞는 해가 여럿일 수 있다.
+- **코드:** `puzzle/Grid`(JSON 은 정수 배열 하나, 크기 3·4·5 만), `puzzle/Lines`(줄 번호 — 가로 0..N−1, 세로 N..2N−1, ↘ 2N, ↙ 2N+1), `puzzle/MagicCheck.magicSum`.
 
 ## 2. 인원·좌석·봇
 
@@ -55,23 +57,28 @@
 
 | 난이도 | 크기 | 단서 수 **[수치]** | 비고 |
 | --- | --- | --- | --- |
-| 쉬움 | 3×3 과 4×4 **번갈아**(1·3·5번째 3×3, 2·4번째 4×4) | 3×3: 2 · 4×4: 8 | 짧게(1개)면 3×3 하나 |
-| 보통 | 4×4 | 6 | |
-| 어려움 | 5×5 | 12 | |
+| 쉬움 | 3×3 과 4×4 **번갈아**(1·3·5번째 3×3, 2·4번째 4×4) | 3×3: 2(가운데 제외) · 4×4: 8, 줄 채우기 비율 **1.0** | 짧게(1개)면 3×3 하나 |
+| 보통 | 4×4 | 7, 줄 채우기 비율 0.3~0.8 | S1 에서 6 → 7(§4.3) |
+| 어려움 | 5×5 | 12, 줄 채우기 비율 0.25~0.7 | |
 
 - 7×7·6×6 은 없다(설계서 M3 — 휴대폰 입력이 너무 길다).
-- 단서 수와 띠 경계는 **S1 도구 측정**(§4.3)으로 고르고 **S1.5 사람 측정** 뒤 이 표에 확정한다. 지금 값은 잠정이다.
+- 단서 수와 띠 경계는 **S1 도구 측정**(§4.3)으로 골랐고 **S1.5 사람 측정** 뒤 이 표에 확정한다. 지금 값은 잠정이다.
+- **코드:** `puzzle/Difficulty.bandFor(index)`·`fromOption`(모르는 값 → 보통), `puzzle/Band`(단서 수).
 - `DIFFICULTY` 는 게임 이름이 없는 게임 중립 상수다(`BOT_LEVEL`·`MATCH_LENGTH` 와 같은 맵 옵션 — D-176). 선언한 게임만 대기실에 뜬다(D-106).
 
 ### 4.2 퍼즐은 런타임에 만들지 않는다
 
 - 운영 VM(shared-cpu-1x)과 방 액션 락 2초를 생각해, 서버는 퍼즐을 **풀거나 생성하지 않는다**. 저장소 안의 오프라인 도구가 만든 **자원 파일**
   (`server/src/main/resources/starsquare/puzzles-{띠}.json` — 퍼즐마다 크기·단서·정답 하나·측정값)에서 꺼낸다.
-- 띠는 `3-easy`·`4-easy`·`4-normal`·`5-hard` 넷 **[결정]**(쉬움의 4×4 는 보통 4×4 보다 단서가 많은 별도 띠). 띠마다 200~500개.
+- 띠는 `3-easy`·`4-easy`·`4-normal`·`5-hard` 넷 **[결정]**(쉬움의 4×4 는 보통 4×4 보다 단서가 많은 별도 띠). 4×4·5×5 띠는 300개씩, 3×3 은 원본이 하나뿐이라
+  대칭으로 겹치지 않는 2단서 퍼즐 **전부 16개**(가운데 단서 제외 — 가운데는 늘 5)다. 대칭으로 겹치는 퍼즐은 하나로 친다(런타임이 대칭을 다시 입힌다).
 - 꺼낸 퍼즐에는 **대칭 변환 하나**를 무작위로 입혀 같은 난이도로 다양하게 만든다: 회전·반사 **8** × 보수(x → N²+1−x) **2** = **16가지**.
   셋 다 마방진 성질을 보존한다(회전·반사는 줄을 줄로 옮기고, 보수는 줄 합 M 을 N(N²+1) − M = M 으로 옮긴다). 단서와 정답에 **같은** 변환을 입힌다.
 - 퍼즐 고르기·변환 고르기는 서버 난수다(SecureRandom — 어댑터가 넣는다, 순수 엔진은 받은 것을 쓴다). 고른 결과(정답 포함)는 상태에만 있고
   공개 뷰·이벤트 타입에는 정답 필드 자체가 없다(§11).
+- 같은 매치에서 같은 원본을 두 번 쓰지 않는다 — 띠가 다 떨어진 경우만(3×3 16개라 길게 쉬움 3개도 겹치지 않는다) 다시 쓴다.
+- **코드:** `puzzle/PuzzleBank.fromClasspath`(띠 하나라도 없거나 비면 실패), `puzzle/PuzzlePicker.pick(bank, difficulty, count, rng)`, `puzzle/Symmetry`(16가지), `puzzle/PuzzleSpec.transformed`.
+- **테스트:** `puzzle/SymmetryTest`(3×3 8개·4×4 7,040개 전부 × 16 보존 + 목록 안에 닫힘, 5×5 무작위 200개, 회전·반사 8가지는 늘 서로 다름), `puzzle/PuzzlePickerTest`.
 
 ### 4.3 도구가 재는 것 (S1)
 
@@ -85,6 +92,14 @@
 | 풀이 노드 수 | 백트래킹 풀이기가 첫 해까지 연 노드 수 — 막막함의 정도 |
 
 - 해가 하나일 필요는 없다(§5 — 마방진이면 정답). 해가 많으면 오히려 쉬워지므로 띠는 해 수가 아니라 위 셋을 함께 본다 **[결정]**.
+- **S1 측정으로 바뀐 것**: 풀이기 노드 수는 4×4·5×5 모두 수십 개(가지치기가 줄 합 범위로 바로 좁힌다)라 사람 난이도를 가르지 못했고, 해 수도 거의 늘 1~2개였다.
+  가르는 자는 **줄 채우기 비율**이었다 — 그래서 띠 규칙은 "단서 수 + 줄 채우기 비율 범위"다(§4.1 표). 4×4 단서 6개는 비율이 거의 모두 0.3(빈 칸 10개 중
+  3개)에 몰려 쉬움(1.0)과의 간격이 너무 커서 보통을 단서 7개(비율 0.33~0.56)로 올렸다. 띠 통계는 §15.1.
+- 다시 만들기: `MIRBOARD_STARSQUARE_GENERATE=1 ./gradlew :server:test --rerun --tests "*.starsquare.puzzle.PuzzleGeneratorTool"` — 시드 고정이라 같은 코드면 같은 자원이 나오고,
+  `PuzzleBankTest` 가 자원이 도구 출력과 같은지 본다(규칙을 바꾸고 다시 만들지 않으면 실패).
+- **코드:** `puzzle/Solver`(빈 칸이 가장 적은 줄의 첫 빈 칸, 줄 합 범위 가지치기 — `count`·`enumerate`·`random`), `puzzle/Deduction`(줄 채우기), 생성 도구는 테스트 소스
+  `puzzle/PuzzleGenerator`(띠 규칙 `RULES`)·`PuzzleGeneratorTool`(환경 변수로만 켜짐).
+- **테스트:** `puzzle/SolverTest`(빈 판 3×3 8개·4×4 7,040개, 단서 300가지 셈 = 전수 목록 거르기, 불가능한 단서 0, 상한·노드 한도), `puzzle/PuzzleBankTest`.
 
 ## 5. 완성 판정
 
@@ -93,6 +108,7 @@
 - **완성** = 판이 마방진이다(§1) **그리고** 단서 칸이 단서 값과 같다.
 - **우리 정답과 같은지는 보지 않는다** — 단서와 맞는 다른 마방진도 정답이다 **[결정]**(설계서 §1.2).
 - 판정은 순수 함수 `MagicCheck.isMagic(grid, clues)` 하나다. 클라는 판정하지 않는다(완성처럼 보이면 바로 보내는 것까지만 — §13).
+- **테스트:** `puzzle/MagicCheckExhaustiveTest`(9! 전수 — 참 8개 = 풀이기 목록, 진행도 완성 ⇔ 마방진), `puzzle/MagicCheckTest`(단서 불일치·다른 해도 정답·중복 꼼수·4×4 7,040개와 그 이웃).
 
 ### 5.1 진행도 — 남에게 보이는 것
 
@@ -104,6 +120,7 @@
 - **[결정]** 중복된 숫자는 채운 칸도 맞은 줄도 아니다 — 같은 수를 여러 칸에 넣어 줄 합만 맞추는 꼼수(3×3 을 전부 5 로)를 순위에 못 쓰게.
 - 완성 ⇔ `filled = N²` 이고 `lines = 2N+2`(테스트로 고정).
 - 진행 중 남의 판 숫자는 **보이지 않는다**(베끼기 방지). 남에게는 채운 칸·맞은 줄·완성 여부만 간다.
+- **코드:** `puzzle/MagicCheck.progress` → `puzzle/Progress`.
 
 ## 6. 퍼즐 하나의 흐름
 
@@ -136,6 +153,8 @@
 
 - 다음 퍼즐 전 **8초**(`RESULT_MS` **[수치]**) 동안 결과를 본다. 이때는 아무도 보낼 것이 없다(대기 좌석 없음). 끝나면 다음 `PUZZLE_STARTED`.
 - 마지막 퍼즐이면 결과 보기 없이 `PUZZLE_ENDED` 바로 뒤에 `MATCH_ENDED`(§8.2) — 클라는 결과 화면을 유지한다(D-153 대기실 복귀에도).
+- **코드:** `StarSquareEngine.start(puzzles, matchSeed, now)`·`onTimer`(준비 끝·결과 보기 끝 → `startPuzzle`)·`markSolved`·`endPuzzle`·`deadline`, 상태 `state/StarSquareState`(단계 `state/Phase`)·`state/SeatBoard`.
+- **테스트:** `StarSquareEngineTest`(준비 3초·같은 퍼즐 공개, 첫 완성 → 30초 마감·마지막 완성 → 끝, 마감 → `CLOSED`, 제한 → `TIME_UP`, 결과 보기 8초 → 다음 퍼즐, 혼자 판).
 
 ## 7. 액션 — `SYNC` 하나
 
@@ -174,6 +193,9 @@
 | `CLUE_CHANGED` | 단서 칸이 단서 값과 다름 |
 | `INVALID_ACTION` | 형식 오류(알 수 없는 판별자 등) — 역직렬화 단계(인프라) |
 
+- **코드:** `action/StarSquareAction.Sync`(JSON 판별자 `@action`), `StarSquareEngine.apply`·`sync`, `action/RejectionReason`(`quiet()` = *조용히* 셋), `action/StarSquareActionRejectedException`.
+- **테스트:** `StarSquareEngineTest.rejections_follow_the_documented_order_and_never_change_the_state`·`sync_updates_the_board_and_announces_only_changed_progress`.
+
 판정 순서 **[결정]**: `MATCH_OVER` → `NOT_IN_PLAY` → `PUZZLE_CLOSED` → 퍼즐 번호(작으면 `STALE_SYNC`, 크면 `BAD_GRID`) → `ALREADY_SOLVED`
 → 길이·값 범위(`BAD_GRID`) → `CLUE_CHANGED` → 버전(§7-3). 거절은 상태를 바꾸지 않는다. 관전자·방 밖 사용자는 인프라가 먼저 막는다(`NOT_IN_ROOM`).
 
@@ -203,6 +225,8 @@
 | `LAST_SEAT` | 여럿 판에서 살아 있는 좌석이 **하나**만 남음 — 그 좌석이 1위 |
 
 - 탈주로 끝나면 진행 중이던 퍼즐은 점수 없이 닫고 `PUZZLE_ENDED` 없이 `MATCH_ENDED` 만 낸다 **[결정]**.
+- **코드:** `rules/PuzzleRanking.rank`(완성 순서는 살아 있는 좌석끼리 다시 매긴다 — 먼저 완성하고 나간 좌석이 빠진다), `rules/MatchRanking.result`, `state/SeatResult`·`state/PuzzleOutcome`·`state/MatchResult`.
+- **테스트:** `StarSquareEngineTest`(줄 → 칸 순위·동순위·점수 합 → 1등 횟수), `StarSquareEngineDesertionTest`(먼저 완성하고 나간 좌석이 맨 아래로).
 
 ## 9. 시간 — 퍼즐 제한과 엔진 타이머
 
@@ -220,6 +244,9 @@
    인프라가 재무장하면서 사라진 엔진 타이머를 다시 걸게 하는 효과만 있다.
 7. 공개 뷰에 엔진이 계산한 남은 시간(`remainingMs` — 지금 단계의 끝까지)을 싣는다. resync 바깥의 인프라 `turnRemainingMs`(마지막 액션 기준)는 이 게임에서
    뜻이 없다(D-183 의 얏추와 같다).
+
+- **코드:** `StarSquareEngine.timer(state, now)`·`onTimer(state, now)`·`remainingMillis`·`pendingSeats`·`fallbackAction`·`legalActions`, 설정 `StarSquareConfig`(제한 0 이하 → 300초, `puzzleCountFor(MATCH_LENGTH)`). 포트 ⑦ 연결은 S2.
+- **테스트:** `StarSquareEngineTest.a_zero_limit_means_the_default_five_minutes_and_the_timer_is_not_reset_by_syncs`(SYNC 를 몇 번 보내도 남은 시간은 줄기만, 폴백은 받되 무변화).
 
 ## 10. 봇 — 페이스 모델 (`BOT_LEVEL`)
 
@@ -248,6 +275,11 @@
 3. T 가 마감보다 늦으면 봇은 그 퍼즐을 못 끝내고, 마감까지 채운 만큼으로 순위가 매겨진다.
 4. 봇 판은 퍼즐이 끝날 때 다른 판과 함께 공개된다(단서 + 채운 정답 칸).
 5. 포트 `botAction` 은 쓰이지 않는다(봇 좌석은 대기 좌석에 없다). 그래도 불리면 `timeoutAction` 과 같은 폴백을 돌려준다.
+6. 봇 완성의 걸린 시간은 계획 시각이되, **먼저 처리된 완성보다 짧게 적지 않는다** **[결정]** — 타이머가 폴링 지연으로 늦게 돌아 사람이 먼저 처리된 경우에도
+   완성 순서와 걸린 시간 순서가 어긋나지 않게.
+
+- **코드:** `bot/BotPace.plan`(시드 = 매치 시드 × 퍼즐 번호 × 좌석), `bot/BotLevel`(배수, `fromOption`), `state/BotPlan`(`milestoneAt`·`cellsThrough`), `StarSquareEngine.botStep`.
+- **테스트:** `StarSquareEngineBotTest`(이정표마다 정답 칸·마지막이 완성·봇 첫 완성도 마감 당김, 밀린 이정표는 시각 순서대로, 제한보다 느린 봇은 못 끝냄, 사람보다 짧게 적지 않음, 결정성·강도 순서).
 
 ## 11. 공개·비공개
 
@@ -255,7 +287,7 @@
 
 | type | payload |
 | --- | --- |
-| `PUZZLE_STARTED` | 퍼즐 번호·전체 수, 크기 N, M, 단서(길이 N², 0 = 빈 칸), 제한(ms) |
+| `PUZZLE_STARTED` | 퍼즐 번호·전체 수, 크기 N, M, 단서(길이 N², 0 = 빈 칸), 제한(ms), 새 판의 진행도(채운 칸·맞은 줄 — 모든 좌석 같음) |
 | `PROGRESS` | 좌석, 채운 칸, 맞은 줄 |
 | `SOLVED` | 좌석, 완성 순서, 걸린 시간(ms) |
 | `CLOSING` | 남은 시간(ms) — 첫 완성으로 마감이 당겨짐 |
@@ -266,13 +298,15 @@
 - 한 전이의 이벤트 순서: `PROGRESS` / `SOLVED` → (`CLOSING`) → (`PUZZLE_ENDED`) → (`MATCH_ENDED`). 타이머 발화는 시각 순서대로 이어 붙인다.
 - 시간은 **남은 ms** 로 싣는다(절대 시각 아님 — 서버·휴대폰 시계 차이를 피한다). 시작 상태는 resync 로 받는다(시작 때 이벤트 없음).
 - **공개 뷰**: 단계(`INTRO`·`PLAYING`·`RESULT`·`ENDED`), 퍼즐 번호·수, 크기·M·단서, `remainingMs`, 마감 당겨짐 여부, 좌석별 진행도·완성·점수 합·탈주,
-  `RESULT` 단계면 방금 끝난 퍼즐의 결과·모두의 판·정답, `ENDED` 면 매치 순위. **푸는 중인 퍼즐의 정답과 남의 판은 없다** — 직렬화 타입에 필드
+  `RESULT`·`ENDED` 면 **방금 끝난** 퍼즐의 결과·모두의 판·정답(푸는 도중 탈주로 끝난 매치는 없음 — 지난 퍼즐을 다시 보이지 않는다), `ENDED` 면 매치 순위. **푸는 중인 퍼즐의 정답과 남의 판은 없다** — 직렬화 타입에 필드
   자체가 없다(State Hiding — `TableView`/`PrivateHand` 분리와 같은 방식, 직렬화 테스트로 고정).
 
 ### 11.2 비공개 (`/user/queue/room/{roomId}`)
 
 - **비공개 뷰 = 내 판**(퍼즐 번호·판·버전·완성 여부) — 재접속·다른 탭에서 이어 풀기용. 봇·관전자는 없다.
 - 비공개 이벤트는 `ERROR`(§7.1)뿐이고 엔진 이벤트가 아니다(인프라가 거절 코드로 보낸다). 받아들인 `SYNC` 의 메아리는 없다 — 클라는 로컬 판이 먼저다.
+- **코드:** `event/StarSquareEvent`(sealed, JSON 판별자 `@event`), `state/StarSquareStateMapper.toPublicView`·`toPrivateBoard`.
+- **테스트:** `StarSquareJsonRoundTripTest`(푸는 중 공개 뷰 JSON 에 `solution`·`grid`·`grids`·시드·봇 계획 키 없음, 이벤트 필드 목록 고정, 끝난 퍼즐만 판·정답 공개, 준비 단계 비공개 뷰 없음, 상태·이벤트 왕복).
 
 ## 12. 탈주와 기록
 
@@ -282,6 +316,9 @@
 2. 탈주 뒤 판정, 위에서부터: 살아 있는 사람 0 → `NO_HUMANS` / 여럿 판에서 살아 있는 좌석 1 → `LAST_SEAT` / 남은 살아 있는 좌석이 이 퍼즐을 모두 완성 →
    퍼즐 끝(§6.3 ①) / 그 밖 → 계속(`MATCH_CONTINUES`).
 3. 이미 탈주한 좌석의 다시 탈주는 해당 없음(`NOT_APPLICABLE`).
+
+- **코드:** `StarSquareEngine.desert(state, seat, now)` → `Desertion(newState, outcome, events)` — outcome 은 포트 `DesertOutcome` 과 같은 3치.
+- **테스트:** `StarSquareEngineDesertionTest`(`LAST_SEAT`·`NO_HUMANS` 두 갈래·마지막 미완성의 탈주로 퍼즐 끝·결과 보기 중 탈주·이중 탈주).
 
 ### 12.2 기록 (S2)
 
@@ -341,6 +378,32 @@
 - **시뮬레이션**: 1~4인 각 1,000매치(사람 흉내 — 무작위 시각에 무작위 판·가끔 정답 판을 보냄, 봇 섞기, 무작위 탈주, 타이머 진행)가 전부 끝나고 매 전이 불변식을
   통과한다. 이벤트만 듣는 클라가 그린 공개 상태와 엔진의 공개 뷰가 매 전이 같다. 같은 시드·같은 입력이면 같은 판(결정성).
 - **거절**: §7.1 의 모든 사유마다 단위 테스트, 거절 뒤 상태 불변.
+
+### 15.1 S1 실측 (2026-11-20, 시드 고정)
+
+- **판정·풀이기**: 3×3 9! 전수에서 참 8개, 빈 4×4 7,040개(풀이기 118ms), 무작위 5×5 한 개 약 2ms.
+- **퍼즐 은행**(`server/build/starsquare-puzzles.txt` — `PuzzleBankTest` 가 쓴다):
+
+  | 띠 | 단서 / 빈 칸 | 퍼즐 | 해가 하나뿐 | 줄 채우기 비율(중앙) | 풀이 노드(중앙 / 최대) |
+  | --- | --- | --- | --- | --- | --- |
+  | 3-easy | 2 / 7 | 16 | 12 | 0.14 | 12 / 18 |
+  | 4-easy | 8 / 8 | 300 | 300 | 1.00 | 9 / 9 |
+  | 4-normal | 7 / 9 | 300 | 279 | 0.56 | 10 / 22 |
+  | 5-hard | 12 / 13 | 300 | 267 | 0.31 | 17 / 69 |
+
+  자원 파일 4개 합 약 140KB(서버 jar 에 들어간다).
+- **시뮬레이션**(`StarSquareMatchSimulationTest` — 사람 흉내는 0.3~6.3초마다 보내고 70% 가 무작위 시각에 정답 판을, 8% 는 잘못된 판을 보냄, 봇 40%, 보내기당 탈주 0.3%):
+
+  | 인원 | 매치 | 종료 사유 | 퍼즐 | 퍼즐 끝(모두 완성 / 마감 / 제한) | 전이 |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | 1,000 | FINISHED 795 · NO_HUMANS 205 | 2,706 | 1,429 / — / 1,072 | 66,028 |
+  | 2 | 1,000 | FINISHED 739 · NO_HUMANS 82 · LAST_SEAT 179 | 2,620 | 341 / 850 / 1,168 | 84,380 |
+  | 3 | 1,000 | FINISHED 900 · NO_HUMANS 55 · LAST_SEAT 45 | 2,947 | 140 / 1,386 / 1,321 | 122,562 |
+  | 4 | 1,000 | FINISHED 954 · NO_HUMANS 37 · LAST_SEAT 9 | 2,993 | 76 / 1,649 / 1,222 | 150,815 |
+
+  전부 끝났고 매 전이 불변식·이벤트만 듣는 클라 대조를 통과했다. 같은 시드면 같은 결과(재현 테스트).
+- **코드:** `invariant/StarSquareInvariantChecker`. **테스트:** `invariant/StarSquareInvariantCheckerTest`(통과 1 + 고의 위반 14), `StarSquareMatchSimulationTest`(인원별 1,000매치 + 재현).
+  `./gradlew :server:test --tests "com.mirboard.domain.game.starsquare.*"`(Docker 불필요).
 
 ## 16. 범위 밖 (v1)
 
