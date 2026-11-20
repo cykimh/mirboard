@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>별자리 수판 풀이 측정</title>
+<!--
+  별자리 수판 S1.5 — 사람 풀이 시간 측정용 프로토타입(운영 코드 아님, 게임 화면 디자인 아님 — 디자인은 S3).
+  퍼즐은 서버 자원 그대로(puzzles/ → server/src/main/resources/starsquare, 심볼릭 링크)를 읽고, 서버와 같은 대칭 16가지를 입힌다.
+  판정·진행도는 서버 MagicCheck 와 같은 규칙(docs/rules-starsquare.md §5)을 이 페이지가 따라 한다 — 측정 전용.
+  띄우기: python3 -m http.server 5203 --directory scripts/starsquare-trial  →  http://localhost:5203
+  기록은 이 브라우저의 localStorage 에만 남는다. [표 복사]·[JSON 저장]으로 내보낸다.
+-->
+<style>
+  :root {
+    --bg: #f6f7fb; --card: #ffffff; --ink: #1d2433; --muted: #6b7385; --line: #d9dde8;
+    --clue-bg: #e9ecf5; --clue-ink: #2b3550; --sel: #3b6cff; --sel-bg: #e8eeff;
+    --ok: #1f9d55; --ok-bg: #e3f6ea; --bad: #d64545; --bad-bg: #fde8e8; --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11141b; --card: #1a1f2a; --ink: #e8ecf5; --muted: #9aa3b5; --line: #2e3545;
+      --clue-bg: #262d3c; --clue-ink: #c9d3ee; --sel: #7c9cff; --sel-bg: #232c45;
+      --ok: #4fd18b; --ok-bg: #173726; --bad: #ff7a7a; --bad-bg: #3a1c1c; --warn: #f0b45a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 19px; margin: 4px 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  label.who { font-size: 13px; color: var(--muted); }
+  input[type=text] { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+                     background: var(--bg); color: var(--ink); width: 140px; }
+  button { font: inherit; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line);
+           background: var(--card); color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--sel); }
+  button.primary { background: var(--sel); border-color: var(--sel); color: #fff; font-weight: 600; }
+  button.band[aria-pressed=true] { background: var(--sel-bg); border-color: var(--sel); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  .band small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; line-height: 1.1; }
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .stats b { font-size: 18px; }
+  .clock { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* 판: N 칸 + 오른쪽 가로 합 열, 아래 세로 합 행 */
+  .boardwrap { display: flex; justify-content: center; margin: 10px 0 4px; }
+  .board { display: grid; gap: 4px; }
+  .cell { width: var(--cs); height: var(--cs); border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+          display: flex; align-items: center; justify-content: center; font-size: calc(var(--cs) * .42); font-weight: 600;
+          font-variant-numeric: tabular-nums; cursor: pointer; user-select: none; position: relative; }
+  .cell.clue { background: var(--clue-bg); color: var(--clue-ink); cursor: default; }
+  .cell.clue::after { content: "★"; position: absolute; top: 2px; right: 4px; font-size: 10px; color: var(--muted); }
+  .cell.sel { outline: 3px solid var(--sel); outline-offset: -2px; background: var(--sel-bg); }
+  .cell.dup { color: var(--bad); }
+  .sum { width: var(--cs); height: var(--cs); display: flex; flex-direction: column; align-items: center; justify-content: center;
+         font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); border-radius: 8px; }
+  .sum .mark { font-size: 11px; line-height: 1; }
+  .sum.ok { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
+  .sum.over { background: var(--bad-bg); color: var(--bad); }
+  .sum.under { color: var(--warn); }
+  .diag { display: flex; justify-content: center; gap: 10px; margin: 2px 0 8px; }
+  .diag .sum { width: auto; height: 34px; flex-direction: row; gap: 6px; padding: 0 10px; border: 1px dashed var(--line); }
+
+  .pad { display: grid; gap: 6px; margin-top: 6px; }
+  .pad button { min-height: 44px; padding: 0; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pad button.used { opacity: .38; text-decoration: line-through; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  .overlay { display: flex; align-items: center; justify-content: center; height: 180px; font-size: 54px; font-weight: 800; color: var(--sel); }
+  .done { text-align: center; padding: 6px 0; }
+  .done .big { font-size: 22px; font-weight: 700; color: var(--ok); }
+  .done .big.gave { color: var(--muted); }
+  .rate { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 6px 0; }
+  .rate button { min-height: 40px; padding: 0 10px; font-size: 14px; }
+  .rate button[aria-pressed=true] { background: var(--sel-bg); border-color: var(--sel); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { border-bottom: 1px solid var(--line); padding: 5px 4px; text-align: left; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .hint { color: var(--muted); font-size: 13px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+           padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .95; }
+  @media (max-width: 420px) { main { padding: 12px; } .stats { gap: 10px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>별자리 수판 — 풀이 시간 측정</h1>
+  <p class="sub">S1.5 프로토타입 · 게임 화면이 아니라 측정 도구입니다. 1부터 N²까지 한 번씩 넣어 모든 가로·세로·두 대각선의 합을 같게 만드세요.</p>
+
+  <section class="card">
+    <div class="row" style="margin-bottom:10px">
+      <label class="who" for="who">측정자(별명)</label>
+      <input id="who" type="text" maxlength="20" placeholder="예: 창엽">
+      <span class="hint" id="loadState">퍼즐 불러오는 중…</span>
+    </div>
+    <div class="row" id="bands" role="group" aria-label="퍼즐 종류"></div>
+    <div class="actions">
+      <button class="primary" id="newBtn" disabled>새 퍼즐 시작</button>
+      <span class="hint" id="bandInfo"></span>
+    </div>
+  </section>
+
+  <section class="card" id="play" hidden>
+    <div class="row" style="justify-content:space-between">
+      <div class="clock" id="clock" aria-live="off">0:00</div>
+      <div class="stats">
+        <span>합 <b id="magic">15</b></span>
+        <span>채운 칸 <b id="filled">0</b></span>
+        <span>맞은 줄 <b id="lines">0</b></span>
+        <span>입력 <b id="inputs">0</b></span>
+      </div>
+    </div>
+    <div id="stage"></div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between">
+      <strong>기록 <span class="hint" id="count"></span></strong>
+      <div class="row">
+        <button id="copyTsv">표 복사</button>
+        <button id="copyJson">JSON 복사</button>
+        <button id="saveJson">JSON 저장</button>
+        <button id="clearLog">기록 지우기</button>
+      </div>
+    </div>
+    <div class="scroll" id="summary" style="margin-top:8px"></div>
+    <div class="scroll" id="log" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>측정 방법</summary>
+      <ol class="hint">
+        <li>위에 별명을 적고 퍼즐 종류를 고른 뒤 [새 퍼즐 시작]. 3초 뒤 퍼즐이 보이고 시계가 갑니다.</li>
+        <li>칸을 누르고 아래 숫자를 누릅니다. 이미 쓴 숫자를 누르면 그 숫자가 이 칸으로 옮겨집니다. 키보드: 숫자(두 자리는 0.6초 안에 이어서), 방향키, Backspace.</li>
+        <li>다 맞으면 저절로 멈춥니다. 막히면 [포기]. 끝나면 체감 난이도와 재미를 골라 주세요(선택).</li>
+        <li>권장 순서: 3×3 3판 → 4×4 쉬움 3판 → 4×4 보통 3판 → 5×5 어려움 2판. 힌트·계산기·검색 없이, 쉬고 싶으면 판 사이에.</li>
+        <li>끝나면 [표 복사]로 붙여 넣어 전달합니다. 기록은 이 브라우저에만 남습니다.</li>
+      </ol>
+    </details>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+
+const BANDS = [
+  { key: '3-easy', label: '3×3', note: '단서 2' },
+  { key: '4-easy', label: '4×4 쉬움', note: '단서 8' },
+  { key: '4-normal', label: '4×4 보통', note: '단서 7' },
+  { key: '5-hard', label: '5×5 어려움', note: '단서 12' },
+];
+const LOG_KEY = 'starsquare.trial.log.v1';
+const PLAYED_KEY = 'starsquare.trial.played.v1';
+const WHO_KEY = 'starsquare.trial.who';
+const INTRO_MS = 3000;
+const TWO_DIGIT_MS = 600;
+
+const banks = {};
+let bandKey = '4-easy';
+let game = null;      // 지금 퍼즐
+let clockTimer = null;
+
+// ---- 저장소(실패해도 화면은 돈다) ----
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
+}
+function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 사생활 보호 창 등 */ } }
+
+// ---- 수학(서버 docs/rules-starsquare.md §1·§5 와 같은 규칙) ----
+const magicSum = n => n * (n * n + 1) / 2;
+function linesOf(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ kind: 'row', i, cells: [...Array(n)].map((_, j) => i * n + j) });
+  }
+  for (let i = 0; i < n; i++) {
+    out.push({ kind: 'col', i, cells: [...Array(n)].map((_, j) => j * n + i) });
+  }
+  out.push({ kind: 'diag', i: 0, cells: [...Array(n)].map((_, j) => j * n + j) });
+  out.push({ kind: 'anti', i: 0, cells: [...Array(n)].map((_, j) => j * n + (n - 1 - j)) });
+  return out;
+}
+/** 채운 칸 = 0 아니고 판에서 한 번만 쓰인 값, 맞은 줄 = 그 칸들로만 이뤄지고 합이 M (§5.1). */
+function progress(grid, n) {
+  const uses = new Map();
+  grid.forEach(v => { if (v) uses.set(v, (uses.get(v) || 0) + 1); });
+  const counted = grid.map(v => v !== 0 && uses.get(v) === 1);
+  const filled = counted.filter(Boolean).length;
+  const m = magicSum(n);
+  let lines = 0;
+  for (const l of linesOf(n)) {
+    if (l.cells.every(c => counted[c]) && l.cells.reduce((s, c) => s + grid[c], 0) === m) lines++;
+  }
+  return { filled, lines, complete: filled === n * n && lines === 2 * n + 2 };
+}
+/** 회전·반사 8 × 보수 2 — 서버 Symmetry 와 같은 번호. */
+function transform(grid, n, index) {
+  const out = new Array(n * n).fill(0);
+  const m = n - 1;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      let v = grid[r * n + c];
+      if (index >= 8 && v !== 0) v = n * n + 1 - v;
+      let t;
+      switch (index % 8) {
+        case 0: t = r * n + c; break;
+        case 1: t = c * n + (m - r); break;
+        case 2: t = (m - r) * n + (m - c); break;
+        case 3: t = (m - c) * n + r; break;
+        case 4: t = r * n + (m - c); break;
+        case 5: t = (m - r) * n + c; break;
+        case 6: t = c * n + r; break;
+        default: t = (m - c) * n + (m - r);
+      }
+      out[t] = v;
+    }
+  }
+  return out;
+}
+
+// ---- 퍼즐 은행 ----
+async function loadBanks() {
+  const state = document.getElementById('loadState');
+  try {
+    for (const b of BANDS) {
+      const res = await fetch(`puzzles/puzzles-${b.key}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`${b.key} ${res.status}`);
+      banks[b.key] = await res.json();
+    }
+    state.textContent = BANDS.map(b => `${b.label} ${banks[b.key].puzzles.length}개`).join(' · ');
+    document.getElementById('newBtn').disabled = false;
+  } catch (e) {
+    state.textContent = '퍼즐을 못 읽었어요 — 저장소 맨 위에서 python3 -m http.server 5203 --directory scripts/starsquare-trial 로 띄웠는지 확인하세요. (' + e.message + ')';
+  }
+}
+
+function pickPuzzle(key) {
+  const bank = banks[key];
+  const played = load(PLAYED_KEY, {});
+  const seen = new Set(played[key] || []);
+  let pool = bank.puzzles.map((_, i) => i).filter(i => !seen.has(i));
+  if (pool.length === 0) { pool = bank.puzzles.map((_, i) => i); played[key] = []; }
+  const index = pool[Math.floor(Math.random() * pool.length)];
+  const sym = Math.floor(Math.random() * 16);
+  played[key] = [...(played[key] || []), index];
+  save(PLAYED_KEY, played);
+  const p = bank.puzzles[index];
+  const n = bank.size;
+  return {
+    key, n, index, sym,
+    clues: transform(p.clues, n, sym),
+    fillable: p.fillable,
+    blanks: n * n - bank.clueCount,
+  };
+}
+
+// ---- 화면 ----
+function renderBands() {
+  const wrap = document.getElementById('bands');
+  wrap.innerHTML = '';
+  for (const b of BANDS) {
+    const btn = document.createElement('button');
+    btn.className = 'band';
+    btn.setAttribute('aria-pressed', String(b.key === bandKey));
+    btn.innerHTML = `${b.label}<small>${b.note}</small>`;
+    btn.onclick = () => { if (game && game.running) return; bandKey = b.key; renderBands(); };
+    wrap.appendChild(btn);
+  }
+  const n = Number(bandKey[0]);
+  document.getElementById('bandInfo').textContent = `${n}×${n} · 합 ${magicSum(n)} · 1~${n * n}`;
+}
+
+function startPuzzle() {
+  if (game && game.running) return;
+  const p = pickPuzzle(bandKey);
+  game = {
+    ...p,
+    grid: p.clues.slice(),
+    sel: p.clues.findIndex(v => v === 0),
+    running: false, finished: false,
+    inputs: 0, erases: 0, undos: 0, history: [],
+    firstLineMs: null, maxLines: 0,
+    startedAt: null, t0: 0, hiddenMs: 0, hiddenSince: null,
+    pending: null, record: null,
+  };
+  document.getElementById('play').hidden = false;
+  document.getElementById('newBtn').disabled = true;
+  document.getElementById('magic').textContent = magicSum(p.n);
+  updateStats();
+  const stage = document.getElementById('stage');
+  let left = Math.ceil(INTRO_MS / 1000);
+  stage.innerHTML = `<div class="overlay" aria-live="assertive">${left}</div>`;
+  document.getElementById('clock').textContent = '0:00';
+  const tick = setInterval(() => {
+    left--;
+    if (left > 0) { stage.firstElementChild.textContent = left; return; }
+    clearInterval(tick);
+    game.running = true;
+    game.startedAt = new Date().toISOString();
+    game.t0 = performance.now();
+    renderBoard();
+    clockTimer = setInterval(updateClock, 250);
+  }, 1000);
+}
+
+function elapsedMs() {
+  if (!game || !game.t0) return 0;
+  const end = game.endT || performance.now();
+  return Math.round(end - game.t0);
+}
+function fmt(ms) {
+  if (ms == null) return '';
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+function updateClock() { document.getElementById('clock').textContent = fmt(elapsedMs()); }
+
+function updateStats() {
+  const pr = progress(game.grid, game.n);
+  document.getElementById('filled').textContent = `${pr.filled}/${game.n * game.n}`;
+  document.getElementById('lines').textContent = `${pr.lines}/${2 * game.n + 2}`;
+  document.getElementById('inputs').textContent = game.inputs;
+  return pr;
+}
+
+function cellSize(n) {
+  const w = Math.min(document.querySelector('main').clientWidth - 30, 560);
+  return Math.max(40, Math.min(66, Math.floor((w - 4 * n) / (n + 1))));
+}
+
+function renderBoard() {
+  const { n, grid, clues } = game;
+  const cs = cellSize(n);
+  const stage = document.getElementById('stage');
+  const uses = new Map();
+  grid.forEach(v => { if (v) uses.set(v, (uses.get(v) || 0) + 1); });
+  const lines = linesOf(n);
+  const m = magicSum(n);
+  const sumHtml = l => {
+    const vals = l.cells.map(c => grid[c]);
+    const s = vals.reduce((a, b) => a + b, 0);
+    const full = vals.every(v => v !== 0);
+    let cls = '', mark = '';
+    if (s > m) { cls = 'over'; mark = '△ 넘침'; }
+    else if (full && s === m) { cls = 'ok'; mark = '✓'; }
+    else if (full) { cls = 'under'; mark = '▽ 모자람'; }
+    else { mark = s ? `−${m - s}` : ''; }
+    return `<div class="sum ${cls}" aria-label="합 ${s}">${s || ''}<span class="mark">${mark}</span></div>`;
+  };
+  let html = `<div class="boardwrap"><div class="board" style="--cs:${cs}px;grid-template-columns:repeat(${n + 1}, ${cs}px)">`;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const i = r * n + c;
+      const v = grid[i];
+      const cls = ['cell'];
+      if (clues[i]) cls.push('clue');
+      if (i === game.sel && !game.finished) cls.push('sel');
+      if (v && uses.get(v) > 1) cls.push('dup');
+      html += `<div class="${cls.join(' ')}" data-cell="${i}" role="button" aria-label="${r + 1}행 ${c + 1}열 ${v || '빈 칸'}">${v || ''}</div>`;
+    }
+    html += sumHtml(lines[r]);
+  }
+  for (let c = 0; c < n; c++) html += sumHtml(lines[n + c]);
+  html += `<div></div></div></div>`;
+  html += `<div class="diag"><div class="hint" style="align-self:center">대각선 ↘</div>${sumHtml(lines[2 * n])}` +
+    `<div class="hint" style="align-self:center">↙</div>${sumHtml(lines[2 * n + 1])}</div>`;
+  if (game.finished) {
+    html += doneHtml();
+  } else {
+    const cols = n === 3 ? 5 : n === 4 ? 6 : 7; // 375px 에서도 버튼 폭 44px 안팎
+    html += `<div class="pad" style="grid-template-columns:repeat(${cols}, 1fr)">`;
+    for (let v = 1; v <= n * n; v++) {
+      html += `<button data-num="${v}" class="${uses.has(v) ? 'used' : ''}" aria-label="${v}${uses.has(v) ? ' (사용 중 — 누르면 옮김)' : ''}">${v}</button>`;
+    }
+    html += `</div><div class="actions"><button id="erase">지우기</button><button id="undo">되돌리기</button>` +
+      `<button id="giveUp" style="margin-left:auto">포기</button></div>`;
+  }
+  stage.innerHTML = html;
+  stage.querySelectorAll('[data-cell]').forEach(el => el.onclick = () => select(Number(el.dataset.cell)));
+  stage.querySelectorAll('[data-num]').forEach(el => el.onclick = () => place(Number(el.dataset.num)));
+  const erase = document.getElementById('erase');
+  if (erase) {
+    erase.onclick = () => place(0);
+    document.getElementById('undo').onclick = undo;
+    document.getElementById('giveUp').onclick = () => { if (confirm('이 퍼즐을 포기할까요?')) finish(false); };
+  }
+  stage.querySelectorAll('[data-felt]').forEach(el => el.onclick = () => rate('felt', el.dataset.felt));
+  stage.querySelectorAll('[data-fun]').forEach(el => el.onclick = () => rate('fun', Number(el.dataset.fun)));
+  const next = document.getElementById('nextBtn');
+  if (next) next.onclick = startPuzzle;
+}
+
+function select(i) {
+  if (!game.running || game.finished || game.clues[i]) return;
+  game.sel = i;
+  game.pending = null;
+  renderBoard();
+}
+
+function place(v, combine = false) {
+  if (!game.running || game.finished) return;
+  const i = game.sel;
+  if (i < 0 || game.clues[i]) return;
+  if (combine && game.history.length) {
+    // 두 자리 수의 둘째 자리 — 첫 자리 입력을 물리고 한 번의 입력으로 친다
+    game.grid = game.history.pop();
+    game.inputs--;
+  }
+  if (game.grid[i] === v) { afterChange(); return; }
+  const before = game.grid.slice();
+  if (v !== 0) {
+    const other = game.grid.findIndex((x, k) => x === v && k !== i && !game.clues[k]);
+    if (other >= 0) game.grid[other] = 0; // 이미 쓴 숫자 → 이 칸으로 옮김
+    game.inputs++;
+  } else {
+    game.erases++;
+  }
+  game.grid[i] = v;
+  game.history.push(before);
+  afterChange();
+}
+
+function undo() {
+  if (!game.running || game.finished || game.history.length === 0) return;
+  game.grid = game.history.pop();
+  game.undos++;
+  afterChange();
+}
+
+function afterChange() {
+  const pr = updateStats();
+  if (pr.lines > 0 && game.firstLineMs == null) game.firstLineMs = elapsedMs();
+  game.maxLines = Math.max(game.maxLines, pr.lines);
+  const cluesOk = game.clues.every((c, k) => c === 0 || game.grid[k] === c);
+  if (pr.complete && cluesOk) {
+    finish(true);
+  } else {
+    renderBoard();
+  }
+}
+
+function finish(solved) {
+  game.endT = performance.now();
+  game.running = false;
+  game.finished = true;
+  clearInterval(clockTimer);
+  updateClock();
+  const pr = progress(game.grid, game.n);
+  const rec = {
+    v: 1,
+    who: document.getElementById('who').value.trim(),
+    band: game.key, size: game.n, clues: game.n * game.n - game.blanks,
+    puzzle: `${game.key}#${game.index}/s${game.sym}`,
+    fillRatio: Math.round(game.fillable / game.blanks * 100) / 100,
+    startedAt: game.startedAt,
+    elapsedMs: elapsedMs(),
+    hiddenMs: Math.round(game.hiddenMs),
+    solved, gaveUp: !solved,
+    inputs: game.inputs, erases: game.erases, undos: game.undos,
+    firstLineMs: game.firstLineMs,
+    maxLines: game.maxLines, endFilled: pr.filled, endLines: pr.lines,
+    felt: null, fun: null,
+  };
+  const log = load(LOG_KEY, []);
+  log.push(rec);
+  save(LOG_KEY, log);
+  game.record = log.length - 1;
+  document.getElementById('newBtn').disabled = false;
+  renderBoard();
+  renderLog();
+}
+
+function doneHtml() {
+  const rec = load(LOG_KEY, [])[game.record] || {};
+  const felt = ['쉬움', '적당', '어려움'];
+  return `<div class="done">
+    <div class="big ${rec.solved ? '' : 'gave'}">${rec.solved ? '완성! ' + fmt(rec.elapsedMs) : '포기 · ' + fmt(rec.elapsedMs)}</div>
+    <div class="hint">입력 ${rec.inputs} · 지움 ${rec.erases} · 되돌림 ${rec.undos}${rec.firstLineMs != null ? ' · 첫 줄 ' + fmt(rec.firstLineMs) : ''}</div>
+    <div class="hint" style="margin-top:8px">체감 난이도</div>
+    <div class="rate">${felt.map(f => `<button data-felt="${f}" aria-pressed="${rec.felt === f}">${f}</button>`).join('')}</div>
+    <div class="hint">재미(1 지루함 ~ 5 아주 재밌음)</div>
+    <div class="rate">${[1, 2, 3, 4, 5].map(x => `<button data-fun="${x}" aria-pressed="${rec.fun === x}">${x}</button>`).join('')}</div>
+    <div class="actions" style="justify-content:center"><button class="primary" id="nextBtn">다음 퍼즐</button></div>
+  </div>`;
+}
+
+function rate(field, value) {
+  const log = load(LOG_KEY, []);
+  if (game.record == null || !log[game.record]) return;
+  log[game.record][field] = value;
+  save(LOG_KEY, log);
+  renderBoard();
+  renderLog();
+}
+
+// ---- 기록 ----
+const COLUMNS = [
+  ['who', '측정자'], ['startedAt', '시작'], ['band', '종류'], ['puzzle', '퍼즐'], ['clues', '단서'], ['fillRatio', '줄채우기'],
+  ['solved', '완성'], ['elapsedMs', '시간(ms)'], ['hiddenMs', '숨김(ms)'], ['inputs', '입력'], ['erases', '지움'], ['undos', '되돌림'],
+  ['firstLineMs', '첫줄(ms)'], ['maxLines', '최대줄'], ['endFilled', '끝칸'], ['endLines', '끝줄'], ['felt', '체감'], ['fun', '재미'],
+];
+function median(xs) {
+  if (!xs.length) return null;
+  const s = xs.slice().sort((a, b) => a - b);
+  const k = Math.floor(s.length / 2);
+  return s.length % 2 ? s[k] : Math.round((s[k - 1] + s[k]) / 2);
+}
+function renderLog() {
+  const log = load(LOG_KEY, []);
+  document.getElementById('count').textContent = `${log.length}판`;
+  const sum = BANDS.map(b => {
+    const rows = log.filter(r => r.band === b.key);
+    const solved = rows.filter(r => r.solved);
+    return { b, n: rows.length, solved: solved.length, med: median(solved.map(r => r.elapsedMs)),
+             inputs: median(rows.map(r => r.inputs)) };
+  }).filter(x => x.n > 0);
+  document.getElementById('summary').innerHTML = sum.length ? `<table><thead><tr><th>종류</th><th>판</th><th>완성</th>` +
+    `<th>완성 시간 중앙</th><th>입력 중앙</th></tr></thead><tbody>${sum.map(x => `<tr><td>${x.b.label}</td><td>${x.n}</td>` +
+    `<td>${x.solved}</td><td>${fmt(x.med)}</td><td>${x.inputs ?? ''}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">아직 기록이 없어요.</p>';
+  document.getElementById('log').innerHTML = log.length ? `<table><thead><tr><th>#</th><th>종류</th><th>퍼즐</th><th>완성</th>` +
+    `<th>시간</th><th>입력</th><th>지움</th><th>첫 줄</th><th>체감</th><th>재미</th></tr></thead><tbody>` +
+    log.map((r, i) => `<tr><td>${i + 1}</td><td>${(BANDS.find(b => b.key === r.band) || {}).label || r.band}</td><td>${r.puzzle}</td>` +
+      `<td>${r.solved ? '✓' : '포기'}</td><td>${fmt(r.elapsedMs)}</td><td>${r.inputs}</td><td>${r.erases}</td>` +
+      `<td>${fmt(r.firstLineMs)}</td><td>${r.felt ?? ''}</td><td>${r.fun ?? ''}</td></tr>`).reverse().join('') + `</tbody></table>` : '';
+}
+function toTsv(log) {
+  const head = COLUMNS.map(c => c[1]).join('\t');
+  return [head, ...log.map(r => COLUMNS.map(c => r[c[0]] == null ? '' : String(r[c[0]])).join('\t'))].join('\n');
+}
+async function copyText(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`${what} 복사했어요`); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(`${what} 복사했어요`); } catch { toast('복사를 못 했어요 — JSON 저장을 써 주세요'); }
+    ta.remove();
+  }
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+document.getElementById('copyTsv').onclick = () => copyText(toTsv(load(LOG_KEY, [])), '표를');
+document.getElementById('copyJson').onclick = () => copyText(JSON.stringify(load(LOG_KEY, []), null, 1), 'JSON 을');
+document.getElementById('saveJson').onclick = () => {
+  const blob = new Blob([JSON.stringify(load(LOG_KEY, []), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `starsquare-trial-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+document.getElementById('clearLog').onclick = () => {
+  if (confirm('이 브라우저의 측정 기록을 모두 지울까요? 되돌릴 수 없어요.')) { save(LOG_KEY, []); save(PLAYED_KEY, {}); renderLog(); }
+};
+
+// ---- 키보드: 숫자(두 자리는 0.6초 안에 이어서), 방향키, Backspace ----
+document.addEventListener('keydown', e => {
+  if (!game || !game.running || game.finished || e.target.tagName === 'INPUT') return;
+  const n = game.n;
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault();
+    const d = Number(e.key);
+    const now = performance.now();
+    const p = game.pending;
+    game.pending = null;
+    if (p && p.cell === game.sel && now - p.t < TWO_DIGIT_MS && p.d * 10 + d <= n * n) {
+      place(p.d * 10 + d, p.pushed);   // 1, 2 → 12 (첫 자리가 판을 바꿨으면 그 입력을 물린다)
+      return;
+    }
+    if (d === 0 || d > n * n) return;
+    const before = game.history.length;
+    place(d);
+    // 두 자리 수의 첫 자리일 수 있으면 잠깐 기다린다(이어 치면 덮어쓴다)
+    if (d * 10 <= n * n) game.pending = { d, t: now, cell: game.sel, pushed: game.history.length > before };
+    return;
+  }
+  const r = Math.floor(game.sel / n), c = game.sel % n;
+  const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  if (moves[e.key]) {
+    e.preventDefault();
+    let [nr, nc] = [r + moves[e.key][0], c + moves[e.key][1]];
+    while (nr >= 0 && nr < n && nc >= 0 && nc < n && game.clues[nr * n + nc]) { nr += moves[e.key][0]; nc += moves[e.key][1]; }
+    if (nr >= 0 && nr < n && nc >= 0 && nc < n) { game.sel = nr * n + nc; game.pending = null; renderBoard(); }
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    game.pending = null;
+    place(0);
+  }
+});
+
+// 탭을 숨긴 시간은 따로 적는다(측정에서 뺄 수 있게)
+document.addEventListener('visibilitychange', () => {
+  if (!game || !game.running) return;
+  if (document.hidden) game.hiddenSince = performance.now();
+  else if (game.hiddenSince != null) { game.hiddenMs += performance.now() - game.hiddenSince; game.hiddenSince = null; }
+});
+window.addEventListener('resize', () => { if (game && game.running) renderBoard(); });
+
+const who = document.getElementById('who');
+who.value = load(WHO_KEY, '');
+who.oninput = () => save(WHO_KEY, who.value);
+document.getElementById('newBtn').onclick = startPuzzle;
+renderBands();
+renderLog();
+loadBanks();
+</script>
+</body>
+</html>

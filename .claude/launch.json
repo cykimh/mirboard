@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "client", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "starsquare-trial",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5203", "--bind", "127.0.0.1", "--directory", "scripts/starsquare-trial"],
+      "port": 5203
     }
   ]
 }
