@@ -239,6 +239,9 @@ export function RoomPage() {
     // D-137 — 관전자는 관전으로 돌려놓는다(D-134 끊김에 관전 목록에서 빠졌어도). join-or-reconnect 는 빈자리면 앉혀 버린다 — 앉는 것은
     // [자리에 앉기]로만.
     const wasSpectator = !!user && (current.spectatorIds ?? []).includes(user.userId);
+    // 기다리는 사이 소켓이 더 새 메타를 넣었으면 이 응답(그 전에 읽혔을 수 있다)으로 되돌리지 않는다.
+    const tick = metaTickRef.current;
+    const fresh = () => roomIdRef.current === requested && metaTickRef.current === tick;
     const run = async () => {
       try {
         if (wasSpectator) {
@@ -255,13 +258,19 @@ export function RoomPage() {
             if (watched.spectatorIds?.includes(user!.userId)) void roomsApi.stopSpectating(token, requested).catch(() => {});
             return;
           }
-          if (roomIdRef.current === requested) applyRoomMeta(watched);
+          if (fresh()) applyRoomMeta(watched);
         } else if (current.status === 'WAITING') {
           const r = await roomsApi.joinOrReconnect(token, requested);
+          if (!mountedRef.current) {
+            // 기다리는 사이 방 화면을 떠났다 — 다시 받은 자리·관전을 거둔다(소켓이 없어 끊김 유예도 걸리지 않는다).
+            const undo = r.mode === 'SPECTATING' ? roomsApi.stopSpectating(token, requested) : roomsApi.leave(token, requested);
+            void undo.catch(() => {});
+            return;
+          }
           if (roomIdRef.current === requested) applyJoinResult(r);
         } else {
           const r = await roomsApi.get(token, requested);
-          if (roomIdRef.current === requested) applyRoomMeta(r);
+          if (fresh()) applyRoomMeta(r);
         }
       } catch (err) {
         if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
@@ -275,6 +284,8 @@ export function RoomPage() {
     return resyncingRef.current;
   }
   const mountedRef = useRef(true);
+  /** 소켓 메타가 올 때마다 오른다 — 재동기화 응답이 그보다 낡았는지 가린다. */
+  const metaTickRef = useRef(0);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -304,7 +315,10 @@ export function RoomPage() {
   useRoomMeta(
     roomId,
     token,
-    applyRoomMeta,
+    (r) => {
+      metaTickRef.current += 1;
+      applyRoomMeta(r);
+    },
     () => setError('방이 종료되었습니다.'),
     resyncRoom,
   );

@@ -1078,6 +1078,49 @@ describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
     expect(roomsApi.stopSpectating).toHaveBeenCalledWith('tok', 'r1');
   });
 
+  it('재동기화를 기다리는 사이 소켓이 더 새 메타를 넣었으면 늦은 응답으로 되돌리지 않는다', async () => {
+    renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 });
+    await screen.findByTestId('onecard-table');
+    let resolve!: (r: Room) => void;
+    vi.mocked(roomsApi.get).mockReturnValue(new Promise<Room>((r) => (resolve = r)));
+    const meta = vi.mocked(useRoomMeta).mock.calls.at(-1)![2];
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = resync()() as Promise<void>;
+    });
+    act(() => {
+      meta({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', playerIds: [1, 2], playerCount: 2 } as Room);
+    });
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
+    await act(async () => {
+      resolve({ ...ROOM, gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 } as Room);
+      await pending;
+    });
+
+    expect(oneCardProps.at(-1)!.roomFinished).toBe(true);
+  });
+
+  it('대기실 재동기화를 기다리는 사이 방 화면을 떠났으면 다시 받은 자리를 거둔다', async () => {
+    const view = renderRoom({ gameType: 'ONE_CARD' });
+    await screen.findByText('테스트 방');
+    let resolve!: (r: JoinOrReconnectResponse) => void;
+    joinOrReconnect.mockReturnValue(new Promise<JoinOrReconnectResponse>((r) => (resolve = r)));
+    vi.mocked(roomsApi.leave).mockResolvedValue(undefined);
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = resync()() as Promise<void>;
+    });
+    view.unmount();
+    await act(async () => {
+      resolve({ mode: 'JOINED', room: { ...ROOM, gameType: 'ONE_CARD' } });
+      await pending;
+    });
+
+    expect(roomsApi.leave).toHaveBeenCalledWith('tok', 'r1');
+  });
+
   it('게임 중 방이 없어졌으면 "방이 없어졌어요"', async () => {
     renderRoom({ gameType: 'ONE_CARD', status: 'IN_GAME', playerIds: [1, 2], playerCount: 2 });
     await screen.findByTestId('onecard-table');
