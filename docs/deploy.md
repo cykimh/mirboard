@@ -393,6 +393,18 @@ flyctl secrets set MIRBOARD_ARTILLERY_STATUS=COMING_SOON -a mirboard
 # 다시 열기(시크릿을 지워 코드 기본값 — 공개)
 flyctl secrets unset MIRBOARD_ARTILLERY_STATUS -a mirboard
 ```
+## 담바둑 공개 상태 (`MIRBOARD_DAMBADUK_STATUS`, D-274)
+
+**아직 공개 전** — 코드 기본값 `DISABLED`(카탈로그에서도 빼고 새 방 거절). S4 공개 때 코드 기본값(`application.yml` 과
+`DambadukGameDefinition` 의 `@Value`, 테스트가 둘을 대조한다)을 `AVAILABLE` 로 바꾸고, 그 뒤 되돌리기는 오목과 같은 손잡이다. 매치 테이블은
+`V21__dambaduk_match.sql`(배포 때 Flyway 가 적용 — 감춘 동안에도 테이블은 생긴다).
+
+```bash
+# 공개 전에 운영에서 미리 열어 보기(카탈로그 "준비 중"으로만 보이게)
+flyctl secrets set MIRBOARD_DAMBADUK_STATUS=COMING_SOON -a mirboard
+# 다시 감추기(시크릿을 지워 코드 기본값)
+flyctl secrets unset MIRBOARD_DAMBADUK_STATUS -a mirboard
+```
 ## 운영 Redis (D-171)
 
 `mirboard-redis` 는 Flycast 사설 주소(`mirboard-redis.flycast:6379`)로만 받고, Fly 프록시가 연결이 없으면 머신을 멈춘다. 앱이 켜지며

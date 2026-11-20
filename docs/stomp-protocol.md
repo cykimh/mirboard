@@ -565,6 +565,39 @@ fuel, special, specials, items, team, delay}`(`team` 팀전이면 좌석 홀짝�
 
 ---
 
+## 담바둑 (gameType=DAMBADUK, D-274~D-278)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (2~3). 룰 정본은 `docs/rules-dambaduk.md`. **아직 공개 전** — 설정
+`mirboard.dambaduk.status` 기본 `DISABLED`(S4 에서 `AVAILABLE`). 좌표 `(x, y)` 는 0..6, 담은 면 번호 0..83(0~41 = 가로 이웃 사이 `y·6+x`,
+42~83 = 세로 이웃 사이 `42+y·7+x`), 방향은 `UP`·`RIGHT`·`DOWN`·`LEFT`.
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `PLACE_STONE` | `kind` (`STRAIGHT`·`BENT`), `x`, `y` | 배치 단계, 내 차례만. 2인은 `STRAIGHT` 만(꺾은돌은 고정 칸에서 시작) |
+| `MOVE_STONE` | `stoneId`, `path` (방향 1~2개), `wall` (도착 칸 기준 방향), `jump?` (boolean, 기본 false) | 옮기고 담 세우기 — 떼어 보낼 수 없는 한 액션. `jump` 는 3인으로 시작한 판에서 사람마다 1번 |
+
+시간 초과 자동 수(`TimeoutAct`)는 서버 내부 액션이라 **클라가 보낼 수 없다** — Jackson 하위 타입에 등록돼 있지 않다.
+
+**서버 → 클라 (공개)** — 숨길 정보가 없어 **이벤트가 전부 공개**이고 모두 방 순번을 쓴다. 터·점수·고를 수 있는 수는 **서버가 계산해 싣는다**(클라 판정 금지):
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `STONE_PLACED` | `{ seat, stoneId, kind, x, y, timedOut }` | 배치. `timedOut` 은 시간 초과 자동 배치 |
+| `STONE_MOVED` | `{ seat, stoneId, path, fromX, fromY, toX, toY, wall, wallFace, jumpedFace, timedOut }` | 옮김 + 담. `jumpedFace` 는 담 넘기로 없앤 면(없으면 −1) — 같은 차례에 그 면에 다시 세울 수 있어 `wallFace == jumpedFace` 일 수 있다 |
+| `TURN_CHANGED` | `{ seat, phase, territory, placeKinds, options }` | 액션마다 낸다(턴 카운트다운의 기준, D-131). `territory` = `{ regions: [{cells, kind, owner, seats}], scores, largest }`(`kind`: `HOME`·`CONTESTED`·`EMPTY`), 배치 단계면 `placeKinds`, 옮김 단계면 `options: [{stoneId, path, toX, toY, jump, jumpedFace, walls}]` |
+| `TURN_SKIPPED` | `{ seat }` | 옮길 수 있는 수가 없어 그 차례를 건너뜀 |
+| `SEAT_OUT` | `{ seat, reason, removedStoneIds }` | 빠짐(`reason`: `TIMEOUT` 연속 2번째 시간 초과 · `DESERTED`). 3인이면 그 돌을 치웠다(담은 그대로) — 뒤에 같은 좌석이라도 `TURN_CHANGED` 가 다시 온다. 2인은 바로 `MATCH_ENDED` |
+| `MATCH_ENDED` | `{ reason, standings: [{seat, score, largest, rank, exit}], winners, draw, causeSeat, territory, moveCount }` | `reason`: `SEPARATED`·`FROZEN`·`LAST_STANDING`·`TIMEOUT`·`DESERTED`. 무승부면 `winners` [] |
+
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 담바둑 고유 코드 `MATCH_OVER`·`NOT_YOUR_TURN`·`WRONG_PHASE`·`OUT_OF_BOARD`·`NO_STONE_LEFT`·`OCCUPIED`·
+`NOT_YOUR_STONE`·`BAD_PATH`·`JUMP_UNAVAILABLE`·`PATH_BLOCKED`·`WALL_IN_PATH`·`JUMP_WITHOUT_WALL`·`WALL_SIDE_TAKEN`(이 순서로 판정, 룰 §4.5).
+
+**resync**: `phase` = `PLACING`·`PLAYING`·`ENDED`, `tableView` = `{ seatCount, firstSeat, seatColors, phase, stones: [{id, seat, kind, x, y}], walls,
+placementQueue, turnSeat, jumpsLeft, timeouts, exits, moveCount, territory, placeKinds, options, result }` — `seatColors` 는 좌석별 색 번호(0 흑 · 1 백 · 2 셋째),
+`result` 는 `MATCH_ENDED` 의 `{reason, standings, winners, draw, causeSeat}`. **`privateHand` 는 없다**(오목과 같다).
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.
