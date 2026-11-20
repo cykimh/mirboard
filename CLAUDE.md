@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 현황
 
-**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 7종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131), 얏추(화면 이름 — 코드 이름은 `YACHT`·`yacht`·"요트" 그대로, D-207. 1~4인 개인전 — 주사위 5개·12칸, 순차 진행·혼자 하기, D-181~D-183·D-200 공개), 오목(2인 1:1·4인 2:2 팀전 — 렌주·삼삼만·자유 룰, 봇 3단계, D-175~D-180·D-190 공개), 구름항로(2~4인 주사위·부동산 독창 게임 — 포트 확장 0건, D-210~D-214 공개), 씨앗포(2~4인 턴제 포격 독창 게임 — 서버 Q16 정수 탄도·Canvas 재생, 2:2 팀전·포트리스식 딜레이 차례, D-220~D-223 공개, D-224~D-226. S6 실시간 이동·조준 공유 — 걷기 확정 `MOVE`·차례 전체 마감·조준 미리보기, 포트 선택 확장 ⑧ `preview` 1건 D-228·D-229·D-250, 클라 D-251).
+**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 8종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131), 얏추(화면 이름 — 코드 이름은 `YACHT`·`yacht`·"요트" 그대로, D-207. 1~4인 개인전 — 주사위 5개·12칸, 순차 진행·혼자 하기, D-181~D-183·D-200 공개), 오목(2인 1:1·4인 2:2 팀전 — 렌주·삼삼만·자유 룰, 봇 3단계, D-175~D-180·D-190 공개), 구름항로(2~4인 주사위·부동산 독창 게임 — 포트 확장 0건, D-210~D-214 공개), 씨앗포(2~4인 턴제 포격 독창 게임 — 서버 Q16 정수 탄도·Canvas 재생, 2:2 팀전·포트리스식 딜레이 차례, D-220~D-223 공개, D-224~D-226. S6 실시간 이동·조준 공유 — 걷기 확정 `MOVE`·차례 전체 마감·조준 미리보기, 포트 선택 확장 ⑧ `preview` 1건 D-228·D-229·D-250, 클라 D-251), 담바둑(2~3인 돌 옮기기·담 세우기 독창 게임 — 7×7 판, 옮김+담 한 액션, 갈 수 있는 칸·집·점수는 서버 계산, 포트 확장 0건, D-274~D-280, D-281 공개 준비 — `MIRBOARD_DAMBADUK_STATUS`).
 
 현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-172까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
@@ -85,7 +85,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
-  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 일곱 게임 모두 이
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 여덟 게임 모두 이
   세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129·D-240 티츄), 각
   게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
   판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
@@ -119,7 +119,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 9.4.1 (wrapper), Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129, 요트 `.yt-` 20·오목 `.om-` 21·구름항로 `.cr-` 22·씨앗포 `.ar-` 23 번 part — 번호는 불러오는 순서, 겹치지 않게) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129, 요트 `.yt-` 20·오목 `.om-` 21·구름항로 `.cr-` 22·씨앗포 `.ar-` 23·담바둑 `.db-` 26 번 part — 번호는 불러오는 순서, 겹치지 않게) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
@@ -270,6 +270,9 @@ MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.
 ./gradlew :server:test --tests "com.mirboard.infra.bot.YachtBotMatchSimulationIT"   # 요트 봇 판·차례 전체 타이머·1인 판 무기록 (Docker)
 ./gradlew :server:test --tests "com.mirboard.domain.game.cloudroute.*"   # 구름항로 엔진·불변식·시뮬레이션·어댑터·봇 강도 + 길이 통계 → server/build/cloudroute-sim-stats.txt (D-211·D-212, 기록기 IT 만 Docker)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.CloudRouteBotMatchSimulationIT"   # 구름항로 봇 완주 2·3·4인 + 손 놓은 사람 (D-212, Docker, ~40s)
+./gradlew :server:test --tests "com.mirboard.domain.game.dambaduk.*"   # 담바둑 엔진·불변식·2·3인 각 2,000판 시뮬레이션·어댑터·봇 + 길이 통계 → server/build/dambaduk-sim-stats.txt (D-276~D-280, 기록기 IT 만 Docker)
+MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.dambaduk.bot.DambadukBotStrengthTest"   # 담바둑 봇 강도 200판 표 → server/build/dambaduk-bot-strength.txt (D-277·D-280)
+./gradlew :server:test --tests "com.mirboard.infra.bot.DambadukServerFlowIT" --tests "com.mirboard.infra.ws.DambadukRecorderFailureTest"   # 담바둑 서버 경로(봇 판 완주 2·3인·탈주) + 기록 실패 격리 (D-278, IT 만 Docker)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.TurnRemainingTest"   # resync 남은 턴 시간·재무장을 락 안에서 (D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.*RecorderFailureTest"   # 매치 기록 실패 격리 3게임 (D-130·D-131)
@@ -332,16 +335,19 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128·D-129, D-131 공개): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
   - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `ROUND_STARTED`(D-202 동시 진행 — 방 옵션 `TURN_MODE`, 라운드마다 모두 같이·제한은 라운드 전체), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null). `DICE_SHAKING`(D-268 — 컵 흔드는 중, 포트 ⑧ 미리보기라 **순번 없음**·resync 에 없음)
+  - 담바둑(D-278): `STONE_PLACED`, `STONE_MOVED`(`path`·`wall`·`jump`), `TURN_CHANGED`(서버 계산 `options`·`territory`), `TURN_SKIPPED`, `SEAT_OUT`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
   - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`, 순번 없음 — D-129), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
   - 요트: `ERROR` 만(인프라가 거절 예외 코드로 — 엔진의 비공개 이벤트 0종)
+  - 담바둑: `ERROR` 만
 - 클라 → 서버 `/app/room/{roomId}/action`
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
   - 원카드: `PLAY_CARD`(7 은 `declaredSuit`), `DRAW`, `CALL_ONE_CARD`·`CATCH`(`raceId`). 봇 누름·창 만료는 서버의 엔진 타이머(D-128)
   - 요트: `ROLL`(`held?`), `HOLD`(`held`), `SCORE`(`category`). 차례 만기 자동 기록은 서버의 엔진 타이머(D-183). 미리보기 `/app/room/{id}/preview` 로 `SHAKE`(`shaking`, D-268 — 액션 아님)
+  - 담바둑: `PLACE_STONE`(`kind`·`x`·`y`), `MOVE_STONE`(`stoneId`·`path`·`wall`·`jump`) — 옮김과 담이 한 액션이라 인프라 턴 데드라인이 그대로 차례 제한
 
 전체 카탈로그: `docs/stomp-protocol.md`.
 

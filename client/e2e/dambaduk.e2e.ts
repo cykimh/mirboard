@@ -4,11 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
  * 담바둑 한 판(D-279 — S3 완료 기준). 게스트로 들어가 담바둑 방을 만들고 [빈자리 봇으로 채우기] → [3명으로 시작], 판이 끝날 때까지
  * 화면으로만 둔다 — 배치는 빈 칸 두 번 누르기, 옮김은 내 돌 → 갈 수 있는 칸 → 담 방향 버튼. 끝나면 결과 현판과 [대기실로].
  *
- * <p>공개 전(S4 전)에는 서버가 담바둑을 감춘다(`MIRBOARD_DAMBADUK_STATUS` 기본 DISABLED) — 이 점검은 그 값을 `AVAILABLE` 로 띄운 로컬
- * 스택에서만 돈다: `E2E_DAMBADUK=1 E2E_BASE_URL=http://localhost:5202 npm --prefix client run e2e -- dambaduk --project=phone`.
- * 수는 고르지 않는다(늘 첫 후보) — 끝까지 가는 배선을 보는 점검이지 실력 점검이 아니다.
+ * <p>D-281 공개 뒤에는 기본 스택에서 돈다(`npm --prefix client run e2e -- dambaduk`, 다른 곳은 `E2E_BASE_URL`). 수는 고르지 않는다(늘 첫
+ * 후보) — 끝까지 가는 배선을 보는 점검이지 실력 점검이 아니다. 게스트를 하나 만든다(IP 당 발급 한도 — `practice.e2e.ts` 와 같은 주의).
  */
-test.skip(process.env.E2E_DAMBADUK !== '1', '담바둑은 공개 전 — E2E_DAMBADUK=1 로 연 로컬 스택에서만');
 
 test.describe.configure({ mode: 'serial', timeout: 300_000 });
 
