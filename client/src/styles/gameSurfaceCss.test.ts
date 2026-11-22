@@ -4,7 +4,7 @@ import { gameSurfaceCssSource, indexCssSource } from './cssSources';
 import { readFileSync } from 'node:fs';
 
 /**
- * D-292 — 게임판에서 글자 선택·길게 누르기 메뉴·그림 끌기를 막는 규칙은 `26-game-surface.css` 한 곳에만 있고, `RoomPage` 가 두
+ * D-292 — 게임판에서 글자 선택·길게 누르기 메뉴·그림 끌기를 막는 규칙은 `28-game-surface.css` 한 곳에만 있고, `RoomPage` 가 두
  * 게임판 갈래(티츄 / 나머지 여섯) 모두의 `<main>` 에 `game-surface` 를 얹는다.
  */
 const cssCode = gameSurfaceCssSource.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -16,7 +16,7 @@ const bodyOf = (selector: string) => {
 const source = (relative: string) =>
   (readFileSync as unknown as (p: URL, enc: string) => string)(new URL(relative, import.meta.url), 'utf-8');
 
-describe('26-game-surface.css — 게임판 공통 조작(D-292)', () => {
+describe('28-game-surface.css — 게임판 공통 조작(D-292)', () => {
   it('게임판 루트에서 글자 선택·길게 누르기 메뉴를 막는다', () => {
     const root = bodyOf('.game-surface');
     expect(root).toContain('user-select: none');
@@ -48,10 +48,10 @@ describe('26-game-surface.css — 게임판 공통 조작(D-292)', () => {
 
   it('index.css 에서 게임판 part 뒤, 17 앞에 import 된다', () => {
     const i25 = indexCssSource.indexOf("'./parts/25-tichu-lacquer.css'");
-    const i26 = indexCssSource.indexOf("'./parts/26-game-surface.css'");
+    const i28 = indexCssSource.indexOf("'./parts/28-game-surface.css'");
     const i17 = indexCssSource.indexOf("'./parts/17-responsive.css'");
-    expect(i26).toBeGreaterThan(i25);
-    expect(i17).toBeGreaterThan(i26);
+    expect(i28).toBeGreaterThan(i25);
+    expect(i17).toBeGreaterThan(i28);
   });
 
   it('RoomPage 의 게임판 <main> 은 모두 game-surface 를 단다 — 대기실 셸은 달지 않는다', () => {
