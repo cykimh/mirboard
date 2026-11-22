@@ -86,6 +86,9 @@ class GameCatalogIntegrationTest {
                 .andExpect(jsonPath("$.games[0].defaultPlayers").value(4))
                 .andExpect(jsonPath("$.games[0].defaultTurnSeconds").value(30))
                 .andExpect(jsonPath("$.games[0].turnSecondsChoices").value(org.hamcrest.Matchers.contains(0, 15, 30, 60)))
+                // D-286 — 시간 라벨은 게임 선언, 기본 "턴 제한"·"끔"
+                .andExpect(jsonPath("$.games[0].turnLimitLabel").value("턴 제한"))
+                .andExpect(jsonPath("$.games[0].turnLimitZeroLabel").value("끔"))
                 .andExpect(jsonPath("$.games[1].id").value("SKULL_KING"))
                 .andExpect(jsonPath("$.games[1].displayName").value("스컬킹"))
                 .andExpect(jsonPath("$.games[1].minPlayers").value(2))

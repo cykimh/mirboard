@@ -93,6 +93,18 @@ public final class StarSquareGameDefinition implements GameDefinition {
         return List.of(0, 180, 300, 480, 600, 900, 1_200);
     }
 
+    /** D-286 — 모두가 같은 퍼즐을 동시에 푼다 — 시간은 퍼즐 하나에 걸린다. */
+    @Override
+    public String turnLimitLabel() {
+        return "퍼즐 제한";
+    }
+
+    /** D-286 — 0 은 끔이 아니라 난이도별 권장 제한(쉬움 8분·보통 7분·어려움 20분). */
+    @Override
+    public String turnLimitZeroLabel() {
+        return "자동";
+    }
+
     @Override
     public Set<RoomOption> supportedRoomOptions() {
         return EnumSet.of(RoomOption.BOT_LEVEL, RoomOption.MATCH_LENGTH, RoomOption.DIFFICULTY);

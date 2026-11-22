@@ -58,7 +58,9 @@ public class GameCatalogController {
             int defaultTurnSeconds,
             List<Integer> turnSecondsChoices,
             List<RoomOptionChoices> roomOptionChoices,
-            List<Integer> playerCounts) {
+            List<Integer> playerCounts,
+            String turnLimitLabel,
+            String turnLimitZeroLabel) {
 
         static GameSummary of(GameDefinition d) {
             return new GameSummary(
@@ -78,7 +80,10 @@ public class GameCatalogController {
                             .map(o -> new RoomOptionChoices(o, o.choices(), o.defaultValue()))
                             .toList(),
                     // D-196 — 할 수 있는 인원(게임 선언 — 맵 옵션 조합의 시작 인원..정원 합집합). 메인 카드의 인원 표기.
-                    d.playerCounts());
+                    d.playerCounts(),
+                    // D-286 — 대기실 턴 제한 줄의 이름과 0 의 이름(게임 선언, 기본 "턴 제한"·"끔").
+                    d.turnLimitLabel(),
+                    d.turnLimitZeroLabel());
         }
     }
 

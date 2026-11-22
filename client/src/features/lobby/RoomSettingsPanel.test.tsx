@@ -210,4 +210,25 @@ describe('RoomSettingsPanel (D-161)', () => {
       expect(screen.getByText('어려움')).toBeInTheDocument();
     });
   });
+
+  it('D-286 — 게임이 정한 시간 줄 이름과 0 의 이름(별자리 수판 "퍼즐 제한"·"자동", 2분 이상은 분 단위)', () => {
+    const onChange = vi.fn();
+    const sq: GameSummary = {
+      ...game('STAR_SQUARE', ['BOT_LEVEL', 'MATCH_LENGTH', 'DIFFICULTY'], [0, 180, 300, 480, 600, 900, 1200]),
+      turnLimitLabel: '퍼즐 제한',
+      turnLimitZeroLabel: '자동',
+      roomOptionChoices: [{ option: 'DIFFICULTY', values: ['EASY', 'NORMAL', 'HARD'], defaultValue: 'NORMAL' }],
+    };
+    render(<RoomSettingsPanel room={room({ gameType: 'STAR_SQUARE', turnSeconds: 0 })} game={sq} canEdit onChange={onChange} />);
+    const limit = screen.getByRole('group', { name: '퍼즐 제한' });
+    expect(within(limit).getAllByRole('radio').map((r) => r.textContent)).toEqual([
+      '자동', '3분', '5분', '8분', '10분', '15분', '20분',
+    ]);
+    expect(within(limit).getByRole('radio', { name: '자동' })).toHaveAttribute('aria-checked', 'true');
+    const difficulty = screen.getByRole('group', { name: '난이도' });
+    fireEvent.click(within(difficulty).getByRole('radio', { name: '어려움' }));
+    expect(onChange).toHaveBeenCalledWith({ options: { DIFFICULTY: 'HARD' } });
+    // 라벨을 싣지 않은 게임은 예전 그대로
+    expect(screen.queryByRole('group', { name: '턴 제한' })).toBeNull();
+  });
 });

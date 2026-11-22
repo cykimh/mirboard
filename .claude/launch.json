@@ -18,6 +18,18 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "5203", "--bind", "127.0.0.1", "--directory", "scripts/starsquare-trial"],
       "port": 5203
+    },
+    {
+      "name": "starsquare-server",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["MIRBOARD_PORT=8203", "MIRBOARD_REDIS_DATABASE=7", "MIRBOARD_DB_SCHEMA=sq_dev", "MIRBOARD_ALLOWED_ORIGINS=http://localhost:5203", "MIRBOARD_STAR_SQUARE_STATUS=AVAILABLE", "./gradlew", ":server:bootRun"],
+      "port": 8203
+    },
+    {
+      "name": "starsquare-client",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_PORT=5203", "MIRBOARD_DEV_API=http://localhost:8203", "npm", "--prefix", "client", "run", "dev"],
+      "port": 5203
     }
   ]
 }

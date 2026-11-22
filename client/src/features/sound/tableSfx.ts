@@ -37,7 +37,16 @@ export type TableCue =
   | 'match.win'
   | 'match.lose'
   | 'match.draw'
-  | 'match.resign';
+  | 'match.resign'
+  // 별자리 수판(D-286) — 유리 실로폰 같은 맑은 "팅". 별 켜기·끄기·되돌리기, 별자리 선, 완성, 별똥별(누군가 완성), 새벽(마감), 밤하늘 열림.
+  | 'star.place'
+  | 'star.erase'
+  | 'star.undo'
+  | 'star.line'
+  | 'star.complete'
+  | 'star.solved'
+  | 'star.closing'
+  | 'star.open';
 
 export interface TableCueCall {
   cue: TableCue;
@@ -45,7 +54,7 @@ export interface TableCueCall {
   gain?: number;
   /** `card.draw` — 먹은 장수(최대 {@link DRAW_REPEAT_MAX} 번 반복). */
   count?: number;
-  /** `card.attack` — 세기 1~3. */
+  /** `card.attack` — 세기 1~3. `star.line` — 새로 이어진 줄 수 1~3. */
   level?: number;
   /** 이만큼 뒤에 울린다(초). */
   delaySec?: number;
@@ -224,6 +233,53 @@ const RECIPES: Record<TableCue, Recipe> = {
   'match.resign': (ctx, t, g) => {
     tone(ctx, { f: 400, to: 150, at: t, dur: 0.22, peak: 0.19 * g });
     return 0.22;
+  },
+  // ── 별자리 수판 ──
+  // 별 켜기(숫자 넣기) — 맑은 "팅" 한 방울(높은 마림바 + 아주 작은 윗소리).
+  'star.place': (ctx, t, g) => {
+    pluck(ctx, t, 1174.66, 0.14 * g, 0.11);
+    tone(ctx, { f: 2349.32, at: t + 0.012, dur: 0.07, peak: 0.035 * g });
+    return 0.11;
+  },
+  // 별 끄기(지우기) — 아래로 스르륵 꺼지는 "뾰".
+  'star.erase': (ctx, t, g) => {
+    tone(ctx, { f: 880, to: 440, glide: 0.07, at: t, dur: 0.1, peak: 0.12 * g });
+    return 0.1;
+  },
+  // 되돌리기 — 내려갔다 살짝 돌아오는 두 방울.
+  'star.undo': (ctx, t, g) => {
+    pop(ctx, t, 783.99, 0.11 * g, 0.06);
+    pop(ctx, t + 0.065, 587.33, 0.11 * g, 0.08);
+    return 0.145;
+  },
+  // 별자리 선이 이어짐 — 위로 반짝이는 두 음, 한꺼번에 여러 줄이면 한 음씩 더(최대 3줄).
+  'star.line': (ctx, t, g, call) => {
+    const level = Math.max(1, Math.min(3, Math.round(call.level ?? 1)));
+    const notes = [987.77, 1318.51, 1567.98, 1975.53].slice(0, level + 1);
+    return plucks(ctx, t, notes, 0.065, 0.1, 0.13 * g, 0.22);
+  },
+  // 내 판이 별자리가 됨 — 5음계로 올라가는 반짝임 + 높은 별빛 둘.
+  'star.complete': (ctx, t, g) => {
+    const run = plucks(ctx, t, [783.99, 987.77, 1174.66, 1567.98, 1975.53], 0.07, 0.12, 0.15 * g, 0.4);
+    [2637.02, 3135.96].forEach((f, i) => tone(ctx, { f, at: t + 0.34 + i * 0.09, dur: 0.32, peak: 0.045 * g }));
+    return Math.max(run, 0.75);
+  },
+  // 누군가 완성 — 별똥별: 높은 데서 미끄러져 내려와 "딩".
+  'star.solved': (ctx, t, g) => {
+    tone(ctx, { f: 2093, to: 880, glide: 0.16, at: t, dur: 0.18, peak: 0.1 * g });
+    pluck(ctx, t + 0.16, 1318.51, 0.16 * g, 0.3);
+    return 0.46;
+  },
+  // 마감 시작 — 재촉하되 놀라지 않게: 낮은 종 두 번(새벽 종).
+  'star.closing': (ctx, t, g) => {
+    pluck(ctx, t, 659.25, 0.15 * g, 0.26);
+    pluck(ctx, t + 0.2, 493.88, 0.15 * g, 0.4);
+    return 0.6;
+  },
+  // 퍼즐 열림 — 밤하늘이 켜지는 느린 세 음.
+  'star.open': (ctx, t, g) => {
+    tone(ctx, { f: 392, to: 523.25, at: t, dur: 0.22, peak: 0.07 * g });
+    return 0.12 + plucks(ctx, t + 0.12, [783.99, 1174.66, 1567.98], 0.09, 0.14, 0.12 * g, 0.36);
   },
 };
 

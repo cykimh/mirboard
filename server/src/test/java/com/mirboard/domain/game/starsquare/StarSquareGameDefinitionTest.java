@@ -37,6 +37,8 @@ class StarSquareGameDefinitionTest {
         // 퍼즐 제한: 0 = 자동(난이도별), 기본 자동
         assertThat(def.defaultTurnSeconds()).isZero();
         assertThat(def.turnSecondsChoices()).containsExactly(0, 180, 300, 480, 600, 900, 1_200).contains(def.defaultTurnSeconds());
+        assertThat(def.turnLimitLabel()).isEqualTo("퍼즐 제한");
+        assertThat(def.turnLimitZeroLabel()).isEqualTo("자동");
         assertThat(def.newEngine(new GameContext("r", List.of(1L, 2L)))).isInstanceOf(StarSquareGameEngine.class);
         assertThat(RoomOption.DIFFICULTY.choices()).containsExactly("EASY", "NORMAL", "HARD");
         assertThat(RoomOption.DIFFICULTY.defaultValue()).isEqualTo("NORMAL");

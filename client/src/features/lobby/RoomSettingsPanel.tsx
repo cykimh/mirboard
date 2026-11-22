@@ -31,6 +31,8 @@ const ROOM_OPTION_TEXT: Partial<Record<RoomOption, { label: string; values?: Rec
   MATCH_LENGTH: { label: '판 길이', values: { SHORT: '짧게', NORMAL: '보통', LONG: '길게' } },
   // D-202 — 진행 방식(요트: 모두 같이 = 라운드마다 맞춰 같이 굴림).
   TURN_MODE: { label: '진행 방식', values: { SEQUENTIAL: '차례대로', SIMULTANEOUS: '모두 같이' } },
+  // D-283 — 퍼즐 난이도(별자리 수판: 쉬움 3×3·4×4 / 보통 4×4 / 어려움 5×5).
+  DIFFICULTY: { label: '난이도', values: { EASY: '쉬움', NORMAL: '보통', HARD: '어려움' } },
 };
 
 /** 봇 난이도는 봇이 앉은 방에서만 뜻이 있다 — 봇이 없으면 줄을 숨긴다(값은 그대로라 나중에 봇을 채워도 그 값을 쓴다). */
@@ -47,7 +49,8 @@ interface Props {
   pending?: boolean;
 }
 
-const turnLabel = (v: number) => (v === 0 ? '끔' : `${v}초`);
+/** D-286 — 0 의 이름은 게임이 정한다(기본 "끔"). 2분 이상 분 단위로 떨어지면 "N분"(별자리 수판 퍼즐 제한). */
+const turnLabel = (v: number, zero = '끔') => (v === 0 ? zero : v >= 120 && v % 60 === 0 ? `${v / 60}분` : `${v}초`);
 const stakeLabel = (v: number) => (v === 0 ? '없음' : `${v}칩`);
 
 /**
@@ -58,9 +61,12 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
   const options = game?.supportedRoomOptions ?? [];
   const rows: { label: string; value: string; choices: { value: string; text: string }[]; send: (v: string) => RoomSettingsUpdate }[] = [
     {
-      label: '턴 제한',
+      label: game?.turnLimitLabel ?? '턴 제한',
       value: String(room.turnSeconds ?? 0),
-      choices: (game?.turnSecondsChoices ?? DEFAULT_TURN_CHOICES).map((v) => ({ value: String(v), text: turnLabel(v) })),
+      choices: (game?.turnSecondsChoices ?? DEFAULT_TURN_CHOICES).map((v) => ({
+        value: String(v),
+        text: turnLabel(v, game?.turnLimitZeroLabel),
+      })),
       send: (v) => ({ turnSeconds: Number(v) }),
     },
   ];

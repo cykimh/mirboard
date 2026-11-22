@@ -64,6 +64,21 @@ public interface GameDefinition {
     }
 
     /**
+     * D-286 — 대기실에서 턴 제한 줄의 이름. <b>기본은 "턴 제한"</b>(지금 화면 그대로). 한 차례가 아니라 다른 단위에 시간이 걸리는 게임이
+     * 바꾼다(별자리 수판 "퍼즐 제한" — 모두가 같은 퍼즐을 동시에 푼다).
+     */
+    default String turnLimitLabel() {
+        return "턴 제한";
+    }
+
+    /**
+     * D-286 — 턴 제한 0 의 이름. <b>기본은 "끔"</b>. 0 이 끔이 아닌 게임이 바꾼다(별자리 수판 "자동" — 난이도별 권장 제한).
+     */
+    default String turnLimitZeroLabel() {
+        return "끔";
+    }
+
+    /**
      * D-176 — 이 방 옵션일 때의 정원. <b>기본은 {@link #maxPlayers()}</b>(지금 동작). 방 만들기·대기실 복귀·설정 변경으로 정원을
      * 정할 때 서버가 부른다. {@code options} 는 이 게임이 선언한 맵 옵션의 실제 값이다({@link RoomOption#resolve} — 선언한 옵션은
      * 늘 값이 있다). {@code minPlayers()..maxPlayers()} 안이어야 한다. 예: 오목은 {@code TEAM_MODE} 에 따라 2 또는 4.

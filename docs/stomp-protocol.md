@@ -598,6 +598,39 @@ fuel, special, specials, items, team, delay}`(`team` 팀전이면 좌석 홀짝�
 placementQueue, turnSeat, jumpsLeft, timeouts, exits, moveCount, territory, placeKinds, options, result }` — `seatColors` 는 좌석별 색 번호(0 흑 · 1 백 · 2 셋째),
 `result` 는 `MATCH_ENDED` 의 `{reason, standings, winners, draw, causeSeat}`. **`privateHand` 는 없다**(오목과 같다).
 
+## 별자리 수판 (gameType=STAR_SQUARE, D-282~D-287)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (1~4). 룰 정본은 `docs/rules-starsquare.md`. 모두가 **같은 퍼즐을 동시에** 푼다 — 차례가 없다.
+판은 길이 N² 정수 배열(0 = 빈 칸, 칸 번호 `행 × N + 열`), N = 3·4·5. 시간은 남은 ms 로 싣는다(절대 시각 아님).
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `SYNC` | `puzzle`(지금 퍼즐 번호), `version`(퍼즐마다 올리는 번호), `grid`(내 판 전체, 단서 칸 포함) | 0.4초에 한 번까지 모아 보낸다(완성처럼 보이면 바로). 멱등·마지막 판이 이김 — 같은 버전·같은 판은 받되 무변화 |
+
+준비 끝·마감·봇 진행·결과 보기 끝은 서버 엔진 타이머다(클라가 보낼 수 없다).
+
+**서버 → 클라 (공개)** — 전부 순번 있음. **푸는 중인 남의 판 숫자와 정답은 어디에도 없다**(진행도 수만 — 끝난 퍼즐만 모두의 판·정답 공개):
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `PUZZLE_STARTED` | `{ index, count, size, magicSum, clues, limitMs, filled, lines }` | 퍼즐 공개(준비 3초 뒤 모두 동시). `filled`·`lines` 는 단서 판의 진행도 |
+| `PROGRESS` | `{ seat, filled, lines }` | 진행도가 바뀜(한 번만 쓰인 값만 셈 — 룰 §5.1) |
+| `SOLVED` | `{ seat, place, elapsedMs }` | 완성. 그 좌석 진행도는 N²·2N+2 |
+| `CLOSING` | `{ remainingMs }` | 첫 완성으로 마감이 당겨짐(30초 또는 퍼즐 제한 중 이른 쪽) |
+| `PUZZLE_ENDED` | `{ index, reason, results: [{seat, rank, points, solved, elapsedMs, filled, lines, deserted}], grids, solution, totals, nextInMs }` | `reason`: `ALL_SOLVED`·`CLOSED`·`TIME_UP`. 마지막 퍼즐이면 `nextInMs` 0 이고 곧바로 `MATCH_ENDED` |
+| `SEAT_DESERTED` | `{ seat }` | 탈주 |
+| `MATCH_ENDED` | `{ reason, placements: [{seat, rank, points, firsts, deserted}] }` | `reason`: `FINISHED`·`NO_HUMANS`·`LAST_SEAT` |
+
+**서버 → 클라 (비공개)**: `ERROR` 뿐 — 별자리 수판 고유 코드 `MATCH_OVER`·`NOT_IN_PLAY`·`PUZZLE_CLOSED`·`STALE_SYNC`·`ALREADY_SOLVED`·`BAD_GRID`·`CLUE_CHANGED`
+(이 순서로 판정, 룰 §7.1). `PUZZLE_CLOSED`·`STALE_SYNC`·`ALREADY_SOLVED` 와 인프라 `BUSY` 는 클라가 문구 없이 처리한다(`BUSY` → 150ms 뒤 지금 판을 새 버전으로).
+
+**resync**: `phase` = `INTRO`·`PLAYING`·`RESULT`·`ENDED`, `tableView` = `{ phase, puzzleIndex, puzzleCount, size, magicSum, clues, remainingMs, closing,
+seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, deserted}], lastPuzzle, result }` — 준비 단계는 퍼즐을 숨긴다(`size` 0, `clues` null).
+`lastPuzzle` 은 방금 끝난 퍼즐(결과 보기·끝)의 `{index, reason, results, grids, solution}`. **`privateHand` = 내 판** `{ puzzleIndex, grid, version, solved }`
+(준비 단계·봇·관전자는 없음) — 재접속한 클라는 이 버전보다 큰 번호부터 보낸다.
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.

@@ -196,6 +196,47 @@ const ICONS: Record<string, IconDef> = {
       </>
     ),
   },
+  // 별자리 수판 — 깊은 남색 밤하늘 타일, 3×3 별(크림) 가운데 대각선 한 줄이 금빛 별자리 선으로 이어졌다. 작을 때는 별 아홉 개와 선만.
+  STAR_SQUARE: {
+    tile: { hi: '#4f5fd0', lo: '#1a1f5e', deep: '#0b0e33' },
+    glyph: ({ detail, deep }) => {
+      const at = [12, 24, 36];
+      const onLine = (r: number, c: number) => r + c === 2;
+      // 네 갈래 별(✦) — 가운데 (x, y), 크기 s.
+      const spark = (x: number, y: number, s: number) =>
+        `M${x} ${y - s}Q${x + s * 0.22} ${y - s * 0.22} ${x + s} ${y}Q${x + s * 0.22} ${y + s * 0.22} ${x} ${y + s}Q${x - s * 0.22} ${y + s * 0.22} ${x - s} ${y}Q${x - s * 0.22} ${y - s * 0.22} ${x} ${y - s}z`;
+      return (
+        <>
+          <path d="M36 12L24 24L12 36" fill="none" stroke={deep} strokeWidth="5" strokeLinecap="round" />
+          <path d="M36 12L24 24L12 36" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round" />
+          {at.map((y, r) =>
+            at.map((x, c) =>
+              onLine(r, c) ? (
+                <path
+                  key={`${r}-${c}`}
+                  d={spark(x, y, detail ? 6.2 : 5.4)}
+                  fill={GOLD}
+                  stroke={deep}
+                  strokeWidth={detail ? 1.4 : 1}
+                  strokeLinejoin="round"
+                />
+              ) : (
+                <circle key={`${r}-${c}`} cx={x} cy={y} r={detail ? 2.6 : 2.8} fill={CREAM} stroke={deep} strokeWidth={detail ? 1 : 0.8} />
+              ),
+            ),
+          )}
+          {detail && (
+            <>
+              <circle cx="24" cy="24" r="1.3" fill={CREAM} />
+              <circle cx="18.5" cy="7" r="0.9" fill={CREAM} fillOpacity="0.8" />
+              <circle cx="41" cy="30" r="0.9" fill={CREAM} fillOpacity="0.8" />
+              <circle cx="7" cy="18" r="0.7" fill={CREAM} fillOpacity="0.7" />
+            </>
+          )}
+        </>
+      );
+    },
+  },
 };
 
 /** 모르는 게임 — 회색 타일의 말(폰). */

@@ -349,17 +349,36 @@
 - **어댑터** `StarSquareGameEngine` — 상태 `persistence/StarSquareStateStore`(`room:{id}:state`), 비공개 뷰 = 내 판(`PrivateBoard`), 봇은 대기 좌석이 아니라
   `botAction` 은 대기 좌석일 때만 폴백(그 밖 null). 인프라에 게임 이름 0(`grep -rniE 'starsquare|star_square|별자리' server/src/main/java/com/mirboard/infra` → 0건).
 
-## 13. 클라 (S3에서 채운다)
+## 13. 클라 (S3, D-286)
 
-클라는 판정하지 않는다 — 완성·진행도·순위·점수는 서버 값이다. 자기 판의 **줄 합 표시**는 클라가 더하기만 한다(표시용 — 판정 아님).
+클라는 판정하지 않는다 — 완성·진행도·순위·점수는 서버 값이다. 자기 판의 **줄 합 표시**는 클라가 더하기만 한다(표시용 — 판정 아님, 규칙은 §5.1 과 같아
+중복 숫자로 합만 맞춘 줄은 맞음으로 보이지 않는다).
 
-- 입력: 칸 누르기 → 숫자판(1~N², 이미 쓴 숫자는 꺼진 별 + `aria-disabled`). 데스크톱은 키보드(두 자리 수는 0.6초 안에 이어 치면 한 수 — 1, 2 → 12),
-  방향키 이동, Backspace 지우기. 되돌리기는 로컬 기록(서버 무관).
-- 보내기: §7 의 모아 보내기·바로 보내기·`BUSY` 한 번 재전송, *조용히* 사유는 문구 없이.
-- 줄 합 칩: 비었음/모자람/넘침/맞음을 모양으로도 구분(색만으로 구분하지 않는다).
-- 상대 띠: 좌석마다 채운 칸·맞은 줄·완성 도장. 결과 보기: 모두의 판 나란히.
-- CSS `styles/parts/27-starsquare-table.css`(`.sq-` 접두), 튜토리얼 `features/starsquare/tutorial`(① 마방진과 합 M ② 단서 별 ③ 넣기·지우기
-  ④ 줄 합 칩 ⑤ 동시 풀기와 30초 마감 ⑥ 점수).
+- **입력**: 칸 누르기 → 숫자판(1~N²). 이미 쓴 숫자는 꺼진 별 모양이고, 누르면 그 숫자가 고른 칸으로 **옮겨진다**(한 번씩만 쓰는 퍼즐이라 지웠다 쓰기보다 짧다 —
+  S1.5 측정 페이지와 같은 동작) **[결정]**. 데스크톱은 키보드(두 자리 수는 0.6초 안에 이어 치면 한 수 — 1, 2 → 12, 둘째 자리는 첫 자리 입력을 물리고 한 번으로 셈),
+  방향키 이동(단서 칸은 건너뜀), Backspace 지우기, Ctrl/⌘+Z 되돌리기. 되돌리기는 로컬 기록(서버 무관, 200개까지).
+- **보내기(로컬 우선, 화면을 막지 않음)**: 바뀐 판을 0.4초에 한 번까지 모아 판 전체를 `SYNC` 로(완성처럼 보이면 바로). 버전은 보낸 것·서버가 아는 것
+  (resync 비공개 뷰) 중 큰 쪽 + 1. 거절 처리 — `BUSY` 는 150ms 뒤 지금 판을 새 버전으로(5번 넘게 이어지면 안내 한 번 뒤 1초 쉬고 계속),
+  `STALE_SYNC` 는 다시 받아 서버 버전을 알고 내 판(로컬이 이김)을 다시, `PUZZLE_CLOSED`·`ALREADY_SOLVED` 는 조용히, 그 밖은 안내 + 다시 받기.
+  **기다리며 잠그는 상태가 없다** — 소켓이 끊겨 나가지 않은 판(`sendAction` 이 false)·재연결은 "보내지 않음"으로 되돌려 다시 보내고, 완성처럼 보이는 판의
+  "확인 중" 표시는 3초 안에 `SOLVED` 가 없으면 풀고 한 번 더 보낸다(D-270 의 시간 제한 해제와 같은 뜻).
+- **재접속**: resync 의 내 판이 같은 퍼즐이고 보내지 않은 내 입력이 있으면 로컬이 이기고(버전만 서버보다 크게), 아니면 서버 판을 받는다.
+- **줄 합 칩**: 가로 줄 오른쪽·세로 줄 아래·두 대각선 판 아래. 비었음/채우는 중/▽ 모자람/△ 넘침/✦ 맞음 — 모양으로도 구분. 맞은 줄은 별자리 선으로 잇는다.
+- **좌석 띠**: 좌석마다 채운 칸·맞은 줄·완성 도장(순서·시간)·점수 합. **결과 보기**: 순위·점수·걸린 시간과 모두의 판·정답 하나를 나란히.
+- 안내는 공용 `FloatingNotice`/`ErrorNotice`(D-269)로만.
+- **대기실(설계서 M7)**: 카탈로그가 게임이 정한 시간 줄 이름·0 의 이름을 싣는다(`GameDefinition.turnLimitLabel`·`turnLimitZeroLabel`, 기본 "턴 제한"·"끔" —
+  별자리 수판 "퍼즐 제한"·"자동"). 2분 이상 분 단위 값은 "N분"으로 보인다. 난이도 줄 "난이도: 쉬움·보통·어려움".
+
+- **코드(S3):** `client/src/features/starsquare/` — `StarSquareTable`(조립 루트·자기 소켓·키보드), `starSquareStore`(순수 리듀서 + 로컬 판·`sync` 상태 —
+  `takeSync`·`onSyncRejected`·`markUnsent`·`solveConfirmTimedOut`), `useSyncSender`(모아 보내기·재연결·확인 시간 제한), `starSquareRoomSink`(거절 → 보내기 상태,
+  *조용히* 사유는 문구 없음), `StarGrid`·`NumberPad`·`RivalStrip`·`PuzzleResult`·`StarSquareMatchEnd`, `starSquareMath`(줄 합·진행도 — 서버와 같은 셈),
+  `starSquareSfx`, `tutorial/`(6단계), 타입 `types/starsquare.ts`, CSS `styles/parts/27-starsquare-table.css`(`.sq-`) + `17-responsive.css` 의 `.sq-` 블록.
+  대기실 `features/lobby/RoomSettingsPanel`, 서버 `GameDefinition`·`GameCatalogController.GameSummary`.
+  디자인 층(Fable): `starSquareArt.tsx`(망원경·천문대·왕관 별자리 SVG, id 없음)·`useStarSquareFx`(화면 전용 연출 — 눌림 통과, `.sq-anim` 일 때만 움직임),
+  효과음 `features/sound/tableSfx` 의 `star.*` 8종(놓기·지우기·되돌리기·줄 맞음·완성처럼 보임·완성 확정·마감·퍼즐 열림), 아이콘 `components/GameIcon` 의 `STAR_SQUARE`.
+- **테스트(S3):** `starSquareMath.test`(5)·`starSquareStore.test`(9 — sink 포함)·`useSyncSender.test`(5 — 0.4초 모아 보내기·완성 바로·BUSY·끊김/재연결·잠그지 않음)·
+  `StarSquareTable.test`(8)·`starSquareSfx.test`(이벤트·입력 → 소리)·`tutorial/starSquareTutorial.test`(2)·`styles/starsquareCssNamespace.test`(5)·`RoomSettingsPanel.test`(M7 1건),
+  e2e `client/e2e/starsquare.e2e.ts`(공개 전이라 `E2E_STAR_SQUARE=1` 과 AVAILABLE 서버에서만 — 혼자 한 판 완주, 넷 동시 입력 BUSY 재전송 뒤 넷 모두 서버 판 = 화면 판).
 
 ## 14. 우리가 정한 것 (미규정·새 형식)
 

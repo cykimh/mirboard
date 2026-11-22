@@ -1,0 +1,1452 @@
+/*
+ * 별자리 수판 게임판(D-286) — `.sq-` 접두 전용. 공용 클래스 재정의 금지, 폭 미디어 0개(폭·동작 줄이기는 17-responsive 의 `.sq-` 블록).
+ * 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 닿지 않는다 — 여기서 명시한다.
+ *
+ * 테마 "밤하늘 천문대": 판은 하늘을 내다보는 <b>별판(짙은 하늘 판)</b>이고 칸은 별, 숫자는 별의 밝기다. 맞은 줄은 별과 별 사이를 잇는
+ * 별자리 선, 줄 합 칩은 달(모양으로 상태를 가른다 — 점선 고리·반달·초승달·겹고리·보름달). 라이트는 새벽 하늘(연보라→살구), 다크는 깊은
+ * 남색 밤. 별판은 두 테마 모두 어두운 하늘이라(라이트는 보랏빛 황혼) 별빛이 살고, 튜토리얼 포털(`.sq-tokens` 만 있는 body)에서도 같다.
+ *
+ * 움직임은 전부 `.sq-anim`(앱 연출 설정이 켜졌을 때만 게임판이 붙인다) 아래에만 둔다. `prefers-reduced-motion` 은 17 이 한 번 더 끈다.
+ * 연출 층은 모두 `pointer-events: none` — 입력을 막지 않는다.
+ */
+
+/* ── 토큰 — 튜토리얼 포털(body)도 쓰도록 `.sq-tokens` 에 둔다 ── */
+.sq-tokens {
+  /* 바깥(새벽 하늘) */
+  --sq-bg: #e9e6f8;
+  --sq-sky: linear-gradient(180deg, #dfe3fb 0%, #ece4f6 52%, #fbe7dc 100%);
+  --sq-panel: #fbfaff;
+  --sq-ink: #1f2247;
+  --sq-muted: #555a82;
+  --sq-line: #cbcce8;
+  --sq-accent: #4a4fc4;
+  --sq-on-accent: #ffffff;
+  --sq-accent-soft: #e2e3fb;
+  --sq-ok: #0c7455;
+  --sq-ok-soft: #d9f3e8;
+  --sq-over: #9c2740;
+  --sq-over-soft: #fbe3e6;
+  --sq-under: #855200;
+  --sq-star: #e3a316;
+  --sq-pad-star: #ffe2a0;
+  --sq-dawn: rgba(255, 168, 120, 0.4);
+  --sq-sky-dot: rgba(74, 79, 196, 0.28);
+  /* 그림(천문대) */
+  --sq-moon: #f0b93a;
+  --sq-hill: #b7b1df;
+  --sq-dome: #ffffff;
+  --sq-dome-wall: #ece9fb;
+  --sq-dome-line: #3a3f8a;
+  --sq-scope: #dcdcf7;
+  /* 별판(황혼 하늘) — 칸·합 칩·별자리 선은 이 위에 놓인다 */
+  --sq-plate: linear-gradient(158deg, #2f3684 0%, #453c8d 58%, #74498f 100%);
+  --sq-plate-line: rgba(255, 255, 255, 0.2);
+  --sq-cell: rgba(255, 255, 255, 0.1);
+  --sq-cell-line: rgba(255, 255, 255, 0.22);
+  --sq-cell-clue: rgba(255, 216, 120, 0.2);
+  --sq-cell-clue-line: rgba(255, 216, 120, 0.7);
+  --sq-cell-ink: #f6f3ff;
+  --sq-clue-ink: #ffe9ae;
+  --sq-cell-dup: #ffc0b5;
+  --sq-plate-star: #ffd772;
+  --sq-plate-ink: #ece9ff;
+  --sq-plate-muted: #c9c5ee;
+  --sq-chip-over: #ffc2b8;
+  --sq-chip-under: #ffd391;
+  --sq-chip-ok-ink: #2a2150;
+  --sq-constellation: rgba(255, 221, 130, 0.95);
+  --sq-cell-size: 52px;
+}
+
+.dark .sq-tokens,
+.sq-tokens.dark {
+  --sq-bg: #0b0f26;
+  --sq-sky: linear-gradient(180deg, #080b1f 0%, #0e1330 55%, #171a3d 100%);
+  --sq-panel: #161c3e;
+  --sq-ink: #e9ecff;
+  --sq-muted: #a6aed8;
+  --sq-line: #2c3564;
+  --sq-accent: #9aa8ff;
+  --sq-on-accent: #10143a;
+  --sq-accent-soft: #232b5c;
+  --sq-ok: #5ee0a4;
+  --sq-ok-soft: #143a2e;
+  --sq-over: #ff9a8f;
+  --sq-over-soft: #3f1d27;
+  --sq-under: #ffc46b;
+  --sq-star: #ffd772;
+  --sq-pad-star: rgba(255, 215, 114, 0.24);
+  --sq-dawn: rgba(255, 150, 110, 0.26);
+  --sq-sky-dot: rgba(255, 255, 255, 0.5);
+  --sq-moon: #fff3c4;
+  --sq-hill: #1c2250;
+  --sq-dome: #2b3370;
+  --sq-dome-wall: #222a5e;
+  --sq-dome-line: #a9b3f5;
+  --sq-scope: #2b3370;
+  --sq-plate: linear-gradient(158deg, #0a0f2e 0%, #121843 58%, #1f1c4f 100%);
+  --sq-plate-line: rgba(154, 168, 255, 0.28);
+  --sq-cell: rgba(150, 168, 255, 0.09);
+  --sq-cell-line: rgba(154, 168, 255, 0.26);
+  --sq-cell-clue: rgba(255, 216, 120, 0.14);
+  --sq-cell-clue-line: rgba(255, 216, 120, 0.6);
+}
+
+/* ── 틀 ── */
+.sq-table {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 10px 16px;
+  color: var(--sq-ink);
+  background: var(--sq-bg);
+  background-image: var(--sq-sky);
+  min-height: 100%;
+}
+
+.sq-table *,
+.sq-table *::before,
+.sq-table *::after {
+  box-sizing: border-box;
+}
+
+/* 하늘의 잔별(바탕 층) — 내용 아래, 눌림 통과 */
+.sq-table::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, var(--sq-sky-dot) 0 1px, transparent 1.6px),
+    radial-gradient(circle, var(--sq-sky-dot) 0 1.3px, transparent 1.9px),
+    radial-gradient(circle, var(--sq-sky-dot) 0 0.8px, transparent 1.4px);
+  background-size:
+    131px 113px,
+    197px 167px,
+    89px 71px;
+  background-position:
+    17px 23px,
+    101px 59px,
+    47px 11px;
+  opacity: 0.8;
+  transition: opacity 0.6s ease;
+}
+
+/* 준비·결과 사이에는 하늘이 잠깐 어두워진다(잔별이 숨는다) */
+.sq-table[data-phase='INTRO']::before,
+.sq-table[data-phase='LOADING']::before {
+  opacity: 0.25;
+}
+
+/* 마감 30초 — 가장자리(아래)에서 새벽빛이 번져 온다. 내용 아래 층이라 글자를 가리지 않는다 */
+.sq-table::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(0deg, var(--sq-dawn) 0%, transparent 46%);
+  opacity: 0;
+  transform-origin: 50% 100%;
+  transition: opacity 0.8s ease;
+}
+
+.sq-table-closing::after {
+  opacity: 1;
+}
+
+.sq-anim.sq-table-closing::after {
+  animation: sq-dawn-rise 30s linear both;
+}
+
+@keyframes sq-dawn-rise {
+  from {
+    transform: scaleY(0.3);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.sq-art {
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.sq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sq-header-info,
+.sq-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sq-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  color: var(--sq-ink);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+button.sq-badge {
+  cursor: pointer;
+}
+
+.sq-table button:focus-visible {
+  outline: 3px solid var(--sq-accent);
+  outline-offset: 2px;
+}
+
+.sq-badge-title {
+  font-weight: 700;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 2px;
+  letter-spacing: 0.01em;
+}
+
+.sq-badge-warn {
+  color: var(--sq-over);
+  border-color: var(--sq-over);
+  min-height: 22px;
+  align-self: flex-start;
+  font-size: 12px;
+}
+
+/* ── 좌석 띠 — 좌석마다 작은 망원경 + 진행도 ── */
+.sq-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.sq-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.sq-seat-me {
+  border-color: var(--sq-accent);
+  box-shadow: inset 0 0 0 1px var(--sq-accent);
+}
+
+.sq-seat-solved {
+  border-color: var(--sq-ok);
+  background: linear-gradient(90deg, var(--sq-ok-soft), var(--sq-panel) 70%);
+}
+
+.sq-seat-out {
+  opacity: 0.55;
+}
+
+.sq-seat-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sq-seat-scope {
+  color: var(--sq-accent);
+}
+
+.sq-seat-solved .sq-seat-scope {
+  color: var(--sq-ok);
+}
+
+.sq-seat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.sq-seat-points {
+  font-variant-numeric: tabular-nums;
+  color: var(--sq-muted);
+}
+
+.sq-seat-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sq-muted);
+}
+
+.sq-seat-count {
+  white-space: nowrap;
+}
+
+/* 완성 도장 — 살짝 기운 테두리 도장 */
+.sq-seat-stamp {
+  align-self: flex-start;
+  padding: 0 7px;
+  border: 1.5px solid var(--sq-ok);
+  border-radius: 6px;
+  color: var(--sq-ok);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transform: rotate(-3deg);
+  transform-origin: 0 50%;
+  white-space: nowrap;
+}
+
+.sq-anim .sq-seat-fresh .sq-seat-stamp {
+  animation: sq-stamp-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes sq-stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-14deg) scale(2);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+
+/* 진행 띠 — 밤하늘 길 위로 별빛이 차오른다 */
+.sq-seat-bar {
+  display: block;
+  min-width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sq-accent) 0, var(--sq-star) calc(var(--sq-fill, 0) * 100%), var(--sq-line) 0);
+}
+
+.sq-seat-solved .sq-seat-bar {
+  background: var(--sq-ok);
+}
+
+/* 좌석의 별똥별 — 새로 완성한 순간 한 번, 이름 위를 스친다 */
+.sq-seat-meteor {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  width: 46px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sq-star), transparent);
+  box-shadow: -1px 0 6px 1px var(--sq-star);
+  transform: rotate(-12deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sq-anim .sq-seat-meteor {
+  animation: sq-seat-meteor 0.7s ease-out both;
+}
+
+@keyframes sq-seat-meteor {
+  0% {
+    opacity: 0;
+    transform: translate(30px, -6px) rotate(-12deg) scaleX(0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-70px, 14px) rotate(-12deg) scaleX(1.2);
+  }
+}
+
+.sq-seat-chat {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 2px);
+  z-index: 2;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--sq-ink);
+  color: var(--sq-bg);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 무대 ── */
+.sq-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.sq-clock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  font-variant-numeric: tabular-nums;
+}
+
+.sq-clock:empty {
+  display: none;
+}
+
+.sq-clock-label {
+  font-size: 12px;
+  color: var(--sq-muted);
+}
+
+.sq-clock-value {
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* 마감 — 색 + 굵은 테두리 + "마감" 글자. 조급하되 깜빡이지 않는다(느린 숨) */
+.sq-clock-closing {
+  border: 2px solid var(--sq-over);
+  background: var(--sq-over-soft);
+}
+
+.sq-clock-closing .sq-clock-value,
+.sq-clock-closing .sq-clock-label {
+  color: var(--sq-over);
+  font-weight: 800;
+}
+
+.sq-anim .sq-clock-closing {
+  animation: sq-breathe 2s ease-in-out infinite;
+}
+
+@keyframes sq-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--sq-dawn);
+  }
+}
+
+.sq-clock-intro {
+  border-color: transparent;
+  background: transparent;
+}
+
+.sq-clock-intro-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--sq-accent);
+}
+
+/* 준비 — 어두운 하늘 아래 천문대, 별이 하나씩 켜진다 */
+.sq-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 0 28px;
+}
+
+.sq-intro-art {
+  margin-bottom: 10px;
+}
+
+.sq-intro-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sq-intro-text {
+  margin: 0;
+  color: var(--sq-muted);
+}
+
+.sq-anim .sq-intro {
+  animation: sq-relight 0.6s ease both;
+}
+
+.sq-anim .sq-art-star {
+  animation: sq-star-on 0.5s ease-out both, sq-twinkle 2.6s ease-in-out 0.9s infinite;
+}
+
+.sq-anim .sq-art-star-1 {
+  animation-delay: 0.15s, 0.9s;
+}
+
+.sq-anim .sq-art-star-2 {
+  animation-delay: 0.6s, 1.7s;
+}
+
+.sq-anim .sq-art-star-3 {
+  animation-delay: 1.05s, 2.3s;
+}
+
+.sq-anim .sq-art-thread {
+  animation: sq-relight 0.9s ease 0.9s both;
+}
+
+.sq-anim .sq-art-glint {
+  animation: sq-twinkle 3.2s ease-in-out infinite;
+}
+
+@keyframes sq-star-on {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sq-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* 하늘이 다시 밝아진다 — 판·결과가 나타날 때 */
+@keyframes sq-relight {
+  from {
+    opacity: 0.15;
+    filter: brightness(0.55);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+.sq-play {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sq-anim .sq-play {
+  animation: sq-relight 0.55s ease both;
+}
+
+/* ── 판(별판) ── */
+.sq-grid-wrap {
+  --sq-cs: var(--sq-cell-size);
+  --sq-gap: 4px;
+  --sq-moon-size: 34px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--sq-plate-line);
+  background: var(--sq-plate);
+  color: var(--sq-plate-ink);
+  box-shadow: 0 6px 18px rgba(20, 22, 70, 0.22);
+}
+
+/* 내 판은 3×3·4×4 일 때 칸을 키운다(375px 에 맞는 크기 — 더 넓은 화면은 17 이 더 키운다) */
+.sq-play .sq-grid-wrap[data-n='3'] {
+  --sq-cs: 64px;
+}
+
+.sq-play .sq-grid-wrap[data-n='4'] {
+  --sq-cs: 58px;
+}
+
+.sq-grid-frame {
+  position: relative;
+}
+
+.sq-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sq-gap);
+}
+
+.sq-row {
+  display: flex;
+  gap: var(--sq-gap);
+}
+
+/* 칸 = 별. 빈 칸은 아직 어두운 별(작은 점), 숫자가 들면 별빛이 번진다 */
+.sq-cell {
+  position: relative;
+  width: var(--sq-cs);
+  height: var(--sq-cs);
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--sq-cell-line);
+  background: var(--sq-cell);
+  color: var(--sq-cell-ink);
+  font: inherit;
+  font-size: calc(var(--sq-cs) * 0.42);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sq-cell:disabled {
+  cursor: default;
+  color: var(--sq-cell-ink);
+  opacity: 1;
+}
+
+.sq-cell::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--sq-plate-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.sq-cell-lit::before {
+  width: 86%;
+  height: 86%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 228, 150, 0.3) 0%, rgba(255, 228, 150, 0.1) 45%, transparent 70%);
+  opacity: 1;
+}
+
+.sq-cell-value {
+  position: relative;
+  text-shadow: 0 1px 2px rgba(10, 12, 50, 0.55);
+}
+
+.sq-anim .sq-cell-lit .sq-cell-value {
+  animation: sq-star-pop 0.26s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+@keyframes sq-star-pop {
+  from {
+    opacity: 0.2;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 단서 = 붙박이별(★) — 금빛 테두리 + 구석의 별 */
+.sq-cell-clue,
+.sq-cell-clue:disabled {
+  background: var(--sq-cell-clue);
+  border-color: var(--sq-cell-clue-line);
+  color: var(--sq-clue-ink);
+}
+
+.sq-cell-clue::after {
+  content: '★';
+  position: absolute;
+  /* 구석·변 가운데는 별자리 선이 지나므로 그 사이(왼쪽 위 1/4 지점)에 둔다 */
+  top: 1px;
+  left: 17%;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--sq-plate-star);
+  pointer-events: none;
+}
+
+/* 고른 칸 — 망원경이 겨눈 별: 밝은 겹테두리 */
+.sq-cell-selected {
+  outline: 3px solid #ffffff;
+  outline-offset: -3px;
+  background: rgba(255, 255, 255, 0.26);
+  box-shadow: 0 0 0 2px var(--sq-plate-star);
+}
+
+.sq-table .sq-cell:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: -3px;
+}
+
+.sq-cell-dup .sq-cell-value {
+  color: var(--sq-cell-dup);
+  text-decoration: underline wavy;
+  text-underline-offset: 3px;
+}
+
+/* 별자리 선에 이어진 별 — 금빛 테두리로 빛난다 */
+.sq-cell-linked {
+  border-color: var(--sq-constellation);
+  box-shadow: 0 0 8px rgba(255, 221, 130, 0.35);
+}
+
+.sq-cell-selected.sq-cell-linked {
+  box-shadow: 0 0 0 2px var(--sq-plate-star);
+}
+
+/* 줄 합 칩 = 달. 상태는 달의 모양으로 가른다(색만 쓰지 않는다):
+   비었음 = 점선 고리 · 채우는 중 = 반달 · 모자람 ▽ = 초승달 · 넘침 △ = 겹고리 보름달 · 맞음 ✦ = 꽉 찬 금빛 보름달 */
+.sq-sum {
+  position: relative;
+  isolation: isolate;
+  width: var(--sq-cs);
+  height: var(--sq-cs);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1.05;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--sq-plate-ink);
+}
+
+.sq-row-sums .sq-sum {
+  height: calc(var(--sq-moon-size) + 2px);
+}
+
+.sq-sum::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: var(--sq-moon-size);
+  height: var(--sq-moon-size);
+  margin: calc(var(--sq-moon-size) / -2) 0 0 calc(var(--sq-moon-size) / -2);
+  border-radius: 50%;
+  border: 1.5px solid var(--sq-plate-muted);
+}
+
+.sq-sum-mark {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.sq-sum-mark:empty {
+  display: none;
+}
+
+.sq-sum-empty::before {
+  border-style: dashed;
+  opacity: 0.5;
+}
+
+.sq-sum-partial::before {
+  background: linear-gradient(90deg, rgba(236, 233, 255, 0.26) 50%, transparent 50%);
+}
+
+.sq-sum-under {
+  color: var(--sq-chip-under);
+}
+
+.sq-sum-under::before {
+  border-color: var(--sq-chip-under);
+  background: radial-gradient(circle at 72% 40%, transparent 0 56%, rgba(255, 196, 107, 0.42) 58%);
+}
+
+.sq-sum-over {
+  color: var(--sq-chip-over);
+}
+
+.sq-sum-over::before {
+  border: 2px solid var(--sq-chip-over);
+  background: rgba(255, 150, 140, 0.2);
+  box-shadow: 0 0 0 2px rgba(20, 20, 60, 0.6), 0 0 0 3.5px var(--sq-chip-over);
+}
+
+.sq-sum-ok {
+  color: var(--sq-chip-ok-ink);
+  font-weight: 800;
+}
+
+.sq-sum-ok::before {
+  border-color: var(--sq-plate-star);
+  background: radial-gradient(circle at 36% 32%, #fff3c4 0%, var(--sq-plate-star) 62%);
+  box-shadow: 0 0 10px rgba(255, 215, 114, 0.6);
+}
+
+.sq-anim .sq-sum-ok::before {
+  animation: sq-moon-full 0.4s ease-out both;
+}
+
+@keyframes sq-moon-full {
+  from {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.sq-sum-corner {
+  width: var(--sq-cs);
+}
+
+/* 두 대각선 — 길쭉한 달(알약). 같은 상태 규칙 */
+.sq-diag-sums {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 1px;
+}
+
+.sq-diag-sums .sq-sum {
+  width: auto;
+  min-width: 60px;
+  height: 28px;
+  flex-direction: row;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.sq-diag-sums .sq-sum::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border-radius: 999px;
+}
+
+.sq-diag-sums .sq-sum-under::before {
+  background: linear-gradient(90deg, rgba(255, 196, 107, 0.36) 28%, transparent 28%);
+}
+
+.sq-diag-sums .sq-sum-mark {
+  font-size: 10px;
+}
+
+.sq-diag-label {
+  color: var(--sq-plate-muted);
+  font-weight: 700;
+}
+
+/* 별자리 선 — 판 좌표(0~N) 위, 눌림 통과. 한 칸 = 칸 + 틈이 되도록 층을 틈의 절반만큼 넓혀 칸 중심이 정확히 i+0.5 에 온다.
+   선은 별과 별 <b>사이</b>만 잇는다(점선 무늬를 틈에 맞춘다) — 숫자를 가로지르지 않는다. */
+.sq-constellation {
+  position: absolute;
+  top: calc(var(--sq-gap) / -2);
+  left: calc(var(--sq-gap) / -2);
+  width: calc(var(--sq-n) * (var(--sq-cs) + var(--sq-gap)));
+  height: calc(var(--sq-n) * (var(--sq-cs) + var(--sq-gap)));
+  pointer-events: none;
+  overflow: visible;
+}
+
+.sq-constellation-line {
+  stroke: var(--sq-constellation);
+  stroke-width: 0.055;
+  stroke-linecap: round;
+  stroke-dasharray: 0.36 0.64;
+  stroke-dashoffset: -0.32;
+  filter: drop-shadow(0 0 0.04px var(--sq-constellation));
+}
+
+.sq-constellation-diag,
+.sq-constellation-anti {
+  stroke-dasharray: 0.46 0.9542;
+  stroke-dashoffset: -0.4771;
+}
+
+.sq-anim .sq-constellation-line {
+  animation: sq-link-in 0.45s ease-out both;
+}
+
+@keyframes sq-link-in {
+  from {
+    opacity: 0;
+    stroke-width: 0.2;
+  }
+  to {
+    opacity: 1;
+    stroke-width: 0.055;
+  }
+}
+
+/* 판 전체가 하나의 별자리가 됨 — 금빛 테두리, 별들이 엇갈려 반짝인다 */
+.sq-grid-complete {
+  border-color: var(--sq-plate-star);
+  box-shadow: 0 0 0 1px var(--sq-plate-star), 0 0 22px rgba(255, 215, 114, 0.45);
+}
+
+.sq-grid-complete .sq-cell {
+  color: #fff6d6;
+}
+
+.sq-anim .sq-grid-complete .sq-cell::before {
+  animation: sq-twinkle 2.2s ease-in-out infinite;
+}
+
+.sq-anim .sq-grid-complete .sq-row:nth-child(2n) .sq-cell:nth-child(2n + 1)::before,
+.sq-anim .sq-grid-complete .sq-row:nth-child(2n + 1) .sq-cell:nth-child(2n)::before {
+  animation-delay: 0.7s;
+}
+
+.sq-anim .sq-grid-complete .sq-row:nth-child(3n) .sq-cell:nth-child(3n)::before {
+  animation-delay: 1.3s;
+}
+
+/* 서버 확인을 기다리는 동안 — 테두리만 숨 쉰다(입력은 막지 않는다) */
+.sq-anim .sq-play-checking .sq-grid-wrap {
+  animation: sq-breathe 1.2s ease-in-out infinite;
+}
+
+/* 내 완성 도장 "N등!" — 글자는 data-place 로 그린다. 판 위에 비스듬히, 눌림 통과 */
+.sq-fx-stamp {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  z-index: 2;
+  padding: 4px 16px;
+  border: 3px solid var(--sq-plate-star);
+  border-radius: 12px;
+  background: rgba(20, 22, 70, 0.92);
+  color: var(--sq-plate-star);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-9deg);
+  pointer-events: none;
+}
+
+.sq-fx-stamp::before {
+  content: attr(data-place) '등!';
+}
+
+.sq-anim .sq-fx-stamp {
+  animation: sq-big-stamp 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes sq-big-stamp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-22deg) scale(2.4);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-9deg) scale(1);
+  }
+}
+
+/* 무대의 별똥별 — 누군가 완성한 순간 오른쪽 위에서 왼쪽 아래로. 층 전체가 눌림 통과 */
+.sq-fx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sq-fx-meteor {
+  position: absolute;
+  top: 6%;
+  left: 100%;
+  width: 110px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffffff 0%, var(--sq-star) 18%, transparent 100%);
+  box-shadow: -2px 0 10px 2px var(--sq-star);
+  transform: rotate(-20deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sq-fx-meteor[data-lane='1'] {
+  top: 20%;
+}
+
+.sq-fx-meteor[data-lane='2'] {
+  top: 0;
+}
+
+.sq-fx-meteor[data-lane='3'] {
+  top: 32%;
+}
+
+.sq-fx-meteor-mine {
+  width: 170px;
+  height: 4px;
+}
+
+.sq-anim .sq-fx-meteor {
+  animation: sq-meteor 0.95s cubic-bezier(0.3, 0.1, 0.6, 1) both;
+}
+
+@keyframes sq-meteor {
+  0% {
+    left: 100%;
+    margin-top: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: -180px;
+    margin-top: 190px;
+    opacity: 0;
+  }
+}
+
+/* 미니 판(결과 비교) */
+.sq-grid-mini {
+  --sq-cs: 22px;
+  --sq-gap: 3px;
+  padding: 5px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.sq-grid-mini .sq-cell {
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sq-grid-mini .sq-cell::before {
+  display: none;
+}
+
+.sq-grid-mini .sq-cell-clue::after {
+  display: none;
+}
+
+.sq-grid-mini .sq-cell-linked {
+  box-shadow: none;
+}
+
+.sq-grid-mini.sq-grid-complete {
+  box-shadow: 0 0 0 1px var(--sq-plate-star);
+}
+
+/* ── 숫자판 — 단추는 별. 쓴 숫자는 꺼진 별(점선 테두리 + 작게 꺼진 별) ── */
+.sq-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.sq-pad-numbers {
+  display: grid;
+  grid-template-columns: repeat(var(--sq-pad-cols, 6), minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sq-pad-number,
+.sq-pad-tool {
+  position: relative;
+  isolation: isolate;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  color: var(--sq-ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 단추 뒤의 네 갈래 별 */
+.sq-pad-number::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+  background: var(--sq-pad-star);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  pointer-events: none;
+}
+
+.sq-pad-used {
+  border-style: dashed;
+  background: transparent;
+  color: var(--sq-muted);
+  font-weight: 600;
+}
+
+.sq-pad-used::before {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  left: auto;
+  right: 3px;
+  top: 3px;
+  background: var(--sq-line);
+}
+
+.sq-pad-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.sq-pad-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--sq-accent-soft);
+  border-color: transparent;
+}
+
+.sq-pad-number:disabled,
+.sq-pad-tool:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.sq-anim .sq-pad-number,
+.sq-anim .sq-pad-tool {
+  transition: transform 0.08s ease-out;
+}
+
+.sq-anim .sq-pad-number:active:not(:disabled),
+.sq-anim .sq-pad-tool:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+/* 5×5 — 숫자 25개 + 지우기(1칸) + 되돌리기(2칸)가 7열 네 줄에 꼭 맞는다(375px 한 화면) */
+.sq-pad[data-n='5'] {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.sq-pad[data-n='5'] .sq-pad-numbers,
+.sq-pad[data-n='5'] .sq-pad-tools {
+  display: contents;
+}
+
+.sq-pad[data-n='5'] .sq-pad-tool {
+  font-size: 12px;
+}
+
+.sq-pad[data-n='5'] .sq-pad-tool:first-child {
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+}
+
+.sq-pad[data-n='5'] .sq-pad-tool:last-child {
+  grid-column: span 2;
+}
+
+/* ── 상태 줄 ── */
+.sq-status {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--sq-muted);
+}
+
+.sq-status-warn {
+  color: var(--sq-over);
+  font-weight: 700;
+}
+
+/* ── 퍼즐 결과 — 하늘이 다시 밝아지며 모두의 별판이 나란히 ── */
+.sq-result {
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+}
+
+.sq-anim .sq-result {
+  animation: sq-relight 0.6s ease both;
+}
+
+.sq-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sq-result-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.sq-result-reason,
+.sq-result-next {
+  font-size: 13px;
+  color: var(--sq-muted);
+}
+
+.sq-result-next {
+  margin-left: auto;
+}
+
+.sq-result-rows {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sq-result-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sq-result-row[data-rank='1'] {
+  background: var(--sq-accent-soft);
+}
+
+.sq-result-row[data-rank='1'] .sq-result-rank::after {
+  content: ' ✦';
+  color: var(--sq-star);
+}
+
+.sq-result-rank {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sq-result-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sq-result-detail {
+  color: var(--sq-muted);
+  white-space: nowrap;
+}
+
+.sq-result-me {
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--sq-accent);
+}
+
+.sq-result-points {
+  color: var(--sq-accent);
+  font-weight: 800;
+}
+
+.sq-result-boards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sq-result-board {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: 12px;
+  color: var(--sq-muted);
+}
+
+.sq-anim .sq-result-board {
+  animation: sq-relight 0.5s ease 0.15s both;
+}
+
+.sq-result-solution .sq-grid-wrap {
+  border: 1.5px dashed var(--sq-plate-star);
+}
+
+.sq-result-solution figcaption {
+  color: var(--sq-ink);
+  font-weight: 700;
+}
+
+.sq-result-solution figcaption::before {
+  content: '✦ ';
+  color: var(--sq-star);
+}
+
+/* ── 매치 끝 ── */
+.sq-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 16px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  text-align: center;
+}
+
+.sq-anim .sq-end {
+  animation: sq-relight 0.6s ease both;
+}
+
+.sq-end-won {
+  border-color: var(--sq-star);
+  box-shadow: 0 0 0 1px var(--sq-star), 0 0 26px var(--sq-pad-star);
+}
+
+.sq-end-crown {
+  margin-bottom: 4px;
+}
+
+.sq-end-title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.sq-end-reason {
+  margin: 0 0 8px;
+  color: var(--sq-muted);
+}
+
+.sq-end-rows {
+  list-style: none;
+  align-self: stretch;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sq-end-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.sq-end-rank {
+  font-weight: 800;
+}
+
+.sq-end-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sq-end-me {
+  font-weight: 700;
+  background: var(--sq-accent-soft);
+}
+
+.sq-end-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sq-primary,
+.sq-secondary {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sq-primary {
+  border: 1px solid var(--sq-accent);
+  background: var(--sq-accent);
+  color: var(--sq-on-accent);
+}
+
+.sq-secondary {
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  color: var(--sq-ink);
+}
+
+/* 튜토리얼 안 판 */
+.sq-tutorial-board {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}

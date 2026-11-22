@@ -16,7 +16,8 @@ export type RoomOption =
   | 'OMOK_RULE'
   | 'BOT_LEVEL'
   | 'MATCH_LENGTH'
-  | 'TURN_MODE';
+  | 'TURN_MODE'
+  | 'DIFFICULTY';
 
 /**
  * D-176 — 값을 가진 방 옵션(서버 `RoomOption.valued()`) 하나의 선택지(선언 순서)와 기본값. 카탈로그가 게임이 선언한 것만 싣는다.
@@ -48,6 +49,10 @@ export interface GameSummary {
   roomOptionChoices?: RoomOptionChoices[];
   /** D-196 — 할 수 있는 인원(오름차순). 오목은 [2, 4]. 없으면(구 서버·픽스처) minPlayers..maxPlayers. */
   playerCounts?: number[];
+  /** D-286 — 대기실 턴 제한 줄의 이름(게임 선언). 없으면 "턴 제한". 별자리 수판은 "퍼즐 제한". */
+  turnLimitLabel?: string;
+  /** D-286 — 턴 제한 0 의 이름. 없으면 "끔". 별자리 수판은 "자동"(난이도별 권장 제한). */
+  turnLimitZeroLabel?: string;
 }
 
 export interface CatalogResponse {

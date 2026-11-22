@@ -5,7 +5,7 @@ import { GAME_ICON_IDS, GameIcon, hasGameIcon } from './GameIcon';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 
 /** 게임판이 있는 일곱 게임(pages/gameTables 의 키와 같다). */
-const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY'];
+const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY', 'STAR_SQUARE'];
 
 const svgOf = (el: HTMLElement) => el.querySelector('svg') as SVGSVGElement;
 
