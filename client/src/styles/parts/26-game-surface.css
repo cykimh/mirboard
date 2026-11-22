@@ -1,0 +1,30 @@
+/* 게임판 공통 조작(D-292) — `.game-` 접두 전용. 게임판 CSS(18~25) 뒤·17 앞, 미디어 0개.
+ *
+ * `RoomPage` 가 일곱 게임판을 감싸는 `<main class="room-page game-surface">` 에 얹는다. 손가락으로 하다 보면 이름·점수 글자가
+ * 길게 눌려 선택되고 번역·복사 메뉴가 떴다 — 게임판 안에서는 글자 선택·길게 누르기 메뉴(iOS)·그림 끌기를 막는다.
+ * 게임별 part(`.sk-`·`.oc-`·`.yt-` …)에 흩지 않고 여기 한 곳에만 둔다. 공용 클래스(`.room-page` 등)는 다시 정의하지 않는다.
+ *
+ * 예외: 글을 쓰는 곳(입력란)과 `game-selectable` 을 붙인 곳(방 채팅 목록 — 복사할 수 있다).
+ * 대기실·허브(`.app-shell`)와 body 포털(튜토리얼·토스트)은 이 클래스 밖이라 그대로다.
+ */
+.game-surface {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.game-surface img,
+.game-surface svg,
+.game-surface a {
+  -webkit-user-drag: none;
+}
+
+.game-surface input,
+.game-surface textarea,
+.game-surface select,
+.game-surface [contenteditable]:not([contenteditable='false']),
+.game-surface .game-selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}

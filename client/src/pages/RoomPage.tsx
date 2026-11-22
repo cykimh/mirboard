@@ -723,7 +723,7 @@ export function RoomPage() {
       onBackToRoom,
     };
     return withLiveRegion(
-      <main className="room-page">
+      <main className="room-page game-surface">
         {notice}
         <Suspense fallback={<TableLoading />}>
           {room.gameType === 'ONE_CARD' ? (
@@ -751,7 +751,7 @@ export function RoomPage() {
   // D-240 — 티츄도 전이를 본 게임판은 FINISHED(봇 판·탈주·강제 종료)·대기실 복귀 뒤에도 유지하고 `roomFinished` 를 넘긴다.
   if (room.status === 'IN_GAME' || (room.gameType === 'TICHU' && boardHeld && roomFinished)) {
     return withLiveRegion(
-      <main className="room-page">
+      <main className="room-page game-surface">
         {notice}
         <Suspense fallback={<TableLoading />}>
           <GameTable

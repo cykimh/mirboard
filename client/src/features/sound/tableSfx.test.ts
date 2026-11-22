@@ -23,6 +23,8 @@ const ALL_CUES: TableCue[] = [
   'die.release',
   'score.commit',
   'ui.tap',
+  'clock.tick',
+  'clock.last',
   'seat.out',
   'match.win',
   'match.lose',
@@ -133,6 +135,28 @@ describe('tableSfx — 소리', () => {
     // 기록되는 값은 시작 주파수 — 뽁은 목표음(780)보다 낮게 시작한다.
     expect(first('ui.tap')).toBeLessThan(780);
     expect(first('die.hold')).toBeGreaterThan(first('die.release'));
+  });
+
+  it('D-293 — 마감 소리: 3·2 는 "똑" 한 방울, 1 은 그보다 높고 조금 길다. 음소거면 울리지 않는다', async () => {
+    const sfx = await fresh();
+    const one = (cue: TableCue) => {
+      audioLog.reset();
+      sfx.resetTableSfx();
+      expect(sfx.playTableSfx(cue)).toBe(true);
+      expect(audioLog.tones).toHaveLength(1);
+      return audioLog.tones[0];
+    };
+    const tick = one('clock.tick');
+    const last = one('clock.last');
+    expect(last.freq).toBeGreaterThan(tick.freq);
+    expect(tick.type).toBe('sine');
+    expect(last.type).toBe('sine');
+    window.localStorage.setItem(MUTE_KEY, '1');
+    audioLog.reset();
+    sfx.resetTableSfx();
+    expect(sfx.playTableSfx('clock.tick')).toBe(false);
+    expect(sfx.playTableSfx('clock.last')).toBe(false);
+    expect(audioLog.tones).toHaveLength(0);
   });
 });
 

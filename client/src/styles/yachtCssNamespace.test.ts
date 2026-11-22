@@ -115,6 +115,29 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(block).toMatch(/\.yt-seat-cup-live,\s*\.yt-seat-dice-shaking-live \.yt-mini-die[^{]*\{\s*animation: none;/);
   });
 
+  it('D-291 — 넓은 화면(1024px 이상) 2단 배치는 17 에 있고, 점수표는 오른쪽 칸에 붙어 그 안에서만 스크롤한다', () => {
+    const block = /D-291[\s\S]*?@media \(min-width: 1024px\) \{([\s\S]*?)\n\}/.exec(responsiveCssSource)?.[1] ?? '';
+    expect(block).toMatch(/\.yt-table \{[^}]*display: grid;[^}]*grid-template-columns:/);
+    const card = /\.yt-table > \.yt-card-wrap \{([^}]*)\}/.exec(block)?.[1] ?? '';
+    expect(card).toContain('grid-column: 2');
+    expect(card).toContain('position: sticky');
+    expect(card).toContain('overflow-y: auto');
+    expect(card).toMatch(/max-height: calc\(100dvh - \d+px\)/);
+    expect(block).toMatch(/\.yt-table > \.yt-felt \{[^}]*grid-column: 1;/);
+    // 좁은 화면 규칙을 건드리지 않는다 — 이 블록의 선택자는 전부 .yt- 다.
+    const selectors = [...block.matchAll(/(^|})\s*([^{}]+?)\s*\{/g)].map((m) => m[2]);
+    expect(selectors.every((s) => s.split(',').every((one) => one.includes('.yt-')))).toBe(true);
+  });
+
+  it('D-293 — 마지막 3초의 큰 숫자는 눌림을 가로채지 않고, 움직임 줄이기에서는 움직이지 않는다', () => {
+    const base = /\n\.yt-final \{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(base).toContain('pointer-events: none');
+    expect(cssCode).toMatch(/\.yt-final-live \{[^}]*animation: yt-final-pop/);
+    expect(responsiveCssSource).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.yt-final\.yt-final-live \{\s*animation: none;/,
+    );
+  });
+
   it('튜토리얼 포털 토큰(.yt-tokens)이 게임판 토큰과 같은 값이다', () => {
     const table = tokensOf('.yt-table');
     const portal = tokensOf('.yt-tokens');

@@ -404,6 +404,14 @@
   }
 }
 
+/* D-293 — 마지막 3초의 큰 숫자: 움직임 줄이기면 커졌다 흐려지지 않고 흐리게 바뀌기만 한다(소리는 그대로). */
+@media (prefers-reduced-motion: reduce) {
+  .yt-final.yt-final-live {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
 /* D-203 — 마우스가 있는 기기에서만 떠오르는 주사위·채워지는 후보 칸(터치에서는 눌린 채 남는 :hover 를 피한다). */
 @media (hover: hover) {
   .yt-theme-salon .yt-die:not(:disabled):not(.yt-die-held):hover .yt-die-face {
@@ -618,6 +626,68 @@
     flex-wrap: nowrap;
     overflow: hidden;
     white-space: nowrap;
+  }
+}
+
+/* D-291 — 얏추 PC 넓은 화면(1024px 이상): 2단. 머리 줄은 위 전체, 왼쪽에 좌석 띠 + 주사위 판(+ 결과), 오른쪽에 점수표.
+   760px 기둥 하나라 넓은 화면에서 양옆이 비고 점수표를 스크롤해야 했다. 점수표는 화면에 붙어 따라오고(sticky), 화면 높이를
+   넘으면 그 칸 안에서만 스크롤한다. 줄 높이를 조금 줄여 1280×800 에서도 한 화면에 든다. 주사위는 넓은 판에 맞게 키운다 — 굴림·
+   컵·고리는 `--yt-die-size`·`--yt-step` 을 따라가고, 숫자 비행·금가루 좌표는 게임판이 실측해 그대로 맞는다.
+   1023px 이하(휴대폰·태블릿 세로)는 이 블록이 닿지 않는다. 20 은 미디어 0개 규칙이라 여기 둔다(스컬킹 맨 끝 두 블록 앞). */
+@media (min-width: 1024px) {
+  .yt-table {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+    grid-template-rows: auto auto auto 1fr;
+    align-content: start;
+    column-gap: 20px;
+    row-gap: 12px;
+    max-width: 1240px;
+    padding: 14px 20px 20px;
+  }
+
+  .yt-table > .yt-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .yt-table > .yt-seats {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .yt-table > .yt-felt {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: clamp(320px, 48vh, 480px);
+    justify-content: center;
+  }
+
+  .yt-table > .yt-end {
+    grid-column: 1;
+    grid-row: 4;
+    align-self: start;
+  }
+
+  .yt-table > .yt-card-wrap {
+    grid-column: 2;
+    grid-row: 2 / span 3;
+    align-self: start;
+    position: sticky;
+    top: 12px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .yt-theme-salon .yt-card th,
+  .yt-theme-salon .yt-card td {
+    height: 36px;
+  }
+
+  .yt-theme-salon .yt-dice {
+    --yt-die-size: 84px;
+    --yt-gap: 18px;
   }
 }
 
