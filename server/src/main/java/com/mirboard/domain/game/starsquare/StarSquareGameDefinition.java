@@ -20,8 +20,9 @@ import org.springframework.stereotype.Component;
  * 이 Bean 등록으로 인게임까지 연결된다.
  *
  * <p><b>공개 상태는 설정이다</b>({@code mirboard.starsquare.status} = 환경 변수 {@code MIRBOARD_STAR_SQUARE_STATUS}, 기본
- * {@code DISABLED} — 카탈로그에도 없다. S4 에서 {@code AVAILABLE}). 기본값은 {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고
- * 같아야 한다.
+ * {@code AVAILABLE} — D-287 공개, 그 전에는 {@code DISABLED}). {@code COMING_SOON} 이면 카탈로그에 "준비 중"으로만 보이고 새 방을 만들 수
+ * 없다(진행 중인 판은 끝까지) — 운영의 되돌리기 손잡이다({@code docs/deploy.md}). 기본값은 {@code application.yml} 과 아래 {@code @Value}
+ * 두 곳에 있고 같아야 한다.
  *
  * <p>방 옵션: 판 길이(퍼즐 수 1·3·5)·봇 강도·난이도. 턴 제한은 <b>퍼즐 제한</b>이다 — 0 = 자동(난이도별 권장 제한, 기본), 그 밖은 분 단위.
  */
@@ -39,7 +40,7 @@ public final class StarSquareGameDefinition implements GameDefinition {
     public StarSquareGameDefinition(StarSquareStateStore stateStore,
                                     Clock clock,
                                     ApplicationEventPublisher publisher,
-                                    @Value("${mirboard.starsquare.status:DISABLED}") GameStatus status,
+                                    @Value("${mirboard.starsquare.status:AVAILABLE}") GameStatus status,
                                     @Value("${mirboard.starsquare.time-scale:1.0}") double timeScale) {
         this.stateStore = stateStore;
         this.clock = clock;

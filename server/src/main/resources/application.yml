@@ -216,8 +216,9 @@ mirboard:
     # DambadukGameDefinition 의 @Value 기본값을 같이 AVAILABLE 로 바꾼다(DambadukGameDefinitionTest). 런북은 docs/deploy.md.
     status: ${MIRBOARD_DAMBADUK_STATUS:DISABLED}
   starsquare:
-    # 별자리 수판(D-282) 공개 상태. S4 전까지 DISABLED(카탈로그에도 없음). StarSquareGameDefinition 의 @Value 기본값과 같아야 한다.
-    status: ${MIRBOARD_STAR_SQUARE_STATUS:DISABLED}
+    # 별자리 수판(D-282) 공개 상태. D-287 — 공개(기본 AVAILABLE). 되돌리기는 시크릿 MIRBOARD_STAR_SQUARE_STATUS=COMING_SOON(새 방만 막음,
+    # 진행 중인 판은 끝까지)·DISABLED(카탈로그에서도 뺌). StarSquareGameDefinition 의 @Value 기본값과 같아야 한다. 런북은 docs/deploy.md.
+    status: ${MIRBOARD_STAR_SQUARE_STATUS:AVAILABLE}
     # 준비·첫 완성 뒤 마감·결과 보기·봇 페이스 배율(D-285). 운영은 1.0 — 봇끼리 도는 통합 테스트만 줄인다.
     time-scale: 1.0
   moderation:

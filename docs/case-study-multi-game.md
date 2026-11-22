@@ -441,6 +441,37 @@ p99 46.5ms · 최대 노드 88,356.
 `client/src/features/artillery/`(Canvas 전장·대본 재생) · `테스트:` `ArtilleryCostTest`(한 발 비용) · `ArtillerySimulationTest`(2~6인 무작위) ·
 `ArtilleryGoldenTest`(골든 해시) · `ArtilleryBotMatchSimulationIT` · `ArtilleryTable.test` · `결정:` D-220 · D-221 · D-222 · D-223
 
+## §14 아홉 번째 게임 — 모두가 같은 퍼즐을 동시에 (별자리 수판, D-282~D-287)
+
+**문제** — 마방진(1~N² 을 한 번씩 넣어 모든 줄의 합을 같게)은 원래 혼자 푸는 퍼즐입니다. 여럿이 같은 퍼즐을 동시에 푸는 레이스로 바꾸면
+지금까지와 다른 세 가지가 한꺼번에 옵니다 — 차례가 없고(모두가 동시에 수십 번 고친다), **서버만 아는 정답**과 **남에게 숨길 각자의 판**이 있고,
+퍼즐을 풀거나 만드는 계산이 무료 서버(shared-cpu-1x)와 방 락 2초 안에 들어와야 합니다.
+
+**선택 — 계산은 미리, 입력은 판 전체로.**
+
+- 퍼즐은 런타임에 풀거나 만들지 않습니다. 저장소 안 생성 도구(테스트 소스)가 무작위 마방진에서 단서를 고르고 풀이기로 재서 **자원 파일**(4띠, 약 140KB)로
+  두고, 서버는 꺼내서 대칭 16가지(회전·반사 8 × 보수 2 — 모두 마방진 성질 보존) 중 하나만 입힙니다. 판정은 "우리 정답과 같나"가 아니라 "단서와 맞는
+  마방진인가"(해가 여럿이라).
+- 액션은 **내 판 전체**를 싣는 `SYNC` 하나 — 버전을 달아 멱등이고 마지막 판이 이깁니다. 클라는 로컬이 먼저고 0.4초에 한 번까지 모아 보내므로 칸마다
+  방 락을 잡지 않고, 하나가 빠져도 다음 보내기가 메웁니다. 4명이 한꺼번에 입력하는 e2e 에서 `BUSY` 4번이 났고 클라가 다시 보내 넷 모두 서버 판 = 화면 판.
+- 은닉은 **타입 분리**로 — 공개 뷰·이벤트 타입에 정답·남의 판 필드 자체가 없고(진행도 수 둘만), 내 판은 비공개 뷰로만. 끝난 퍼즐만 모두의 판과 정답을 공개.
+- 시간(준비 3초·첫 완성 뒤 30초 마감·퍼즐 제한·결과 보기 8초)과 봇은 전부 **엔진 타이머**(⑦) 하나. 봇은 수를 고르지 않는 **페이스 모델** — 퍼즐마다
+  완성 시각을 정해 정답 칸을 이정표마다 채우므로 "공개 정보만 본다"는 봇 원칙과 부딪힐 일이 없습니다. 대기 좌석(④)은 미완성 사람만이라 봇 루프·턴
+  데드라인이 끼지 않습니다.
+
+**포트 확장 0건.** 게임 밖 변경은 게임 중립 맵 옵션 상수 `RoomOption.DIFFICULTY` 하나(§10 오목이 만든 길), 대기실 시간 줄의 이름을 게임이 정하는
+카탈로그 필드 둘(`GameDefinition.turnLimitLabel`·`turnLimitZeroLabel` — 기본 "턴 제한"·"끔", 별자리 수판 "퍼즐 제한"·"자동"), 마이그레이션 `V22` 뿐이고,
+인프라에 게임 이름 0줄(`grep -rniE 'starsquare|star_square|별자리' …/infra` → **0건**). 별자리 수판 도메인 3,173줄(부록 (8)).
+
+**드러난 것.** 풀이기 노드 수는 사람 난이도를 가르지 못했습니다 — 줄 합 범위로 가지치기하면 4×4·5×5 모두 수십 노드에 끝납니다. 사람에게 맞는 자는
+"빈 칸이 하나 남은 줄을 되풀이해 채워지는 칸의 비율"(줄 채우기 비율)이었고, 난이도 띠를 단서 수 + 그 비율로 정했습니다(D-284). 사람 측정은 표본 1판
+(4×4 쉬움 77초)이라 나머지 띠는 외삽했고 운영 뒤 다시 맞춥니다(D-285).
+
+`코드:` `domain/game/starsquare/puzzle/`(판정·대칭·풀이기·은행) · `StarSquareEngine`(동시 진행·마감·페이스 봇) · `StarSquareGameEngine`(`timer`·`onTimer`·
+비공개 뷰) · `client/src/features/starsquare/`(로컬 우선 판·`useSyncSender`) · `테스트:` `MagicCheckExhaustiveTest`(3×3 9! 전수) · `SymmetryTest` ·
+`PuzzleBankTest`(자원 재검증·재현) · `StarSquareMatchSimulationTest`(1~4인 각 1,000매치) · `StarSquareBotMatchSimulationIT` · `client/e2e/starsquare.e2e.ts` ·
+`결정:` D-282 · D-283 · D-284 · D-285 · D-286 · D-287
+
 ## 부록 — 재현 명령
 
 ```bash
@@ -486,6 +517,7 @@ git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard 
 # (8) 포트 뒤 게임별 코드 규모(§8~§12) — main 소스 줄 수
 for d in core tichu skullking onecard yacht omok cloudroute artillery; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
+# 별자리 수판(§14): find server/src/main/java/com/mirboard/domain/game/starsquare -name '*.java' | xargs cat | wc -l → 3173 (D-287 시점, core 803 · GameEngine.java 204)
 # → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756(D-226 시점, D-224 때 3337, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)

@@ -17,7 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 
-/** D-285 — 카탈로그 메타데이터, 공개 상태 기본값(S4 전 DISABLED), 엔진 팩토리. */
+/** D-285·D-287 — 카탈로그 메타데이터, 공개 상태 기본값(D-287 AVAILABLE), 엔진 팩토리. */
 class StarSquareGameDefinitionTest {
 
     private static StarSquareGameDefinition definition(GameStatus status) {
@@ -44,16 +44,16 @@ class StarSquareGameDefinitionTest {
         assertThat(RoomOption.DIFFICULTY.defaultValue()).isEqualTo("NORMAL");
     }
 
-    /** S4 전까지 비공개 — 설정 없이 띄우면 카탈로그에도 없다. 두 기본값(@Value·application.yml)이 같아야 한다. */
+    /** D-287 — 공개. 설정 없이 띄우면 카탈로그에 보인다(되돌리기는 환경 변수). 두 기본값(@Value·application.yml)이 같아야 한다. */
     @Test
-    void the_status_defaults_to_disabled_until_release() throws Exception {
+    void the_status_defaults_to_available() throws Exception {
         Parameter status = Arrays.stream(StarSquareGameDefinition.class.getConstructors()[0].getParameters())
                 .filter(p -> p.getType() == GameStatus.class).findFirst().orElseThrow();
-        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.starsquare.status:DISABLED}");
+        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.starsquare.status:AVAILABLE}");
         YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
         assertThat(yaml.getObject().getProperty("mirboard.starsquare.status"))
-                .isEqualTo("${MIRBOARD_STAR_SQUARE_STATUS:DISABLED}");
+                .isEqualTo("${MIRBOARD_STAR_SQUARE_STATUS:AVAILABLE}");
         assertThat(yaml.getObject().getProperty("mirboard.starsquare.time-scale")).isEqualTo("1.0");
     }
 
