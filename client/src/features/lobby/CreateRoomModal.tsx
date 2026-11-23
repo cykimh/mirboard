@@ -37,7 +37,7 @@ interface CreateRoomModalProps {
 /**
  * Phase 18(#2, D-74) 방 만들기 모달 — Phase 20b(D-76) shadcn Dialog 재디자인.
  * D-174 — 방 종류(친구와 하기/봇과 연습)를 없앴다. 게임·방 이름만 고르고 늘 대기실이 있는 방을 만든다. 봇은 대기실에서 방장이
- * [빈자리 봇으로 채우기]로 앉히고, 턴 제한 같은 게임 설정도 대기실에서 바꾼다(D-161 `RoomSettingsPanel`).
+ * [봇 추가]로 앉히고, 턴 제한 같은 게임 설정도 대기실에서 바꾼다(D-161 `RoomSettingsPanel`).
  */
 export function CreateRoomModal({
   open,
@@ -132,7 +132,7 @@ export function CreateRoomModal({
           )}
 
           <p className="text-xs text-muted-foreground">
-            봇은 대기실에서 [빈자리 봇으로 채우기]로 앉혀요. 턴 제한 같은 게임 설정도 대기실에서 방장이 바꿔요.
+            봇은 대기실에서 [봇 추가]로 앉혀요. 턴 제한 같은 게임 설정도 대기실에서 방장이 바꿔요.
           </p>
 
           <DialogFooter className="gap-2">

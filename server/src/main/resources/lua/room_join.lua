@@ -5,6 +5,7 @@
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = rooms:open
 -- KEYS[4] = room:{roomId}:spectators  (D-137 — 앉으면 관전자 목록에서 뺀다)
+-- KEYS[5] = room:{roomId}:kicked:{userId}  (D-290 — 방장이 방금 내보낸 사람의 재입장 금지 키)
 -- ARGV    = userId, now, roomId
 --
 -- Return codes:
@@ -12,6 +13,7 @@
 --   -2 = GAME_ALREADY_STARTED
 --   -3 = ROOM_FULL
 --   -4 = ALREADY_IN_ROOM
+--   -5 = KICKED (D-290 — 방장이 내보낸 직후, 금지 키가 살아 있는 동안)
 --    N (>= 1) = new player count after the join
 
 local userId = ARGV[1]
@@ -33,6 +35,11 @@ for i = 1, #players do
     if players[i] == userId then
         return -4
     end
+end
+
+-- D-290 — 방장이 방금 내보낸 사람은 금지 키가 만료될 때까지 다시 앉지 못한다(이미 앉은 사람의 재요청은 위에서 -4 로 끝난다).
+if redis.call('EXISTS', KEYS[5]) == 1 then
+    return -5
 end
 
 local capacity = tonumber(redis.call('HGET', KEYS[1], 'capacity'))

@@ -168,6 +168,25 @@ describe('useRoomMeta — 다시 맞추기 알림 (D-134)', () => {
     expect(onMeta).toHaveBeenCalledWith(room);
     expect(onDestroyed).toHaveBeenCalledTimes(1);
   });
+
+  it('D-290 — 강퇴 프레임(ROOM_MEMBER_KICKED)은 내보내진 사람 id 로 알린다 — 콜백이 없어도 터지지 않는다', () => {
+    const onKicked = vi.fn();
+    const onMeta = vi.fn();
+    renderHook(() => useRoomMeta('r1', 'tok', onMeta, undefined, undefined, onKicked));
+    const client = clients.at(-1)!;
+    act(() => client.cfg.onConnect());
+    const frame = { body: JSON.stringify({ type: 'ROOM_MEMBER_KICKED', payload: { roomId: 'r1', userId: 7 } }) };
+
+    act(() => client.handlers.get(META)!(frame));
+
+    expect(onKicked).toHaveBeenCalledWith(7);
+    expect(onMeta).not.toHaveBeenCalled();
+
+    renderHook(() => useRoomMeta('r1', 'tok', vi.fn()));
+    const bare = clients.at(-1)!;
+    act(() => bare.cfg.onConnect());
+    expect(() => act(() => bare.handlers.get(META)!(frame))).not.toThrow();
+  });
 });
 
 describe('useRoomMeta — 오래 숨긴 탭은 끊는다 (D-273)', () => {

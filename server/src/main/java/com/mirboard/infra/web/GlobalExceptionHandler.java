@@ -164,6 +164,15 @@ public class GlobalExceptionHandler {
                         Map.of("roomId", e.roomId())));
     }
 
+    // D-290 — 방장이 방금 내보낸 사람의 재입장(앉기·관전).
+    @ExceptionHandler(com.mirboard.domain.lobby.room.KickedFromRoomException.class)
+    public ResponseEntity<ApiErrorEnvelope> handleKickedFromRoom(
+            com.mirboard.domain.lobby.room.KickedFromRoomException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiErrorEnvelope.of("KICKED_FROM_ROOM", "방장이 내보냈어요 — 잠시 뒤에 다시 들어올 수 있어요",
+                        Map.of("roomId", e.roomId())));
+    }
+
     @ExceptionHandler(AlreadyInRoomException.class)
     public ResponseEntity<ApiErrorEnvelope> handleAlreadyInRoom(AlreadyInRoomException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

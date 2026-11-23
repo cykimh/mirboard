@@ -157,6 +157,9 @@ public class RoomService {
         long now = Instant.now(clock).toEpochMilli();
         java.util.Map<String, String> optionFields = new java.util.LinkedHashMap<>();
         options.forEach((option, value) -> optionFields.put(option.hashField(), value));
+        // D-290 — 방장이 대기실에서 고를 수 있는 정원 범위(화면이 게임 규칙 없이 "최대 인원" 조절을 그린다).
+        optionFields.put(CAP_MIN_FIELD, Integer.toString(def.playersToStart(options)));
+        optionFields.put(CAP_MAX_FIELD, Integer.toString(maxCapacity));
         repository.create(roomId, hostUserId, name, gameType, capacity, now, teamPolicy,
                 fillWithBots, targetScore, turnSeconds, stake, optionFields);
         Room room = getRoom(roomId);
@@ -225,6 +228,12 @@ public class RoomService {
     public static java.util.Map<RoomOption, String> effectiveOptions(GameDefinition def, Room room) {
         return RoomOption.resolve(def.supportedRoomOptions(), room.options());
     }
+
+    /** D-290 — 방 해시의 정원 범위 필드(게임이 지금 방 옵션으로 정한 시작 인원·정원). */
+    static final String CAP_MIN_FIELD = "capMin";
+    static final String CAP_MAX_FIELD = "capMax";
+    /** D-290 — 대기실에서 내보낸 사람의 그 방 재입장 금지(초). 링크를 다시 눌러 곧바로 돌아오는 것만 막는다. */
+    public static final int KICK_REJOIN_BLOCK_SECONDS = 60;
 
     /** D-176 — 게임이 정한 정원. 게임 정의가 범위 밖 값을 내면 정의 버그라 바로 드러낸다. */
     private static int capacityOf(GameDefinition def, java.util.Map<RoomOption, String> options) {
@@ -331,7 +340,7 @@ public class RoomService {
             }
             fields.put("raceButtonVisibility", v);
         }
-        int newCapacity = putOptionFields(def, room, update.options(), fields);
+        int newCapacity = putOptionFields(def, room, update.options(), update.capacity(), fields);
         if (fields.isEmpty()) {
             return room;
         }
@@ -359,10 +368,14 @@ public class RoomService {
      * D-176 — 맵 옵션 갱신을 검증해 {@code fields} 에 {@code opt:<NAME>} 로 담는다. 모르는 이름·값을 갖지 않는 옵션·허용값 밖은
      * {@code INVALID_ROOM_SETTING}, 게임이 선언하지 않은 옵션은 기본값이면 무시하고 아니면 {@code UNSUPPORTED_ROOM_OPTION}(D-106 과
      * 같은 규칙). 바꾼 옵션으로 게임의 정원이 달라지면 {@code capacity} 도 담고 새 정원을 돌려준다(아니면 -1). 준비 표시는 풀지 않는다.
+     *
+     * <p>D-290 — 방장이 정원을 직접 고르면({@code requestedCapacity}) 바뀐 뒤의 옵션이 허용하는 범위(시작 인원~정원) 안인지 보고
+     * {@code capacity} 로 담는다(범위 밖은 {@code INVALID_CAPACITY}). 옵션이 정원 범위를 바꾸면 범위 필드도 같이 쓴다. 옵션으로 정원이
+     * 달라졌는데 정원을 같이 고르지 않았으면 예전처럼 게임이 정한 정원으로 돌아간다.
      */
     private static int putOptionFields(GameDefinition def, Room room, java.util.Map<String, String> requested,
-                                       java.util.Map<String, String> fields) {
-        if (requested.isEmpty()) {
+                                       Integer requestedCapacity, java.util.Map<String, String> fields) {
+        if (requested.isEmpty() && requestedCapacity == null) {
             return -1;
         }
         var supported = def.supportedRoomOptions();
@@ -397,11 +410,31 @@ public class RoomService {
         }
         int before = capacityOf(def, current);
         int after = capacityOf(def, next);
-        if (after == before) {
+        int minBefore = def.playersToStart(current);
+        int minAfter = def.playersToStart(next);
+        if (after != before || minAfter != minBefore) {
+            fields.put(CAP_MIN_FIELD, Integer.toString(minAfter));
+            fields.put(CAP_MAX_FIELD, Integer.toString(after));
+        }
+        if (requestedCapacity != null) {
+            int wanted = requestedCapacity;
+            if (wanted < minAfter || wanted > after) {
+                throw new InvalidCapacityException(wanted, minAfter, after);
+            }
+            if (wanted == room.capacity() && after == before) {
+                return -1;
+            }
+            fields.put("capacity", Integer.toString(wanted));
+            return wanted;
+        }
+        // 옵션으로 게임의 정원이 달라지면 그 정원으로(D-176). 정원은 같은데 시작 인원만 올라 지금 정원이 범위 아래로 떨어지면
+        // (씨앗포 정원 2·3 에서 2:2 팀전 — 시작 인원 4) 범위 안으로 끌어올린다 — 그대로 두면 채울 수도 시작할 수도 없는 방이 된다.
+        int adjusted = after != before ? after : Math.max(room.capacity(), minAfter);
+        if (adjusted == room.capacity() && after == before) {
             return -1;
         }
-        fields.put("capacity", Integer.toString(after));
-        return after;
+        fields.put("capacity", Integer.toString(adjusted));
+        return adjusted;
     }
 
     public Room getRoom(String roomId) {
@@ -502,8 +535,11 @@ public class RoomService {
     }
 
     /**
-     * D-153 — 정상 종료한 친구 방을 대기실로 돌린다(정원 = 게임 최대 인원, 관전자 자동 착석, 방 목록 재등록). 진행 중이 아니면 그대로
+     * D-153 — 정상 종료한 친구 방을 대기실로 돌린다(관전자 자동 착석, 방 목록 재등록). 진행 중이 아니면 그대로
      * 돌려준다. 방장이 다시 시작하면({@link #startNow}) 다음 판이다.
+     *
+     * <p>D-290 — 정원은 게임 최대가 아니라 시작 전에 방장이 정해 둔 정원으로 돌아가고(여기서 넘기는 값은 그 상한), 기다리던 관전자는
+     * 봇보다 먼저 앉는다(빈자리가 모자라면 뒤쪽 봇부터 뺀다 — {@code room_return_waiting.lua}).
      */
     public Room returnToWaiting(String roomId) {
         Room room = getRoom(roomId);
@@ -525,37 +561,64 @@ public class RoomService {
     }
 
     /**
-     * D-174 — 대기실의 [빈자리 봇으로 채우기]. 방장만, WAITING 에서만, 판돈 방은 안 된다(D-81). 정원까지 방에 없는 봇을 앉힌다 — 준비는
-     * 넣지 않는다(친구 방의 준비는 사람만 센다, D-161). 채우는 도중 사람이 마지막 자리에 먼저 앉으면(ROOM_FULL) 거기서 멈춘다.
+     * D-174 — 대기실에서 정원까지 봇으로 채운다(API 호환 — D-290 뒤로 화면은 {@link #addBots} 로 한 명씩 앉힌다).
      */
     public Room fillBots(String roomId, long hostUserId) {
+        return addBots(roomId, hostUserId, null);
+    }
+
+    /**
+     * D-290 — 대기실에서 방장이 봇을 앉힌다. {@code count} 명(생략 = 정원까지)을 방에 없는 봇으로 채운다 — 준비는 넣지 않는다(친구 방의
+     * 준비는 사람만 센다, D-161). 방장·WAITING·판돈 0(D-81)·정원 확인과 앉히기는 {@code room_bot_add.lua} 한 번이라 확인 뒤 사람이
+     * 마지막 자리에 먼저 앉아도 정원을 넘지 않는다. 한 명도 못 앉혔으면: 수를 정했을 때는 {@code ROOM_FULL}, 정원까지 채우기는 그대로 둔다.
+     */
+    public Room addBots(String roomId, long hostUserId, Integer count) {
         Room room = requireHostWhileWaiting(roomId, hostUserId);
         if (room.stake() > 0) {
             throw new StakedRoomNoBotsException();
         }
-        int empty = room.capacity() - room.playerIds().size();
-        if (empty <= 0) {
-            return room;
+        if (count != null && count < 1) {
+            throw new InvalidRoomSettingException("count", count);
         }
-        List<Long> picked = bots.getBotIds().stream()
-                .filter(id -> !room.playerIds().contains(id))
-                .limit(empty)
-                .toList();
         long now = Instant.now(clock).toEpochMilli();
-        for (long botId : picked) {
-            try {
-                repository.join(roomId, botId, now);
-            } catch (RoomFullException e) {
-                break;
+        int code = repository.addBots(roomId, hostUserId, count == null ? -1 : count, bots.getBotIds(), now);
+        switch (code) {
+            case -1 -> throw new RoomNotFoundException(roomId);
+            case -2 -> throw new GameAlreadyStartedException(roomId);
+            case -3 -> throw new NotHostException(roomId);
+            case -4 -> throw new StakedRoomNoBotsException();
+            default -> {
+                if (code < 0) {
+                    throw new IllegalStateException("room_bot_add.lua returned unexpected: " + code);
+                }
             }
+        }
+        if (code == 0) {
+            if (count != null) {
+                throw new RoomFullException(roomId);
+            }
+            return room;
         }
         Room after = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(after));
-        log.info("Room bots filled: roomId={} host={} botSeats={}", roomId, hostUserId, after.botSeats());
+        log.info("Room bots added: roomId={} host={} added={} botSeats={}", roomId, hostUserId, code, after.botSeats());
         return after;
     }
 
-    /** D-174 — 대기실의 [봇 빼기]. 방장만, WAITING 에서만 — 봇 좌석을 모두 비운다(사람 좌석 순서는 그대로). */
+    /** D-290 — 대기실에서 방장이 봇 하나를 뺀다(사람 좌석 순서는 그대로). 봇이 아니거나 앉아 있지 않으면 {@code NOT_IN_ROOM}. */
+    public Room removeBot(String roomId, long hostUserId, long botUserId) {
+        requireHostWhileWaiting(roomId, hostUserId);
+        if (!bots.isBot(botUserId)) {
+            throw new NotInRoomException(roomId);
+        }
+        removeSeat(roomId, hostUserId, botUserId, 0);
+        Room after = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(after));
+        log.info("Room bot removed: roomId={} host={} bot={}", roomId, hostUserId, botUserId);
+        return after;
+    }
+
+    /** D-174 — 대기실에서 봇을 모두 뺀다(API 호환 — D-290 뒤로 화면은 {@link #removeBot} 으로 하나씩 뺀다). 방장만, WAITING 에서만. */
     public Room removeBots(String roomId, long hostUserId) {
         Room room = requireHostWhileWaiting(roomId, hostUserId);
         List<Long> seatedBots = room.playerIds().stream().filter(bots::isBot).toList();
@@ -563,12 +626,52 @@ public class RoomService {
             return room;
         }
         for (long botId : seatedBots) {
-            repository.leave(roomId, botId);
+            try {
+                removeSeat(roomId, hostUserId, botId, 0);
+            } catch (NotInRoomException alreadyGone) {
+                // 읽은 뒤 다른 요청이 먼저 뺐다 — 할 일이 없다.
+            }
         }
         Room after = getRoom(roomId);
         events.publishEvent(RoomChangedEvent.updated(after));
         log.info("Room bots removed: roomId={} host={} removed={}", roomId, hostUserId, seatedBots);
         return after;
+    }
+
+    /**
+     * D-290 — 대기실 강퇴. 방장이 WAITING 방의 사람 참가자를 내보내고, 그 사람은 {@link #KICK_REJOIN_BLOCK_SECONDS} 초 동안 이 방에
+     * 앉지도 관전하지도 못한다(같은 Lua 가 좌석 빼기와 금지 키를 한 번에). 방장 자신·봇(봇은 {@link #removeBot})·앉아 있지 않은 사람은
+     * {@code NOT_IN_ROOM}. 게임 중 강퇴(D-162 — 끊긴 사람 탈주 처리)는 {@code HostKickService} 가 따로 한다.
+     */
+    public Room kickFromLobby(String roomId, long hostUserId, long targetUserId) {
+        Room room = requireHostWhileWaiting(roomId, hostUserId);
+        if (targetUserId == hostUserId || bots.isBot(targetUserId) || !room.playerIds().contains(targetUserId)) {
+            throw new NotInRoomException(roomId);
+        }
+        removeSeat(roomId, hostUserId, targetUserId, KICK_REJOIN_BLOCK_SECONDS);
+        // 내보낸 사람의 화면이 먼저 이유를 알게(좌석 메타보다 앞).
+        events.publishEvent(new RoomMemberKickedEvent(roomId, targetUserId));
+        Room after = getRoom(roomId);
+        events.publishEvent(RoomChangedEvent.updated(after));
+        log.info("Room lobby kick: roomId={} host={} target={} blockSec={}",
+                roomId, hostUserId, targetUserId, KICK_REJOIN_BLOCK_SECONDS);
+        return after;
+    }
+
+    /** room_remove_member.lua 의 반환 코드를 예외로 옮긴다. */
+    private void removeSeat(String roomId, long hostUserId, long targetUserId, int banSeconds) {
+        int code = repository.removeMember(roomId, hostUserId, targetUserId, banSeconds);
+        switch (code) {
+            case -1 -> throw new RoomNotFoundException(roomId);
+            case -2 -> throw new GameAlreadyStartedException(roomId);
+            case -3 -> throw new NotHostException(roomId);
+            case -4 -> throw new NotInRoomException(roomId);
+            default -> {
+                if (code < 1) {
+                    throw new IllegalStateException("room_remove_member.lua returned unexpected: " + code);
+                }
+            }
+        }
     }
 
     private Room requireHostWhileWaiting(String roomId, long userId) {
@@ -620,6 +723,17 @@ public class RoomService {
      * 아니면 자동으로 관전자로 흡수 (손패 노출 방지의 1차 방어선).
      */
     public JoinOrReconnectResult joinOrReconnect(String roomId, long userId) {
+        return joinOrReconnect(roomId, userId, false);
+    }
+
+    /**
+     * D-290 — {@code auto} 는 사용자가 누르지 않은 입장이다(방 화면의 재동기화 — 다시 연결·다시 보임, D-134). 소켓이 끊긴 사이 방장이
+     * 내보낸 사람은 알림을 못 받았으므로, 재입장 금지(60초)가 풀린 뒤 화면으로 돌아와도 자동 입장이 조용히 다시 앉히면 강퇴가
+     * 물러진다. 그래서 방 수명 동안 남는 강퇴 기록이 있으면 자동 입장은 {@code KICKED_FROM_ROOM} 이다. 사용자가 링크를 직접 열어
+     * 들어오는 입장({@code auto=false})은 금지가 풀린 뒤 허용하고 그때 기록을 지운다 — 그 뒤의 재동기화는 다시 평소대로다(유예가 지나
+     * 자리를 잃은 사람이 다시 앉는 D-134 동작은 강퇴 기록이 없으므로 그대로).
+     */
+    public JoinOrReconnectResult joinOrReconnect(String roomId, long userId, boolean auto) {
         Room room = getRoom(roomId);
         if (room.playerIds().contains(userId)) {
             log.info("Room reconnect: roomId={} userId={} status={}",
@@ -629,6 +743,18 @@ public class RoomService {
         if (room.spectatorIds().contains(userId)) {
             return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.SPECTATING, room);
         }
+        if (auto && repository.wasKicked(roomId, userId)) {
+            throw new KickedFromRoomException(roomId);
+        }
+        JoinOrReconnectResult result = enter(room, userId);
+        if (!auto) {
+            repository.clearKickLog(roomId, userId);
+        }
+        return result;
+    }
+
+    private JoinOrReconnectResult enter(Room room, long userId) {
+        String roomId = room.roomId();
         if (room.status() == RoomStatus.WAITING && room.playerCount() < room.capacity()) {
             try {
                 Room joined = joinRoom(roomId, userId);
@@ -704,6 +830,10 @@ public class RoomService {
         Room room = getRoom(roomId);
         if (room.playerIds().contains(userId)) {
             throw new AlreadyInRoomException(roomId);
+        }
+        // D-290 — 방장이 방금 내보낸 사람은 금지가 풀릴 때까지 관전으로도 돌아오지 못한다(앉기는 room_join.lua 가 막는다).
+        if (repository.isKicked(roomId, userId)) {
+            throw new KickedFromRoomException(roomId);
         }
         boolean added = repository.addSpectator(roomId, userId);
         log.info("Room spectate: roomId={} userId={} newcomer={}", roomId, userId, added);

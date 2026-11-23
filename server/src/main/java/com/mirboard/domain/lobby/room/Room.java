@@ -32,12 +32,27 @@ public record Room(
         String raceButtonVisibility,
         // D-176 — 값을 가진 방 옵션(RoomOption.valued()). Redis 해시 opt:<NAME>. 저장된 것 그대로라 게임이 선언하지 않은 옵션이
         // 있을 수도, 선언한 옵션이 빠져 있을 수도 있다 — 쓰는 쪽은 RoomOption.resolve(선언, options) 로 읽는다.
-        Map<RoomOption, String> options) {
+        Map<RoomOption, String> options,
+        // D-290 — 방장이 고를 수 있는 정원 범위(게임이 지금 방 옵션으로 정한 시작 인원~정원). Redis 해시 capMin·capMax. 화면은 이 둘로
+        // "최대 인원" 조절을 그린다(게임 규칙을 모른다). 모르는 방(구방)은 둘 다 지금 정원 — 조절할 수 없다.
+        int minCapacity,
+        int maxCapacity) {
 
     public Room {
         options = options == null || options.isEmpty()
                 ? Map.of()
                 : java.util.Collections.unmodifiableMap(new EnumMap<>(options));
+    }
+
+    /** D-290 이전 모양(정원 범위 없음) — 범위는 지금 정원 한 점. */
+    public Room(String roomId, String name, String gameType, long hostId, RoomStatus status, int capacity,
+                int playerCount, List<Long> playerIds, Set<Long> spectatorIds, TeamPolicy teamPolicy, long createdAt,
+                boolean fillWithBots, List<Integer> botSeats, int targetScore, int turnSeconds, int stake,
+                Set<Long> readyUserIds, String raceButtonSize, String raceButtonVisibility,
+                Map<RoomOption, String> options) {
+        this(roomId, name, gameType, hostId, status, capacity, playerCount, playerIds, spectatorIds, teamPolicy,
+                createdAt, fillWithBots, botSeats, targetScore, turnSeconds, stake, readyUserIds,
+                raceButtonSize, raceButtonVisibility, options, capacity, capacity);
     }
 
     /** D-176 이전 모양(방 옵션 맵 없음). */
@@ -71,6 +86,7 @@ public record Room(
     public Room withSpectatorIds(Set<Long> newSpectatorIds) {
         return new Room(roomId, name, gameType, hostId, status, capacity, playerCount,
                 playerIds, newSpectatorIds, teamPolicy, createdAt, fillWithBots, botSeats,
-                targetScore, turnSeconds, stake, readyUserIds, raceButtonSize, raceButtonVisibility, options);
+                targetScore, turnSeconds, stake, readyUserIds, raceButtonSize, raceButtonVisibility, options,
+                minCapacity, maxCapacity);
     }
 }

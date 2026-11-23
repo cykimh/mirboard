@@ -1,7 +1,11 @@
 -- room_return_waiting.lua  (D-153)
--- 정상 종료한 친구 방을 대기실로 돌린다: IN_GAME -> WAITING, 정원 := 게임 최대 인원(D-143 시작이 줄였다), 준비 비우기,
+-- 정상 종료한 친구 방을 대기실로 돌린다: IN_GAME -> WAITING, 정원 := 시작 전에 방장이 정해 둔 정원(D-290 — lobbyCapacity, 없으면
+-- 게임 최대 인원. D-143 시작이 현재 인원으로 줄였다), 준비 비우기,
 -- 관전자를 들어온 순서(spectators_since 점수)대로 빈자리에 앉히기, 방 목록에 다시 올리기. 한 번에 원자적으로 한다.
 -- 관전 순서 ZSET 에 남은 지난 관전자(이미 나간 사람)는 SET 과 맞춰 걸러낸다.
+-- D-290 — 사람이 오면 봇은 모두 빠진다: 기다리던 관전자가 한 명이라도 앉게 되면(봇을 뺐을 때 자리가 있으면) 봇을 전부 빼고
+-- 관전자를 앉힌다(사람은 빼지 않는다 — 봇이 필요하면 방장이 [봇 추가]로 다시 넣는다). 앉을 관전자가 없으면 봇은 같이 돌아온다.
+-- 판 도중 링크로 온 친구에게 "다음 판에 함께해요"라고 해 놓고 봇이 자리를 쥐고 있어 관전자로 남던 것을 고친다.
 --
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
@@ -9,7 +13,7 @@
 -- KEYS[4] = room:{roomId}:spectators
 -- KEYS[5] = room:{roomId}:spectators_since
 -- KEYS[6] = rooms:open
--- ARGV    = maxPlayers, roomId, now
+-- ARGV    = maxPlayers, roomId, now, botId1, botId2, ...  (봇 user id 전체 — 어느 좌석이 봇인지 가린다)
 --
 -- Return codes:
 --   -1 = ROOM_NOT_FOUND
@@ -30,7 +34,21 @@ end
 
 redis.call('DEL', KEYS[3])
 
-local seated = redis.call('LLEN', KEYS[2])
+local isBot = {}
+for i = 4, #ARGV do
+    isBot[ARGV[i]] = true
+end
+local players = redis.call('LRANGE', KEYS[2], 0, -1)
+local seated = #players
+-- 정원: 방장이 정해 둔 값(게임 최대를 넘지 않게, 지금 앉은 인원보다 작지 않게).
+local capacity = maxPlayers
+local lobbyCapacity = tonumber(redis.call('HGET', KEYS[1], 'lobbyCapacity'))
+if lobbyCapacity and lobbyCapacity < capacity then
+    capacity = lobbyCapacity
+end
+if capacity < seated then
+    capacity = seated
+end
 local ordered = redis.call('ZRANGE', KEYS[5], 0, -1)
 local queue = {}
 local queued = {}
@@ -49,8 +67,24 @@ for i = 1, #rest do
     end
 end
 
+-- 봇을 뺐을 때 관전자가 한 명이라도 앉을 수 있으면 봇을 모두 뺀다.
+local humans = 0
+for i = 1, #players do
+    if not isBot[players[i]] then
+        humans = humans + 1
+    end
+end
+if #queue > 0 and humans < capacity and humans < seated then
+    for i = 1, #players do
+        if isBot[players[i]] then
+            redis.call('LREM', KEYS[2], 0, players[i])
+        end
+    end
+    seated = humans
+end
+
 for i = 1, #queue do
-    if seated >= maxPlayers then
+    if seated >= capacity then
         break
     end
     redis.call('RPUSH', KEYS[2], queue[i])
@@ -59,7 +93,8 @@ for i = 1, #queue do
     seated = seated + 1
 end
 
-redis.call('HSET', KEYS[1], 'status', 'WAITING', 'capacity', maxPlayers, 'updatedAt', now)
+redis.call('HSET', KEYS[1], 'status', 'WAITING', 'capacity', capacity, 'updatedAt', now)
+redis.call('HDEL', KEYS[1], 'lobbyCapacity')
 redis.call('ZADD', KEYS[6], now, roomId)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)

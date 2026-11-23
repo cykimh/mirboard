@@ -91,6 +91,12 @@ export interface Room {
    * 빠진 옵션이 있다 — 카탈로그 `defaultValue` 로 본다.
    */
   options?: Partial<Record<RoomOption, string>>;
+  /**
+   * D-290 — 방장이 고를 수 있는 정원 범위(게임이 지금 방 옵션으로 정한 시작 인원~정원). 둘이 같으면 조절할 것이 없다(티츄·오목).
+   * 옛 서버·옛 방이면 없다 — 조절 줄을 그리지 않는다.
+   */
+  minCapacity?: number;
+  maxCapacity?: number;
 }
 
 /** D-161 — 원카드 "원카드!/잡기!" 버튼 크기. */
@@ -107,6 +113,8 @@ export interface RoomSettingsUpdate {
   raceButtonVisibility?: RaceButtonVisibility;
   /** D-176 — 맵 방 옵션(적은 것만). 정원이 줄어 인원이 넘치면 서버가 `TOO_MANY_PLAYERS`(409). */
   options?: Partial<Record<RoomOption, string>>;
+  /** D-290 — 최대 인원(정원). 범위 밖은 `INVALID_CAPACITY`(400), 지금 인원보다 작으면 `TOO_MANY_PLAYERS`(409). */
+  capacity?: number;
 }
 
 export interface RoomListResponse {

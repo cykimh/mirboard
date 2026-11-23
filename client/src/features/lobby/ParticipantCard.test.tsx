@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ParticipantCard } from './ParticipantCard';
 import type { GameRecord } from '@/api/users';
 
@@ -64,5 +64,27 @@ describe('ParticipantCard — 방장 띠 (D-272)', () => {
     renderCard({ ready: true });
     expect(screen.queryByTestId('host-strip')).toBeNull();
     expect(screen.getByText('준비')).toBeInTheDocument();
+  });
+});
+
+/** D-290 — 방장 화면의 [✕]: 봇은 "빼기", 사람은 "내보내기". 누르는 곳은 40×40. */
+describe('ParticipantCard — 방장의 [✕] (D-290)', () => {
+  it('onRemove 가 없으면 버튼이 없다', () => {
+    renderCard({});
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('사람 카드는 "{이름} 내보내기", 봇 카드는 "{이름} 빼기" — 누르면 onRemove', () => {
+    const onRemove = vi.fn();
+    renderCard({ onRemove });
+    const kick = screen.getByRole('button', { name: '철수 내보내기' });
+    expect(kick).toHaveClass('h-10', 'w-10');
+    fireEvent.click(kick);
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it('봇 카드는 "빼기"이고, 요청 중이면 잠긴다', () => {
+    renderCard({ bot: true, onRemove: vi.fn(), removePending: true });
+    expect(screen.getByRole('button', { name: '철수 빼기' })).toBeDisabled();
   });
 });

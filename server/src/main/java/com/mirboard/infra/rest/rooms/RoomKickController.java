@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** D-162 — 게임 중 끊긴 사람을 방장이 내보낸다(바로 탈주 처리). 판정과 처리는 {@link HostKickService}. */
+/**
+ * D-162 — 게임 중 끊긴 사람을 방장이 내보낸다(바로 탈주 처리). D-290 — 대기실에서는 사람 참가자를 좌석에서 빼고 잠깐 재입장을 막는다.
+ * 판정과 처리는 {@link HostKickService}.
+ */
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomKickController {

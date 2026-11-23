@@ -101,7 +101,7 @@ describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
 
 /**
  * D-161·D-174 — 게임·방 이름만 고른다. 턴 제한·목표 점수·판돈은 대기실에서 방장이 바꾸고(`RoomSettingsPanel`), 봇도 대기실의
- * [빈자리 봇으로 채우기]로 앉힌다 — 요청에 싣지 않는다(서버가 게임 선언 기본으로 연다).
+ * [봇 추가]로 앉힌다 — 요청에 싣지 않는다(서버가 게임 선언 기본으로 연다).
  */
 describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () => {
   beforeEach(() => {
@@ -116,7 +116,7 @@ describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () =
     expect(screen.queryByText('턴 제한')).toBeNull();
     expect(screen.queryByText('목표 점수')).toBeNull();
     expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
-    expect(screen.getByText(/대기실에서 \[빈자리 봇으로 채우기\]/)).toBeInTheDocument();
+    expect(screen.getByText(/대기실에서 \[봇 추가\]/)).toBeInTheDocument();
   });
 
   it('fillWithBots·targetScore·stake·turnSeconds 를 보내지 않는다', async () => {

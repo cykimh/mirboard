@@ -42,11 +42,25 @@ public class RoomLobbyEventPublisher {
         }
     }
 
+    /**
+     * D-290 — 방장이 대기실에서 내보낸 사람을 방 메타 토픽으로 알린다. 내보낸 사람의 화면이 "방장이 내보냈어요"를 띄우고 메인으로 간다
+     * (다른 사람은 무시 — 좌석 변화는 뒤따르는 {@code ROOM_META_UPDATED} 가 싣는다).
+     */
+    @EventListener
+    public void onMemberKicked(com.mirboard.domain.lobby.room.RoomMemberKickedEvent event) {
+        publisher.publishToTopic(roomMetaTopic(event.roomId()),
+                StompEnvelope.of("ROOM_MEMBER_KICKED",
+                        new RoomMemberKickedPayload(event.roomId(), event.userId()), clock));
+    }
+
     /** Phase 13C — per-room 메타 토픽. RoomPage 가 2초 폴링 대신 구독. */
     public static String roomMetaTopic(String roomId) {
         return "/topic/room/" + roomId + "/meta";
     }
 
     public record RoomDestroyedPayload(String roomId) {
+    }
+
+    public record RoomMemberKickedPayload(String roomId, long userId) {
     }
 }
