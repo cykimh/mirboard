@@ -14,6 +14,7 @@
 | `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`, `raceButtonSize`, `raceButtonVisibility`, `opt:<NAME>`, `capMin`, `capMax`, `lobbyCapacity` | 메타. D-290 — `capMin`·`capMax`=방장이 고를 수 있는 정원 범위(게임이 지금 방 옵션으로 정한 시작 인원~정원 — 만들 때와 옵션이 범위를 바꿀 때 쓴다, 없으면 지금 정원 한 점), `lobbyCapacity`=시작 직전의 정원(`room_start_now.lua` 가 쓰고 `room_return_waiting.lua` 가 그 값으로 되돌린 뒤 지운다). `capacity` 는 대기실에서 방장이 `PUT …/settings` 로 바꾼다. `opt:<NAME>`(D-176)=값을 가진 방 옵션(`RoomOption.valued()` — `opt:TEAM_MODE` 등), 만들 때 게임이 선언한 옵션의 기본값을 쓰고 대기실 설정으로 바뀐다. 모르는 이름은 읽을 때 건너뛴다. D-176 — 옵션으로 정원이 바뀌면(`capacityFor`) `room_update_settings.lua` 가 `capacity` 도 같이 쓴다. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
 | `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함). D-136 — 봇과 연습 방(`fillWithBots=true`)은 `room_create.lua` 가 넣지 않는다 |
+| `rooms:playing` | ZSET | — | member=roomId, score=시작 시각(ms) | D-298 — 게임 중인 방 목록(메인 [관전], `GET /api/rooms?status=IN_GAME`). `room_start_now.lua` 가 `ZREM rooms:open` 과 같은 원자 구간에서 넣고(봇과 연습 방은 넣지 않는다), `room_finish`·`room_return_waiting`·`room_delete`·`room_leave`(빈 방 소멸)가 뺀다. 방 키가 TTL 로 사라진 항목은 읽을 때 걸러 내며 ZREM 한다 |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함). 원카드는 `OneCardState`(손패·뽑을 더미 순서·경쟁 창·봇 누름 포함 — 서버 전용, 1판 = 1매치라 `match:` 키 없음, D-128). 요트는 `YachtState`(점수표·주사위·홀드·차례 시작 시각 — 숨길 것이 없고 **미래 눈·시드를 두지 않는다**, D-182, 1판 = 1매치). 오목은 `OmokState`(수순·흑 팀·첫 수 좌석·좌석별 연속 시간 초과 수·결과 — 숨길 정보 없음, 판은 수순에서 다시 만든다, D-175). 씨앗포는 `ArtilleryState`(매치 시드·구멍 목록·포대·차례·바람·구름 수면·연출 대기 끝 시각·마지막 대본 — **지형 비트는 저장하지 않고** 시드 + 구멍 목록으로 다시 만든다, 시드는 서버 전용, D-220·D-221) | 직렬화 책임은 GameEngine. 원카드는 모르는 필드를 무시한다(`@JsonIgnoreProperties(ignoreUnknown)`, 롤백 안전) |
 | `room:{roomId}:hand:{userId}` | STRING(JSON) | 6h | 해당 유저 손패 캐시 | resync 빠른 응답 용 (state로부터 파생 가능) |
 | `match:{roomId}:state` | STRING(JSON) | 6h | 티츄 `TichuMatchState` — 누적 점수/라운드 번호/라운드별 RoundScore. 스컬킹 `SkullKingMatchState` — `roundNumber`·`startSeat`·`cumulativeScores`(좌석→누적)·`desertedSeats`·`completedRounds`(`[{roundNumber, scores:{seat:{bid,won,base,bonus}}}]`, 정산 끝난 라운드만, D-120)·`roundsPlayed`(완주 라운드 수, 매치가 끝날 때 확정 — 진행 중·구 JSON 은 `null`, D-122) | Phase 5c 추가, 라운드 전환 시 유지. 방당 게임 하나라 키 공유. 스컬킹은 필드 부재 구 JSON 을 빈 값으로 읽고 모르는 필드는 무시(`@JsonIgnoreProperties(ignoreUnknown)`, D-120 — 다음 필드 추가부터 롤백 안전) |
@@ -58,7 +59,8 @@
 > 때문이다(Server-Authoritative).
 
 > `rooms:open` 은 TTL이 없는 대신, 방이 `IN_GAME`/`FINISHED` 가 되거나 삭제되면
-> ZREM 으로 동기 제거된다.
+> ZREM 으로 동기 제거된다. `rooms:playing`(D-298)도 TTL 이 없다 — 방이 IN_GAME 을 벗어나는 모든 Lua 가 ZREM 하고,
+> Lua 가 돌지 않는 TTL 만료분은 목록을 읽을 때(`RoomService.listPlayingRooms`) 걸러 내며 지운다.
 
 ## 원자성 보증 (Lua 스크립트)
 
@@ -101,7 +103,8 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 은 정확히 한 번만 반환되어 GameStartingEvent 중복 발행 0건.
 
 ### `room_start_now.lua` *(D-136, D-143)*
-입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`, `ARGV = [hostId, minPlayers, roomId]`.
+입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open, rooms:playing]`, `ARGV = [hostId, minPlayers, roomId]`.
+D-298 — 시작하면 같은 구간에서 `ZADD rooms:playing <Redis TIME ms> roomId`(`fillWithBots` 방은 넣지 않는다).
 
 처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4` → 아니면 앉은 사람 모두 `SADD ready`(상태 맞춤) +
 `HSET lobbyCapacity=<지금 capacity>`(D-290 — 대기실로 돌아갈 때 되돌릴 정원) + `HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. D-143 — 준비는 조건이 아니고 정원이 다 찼어도 이 길로 시작한다(예전 `-5`
@@ -131,7 +134,7 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players, rooms:open, room:{id}:ready,
-room:{id}:spectators]`, `ARGV = [userId, roomId]`.
+room:{id}:spectators, rooms:playing]`, `ARGV = [userId, roomId]`. D-298 — 빈 방 소멸 때 `ZREM rooms:playing` 도 한다.
 
 처리:
 0. **D-122 — `status=FINISHED` 면 좌석을 고정한다.** players 에 userId 가 없으면 `-2`,
@@ -162,7 +165,7 @@ room:{id}:spectators]`, `ARGV = [userId, roomId]`.
 
 ### `room_delete.lua` *(Phase 19 #1, D-75)*
 입력: `KEYS = [room, players, room:{id}:ready, room:{id}:spectators,
-rooms:open]`, `ARGV = [roomId]`.
+rooms:open, rooms:playing]`, `ARGV = [roomId]`. D-298 — `ZREM rooms:playing` 도 한다.
 멤버십 검사 없이 방을 무조건 원자 소멸 — `DEL room players ready
 spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 남았다가
 마지막 관전자가 나간 경우)을 `RoomService.destroyIfEmpty` 가 정리할 때
@@ -170,7 +173,7 @@ spectators` + `ZREM rooms:open`. "플레이어 0 && 관전자 0"(관전자만 �
 
 ### `room_finish.lua`
 입력: `KEYS = [room:{id}, rooms:open, room:{id}:players, room:{id}:ready,
-room:{id}:spectators]`, `ARGV = [roomId, now]`.
+room:{id}:spectators, rooms:playing]`, `ARGV = [roomId, now]`. D-298 — `ZREM rooms:playing` 도 한다.
 `status=FINISHED` + `ZREM rooms:open` + 방 메타 TTL 을 **600s 로 단축**(결과 화면이
 머무를 시간만 남기고 자연 만료). D-122: players·ready·spectators 도 같은 600s 로 줄인다 —
 FINISHED 방은 마지막 leave 로 파괴되지 않으므로(좌석 고정) 그대로 두면 6h 남는다. 방 없으면
@@ -282,6 +285,7 @@ TTL 도 있다" 가 항상 참이다.
   - `KEYS[4]=room:{id}:spectators`
   - `KEYS[5]=room:{id}:spectators_since`
   - `KEYS[6]=rooms:open`
+  - `KEYS[7]=rooms:playing`(D-298 — 대기실로 돌아가면 게임 중 목록에서 뺀다)
   - `ARGV=[maxPlayers, roomId, now, botId...]`(D-290 — 봇 user id 전체)
 - IN_GAME 일 때만 한 번에 처리한다.
   - 준비를 지운다(`DEL ready`).

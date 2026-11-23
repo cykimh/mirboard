@@ -7,6 +7,7 @@
 -- KEYS[3] = rooms:open
 -- KEYS[4] = room:{roomId}:ready
 -- KEYS[5] = room:{roomId}:spectators
+-- KEYS[6] = rooms:playing  (D-298)
 -- ARGV    = userId, roomId
 --
 -- Return codes:
@@ -52,6 +53,7 @@ if remaining == 0 then
     -- D-74: ready SET, D-75: spectators SET 도 함께 삭제해 고아 키 방지.
     redis.call('DEL', KEYS[1], KEYS[2], KEYS[4], KEYS[5])
     redis.call('ZREM', KEYS[3], roomId)
+    redis.call('ZREM', KEYS[6], roomId)
     return 0
 end
 

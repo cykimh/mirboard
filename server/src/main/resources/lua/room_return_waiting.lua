@@ -13,6 +13,7 @@
 -- KEYS[4] = room:{roomId}:spectators
 -- KEYS[5] = room:{roomId}:spectators_since
 -- KEYS[6] = rooms:open
+-- KEYS[7] = rooms:playing  (D-298)
 -- ARGV    = maxPlayers, roomId, now, botId1, botId2, ...  (봇 user id 전체 — 어느 좌석이 봇인지 가린다)
 --
 -- Return codes:
@@ -96,6 +97,7 @@ end
 redis.call('HSET', KEYS[1], 'status', 'WAITING', 'capacity', capacity, 'updatedAt', now)
 redis.call('HDEL', KEYS[1], 'lobbyCapacity')
 redis.call('ZADD', KEYS[6], now, roomId)
+redis.call('ZREM', KEYS[7], roomId)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)
 return seated

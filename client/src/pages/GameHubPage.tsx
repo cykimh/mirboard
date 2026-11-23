@@ -62,6 +62,8 @@ export function GameHubPage() {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  // D-298 — 게임 중인 방(관전용). 대기 목록과 같은 5초 주기로 같이 받는다.
+  const [playingRooms, setPlayingRooms] = useState<Room[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -73,12 +75,14 @@ export function GameHubPage() {
 
   const refreshRooms = useCallback(async () => {
     if (!token) return;
-    try {
-      const res = await roomsApi.list(token);
-      setRooms(res.rooms);
-    } catch (err) {
-      if (err instanceof ApiError) setError(errorText(err, '방 목록을 불러오지 못했어요'));
+    // D-298 — 두 목록을 한 번에. 게임 중 목록만 실패하면(구 서버 등) 가진 것을 그대로 두고 대기 목록은 그린다.
+    const [waiting, playing] = await Promise.allSettled([roomsApi.list(token), roomsApi.listPlaying(token)]);
+    if (waiting.status === 'fulfilled') {
+      setRooms(waiting.value.rooms);
+    } else if (waiting.reason instanceof ApiError) {
+      setError(errorText(waiting.reason, '방 목록을 불러오지 못했어요'));
     }
+    if (playing.status === 'fulfilled') setPlayingRooms(playing.value.rooms);
   }, [token]);
 
   useEffect(() => {
@@ -177,10 +181,15 @@ export function GameHubPage() {
     }
   }
 
-  async function handleSpectate(event: React.FormEvent) {
+  function handleSpectate(event: React.FormEvent) {
     event.preventDefault();
-    if (!token || !spectateInput.trim()) return;
-    const roomId = spectateInput.trim();
+    if (!spectateInput.trim()) return;
+    void spectateRoom(spectateInput.trim());
+  }
+
+  // 방 ID 입력과 게임 중 방의 [관전](D-298)이 같이 쓴다.
+  async function spectateRoom(roomId: string) {
+    if (!token) return;
     try {
       await roomsApi.spectate(token, roomId);
       // D-133 결정 A — 본인이 고른 관전이라 방 화면의 "…관전으로 들어왔어요" 안내를 띄우지 않는다(탭 기록).
@@ -195,6 +204,9 @@ export function GameHubPage() {
   const played = stats?.games ?? [];
   const primary = primaryGame(played);
   const gameName = (id: string) => games?.find((g) => g.id === id)?.displayName ?? id;
+  // D-298 — 두 요청 사이에 상태가 바뀐 방이 양쪽에 다 올 수 있다. 대기 목록이 이긴다(위에 한 번만).
+  const waitingIds = new Set(rooms.map((r) => r.roomId));
+  const playingList = playingRooms.filter((r) => r.status === 'IN_GAME' && !waitingIds.has(r.roomId));
 
   return (
     <div className="app-shell min-h-screen bg-background text-foreground">
@@ -270,15 +282,15 @@ export function GameHubPage() {
           </Alert>
         )}
 
-        {/* D-154 — 순서: 랭킹 → 대기 중인 방 → 게임 소개. */}
+        {/* D-154 — 순서: 랭킹 → 열린 방(D-298 — 대기 중 + 게임 중) → 게임 소개. */}
         {/* 랭킹 — D-199 이번 달, 전체·게임별. 카탈로그를 받기 전에도 자리를 잡아 둔다(나중에 끼어들어 아래 카드를 밀지 않게). */}
         {token && <RankingCard token={token} games={availableGames} myUserId={user?.userId} />}
-        {/* D-146 — 로비 채팅을 없애 대기 중인 방이 한 줄을 다 쓴다. */}
+        {/* D-146 — 로비 채팅을 없애 방 목록이 한 줄을 다 쓴다. */}
         <div className="grid grid-cols-1 gap-6">
-          {/* 대기 중인 방 */}
+          {/* 열린 방 — D-298 대기 중인 방(위)과 게임 중인 방(아래)을 한 목록에. */}
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>대기 중인 방</CardTitle>
+              <CardTitle>열린 방</CardTitle>
               <Button
                 type="button"
                 size="sm"
@@ -292,9 +304,9 @@ export function GameHubPage() {
               {/* D-199 — 방 목록은 5초마다 길이가 바뀐다. 높이를 고정하고 안에서만 스크롤해 아래 게임 카드가 밀리지 않게 한다. */}
               <ul
                 data-testid="room-list"
-                className={cn('m-0 flex h-44 list-none flex-col gap-2 p-0', HUB_SCROLL)}
+                className={cn('m-0 flex h-56 list-none flex-col gap-2 p-0', HUB_SCROLL)}
               >
-                {rooms.length === 0 && (
+                {rooms.length === 0 && playingList.length === 0 && (
                   <li className="flex flex-1 items-center justify-center rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
                     아직 방이 없습니다.
                   </li>
@@ -302,33 +314,37 @@ export function GameHubPage() {
                 {rooms.map((room) => (
                   <li
                     key={room.roomId}
+                    data-room-kind="waiting"
                     className="flex shrink-0 items-center gap-3 rounded-md border p-3"
                   >
-                    {/* 이름은 한 줄로 자른다 — 좁은 화면에서 글자마다 꺾여 줄 높이가 늘지 않게(고정 높이 목록). */}
-                    <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
-                      <span className="truncate" title={room.name}>
-                        {room.name}
+                    {/* 좁은 화면은 이름 줄·정보 줄 두 줄, 넓으면 한 줄. 이름은 잘라 줄 높이가 늘지 않게(고정 높이 목록). */}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="flex min-w-0 items-center gap-2 font-medium sm:flex-1">
+                        <span className="truncate" title={room.name}>
+                          {room.name}
+                        </span>
+                        {room.stake > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0"
+                            title={`내기 방 — 판돈 ${room.stake}칩 (가상 칩)`}
+                          >
+                            💰 {room.stake}
+                          </Badge>
+                        )}
                       </span>
-                      {room.stake > 0 && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0"
-                          title={`내기 방 — 판돈 ${room.stake}칩 (가상 칩)`}
-                        >
-                          💰 {room.stake}
-                        </Badge>
-                      )}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
-                      <GameIcon gameId={room.gameType} size={18} />
-                      {/* D-130 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름과 한글 상태 라벨. 모르는 게임·상태는 원문. */}
-                      {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}
-                      {ROOM_STATUS_LABEL[room.status] ?? room.status}
-                    </span>
+                      <span className="flex min-w-0 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                        <GameIcon gameId={room.gameType} size={18} />
+                        {/* D-130 — 대기실 헤더(D-110)처럼 카탈로그 표시 이름과 한글 상태 라벨. 모르는 게임·상태는 원문. */}
+                        {gameName(room.gameType)} · {room.playerCount} / {room.capacity} ·{' '}
+                        {ROOM_STATUS_LABEL[room.status] ?? room.status}
+                      </span>
+                    </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="secondary"
+                      className="h-10 shrink-0 px-4"
                       onClick={() => handleJoin(room.roomId)}
                       disabled={
                         room.status !== 'WAITING' ||
@@ -339,6 +355,44 @@ export function GameHubPage() {
                     </Button>
                   </li>
                 ))}
+                {/* D-298 — 게임 중인 방. 앉아 있던 사람(허브로 잠깐 나온 플레이어)은 관전이 아니라 제자리로 돌아간다. */}
+                {playingList.map((room) => {
+                  const seated = !!user && room.playerIds.includes(user.userId);
+                  const botCount = room.botSeats.length;
+                  return (
+                    <li
+                      key={room.roomId}
+                      data-room-kind="playing"
+                      className="flex shrink-0 items-center gap-3 rounded-md border bg-muted/40 p-3"
+                    >
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+                        <span className="flex min-w-0 items-center gap-2 font-medium sm:flex-1">
+                          <span className="truncate" title={room.name}>
+                            {room.name}
+                          </span>
+                          <Badge variant="secondary" className="shrink-0">
+                            {ROOM_STATUS_LABEL.IN_GAME}
+                          </Badge>
+                        </span>
+                        <span className="flex min-w-0 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                          <GameIcon gameId={room.gameType} size={18} />
+                          {gameName(room.gameType)} · {room.playerCount}명
+                          {botCount > 0 ? `(봇 ${botCount})` : ''} · 관전 {room.spectatorIds.length}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-10 shrink-0 px-4"
+                        aria-label={`${room.name} ${seated ? '돌아가기' : '관전'}`}
+                        onClick={() => (seated ? handleJoin(room.roomId) : spectateRoom(room.roomId))}
+                      >
+                        {seated ? '돌아가기' : '관전'}
+                      </Button>
+                    </li>
+                  );
+                })}
               </ul>
 
               <Separator />

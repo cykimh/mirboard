@@ -67,6 +67,7 @@ class RoomModesIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired StringRedisTemplate redis;
     @Autowired RoomRepository repository;
+    @Autowired com.mirboard.domain.lobby.room.RoomService roomService;
     @Autowired RoomDisconnectHandler disconnects;
 
     private final Map<String, Long> userIds = new HashMap<>();
@@ -295,6 +296,134 @@ class RoomModesIntegrationTest {
     }
 
     // ---------- helpers ----------
+
+    // ---------- 게임 중인 방 목록 (D-298 — rooms:playing) ----------
+
+    @Test
+    void a_started_friends_room_is_listed_as_playing_and_a_practice_room_is_not() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmplhost"), registerAndLogin("rmpla"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        assertThat(playingRoomIds(players.get(0))).doesNotContain(roomId);
+        String practice = create(players.get(0),
+                Map.of("name", "연습", "gameType", "ONE_CARD", "fillWithBots", true, "capacity", 4)).get("roomId").asText();
+
+        start(roomId, players.get(0));
+
+        assertThat(playingRoomIds(players.get(1))).contains(roomId).doesNotContain(practice);
+        assertThat(waitingRoomIds(players.get(1))).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", practice)).isNull();
+        // 게임 필터도 대기 목록과 같다.
+        mockMvc.perform(get("/api/rooms?status=IN_GAME&gameType=TICHU").header("Authorization", bearer(players.get(0))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rooms[?(@.roomId == '" + roomId + "')]").isEmpty());
+    }
+
+    @Test
+    void a_room_back_in_the_lobby_leaves_the_playing_list() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmpbhost"), registerAndLogin("rmpba"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        start(roomId, players.get(0));
+
+        roomService.returnToWaiting(roomId);
+
+        assertThat(playingRoomIds(players.get(0))).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNull();
+        assertThat(waitingRoomIds(players.get(0))).contains(roomId);
+    }
+
+    /** 방장 + 봇 판의 방장 강제 종료(D-135). 봇이 낀 친구 방도 게임 중 목록에는 오른다(연습 방만 빠진다). */
+    @Test
+    void a_host_aborted_room_leaves_the_playing_list() throws Exception {
+        String host = registerAndLogin("rmpahost");
+        String roomId = friendsRoom(List.of(host), "ONE_CARD", 4);
+        mockMvc.perform(post("/api/rooms/" + roomId + "/bots").header("Authorization", bearer(host)))
+                .andExpect(status().isOk());
+        start(roomId, host);
+        assertThat(playingRoomIds(host)).contains(roomId);
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/abort").header("Authorization", bearer(host)))
+                .andExpect(status().is2xxSuccessful());
+
+        assertThat(roomStatus(roomId, host)).isEqualTo("FINISHED");
+        assertThat(playingRoomIds(host)).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNull();
+    }
+
+    /** 운영자 강제 종료·정상 종료(봇과 연습)·탈주 FINISHED 가 모두 타는 길(room_finish.lua). */
+    @Test
+    void a_finished_room_leaves_the_playing_list() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmpfhost"), registerAndLogin("rmpfa"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        start(roomId, players.get(0));
+
+        roomService.adminAbortGame(roomId);
+
+        assertThat(playingRoomIds(players.get(0))).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNull();
+    }
+
+    /** 게임 중 '나가기' = 탈주(D-75). 2인 판은 판이 끝나므로 목록에서 빠진다. */
+    @Test
+    void a_deserted_two_player_room_leaves_the_playing_list() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmpdhost"), registerAndLogin("rmpda"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        start(roomId, players.get(0));
+
+        mockMvc.perform(post("/api/rooms/" + roomId + "/leave").header("Authorization", bearer(players.get(1))))
+                .andExpect(status().is2xxSuccessful());
+
+        assertThat(roomStatus(roomId, players.get(0))).isNotEqualTo("IN_GAME");
+        assertThat(playingRoomIds(players.get(0))).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNull();
+    }
+
+    @Test
+    void destroyed_rooms_leave_the_playing_list() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmpxhost"), registerAndLogin("rmpxa"));
+        // 마지막 좌석이 비어 소멸(room_leave.lua).
+        String emptied = friendsRoom(players, "ONE_CARD", 4);
+        start(emptied, players.get(0));
+        repository.leave(emptied, userIds.get(players.get(0)));
+        repository.leave(emptied, userIds.get(players.get(1)));
+        assertThat(redis.opsForZSet().score("rooms:playing", emptied)).isNull();
+        // 무조건 소멸(room_delete.lua).
+        String deleted = friendsRoom(players, "ONE_CARD", 4);
+        start(deleted, players.get(0));
+        assertThat(repository.deleteRoom(deleted)).isTrue();
+        assertThat(redis.opsForZSet().score("rooms:playing", deleted)).isNull();
+    }
+
+    /** 방 키가 TTL 로 사라지면 Lua 가 돌지 않는다 — 읽을 때 걸러 내고 목록에서도 뺀다. */
+    @Test
+    void an_expired_room_is_filtered_out_and_dropped_on_read() throws Exception {
+        List<String> players = List.of(registerAndLogin("rmpehost"), registerAndLogin("rmpea"));
+        String roomId = friendsRoom(players, "ONE_CARD", 4);
+        start(roomId, players.get(0));
+        redis.delete("room:" + roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNotNull();
+
+        assertThat(playingRoomIds(players.get(0))).doesNotContain(roomId);
+        assertThat(redis.opsForZSet().score("rooms:playing", roomId)).isNull();
+    }
+
+    private void start(String roomId, String hostToken) throws Exception {
+        mockMvc.perform(post("/api/rooms/" + roomId + "/start").header("Authorization", bearer(hostToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_GAME"));
+    }
+
+    private List<String> playingRoomIds(String token) throws Exception {
+        MvcResult r = mockMvc.perform(get("/api/rooms?status=IN_GAME").header("Authorization", bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn();
+        List<String> ids = new ArrayList<>();
+        objectMapper.readTree(r.getResponse().getContentAsString()).get("rooms")
+                .forEach(room -> {
+                    assertThat(room.get("status").asText()).isEqualTo("IN_GAME");
+                    ids.add(room.get("roomId").asText());
+                });
+        return ids;
+    }
 
     private JsonNode create(String token, Map<String, Object> body) throws Exception {
         MvcResult created = mockMvc.perform(post("/api/rooms")

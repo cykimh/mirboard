@@ -7,6 +7,7 @@
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = room:{roomId}:ready
 -- KEYS[4] = rooms:open
+-- KEYS[5] = rooms:playing  (D-298 — 게임 중인 방 목록. 봇과 연습 방은 넣지 않는다)
 -- ARGV    = hostId, minPlayers, roomId
 --
 -- Return codes:
@@ -54,4 +55,9 @@ redis.call('EXPIRE', KEYS[3], ttl)
 redis.call('HSET', KEYS[1], 'lobbyCapacity', redis.call('HGET', KEYS[1], 'capacity'))
 redis.call('HSET', KEYS[1], 'capacity', #players, 'status', 'IN_GAME')
 redis.call('ZREM', KEYS[4], roomId)
+-- D-298 — 대기 목록에서 빼는 것과 같은 원자 구간에서 게임 중 목록에 올린다(score = 시작 시각 ms).
+if redis.call('HGET', KEYS[1], 'fillWithBots') ~= 'true' then
+    local t = redis.call('TIME')
+    redis.call('ZADD', KEYS[5], tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000), roomId)
+end
 return 1

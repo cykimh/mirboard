@@ -12,6 +12,11 @@ export const roomsApi = {
     return apiRequest(`/api/rooms${qs}`, { token });
   },
 
+  /** D-298 — 게임 중인 방(메인의 [관전] 목록). 봇과 연습 방은 서버가 뺀다. */
+  listPlaying(token: string): Promise<RoomListResponse> {
+    return apiRequest('/api/rooms?status=IN_GAME', { token });
+  },
+
   create(
       token: string,
       name: string,

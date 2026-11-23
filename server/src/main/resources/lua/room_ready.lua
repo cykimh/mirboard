@@ -64,4 +64,5 @@ for i = 1, #players do
 end
 redis.call('HSET', KEYS[1], 'status', 'IN_GAME')
 redis.call('ZREM', KEYS[4], roomId)
+-- D-298 — 이 길로 시작하는 것은 봇과 연습 방뿐이라 게임 중 목록(rooms:playing)에 올리지 않는다.
 return 1

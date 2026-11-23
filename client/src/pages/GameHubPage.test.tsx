@@ -12,9 +12,11 @@ import type { GameSummary, Room } from '@/types/api';
  * 첫 방문 자동 노출을 하지 않는다(자동 노출은 그 게임 대기실 첫 입장, RoomPage).
  */
 
-const { catalog, list, stats, spectate, create, stopSpectating } = vi.hoisted(() => ({
+const { catalog, list, listPlaying, stats, spectate, create, stopSpectating } = vi.hoisted(() => ({
   catalog: vi.fn(),
   list: vi.fn(),
+  // D-298 — 게임 중인 방 목록.
+  listPlaying: vi.fn(),
   stats: vi.fn(),
   spectate: vi.fn(),
   create: vi.fn(),
@@ -22,7 +24,12 @@ const { catalog, list, stats, spectate, create, stopSpectating } = vi.hoisted(()
 }));
 
 vi.mock('@/api/games', () => ({ gamesApi: { catalog } }));
-vi.mock('@/api/rooms', () => ({ roomsApi: { list, joinOrReconnect: vi.fn(), spectate, create, stopSpectating } }));
+vi.mock('@/api/rooms', () => ({ roomsApi: { list, listPlaying, joinOrReconnect: vi.fn(), spectate, create, stopSpectating } }));
+// vi.clearAllMocks 는 구현을 지우지 않는다 — 게임 중 목록은 테스트가 따로 정하지 않으면 늘 빈 목록.
+beforeEach(() => {
+  listPlaying.mockReset();
+  listPlaying.mockResolvedValue({ rooms: [] });
+});
 vi.mock('@/api/users', () => ({ usersApi: { stats } }));
 // D-265 — 관리자 여부(`GET /api/me`). 기본은 관리자 아님.
 const isAdmin = vi.hoisted(() => vi.fn<() => boolean | null>(() => false));
@@ -210,6 +217,95 @@ describe('GameHubPage — 대기 중인 방 목록 (D-130)', () => {
   });
 });
 
+/** D-298 — 게임 중인 방도 같은 카드에: 대기 중 위·게임 중 아래, [관전]으로 들어간다. */
+describe('GameHubPage — 게임 중인 방 (D-298)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    catalog.mockResolvedValue({ games: CATALOG });
+    stats.mockResolvedValue({ userId: 1, username: 'me', games: [] });
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  function playing(roomId: string, over: Partial<Room> = {}): Room {
+    return { ...room(roomId, 'SKULL_KING', 3), status: 'IN_GAME', playerCount: 3, playerIds: [2, 3, 900], ...over };
+  }
+
+  it('대기 중인 방 아래에 게임 중 표시·게임 이름·인원(봇)·관전자 수와 함께 보인다', async () => {
+    list.mockResolvedValue({ rooms: [room('w', 'TICHU', 4)] });
+    listPlaying.mockResolvedValue({ rooms: [playing('p', { botSeats: [2], spectatorIds: [7, 8] })] });
+    renderHub();
+
+    const row = (await screen.findByText('방 p')).closest('li')!;
+    expect(row).toHaveAttribute('data-room-kind', 'playing');
+    expect(within(row).getByText('게임 중')).toBeInTheDocument();
+    expect(within(row).getByText(/스컬킹 · 3명\(봇 1\) · 관전 2/)).toBeInTheDocument();
+    expect(row).toHaveClass('shrink-0');
+    const waitingRow = screen.getByText('방 w').closest('li')!;
+    expect(waitingRow.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId('room-list')).toContainElement(row);
+    expect(screen.queryByText('아직 방이 없습니다.')).toBeNull();
+  });
+
+  it('[관전]을 누르면 관전으로 들어가고 탭에 관전 기록을 남긴다 (D-133)', async () => {
+    list.mockResolvedValue({ rooms: [] });
+    listPlaying.mockResolvedValue({ rooms: [playing('p')] });
+    spectate.mockResolvedValue(playing('p'));
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '방 p 관전' }));
+
+    expect(await screen.findByText('ROOM_PAGE:p')).toBeInTheDocument();
+    expect(spectate).toHaveBeenCalledWith('tok', 'p');
+    expect(spectateNoticeSeen('p')).toBe(true);
+  });
+
+  it('내가 앉아 있는 판은 [돌아가기] — 관전이 아니라 제자리로 간다', async () => {
+    list.mockResolvedValue({ rooms: [] });
+    listPlaying.mockResolvedValue({ rooms: [playing('p', { playerIds: [1, 2, 3] })] });
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.joinOrReconnect).mockResolvedValue({ mode: 'RECONNECTED', room: playing('p') });
+    renderHub();
+
+    fireEvent.click(await screen.findByRole('button', { name: '방 p 돌아가기' }));
+
+    expect(await screen.findByText('ROOM_PAGE:p')).toBeInTheDocument();
+    expect(spectate).not.toHaveBeenCalled();
+  });
+
+  it('게임 중 목록을 못 받아도 대기 중인 방은 그린다 — 양쪽에 다 온 방은 대기 쪽에 한 번만', async () => {
+    list.mockResolvedValue({ rooms: [room('w', 'TICHU', 4)] });
+    listPlaying.mockRejectedValue(new Error('down'));
+    renderHub();
+    expect(await screen.findByText('방 w')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    listPlaying.mockResolvedValue({ rooms: [playing('w'), playing('q')] });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await screen.findByText('방 q');
+    expect(screen.getAllByText('방 w')).toHaveLength(1);
+    expect(screen.getByText('방 w').closest('li')).toHaveAttribute('data-room-kind', 'waiting');
+  });
+
+  it('게임 중인 방이 없어지면 다음 새로고침에 줄이 사라진다', async () => {
+    list.mockResolvedValue({ rooms: [] });
+    listPlaying.mockResolvedValue({ rooms: [playing('p')] });
+    renderHub();
+    await screen.findByText('방 p');
+
+    listPlaying.mockResolvedValue({ rooms: [] });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(await screen.findByText('아직 방이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByText('방 p')).toBeNull();
+  });
+});
+
 /**
  * D-133 결정 A — 서버가 관전으로 받으면 방 화면 위에 "…관전으로 들어왔어요"를 띄운다. 허브 "구경하기"(방 ID 로 관전)는 본인이 고른
  * 관전이라 탭에 관전 기록을 남기고 들어가 방 화면이 안내를 띄우지 않게 한다.
@@ -336,11 +432,11 @@ describe('GameHubPage — 배치와 아바타 (D-154)', () => {
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
   });
 
-  it('랭킹 → 대기 중인 방 → 게임 소개 순서다', async () => {
+  it('랭킹 → 열린 방 → 게임 소개 순서다', async () => {
     renderHub();
     const gameCard = await screen.findByRole('button', { name: '티츄 게임 방법' });
     const ranking = screen.getByTestId('ranking');
-    const rooms = screen.getByText('대기 중인 방');
+    const rooms = screen.getByText('열린 방');
 
     expect(ranking.compareDocumentPosition(rooms) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rooms.compareDocumentPosition(gameCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -351,7 +447,7 @@ describe('GameHubPage — 배치와 아바타 (D-154)', () => {
     renderHub();
     await screen.findByRole('button', { name: '티츄 게임 방법' });
     const box = screen.getByTestId('room-list');
-    for (const cls of ['h-44', 'overflow-y-auto', '[scrollbar-width:thin]', '[scrollbar-gutter:stable]']) {
+    for (const cls of ['h-56', 'overflow-y-auto', '[scrollbar-width:thin]', '[scrollbar-gutter:stable]']) {
       expect(box).toHaveClass(cls);
     }
     expect(within(box).getByText('아직 방이 없습니다.')).toBeTruthy();
@@ -362,7 +458,7 @@ describe('GameHubPage — 배치와 아바타 (D-154)', () => {
     });
     await screen.findByText('방 r7');
     expect(screen.getByTestId('room-list')).toBe(box);
-    expect(box).toHaveClass('h-44');
+    expect(box).toHaveClass('h-56');
     // 줄이 눌려 줄어들지 않고 넘치는 만큼 스크롤된다.
     expect(screen.getByText('방 r7').closest('li')).toHaveClass('shrink-0');
   });
