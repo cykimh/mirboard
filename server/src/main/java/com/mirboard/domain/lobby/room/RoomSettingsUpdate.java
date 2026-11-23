@@ -14,9 +14,11 @@ import java.util.Map;
  * @param options        D-176 — 값을 가진 방 옵션({@code RoomOption.valued()}) 이름 → 값. 적은 것만 바꾼다. 게임이 선언한 옵션만
  *                       받고(선언 안 한 옵션에 기본 아닌 값은 {@code UNSUPPORTED_ROOM_OPTION}), 모르는 이름·허용값 밖은
  *                       {@code INVALID_ROOM_SETTING}. 정원이 바뀌면 같이 바꾸고, 지금 인원이 새 정원보다 많으면 {@code TOO_MANY_PLAYERS}.
+ * @param capacity       D-290 — 최대 인원(정원). 게임이 지금 방 옵션으로 정한 시작 인원~정원 안이어야 하고({@code INVALID_CAPACITY}),
+ *                       지금 앉은 인원보다 작으면 {@code TOO_MANY_PLAYERS}.
  */
 public record RoomSettingsUpdate(Integer turnSeconds, Integer targetScore, Integer stake, String raceButtonSize,
-                                 String raceButtonVisibility, Map<String, String> options) {
+                                 String raceButtonVisibility, Map<String, String> options, Integer capacity) {
 
     public RoomSettingsUpdate {
         // 값이 null 인 항목은 다른 필드처럼 "그대로"다(부분 갱신).
@@ -31,19 +33,30 @@ public record RoomSettingsUpdate(Integer turnSeconds, Integer targetScore, Integ
         options = java.util.Collections.unmodifiableMap(kept);
     }
 
+    /** D-290 이전 모양(정원 없음). */
+    public RoomSettingsUpdate(Integer turnSeconds, Integer targetScore, Integer stake, String raceButtonSize,
+                              String raceButtonVisibility, Map<String, String> options) {
+        this(turnSeconds, targetScore, stake, raceButtonSize, raceButtonVisibility, options, null);
+    }
+
+    /** D-290 — 정원만 바꾼다. */
+    public static RoomSettingsUpdate ofCapacity(int capacity) {
+        return new RoomSettingsUpdate(null, null, null, null, null, null, capacity);
+    }
+
     /** D-176 이전 모양(방 옵션 맵 없음). */
     public RoomSettingsUpdate(Integer turnSeconds, Integer targetScore, Integer stake, String raceButtonSize,
                               String raceButtonVisibility) {
-        this(turnSeconds, targetScore, stake, raceButtonSize, raceButtonVisibility, null);
+        this(turnSeconds, targetScore, stake, raceButtonSize, raceButtonVisibility, null, null);
     }
 
     /** D-165 이전 모양(찾기 난이도 없음). */
     public RoomSettingsUpdate(Integer turnSeconds, Integer targetScore, Integer stake, String raceButtonSize) {
-        this(turnSeconds, targetScore, stake, raceButtonSize, null, null);
+        this(turnSeconds, targetScore, stake, raceButtonSize, null, null, null);
     }
 
     /** D-176 — 방 옵션만 바꾼다. */
     public static RoomSettingsUpdate ofOptions(Map<String, String> options) {
-        return new RoomSettingsUpdate(null, null, null, null, null, options);
+        return new RoomSettingsUpdate(null, null, null, null, null, options, null);
     }
 }

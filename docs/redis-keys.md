@@ -11,7 +11,7 @@
 
 | 키 | 타입 | TTL | 필드 / 값 | 비고 |
 | --- | --- | --- | --- | --- |
-| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`, `raceButtonSize`, `raceButtonVisibility`, `opt:<NAME>` | 메타. `opt:<NAME>`(D-176)=값을 가진 방 옵션(`RoomOption.valued()` — `opt:TEAM_MODE` 등), 만들 때 게임이 선언한 옵션의 기본값을 쓰고 대기실 설정으로 바뀐다. 모르는 이름은 읽을 때 건너뛴다. D-176 — 옵션으로 정원이 바뀌면(`capacityFor`) `room_update_settings.lua` 가 `capacity` 도 같이 쓴다. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
+| `room:{roomId}` | HASH | 6h | `hostId`, `name`, `gameType`, `status`, `capacity`, `createdAt`, `updatedAt`, `teamPolicy`, `fillWithBots`, `targetScore`, `turnSeconds`, `stake`, `raceButtonSize`, `raceButtonVisibility`, `opt:<NAME>`, `capMin`, `capMax`, `lobbyCapacity` | 메타. D-290 — `capMin`·`capMax`=방장이 고를 수 있는 정원 범위(게임이 지금 방 옵션으로 정한 시작 인원~정원 — 만들 때와 옵션이 범위를 바꿀 때 쓴다, 없으면 지금 정원 한 점), `lobbyCapacity`=시작 직전의 정원(`room_start_now.lua` 가 쓰고 `room_return_waiting.lua` 가 그 값으로 되돌린 뒤 지운다). `capacity` 는 대기실에서 방장이 `PUT …/settings` 로 바꾼다. `opt:<NAME>`(D-176)=값을 가진 방 옵션(`RoomOption.valued()` — `opt:TEAM_MODE` 등), 만들 때 게임이 선언한 옵션의 기본값을 쓰고 대기실 설정으로 바뀐다. 모르는 이름은 읽을 때 건너뛴다. D-176 — 옵션으로 정원이 바뀌면(`capacityFor`) `room_update_settings.lua` 가 `capacity` 도 같이 쓴다. `stake`(D-81)=판돈(가상 칩, 0=내기없음), 생성 시 고정·불변. `capacity`(D-99)=방 인원, 생성 시 게임의 `minPlayers()..maxPlayers()` 안에서 확정 — 바뀌는 것은 D-136 "지금 N명으로 시작"(`room_start_now.lua`)에서 현재 인원으로 한 번 줄 때뿐. `fillWithBots`=D-136 봇과 연습 방 |
 | `room:{roomId}:players` | LIST | 6h (FINISHED 후 600s) | 입장 순서대로 `userId` push (`LLEN` ≤ `capacity`) | 자리 = index. **D-122: 게임이 시작된 뒤 좌석 인덱스는 불변** — FINISHED 방 leave 는 목록을 건드리지 않는다(`room_leave.lua`) |
 | `rooms:open` | ZSET | — | member=roomId, score=createdAt | 대기방 목록 표시 (status==WAITING 만 포함). D-136 — 봇과 연습 방(`fillWithBots=true`)은 `room_create.lua` 가 넣지 않는다 |
 | `room:{roomId}:state` | STRING(JSON) | 6h | 마스터 `TichuState` 전체 (덱 잔여, 손패 포함). 원카드는 `OneCardState`(손패·뽑을 더미 순서·경쟁 창·봇 누름 포함 — 서버 전용, 1판 = 1매치라 `match:` 키 없음, D-128). 요트는 `YachtState`(점수표·주사위·홀드·차례 시작 시각 — 숨길 것이 없고 **미래 눈·시드를 두지 않는다**, D-182, 1판 = 1매치). 오목은 `OmokState`(수순·흑 팀·첫 수 좌석·좌석별 연속 시간 초과 수·결과 — 숨길 정보 없음, 판은 수순에서 다시 만든다, D-175). 씨앗포는 `ArtilleryState`(매치 시드·구멍 목록·포대·차례·바람·구름 수면·연출 대기 끝 시각·마지막 대본 — **지형 비트는 저장하지 않고** 시드 + 구멍 목록으로 다시 만든다, 시드는 서버 전용, D-220·D-221) | 직렬화 책임은 GameEngine. 원카드는 모르는 필드를 무시한다(`@JsonIgnoreProperties(ignoreUnknown)`, 롤백 안전) |
@@ -20,6 +20,7 @@
 | `room:{roomId}:ready` | SET | 6h (FINISHED 후 600s) | 대기실 준비 완료 `userId` (봇은 join 시 자동 추가) | Phase 16(#2). 전원 ready+정원 → IN_GAME. D-74: 빈 방 leave 시 `room_leave.lua` 가 함께 삭제 |
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(다음 판 — D-153 대기실 복귀 뒤 — 에도 유지, 새로 앉은 사람은 재바이인), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h (FINISHED 후 600s) | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
+| `room:{roomId}:kicked:{userId}` | STRING | 60s | `"1"` | D-290. 방장이 대기실에서 내보낸 사람의 재입장 금지. `room_remove_member.lua` 가 좌석 빼기와 같은 원자 구간에서 `SET … EX 60`. 살아 있는 동안 `room_join.lua` 가 `-5`(KICKED), 관전은 서비스가 거절 |
 | `room:{roomId}:spectators_since` | ZSET | 6h | member=관전자 `userId`, score=관전 시작 `epochMillis` | D-153. 다음 판 자동 착석 순서. `addSpectator` 가 `ZADD`(다시 관전하면 시각 갱신). 나간 관전자는 지우지 않고 `room_return_waiting.lua` 가 SET 과 맞춰 거른다(순서 기록 없는 관전자는 뒤에 userId 순). 앉으면 `ZREM` |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 — 값은 획득 때의 무작위 토큰 | `SET key token NX EX 2`. D-140: 해제는 `room_lock_release.lua`(`GET == token` 일 때만 `DEL`) — TTL 이 지나 남이 잡은 락을 늦게 돌아온 스레드가 지우지 않는다 |
@@ -70,8 +71,9 @@ UUID 라 충돌은 없어야 하지만 기존 키를 덮지 않도록 `EXISTS` �
 성공 `1`.
 
 ### `room_join.lua`
-입력: `KEYS[1]=room:{id}`, `KEYS[2]=room:{id}:players`, `KEYS[3]=rooms:open`, `KEYS[4]=room:{id}:spectators`(D-137), `ARGV[1]=userId`,
-`ARGV[2]=now`. 앉으면 같은 원자 구간에서 `SREM spectators userId`(관전자가 자리에 앉기).
+입력: `KEYS[1]=room:{id}`, `KEYS[2]=room:{id}:players`, `KEYS[3]=rooms:open`, `KEYS[4]=room:{id}:spectators`(D-137),
+`KEYS[5]=room:{id}:kicked:{userId}`(D-290), `ARGV[1]=userId`, `ARGV[2]=now`. 앉으면 같은 원자 구간에서 `SREM spectators userId`(관전자가 자리에 앉기).
+D-290 — 좌석 확인 뒤 `EXISTS KEYS[5]` 면 `-5`(방장이 방금 내보낸 사람).
 
 처리:
 1. `HGET room status` 검사 → `WAITING` 아니면 `"NOT_WAITING"` 반환.
@@ -101,7 +103,7 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, rooms:open]`, `ARGV = [hostId, minPlayers, roomId]`.
 
 처리: 방 없음 `-1`, status≠WAITING `-2`, 방장이 players 에 없음 `-3`, `LLEN < minPlayers` `-4` → 아니면 앉은 사람 모두 `SADD ready`(상태 맞춤) +
-`HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. D-143 — 준비는 조건이 아니고 정원이 다 찼어도 이 길로 시작한다(예전 `-5`
+`HSET lobbyCapacity=<지금 capacity>`(D-290 — 대기실로 돌아갈 때 되돌릴 정원) + `HSET capacity=LLEN status=IN_GAME` + `ZREM rooms:open` → `1`. D-143 — 준비는 조건이 아니고 정원이 다 찼어도 이 길로 시작한다(예전 `-5`
 준비 안 됨·`-6` 정원 다 참은 없앴다). `room_join.lua` 와 같은 키를 원자적으로 다뤄 확인과 시작 사이에 입장이 끼지 않는다. 방장 확인은 자바가 먼저 한다.
 
 ### `room_update_settings.lua` *(D-161, D-176)*
@@ -110,6 +112,21 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 처리: 방 없음 `-1`, status≠WAITING `-2`, `maxSeated ≥ 0` 이고 `LLEN players > maxSeated` 면 `-3`(TOO_MANY_PLAYERS — 아무것도 안 씀) → 아니면
 `HSET` 짝들 → `1`. 정원이 바뀌는 설정(D-176)만 `maxSeated` = 새 정원을 넘기고(`capacity` 필드도 짝에 들어 있다), 나머지는 `-1`(확인 안 함).
 `room_join.lua` 와 같은 해시의 `capacity` 를 원자적으로 다뤄 확인과 쓰기 사이에 입장이 끼지 않는다.
+
+### `room_bot_add.lua` *(D-290)*
+입력: `KEYS = [room:{id}, room:{id}:players]`, `ARGV = [hostId, now, count(-1 = 정원까지), botId...]`.
+
+처리: 방 없음 `-1`, status≠WAITING `-2`, `hostId` 가 방장이 아님 `-3`, `stake > 0` `-4` → 아니면 후보 봇을 순서대로 보며 이미 앉은 봇은
+건너뛰고 `LLEN < capacity` 이고 `count` 를 채우지 않은 동안 `RPUSH players botId` → 앉힌 수(0 이상). `room_join.lua` 와 같은 키를 원자적으로
+다뤄 확인과 앉히기 사이에 누가 들어와 정원을 넘는 일이 없다. 봇은 준비 집합에 넣지 않는다.
+
+### `room_remove_member.lua` *(D-290)*
+입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, room:{id}:kicked:{targetId}]`, `ARGV = [hostId, targetId, banSeconds]`.
+
+처리: 방 없음 `-1`, status≠WAITING `-2`, `hostId` 가 방장이 아님 `-3`, 대상이 방장 자신이거나 좌석에 없음 `-4` → 아니면 `LREM players`·
+`SREM ready` 하고 `banSeconds > 0`(강퇴)이면 `SET kicked 1 EX banSeconds` → 남은 좌석 수. 봇 빼기(`banSeconds=0`)와 대기실 강퇴(60)가 같이
+쓴다. WAITING 확인과 `LREM` 이 한 번이라 확인 뒤 시작된 판의 좌석이 당겨지지 않는다(D-122) — 예전 봇 빼기는 `room_leave.lua` 라 그 틈이 있었다.
+방장은 대상이 될 수 없어 방이 비거나 방장이 바뀌는 일이 없다.
 
 ### `room_leave.lua`
 입력: `KEYS = [room, players, rooms:open, room:{id}:ready,
@@ -264,11 +281,14 @@ TTL 도 있다" 가 항상 참이다.
   - `KEYS[4]=room:{id}:spectators`
   - `KEYS[5]=room:{id}:spectators_since`
   - `KEYS[6]=rooms:open`
-  - `ARGV=[maxPlayers, roomId, now]`
+  - `ARGV=[maxPlayers, roomId, now, botId...]`(D-290 — 봇 user id 전체)
 - IN_GAME 일 때만 한 번에 처리한다.
   - 준비를 지운다(`DEL ready`).
-  - 관전자를 들어온 순서대로 `maxPlayers` 까지 `RPUSH players`·`SREM`·`ZREM` 한다.
-  - `status=WAITING`, `capacity=maxPlayers` 로 둔다.
+  - 정원을 정한다(D-290): `lobbyCapacity`(시작 직전에 방장이 정해 둔 정원)가 있으면 그 값, 없으면 `maxPlayers` — `maxPlayers` 를 넘지 않고
+    지금 앉은 인원보다 작지 않게.
+  - 관전자를 들어온 순서대로 그 정원까지 `RPUSH players`·`SREM`·`ZREM` 한다. **빈자리가 없으면 가장 뒤에 앉은 봇 하나를 `LREM` 하고 그
+    자리를 준다**(D-290 — 봇이 없으면 남은 관전자는 계속 관전, 사람은 빼지 않는다).
+  - `status=WAITING`, `capacity=<그 정원>` 으로 두고 `HDEL lobbyCapacity`.
   - `ZADD rooms:open now roomId` 로 방 목록에 다시 올리고, 메타·좌석 TTL 을 6h 로 되돌린다.
 - 반환:
   - `n` = 돌아간 뒤 좌석 수

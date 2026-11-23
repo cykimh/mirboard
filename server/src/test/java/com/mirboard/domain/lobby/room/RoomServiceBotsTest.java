@@ -2,6 +2,7 @@ package com.mirboard.domain.lobby.room;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,8 +27,9 @@ import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
- * D-174 — 대기실의 [빈자리 봇으로 채우기]·[봇 빼기]와, 봇이 있는 대기실의 나가기(봇만 남으면 방 없애기·방장은 사람에게). 저장소는 모의라
- * Docker 가 필요 없다 — 좌석 원자성은 기존 {@code room_join.lua}·{@code room_leave.lua} 가 맡는다.
+ * D-174·D-290 — 대기실의 봇 앉히기·빼기·사람 내보내기(강퇴)와, 봇이 있는 대기실의 나가기(봇만 남으면 방 없애기·방장은 사람에게).
+ * 저장소는 모의라 Docker 가 필요 없다 — 좌석 원자성은 {@code room_bot_add.lua}·{@code room_remove_member.lua} 가 맡고
+ * {@code RoomLobbyControlsIT} 가 실제 Redis 로 확인한다.
  */
 class RoomServiceBotsTest {
 
@@ -64,64 +66,97 @@ class RoomServiceBotsTest {
         return room(RoomStatus.WAITING, HOST, 6, 0, players);
     }
 
-    // ---------- 채우기 ----------
+    // ---------- 앉히기 (D-290 — room_bot_add.lua 한 번) ----------
 
     @Test
-    @DisplayName("빈자리만큼 방에 없는 봇을 앉히고 준비는 넣지 않는다")
-    void fills_empty_seats_with_bots_not_already_in_the_room() {
+    @DisplayName("[봇 추가]는 한 명 — 후보는 봇 전체(이미 앉은 봇은 Lua 가 건너뛴다), 준비는 넣지 않는다")
+    void adds_one_bot_atomically() {
         when(repository.findById(ROOM_ID)).thenReturn(
                 Optional.of(room(RoomStatus.WAITING, HOST, 4, 0, HOST, 900L)),
-                Optional.of(room(RoomStatus.WAITING, HOST, 4, 0, HOST, 900L, 901L, 902L)));
+                Optional.of(room(RoomStatus.WAITING, HOST, 4, 0, HOST, 900L, 901L)));
+        when(repository.addBots(eq(ROOM_ID), eq(HOST), eq(1), eq(BOT_POOL), anyLong())).thenReturn(1);
 
-        Room after = service.fillBots(ROOM_ID, HOST);
+        Room after = service.addBots(ROOM_ID, HOST, 1);
 
-        verify(repository).join(eq(ROOM_ID), eq(901L), anyLong());
-        verify(repository).join(eq(ROOM_ID), eq(902L), anyLong());
-        verify(repository, never()).join(eq(ROOM_ID), eq(900L), anyLong());
+        assertThat(after.botSeats()).containsExactly(1, 2);
+        verify(repository, never()).join(anyString(), anyLong(), anyLong());
         verify(repository, never()).setReady(anyString(), anyLong(), org.mockito.ArgumentMatchers.anyBoolean());
-        assertThat(after.botSeats()).containsExactly(1, 2, 3);
         verify(events).publishEvent(org.mockito.ArgumentMatchers.any(RoomChangedEvent.class));
     }
 
     @Test
-    @DisplayName("채우는 도중 사람이 마지막 자리에 먼저 앉으면(ROOM_FULL) 거기서 멈춘다 — 오류가 아니다")
-    void stops_when_a_human_takes_the_last_seat_first() {
-        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, HOST, 3, 0, HOST)));
-        when(repository.join(eq(ROOM_ID), eq(901L), anyLong())).thenThrow(new RoomFullException(ROOM_ID));
+    @DisplayName("수를 생략하면 정원까지(-1) — 예전 [빈자리 봇으로 채우기]")
+    void omitted_count_fills_to_capacity() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, HOST, 4, 0, HOST)));
+        when(repository.addBots(eq(ROOM_ID), eq(HOST), eq(-1), eq(BOT_POOL), anyLong())).thenReturn(3);
 
         service.fillBots(ROOM_ID, HOST);
 
-        verify(repository).join(eq(ROOM_ID), eq(900L), anyLong());
-        verify(repository).join(eq(ROOM_ID), eq(901L), anyLong());
-        verify(repository, never()).join(eq(ROOM_ID), eq(902L), anyLong());
+        verify(repository).addBots(eq(ROOM_ID), eq(HOST), eq(-1), eq(BOT_POOL), anyLong());
     }
 
     @Test
-    @DisplayName("빈자리가 없으면 아무것도 하지 않는다")
-    void a_full_room_is_left_alone() {
+    @DisplayName("한 명도 못 앉혔으면 — 수를 정했을 때는 ROOM_FULL, 정원까지 채우기는 그대로 둔다")
+    void nothing_added() {
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, HOST, 2, 0, HOST, GUEST)));
+        when(repository.addBots(eq(ROOM_ID), eq(HOST), anyInt(), eq(BOT_POOL), anyLong())).thenReturn(0);
 
-        service.fillBots(ROOM_ID, HOST);
-
-        verify(repository, never()).join(anyString(), anyLong(), anyLong());
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(RoomFullException.class);
+        assertThat(service.fillBots(ROOM_ID, HOST).playerIds()).containsExactly(HOST, GUEST);
+        verify(events, never()).publishEvent(org.mockito.ArgumentMatchers.any(RoomChangedEvent.class));
     }
 
     @Test
-    @DisplayName("방장이 아니면 NOT_HOST, 시작된 방이면 GAME_ALREADY_STARTED, 판돈 방이면 STAKED_ROOM_NO_BOTS")
+    @DisplayName("방장이 아니면 NOT_HOST, 시작된 방이면 GAME_ALREADY_STARTED, 판돈 방이면 STAKED_ROOM_NO_BOTS, 0명은 INVALID_ROOM_SETTING")
     void only_the_host_of_a_waiting_unstaked_room() {
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, GUEST)));
-        assertThatThrownBy(() -> service.fillBots(ROOM_ID, GUEST)).isInstanceOf(NotHostException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, GUEST, 1)).isInstanceOf(NotHostException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 0)).isInstanceOf(InvalidRoomSettingException.class);
 
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.IN_GAME, HOST, 2, 0, HOST, GUEST)));
-        assertThatThrownBy(() -> service.fillBots(ROOM_ID, HOST)).isInstanceOf(GameAlreadyStartedException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(GameAlreadyStartedException.class);
 
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.WAITING, HOST, 4, 100, HOST)));
-        assertThatThrownBy(() -> service.fillBots(ROOM_ID, HOST)).isInstanceOf(StakedRoomNoBotsException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(StakedRoomNoBotsException.class);
 
-        verify(repository, never()).join(anyString(), anyLong(), anyLong());
+        verify(repository, never()).addBots(anyString(), anyLong(), anyInt(), org.mockito.ArgumentMatchers.anyList(), anyLong());
     }
 
-    // ---------- 빼기 ----------
+    @Test
+    @DisplayName("확인 뒤 바뀐 방은 Lua 코드가 같은 예외로 — 시작됨(-2)·방장 아님(-3)·판돈(-4)")
+    void lua_codes_become_the_same_exceptions() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST)));
+        when(repository.addBots(eq(ROOM_ID), eq(HOST), anyInt(), eq(BOT_POOL), anyLong())).thenReturn(-2, -3, -4);
+
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(GameAlreadyStartedException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(NotHostException.class);
+        assertThatThrownBy(() -> service.addBots(ROOM_ID, HOST, 1)).isInstanceOf(StakedRoomNoBotsException.class);
+    }
+
+    // ---------- 빼기 (D-290 — room_remove_member.lua) ----------
+
+    @Test
+    @DisplayName("봇 하나만 뺀다 — 재입장 금지는 걸지 않는다")
+    void removes_one_bot() {
+        when(repository.findById(ROOM_ID)).thenReturn(
+                Optional.of(waiting(HOST, 900L, GUEST, 901L)),
+                Optional.of(waiting(HOST, 900L, GUEST)));
+        when(repository.removeMember(ROOM_ID, HOST, 901L, 0)).thenReturn(3);
+
+        Room after = service.removeBot(ROOM_ID, HOST, 901L);
+
+        verify(repository).removeMember(ROOM_ID, HOST, 901L, 0);
+        assertThat(after.playerIds()).containsExactly(HOST, 900L, GUEST);
+    }
+
+    @Test
+    @DisplayName("봇 빼기로 사람은 못 뺀다(NOT_IN_ROOM) — 사람은 강퇴로")
+    void remove_bot_is_only_for_bots() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, GUEST, 900L)));
+
+        assertThatThrownBy(() -> service.removeBot(ROOM_ID, HOST, GUEST)).isInstanceOf(NotInRoomException.class);
+        verify(repository, never()).removeMember(anyString(), anyLong(), anyLong(), anyInt());
+    }
 
     @Test
     @DisplayName("봇만 모두 뺀다 — 사람은 그대로")
@@ -129,12 +164,13 @@ class RoomServiceBotsTest {
         when(repository.findById(ROOM_ID)).thenReturn(
                 Optional.of(waiting(HOST, 900L, GUEST, 901L)),
                 Optional.of(waiting(HOST, GUEST)));
+        when(repository.removeMember(eq(ROOM_ID), eq(HOST), anyLong(), eq(0))).thenReturn(2);
 
         Room after = service.removeBots(ROOM_ID, HOST);
 
-        verify(repository).leave(ROOM_ID, 900L);
-        verify(repository).leave(ROOM_ID, 901L);
-        verify(repository, never()).leave(ROOM_ID, GUEST);
+        verify(repository).removeMember(ROOM_ID, HOST, 900L, 0);
+        verify(repository).removeMember(ROOM_ID, HOST, 901L, 0);
+        verify(repository, never()).removeMember(ROOM_ID, HOST, GUEST, 0);
         assertThat(after.playerIds()).containsExactly(HOST, GUEST);
     }
 
@@ -143,11 +179,68 @@ class RoomServiceBotsTest {
     void removing_bots_is_for_the_host_while_waiting() {
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, GUEST, 900L)));
         assertThatThrownBy(() -> service.removeBots(ROOM_ID, GUEST)).isInstanceOf(NotHostException.class);
+        assertThatThrownBy(() -> service.removeBot(ROOM_ID, GUEST, 900L)).isInstanceOf(NotHostException.class);
 
         when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.IN_GAME, HOST, 3, 0, HOST, GUEST, 900L)));
         assertThatThrownBy(() -> service.removeBots(ROOM_ID, HOST)).isInstanceOf(GameAlreadyStartedException.class);
+        assertThatThrownBy(() -> service.removeBot(ROOM_ID, HOST, 900L)).isInstanceOf(GameAlreadyStartedException.class);
 
+        verify(repository, never()).removeMember(anyString(), anyLong(), anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("확인 뒤 판이 시작됐으면(Lua -2) GAME_ALREADY_STARTED — 시작된 판의 좌석을 당기지 않는다")
+    void a_started_room_keeps_its_seats() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, GUEST, 900L)));
+        when(repository.removeMember(ROOM_ID, HOST, 900L, 0)).thenReturn(-2);
+
+        assertThatThrownBy(() -> service.removeBot(ROOM_ID, HOST, 900L)).isInstanceOf(GameAlreadyStartedException.class);
         verify(repository, never()).leave(anyString(), anyLong());
+    }
+
+    // ---------- 대기실 강퇴 (D-290) ----------
+
+    @Test
+    @DisplayName("방장이 사람을 내보낸다 — 재입장 금지 60초, 내보냄 알림이 좌석 메타보다 먼저")
+    void the_host_kicks_a_human_from_the_lobby() {
+        when(repository.findById(ROOM_ID)).thenReturn(
+                Optional.of(waiting(HOST, GUEST, 900L)),
+                Optional.of(waiting(HOST, 900L)));
+        when(repository.removeMember(ROOM_ID, HOST, GUEST, RoomService.KICK_REJOIN_BLOCK_SECONDS)).thenReturn(2);
+
+        Room after = service.kickFromLobby(ROOM_ID, HOST, GUEST);
+
+        assertThat(RoomService.KICK_REJOIN_BLOCK_SECONDS).isEqualTo(60);
+        assertThat(after.playerIds()).containsExactly(HOST, 900L);
+        InOrder order = inOrder(events);
+        order.verify(events).publishEvent(new RoomMemberKickedEvent(ROOM_ID, GUEST));
+        order.verify(events).publishEvent(org.mockito.ArgumentMatchers.any(RoomChangedEvent.class));
+    }
+
+    @Test
+    @DisplayName("강퇴는 방장만·대기실에서만, 대상은 다른 사람 참가자만(자신·봇·없는 사람은 NOT_IN_ROOM)")
+    void lobby_kick_guards() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, GUEST, 900L)));
+        assertThatThrownBy(() -> service.kickFromLobby(ROOM_ID, GUEST, HOST)).isInstanceOf(NotHostException.class);
+        assertThatThrownBy(() -> service.kickFromLobby(ROOM_ID, HOST, HOST)).isInstanceOf(NotInRoomException.class);
+        assertThatThrownBy(() -> service.kickFromLobby(ROOM_ID, HOST, 900L)).isInstanceOf(NotInRoomException.class);
+        assertThatThrownBy(() -> service.kickFromLobby(ROOM_ID, HOST, 77L)).isInstanceOf(NotInRoomException.class);
+
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(room(RoomStatus.IN_GAME, HOST, 3, 0, HOST, GUEST, 900L)));
+        assertThatThrownBy(() -> service.kickFromLobby(ROOM_ID, HOST, GUEST)).isInstanceOf(GameAlreadyStartedException.class);
+
+        verify(repository, never()).removeMember(anyString(), anyLong(), anyLong(), anyInt());
+        verify(events, never()).publishEvent(org.mockito.ArgumentMatchers.any(RoomMemberKickedEvent.class));
+    }
+
+    @Test
+    @DisplayName("내보낸 사람은 금지가 풀릴 때까지 관전으로도 못 돌아온다 — KICKED_FROM_ROOM")
+    void a_kicked_user_cannot_spectate() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST, 900L)));
+        when(repository.isKicked(ROOM_ID, GUEST)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.spectate(ROOM_ID, GUEST)).isInstanceOf(KickedFromRoomException.class);
+        verify(repository, never()).addSpectator(anyString(), anyLong());
     }
 
     // ---------- 나가기 ----------

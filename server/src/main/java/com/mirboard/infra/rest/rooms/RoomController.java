@@ -143,10 +143,21 @@ public class RoomController {
         return rooms.startNow(roomId, me.userId());
     }
 
-    /** D-174 — 대기실에서 방장이 빈자리를 봇으로 채운다(시작은 따로 /start). */
+    /**
+     * D-174·D-290 — 대기실에서 방장이 봇을 앉힌다(시작은 따로 /start). {@code count} 명을 앉히고(화면의 [봇 추가]는 1), 생략하면
+     * 정원까지 채운다.
+     */
     @PostMapping("/{roomId}/bots")
-    public Room fillBots(@PathVariable String roomId, @AuthenticationPrincipal AuthPrincipal me) {
-        return rooms.fillBots(roomId, me.userId());
+    public Room addBots(@PathVariable String roomId, @AuthenticationPrincipal AuthPrincipal me,
+                        @RequestParam(required = false) Integer count) {
+        return rooms.addBots(roomId, me.userId(), count);
+    }
+
+    /** D-290 — 대기실에서 방장이 봇 하나를 뺀다. */
+    @DeleteMapping("/{roomId}/bots/{botUserId}")
+    public Room removeBot(@PathVariable String roomId, @PathVariable long botUserId,
+                          @AuthenticationPrincipal AuthPrincipal me) {
+        return rooms.removeBot(roomId, me.userId(), botUserId);
     }
 
     /** D-174 — 대기실에서 방장이 봇을 모두 뺀다. */

@@ -54,7 +54,10 @@ export const roomsApi = {
     });
   },
 
-  /** D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리). 응답 본문 없음. */
+  /**
+   * D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(바로 탈주 처리). D-290 — 대기실에서는 사람 참가자를 좌석에서 빼고 잠깐(60초) 그 방
+   * 재입장을 막는다. 응답 본문 없음.
+   */
   kick(token: string, roomId: string, userId: number): Promise<void> {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/kick`, {
       method: 'POST',
@@ -81,14 +84,14 @@ export const roomsApi = {
     return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/start`, { method: 'POST', token });
   },
 
-  /** D-174 — 대기실에서 방장이 빈자리를 봇으로 채운다(시작은 따로 startNow). */
-  fillBots(token: string, roomId: string): Promise<Room> {
-    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots`, { method: 'POST', token });
+  /** D-290 — 대기실에서 방장이 봇을 한 명 앉힌다(시작은 따로 startNow). 자리가 없으면 `ROOM_FULL`. */
+  addBot(token: string, roomId: string): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots?count=1`, { method: 'POST', token });
   },
 
-  /** D-174 — 대기실에서 방장이 봇을 모두 뺀다. */
-  removeBots(token: string, roomId: string): Promise<Room> {
-    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots`, { method: 'DELETE', token });
+  /** D-290 — 대기실에서 방장이 봇 하나를 뺀다. */
+  removeBot(token: string, roomId: string, botUserId: number): Promise<Room> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/bots/${botUserId}`, { method: 'DELETE', token });
   },
 
   join(token: string, roomId: string): Promise<Room> {

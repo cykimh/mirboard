@@ -53,8 +53,8 @@ vi.mock('@/api/rooms', () => ({
     join: vi.fn(),
     updateSettings: vi.fn(),
     kick: vi.fn(),
-    fillBots: vi.fn(),
-    removeBots: vi.fn(),
+    addBot: vi.fn(),
+    removeBot: vi.fn(),
   },
 }));
 vi.mock('@/api/games', () => ({ loadGame }));
@@ -1792,68 +1792,210 @@ describe('RoomPage — 끊긴 사람 내보내기 (D-162)', () => {
 });
 
 /**
- * D-174 — 방 종류 없이 만든 방에서 방장이 대기실의 [빈자리 봇으로 채우기]로 정원까지 봇을 앉히고, [봇 빼기]로 모두 뺀다. 시작은 그대로
- * [N명으로 시작]. 시작 줄은 안내 문구가 왼쪽, 버튼이 오른쪽이다.
+ * D-174·D-290 — 방 종류 없이 만든 방에서 방장이 대기실의 [봇 추가]로 봇을 한 명씩 앉히고, 봇 카드의 [✕]로 한 명씩 뺀다. 사람 카드의
+ * [✕]는 내보내기(확인 창), "최대 인원" −/＋ 는 정원. 시작은 그대로 [N명으로 시작]. 시작 줄은 안내 문구가 왼쪽, 버튼이 오른쪽이다.
  */
-describe('RoomPage — 대기실 봇 채우기·시작 줄 (D-174)', () => {
+describe('RoomPage — 대기실 봇·강퇴·정원·시작 줄 (D-174·D-290)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useToastStore.getState().clear();
     Object.values(GAME_TUTORIALS).forEach((t) => markTutorialSeen(t.seenKey));
-    names.mockResolvedValue({ names: [{ userId: 1, username: 'host' }] });
+    names.mockResolvedValue({
+      names: [
+        { userId: 1, username: 'host' },
+        { userId: 2, username: '철수' },
+        { userId: 900, username: '봇1' },
+      ],
+    });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'host' } as never });
     loadGame.mockResolvedValue({ ...game('ONE_CARD', []), minPlayers: 2, maxPlayers: 6 });
   });
 
   const waiting = (extra: Partial<Room>) =>
-    ({ ...ROOM, gameType: 'ONE_CARD', status: 'WAITING', capacity: 6, playerIds: [1, 2], playerCount: 2, botSeats: [], readyUserIds: [], ...extra }) as Room;
+    ({
+      ...ROOM,
+      gameType: 'ONE_CARD',
+      status: 'WAITING',
+      capacity: 6,
+      minCapacity: 2,
+      maxCapacity: 6,
+      playerIds: [1, 2],
+      playerCount: 2,
+      botSeats: [],
+      readyUserIds: [],
+      ...extra,
+    }) as Room;
+  const toasts = () => useToastStore.getState().toasts.map((t) => t.message);
 
-  it('방장이 [빈자리 봇으로 채우기]를 누르면 봇을 앉히고 응답 방으로 바로 맞춘다', async () => {
+  it('방장이 [봇 추가]를 누르면 봇을 한 명 앉히고 응답 방으로 바로 맞춘다', async () => {
     const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.fillBots).mockResolvedValue(
-      waiting({ playerIds: [1, 2, 900, 901, 902, 903], playerCount: 6, botSeats: [2, 3, 4, 5] }),
-    );
+    vi.mocked(roomsApi.addBot).mockResolvedValue(waiting({ playerIds: [1, 2, 900], playerCount: 3, botSeats: [2] }));
     renderRoom(waiting({}));
 
-    const fill = await screen.findByRole('button', { name: '빈자리 봇으로 채우기' });
+    const add = await screen.findByRole('button', { name: '＋ 봇 추가' });
     await act(async () => {
-      fireEvent.click(fill);
+      fireEvent.click(add);
     });
 
-    expect(roomsApi.fillBots).toHaveBeenCalledWith('tok', 'r1');
-    expect(await screen.findByRole('button', { name: '6명으로 시작' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: '빈자리 봇으로 채우기' })).toBeNull(); // 빈자리가 없다
-    expect(screen.getByRole('button', { name: '봇 빼기' })).toBeInTheDocument();
+    expect(roomsApi.addBot).toHaveBeenCalledWith('tok', 'r1');
+    expect(await screen.findByRole('button', { name: '3명으로 시작' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '봇1 빼기' })).toBeInTheDocument();
   });
 
-  it('봇이 있으면 [봇 빼기] — 누르면 봇을 모두 뺀다', async () => {
+  it('자리가 다 차면 [봇 추가]를 잠근다', async () => {
+    renderRoom(waiting({ capacity: 2 }));
+
+    expect(await screen.findByRole('button', { name: '＋ 봇 추가' })).toBeDisabled();
+  });
+
+  it('봇 카드의 [✕]는 그 봇만 뺀다 — 확인 창 없이', async () => {
     const { roomsApi } = await import('@/api/rooms');
-    vi.mocked(roomsApi.removeBots).mockResolvedValue(waiting({}));
+    const confirm = vi.spyOn(window, 'confirm');
+    vi.mocked(roomsApi.removeBot).mockResolvedValue(waiting({}));
     renderRoom(waiting({ playerIds: [1, 2, 900], playerCount: 3, botSeats: [2] }));
 
-    const remove = await screen.findByRole('button', { name: '봇 빼기' });
+    const remove = await screen.findByRole('button', { name: '봇1 빼기' });
     await act(async () => {
       fireEvent.click(remove);
     });
 
-    expect(roomsApi.removeBots).toHaveBeenCalledWith('tok', 'r1');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(roomsApi.removeBot).toHaveBeenCalledWith('tok', 'r1', 900);
     expect(await screen.findByRole('button', { name: '2명으로 시작' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '봇 빼기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '봇1 빼기' })).toBeNull();
+    confirm.mockRestore();
   });
 
-  it('방장이 아니면 봇 버튼이 없다', async () => {
+  it('사람 카드의 [✕]는 확인한 뒤 내보낸다 — 취소하면 보내지 않는다. 방장 자신의 카드에는 없다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    vi.mocked(roomsApi.kick).mockResolvedValue(undefined);
+    renderRoom(waiting({}));
+
+    const kick = await screen.findByRole('button', { name: '철수 내보내기' });
+    expect(screen.queryByRole('button', { name: 'host 내보내기' })).toBeNull();
+    fireEvent.click(kick);
+    expect(roomsApi.kick).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(kick);
+    });
+
+    expect(confirm).toHaveBeenLastCalledWith('철수님을 방에서 내보낼까요?');
+    expect(roomsApi.kick).toHaveBeenCalledWith('tok', 'r1', 2);
+    confirm.mockRestore();
+  });
+
+  it('방장이 아니면 [봇 추가]·[✕]·정원 조절이 없다 — 최대 인원은 값만 본다', async () => {
     renderRoom(waiting({ hostId: 2, playerIds: [2, 1, 900], playerCount: 3, botSeats: [2] }));
 
     await screen.findByText(/방장이 시작하면 게임이 시작돼요/);
-    expect(screen.queryByRole('button', { name: '빈자리 봇으로 채우기' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '봇 빼기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '＋ 봇 추가' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /빼기$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /내보내기$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '최대 인원 줄이기' })).toBeNull();
+    expect(screen.getByText('최대 인원')).toBeInTheDocument();
   });
 
   it('판돈 방에는 봇을 앉힐 수 없다고 버튼을 잠근다', async () => {
     loadGame.mockResolvedValue({ ...game('TICHU', ['TEAMS', 'BETTING', 'TARGET_SCORE']), minPlayers: 4, maxPlayers: 4 });
-    renderRoom(waiting({ gameType: 'TICHU', capacity: 4, stake: 100 }));
+    renderRoom(waiting({ gameType: 'TICHU', capacity: 4, minCapacity: 4, maxCapacity: 4, stake: 100 }));
 
-    expect(await screen.findByRole('button', { name: '빈자리 봇으로 채우기' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: '＋ 봇 추가' })).toBeDisabled();
     expect(screen.getByText('판돈 방에는 봇을 앉힐 수 없어요')).toBeInTheDocument();
+    // 정원 범위가 한 점(티츄 4명)이면 최대 인원 줄이 없다.
+    expect(screen.queryByRole('group', { name: '최대 인원' })).toBeNull();
+  });
+
+  it('"최대 인원" −/＋ 로 정원을 바꾼다 — 지금 인원(2) 아래와 범위 위(6)로는 잠긴다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.updateSettings).mockResolvedValue(waiting({ capacity: 5 }));
+    renderRoom(waiting({}));
+
+    const group = await screen.findByRole('group', { name: '최대 인원' });
+    expect(within(group).getByTestId('capacity-value')).toHaveTextContent('6명');
+    expect(within(group).getByRole('button', { name: '최대 인원 늘리기' })).toBeDisabled();
+    await act(async () => {
+      fireEvent.click(within(group).getByRole('button', { name: '최대 인원 줄이기' }));
+    });
+
+    expect(roomsApi.updateSettings).toHaveBeenCalledWith('tok', 'r1', { capacity: 5 });
+    expect(await screen.findByText('5명')).toBeInTheDocument();
+    expect(screen.getByText('지금 2명 · 최대 5명')).toBeInTheDocument();
+  });
+
+  it('정원이 지금 인원과 같으면 줄이기가 잠긴다', async () => {
+    renderRoom(waiting({ capacity: 2 }));
+
+    const group = await screen.findByRole('group', { name: '최대 인원' });
+    expect(within(group).getByRole('button', { name: '최대 인원 줄이기' })).toBeDisabled();
+    expect(within(group).getByRole('button', { name: '최대 인원 늘리기' })).toBeEnabled();
+  });
+
+  it('설정 거절은 화면을 오류로 덮지 않고 토스트로 알린다', async () => {
+    const { roomsApi } = await import('@/api/rooms');
+    vi.mocked(roomsApi.updateSettings).mockRejectedValue(
+      new ApiError(409, { error: { code: 'TOO_MANY_PLAYERS', message: '5명만 남기고 바꿔 주세요' } }),
+    );
+    renderRoom(waiting({}));
+
+    const group = await screen.findByRole('group', { name: '최대 인원' });
+    await act(async () => {
+      fireEvent.click(within(group).getByRole('button', { name: '최대 인원 줄이기' }));
+    });
+
+    expect(toasts()).toContain('5명만 남기고 바꿔 주세요');
+    expect(screen.getByRole('button', { name: '2명으로 시작' })).toBeInTheDocument();
+  });
+
+  const renderWithHub = (room: Room) => {
+    joinOrReconnect.mockResolvedValue({ mode: 'JOINED', room });
+    return render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+          <Route path="/games" element={<p>메인 화면</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  };
+  const kickedCallback = () => vi.mocked(useRoomMeta).mock.calls.at(-1)![5]!;
+
+  it('방장이 나를 내보내면 "방장이 내보냈어요"와 함께 메인으로 간다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: '철수' } as never });
+    renderWithHub(waiting({}));
+    await screen.findByText(/방장이 시작하면 게임이 시작돼요/);
+
+    act(() => kickedCallback()(2));
+
+    expect(await screen.findByText('메인 화면')).toBeInTheDocument();
+    expect(toasts()).toEqual(['방장이 내보냈어요']);
+  });
+
+  it('다른 사람이 내보내진 알림에는 아무것도 하지 않는다', async () => {
+    renderWithHub(waiting({}));
+    await screen.findByRole('button', { name: '2명으로 시작' });
+
+    act(() => kickedCallback()(2));
+
+    expect(screen.queryByText('메인 화면')).toBeNull();
+    expect(toasts()).toEqual([]);
+  });
+
+  it('내보내진 직후 같은 링크로 오면 "방장이 내보냈어요" 패널 — 관전 제안은 없다', async () => {
+    joinOrReconnect.mockRejectedValue(
+      new ApiError(403, { error: { code: 'KICKED_FROM_ROOM', message: '방장이 내보냈어요 — 잠시 뒤에 다시 들어올 수 있어요' } }),
+    );
+    render(
+      <MemoryRouter initialEntries={['/rooms/r1']}>
+        <Routes>
+          <Route path="/rooms/:roomId" element={<RoomPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('방장이 내보냈어요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '관전하기' })).toBeNull();
+    expect(screen.getByRole('link', { name: '메인으로' })).toBeInTheDocument();
   });
 
   it('시작 줄은 안내 문구가 왼쪽, [N명으로 시작]이 오른쪽(같은 줄)이다', async () => {

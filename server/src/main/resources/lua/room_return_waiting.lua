@@ -1,7 +1,10 @@
 -- room_return_waiting.lua  (D-153)
--- 정상 종료한 친구 방을 대기실로 돌린다: IN_GAME -> WAITING, 정원 := 게임 최대 인원(D-143 시작이 줄였다), 준비 비우기,
+-- 정상 종료한 친구 방을 대기실로 돌린다: IN_GAME -> WAITING, 정원 := 시작 전에 방장이 정해 둔 정원(D-290 — lobbyCapacity, 없으면
+-- 게임 최대 인원. D-143 시작이 현재 인원으로 줄였다), 준비 비우기,
 -- 관전자를 들어온 순서(spectators_since 점수)대로 빈자리에 앉히기, 방 목록에 다시 올리기. 한 번에 원자적으로 한다.
 -- 관전 순서 ZSET 에 남은 지난 관전자(이미 나간 사람)는 SET 과 맞춰 걸러낸다.
+-- D-290 — 기다리던 관전자가 봇보다 먼저다: 빈자리가 모자라면 뒤쪽 봇부터 빼고 그 자리에 앉힌다(사람은 빼지 않는다). 판 도중
+-- 링크로 온 친구에게 "다음 판에 함께해요"라고 해 놓고 봇이 자리를 쥐고 있어 관전자로 남던 것을 고친다.
 --
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
@@ -9,7 +12,7 @@
 -- KEYS[4] = room:{roomId}:spectators
 -- KEYS[5] = room:{roomId}:spectators_since
 -- KEYS[6] = rooms:open
--- ARGV    = maxPlayers, roomId, now
+-- ARGV    = maxPlayers, roomId, now, botId1, botId2, ...  (봇 user id 전체 — 어느 좌석이 봇인지 가린다)
 --
 -- Return codes:
 --   -1 = ROOM_NOT_FOUND
@@ -30,7 +33,21 @@ end
 
 redis.call('DEL', KEYS[3])
 
-local seated = redis.call('LLEN', KEYS[2])
+local isBot = {}
+for i = 4, #ARGV do
+    isBot[ARGV[i]] = true
+end
+local players = redis.call('LRANGE', KEYS[2], 0, -1)
+local seated = #players
+-- 정원: 방장이 정해 둔 값(게임 최대를 넘지 않게, 지금 앉은 인원보다 작지 않게).
+local capacity = maxPlayers
+local lobbyCapacity = tonumber(redis.call('HGET', KEYS[1], 'lobbyCapacity'))
+if lobbyCapacity and lobbyCapacity < capacity then
+    capacity = lobbyCapacity
+end
+if capacity < seated then
+    capacity = seated
+end
 local ordered = redis.call('ZRANGE', KEYS[5], 0, -1)
 local queue = {}
 local queued = {}
@@ -50,16 +67,31 @@ for i = 1, #rest do
 end
 
 for i = 1, #queue do
-    if seated >= maxPlayers then
-        break
+    if seated >= capacity then
+        -- 빈자리가 없다 — 가장 뒤에 앉은 봇 하나를 빼고 그 자리를 준다. 봇이 없으면 남은 사람은 계속 관전한다.
+        local evicted = false
+        for p = #players, 1, -1 do
+            if isBot[players[p]] then
+                redis.call('LREM', KEYS[2], -1, players[p])
+                table.remove(players, p)
+                seated = seated - 1
+                evicted = true
+                break
+            end
+        end
+        if not evicted then
+            break
+        end
     end
     redis.call('RPUSH', KEYS[2], queue[i])
+    players[#players + 1] = queue[i]
     redis.call('SREM', KEYS[4], queue[i])
     redis.call('ZREM', KEYS[5], queue[i])
     seated = seated + 1
 end
 
-redis.call('HSET', KEYS[1], 'status', 'WAITING', 'capacity', maxPlayers, 'updatedAt', now)
+redis.call('HSET', KEYS[1], 'status', 'WAITING', 'capacity', capacity, 'updatedAt', now)
+redis.call('HDEL', KEYS[1], 'lobbyCapacity')
 redis.call('ZADD', KEYS[6], now, roomId)
 redis.call('EXPIRE', KEYS[1], ttl)
 redis.call('EXPIRE', KEYS[2], ttl)
