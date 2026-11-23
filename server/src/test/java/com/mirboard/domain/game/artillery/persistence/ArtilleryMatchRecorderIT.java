@@ -89,7 +89,7 @@ class ArtilleryMatchRecorderIT {
                 .containsExactly("2/0/false/false", "1/64/true/false", "3/30/false/true");
         assertThat(ar(b).rating()).isEqualTo(1020);
         assertThat(ar(a).rating()).isEqualTo(1000);
-        assertThat(ar(c).rating()).isEqualTo(980);
+        assertThat(ar(c).rating()).isEqualTo(990);
         assertThat(ar(b).winCount()).isEqualTo(1);
         assertThat(ar(c).desertCount()).isEqualTo(1);
         assertThat(headToHead.against(b)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(a, c);
@@ -114,9 +114,9 @@ class ArtilleryMatchRecorderIT {
                 .extracting(r -> r.get("team") + "/" + r.get("final_rank") + "/" + r.get("is_win") + "/" + r.get("deserted"))
                 .containsExactly("0/1/true/false", "1/2/false/false", "0/4/false/true", "1/2/false/false");
         assertThat(ar(a).rating()).isEqualTo(1020);
-        assertThat(ar(b).rating()).isEqualTo(980);
-        assertThat(ar(d).rating()).isEqualTo(980);
-        assertThat(ar(c).rating()).isEqualTo(980);   // 이긴 팀이지만 탈주 — 상대 팀에 혼자 졌다
+        assertThat(ar(b).rating()).isEqualTo(990);
+        assertThat(ar(d).rating()).isEqualTo(990);
+        assertThat(ar(c).rating()).isEqualTo(990);   // 이긴 팀이지만 탈주 — 상대 팀에 혼자 졌다
         assertThat(ar(c).desertCount()).isEqualTo(1);
         assertThat(ar(c).winCount()).isZero();
         assertThat(ar(a).winCount()).isEqualTo(1);

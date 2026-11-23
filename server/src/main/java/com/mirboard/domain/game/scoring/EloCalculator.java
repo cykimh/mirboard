@@ -14,6 +14,8 @@ import java.util.Map;
  *   <li>{@code EA = 1 / (1 + 10^((avgB - avgA)/400))}</li>
  *   <li>{@code delta = K * (S - EA)}  (S=1 승, 0 패)</li>
  *   <li>K-factor: 30게임 미만 신규는 40, 그 외 32</li>
+ *   <li>D-297 — 깎일 때는 절반만({@link #LOSS_FACTOR}). 친구끼리 자주 지는 사람도 계급이 오르게 — 증감 합이 0 이 아니라 조금씩
+ *       오른다(레이팅 인플레이션을 받아들인다). 탈주도 같다 — 탈주는 패배·탈주 수로 따로 남는다.</li>
  * </ul>
  */
 public final class EloCalculator {
@@ -21,6 +23,8 @@ public final class EloCalculator {
     public static final int DEFAULT_K = 32;
     public static final int NEW_PLAYER_K = 40;
     public static final int NEW_PLAYER_THRESHOLD = 30;
+    /** D-297 — 레이팅이 내려갈 때 곱하는 비율(오를 때는 그대로). */
+    public static final double LOSS_FACTOR = 0.5;
 
     private EloCalculator() {}
 
@@ -55,12 +59,12 @@ public final class EloCalculator {
         java.util.HashMap<Long, Integer> result = new java.util.HashMap<>();
         for (PlayerInput p : teamA) {
             int k = kFactor(p.gamesPlayed());
-            int delta = (int) Math.round(k * (scoreA - expectedA));
+            int delta = delta(k * (scoreA - expectedA));
             result.put(p.userId(), p.currentRating() + delta);
         }
         for (PlayerInput p : teamB) {
             int k = kFactor(p.gamesPlayed());
-            int delta = (int) Math.round(k * (scoreB - expectedB));
+            int delta = delta(k * (scoreB - expectedB));
             result.put(p.userId(), p.currentRating() + delta);
         }
         return java.util.Map.copyOf(result);
@@ -77,7 +81,7 @@ public final class EloCalculator {
     /**
      * D-115 — 개인전(2~8인) 쌍대 ELO. 모든 쌍 (i, j) 를 한 판으로 보고
      * {@code S_ij}(점수가 높으면 1, 같으면 0.5, 낮으면 0)와 개인 rating 기대 승률의 차를
-     * {@code K_i / (n−1)} 로 합산한다. 2인이면 일반 ELO 와 같고, 같은 K 면 증감 합이 보존된다.
+     * {@code K_i / (n−1)} 로 합산한다. 2인이면 일반 ELO 와 같다. D-297 — 내려가는 몫은 절반이라 증감 합은 보존되지 않는다.
      *
      * @return userId → newRating 맵 (전원 포함)
      */
@@ -98,7 +102,7 @@ public final class EloCalculator {
                 sum += outcome(me, other) - expected;
             }
             int k = kFactor(me.player().gamesPlayed());
-            int delta = (int) Math.round(k * sum / (n - 1));
+            int delta = delta(k * sum / (n - 1));
             result.put(me.player().userId(), me.player().currentRating() + delta);
         }
         return java.util.Map.copyOf(result);
@@ -113,6 +117,12 @@ public final class EloCalculator {
             return 0.5;
         }
         return me.score() > other.score() ? 1.0 : me.score() == other.score() ? 0.5 : 0.0;
+    }
+
+    /** D-297 — 내려가는 몫은 {@link #LOSS_FACTOR} 만큼만. 반올림은 줄인 뒤에. */
+    static int delta(double raw) {
+        double scaled = raw < 0 ? raw * LOSS_FACTOR : raw;
+        return (int) Math.round(scaled);
     }
 
     public static int kFactor(int gamesPlayed) {

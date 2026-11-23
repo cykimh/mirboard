@@ -239,7 +239,7 @@ MOVE_STONE { stoneId, path: [방향…], wall: 방향, jump: false }
 `DambadukMatchRecorder`·`DambadukHeadToHead`) · `bot/`(`DambadukBotPolicy`·`Influence`·`BotBoard`·`DambadukBotView`·`DambadukBotLevel`)
 - **테스트(S2):** `DambadukGameDefinitionTest`(4)·`DambadukGameEngineTest`(8 — 안전망·기록 한 번·탈주 결과)·`DambadukRoundStarterTest`(3)·
   `bot/DambadukBotPolicyTest`(7 — 합법·결정적·이기는 마무리·지는 마무리 피함)·`bot/DambadukBotStrengthTest`(6)·`bot/DambadukBotBudgetTest`(2) — Docker 불필요.
-  `infra.ws.DambadukRecorderFailureTest`(기록 실패에도 방송·대기실 복귀), Docker: `persistence/DambadukMatchRecorderIT`(5 — 2인 ELO ±20·무승부 행만·
+  `infra.ws.DambadukRecorderFailureTest`(기록 실패에도 방송·대기실 복귀), Docker: `persistence/DambadukMatchRecorderIT`(5 — 2인 ELO +20·−10(D-297)·무승부 행만·
   3인 시간패와 탈주·봇 판·상대 전적), `infra.bot.DambadukServerFlowIT`(5 — 봇 2인·3인 완주, 3인 사람 탈주 뒤 봇이 끝냄, 2인 손 놓은 사람 두 번째
   시간 초과 패, resync 모양).
 - **봇 실측(`MIRBOARD_BOT_EVAL=1`, 200판, 시드 고정, 첫 두 수 무작위 — `server/build/dambaduk-bot-strength.txt`):**

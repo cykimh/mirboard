@@ -13,7 +13,7 @@ class EloCalculatorTest {
 
     @Test
     void equal_ratings_with_default_K_yield_plus_minus_K_over_2() {
-        // 4명 모두 rating 1000, gamesPlayed 50 (신규 아님 → K=32). expected=0.5 → delta=±16.
+        // 4명 모두 rating 1000, gamesPlayed 50 (신규 아님 → K=32). expected=0.5 → delta=+16 / −16×½(D-297) = −8.
         var a1 = new PlayerInput(1, 1000, 50);
         var a2 = new PlayerInput(2, 1000, 50);
         var b1 = new PlayerInput(3, 1000, 50);
@@ -21,8 +21,8 @@ class EloCalculatorTest {
         Map<Long, Integer> out = EloCalculator.applyMatch(List.of(a1, a2), List.of(b1, b2), true);
         assertThat(out.get(1L)).isEqualTo(1016);
         assertThat(out.get(2L)).isEqualTo(1016);
-        assertThat(out.get(3L)).isEqualTo(984);
-        assertThat(out.get(4L)).isEqualTo(984);
+        assertThat(out.get(3L)).isEqualTo(992);
+        assertThat(out.get(4L)).isEqualTo(992);
     }
 
     @Test
@@ -46,8 +46,8 @@ class EloCalculatorTest {
         var b1 = new PlayerInput(3, 1000, 50);
         var b2 = new PlayerInput(4, 1000, 50);
         Map<Long, Integer> out = EloCalculator.applyMatch(List.of(a1, a2), List.of(b1, b2), false);
-        // delta = 32 * (0 - 0.909...) ≈ -29.
-        assertThat(out.get(1L)).isEqualTo(1371);
+        // delta = 32 * (0 - 0.909...) ≈ -29 → 깎일 때 절반(D-297) ≈ -15.
+        assertThat(out.get(1L)).isEqualTo(1385);
         assertThat(out.get(3L)).isEqualTo(1029);
     }
 
@@ -79,7 +79,7 @@ class EloCalculatorTest {
         // 2인이면 쌍이 하나뿐이라 K/(n-1)=K — 일반 ELO 와 같아야 한다.
         Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
                 placed(1, 1000, 50, 80), placed(2, 1000, 50, 20)));
-        assertThat(out).containsEntry(1L, 1016).containsEntry(2L, 984);
+        assertThat(out).containsEntry(1L, 1016).containsEntry(2L, 992);
     }
 
     @Test
@@ -89,7 +89,7 @@ class EloCalculatorTest {
                 placed(1, 1000, 50, 120), placed(2, 1000, 50, 60),
                 placed(3, 1000, 50, 10), placed(4, 1000, 50, -40)));
         assertThat(out).containsEntry(1L, 1016).containsEntry(2L, 1005)
-                .containsEntry(3L, 995).containsEntry(4L, 984);
+                .containsEntry(3L, 997).containsEntry(4L, 992);
     }
 
     @Test
@@ -106,12 +106,21 @@ class EloCalculatorTest {
         Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
                 new Placement(new PlayerInput(1, 1000, 50), 300, true),
                 placed(2, 1000, 50, 10)));
-        assertThat(out).containsEntry(1L, 984).containsEntry(2L, 1016);
+        assertThat(out).containsEntry(1L, 992).containsEntry(2L, 1016);
     }
 
     @Test
     void ffa_needs_at_least_two_players() {
         assertThatThrownBy(() -> EloCalculator.applyFreeForAll(List.of(placed(1, 1000, 50, 0))))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void d297_losses_are_halved_gains_are_not() {
+        // 2인 K=40, 레이팅 같음 → 이긴 쪽 +20, 진 쪽 −20×½ = −10. 증감 합은 +10(인플레이션을 받아들인다).
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 0, 50), placed(2, 1000, 0, 10)));
+        assertThat(out).containsEntry(1L, 1020).containsEntry(2L, 990);
+        assertThat(EloCalculator.LOSS_FACTOR).isEqualTo(0.5);
     }
 }

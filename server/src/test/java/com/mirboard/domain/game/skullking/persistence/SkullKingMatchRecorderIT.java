@@ -96,7 +96,7 @@ class SkullKingMatchRecorderIT {
         // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20.
         assertThat(sk(a).rating()).isEqualTo(1020);
         assertThat(sk(b).rating()).isEqualTo(1000);
-        assertThat(sk(c).rating()).isEqualTo(980);
+        assertThat(sk(c).rating()).isEqualTo(990);
         assertThat(sk(a).winCount()).isEqualTo(1);
         assertThat(sk(b).loseCount()).isEqualTo(1);
         assertThat(sk(c).loseCount()).isEqualTo(1);

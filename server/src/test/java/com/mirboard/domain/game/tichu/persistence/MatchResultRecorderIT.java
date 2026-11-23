@@ -120,8 +120,8 @@ class MatchResultRecorderIT {
         // expected=0.5, delta = 40 * 0.5 = 20. 승팀 +20, 패팀 -20.
         assertThat(refreshed.get(0).rating()).isEqualTo(1020);
         assertThat(refreshed.get(2).rating()).isEqualTo(1020);
-        assertThat(refreshed.get(1).rating()).isEqualTo(980);
-        assertThat(refreshed.get(3).rating()).isEqualTo(980);
+        assertThat(refreshed.get(1).rating()).isEqualTo(990);
+        assertThat(refreshed.get(3).rating()).isEqualTo(990);
 
         // D-115 — users 의 옛 레이팅 컬럼은 이관 후 쓰기가 멈췄다(DROP 은 별도 마이그레이션).
         assertThat(userRepo.findById(ids.get(0)).orElseThrow().getRating()).isEqualTo(1000);
