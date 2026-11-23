@@ -178,7 +178,7 @@ interface Props {
  * 얏추(코드 이름 요트 — D-207 표시 이름만 바꿈) 게임판 조립 루트(요트 S4, 설계 `docs/plans/yacht.md` §7). 원카드처럼 자기 소켓을 소유하고 자기 sink 를 주입한다(D-103).
  *
  * <p>순차 진행이라 화면의 중심은 <b>차례인 사람의 주사위</b>다 — 전원이 같은 주사위 판을 보고, 홀드(`DICE_HELD`)와 굴림이 실시간으로
- * 움직이며, 점수표의 차례 열에 서버가 계산한 후보 점수가 흐리게 뜬다(D-181 — 기다림을 구경으로). 좌석 띠는 점수표 열과 같은 좌석
+ * 움직인다(D-181 — 기다림을 구경으로. 후보 점수는 D-295 부터 내 차례의 내 열에만 뜬다). 좌석 띠는 점수표 열과 같은 좌석
  * 순서다(점수표가 좌석 순 표라 테이블 배치 `tableLayout` 대신 띠 하나 — 좌석이 4개뿐이다).
  */
 export function YachtTable({
@@ -943,6 +943,9 @@ export function YachtTable({
         })}
       </ol>
 
+      {/* D-295 — 판을 감싸는 칸: 내 차례 맥박 빛(`yt-felt-glow`)이 판 밖으로 번지는데 판은 `overflow: hidden` 이라 판과 나란히 둔다.
+          빛은 투명도만 움직인다(판의 box-shadow 를 움직이면 프레임마다 판 전체를 다시 그린다). */}
+      <div className="yt-felt-wrap">
       <div
         ref={feltRef}
         className={`yt-felt${myTurn && watching === null ? ' yt-felt-myturn' : ''}${watching !== null ? ' yt-felt-watch' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
@@ -1036,12 +1039,15 @@ export function YachtTable({
           }
         />
       </div>
+      {myTurn && watching === null && <span className="yt-felt-glow" aria-hidden="true" />}
+      </div>
 
       <YachtScorecard
         seats={s.seats}
         turnSeat={watching !== null ? watching : simultaneous ? (myTurn ? mySeat : -1) : turnSeat}
         mySeat={mySeat}
-        candidates={watched ? (watched.pending ? watched.candidates : {}) : s.candidates}
+        // D-295 — 후보 점수는 내 차례의 내 열에만(점수표가 가른다). 남의 판을 구경하는 동안에는 넘기지 않는다.
+        candidates={watching !== null ? {} : s.candidates}
         nameOf={nameOf}
         onScore={canScore ? score : undefined}
         lastScore={flash}

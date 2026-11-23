@@ -1391,27 +1391,54 @@ html.dark .yt-theme-salon {
   pointer-events: none;
 }
 
+/* 내 차례 맥박(D-295) — 판 자체는 맥박의 시작 모습으로 멈춰 있고, 가장 밝은 모습을 띤 겹침 층(.yt-felt-glow)의 투명도만 오르내린다.
+   예전에는 판의 box-shadow 를 움직여 프레임마다 판 전체(무늬·안쪽 그림자·주사위)를 다시 그렸다 — 내 차례 내내, 굴리는 동안에도. */
+.yt-felt-wrap {
+  position: relative;
+}
+
+.yt-felt-glow {
+  display: none;
+}
+
 .yt-theme-salon .yt-felt-myturn {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 10px 26px rgba(0, 0, 0, 0.42),
+    0 0 0 1px var(--yt-s-brass),
+    0 0 0 2px var(--yt-s-brass-lo),
+    0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.yt-theme-salon .yt-felt-glow {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: clamp(22px, 6vw, 30px);
+  box-shadow:
+    0 0 0 1px var(--yt-s-brass-hi),
+    0 0 0 3px var(--yt-s-brass),
+    0 0 22px 3px var(--yt-s-brass-glow);
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
   animation: yt-salon-turn 2.2s ease-in-out infinite;
+}
+
+/* 축하로 판이 울리는 동안에는 빛을 쉰다(빛은 판과 같이 움직이지 않는다). */
+.yt-theme-salon .yt-felt-party + .yt-felt-glow,
+.yt-theme-salon .yt-felt-cheer + .yt-felt-glow {
+  animation: none;
 }
 
 @keyframes yt-salon-turn {
   0%,
   100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-      inset 0 10px 26px rgba(0, 0, 0, 0.42),
-      0 0 0 1px var(--yt-s-brass),
-      0 0 0 2px var(--yt-s-brass-lo),
-      0 8px 20px rgba(0, 0, 0, 0.3);
+    opacity: 0;
   }
   50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-      inset 0 10px 26px rgba(0, 0, 0, 0.42),
-      0 0 0 1px var(--yt-s-brass-hi),
-      0 0 0 3px var(--yt-s-brass),
-      0 0 22px 3px var(--yt-s-brass-glow);
+    opacity: 1;
   }
 }
 
@@ -1437,26 +1464,14 @@ html.dark .yt-theme-salon {
   opacity: 1;
 }
 
-/* 요트 축하 — 펠트가 짧게 울리며 카메라가 살짝 당겨졌다 돌아온다(D-204, 내 차례 맥박과 같이 돌 수 있게 두 벌). */
+/* 요트 축하 — 펠트가 짧게 울리며 카메라가 살짝 당겨졌다 돌아온다(D-204). 내 차례 맥박은 겹침 층이라 따로 돈다(D-295). */
 .yt-theme-salon .yt-felt-party {
   animation: yt-salon-shake 1.7s cubic-bezier(0.3, 0, 0.3, 1) 0.05s;
-}
-
-.yt-theme-salon .yt-felt-myturn.yt-felt-party {
-  animation:
-    yt-salon-shake 1.7s cubic-bezier(0.3, 0, 0.3, 1) 0.05s,
-    yt-salon-turn 2.2s ease-in-out infinite;
 }
 
 /* 중간 축하(라지 스트레이트·풀 하우스·상단 보너스) — 펠트가 한 번 가볍게 부푼다. */
 .yt-theme-salon .yt-felt-cheer {
   animation: yt-salon-cheer 0.55s ease-out 0.05s;
-}
-
-.yt-theme-salon .yt-felt-myturn.yt-felt-cheer {
-  animation:
-    yt-salon-cheer 0.55s ease-out 0.05s,
-    yt-salon-turn 2.2s ease-in-out infinite;
 }
 
 @keyframes yt-salon-cheer {
@@ -2285,6 +2300,8 @@ html.dark .yt-theme-salon {
   background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7) 50%, transparent);
   transform: translateX(-130%) skewX(-18deg);
   pointer-events: none;
+  /* D-295 — 합성 층으로 올려 둔다(없으면 광택이 지나가는 동안 프레임마다 버튼을 다시 그린다). */
+  will-change: transform;
   animation: yt-salon-sheen 3.4s ease-in-out 0.6s infinite;
 }
 

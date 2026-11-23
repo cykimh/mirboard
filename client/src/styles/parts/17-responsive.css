@@ -365,9 +365,8 @@
 /* D-203 — 요트 "미드나잇 살롱" 연출도 움직임 줄이기면 끈다: 눈·점수만 바로 바뀌고 축하는 상태 줄 배지 하나로만. 테마 규칙과
    명시도를 맞춰야 이긴다(.yt-theme-salon 접두). */
 @media (prefers-reduced-motion: reduce) {
-  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn,
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-glow,
   :root:not(.motion-forced) .yt-theme-salon .yt-felt-party,
-  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn.yt-felt-party,
   :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-die-face,
   :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-die-shadow,
   :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-cube,
@@ -382,7 +381,6 @@
   :root:not(.motion-forced) .yt-theme-salon .yt-cell-flash .yt-num,
   :root:not(.motion-forced) .yt-theme-salon .yt-end,
   :root:not(.motion-forced) .yt-theme-salon .yt-felt-cheer,
-  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
   :root:not(.motion-forced) .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
   :root:not(.motion-forced) .yt-theme-salon .yt-mini-die-rolling,
   :root:not(.motion-forced) .yt-theme-salon .yt-cell-bonus-new,
@@ -424,9 +422,8 @@
 }
 
 /* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
-:root.motion-off .yt-theme-salon .yt-felt-myturn,
+:root.motion-off .yt-theme-salon .yt-felt-glow,
 :root.motion-off .yt-theme-salon .yt-felt-party,
-:root.motion-off .yt-theme-salon .yt-felt-myturn.yt-felt-party,
 :root.motion-off .yt-theme-salon .yt-die-rolling .yt-die-face,
 :root.motion-off .yt-theme-salon .yt-die-rolling .yt-die-shadow,
 :root.motion-off .yt-theme-salon .yt-die-rolling .yt-cube,
@@ -441,7 +438,6 @@
 :root.motion-off .yt-theme-salon .yt-cell-flash .yt-num,
 :root.motion-off .yt-theme-salon .yt-end,
 :root.motion-off .yt-theme-salon .yt-felt-cheer,
-:root.motion-off .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
 :root.motion-off .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
 :root.motion-off .yt-theme-salon .yt-mini-die-rolling,
 :root.motion-off .yt-theme-salon .yt-cell-bonus-new,
@@ -829,9 +825,13 @@
     grid-row: 2;
   }
 
-  .yt-table > .yt-felt {
+  /* D-295 — 판은 감싸는 칸(.yt-felt-wrap — 내 차례 맥박 빛이 판과 나란히 놓인다) 안에 있다. */
+  .yt-table > .yt-felt-wrap {
     grid-column: 1;
     grid-row: 3;
+  }
+
+  .yt-table .yt-felt {
     min-height: clamp(320px, 48vh, 480px);
     justify-content: center;
   }

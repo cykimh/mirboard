@@ -115,6 +115,24 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(block).toMatch(/\.yt-seat-cup-live,\s*:root:not\(\.motion-forced\) \.yt-seat-dice-shaking-live \.yt-mini-die[^{]*\{\s*animation: none;/);
   });
 
+  it('D-295 — 내 차례 맥박은 판의 box-shadow 가 아니라 겹침 층의 투명도만 움직인다(프레임마다 판을 다시 그리지 않게)', () => {
+    const turn = /@keyframes yt-salon-turn \{([\s\S]*?)\n\}/.exec(yachtCssSource)?.[1] ?? '';
+    expect(turn).toContain('opacity');
+    expect(turn).not.toMatch(/box-shadow|filter|width|height|top|left/);
+    const felt = /\n\.yt-theme-salon \.yt-felt-myturn \{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(felt).toContain('box-shadow');
+    expect(felt).not.toContain('animation');
+    const glow = /\n\.yt-theme-salon \.yt-felt-glow \{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(glow).toContain('animation: yt-salon-turn 2.2s ease-in-out infinite');
+    expect(glow).toContain('pointer-events: none');
+    // 움직임 줄이기·연출 끔에서는 빛도 멈춘다(투명 그대로).
+    expect(responsiveCssSource).toContain(':root:not(.motion-forced) .yt-theme-salon .yt-felt-glow,');
+    expect(responsiveCssSource).toContain(':root.motion-off .yt-theme-salon .yt-felt-glow,');
+    // [굴리기] 광택 줄은 합성 층이다.
+    const sheen = /\.yt-theme-salon \.yt-roll:not\(:disabled\)::after \{([^}]*)\}/.exec(cssCode)?.[1] ?? '';
+    expect(sheen).toContain('will-change: transform');
+  });
+
   it('D-291 — 넓은 화면(1024px 이상) 2단 배치는 17 에 있고, 점수표는 오른쪽 칸에 붙어 그 안에서만 스크롤한다', () => {
     const block = /D-291[\s\S]*?@media \(min-width: 1024px\) \{([\s\S]*?)\n\}/.exec(responsiveCssSource)?.[1] ?? '';
     expect(block).toMatch(/\.yt-table \{[^}]*display: grid;[^}]*grid-template-columns:/);
@@ -123,7 +141,8 @@ describe('20-yacht-table.css — 네임스페이스 격리', () => {
     expect(card).toContain('position: sticky');
     expect(card).toContain('overflow-y: auto');
     expect(card).toMatch(/max-height: calc\(100dvh - \d+px\)/);
-    expect(block).toMatch(/\.yt-table > \.yt-felt \{[^}]*grid-column: 1;/);
+    // D-295 — 판은 감싸는 칸(.yt-felt-wrap) 안에 있다: 칸이 왼쪽 단에 놓인다.
+    expect(block).toMatch(/\.yt-table > \.yt-felt-wrap \{[^}]*grid-column: 1;/);
     // 리뷰 — 주사위 크기는 고정값이 아니라 주사위 칸 폭에서 나온다(1024~1110px 에서 줄이 넘쳐 찌그러지던 결함). 다섯 개 + 간격 넷이
     // 칸에 들어가는 값과 84px 중 작은 쪽이고, 버튼은 줄어들지 않는다(크기 변수와 실제 크기가 늘 같다).
     expect(block).toMatch(/\.yt-theme-salon \.yt-felt \{[^}]*container-type: inline-size;/);
