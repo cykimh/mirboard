@@ -23,7 +23,17 @@ await dialog.getByRole('combobox', { name: '게임 선택' }).click();
 await page.getByRole('option', { name: '얏추' }).click();
 await dialog.getByLabel('방 이름').fill('넓은 화면 확인');
 await dialog.getByRole('button', { name: '방 만들기' }).click();
-await page.getByRole('button', { name: '빈자리 봇으로 채우기' }).click();
+// D-290 — 봇은 [＋ 봇 추가]로 한 명씩(얏추 정원 4 → 봇 셋).
+for (let i = 0; i < 3; i++) {
+  const add = page.getByRole('button', { name: /봇 추가/ });
+  await add.waitFor();
+  await page.waitForFunction(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /봇 추가/.test(x.textContent ?? ''));
+    return b && !b.disabled;
+  });
+  await add.click();
+  await page.waitForTimeout(400);
+}
 await page.getByRole('button', { name: /명으로 시작$/ }).click();
 await page.locator('.yt-table').waitFor();
 

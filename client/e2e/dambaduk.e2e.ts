@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import { fillBots } from './lobbyBots';
 
 /**
- * 담바둑 한 판(D-279 — S3 완료 기준). 게스트로 들어가 담바둑 방을 만들고 [빈자리 봇으로 채우기] → [3명으로 시작], 판이 끝날 때까지
+ * 담바둑 한 판(D-279 — S3 완료 기준). 게스트로 들어가 담바둑 방을 만들고 [＋ 봇 추가]로 정원까지(D-290) → [3명으로 시작], 판이 끝날 때까지
  * 화면으로만 둔다 — 배치는 빈 칸 두 번 누르기, 옮김은 내 돌 → 갈 수 있는 칸 → 담 방향 버튼. 끝나면 결과 현판과 [대기실로].
  *
  * <p>D-281 공개 뒤에는 기본 스택에서 돈다(`npm --prefix client run e2e -- dambaduk`, 다른 곳은 `E2E_BASE_URL`). 수는 고르지 않는다(늘 첫
@@ -42,7 +43,7 @@ test('담바둑 — 봇 둘과 한 판을 끝까지 두고 대기실로 돌아�
   await dialog.getByRole('button', { name: '방 만들기' }).click();
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
 
-  await page.getByRole('button', { name: '빈자리 봇으로 채우기' }).click();
+  await fillBots(page);
   await page.getByRole('button', { name: '3명으로 시작' }).click();
   await expect(page.locator('.db-table')).toBeVisible();
 
@@ -66,5 +67,5 @@ test('담바둑 — 봇 둘과 한 판을 끝까지 두고 대기실로 돌아�
   expect(moves).toBeGreaterThan(2);
   await expect(result.getByRole('table')).toBeVisible();
   await result.getByRole('button', { name: '대기실로' }).click();
-  await expect(page.getByRole('button', { name: '빈자리 봇으로 채우기' }).or(page.getByRole('button', { name: '봇 빼기' }))).toBeVisible();
+  await expect(page.getByRole('button', { name: /봇 추가/ })).toBeVisible();
 });
