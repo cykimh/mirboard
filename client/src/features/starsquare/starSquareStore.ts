@@ -5,6 +5,7 @@ import type {
   Grid,
   MatchEndedPayload,
   MatchResult,
+  PeerBoardPayload,
   ProgressPayload,
   PuzzleEndedPayload,
   PuzzleOutcome,
@@ -91,6 +92,11 @@ export interface StarSquareRoomState {
   selected: number;
   mySolved: boolean;
   sync: SyncState;
+  /**
+   * 아직 푸는 남의 판(좌석 → 판, D-294) — <b>내가 이 퍼즐을 완성한 뒤에만</b> 서버가 본인 큐로 보낸다(비공개 뷰 `peers`·`PEER_BOARD`).
+   * 푸는 동안은 늘 비어 있다. 보기 전용이고 퍼즐이 바뀌거나 끝나면 비운다(끝난 퍼즐의 판은 `lastPuzzle` 로 모두 공개된다).
+   */
+  peers: Record<number, Grid>;
 
   // ── 메타 ──
   disconnectedSeats: Set<number>;
@@ -111,6 +117,10 @@ export interface StarSquareActions {
   /** 고른 칸에 숫자(0 = 지우기). 이미 쓴 숫자면 그 칸에서 이 칸으로 옮긴다. 두 자리 수의 둘째 자리는 `mergeLast` 로 첫 자리 입력을 물린다. */
   place: (value: number, mergeLast?: boolean) => boolean;
   undo: () => void;
+  /** 전체 리셋(D-294) — 내가 넣은 숫자를 모두 지우고 단서만 남긴다. 되돌리기 한 번으로 복구된다. 지울 것이 없으면 false. */
+  clearAll: () => boolean;
+  /** 비공개 `PEER_BOARD` — 아직 푸는 남의 판 하나(지금 퍼즐 것만 받는다). */
+  applyPeerBoard: (p: PeerBoardPayload) => void;
   /** 보낼 판 — 버전을 하나 올리고 `dirty` 를 내린다. 서버 확인 전인 내 입력이 실리면 `editVersion` 을 이 버전으로. 보낼 수 없으면 null. */
   takeSync: (now: number, complete: boolean) => { '@action': 'SYNC'; puzzle: number; version: number; grid: Grid } | null;
   /** 서버 거절 — `BUSY` 면 잠깐 뒤 다시, 낡은 버전이면 다시 받아 버전을 맞춘다(누가 이길지는 받은 판이 정한다). 그 밖은 보내지 않은 것으로 되돌리지 않는다. */
@@ -129,6 +139,16 @@ export interface StarSquareActions {
 export const BUSY_RETRY_MS = 150;
 /** BUSY 재전송 상한 — 넘으면 문구를 보이고 다음 입력이 다시 시도한다. */
 export const BUSY_RETRY_MAX = 5;
+
+const NO_PEERS: Record<number, Grid> = {};
+
+/** 좌석 하나를 뺀 남의 판 목록(없으면 같은 객체). */
+function withoutPeer(peers: Record<number, Grid>, seat: number): Record<number, Grid> {
+  if (!(seat in peers)) return peers;
+  const next = { ...peers };
+  delete next[seat];
+  return next;
+}
 
 const INITIAL: StarSquareRoomState = {
   roomId: null,
@@ -150,6 +170,7 @@ const INITIAL: StarSquareRoomState = {
   selected: -1,
   mySolved: false,
   sync: FRESH_SYNC,
+  peers: NO_PEERS,
   disconnectedSeats: new Set(),
   errorMessage: null,
   errorSeq: 0,
@@ -225,6 +246,11 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
       sync = FRESH_SYNC;
       mySolved = false;
     }
+    // 남의 판은 서버가 준 것만 — 완성한 내 비공개 뷰에만 실린다(그 밖에는 비운다: 아직 푸는 중·관전·준비·결과)
+    const peers: Record<number, Grid> =
+      mine && t.phase === 'PLAYING' && mine.solved && mine.peers && mine.peers.length > 0
+        ? Object.fromEntries(mine.peers.map((p) => [p.seat, p.grid]))
+        : NO_PEERS;
     const selected =
       board.length > 0 && t.clues && state.selected >= 0 && state.selected < board.length && t.clues[state.selected] === 0
         ? state.selected
@@ -247,6 +273,7 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
       selected,
       mySolved,
       sync,
+      peers,
       disconnectedSeats: new Set(snap.disconnectedSeats ?? []),
       errorMessage: null,
     });
@@ -293,6 +320,7 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
           selected: firstEmpty(p.clues),
           mySolved: false,
           sync: FRESH_SYNC,
+          peers: NO_PEERS,
         });
         return 'applied';
       }
@@ -316,6 +344,8 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
             lines: 2 * n + 2,
           }),
           ...(mine ? { mySolved: true, sync: { ...state.sync, dirty: false, awaitingSolveSince: 0 } } : {}),
+          // 완성한 좌석은 더 볼 판이 아니다(끝나면 `PUZZLE_ENDED` 가 모두 공개한다)
+          peers: withoutPeer(state.peers, p.seat),
         });
         return 'applied';
       }
@@ -350,13 +380,14 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
           seats,
           clock: { since: Date.now(), remainingMs: p.nextInMs },
           sync: { ...state.sync, dirty: false, awaitingSolveSince: 0 },
+          peers: NO_PEERS,
         });
         return 'applied';
       }
 
       case 'SEAT_DESERTED': {
         const p = payload as SeatDesertedPayload;
-        set({ seats: patchSeat(state.seats, p.seat, { deserted: true }) });
+        set({ seats: patchSeat(state.seats, p.seat, { deserted: true }), peers: withoutPeer(state.peers, p.seat) });
         return 'applied';
       }
 
@@ -368,6 +399,7 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
           clock: null,
           result: { reason: p.reason, placements: p.placements },
           sync: { ...state.sync, dirty: false, awaitingSolveSince: 0 },
+          peers: NO_PEERS,
         });
         return 'applied';
       }
@@ -429,6 +461,30 @@ export const useStarSquareStore = create<StarSquareRoomState & StarSquareActions
     if (!canEditBoard(s) || s.history.length === 0) return;
     const prev = s.history[s.history.length - 1];
     set({ board: prev, history: s.history.slice(0, -1), sync: { ...s.sync, dirty: true, edited: true, busyRetries: 0 } });
+  },
+
+  clearAll() {
+    const s = get();
+    if (!canEditBoard(s) || !s.clues) return false;
+    const next = [...s.clues];
+    if (sameGrid(next, s.board)) return false;
+    // 되돌리기 기록 한 칸 — 한 번에 복구된다. 서버에는 평소 SYNC 로 간다(다른 입력과 같은 길)
+    set({
+      board: next,
+      history: [...s.history, s.board].slice(-UNDO_LIMIT),
+      sync: { ...s.sync, dirty: true, edited: true, busyRetries: 0 },
+    });
+    return true;
+  },
+
+  applyPeerBoard(p) {
+    const s = get();
+    // 지금 퍼즐의 판만 — 지난 퍼즐의 늦은 프레임, 크기가 다른 판, 내 좌석, 이미 완성했거나 나간 좌석은 버린다
+    if (s.phase !== 'PLAYING' || s.result || p.puzzle !== s.puzzleIndex) return;
+    if (p.seat === s.mySeat || !Array.isArray(p.grid) || p.grid.length !== s.size * s.size) return;
+    const seat = s.seats[p.seat];
+    if (!seat || seat.solved || seat.deserted) return;
+    set({ peers: { ...s.peers, [p.seat]: p.grid } });
   },
 
   takeSync(now, complete) {

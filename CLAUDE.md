@@ -157,6 +157,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - D-157: 버튼을 누른 뒤의 짧은 안내(마이크 오류·초대 링크 복사됨)는 **토스트**(`components/toast` — `showToast`, 앱에 `Toaster` 하나). 버튼 줄에 글을 끼우지 말 것.
 - D-156: 음성 대화를 **티츄·스컬킹에도**(공용 `features/voice/VoiceControls`·`voiceStatusOf`). 비밀번호는 **4~64자면 무엇이든**(`PasswordPolicy`).
 - D-170: **허브 서비스 토큰** — 허브 서버가 `/api/admin/**` 를 `Authorization: Bearer <서비스 토큰>` 으로 부르면 운영자 본인 userId(`mirboard.admin.service-user-id`, `admin_roles` 에 있어야 함)로 인증한다. `JwtAuthFilter` 안의 분기(상수 시간 비교, `/api/admin/` 밖·토큰 미설정이면 꺼짐). 값은 Fly secrets 로만 — `docs/deploy.md` "허브 서비스 토큰".
+- D-294: **별자리 수판 은닉** — 푸는 중인 남의 판은 공개 토픽·공개 뷰에 없다. 이 퍼즐을 **완성한 좌석만** 본인 큐로 받는다(비공개·순번 없는 `PEER_BOARD` + 비공개 뷰 `peers`, 대상·받는 좌석은 `StarSquareState.peerSeats` 한 곳). 아직 푸는 좌석·봇·탈주·방 관전자에게는 보내지 않는다 — 판을 내보내는 새 경로를 만들면 이 함수를 거칠 것. 첫 완성 뒤 마감 15초, 칸 크기는 `27-starsquare-table.css` 의 식(폭·높이·상한)과 17 의 `.sq-` 블록 값.
 - D-200: **요트 공개** — 운영은 원카드·요트(D-168 의 "원카드만"을 바꿈), 되돌리기 `MIRBOARD_YACHT_STATUS`. D-183 — **`GameContext.turnSeconds`**: 인프라 턴 데드라인은
   액션마다 다시 걸리므로(한 차례 = 한 액션 가정) 한 차례가 여러 액션인 게임은 차례 시작 시각을 상태에 두고 엔진 타이머로 **차례 전체 마감**을 건다(요트 — 만기면
   최고점 칸 자동 기록). 요트 클라는 `HOLD` 를 마지막 탭 뒤 250ms 에 모아 보내고 `ROLL` 에 홀드를 싣는다(탭마다 보내면 방 락 `BUSY`), `ROLL`·`SCORE` 의 `BUSY` 는 한 번 재전송.

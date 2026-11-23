@@ -78,6 +78,9 @@ function useRemaining(clock: { since: number; remainingMs: number } | null): num
  * <p>모두가 같은 퍼즐을 <b>동시에</b> 푼다 — 차례가 없다. 내 판은 로컬이 먼저고(입력은 바로 화면), 판 전체를 0.4초에 한 번까지 모아 보낸다
  * ({@link useSyncSender} — 보낸 판을 기다리며 잠그는 상태가 없다). 남의 판은 숫자 없이 진행도(채운 칸·맞은 줄)만 보이고, 퍼즐이 끝나면 모두의
  * 판과 정답 하나를 나란히 본다.
+ *
+ * <p><b>D-294</b> — 판이 주인공이다: 시계는 머리 줄에, 칸 크기는 화면 폭·높이에서 계산한다(CSS). 내가 이 퍼즐을 완성하면 아직 푸는 사람의 판을
+ * 골라 볼 수 있다(보기 전용 — 판은 서버가 완성한 사람의 본인 큐로만 보낸다. 푸는 동안·관전 중에는 스토어 `peers` 가 비어 있다).
  */
 export function StarSquareTable({
   roomId,
@@ -121,6 +124,39 @@ export function StarSquareTable({
   const editable = canEditBoard(s) && !roomFinished;
   const n = s.size;
   const solo = playerIds.length === 1;
+
+  // ── 남의 판 보기(D-294) — 내가 완성한 뒤, 아직 푸는 살아 있는 좌석만. 고른 좌석이 완성하거나 나가면 내 판으로 돌아온다 ──
+  const [watchPick, setWatchPick] = useState<number | null>(null);
+  const watchable =
+    s.phase === 'PLAYING' && s.mySolved && mySeat >= 0 && !roomFinished && s.result === null
+      ? s.seats.filter((v) => v.seat !== mySeat && !v.solved && !v.deserted).map((v) => v.seat)
+      : [];
+  const watching = watchPick !== null && watchable.includes(watchPick) ? watchPick : null;
+  const puzzleKey = s.puzzleIndex;
+  useEffect(() => {
+    setWatchPick(null); // 퍼즐이 바뀌면 내 판부터
+  }, [puzzleKey]);
+  // 포커스가 있던 탭 단추가 사라지면(그 사람이 완성했거나 나갔다) 포커스가 body 로 떨어진다 — '내 판' 탭으로 옮긴다.
+  // 지워진 요소는 blur 를 믿을 수 없어, 마지막으로 포커스를 받은 탭 좌석을 focusin 으로 적어 둔다(다른 곳으로 옮기면 지워진다).
+  const focusedTabSeat = useRef<number | null>(null);
+  const myTabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const tab = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-watch-seat]') : null;
+      focusedTabSeat.current = tab ? Number(tab.dataset.watchSeat) : null;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+  const watchableKey = watchable.join(',');
+  useEffect(() => {
+    const seat = focusedTabSeat.current;
+    if (seat === null || watchableKey.split(',').includes(String(seat))) return;
+    focusedTabSeat.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body) return; // 포커스가 이미 다른 곳에 있다
+    myTabRef.current?.focus();
+  }, [watchableKey]);
 
   const resyncNonce = s.resyncNonce;
   useEffect(() => {
@@ -220,7 +256,12 @@ export function StarSquareTable({
   else if (s.phase === 'INTRO' || s.phase === null) status = '곧 첫 퍼즐이 열려요';
   else if (s.phase === 'RESULT') status = '퍼즐이 끝났어요';
   else if (spectator || mySeat < 0) status = '관전 중 — 모두의 진행만 보여요';
-  else if (s.mySolved && mySeatView) status = `완성! ${mySeatView.solvePlace}번째 — 다른 사람을 기다려요`;
+  else if (watching !== null) status = `${nameOf(watching)}의 판을 보는 중 — 보기만 할 수 있어요`;
+  else if (s.mySolved && mySeatView)
+    status =
+      watchable.length > 0
+        ? `완성! ${mySeatView.solvePlace}번째 — 아직 푸는 사람의 판을 볼 수 있어요`
+        : `완성! ${mySeatView.solvePlace}번째 — 다른 사람을 기다려요`;
   else if (awaiting) status = '마방진인지 확인하는 중…';
   else if (s.closing) status = '누군가 완성했어요 — 마감이 다가와요!';
   else status = `1~${n * n} 을 한 번씩 — 모든 줄의 합을 ${s.magicSum || magicSumOf(n)}로`;
@@ -244,6 +285,24 @@ export function StarSquareTable({
           )}
           {spectator && <span className="sq-badge">👀 관전 중</span>}
         </div>
+        {/* D-294 — 시계는 머리 줄에(판 위 한 줄을 판에 준다) */}
+        {remaining !== null && s.phase !== 'ENDED' && s.phase !== 'RESULT' && !s.result && (
+          <div
+            className={`sq-clock${s.closing ? ' sq-clock-closing' : ''}${s.phase === 'INTRO' ? ' sq-clock-intro' : ''}`}
+            role="timer"
+            aria-live="off"
+            aria-label={s.phase === 'INTRO' ? '시작까지' : s.closing ? '마감까지' : '남은 시간'}
+          >
+            {s.phase === 'INTRO' ? (
+              <span className="sq-clock-intro-text">곧 시작 · {Math.max(1, Math.ceil(remaining / 1000))}</span>
+            ) : (
+              <>
+                <span className="sq-clock-label">{s.closing ? '마감' : '남은 시간'}</span>
+                <span className="sq-clock-value">{clockText(remaining)}</span>
+              </>
+            )}
+          </div>
+        )}
         <div className="sq-header-actions gm-header-actions">
           <button type="button" className="sq-badge" onClick={() => setChatOpen((v) => !v)} aria-pressed={chatOpen}>
             채팅{chatUnread > 0 ? ` (${chatUnread})` : ''}
@@ -281,24 +340,6 @@ export function StarSquareTable({
         <ReconnectBanner connected={connected} />
         <ErrorNotice message={s.errorMessage} seq={s.errorSeq} sticky={s.errorSticky} onClose={() => s.setError(null)} />
 
-        {remaining !== null && s.phase !== 'ENDED' && !s.result && (
-          <div
-            className={`sq-clock${s.closing ? ' sq-clock-closing' : ''}${s.phase === 'INTRO' ? ' sq-clock-intro' : ''}`}
-            role="timer"
-            aria-live="off"
-            aria-label={s.phase === 'INTRO' ? '시작까지' : s.closing ? '마감까지' : '남은 시간'}
-          >
-            {s.phase === 'INTRO' ? (
-              <span className="sq-clock-intro-text">곧 시작 · {Math.max(1, Math.ceil(remaining / 1000))}</span>
-            ) : s.phase === 'RESULT' ? null : (
-              <>
-                <span className="sq-clock-label">{s.closing ? '마감' : '남은 시간'}</span>
-                <span className="sq-clock-value">{clockText(remaining)}</span>
-              </>
-            )}
-          </div>
-        )}
-
         {(s.phase === 'INTRO' || s.phase === null) && !s.result && (
           <div className="sq-intro" aria-live="polite">
             <ObservatoryArt className="sq-intro-art" />
@@ -308,22 +349,69 @@ export function StarSquareTable({
         )}
 
         {showBoard && s.clues && (
-          <div ref={playRef} className={`sq-play${s.mySolved ? ' sq-play-solved' : ''}${awaiting ? ' sq-play-checking' : ''}`}>
-            <StarGrid
-              n={n}
-              board={s.board.length === n * n ? s.board : s.clues}
-              clues={s.clues}
-              selected={s.selected}
-              editable={editable}
-              onSelect={(cell) => {
-                pendingDigit.current = null;
-                s.select(cell);
-              }}
-              label={spectator || mySeat < 0 ? '퍼즐(단서)' : '내 판'}
-            />
-            {/* 완성 도장 — 글자는 CSS(`attr(data-place)` + "등!")가 그린다. 장식이라 눌림을 받지 않는다 */}
-            {s.mySolved && mySeatView && mySeatView.solvePlace > 0 && (
-              <span className="sq-fx-stamp" data-place={mySeatView.solvePlace} aria-hidden="true" />
+          <div
+            ref={playRef}
+            className={`sq-play${s.mySolved ? ' sq-play-solved' : ''}${awaiting ? ' sq-play-checking' : ''}${watching !== null ? ' sq-play-watching' : ''}${editable ? ' sq-play-editing' : ''}`}
+          >
+            {/* 내가 완성한 뒤 — 누구 판을 볼지 고른다(보기 전용). 넓은 화면은 내 판 옆에, 좁은 화면은 판 위에 */}
+            {watchable.length > 0 && (
+              <div className="sq-watch-tabs" role="group" aria-label="누구 판 보기">
+                <button
+                  ref={myTabRef}
+                  type="button"
+                  className="sq-watch-tab"
+                  aria-pressed={watching === null}
+                  onClick={() => setWatchPick(null)}
+                >
+                  내 판
+                </button>
+                {watchable.map((seat) => (
+                  <button
+                    key={seat}
+                    type="button"
+                    className="sq-watch-tab"
+                    data-watch-seat={seat}
+                    aria-pressed={watching === seat}
+                    onClick={() => setWatchPick(seat)}
+                  >
+                    {nameOf(seat)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="sq-board sq-board-mine">
+              <StarGrid
+                n={n}
+                board={s.board.length === n * n ? s.board : s.clues}
+                clues={s.clues}
+                selected={s.selected}
+                editable={editable}
+                onSelect={(cell) => {
+                  pendingDigit.current = null;
+                  s.select(cell);
+                }}
+                label={spectator || mySeat < 0 ? '퍼즐(단서)' : '내 판'}
+              />
+              {/* 완성 도장 — 글자는 CSS(`attr(data-place)` + "등!")가 그린다. 장식이라 눌림을 받지 않는다 */}
+              {s.mySolved && mySeatView && mySeatView.solvePlace > 0 && (
+                <span className="sq-fx-stamp" data-place={mySeatView.solvePlace} aria-hidden="true" />
+              )}
+            </div>
+            {watching !== null && (
+              <div className="sq-board sq-board-peer" aria-live="off">
+                <p className="sq-peer-title">
+                  <span className="sq-peer-name">{nameOf(watching)}</span>의 판 <span className="sq-peer-note">· 보기 전용</span>
+                </p>
+                {/* 줄 합·별자리 선은 그 사람 판 기준. 아직 판을 받지 못했으면(막 골랐을 때) 단서 판부터 */}
+                <StarGrid
+                  n={n}
+                  board={(s.peers[watching]?.length ?? 0) === n * n ? s.peers[watching] : s.clues}
+                  clues={s.clues}
+                  selected={-1}
+                  editable={false}
+                  label={`${nameOf(watching)}의 판`}
+                />
+              </div>
             )}
             {editable && (
               <NumberPad
@@ -331,6 +419,7 @@ export function StarSquareTable({
                 board={s.board}
                 enabled={editable && s.selected >= 0}
                 canUndo={s.history.length > 0}
+                canReset={editable && s.board.some((v, i) => v !== 0 && s.clues![i] === 0)}
                 onNumber={(v) => {
                   pendingDigit.current = null;
                   s.place(v);
@@ -342,6 +431,10 @@ export function StarSquareTable({
                 onUndo={() => {
                   pendingDigit.current = null;
                   s.undo();
+                }}
+                onReset={() => {
+                  pendingDigit.current = null;
+                  s.clearAll();
                 }}
               />
             )}

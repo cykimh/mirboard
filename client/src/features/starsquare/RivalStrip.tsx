@@ -85,10 +85,11 @@ export function RivalStrip({ seats, n, mySeat, playerIds, nameOf, tiers, disconn
                   </span>
                 ) : (
                   <span className="sq-seat-count">
-                    <span aria-label={`맞은 줄 ${s.lines} / ${lines}`}>
-                      ✦ {s.lines}/{lines}줄
+                    <span className="sq-seat-lines" aria-label={`맞은 줄 ${s.lines} / ${lines}`}>
+                      ✦ {s.lines}/{lines}
+                      <span className="sq-seat-unit">줄</span>
                     </span>
-                    <span aria-label={`채운 칸 ${s.filled} / ${nn}`}>
+                    <span className="sq-seat-filled" aria-label={`채운 칸 ${s.filled} / ${nn}`}>
                       {' · '}
                       {s.filled}/{nn}칸
                     </span>

@@ -94,7 +94,7 @@ class StarSquareBotMatchSimulationIT {
         runAllBotMatch(4);
     }
 
-    /** 사람은 손을 놓고 봇 둘이 푼다 — 봇의 첫 완성 + 30초(배율) 마감이 퍼즐마다 끝내고, 사람의 전적은 남되 ELO 는 제외. */
+    /** 사람은 손을 놓고 봇 둘이 푼다 — 봇의 첫 완성 + 15초(배율) 마감이 퍼즐마다 끝내고, 사람의 전적은 남되 ELO 는 제외. */
     @Test
     void an_idle_human_with_bots_is_closed_out_by_the_bots_and_keeps_a_record_without_elo() {
         long human = newUser("sq_idle_");
@@ -176,7 +176,7 @@ class StarSquareBotMatchSimulationIT {
         }
         StarSquareState ended = awaitEnded(room.roomId(), 60, botSeats, 0);
         assertThat(ended.result().reason()).isEqualTo(EndReason.FINISHED);
-        // 봇끼리는 모두 완성하거나, 봇 완성 시각의 흩어짐이 첫 완성 + 30초보다 넓으면 마감으로 끝난다 — 어느 쪽이든 누군가는 풀었다
+        // 봇끼리는 모두 완성하거나, 봇 완성 시각의 흩어짐이 첫 완성 + 15초보다 넓으면 마감으로 끝난다 — 어느 쪽이든 누군가는 풀었다
         assertThat(ended.outcomes()).extracting(PuzzleOutcome::reason)
                 .allMatch(r -> r == PuzzleOutcome.EndReason.ALL_SOLVED || r == PuzzleOutcome.EndReason.CLOSED);
         assertThat(ended.outcomes()).allMatch(o -> o.results().stream().anyMatch(r -> r.solved()));

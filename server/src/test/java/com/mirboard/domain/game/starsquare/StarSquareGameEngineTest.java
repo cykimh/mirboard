@@ -159,7 +159,7 @@ class StarSquareGameEngineTest {
         StarSquareGameEngine a = adapter(t, publisher);
         s = (StarSquareState) a.apply(s, 0, sync(0, 1, LO_SHU.toArray())).newState();
         s = (StarSquareState) a.apply(s, 1, sync(0, 1, LO_SHU.toArray())).newState();
-        // 봇(좌석 2)은 아직 — 첫 완성 + 30초 마감이 퍼즐(짧게 = 1개)과 매치를 끝낸다
+        // 봇(좌석 2)은 아직 — 첫 완성 + 15초 마감이 퍼즐(짧게 = 1개)과 매치를 끝낸다
         StarSquareGameEngine closing = adapter(t + StarSquareEngine.CLOSE_AFTER_FIRST_MS, publisher);
         GameEngine.Result last = closing.onTimer(s).orElseThrow();
         assertThat(last.events()).last().isInstanceOf(StarSquareEvent.MatchEnded.class);

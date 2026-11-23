@@ -30,13 +30,15 @@ import java.util.OptionalLong;
  * <p>모든 좌석이 같은 퍼즐을 <b>동시에</b> 푼다 — 차례가 없다. 시간이 지나면 일어나는 것(준비 끝·봇 이정표·마감·결과 보기 끝)은
  * 전부 {@link #onTimer} 하나이고, {@link #timer} 가 그 가장 이른 시각까지 남은 시간을 돌려준다(포트 ⑦ — 시작 시각을 상태에 두므로
  * 재무장해도 처음부터 세지 않는다). 거절은 {@link StarSquareActionRejectedException} 이고 상태를 바꾸지 않는다.
+ *
+ * <p>이 퍼즐을 완성한 사람은 아직 푸는 남의 판을 본다(D-294) — 판이 바뀐 전이에 비공개 {@code PEER_BOARD} 를 덧붙일 뿐이고 새 액션은 없다.
  */
 public final class StarSquareEngine {
 
     /** 시작 준비(§6.1) [결정] — 운영값. 실제로는 {@link StarSquareConfig#introMillis()}(배율). */
     public static final long INTRO_MS = 3_000L;
     /** 첫 완성 뒤 마감(§6.3 ②) [수치]. */
-    public static final long CLOSE_AFTER_FIRST_MS = 30_000L;
+    public static final long CLOSE_AFTER_FIRST_MS = 15_000L;
     /** 퍼즐 사이 결과 보기(§6.4) [수치]. */
     public static final long RESULT_MS = 8_000L;
 
@@ -132,13 +134,38 @@ public final class StarSquareEngine {
         }
         SeatBoard next = board.withGrid(grid, sync.version());
         StarSquareState updated = state.withBoard(seat, next);
-        List<StarSquareEvent> events = new ArrayList<>(3);
+        List<StarSquareEvent> events = new ArrayList<>(4);
         if (MagicCheck.isMagic(grid, puzzle.clues())) {
             updated = markSolved(updated, seat, now - state.phaseStartedAt(), now, events);
-        } else if (!next.progress().equals(board.progress())) {
-            events.add(new StarSquareEvent.Progress(seat, next.filled(), next.lines()));
+            sharePeersWith(updated, seat, events);
+        } else {
+            if (!next.progress().equals(board.progress())) {
+                events.add(new StarSquareEvent.Progress(seat, next.filled(), next.lines()));
+            }
+            shareBoard(updated, seat, events);
         }
         return new Result(updated, events);
+    }
+
+    // ---- 완성한 사람의 남의 판 보기 (§11.2, D-294) ----
+
+    /** {@code seat} 의 바뀐 판을, 이 퍼즐을 완성한 살아 있는 <b>사람</b> 좌석들의 본인 큐로. 아직 푸는 좌석·봇·탈주한 좌석에게는 가지 않는다. */
+    private void shareBoard(StarSquareState state, int seat, List<StarSquareEvent> events) {
+        for (int viewer : state.aliveSeats()) {
+            if (!config.bot(viewer) && state.peerSeats(viewer).contains(seat)) {
+                events.add(new StarSquareEvent.PeerBoard(viewer, state.index(), seat, state.board(seat).grid()));
+            }
+        }
+    }
+
+    /** 방금 완성한 {@code viewer}(사람)에게 아직 푸는 판들을 한 번. 퍼즐이 끝났으면 대상이 없다({@code PUZZLE_ENDED} 가 모두 공개한다). */
+    private void sharePeersWith(StarSquareState state, int viewer, List<StarSquareEvent> events) {
+        if (config.bot(viewer)) {
+            return;
+        }
+        for (int seat : state.peerSeats(viewer)) {
+            events.add(new StarSquareEvent.PeerBoard(viewer, state.index(), seat, state.board(seat).grid()));
+        }
     }
 
     private static Grid parse(List<Integer> values, int n) {
@@ -226,7 +253,7 @@ public final class StarSquareEngine {
 
     // ---- 시간 (§9) ----
 
-    /** 지금 퍼즐의 마감 시각 — 퍼즐 시작 + 제한, 첫 완성이 있으면 그 + 30초와 더 이른 쪽. 푸는 단계에서만 뜻이 있다. */
+    /** 지금 퍼즐의 마감 시각 — 퍼즐 시작 + 제한, 첫 완성이 있으면 그 + 15초와 더 이른 쪽. 푸는 단계에서만 뜻이 있다. */
     public long deadline(StarSquareState state) {
         long limit = state.phaseStartedAt() + config.limitMillis();
         return state.firstSolvedAt() < 0 ? limit : Math.min(limit, state.firstSolvedAt() + config.closeAfterFirstMillis());
@@ -342,6 +369,7 @@ public final class StarSquareEngine {
         if (!next.progress().equals(board.progress())) {
             events.add(new StarSquareEvent.Progress(seat, next.filled(), next.lines()));
         }
+        shareBoard(updated, seat, events);
         return updated;
     }
 

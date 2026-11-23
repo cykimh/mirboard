@@ -17,11 +17,11 @@ describe('별자리 수판 튜토리얼', () => {
     expect(tutorialFor('STAR_SQUARE')?.bodyClassName?.split(' ')).toContain('sq-tokens');
   });
 
-  it('여섯 단계 — 합 공식·단서·옮기기·줄 합 칩·30초 마감·점수', () => {
+  it('여섯 단계 — 합 공식·단서·옮기기·줄 합 칩·15초 마감·점수', () => {
     expect(STAR_SQUARE_TUTORIAL_STEPS).toHaveLength(6);
     const all = STAR_SQUARE_TUTORIAL_STEPS.map((_, i) => text(i)).join('\n');
     for (const phrase of ['1부터 N²까지 한 번씩', '15', '34', '65', '단서 별', '어떤 마방진이든 정답', '이 칸으로 옮겨져요',
-      '▽ 모자람', '△ 넘침', '30초', '남의 판 숫자는 보이지 않아요', '맞은 줄 → 채운 칸', '혼자 하기']) {
+      '▽ 모자람', '△ 넘침', '15초', '남의 판 숫자는 보이지 않아요', '맞은 줄 → 채운 칸', '혼자 하기']) {
       expect(all).toContain(phrase);
     }
   });

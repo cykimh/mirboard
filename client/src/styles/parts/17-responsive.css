@@ -1052,33 +1052,141 @@
 }
 /* motion-off:end */
 
-/* D-286 — 별자리 수판(27 은 폭 미디어 0개라 여기 둔다). 기준: 375px 에서 5×5 판 + 합 열 + 7열 숫자판이 가로 스크롤 없이 한 화면.
-   ① 넓은 화면은 칸을 키운다(3×3·4×4 는 더 크게). ② 좁은 화면은 틈·안쪽 여백을 줄이고 좌석 띠를 두 줄짜리로 눕힌다(진행도 수 옆에 띠).
-   ③ 360px 아래는 칸을 44px 까지 줄인다(누름 하한). ④ 동작 줄이기: 움직임을 모두 끄고 결과만 남긴다 — 별똥별은 그리지 않는다(D-291 — `:root:not(.motion-forced)` 아래 + 바로 뒤 motion-off 짝).
+/* D-286·D-294 — 별자리 수판(27 은 폭 미디어 0개라 여기 둔다). 기준: 375px 에서 5×5 판 + 합 열 + 7열 숫자판이 가로 스크롤 없이 한 화면.
+   칸 크기는 27 의 식(min(폭에 맞춤, 높이에 맞춤, 상한))이 정하고, 여기서는 화면마다 그 식의 값(판 밖 여백·칸 아닌 높이·상한)만 바꾼다.
+   ① 좁은 화면(≤480px): 판 밖 좌우 24px(= #root 6 + 판 6, 양쪽) → 5×5 칸 58px(D-286 은 52px). 좌석 띠는 한 줄짜리(이름·맞은 줄·점수, 채운 칸은
+      아래 가는 띠로), 머리 줄은 게임 이름·"남은 시간" 글자를 접는다("마감"은 남긴다 — 색만으로 알리지 않게).
+   ② 600px 이상: 여백·숫자판 단추가 커진 만큼 높이 식을 다시 맞추고 상한을 올린다.
+   ③ 1200px 이상(PC): 판을 가운데 크게 두고 숫자판·남의 판 보기를 오른쪽 옆에 둔다 — 높이에서 숫자판이 빠져 칸이 더 커진다. #root 의 폭 상한을
+      이 게임판에서만 넓힌다. 남의 판은 내 판을 가리지 않고 옆에 작게.
+   ④ 동작 줄이기: 움직임을 모두 끄고 결과만 남긴다 — 별똥별은 그리지 않는다(D-291 — `:root:not(.motion-forced)` 아래 + 바로 뒤 motion-off 짝).
    (담바둑 블록 뒤·스컬킹 맨 끝 두 블록 앞에 둔다 — `skullkingCssNamespace.test` 가 맨 끝 두 블록을 붙잡는다.) */
+@media (max-width: 480px) {
+  /* 방 화면의 #root 좌우 여백(6px) 안에서 5×5 별판(348px)이 들어가도록 판 좌우 여백도 6px 로 */
+  .sq-table {
+    gap: 5px;
+    padding: 4px 6px 6px;
+  }
+  .sq-stage,
+  .sq-play {
+    gap: 5px;
+  }
+  .sq-play .sq-grid-wrap {
+    --sq-out-w: 24px;
+  }
+  /* 머리 줄 — 아이콘·퍼즐 번호·시계·채팅·메뉴만 */
+  .sq-badge-title,
+  .sq-clock:not(.sq-clock-closing) .sq-clock-label {
+    display: none;
+  }
+  .sq-clock-value {
+    font-size: 18px;
+  }
+  /* 좌석 띠 — 한 줄: [계급 이름 점수] [✦ 맞은 줄 | 완성 도장], 채운 칸은 아래 가는 띠 */
+  .sq-strip {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 4px;
+  }
+  .sq-seat {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    min-height: 26px;
+    padding: 2px 8px 5px;
+    font-size: 12px;
+  }
+  /* 이름 줄은 96px 아래로 줄지 않는다 — 끊김 표시·[내보내기]가 붙어 자리가 모자라면 그것들이 다음 줄로 내려간다 */
+  .sq-seat-head {
+    flex: 1 1 96px;
+  }
+  .sq-seat-points {
+    flex: none;
+    white-space: nowrap;
+  }
+  .sq-seat-scope,
+  .sq-seat-unit {
+    display: none;
+  }
+  .sq-seat-progress {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    font-size: 11px;
+  }
+  /* 채운 칸 수는 띠가 보여 준다 — 글자는 보조기기에만 남긴다 */
+  .sq-seat-filled {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sq-seat-bar {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 2px;
+    height: 2px;
+  }
+  .sq-seat-stamp {
+    align-self: center;
+    padding: 0 5px;
+    font-size: 11px;
+  }
+  /* 끊김·나감 표시와 [내보내기]도 한 줄 안에 들게 작게(누르는 [내보내기]만 높이를 남긴다) */
+  .sq-seat .sq-badge {
+    min-height: 20px;
+    padding: 0 6px;
+    font-size: 11px;
+    align-self: center;
+  }
+  .sq-seat button.sq-badge {
+    min-height: 28px;
+  }
+  .sq-status {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+  .sq-intro-art {
+    width: 112px;
+    height: auto;
+  }
+}
+
 @media (min-width: 600px) {
   .sq-table {
     gap: 12px;
     padding: 12px 16px 20px;
   }
+  .sq-play .sq-grid-wrap {
+    --sq-out-w: 80px;
+    --sq-gap: 6px;
+    --sq-chip: 28px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
   .sq-play .sq-grid-wrap[data-n='3'] {
-    --sq-cs: 84px;
-    --sq-moon-size: 42px;
+    --sq-fit-h: calc((100dvh - 420px) / 3);
+    --sq-cs-cap: 112px;
   }
   .sq-play .sq-grid-wrap[data-n='4'] {
-    --sq-cs: 72px;
-    --sq-moon-size: 40px;
+    --sq-fit-h: calc((100dvh - 472px) / 4);
+    --sq-cs-cap: 92px;
   }
   .sq-play .sq-grid-wrap[data-n='5'] {
-    --sq-cs: 60px;
-    --sq-moon-size: 38px;
-  }
-  .sq-play .sq-grid-wrap {
-    padding: 10px;
-    gap: 8px;
+    --sq-fit-h: calc((100dvh - 478px) / 5);
+    --sq-cs-cap: 76px;
   }
   .sq-play .sq-sum {
-    font-size: 14px;
+    font-size: 12px;
+  }
+  .sq-play .sq-sum-diag,
+  .sq-play .sq-sum-anti {
+    height: 22px;
+    bottom: -10px;
   }
   .sq-pad-number,
   .sq-pad-tool {
@@ -1092,42 +1200,109 @@
   }
 }
 
-@media (max-width: 480px) {
-  /* 방 화면의 #root 좌우 여백(6px) 안에서 5×5 별판(346px)이 들어가도록 판 좌우 여백도 6px 로 */
+@media (min-width: 1200px) {
+  #root:has(.sq-table) {
+    max-width: 1320px;
+  }
   .sq-table {
-    gap: 5px;
-    padding: 4px 6px 6px;
+    width: 100%;
+    max-width: 1240px;
+    padding: 12px 20px 20px;
   }
-  .sq-stage,
+  /* 판은 가운데, 숫자판(푸는 중)·남의 판 보기(완성 뒤)는 오른쪽 옆. 왼쪽 칸은 비워 판이 한가운데에 온다 */
   .sq-play {
-    gap: 5px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 24px;
+    row-gap: 10px;
+    align-items: start;
   }
-  .sq-seat {
-    gap: 2px;
-    padding: 4px 8px;
-    font-size: 12px;
+  .sq-play > .sq-board-mine,
+  .sq-play-watching > .sq-board-mine {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
-  .sq-seat-progress {
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-  }
-  .sq-seat-bar {
-    flex: 1 1 0;
-  }
-  .sq-seat-stamp {
+  .sq-play > .sq-pad {
+    grid-column: 3;
+    grid-row: 1 / span 2;
     align-self: center;
+    justify-self: start;
+    max-width: 300px;
   }
-  .sq-clock-value {
-    font-size: 18px;
+  .sq-play > .sq-watch-tabs {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: start;
+    justify-content: flex-start;
+    max-width: 300px;
   }
-  .sq-status {
+  .sq-play > .sq-board-peer {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: start;
+    align-items: flex-start;
+  }
+  /* 칸 — 높이에서 숫자판이 빠지고, 폭은 양옆 300px 칸과 틈을 뺀 가운데 */
+  .sq-play .sq-grid-wrap[data-n='3'] {
+    --sq-fit-w: calc((100vw - 804px) / 3);
+    --sq-fit-h: calc((100dvh - 262px) / 3);
+    --sq-cs-cap: 140px;
+  }
+  .sq-play .sq-grid-wrap[data-n='4'] {
+    --sq-fit-w: calc((100vw - 810px) / 4);
+    --sq-fit-h: calc((100dvh - 268px) / 4);
+    --sq-cs-cap: 116px;
+  }
+  .sq-play .sq-grid-wrap[data-n='5'] {
+    --sq-fit-w: calc((100vw - 816px) / 5);
+    --sq-fit-h: calc((100dvh - 274px) / 5);
+    --sq-cs-cap: 96px;
+  }
+  .sq-play .sq-sum {
     font-size: 13px;
   }
-  .sq-intro-art {
-    width: 112px;
-    height: auto;
+  /* 옆의 남의 판 — 300px 칸에 맞는 작은 판 */
+  .sq-play .sq-board-peer .sq-grid-wrap {
+    --sq-gap: 4px;
+    --sq-chip: 22px;
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+  .sq-play .sq-board-peer .sq-grid-wrap[data-n='3'] {
+    --sq-cs: 80px;
+  }
+  .sq-play .sq-board-peer .sq-grid-wrap[data-n='4'] {
+    --sq-cs: 60px;
+  }
+  .sq-play .sq-board-peer .sq-grid-wrap[data-n='5'] {
+    --sq-cs: 47px;
+  }
+  .sq-play .sq-board-peer .sq-sum {
+    font-size: 11px;
+  }
+  /* 옆 숫자판은 판과 같은 모양(N열) — 5×5 는 숫자 다섯 줄 + 도구 한 줄 */
+  .sq-pad[data-n='3'] .sq-pad-numbers {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sq-pad[data-n='4'] .sq-pad-numbers {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .sq-pad[data-n='5'] {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+  .sq-pad[data-n='5'] .sq-pad-number {
+    grid-column: span 2;
+  }
+  .sq-pad[data-n='5'] .sq-pad-tool {
+    grid-column: span 3;
+    flex-direction: row;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .sq-pad[data-n='5'] .sq-pad-tool:nth-child(2) {
+    grid-column: span 4;
   }
 }
 
@@ -1137,17 +1312,8 @@
     padding-right: 6px;
   }
   .sq-play .sq-grid-wrap {
+    --sq-chip: 22px;
     padding: 4px;
-  }
-  .sq-play .sq-grid-wrap[data-n='3'] {
-    --sq-cs: 60px;
-  }
-  .sq-play .sq-grid-wrap[data-n='4'] {
-    --sq-cs: 52px;
-  }
-  .sq-play .sq-grid-wrap[data-n='5'] {
-    --sq-cs: 44px;
-    --sq-moon-size: 32px;
   }
   .sq-strip {
     grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));

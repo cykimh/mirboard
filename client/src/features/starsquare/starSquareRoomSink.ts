@@ -1,7 +1,7 @@
 import type { RoomEventSink } from '@/ws/roomEventSink';
 import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
-import type { StarSquarePrivateBoard, StarSquareTableView } from '@/types/starsquare';
+import type { PeerBoardPayload, StarSquarePrivateBoard, StarSquareTableView } from '@/types/starsquare';
 import { playCues } from '@/features/sound/tableSfx';
 import { starSquareCues } from './starSquareSfx';
 import { useStarSquareStore } from './starSquareStore';
@@ -28,8 +28,8 @@ export const QUIET_CODES: ReadonlySet<string> = new Set(['PUZZLE_CLOSED', 'STALE
 /**
  * 별자리 수판용 {@link RoomEventSink} — 모듈 상수이고 각 메서드는 호출 시점에 `useStarSquareStore.getState()` 를 읽는다(D-103).
  *
- * <p>비공개 큐에는 `ERROR` 만 온다(받아들인 SYNC 의 메아리는 없다 — 내 판은 로컬이 먼저). 거절은 보내기 상태로 넘기고, 문구가 있는 사유만
- * 화면 위 안내(`FloatingNotice`, D-269)로 띄운다.
+ * <p>비공개 큐에는 `ERROR` 와 `PEER_BOARD`(D-294 — 내가 완성한 뒤에만 오는 아직 푸는 남의 판, 순번 없음)가 온다. 받아들인 SYNC 의 메아리는
+ * 없다 — 내 판은 로컬이 먼저. 거절은 보내기 상태로 넘기고, 문구가 있는 사유만 화면 위 안내(`FloatingNotice`, D-269)로 띄운다.
  */
 export const starSquareRoomSink: RoomEventSink<StarSquareTableView, StarSquarePrivateBoard> = {
   reset(roomId) {
@@ -49,8 +49,12 @@ export const starSquareRoomSink: RoomEventSink<StarSquareTableView, StarSquarePr
   },
 
   applyPrivateEvent(envelope: StompEnvelope<unknown>) {
-    if (envelope.type !== 'ERROR') return;
     const store = useStarSquareStore.getState();
+    if (envelope.type === 'PEER_BOARD') {
+      store.applyPeerBoard(envelope.payload as PeerBoardPayload);
+      return;
+    }
+    if (envelope.type !== 'ERROR') return;
     const p = envelope.payload as ErrorPayload;
     store.onSyncRejected(p.code, Date.now());
     if (!QUIET_CODES.has(p.code)) store.setError(errorText(p.code, p.message, ERROR_LABEL));

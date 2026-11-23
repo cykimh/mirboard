@@ -44,8 +44,8 @@ export const STAR_SQUARE_TUTORIAL_STEPS: TutorialStep[] = [
     title: '넣기·지우기',
     body: (
       <ul style={LIST}>
-        <li>칸을 누르고 아래 숫자판에서 숫자를 누릅니다. 이미 쓴 숫자를 누르면 그 숫자가 <strong>이 칸으로 옮겨져요</strong>.</li>
-        <li>[지우기]·[되돌리기]도 있어요. 숫자를 잠깐 겹쳐 써도 괜찮지만, 겹친 숫자는 채운 칸으로 세지 않아요.</li>
+        <li>칸을 누르고 숫자판에서 숫자를 누릅니다. 이미 쓴 숫자를 누르면 그 숫자가 <strong>이 칸으로 옮겨져요</strong>.</li>
+        <li>[지우기]·[되돌리기]와, 내가 넣은 숫자를 모두 지우는 [리셋](두 번 눌러야 지워져요)이 있어요. 숫자를 잠깐 겹쳐 써도 괜찮지만, 겹친 숫자는 채운 칸으로 세지 않아요.</li>
         <li>키보드: 숫자(두 자리는 이어서 — 1, 2 → 12), 방향키로 칸 이동, Backspace 로 지우기, Ctrl/⌘+Z 로 되돌리기.</li>
       </ul>
     ),
@@ -55,7 +55,7 @@ export const STAR_SQUARE_TUTORIAL_STEPS: TutorialStep[] = [
     title: '줄 합 칩 읽기',
     body: (
       <ul style={LIST}>
-        <li>가로 줄은 오른쪽, 세로 줄은 아래, 두 대각선은 판 아래에 합이 보여요.</li>
+        <li>가로 줄은 오른쪽, 세로 줄은 아래, 두 대각선은 그 대각선이 끝나는 아래 모서리에 합이 작게 보여요.</li>
         <li>
           <strong>✦ 맞음</strong> · <strong>▽ 모자람</strong>(다 찼는데 작음) · <strong>△ 넘침</strong>(이미 큼) — 색만이 아니라 모양으로도
           구분합니다.
@@ -66,13 +66,14 @@ export const STAR_SQUARE_TUTORIAL_STEPS: TutorialStep[] = [
     source: '§3.2·§13',
   },
   {
-    title: '모두 같이 — 30초 마감',
+    title: '모두 같이 — 15초 마감',
     body: (
       <ul style={LIST}>
         <li>모두에게 <strong>같은 퍼즐</strong>이 동시에 열리고, 각자 자기 판을 풉니다. 남의 판 숫자는 보이지 않아요 — 채운 칸·맞은 줄 수만.</li>
         <li>
-          누군가 처음 완성하면 남은 사람에게 <strong>30초</strong>가 주어져요. 모두 완성하거나 퍼즐 제한 시간이 끝나도 퍼즐이 끝납니다.
+          누군가 처음 완성하면 남은 사람에게 <strong>15초</strong>가 주어져요. 모두 완성하거나 퍼즐 제한 시간이 끝나도 퍼즐이 끝납니다.
         </li>
+        <li>먼저 완성한 사람은 기다리는 동안 <strong>아직 푸는 사람의 판을 볼 수 있어요</strong>(보기만).</li>
         <li>퍼즐이 끝나면 모두의 판과 정답 하나를 나란히 보여 주고, 잠시 뒤 다음 퍼즐이 열려요.</li>
       </ul>
     ),

@@ -293,7 +293,7 @@ describe('starSquareStore', () => {
     ev('SOLVED', { seat: 1, place: 1, elapsedMs: 40_000 });
     expect(st().seats[1]).toMatchObject({ solved: true, solvePlace: 1, filled: 9, lines: 8 });
     expect(st().mySolved).toBe(false);
-    ev('CLOSING', { remainingMs: 30_000 });
+    ev('CLOSING', { remainingMs: 15_000 });
     expect(st().closing).toBe(true);
     ev('SOLVED', { seat: 0, place: 2, elapsedMs: 50_000 });
     expect(st().mySolved).toBe(true);
@@ -331,6 +331,97 @@ describe('starSquareStore', () => {
     expect(st().phase).toBe('ENDED');
     expect(st().result?.reason).toBe('LAST_SEAT');
     expect(canEditBoard(st())).toBe(false);
+  });
+
+  it('D-294 전체 리셋 — 내 숫자만 지우고 단서는 남는다, 되돌리기 한 번에 복구, 평소 SYNC 로 나간다', () => {
+    act(() => {
+      st().select(1);
+      st().place(7);
+      st().select(2);
+      st().place(6);
+      st().takeSync(1, false);
+    });
+    expect(st().sync.dirty).toBe(false);
+    let cleared = false;
+    act(() => {
+      cleared = st().clearAll();
+    });
+    expect(cleared).toBe(true);
+    expect(st().board).toEqual(LO_SHU_CLUES);
+    expect(st().sync).toMatchObject({ dirty: true, edited: true });
+    expect(st().takeSync(2, false)).toMatchObject({ '@action': 'SYNC', version: 2, grid: LO_SHU_CLUES });
+    act(() => st().undo());
+    expect(st().board).toEqual([2, 7, 6, 0, 0, 1, 0, 0, 0]);
+    // 지울 것이 없으면 아무 일도 없다(기록도 쌓이지 않는다)
+    act(() => void st().clearAll());
+    const history = st().history.length;
+    act(() => {
+      cleared = st().clearAll();
+    });
+    expect(cleared).toBe(false);
+    expect(st().history.length).toBe(history);
+    // 완성 뒤·마감 뒤에는 잠긴다
+    act(() => {
+      st().select(1);
+      st().place(7);
+    });
+    ev('SOLVED', { seat: 0, place: 1, elapsedMs: 9_000 });
+    act(() => {
+      cleared = st().clearAll();
+    });
+    expect(cleared).toBe(false);
+    expect(st().board[1]).toBe(7);
+  });
+
+  it('D-294 남의 판 — 비공개 PEER_BOARD 는 지금 퍼즐·아직 푸는 좌석 것만 받고, 완성·나감·퍼즐 끝에 비운다', () => {
+    const peer = (payload: unknown) =>
+      act(() => starSquareRoomSink.applyPrivateEvent({ eventId: 'p', type: 'PEER_BOARD', ts: 0, payload }));
+    seedStore({ seats: [seat(0), seat(1), seat(2)] });
+    expect(st().peers).toEqual({});
+    ev('SOLVED', { seat: 0, place: 1, elapsedMs: 9_000 });
+    peer({ viewer: 0, puzzle: 0, seat: 1, grid: [2, 7, 0, 0, 0, 1, 0, 0, 0] });
+    peer({ viewer: 0, puzzle: 0, seat: 2, grid: [2, 0, 0, 0, 5, 1, 0, 0, 0] });
+    expect(st().peers).toEqual({ 1: [2, 7, 0, 0, 0, 1, 0, 0, 0], 2: [2, 0, 0, 0, 5, 1, 0, 0, 0] });
+    // 지난 퍼즐·크기가 다른 판·내 좌석은 버린다
+    peer({ viewer: 0, puzzle: 3, seat: 1, grid: LO_SHU });
+    peer({ viewer: 0, puzzle: 0, seat: 1, grid: [1, 2, 3] });
+    peer({ viewer: 0, puzzle: 0, seat: 0, grid: LO_SHU });
+    expect(st().peers[1]).toEqual([2, 7, 0, 0, 0, 1, 0, 0, 0]);
+    expect(st().peers[0]).toBeUndefined();
+    // 내 판·보내기 상태는 건드리지 않는다
+    expect(st().board).toEqual(LO_SHU_CLUES);
+    ev('SOLVED', { seat: 1, place: 2, elapsedMs: 12_000 }, 3);
+    expect(Object.keys(st().peers)).toEqual(['2']);
+    ev('SEAT_DESERTED', { seat: 2 }, 4);
+    expect(st().peers).toEqual({});
+    // 완성한 좌석의 늦은 프레임도 버린다
+    peer({ viewer: 0, puzzle: 0, seat: 1, grid: LO_SHU });
+    expect(st().peers).toEqual({});
+  });
+
+  it('D-294 남의 판 — 다시 받은 비공개 뷰의 peers 는 내가 완성했을 때만 쓴다', () => {
+    const peers = [{ seat: 1, grid: [2, 7, 0, 0, 0, 1, 0, 0, 0] }];
+    const solvedSeats = [seat(0, { solved: true, solvePlace: 1, elapsedMs: 5_000 }), seat(1)];
+    seedStore({ seats: solvedSeats }, { puzzleIndex: 0, grid: LO_SHU, version: 4, solved: true, peers });
+    expect(st().peers).toEqual({ 1: [2, 7, 0, 0, 0, 1, 0, 0, 0] });
+    // 아직 푸는 중이면 서버가 주지 않지만, 와도 쓰지 않는다
+    seedStore({}, { puzzleIndex: 0, grid: LO_SHU_CLUES, version: 0, solved: false, peers });
+    expect(st().peers).toEqual({});
+    // 관전자(비공개 뷰 없음)
+    seedStore({}, null, -1);
+    expect(st().peers).toEqual({});
+    // 퍼즐이 끝나면 비운다(모두의 판은 lastPuzzle 로 공개된다)
+    seedStore({ seats: solvedSeats }, { puzzleIndex: 0, grid: LO_SHU, version: 4, solved: true, peers });
+    ev('PUZZLE_ENDED', {
+      index: 0,
+      reason: 'CLOSED',
+      results: [],
+      grids: [LO_SHU, LO_SHU_CLUES],
+      solution: LO_SHU,
+      totals: [1, 0],
+      nextInMs: 8_000,
+    });
+    expect(st().peers).toEqual({});
   });
 
   it('준비 단계는 판이 없다', () => {

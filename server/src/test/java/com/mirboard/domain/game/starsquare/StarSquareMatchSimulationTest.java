@@ -88,6 +88,7 @@ class StarSquareMatchSimulationTest {
         int botSolves = 0;
         int transitions = 0;
         int rejections = 0;
+        int peerBoards = 0;
         for (int m = 0; m < matches; m++) {
             Set<Integer> bots = new HashSet<>();
             int human = rng.nextInt(seats);
@@ -183,6 +184,19 @@ class StarSquareMatchSimulationTest {
                         }
                     } else if (ev instanceof StarSquareEvent.PuzzleEnded ended) {
                         puzzleEnds.merge(ended.reason(), 1, Integer::sum);
+                    } else if (ev instanceof StarSquareEvent.PeerBoard peer) {
+                        // 은닉(D-294) — 남의 판은 이 퍼즐을 완성한 살아 있는 사람에게만, 아직 푸는 좌석의 지금 판만, 순번 없이 본인 큐로
+                        peerBoards++;
+                        if (!ev.isPrivate() || ev.sequenced() || bots.contains(peer.viewer())
+                                || !state.peerSeats(peer.viewer()).contains(peer.seat())
+                                || !state.board(peer.viewer()).solved() || state.board(peer.seat()).solved()
+                                || peer.puzzle() != state.index()
+                                || !peer.grid().equals(state.board(peer.seat()).grid())) {
+                            fail("peer board leaked: " + peer + " in " + state);
+                        }
+                    }
+                    if (!(ev instanceof StarSquareEvent.PeerBoard) && (ev.isPrivate() || !ev.sequenced())) {
+                        fail("only PEER_BOARD may be private/unsequenced: " + ev);
                     }
                 }
                 StarSquareInvariantChecker.check(state, engine);
@@ -190,6 +204,9 @@ class StarSquareMatchSimulationTest {
                 mirror.assertMatches(StarSquareStateMapper.toPublicView(state, engine.remainingMillis(state, now)));
             }
             reasons.merge(state.result().reason(), 1, Integer::sum);
+        }
+        if (seats > 1 && matches >= 100 && peerBoards == 0) {
+            fail("no peer board was ever shared in " + matches + " matches");
         }
         return new Stats(matches, reasons, puzzleEnds, puzzles, humanSolves, botSolves, transitions, rejections);
     }
@@ -313,6 +330,9 @@ class StarSquareMatchSimulationTest {
                         SeatView v = seats.get(e.seat());
                         seats.set(e.seat(), new SeatView(e.seat(), v.filled(), v.lines(), v.solved(), v.solvePlace(),
                                 v.elapsedMs(), v.points(), v.firsts(), true));
+                    }
+                    case StarSquareEvent.PeerBoard e -> {
+                        // 비공개 — 공개 토픽만 듣는 클라에게는 오지 않는다
                     }
                     case StarSquareEvent.MatchEnded e -> {
                         phase = "ENDED";

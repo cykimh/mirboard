@@ -600,7 +600,7 @@ fuel, special, specials, items, team, delay}`(`team` 팀전이면 좌석 홀짝�
 placementQueue, turnSeat, jumpsLeft, timeouts, exits, moveCount, territory, placeKinds, options, result }` — `seatColors` 는 좌석별 색 번호(0 흑 · 1 백 · 2 셋째),
 `result` 는 `MATCH_ENDED` 의 `{reason, standings, winners, draw, causeSeat}`. **`privateHand` 는 없다**(오목과 같다).
 
-## 별자리 수판 (gameType=STAR_SQUARE, D-282~D-287)
+## 별자리 수판 (gameType=STAR_SQUARE, D-282~D-287, D-294)
 
 같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (1~4). 룰 정본은 `docs/rules-starsquare.md`. 모두가 **같은 퍼즐을 동시에** 푼다 — 차례가 없다.
 판은 길이 N² 정수 배열(0 = 빈 칸, 칸 번호 `행 × N + 열`), N = 3·4·5. 시간은 남은 ms 로 싣는다(절대 시각 아님).
@@ -620,18 +620,20 @@ placementQueue, turnSeat, jumpsLeft, timeouts, exits, moveCount, territory, plac
 | `PUZZLE_STARTED` | `{ index, count, size, magicSum, clues, limitMs, filled, lines }` | 퍼즐 공개(준비 3초 뒤 모두 동시). `filled`·`lines` 는 단서 판의 진행도 |
 | `PROGRESS` | `{ seat, filled, lines }` | 진행도가 바뀜(한 번만 쓰인 값만 셈 — 룰 §5.1) |
 | `SOLVED` | `{ seat, place, elapsedMs }` | 완성. 그 좌석 진행도는 N²·2N+2 |
-| `CLOSING` | `{ remainingMs }` | 첫 완성으로 마감이 당겨짐(30초 또는 퍼즐 제한 중 이른 쪽) |
+| `CLOSING` | `{ remainingMs }` | 첫 완성으로 마감이 당겨짐(15초 또는 퍼즐 제한 중 이른 쪽 — D-294) |
 | `PUZZLE_ENDED` | `{ index, reason, results: [{seat, rank, points, solved, elapsedMs, filled, lines, deserted}], grids, solution, totals, nextInMs }` | `reason`: `ALL_SOLVED`·`CLOSED`·`TIME_UP`. 마지막 퍼즐이면 `nextInMs` 0 이고 곧바로 `MATCH_ENDED` |
 | `SEAT_DESERTED` | `{ seat }` | 탈주 |
 | `MATCH_ENDED` | `{ reason, placements: [{seat, rank, points, firsts, deserted}] }` | `reason`: `FINISHED`·`NO_HUMANS`·`LAST_SEAT` |
 
-**서버 → 클라 (비공개)**: `ERROR` 뿐 — 별자리 수판 고유 코드 `MATCH_OVER`·`NOT_IN_PLAY`·`PUZZLE_CLOSED`·`STALE_SYNC`·`ALREADY_SOLVED`·`BAD_GRID`·`CLUE_CHANGED`
+**서버 → 클라 (비공개)**: `PEER_BOARD` `{ viewer, puzzle, seat, grid }`(D-294 — **순번 없음**) — 아직 푸는 좌석 `seat` 의 판. **이 퍼즐을 완성한 살아 있는 사람 좌석의
+본인 큐로만** 간다(아직 푸는 좌석·봇·탈주한 좌석·방 관전자에게는 가지 않는다). 그 좌석의 판이 바뀐 전이(받아들인 `SYNC`·봇 이정표)와, 받는 좌석이 완성한 전이(남은 판 전부)에
+덧붙는다. 그리고 `ERROR` — 별자리 수판 고유 코드 `MATCH_OVER`·`NOT_IN_PLAY`·`PUZZLE_CLOSED`·`STALE_SYNC`·`ALREADY_SOLVED`·`BAD_GRID`·`CLUE_CHANGED`
 (이 순서로 판정, 룰 §7.1). `PUZZLE_CLOSED`·`STALE_SYNC`·`ALREADY_SOLVED` 와 인프라 `BUSY` 는 클라가 문구 없이 처리한다(`BUSY` → 150ms 뒤 지금 판을 새 버전으로).
 
 **resync**: `phase` = `INTRO`·`PLAYING`·`RESULT`·`ENDED`, `tableView` = `{ phase, puzzleIndex, puzzleCount, size, magicSum, clues, remainingMs, closing,
 seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, deserted}], lastPuzzle, result }` — 준비 단계는 퍼즐을 숨긴다(`size` 0, `clues` null).
-`lastPuzzle` 은 방금 끝난 퍼즐(결과 보기·끝)의 `{index, reason, results, grids, solution}`. **`privateHand` = 내 판** `{ puzzleIndex, grid, version, solved }`
-(준비 단계·봇·관전자는 없음) — 재접속한 클라는 이 버전보다 큰 번호부터 보낸다.
+`lastPuzzle` 은 방금 끝난 퍼즐(결과 보기·끝)의 `{index, reason, results, grids, solution}`. **`privateHand` = 내 판** `{ puzzleIndex, grid, version, solved, peers: [{seat, grid}] }`
+(준비 단계·봇·관전자는 없음) — 재접속한 클라는 이 버전보다 큰 번호부터 보낸다. `peers` 는 내가 이 퍼즐을 완성했을 때만 아직 푸는 좌석들의 판이고(D-294), 그 밖에는 빈 목록이다.
 
 ## 보안 검토 체크리스트
 
