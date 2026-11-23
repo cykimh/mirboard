@@ -3587,28 +3587,32 @@ html.dark .yt-board-wood {
   --yt-s-rail-lo: #17191c;
 }
 
-/* 꾸미기 창 — ⋮ 메뉴 "주사위·판 꾸미기". 게임판 안에 뜨는 작은 창(라디오 두 묶음), 고르면 뒤의 판이 바로 바뀐다. */
-.yt-skin-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.45);
+/* 꾸미기 창 — ⋮ 메뉴 "주사위·판 꾸미기". 공용 Radix 다이얼로그(body 포털 — 가운데 놓기·덮개는 그쪽 것)에 얹는다: 게임판 스코프 밖이라
+   살롱 토큰은 `.yt-theme-salon` 을 창에 같이 붙여 풀고, border-box 도 여기서 명시한다. 두 클래스로 적어 공용 창의 기본 꾸밈을 이긴다. */
+.yt-skin-panel,
+.yt-skin-panel *,
+.yt-skin-panel *::before,
+.yt-skin-panel *::after {
+  box-sizing: border-box;
 }
 
-.yt-skin-panel {
-  width: min(100%, 440px);
+.yt-skin-panel.yt-theme-salon {
+  display: block;
+  width: min(calc(100vw - 24px), 440px);
+  max-width: none;
   max-height: calc(100dvh - 24px);
   overflow-y: auto;
   padding: 14px 14px 16px;
-  border: 1px solid var(--yt-s-line, var(--color-border, #8884));
+  border: 1px solid var(--yt-s-line);
   border-radius: 16px;
-  background: var(--yt-s-plaque, var(--color-surface, #fff));
-  color: var(--yt-s-ink, inherit);
+  background: var(--yt-s-plaque);
+  color: var(--yt-s-ink);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* 공용 창이 덧붙이는 영어 이름의 ✕ 버튼은 감춘다 — [닫기]가 있다. */
+.yt-skin-panel.yt-theme-salon > button:last-child {
+  display: none;
 }
 
 .yt-skin-head {
@@ -3618,10 +3622,12 @@ html.dark .yt-board-wood {
   gap: 8px;
 }
 
-.yt-skin-title {
+.yt-skin-panel .yt-skin-title {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0;
 }
 
 .yt-skin-close {
@@ -3641,9 +3647,10 @@ html.dark .yt-board-wood {
   outline-offset: 2px;
 }
 
-.yt-skin-note {
+.yt-skin-panel .yt-skin-note {
   margin: 4px 0 0;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--yt-s-ink-soft, inherit);
 }
 

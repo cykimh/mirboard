@@ -54,7 +54,9 @@ async function choose(board, dice) {
   // 고른 것은 이름 앞에 "✓ " 가 붙는다 — 이미 고른 것이면 그대로 둔다.
   for (const name of [board, dice]) {
     const radio = picker.getByRole('radio', { name: new RegExp(`^(✓ )?${name}$`) });
-    if (!(await radio.isChecked())) await radio.click({ force: true });
+    // 라디오는 칸을 덮은 투명한 입력이다 — 칸(label)을 누른다(창이 열리는 움직임이 멎을 때까지 기다린다).
+    if (!(await radio.isChecked())) await picker.locator('label', { hasText: name }).click();
+    if (!(await radio.isChecked())) throw new Error(`${name} 을(를) 고르지 못했다`);
   }
 }
 
@@ -89,6 +91,19 @@ for (const [file, board, dice] of PAIRS) {
   ]);
   console.log(`${file}: 저장 ${saved[0]}·${saved[1]}, 가로 스크롤 없음 ${saved[2]}`);
 }
+
+// 리뷰 — 창 안의 글자를 누른 뒤에도 Esc 로 닫히고, Tab 을 여러 번 눌러도 초점이 창 안에 머문다(공용 Radix 다이얼로그).
+await choose('나무 판', '호두나무');
+await picker.getByText(/내 화면에만 보여요/).click();
+let inside = true;
+for (let i = 0; i < 14; i++) {
+  await page.keyboard.press('Tab');
+  inside &&= await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
+}
+await picker.getByText(/내 화면에만 보여요/).click();
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+console.log(`꾸미기 창: Tab 이 창 안에 머묾 ${inside}, 글자 누른 뒤 Esc 로 닫힘 ${!(await picker.isVisible())}`);
 
 // 굴리는 도중 한 장(정육면체 옆면도 스킨 색) — 타탄 + 흑요석, 1280 다크.
 await page.setViewportSize({ width: 1280, height: 800 });

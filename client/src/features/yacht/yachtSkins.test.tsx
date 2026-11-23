@@ -130,11 +130,13 @@ describe('D-296 — 얏추 스킨', () => {
     expect(felt).toContain('var(--yt-board-pattern),');
   });
 
-  it('꾸미기 창 — 라디오 두 묶음, 고르면 바로 적용·기억, Esc·닫기·바깥 누르기로 닫힌다', () => {
+  it('꾸미기 창 — 라디오 두 묶음, 고르면 바로 적용·기억, Esc·닫기·바깥 누르기로 닫힌다', async () => {
     const onClose = vi.fn();
-    const { container } = render(<YachtSkinPicker onClose={onClose} />);
+    render(<YachtSkinPicker onClose={onClose} />);
     const dialog = screen.getByRole('dialog', { name: '주사위·판 꾸미기' });
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    // body 포털이라 게임판 스코프 밖이다 — 살롱 토큰을 창에 같이 붙여 푼다.
+    expect(dialog).toHaveClass('yt-theme-salon', 'yt-skin-panel');
+    expect(dialog.closest('.yt-table')).toBeNull();
     const diceGroup = within(dialog).getByRole('group', { name: '주사위' });
     const boardGroup = within(dialog).getByRole('group', { name: '경기판' });
     expect(within(diceGroup).getAllByRole('radio')).toHaveLength(DICE_SKINS.length);
@@ -151,14 +153,56 @@ describe('D-296 — 얏추 스킨', () => {
 
     fireEvent.click(within(boardGroup).getByRole('radio', { name: '바다' }));
     expect(useYachtSkinStore.getState().board).toBe('ocean');
-    expect(container.querySelector('.yt-skin-option-on .yt-skin-board')).toHaveClass('yt-board-ocean');
+    expect(dialog.querySelector('.yt-skin-option-on .yt-skin-board')).toHaveClass('yt-board-ocean');
 
     fireEvent.keyDown(dialog, { key: 'Escape' });
     fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
-    fireEvent.click(container.querySelector('.yt-skin-layer')!);
+    expect(onClose).toHaveBeenCalledTimes(2);
+    // 바깥(덮개) 누르기 — 공용 다이얼로그는 바깥 누름을 한 박자 뒤부터 듣는다.
+    await new Promise((r) => setTimeout(r, 0));
+    fireEvent.pointerDown(document.body);
     expect(onClose).toHaveBeenCalledTimes(3);
     // 창 안을 누른 것은 닫지 않는다.
+    fireEvent.pointerDown(dialog);
     fireEvent.click(dialog);
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('리뷰 — 창 안의 글자를 눌러 초점이 body 로 빠진 뒤에도 Esc 로 닫히고, Tab 은 창 안에 머문다', () => {
+    const onClose = vi.fn();
+    render(
+      <>
+        <button type="button">뒤의 게임판 버튼</button>
+        <YachtSkinPicker onClose={onClose} />
+      </>,
+    );
+    const dialog = screen.getByRole('dialog', { name: '주사위·판 꾸미기' });
+    const close = within(dialog).getByRole('button', { name: '닫기' });
+
+    // 글자(초점을 받지 않는 곳)를 누르면 브라우저는 초점을 body 로 옮긴다.
+    fireEvent.pointerDown(screen.getByText(/내 화면에만 보여요/));
+    fireEvent.click(screen.getByText(/내 화면에만 보여요/));
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Tab — 창의 마지막 자리에서 누르면 첫 자리([닫기])로 돈다(뒤의 게임판으로 나가지 않는다).
+    const radios = within(dialog).getAllByRole('radio');
+    // 테스트 환경은 CSS 를 싣지 않아 공용 창의 감춘 ✕ 버튼이 마지막 자리로 잡힌다(화면에서는 마지막 라디오).
+    const last = within(dialog).queryByRole('button', { name: 'Close' }) ?? radios[radios.length - 1];
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    // Shift+Tab — 첫 자리에서 누르면 마지막 자리로.
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+    // 초점이 창 밖으로 옮겨지면 창 안으로 되돌린다.
+    screen.getByText('뒤의 게임판 버튼').focus();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    // 초점이 body 에 있어도 Esc 는 문서 단위로 듣는다.
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
