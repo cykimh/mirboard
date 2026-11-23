@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // @ts-ignore — 테스트에서만 쓰는 Node 모듈(cssSources 와 같은 이유).
 import { readFileSync, readdirSync } from 'node:fs';
-import { MOTION_FORCED_CLASS, motionReduced, useCardAnimStore } from './cardAnimStore';
+import { MOTION_FORCED_CLASS, MOTION_OFF_CLASS, motionReduced, useCardAnimStore } from './cardAnimStore';
 import { GameMenu } from '@/components/GameMenu';
 import { GoldBurst } from '@/features/yacht/GoldBurst';
 import { prefersReducedMotion as yachtReduced } from '@/features/yacht/yachtTheme';
@@ -33,13 +33,13 @@ function osReduce(on: boolean) {
 describe('D-291 — 연출 설정이 OS 동작 줄이기보다 앞선다', () => {
   beforeEach(() => {
     localStorage.clear();
-    html().classList.remove(MOTION_FORCED_CLASS);
+    html().classList.remove(MOTION_FORCED_CLASS, MOTION_OFF_CLASS);
     useCardAnimStore.setState({ enabled: true, forced: false });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
-    html().classList.remove(MOTION_FORCED_CLASS);
+    html().classList.remove(MOTION_FORCED_CLASS, MOTION_OFF_CLASS);
     useCardAnimStore.setState({ enabled: true, forced: false });
   });
 
@@ -77,6 +77,36 @@ describe('D-291 — 연출 설정이 OS 동작 줄이기보다 앞선다', () =>
       expect(useCardAnimStore.getState().enabled).toBe(false);
       expect(html()).not.toHaveClass(MOTION_FORCED_CLASS);
     }
+  });
+
+  it('리뷰 — 꺼짐도 단일 기준: OS 동작 줄이기가 아닌 기기에서 메뉴로 끄면 <html> 에 motion-off 가 붙는다(켜면 걷힌다)', () => {
+    osReduce(false);
+    useCardAnimStore.getState().init();
+    expect(html()).not.toHaveClass(MOTION_OFF_CLASS);
+    render(<GameMenu />);
+    fireEvent.click(screen.getByRole('button', { name: '게임 메뉴' }));
+    const toggle = screen.getByRole('menuitemcheckbox', { name: /연출/ });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(localStorage.getItem(KEY)).toBe('0');
+    expect(html()).toHaveClass(MOTION_OFF_CLASS);
+    expect(html()).not.toHaveClass(MOTION_FORCED_CLASS);
+    useCardAnimStore.getState().toggle();
+    expect(html()).not.toHaveClass(MOTION_OFF_CLASS);
+  });
+
+  it('저장값 0 으로 시작해도, 저장값 없이 OS 동작 줄이기로 꺼진 채 시작해도 motion-off 다 — 직접 켠 사람만 아니다', () => {
+    osReduce(false);
+    localStorage.setItem(KEY, '0');
+    useCardAnimStore.getState().init();
+    expect(html()).toHaveClass(MOTION_OFF_CLASS);
+    localStorage.clear();
+    osReduce(true);
+    useCardAnimStore.getState().init();
+    expect(html()).toHaveClass(MOTION_OFF_CLASS);
+    localStorage.setItem(KEY, '1');
+    useCardAnimStore.getState().init();
+    expect(html()).not.toHaveClass(MOTION_OFF_CLASS);
   });
 
   it('OS 가 동작 줄이기가 아니면 저장값이 없어도 켜져 있고, 줄일 것이 없다', () => {
@@ -161,6 +191,46 @@ describe('D-291 — 소스 규칙(단일 기준)', () => {
     }
     expect(blocks).toBeGreaterThanOrEqual(12);
     expect(offenders).toEqual([]);
+  });
+
+  it('리뷰 — 동작 줄이기 블록마다 바로 뒤에 같은 규칙의 :root.motion-off 짝이 있다(스토어를 읽지 않는 스컬킹·오목·구름항로도 꺼진다)', () => {
+    const dir = at('../../styles/');
+    const head = '@media (prefers-reduced-motion: reduce) {';
+    const norm = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+    let pairs = 0;
+    for (const f of list(dir).filter((x) => x.endsWith('.css'))) {
+      const css = read(new URL(f, dir));
+      let from = 0;
+      for (;;) {
+        const i = css.indexOf(head, from);
+        if (i < 0) break;
+        // 블록 끝(주석 안의 중괄호는 세지 않는다).
+        let depth = 1;
+        let j = i + head.length;
+        while (depth > 0) {
+          if (css.startsWith('/*', j)) {
+            j = css.indexOf('*/', j) + 2;
+            continue;
+          }
+          if (css[j] === '{') depth++;
+          else if (css[j] === '}') depth--;
+          j++;
+        }
+        const inner = css.slice(i + head.length, j - 1);
+        const rest = css.slice(j);
+        const m = /^\s*\/\* motion-off:begin[^*]*\*\/([\s\S]*?)\/\* motion-off:end \*\//.exec(rest);
+        expect(m, `${f}: 동작 줄이기 블록 뒤에 motion-off 짝이 없다`).not.toBeNull();
+        expect(norm(m![1]), f).toBe(norm(inner).split(':root:not(.motion-forced) ').join(':root.motion-off '));
+        pairs++;
+        from = j;
+      }
+    }
+    expect(pairs).toBeGreaterThanOrEqual(12);
+    // 세 게임판의 연출 규칙이 실제로 짝에 들어 있다.
+    const responsive = read(new URL('parts/17-responsive.css', dir));
+    for (const needle of [':root.motion-off .sk-theme-cabin *', ':root.motion-off .om-tokens *', ':root.motion-off .cr-table *']) {
+      expect(responsive, needle).toContain(needle);
+    }
   });
 
   it('JS 는 OS 동작 줄이기를 cardAnimStore 한 곳에서만 읽는다', () => {

@@ -10,9 +10,13 @@ import { create } from 'zustand';
 // `forced` 는 `<html>` 의 `motion-forced` 클래스로도 나간다 — CSS 의 `@media (prefers-reduced-motion: reduce)` 블록은 전부
 // `:root:not(.motion-forced)` 아래에 있어 직접 켠 사람에게는 닿지 않는다. JS 로 돌리는 연출은 {@link motionReduced} 하나로 묻는다
 // (`matchMedia` 를 따로 읽지 말 것).
+// 꺼짐도 같은 기준이다 — 연출이 꺼져 있으면(`enabled` 거짓) `<html>` 에 `motion-off` 가 붙고, 동작 줄이기 블록마다 붙어 있는
+// `:root.motion-off` 짝 규칙이 OS 설정과 무관하게 같은 것을 끈다. 스토어를 읽지 않는 게임판(스컬킹·오목)의 CSS 연출도 그래서 꺼진다.
 const STORAGE_KEY = 'mirboard.cardAnim';
 /** `<html>` 클래스 — 사용자가 연출을 직접 켰다(OS 동작 줄이기보다 앞선다). */
 export const MOTION_FORCED_CLASS = 'motion-forced';
+/** `<html>` 클래스 — 연출이 꺼져 있다(직접 껐거나, 저장값 없이 OS 동작 줄이기). */
+export const MOTION_OFF_CLASS = 'motion-off';
 
 interface CardAnimState {
   enabled: boolean;
@@ -32,9 +36,10 @@ function persist(enabled: boolean) {
   }
 }
 
-function applyHtmlClass(forced: boolean) {
+function applyHtmlClass(enabled: boolean, forced: boolean) {
   try {
     document.documentElement.classList.toggle(MOTION_FORCED_CLASS, forced);
+    document.documentElement.classList.toggle(MOTION_OFF_CLASS, !enabled);
   } catch {
     /* 문서 없음 — 무시 */
   }
@@ -60,7 +65,7 @@ export const useCardAnimStore = create<CardAnimState>((set, get) => ({
 
   setEnabled(v) {
     persist(v);
-    applyHtmlClass(v);
+    applyHtmlClass(v, v);
     set({ enabled: v, forced: v });
   },
 
@@ -83,7 +88,7 @@ export const useCardAnimStore = create<CardAnimState>((set, get) => ({
     } catch {
       /* 무시 */
     }
-    applyHtmlClass(forced);
+    applyHtmlClass(enabled, forced);
     set({ enabled, forced });
   },
 }));

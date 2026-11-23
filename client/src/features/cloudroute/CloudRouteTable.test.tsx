@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloudRouteTable } from './CloudRouteTable';
 import { useCloudRouteStore } from './cloudrouteStore';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { seatOf, snapshotOf, tableOf, tilesOf } from './testTables';
 import type { CloudRouteTableView } from '@/types/cloudroute';
 
@@ -269,5 +270,55 @@ describe('CloudRouteTable — 칸 시트', () => {
       useCloudRouteStore.getState().applyEvent({ type: 'DECISION_REQUIRED', payload: { seat: 0, pending: { kind: 'ROLL' } } });
     });
     expect(screen.queryByRole('dialog', { name: '세관 자세히' })).toBeNull();
+  });
+});
+
+describe('CloudRouteTable — 연출 설정을 판 도중 바꾸면 따라간다 (D-291 리뷰)', () => {
+  const proto = Element.prototype as unknown as { animate?: unknown };
+  const hadAnimate = 'animate' in proto;
+  const savedAnimate = proto.animate;
+
+  beforeEach(() => {
+    // 움직임 연출을 틀 수 있는 환경(Web Animations 있음·OS 동작 줄이기 아님).
+    proto.animate = () => ({ cancel() {}, finished: Promise.resolve(), onfinish: null, oncancel: null });
+    vi.stubGlobal('matchMedia', (q: string) => ({
+      matches: false,
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+    }));
+    useCardAnimStore.setState({ enabled: true, forced: false });
+  });
+  afterEach(() => {
+    if (hadAnimate) proto.animate = savedAnimate;
+    else delete proto.animate;
+    vi.unstubAllGlobals();
+    useCardAnimStore.setState({ enabled: true, forced: false });
+  });
+
+  it('메뉴에서 연출을 끄면 cr-motion 이 걷히고, 다시 켜면 돌아온다(마운트 때 한 번만 읽지 않는다)', () => {
+    seed(tableOf());
+    const { container } = renderTable();
+    const root = container.querySelector('.cr-table')!;
+    expect(root).toHaveClass('cr-motion');
+    act(() => useCardAnimStore.getState().setEnabled(false));
+    expect(root).not.toHaveClass('cr-motion');
+    act(() => useCardAnimStore.getState().setEnabled(true));
+    expect(root).toHaveClass('cr-motion');
+  });
+
+  it('끌 때 떠 있던 연출 조각(WAAPI)을 멈추고 지운다', () => {
+    seed(tableOf());
+    const { container } = renderTable();
+    const layer = container.querySelector('.cr-fx') as HTMLElement;
+    const cancel = vi.fn();
+    const piece = document.createElement('i');
+    layer.append(piece);
+    (layer as unknown as { getAnimations: () => unknown[] }).getAnimations = () => [{ cancel }];
+    act(() => useCardAnimStore.getState().setEnabled(false));
+    expect(cancel).toHaveBeenCalled();
+    expect(layer.childElementCount).toBe(0);
   });
 });

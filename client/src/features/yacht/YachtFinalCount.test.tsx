@@ -157,7 +157,31 @@ describe('얏추 D-293 — 마지막 3초', () => {
     expect(cues()).toEqual(['clock.tick', 'clock.tick']);
   });
 
-  it('리뷰 — 울리지 않고 지나간 차례도 기록의 주인을 바꾼다: 지난 판 3라운드의 기록이 다음 판 3라운드를 막지 않는다', () => {
+  it('리뷰 — 게임판이 다시 붙을 때(스토어 초기화 → 스냅샷) 차례 키가 잠깐 흔들려도 같은 숫자를 또 울리지 않는다', () => {
+    const at = (key: string) => (
+      <>
+        <YachtTurnCountdown turnSeconds={45} />
+        <YachtFinalCount turnSeconds={45} active turnKey={key} animate />
+      </>
+    );
+    snapshot(2_900);
+    const { rerender } = render(at('r-1:0:1'));
+    expect(cues()).toEqual(['clock.tick']);
+    // 다시 붙는다 — 스토어가 처음 상태로 돌아가(시계 없음·라운드 0) 키가 달라졌다가,
+    act(() => useYachtStore.getState().reset('r-1'));
+    rerender(at('r-1:0:0'));
+    expect(cues()).toHaveLength(1);
+    // 스냅샷이 와서 같은 차례로 돌아온다(게임판에서는 키와 시계가 같은 스토어 갱신에서 함께 온다). 아직 3초 — 또 울리지 않는다.
+    rerender(at('r-1:0:1'));
+    snapshot(2_700);
+    expect(cues()).toHaveLength(1);
+    // 이어서 2·1 은 제때 한 번씩.
+    pass(1_000);
+    pass(1_000);
+    expect(cues()).toEqual(['clock.tick', 'clock.tick', 'clock.last']);
+  });
+
+  it('리뷰 — 지난 판 3라운드의 기록이 다음 판 3라운드를 막지 않는다(판이 끝날 때 비운다 — 그 사이 한 번도 안 울렸어도)', () => {
     const at = (round: number, active = true) => (
       <>
         <YachtTurnCountdown turnSeconds={45} />
@@ -167,7 +191,10 @@ describe('얏추 D-293 — 마지막 3초', () => {
     snapshot(2_900, { round: 3 });
     const { rerender } = render(at(3));
     expect(cues()).toEqual(['clock.tick']);
+    // 판이 끝난다(결과가 온다).
+    snapshot(null, { phase: 'ENDED', turnSeat: -1, round: 12, result: { reason: 'FINISHED', placements: [] } } as never);
     // 다음 판 1·2라운드는 여유 있게 기록해 한 번도 울리지 않았다.
+    act(() => useYachtStore.getState().reset('r-1'));
     snapshot(40_000, { round: 1 });
     rerender(at(1));
     snapshot(40_000, { round: 2 });
