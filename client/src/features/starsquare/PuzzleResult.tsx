@@ -28,8 +28,9 @@ export function PuzzleResult({ outcome, n, clues, mySeat, nameOf, nextInMs }: Pr
       <header className="sq-result-head">
         <h3 className="sq-result-title">퍼즐 {outcome.index + 1} 결과</h3>
         <span className="sq-result-reason">{REASON_LABEL[outcome.reason]}</span>
+        {/* 매초 바뀌는 글자라 알림 영역이 아니다(읽으면 1초마다 다시 읽는다) — 상태 줄이 "퍼즐이 끝났어요"를 한 번 알린다 */}
         {nextInMs !== null && (
-          <span className="sq-result-next" aria-live="polite">
+          <span className="sq-result-next" role="timer" aria-live="off">
             다음 퍼즐까지 {Math.max(0, Math.ceil(nextInMs / 1000))}초
           </span>
         )}

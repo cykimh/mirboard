@@ -51,7 +51,7 @@ describe('StarSquareTable (S3)', () => {
     seedStore({ seats: [seat(0), seat(1, { filled: 5, lines: 1 })] });
     renderTable();
     expect(screen.getByRole('grid', { name: '내 판' })).toBeInTheDocument();
-    expect(screen.getAllByRole('gridcell')).toHaveLength(9);
+    expect(screen.getAllByRole('gridcell', { name: /^\d행 \d열/ })).toHaveLength(9); // 별 칸(줄 합 칩도 gridcell)
     expect(cell(1, 1)).toHaveAccessibleName(/2 \(단서\)/);
     expect(cell(1, 1)).toBeDisabled();
     expect(screen.getByRole('button', { name: '9' })).toBeInTheDocument();
@@ -108,6 +108,59 @@ describe('StarSquareTable (S3)', () => {
     expect(st().board[3]).toBe(9);
   });
 
+  /** 리뷰 5 — 방향키로 고른 칸에 DOM 포커스도 간다(roving tabindex). */
+  it('방향키로 옮기면 고른 칸이 포커스를 받는다 — 탭 순서에 드는 칸도 하나', () => {
+    seedStore();
+    renderTable();
+    expect(st().selected).toBe(1);
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(st().selected).toBe(2);
+    expect(document.activeElement).toBe(cell(1, 3));
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(st().selected).toBe(5 + 3); // 2행 3열(5)은 단서 — 건너뛰어 3행 3열
+    expect(document.activeElement).toBe(cell(3, 3));
+    const tabbable = screen.getAllByRole('gridcell').filter((el) => el.getAttribute('tabindex') === '0');
+    expect(tabbable).toEqual([cell(3, 3)]);
+  });
+
+  /** 리뷰 4 — 규칙 다이얼로그·게임 메뉴가 열려 있으면 판 키보드는 쉰다(뒤의 판을 고치거나 SYNC 를 내보내지 않는다). */
+  it('게임 메뉴·규칙 다이얼로그가 열려 있으면 숫자·Backspace·방향키가 판을 고치지 않는다', () => {
+    seedStore();
+    renderTable();
+    fireEvent.keyDown(window, { key: '7' });
+    expect(st().board[1]).toBe(7);
+    act(() => vi.advanceTimersByTime(SYNC_THROTTLE_MS));
+    sendAction.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '게임 메뉴' }));
+    const menu = screen.getByRole('menu', { name: '게임 메뉴' });
+    fireEvent.keyDown(menu, { key: '9' });
+    fireEvent.keyDown(menu, { key: 'Backspace' });
+    fireEvent.keyDown(window, { key: 'ArrowRight' }); // 포커스가 메뉴 밖에 남아도 층이 열려 있으면 쉰다
+    expect(st().board[1]).toBe(7);
+    expect(st().selected).toBe(1);
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '규칙 보기' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Backspace' });
+    fireEvent.keyDown(dialog, { key: '3' });
+    expect(st().board[1]).toBe(7);
+    act(() => vi.advanceTimersByTime(SYNC_THROTTLE_MS * 3));
+    expect(sendAction).not.toHaveBeenCalled();
+  });
+
+  /** 리뷰 6 — 줄 합 칩의 상태(맞음·넘침·모자람)가 보조기기에 읽힌다. */
+  it('줄 합 칩은 줄·합·상태를 읽는 글자로 낸다', () => {
+    seedStore({}, { puzzleIndex: 0, grid: [2, 7, 6, 3, 4, 1, 0, 0, 0], version: 1, solved: false });
+    renderTable();
+    expect(screen.getByText('1행 합 15, 맞음')).toBeInTheDocument();
+    expect(screen.getByText('2행 합 8, 모자람')).toBeInTheDocument();
+    expect(screen.getByText('3행 비었음')).toBeInTheDocument();
+    expect(screen.getByText('1열 합 5, 채우는 중')).toBeInTheDocument();
+    // 가로 줄 칩은 grid 의 row 안 — gridcell 로 읽힌다
+    expect(screen.getByRole('gridcell', { name: '1행 합 15, 맞음' })).toBeInTheDocument();
+  });
+
   it('관전자는 단서 판만 보고 숫자판이 없다', () => {
     seedStore({}, null, -1);
     renderTable({ spectator: true });
@@ -153,6 +206,8 @@ describe('StarSquareTable (S3)', () => {
     expect(within(result).getByRole('grid', { name: '정답 하나' })).toBeInTheDocument();
     expect(within(result).getByRole('grid', { name: '나래의 판' })).toBeInTheDocument();
     expect(within(result).getByText(/다음 퍼즐까지 8초/)).toBeInTheDocument();
+    // 리뷰 7 — 매초 바뀌는 글자라 알림 영역이 아니다(1초마다 다시 읽지 않게)
+    expect(within(result).getByText(/다음 퍼즐까지 8초/)).toHaveAttribute('aria-live', 'off');
     expect(screen.queryByRole('button', { name: '지우기' })).toBeNull();
   });
 

@@ -60,6 +60,27 @@ describe('starSquareStore', () => {
     });
     expect(st().board[1]).toBe(12);
     expect(st().history).toHaveLength(1);
+    // 리뷰 3 — 되돌리기는 첫 자리(1) 판이 아니라 그 전 판으로
+    act(() => st().undo());
+    expect(st().board[1]).toBe(0);
+    expect(st().history).toHaveLength(0);
+  });
+
+  it('두 자리 수 — 그 칸에 이미 그 수가 있었으면 입력이 없던 것과 같다', () => {
+    const grid = Array(16).fill(0).map((_, i) => (i === 0 ? 16 : i === 1 ? 12 : 0));
+    seedStore({ size: 4, magicSum: 34, clues: Array(16).fill(0).map((_, i) => (i === 0 ? 16 : 0)) }, {
+      puzzleIndex: 0,
+      grid,
+      version: 2,
+      solved: false,
+    });
+    let changed = false;
+    act(() => {
+      changed = st().place(1);
+      st().place(12, changed);
+    });
+    expect(st().board).toEqual(grid);
+    expect(st().history).toHaveLength(0);
   });
 
   it('보낼 판 — 버전은 보낸 것·서버 것 중 큰 쪽 + 1, 보내면 dirty 가 내려간다', () => {
@@ -94,7 +115,6 @@ describe('starSquareStore', () => {
     const before = st().resyncNonce;
     err('STALE_SYNC');
     expect(st().resyncNonce).toBe(before + 1);
-    expect(st().sync.dirty).toBe(true);
     err('PUZZLE_CLOSED');
     err('ALREADY_SOLVED');
     expect(st().errorMessage).toContain('서버가 바빠'); // 조용한 사유는 새 문구를 띄우지 않는다
@@ -130,7 +150,7 @@ describe('starSquareStore', () => {
     expect(st().board[1]).toBe(9);
   });
 
-  it('보낸 판이 나가지 않았거나 다시 연결되면 보내지 않은 것으로 되돌린다', () => {
+  it('보낸 판이 나가지 않았으면(소켓 끊김) 보내지 않은 것으로 되돌린다 — 완성 확인 시간 제한도', () => {
     act(() => {
       st().place(7);
     });
@@ -144,6 +164,127 @@ describe('starSquareStore', () => {
     act(() => st().solveConfirmTimedOut());
     expect(st().sync.awaitingSolveSince).toBe(0);
     expect(st().sync.dirty).toBe(true);
+  });
+
+  /** 리뷰 1 — 보냈지만 서버가 확인하지 않은 판(죽은 소켓으로 나간 SYNC)은 다시 받은 낡은 서버 판에 덮이지 않는다. */
+  it('보낸 판이 서버에 닿지 않았으면(받은 판의 버전이 못 미침) 로컬이 이기고 다시 보낸다', () => {
+    act(() => {
+      st().place(7);
+    });
+    expect(st().takeSync(1_000, false)?.version).toBe(1); // 보냈다 — dirty 가 내려간다
+    expect(st().sync.dirty).toBe(false);
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 5,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: LO_SHU_CLUES, version: 0, solved: false }, // 서버는 v1 을 못 받았다
+      }),
+    );
+    expect(st().board[1]).toBe(7);
+    expect(st().sync.dirty).toBe(true);
+    expect(st().takeSync(1_001, false)).toMatchObject({ version: 2, grid: [2, 7, 0, 0, 0, 1, 0, 0, 0] });
+    // 서버가 그 버전을 받았다고 알려 주면(같은 판) 그대로 받고 다시 보낼 것이 없다
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 6,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: [2, 7, 0, 0, 0, 1, 0, 0, 0], version: 2, solved: false },
+      }),
+    );
+    expect(st().board[1]).toBe(7);
+    expect(st().sync.dirty).toBe(false);
+    expect(st().sync.editVersion).toBe(0);
+  });
+
+  /** 리뷰 2 — 다시 보내야 하는 것(재연결·STALE)과 서버에 없는 내 입력을 나눈다. 입력이 없으면 다른 탭이 더 진행한 서버 판을 덮지 않는다. */
+  it('입력 없이 다시 받으면 다른 탭이 더 진행한 서버 판을 받는다 — 재연결·STALE_SYNC 는 다시 보낼 것으로 켜지 않는다', () => {
+    act(() => {
+      st().place(7);
+    });
+    st().takeSync(1_000, false);
+    // 서버가 v1 을 받았다(확인)
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 5,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: [2, 7, 0, 0, 0, 1, 0, 0, 0], version: 1, solved: false },
+      }),
+    );
+    // 서버가 모르는 내 입력이 없으면 되돌릴 것도 없다(재전송이 다른 탭 판을 덮지 않게)
+    act(() => st().markUnsent());
+    expect(st().sync.dirty).toBe(false);
+    // 다른 탭이 더 진행해 이 탭의 다음 프레임이 낡았다 — STALE 은 다시 받기만 한다
+    const before = st().resyncNonce;
+    err('STALE_SYNC');
+    expect(st().resyncNonce).toBe(before + 1);
+    expect(st().sync.dirty).toBe(false);
+    const other = [2, 7, 6, 9, 0, 1, 0, 0, 0];
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 9,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: other, version: 4, solved: false },
+      }),
+    );
+    expect(st().board).toEqual(other); // 다른 탭의 판
+    expect(st().sync.dirty).toBe(false);
+    expect(st().takeSync(2_000, false)).toBeNull(); // 덮어쓸 프레임이 나가지 않는다
+    // 이 탭에서 새로 입력하면 그 입력이 이기고, 버전은 서버보다 크다
+    act(() => {
+      st().select(4);
+      st().place(5);
+    });
+    expect(st().takeSync(2_001, false)).toMatchObject({ version: 5, grid: [2, 7, 6, 9, 5, 1, 0, 0, 0] });
+  });
+
+  it('STALE_SYNC 뒤 받은 판이 거절된 프레임 버전 이상이면 서버 판, 그 사이 새 입력이 있으면 로컬', () => {
+    act(() => {
+      st().place(7);
+    });
+    st().takeSync(1_000, false); // v1 — 다른 탭이 이미 v3 까지 썼다
+    err('STALE_SYNC');
+    act(() => {
+      st().select(2);
+      st().place(6); // 다시 받기 전에 새 입력
+    });
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 9,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: [2, 9, 0, 0, 0, 1, 0, 0, 0], version: 3, solved: false },
+      }),
+    );
+    expect(st().board.slice(0, 3)).toEqual([2, 7, 6]);
+    expect(st().takeSync(1_001, false)?.version).toBe(4);
+  });
+
+  it('BAD_GRID 같은 어긋남은 거절된 판이 다시 이기지 않는다 — 서버 판으로 맞춘다', () => {
+    act(() => {
+      st().place(7);
+    });
+    st().takeSync(1_000, false);
+    err('BAD_GRID');
+    act(() =>
+      st().applySnapshot({
+        roomId: 'r1',
+        phase: 'PLAYING',
+        eventSeq: 9,
+        tableView: view(),
+        privateHand: { puzzleIndex: 0, grid: LO_SHU_CLUES, version: 0, solved: false },
+      }),
+    );
+    expect(st().board).toEqual(LO_SHU_CLUES);
+    expect(st().sync.dirty).toBe(false);
   });
 
   it('공개 이벤트 — 시작·진행도·완성·마감·끝·탈주·매치 끝', () => {

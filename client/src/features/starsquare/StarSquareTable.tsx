@@ -30,6 +30,15 @@ import { useSyncSender } from './useSyncSender';
 /** 키보드 두 자리 수 — 이 시간 안에 이어 치면 한 수(1, 2 → 12, §13). */
 export const TWO_DIGIT_MS = 600;
 
+/** 판 키보드를 쉬게 하는 겹친 층 — 규칙 다이얼로그(Radix)·게임 메뉴·확인 창. 열려 있으면 키는 그 층의 것이다. */
+const KEY_OVERLAYS = '[role="dialog"], [role="alertdialog"], [role="menu"], [aria-modal="true"]';
+
+/** 키가 겹친 층의 것인가 — 대상이 층 안이거나(포털이라 게임판 밖) 층이 하나라도 열려 있다(포커스가 층 밖에 남은 경우). */
+function overlayOwnsKeys(target: EventTarget | null): boolean {
+  if (target instanceof Element && target.closest(KEY_OVERLAYS)) return true;
+  return document.querySelector(KEY_OVERLAYS) !== null;
+}
+
 interface Props {
   roomId: string;
   playerIds: number[];
@@ -129,10 +138,13 @@ export function StarSquareTable({
 
   // ── 키보드: 숫자(두 자리는 0.6초 안에 이어서), 방향키, Backspace, Ctrl/⌘+Z ──
   const pendingDigit = useRef<{ d: number; t: number; cell: number; changed: boolean } | null>(null);
+  const playRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      // 규칙 다이얼로그·게임 메뉴 안의 키(숫자·Backspace·방향키)가 뒤의 판을 고치고 SYNC 까지 내보내지 않게
+      if (overlayOwnsKeys(e.target)) return;
       const st = useStarSquareStore.getState();
       if (!canEditBoard(st) || roomFinished) return;
       const size = st.size;
@@ -176,7 +188,10 @@ export function StarSquareTable({
           if (r < 0 || r >= size || c < 0 || c >= size) return;
           if (st.clues[r * size + c] === 0) break;
         }
-        st.select(r * size + c);
+        const next = r * size + c;
+        st.select(next);
+        // roving tabindex — 고른 칸으로 DOM 포커스도 옮긴다(고른 칸·포커스 칸이 갈라지지 않게, 스크린리더가 새 칸을 읽게)
+        playRef.current?.querySelector<HTMLElement>(`[role="grid"] [data-cell="${next}"]`)?.focus();
         return;
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -293,7 +308,7 @@ export function StarSquareTable({
         )}
 
         {showBoard && s.clues && (
-          <div className={`sq-play${s.mySolved ? ' sq-play-solved' : ''}${awaiting ? ' sq-play-checking' : ''}`}>
+          <div ref={playRef} className={`sq-play${s.mySolved ? ' sq-play-solved' : ''}${awaiting ? ' sq-play-checking' : ''}`}>
             <StarGrid
               n={n}
               board={s.board.length === n * n ? s.board : s.clues}

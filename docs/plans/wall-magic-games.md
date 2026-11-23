@@ -423,6 +423,8 @@ domain.game.starsquare
   시간 라벨(M7 — 카탈로그 `turnLimitLabel`). Vitest 클라 전체 1,900건 통과, 375px 라이트/다크 5×5 + 숫자판 한 화면, e2e 혼자 한 판·넷 동시 입력 BUSY 재전송.
 - **S4 준비 (2026-11-23)**: D-287 — 코드 기본값 AVAILABLE·카탈로그 테스트 순서·문서 수치(README·CLAUDE.md·implementation-status·케이스 스터디 §14·deploy·
   stomp-protocol)·practice e2e 한 줄. 배포는 사용자 보류 — 병합·배포는 관제. 운영 뒤 판 길이로 봇 페이스·제한 재조정, 재미 확인.
+- **S3·S4 리뷰 (2026-11-23)**: D-288 — 확인된 결함 10건(보낸 판·다른 탭 판의 승패, 두 자리 되돌리기, 겹친 층의 키, 방향키 포커스, 줄 합 칩·결과 초 읽기,
+  README·CLAUDE.md·룰 §12b 수치). 코드 결함마다 재현 테스트. 배포는 계속 보류.
 
 ### 10.2 A 담바둑 S1 결과 (2026-11-20)
 

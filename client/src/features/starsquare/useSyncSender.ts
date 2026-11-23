@@ -13,6 +13,9 @@ export const SOLVE_CONFIRM_MS = 3_000;
  *
  * <p>응답을 기다리는 동안 잠그는 상태가 없다 — 입력은 늘 된다. 완성처럼 보이는 판을 보낸 뒤의 "확인 중" 표시도 {@link SOLVE_CONFIRM_MS} 뒤
  * 스스로 풀리고 판을 한 번 더 보낸다(D-270 의 시간 제한 해제와 같은 뜻 — 보낸 판이 닿지 않아도 화면이 멈추지 않는다).
+ *
+ * <p>다시 연결될 때 여기서 판을 다시 보내지 않는다 — 연결마다 오는 resync 의 내 판(버전)이 정한다(`applySnapshot`: 서버가 모르는 내 입력이 있을
+ * 때만 로컬이 이기고 다시 보낸다). 입력 없이 다시 보내면 다른 탭에서 더 진행한 판을 이 탭의 낡은 판이 덮는다.
  */
 export function useSyncSender(
   sendAction: (action: Record<string, unknown>) => boolean | void,
@@ -35,7 +38,7 @@ export function useSyncSender(
         const s = useStarSquareStore.getState();
         const msg = s.takeSync(Date.now(), looksComplete(s.board, s.size));
         if (msg) {
-          // 소켓이 그 사이 끊겨 나가지 않았으면(false) 보내지 않은 것으로 되돌린다 — 다시 연결되면 아래 효과가 보낸다
+          // 소켓이 그 사이 끊겨 나가지 않았으면(false) 보내지 않은 것으로 되돌린다 — 다시 연결되면 위 효과가 보낸다
           if (sendAction(msg) === false) s.markUnsent();
           else lastSentAt.current = Date.now();
         }
@@ -44,13 +47,6 @@ export function useSyncSender(
     );
     return () => window.clearTimeout(timer);
   }, [dirty, board, retryAt, connected, sendAction]);
-
-  // 다시 연결되면 지금 판을 한 번 더 보낸다 — 끊긴 사이 보낸 판이 조용히 버려졌을 수 있다(멱등이라 이미 닿았어도 무해)
-  const wasConnected = useRef(connected);
-  useEffect(() => {
-    if (connected && !wasConnected.current) useStarSquareStore.getState().markUnsent();
-    wasConnected.current = connected;
-  }, [connected]);
 
   useEffect(() => {
     if (!awaiting) return;

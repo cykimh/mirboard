@@ -32,6 +32,13 @@ interface Props {
   mini?: boolean;
 }
 
+/** 줄 합 칩의 읽는 글자 — "1행 합 12, 모자람"(빈 줄은 합 없이). */
+export function chipText(s: LineSum, where: string): string {
+  const name =
+    where === 'row' ? `${s.line.index + 1}행` : where === 'col' ? `${s.line.index + 1}열` : where === 'diag' ? '↘ 대각선' : '↙ 대각선';
+  return s.state === 'empty' ? `${name} 비었음` : `${name} 합 ${s.sum}, ${STATE_LABEL[s.state]}`;
+}
+
 /** 줄의 첫 칸 중심 → 끝 칸 중심(판 좌표 0~N). 별자리 선을 긋는다. */
 function lineEnds(sum: LineSum, n: number) {
   const first = sum.line.cells[0];
@@ -58,17 +65,22 @@ export function StarGrid({ n, board, clues, selected, editable, onSelect, label 
   for (const s of ok) for (const c of s.line.cells) linked.add(c);
   const complete = looksComplete(board, n);
 
+  // 줄 합 칩 — 역할 없는 span 의 aria-label 은 읽히지 않는다. 보이는 숫자·모양은 가리고 읽을 글자(줄·합·상태)를 sr-only 로 둔다.
+  // 가로 줄 칩은 grid 의 row 안이라 gridcell 이어야 한다(row 의 자식 규칙).
   const chip = (s: LineSum, where: string) => (
     <span
       key={`${s.line.kind}-${s.line.index}`}
       className={`sq-sum sq-sum-${s.state} sq-sum-${where}`}
       data-state={s.state}
-      aria-label={`${where === 'row' ? `${s.line.index + 1}행` : where === 'col' ? `${s.line.index + 1}열` : where === 'diag' ? '↘ 대각선' : '↙ 대각선'} 합 ${s.sum} ${STATE_LABEL[s.state]}`}
+      role={where === 'row' || where === 'col' ? 'gridcell' : undefined}
     >
-      <span className="sq-sum-value">{s.sum || ''}</span>
+      <span className="sq-sum-value" aria-hidden="true">
+        {s.sum || ''}
+      </span>
       <span className="sq-sum-mark" aria-hidden="true">
         {STATE_MARK[s.state]}
       </span>
+      <span className="sr-only">{chipText(s, where)}</span>
     </span>
   );
 
@@ -79,7 +91,7 @@ export function StarGrid({ n, board, clues, selected, editable, onSelect, label 
       data-n={n}
     >
       <div className="sq-grid-frame">
-        <div className="sq-grid" role="grid" aria-label={label} aria-rowcount={n} aria-colcount={n}>
+        <div className="sq-grid" role="grid" aria-label={label}>
           {Array.from({ length: n }, (_, r) => (
             <div key={r} className="sq-row" role="row">
               {Array.from({ length: n }, (_, c) => {

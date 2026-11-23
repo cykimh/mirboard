@@ -1,16 +1,16 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 /**
- * 별자리 수판 S3 화면 점검(D-286) — 아직 비공개(`DISABLED`)라 허브 카드가 없다. 로컬 서버를 `MIRBOARD_STAR_SQUARE_STATUS=AVAILABLE` 로 띄운
- * 스택에서만 돈다(`.claude/launch.json` 의 starsquare-server·starsquare-client — `E2E_BASE_URL=http://localhost:5203`).
- * 공개 전에는 기본 e2e 에서 건너뛴다(`E2E_STAR_SQUARE=1` 일 때만).
+ * 별자리 수판 S3 화면 점검(D-286·D-288). 코드 기본값은 공개(D-287)지만 가입 계정 5개·브라우저 넷을 쓰는 무거운 점검이라 기본 e2e 에서는
+ * 건너뛰고 `E2E_STAR_SQUARE=1` 일 때만 돈다 — 보통 `.claude/launch.json` 의 starsquare-server·starsquare-client 스택(`E2E_BASE_URL=http://localhost:5203`).
+ * 가입은 IP 레이트리밋(`/api/auth/**`)에 걸리므로 두 프로젝트(desktop·phone)를 한 번에 돌리면 뒤쪽이 429 로 멈출 수 있다 — `--project` 로 하나씩.
  *
  * 1. 혼자 한 판 — 짧게(퍼즐 1개)·쉬움(3×3): 화면의 단서를 읽어 테스트가 마방진을 풀고 칸·숫자판을 눌러 넣는다 → 완성·판 끝까지.
  * 2. 넷이 동시에 입력 — 어려움(5×5): 네 브라우저가 한꺼번에 칸을 채우는 동안 서버가 `BUSY` 를 내도 보내기가 다시 보내, 끝나면 넷 모두
  *    서버의 내 판(resync 의 비공개 뷰)이 화면의 판과 같다. 받은 `BUSY` 수를 적는다.
  * 계정은 가입으로 만든다(게스트는 IP 당 하루 발급 한도가 있다).
  */
-test.skip(process.env.E2E_STAR_SQUARE !== '1', '별자리 수판은 공개 전 — E2E_STAR_SQUARE=1 과 AVAILABLE 서버에서만');
+test.skip(process.env.E2E_STAR_SQUARE !== '1', '별자리 수판 점검은 무거워 E2E_STAR_SQUARE=1 일 때만');
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
@@ -54,7 +54,8 @@ async function openAs(browser: Browser, s: Session, roomId: string): Promise<Pag
 
 /** 화면 칸 → [값, 단서?] (aria-label "1행 2열 7 (단서)"). */
 async function readBoard(page: Page): Promise<{ values: number[]; clue: boolean[] }> {
-  const labels = await page.getByRole('grid', { name: '내 판' }).getByRole('gridcell').evaluateAll((els) =>
+  // 별 칸만(줄 합 칩도 gridcell 이지만 aria-label 이 없다 — 읽는 글자는 sr-only)
+  const labels = await page.getByRole('grid', { name: '내 판' }).locator('[role="gridcell"][data-cell]').evaluateAll((els) =>
     els.map((e) => e.getAttribute('aria-label') ?? ''),
   );
   return {

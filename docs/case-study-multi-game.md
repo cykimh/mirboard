@@ -506,7 +506,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=1971 skipped=5 failed=0 dockerfree=1690 (86%)   (D-223 시점 — 일곱 게임 공개 뒤, 씨앗포 도메인 51 / 49. D-196 시점 1955 / 1679 — 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
+# → tests=2309 skipped=7 failed=0 dockerfree=1992 (86%)   (D-288 시점 — 별자리 수판 공개 준비 뒤, 별자리 수판 도메인 68 / 68. D-223 시점 1971 / 1690 — 일곱 게임 공개 뒤, 씨앗포 도메인 51 / 49. D-196 시점 1955 / 1679 — 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -514,11 +514,11 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8~§12) — main 소스 줄 수
-for d in core tichu skullking onecard yacht omok cloudroute artillery; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8~§12·§14) — main 소스 줄 수
+for d in core tichu skullking onecard yacht omok cloudroute artillery starsquare; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# 별자리 수판(§14): find server/src/main/java/com/mirboard/domain/game/starsquare -name '*.java' | xargs cat | wc -l → 3173 (D-287 시점, core 803 · GameEngine.java 204)
-# → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756(D-226 시점, D-224 때 3337, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+# → core 803 · tichu 6048 · skullking 4802 · onecard 2647 · yacht 2518 · omok 3735 · cloudroute 3106 · artillery 4017 · starsquare 3173, GameEngine.java 204   (D-288 시점)
+# 그 전 → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756(D-226 시점, D-224 때 3337, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
 grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
@@ -541,6 +541,11 @@ git diff --stat 666a26c^ 666a26c -- client/src | tail -1   # → 24 files change
 git diff --name-only 666a26c^ 666a26c -- client/src | grep -vE 'features/artillery|types/artillery|artillery-table|artilleryCss'
 ./gradlew :server:test --tests 'com.mirboard.domain.game.artillery.*'   # → 씨앗포 도메인 90건(Docker 불필요 86 — Docker 는 ArtilleryMatchRecorderIT 만) + 서버 경로 IT 4(ArtilleryBotMatchSimulationIT)·기록 실패 격리 1   (D-226 시점 — D-224 때 71 / 69, S3 때 51 / 49)
 npm --prefix client run test -- artillery   # → 42건 (D-226 시점 — D-224 때 36, S3 때 26)
+
+# (12) 별자리 수판(§14) — 인프라가 이름을 아는가 / 도메인 테스트 / 클라 테스트
+grep -rniE 'starsquare|star_square|별자리' server/src/main/java/com/mirboard/infra   # → 0건
+./gradlew :server:test --tests 'com.mirboard.domain.game.starsquare.*'   # → 68건(전부 Docker 불필요) + 서버 경로 IT(StarSquareBotMatchSimulationIT)
+npm --prefix client run test -- starsquare   # → 52건 (D-288 시점 — 게임판·스토어·보내기·연출 소리·튜토리얼 47 + CSS 네임스페이스 5)
 ```
 
 관련 문서: [game-port.md](game-port.md)(포트 계약 정본) ·
@@ -549,4 +554,5 @@ npm --prefix client run test -- artillery   # → 42건 (D-226 시점 — D-224 
 [rules-yacht.md](rules-yacht.md) · [plans/yacht.md](plans/yacht.md)(네 번째 게임) ·
 [rules-omok.md](rules-omok.md) · [plans/omok.md](plans/omok.md)(다섯 번째 게임) ·
 [rules-artillery.md](rules-artillery.md) · [plans/artillery.md](plans/artillery.md)(일곱 번째 게임) ·
-[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-196, D-200, D-220 ~ D-223)
+[rules-starsquare.md](rules-starsquare.md) · [plans/wall-magic-games.md](plans/wall-magic-games.md)(별자리 수판) ·
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-196, D-200, D-220 ~ D-223, D-282 ~ D-288)
