@@ -90,21 +90,22 @@ class StarSquareEngineTest {
     }
 
     @Test
-    void a_magic_square_solves_closes_the_puzzle_in_30_seconds_and_the_last_solver_ends_it() {
+    void a_magic_square_solves_closes_the_puzzle_in_15_seconds_and_the_last_solver_ends_it() {
         StarSquareEngine e = engine(2, Set.of(), 2, 300);
         StarSquareState s = playing(e, loShuPuzzles(2));
         long start = s.phaseStartedAt();
         var first = e.apply(s, 1, sync(0, 1, LO_SHU.toArray()), start + 40_000);
+        // 완성한 좌석 1 에게만 아직 푸는 좌석 0 의 판이 간다(비공개 — D-294)
         assertThat(first.events()).containsExactly(new StarSquareEvent.Solved(1, 1, 40_000),
-                new StarSquareEvent.Closing(30_000));
+                new StarSquareEvent.Closing(15_000), new StarSquareEvent.PeerBoard(1, 0, 0, LO_SHU_CLUES));
         StarSquareState closing = first.newState();
-        assertThat(e.deadline(closing)).isEqualTo(start + 70_000);
+        assertThat(e.deadline(closing)).isEqualTo(start + 55_000);
         assertThat(e.pendingSeats(closing)).containsExactly(0);
-        assertThat(e.timer(closing, start + 50_000)).hasValue(20_000);
+        assertThat(e.timer(closing, start + 50_000)).hasValue(5_000);
         assertReject(() -> e.apply(closing, 1, sync(0, 2, LO_SHU.toArray()), start + 41_000),
                 RejectionReason.ALREADY_SOLVED);
 
-        var second = e.apply(closing, 0, sync(0, 1, LO_SHU.toArray()), start + 55_000);
+        var second = e.apply(closing, 0, sync(0, 1, LO_SHU.toArray()), start + 50_000);
         assertThat(types(second.events())).containsExactly("SOLVED", "PUZZLE_ENDED");
         var ended = (StarSquareEvent.PuzzleEnded) second.events().get(1);
         assertThat(ended.reason()).isEqualTo(PuzzleOutcome.EndReason.ALL_SOLVED);
@@ -117,12 +118,12 @@ class StarSquareEngineTest {
         StarSquareState result = second.newState();
         assertThat(result.phase()).isEqualTo(Phase.RESULT);
         assertThat(e.pendingSeats(result)).isEmpty();
-        assertReject(() -> e.apply(result, 0, sync(0, 9, LO_SHU.toArray()), start + 56_000),
+        assertReject(() -> e.apply(result, 0, sync(0, 9, LO_SHU.toArray()), start + 51_000),
                 RejectionReason.PUZZLE_CLOSED);
         StarSquareInvariantChecker.check(result, e);
 
         // 결과 보기 8초 뒤 다음 퍼즐 — 판·버전이 새로
-        var next = e.onTimer(result, start + 55_000 + StarSquareEngine.RESULT_MS);
+        var next = e.onTimer(result, start + 50_000 + StarSquareEngine.RESULT_MS);
         assertThat(types(next.events())).containsExactly("PUZZLE_STARTED");
         StarSquareState p2 = next.newState();
         assertThat(p2.index()).isEqualTo(1);
@@ -145,10 +146,10 @@ class StarSquareEngineTest {
         s = e.apply(s, 0, sync(0, 1, 2, 7, 6, 0, 0, 1, 0, 0, 0), start + 11_000).newState();
         s = e.apply(s, 1, sync(0, 1, 2, 0, 0, 0, 0, 1, 0, 0, 8), start + 12_000).newState();
         s = e.apply(s, 3, sync(0, 1, 2, 7, 6, 0, 0, 1, 0, 0, 3), start + 13_000).newState();
-        assertReject(sOf(s, e, 0, start + 40_000), RejectionReason.PUZZLE_CLOSED);
+        assertReject(sOf(s, e, 0, start + 25_000), RejectionReason.PUZZLE_CLOSED);
 
-        assertThat(e.onTimer(s, start + 39_999).events()).isEmpty();
-        var end = e.onTimer(s, start + 40_000);
+        assertThat(e.onTimer(s, start + 24_999).events()).isEmpty();
+        var end = e.onTimer(s, start + 25_000);
         assertThat(types(end.events())).containsExactly("PUZZLE_ENDED", "MATCH_ENDED");
         var ended = (StarSquareEvent.PuzzleEnded) end.events().get(0);
         assertThat(ended.reason()).isEqualTo(PuzzleOutcome.EndReason.CLOSED);
@@ -298,7 +299,7 @@ class StarSquareEngineTest {
         assertThat(s.board(1).pace().solveAfterMs()).isLessThan(3_000);
         assertThat(e.deadline(s)).isEqualTo(s.phaseStartedAt() + 60_000);
         var r = e.apply(s, 0, sync(0, 1, LO_SHU.toArray()), s.phaseStartedAt() + 10);
-        assertThat(r.events()).contains(new StarSquareEvent.Closing(300));
+        assertThat(r.events()).contains(new StarSquareEvent.Closing(150));
         assertThatThrownBy(() -> new StarSquareConfig(1, Set.of(), 1, Difficulty.EASY, BotLevel.NORMAL, 60, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }

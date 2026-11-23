@@ -49,8 +49,9 @@ function lineEnds(sum: LineSum, n: number) {
 }
 
 /**
- * 별자리 수판의 판(§13). 칸은 별, 숫자는 별의 밝기. 줄 합 칩은 가로 줄 끝(오른쪽)·세로 줄 끝(아래)·두 대각선(아래 줄)에 놓고, 맞은 줄은
- * 판 위 SVG 층에 <b>별자리 선</b>으로 잇는다(§3.2). 합은 내 판에서 더하기만 한다 — 판정은 서버(§5).
+ * 별자리 수판의 판(§13). 칸은 별, 숫자는 별의 밝기. 줄 합 칩은 <b>작은 달</b>로 가로 줄 끝(오른쪽)·세로 줄 끝(아래)에 놓고, 두 대각선 합은
+ * 그 대각선이 <b>끝나는 모서리</b>(↘ 오른쪽 아래 · ↙ 왼쪽 아래)에 작은 알약으로 붙인다(D-294). 맞은 줄은 판 위 SVG 층에 <b>별자리 선</b>으로
+ * 잇는다(§3.2). 합은 그 판에서 더하기만 한다 — 판정은 서버(§5).
  */
 export function StarGrid({ n, board, clues, selected, editable, onSelect, label = '내 판', mini = false }: Props) {
   const sums = lineSums(board, n);
@@ -74,6 +75,11 @@ export function StarGrid({ n, board, clues, selected, editable, onSelect, label 
       data-state={s.state}
       role={where === 'row' || where === 'col' ? 'gridcell' : undefined}
     >
+      {(where === 'diag' || where === 'anti') && (
+        <span className="sq-diag-label" aria-hidden="true">
+          {where === 'diag' ? '↘' : '↙'}
+        </span>
+      )}
       <span className="sq-sum-value" aria-hidden="true">
         {s.sum || ''}
       </span>
@@ -151,18 +157,9 @@ export function StarGrid({ n, board, clues, selected, editable, onSelect, label 
           </svg>
         )}
       </div>
-      {!mini && (
-        <div className="sq-diag-sums">
-          <span className="sq-diag-label" aria-hidden="true">
-            ↘
-          </span>
-          {chip(diag, 'diag')}
-          <span className="sq-diag-label" aria-hidden="true">
-            ↙
-          </span>
-          {chip(anti, 'anti')}
-        </div>
-      )}
+      {/* 두 대각선 합 — 대각선이 끝나는 아래 모서리에(↙ 왼쪽 아래, ↘ 오른쪽 아래). 읽는 순서는 ↘ 먼저 */}
+      {!mini && chip(diag, 'diag')}
+      {!mini && chip(anti, 'anti')}
     </div>
   );
 }

@@ -145,7 +145,7 @@
   opacity: 0.25;
 }
 
-/* 마감 30초 — 가장자리(아래)에서 새벽빛이 번져 온다. 내용 아래 층이라 글자를 가리지 않는다 */
+/* 마감 15초(D-294) — 가장자리(아래)에서 새벽빛이 번져 온다. 내용 아래 층이라 글자를 가리지 않는다 */
 .sq-table::after {
   content: '';
   position: absolute;
@@ -163,7 +163,7 @@
 }
 
 .sq-anim.sq-table-closing::after {
-  animation: sq-dawn-rise 30s linear both;
+  animation: sq-dawn-rise 15s linear both;
 }
 
 @keyframes sq-dawn-rise {
@@ -415,11 +415,13 @@ button.sq-badge {
   gap: 8px;
 }
 
+/* D-294 — 시계는 머리 줄 가운데에 있다(판 위 한 줄을 판에 준다) */
 .sq-clock {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 2px 14px;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 1px 12px;
   border-radius: 999px;
   border: 1px solid var(--sq-line);
   background: var(--sq-panel);
@@ -571,6 +573,72 @@ button.sq-badge {
   width: 100%;
 }
 
+/* 판 한 장(내 판 · 보고 있는 남의 판). 완성 도장은 내 판 위에 놓인다 */
+.sq-board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 남의 판을 보는 동안 좁은 화면은 그 판이 내 판 자리를 대신한다(넓은 화면은 17 이 나란히 둔다) */
+.sq-play-watching .sq-board-mine {
+  display: none;
+}
+
+/* ── 남의 판 보기(D-294) — 내가 완성한 뒤에만 뜨는 작은 선택지 ── */
+.sq-watch-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.sq-watch-tab {
+  min-height: 32px;
+  max-width: 132px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sq-line);
+  background: var(--sq-panel);
+  color: var(--sq-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 고른 것 — 색 + 굵은 테두리 + 앞의 별표(색만 쓰지 않는다) */
+.sq-watch-tab[aria-pressed='true'] {
+  border: 2px solid var(--sq-accent);
+  background: var(--sq-accent-soft);
+  font-weight: 800;
+}
+
+.sq-watch-tab[aria-pressed='true']::before {
+  content: '✦ ';
+  color: var(--sq-accent);
+}
+
+.sq-peer-title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sq-muted);
+  text-align: center;
+}
+
+.sq-peer-name {
+  color: var(--sq-ink);
+  font-weight: 700;
+}
+
 .sq-anim .sq-play {
   animation: sq-relight 0.55s ease both;
 }
@@ -579,7 +647,9 @@ button.sq-badge {
 .sq-grid-wrap {
   --sq-cs: var(--sq-cell-size);
   --sq-gap: 4px;
-  --sq-moon-size: 34px;
+  /* 줄 합 칩(작은 달)의 지름 — 가로 줄 칩의 열 폭·세로 줄 칩의 행 높이이기도 하다(D-294) */
+  --sq-chip: 24px;
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -592,13 +662,36 @@ button.sq-badge {
   box-shadow: 0 6px 18px rgba(20, 22, 70, 0.22);
 }
 
-/* 내 판은 3×3·4×4 일 때 칸을 키운다(375px 에 맞는 크기 — 더 넓은 화면은 17 이 더 키운다) */
+/* 게임판의 판은 화면에 맞춰 가장 크게(D-294) — 칸 = min(폭에 맞는 크기, 높이에 맞는 크기, 상한), 누름 하한 44px.
+   · 폭: 화면 폭 − 판 밖 좌우(`--sq-out-w`) − 판 안의 칸 아닌 것(테두리·안쪽 여백 14 + 합 열 24 + 틈 4 + 칸 사이 틈)
+   · 높이: 화면 높이 − 칸이 아닌 모든 것(`--sq-out-h` — 머리 줄·좌석 띠·합 행·숫자판·상태 줄. 판 + 숫자판이 한 화면에 들게)
+   여기 값은 좁은 화면(375px) 기준이고, 넓은 화면의 값은 17 이 바꾼다(27 은 폭 미디어 0개). */
+.sq-play .sq-grid-wrap {
+  --sq-out-w: 44px;
+  --sq-cs: clamp(44px, min(var(--sq-fit-w), var(--sq-fit-h)), var(--sq-cs-cap));
+  /* 아래 모서리의 대각선 합이 숫자판과 닿지 않게 */
+  margin-bottom: 6px;
+}
+
 .sq-play .sq-grid-wrap[data-n='3'] {
-  --sq-cs: 64px;
+  --sq-fit-w: calc((100vw - var(--sq-out-w) - 50px) / 3);
+  --sq-fit-h: calc((100vh - 344px) / 3);
+  --sq-fit-h: calc((100dvh - 344px) / 3);
+  --sq-cs-cap: 100px;
 }
 
 .sq-play .sq-grid-wrap[data-n='4'] {
-  --sq-cs: 58px;
+  --sq-fit-w: calc((100vw - var(--sq-out-w) - 54px) / 4);
+  --sq-fit-h: calc((100vh - 396px) / 4);
+  --sq-fit-h: calc((100dvh - 396px) / 4);
+  --sq-cs-cap: 78px;
+}
+
+.sq-play .sq-grid-wrap[data-n='5'] {
+  --sq-fit-w: calc((100vw - var(--sq-out-w) - 58px) / 5);
+  --sq-fit-h: calc((100vh - 400px) / 5);
+  --sq-fit-h: calc((100dvh - 400px) / 5);
+  --sq-cs-cap: 64px;
 }
 
 .sq-grid-frame {
@@ -735,26 +828,30 @@ button.sq-badge {
   box-shadow: 0 0 0 2px var(--sq-plate-star);
 }
 
-/* 줄 합 칩 = 달. 상태는 달의 모양으로 가른다(색만 쓰지 않는다):
-   비었음 = 점선 고리 · 채우는 중 = 반달 · 모자람 ▽ = 초승달 · 넘침 △ = 겹고리 보름달 · 맞음 ✦ = 꽉 찬 금빛 보름달 */
+/* 줄 합 칩 = 작은 달(D-294 — 칸 크기 한 칸을 차지하던 것을 지름 `--sq-chip` 로 줄였다). 상태는 달의 모양으로 가른다(색만 쓰지 않는다):
+   비었음 = 점선 고리 · 채우는 중 = 반달 · 모자람 ▽ = 초승달 · 넘침 △ = 겹고리 보름달 · 맞음 ✦ = 꽉 찬 금빛 보름달.
+   모양 표시(▽ △ ✦)는 달의 오른쪽 위 귀퉁이에 작게 붙는다. */
 .sq-sum {
   position: relative;
   isolation: isolate;
-  width: var(--sq-cs);
+  flex: 0 0 var(--sq-chip);
+  width: var(--sq-chip);
   height: var(--sq-cs);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  line-height: 1.05;
+  font-size: 11px;
+  line-height: 1;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
   color: var(--sq-plate-ink);
 }
 
 .sq-row-sums .sq-sum {
-  height: calc(var(--sq-moon-size) + 2px);
+  flex-basis: var(--sq-cs);
+  width: var(--sq-cs);
+  height: var(--sq-chip);
 }
 
 .sq-sum::before {
@@ -763,16 +860,20 @@ button.sq-badge {
   left: 50%;
   top: 50%;
   z-index: -1;
-  width: var(--sq-moon-size);
-  height: var(--sq-moon-size);
-  margin: calc(var(--sq-moon-size) / -2) 0 0 calc(var(--sq-moon-size) / -2);
+  width: var(--sq-chip);
+  height: var(--sq-chip);
+  margin: calc(var(--sq-chip) / -2) 0 0 calc(var(--sq-chip) / -2);
   border-radius: 50%;
   border: 1.5px solid var(--sq-plate-muted);
 }
 
 .sq-sum-mark {
+  position: absolute;
+  left: calc(50% + var(--sq-chip) / 2 - 6px);
+  top: calc(50% - var(--sq-chip) / 2 - 4px);
   font-size: 9px;
   line-height: 1;
+  text-shadow: 0 0 2px rgba(12, 14, 50, 0.95), 0 0 2px rgba(12, 14, 50, 0.95);
 }
 
 .sq-sum-mark:empty {
@@ -804,7 +905,7 @@ button.sq-badge {
 .sq-sum-over::before {
   border: 2px solid var(--sq-chip-over);
   background: rgba(255, 150, 140, 0.2);
-  box-shadow: 0 0 0 2px rgba(20, 20, 60, 0.6), 0 0 0 3.5px var(--sq-chip-over);
+  box-shadow: 0 0 0 1.5px rgba(20, 20, 60, 0.6), 0 0 0 3px var(--sq-chip-over);
 }
 
 .sq-sum-ok {
@@ -815,7 +916,11 @@ button.sq-badge {
 .sq-sum-ok::before {
   border-color: var(--sq-plate-star);
   background: radial-gradient(circle at 36% 32%, #fff3c4 0%, var(--sq-plate-star) 62%);
-  box-shadow: 0 0 10px rgba(255, 215, 114, 0.6);
+  box-shadow: 0 0 8px rgba(255, 215, 114, 0.6);
+}
+
+.sq-sum-ok .sq-sum-mark {
+  color: var(--sq-plate-star);
 }
 
 .sq-anim .sq-sum-ok::before {
@@ -834,28 +939,38 @@ button.sq-badge {
 }
 
 .sq-sum-corner {
-  width: var(--sq-cs);
+  flex: 0 0 var(--sq-chip);
+  width: var(--sq-chip);
 }
 
-/* 두 대각선 — 길쭉한 달(알약). 같은 상태 규칙 */
-.sq-diag-sums {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 2px 1px;
-}
-
-.sq-diag-sums .sq-sum {
+/* 두 대각선 합 — 그 대각선이 <b>끝나는 모서리</b>에 걸친 작은 알약(D-294): ↘ 는 오른쪽 아래, ↙ 는 왼쪽 아래. 별판 모서리 밖으로 비스듬히
+   반쯤 나가 있어 대각선의 연장선 위에 놓인다. 같은 상태 규칙(점선·반·▽·△·✦), 눌림은 받지 않는다. */
+.sq-sum-diag,
+.sq-sum-anti {
+  position: absolute;
+  bottom: -9px;
+  z-index: 1;
+  flex: none;
   width: auto;
-  min-width: 60px;
-  height: 28px;
-  flex-direction: row;
-  gap: 4px;
-  padding: 0 10px;
-  font-size: 13px;
+  min-width: 30px;
+  height: 20px;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sq-plate);
+  pointer-events: none;
 }
 
-.sq-diag-sums .sq-sum::before {
+.sq-sum-diag {
+  right: -9px;
+}
+
+.sq-sum-anti {
+  left: -9px;
+}
+
+.sq-sum-diag::before,
+.sq-sum-anti::before {
   inset: 0;
   width: auto;
   height: auto;
@@ -863,17 +978,27 @@ button.sq-badge {
   border-radius: 999px;
 }
 
-.sq-diag-sums .sq-sum-under::before {
+.sq-sum-diag.sq-sum-under::before,
+.sq-sum-anti.sq-sum-under::before {
   background: linear-gradient(90deg, rgba(255, 196, 107, 0.36) 28%, transparent 28%);
 }
 
-.sq-diag-sums .sq-sum-mark {
-  font-size: 10px;
+.sq-sum-diag .sq-sum-mark,
+.sq-sum-anti .sq-sum-mark {
+  position: static;
+  font-size: 8px;
+  text-shadow: none;
+}
+
+.sq-sum-diag.sq-sum-ok .sq-sum-mark,
+.sq-sum-anti.sq-sum-ok .sq-sum-mark {
+  color: inherit;
 }
 
 .sq-diag-label {
-  color: var(--sq-plate-muted);
+  font-size: 9px;
   font-weight: 700;
+  opacity: 0.8;
 }
 
 /* 별자리 선 — 판 좌표(0~N) 위, 눌림 통과. 한 칸 = 칸 + 틈이 되도록 층을 틈의 절반만큼 넓혀 칸 중심이 정확히 i+0.5 에 온다.
@@ -949,7 +1074,7 @@ button.sq-badge {
 /* 내 완성 도장 "N등!" — 글자는 data-place 로 그린다. 판 위에 비스듬히, 눌림 통과 */
 .sq-fx-stamp {
   position: absolute;
-  top: 34%;
+  top: 44%;
   left: 50%;
   z-index: 2;
   padding: 4px 16px;
@@ -1144,9 +1269,19 @@ button.sq-badge {
 }
 
 .sq-pad-tools {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
+}
+
+/* 전체 리셋(D-294) — 첫 누름에 "한 번 더"로 바뀐다: 색 + 굵은 테두리 + 글자 */
+.sq-pad-reset-armed,
+.sq-pad-reset-armed:disabled {
+  border: 2px solid var(--sq-over);
+  background: var(--sq-over-soft);
+  color: var(--sq-over);
+  font-weight: 800;
 }
 
 .sq-pad-tool {
@@ -1176,7 +1311,7 @@ button.sq-badge {
   transform: scale(0.93);
 }
 
-/* 5×5 — 숫자 25개 + 지우기(1칸) + 되돌리기(2칸)가 7열 네 줄에 꼭 맞는다(375px 한 화면) */
+/* 5×5 — 숫자 25개 + 지우기·되돌리기·리셋(1칸씩)이 7열 네 줄에 꼭 맞는다(375px 한 화면) */
 .sq-pad[data-n='5'] {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1188,17 +1323,11 @@ button.sq-badge {
 }
 
 .sq-pad[data-n='5'] .sq-pad-tool {
-  font-size: 12px;
-}
-
-.sq-pad[data-n='5'] .sq-pad-tool:first-child {
   flex-direction: column;
   gap: 1px;
-  font-size: 11px;
-}
-
-.sq-pad[data-n='5'] .sq-pad-tool:last-child {
-  grid-column: span 2;
+  font-size: 10px;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
 }
 
 /* ── 상태 줄 ── */

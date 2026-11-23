@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/features/auth/authStore';
 import { StarSquareTable } from './StarSquareTable';
+import { RESET_CONFIRM_MS } from './NumberPad';
+import { starSquareRoomSink } from './starSquareRoomSink';
 import { useStarSquareStore } from './starSquareStore';
-import { LO_SHU, seat, seedStore } from './starSquareTestFixtures';
+import { LO_SHU, LO_SHU_CLUES, seat, seedStore } from './starSquareTestFixtures';
 import { SYNC_THROTTLE_MS } from './useSyncSender';
 
 const sendAction = vi.fn((_: Record<string, unknown>) => true);
@@ -229,6 +231,112 @@ describe('StarSquareTable (S3)', () => {
     expect(within(end).getByText('4점 · 1등 2번')).toBeInTheDocument();
     fireEvent.click(within(end).getByRole('button', { name: '대기실로' }));
     expect(onBackToRoom).toHaveBeenCalled();
+  });
+
+  it('D-294 전체 리셋 — 두 번 눌러야 지운다, 3초 지나거나 다른 입력이 끼면 풀린다, 되돌리기로 복구', () => {
+    seedStore();
+    renderTable();
+    const reset = () => screen.getByRole('button', { name: /전체 리셋|한 번 더 누르면/ });
+    expect(reset()).toBeDisabled(); // 지울 내 숫자가 없다
+    fireEvent.click(cell(1, 2));
+    fireEvent.click(screen.getByRole('button', { name: '7' }));
+    fireEvent.click(cell(1, 3));
+    fireEvent.click(screen.getByRole('button', { name: '6' }));
+    expect(reset()).toBeEnabled();
+    expect(reset()).toHaveTextContent('리셋');
+
+    fireEvent.click(reset()); // 첫 누름 — 지우지 않는다
+    expect(st().board).toEqual([2, 7, 6, 0, 0, 1, 0, 0, 0]);
+    expect(reset()).toHaveTextContent('한 번 더');
+    expect(screen.getByRole('status')).toHaveTextContent('한 번 더 누르면 내가 넣은 숫자를 모두 지워요.');
+    act(() => vi.advanceTimersByTime(RESET_CONFIRM_MS));
+    expect(reset()).toHaveTextContent('리셋'); // 시간이 지나 풀림
+
+    fireEvent.click(reset());
+    fireEvent.click(screen.getByRole('button', { name: '9' })); // 다른 입력이 끼면 풀린다
+    expect(reset()).toHaveTextContent('리셋');
+    expect(st().board[2]).toBe(9);
+
+    fireEvent.click(reset());
+    fireEvent.click(reset()); // 두 번째 누름 — 단서만 남는다
+    expect(st().board).toEqual(LO_SHU_CLUES);
+    expect(reset()).toBeDisabled();
+    act(() => vi.advanceTimersByTime(SYNC_THROTTLE_MS));
+    expect(sendAction).toHaveBeenLastCalledWith(expect.objectContaining({ '@action': 'SYNC', grid: LO_SHU_CLUES }));
+    fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
+    expect(st().board).toEqual([2, 7, 9, 0, 0, 1, 0, 0, 0]);
+  });
+
+  it('D-294 남의 판 보기 — 푸는 동안은 선택지가 없고, 완성한 뒤에만 아직 푸는 사람의 판을 골라 본다(보기 전용)', () => {
+    const three = [10, 20, 30];
+    const names = { 10: '가람', 20: '나래', 30: '다솜' };
+    seedStore({ seats: [seat(0), seat(1), seat(2)] });
+    renderTable({ playerIds: three, usernames: names });
+    expect(screen.queryByRole('group', { name: '누구 판 보기' })).toBeNull();
+
+    act(() => {
+      starSquareRoomSink.applyEvent({ type: 'SOLVED', seq: 2, payload: { seat: 0, place: 1, elapsedMs: 9_000 } });
+      starSquareRoomSink.applyPrivateEvent({
+        eventId: 'p',
+        type: 'PEER_BOARD',
+        ts: 0,
+        payload: { viewer: 0, puzzle: 0, seat: 1, grid: [2, 7, 6, 0, 0, 1, 0, 0, 0] },
+      });
+    });
+    const tabs = screen.getByRole('group', { name: '누구 판 보기' });
+    expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['내 판', '나래', '다솜']);
+    expect(within(tabs).getByRole('button', { name: '내 판' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('grid', { name: '나래의 판' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '지우기' })).toBeNull(); // 완성 뒤 — 숫자판·리셋 없음
+
+    fireEvent.click(within(tabs).getByRole('button', { name: '나래' }));
+    const peer = screen.getByRole('grid', { name: '나래의 판' });
+    expect(within(peer).getByRole('gridcell', { name: /^1행 2열 7/ })).toBeDisabled();
+    // 줄 합은 그 사람 판 기준 — 윗줄 2+7+6 = 15 맞음
+    expect(within(peer).getByText('1행 합 15, 맞음')).toBeInTheDocument();
+    expect(screen.getByText(/나래의 판을 보는 중/)).toBeInTheDocument();
+    // 판이 바뀌면 따라 바뀐다
+    act(() =>
+      starSquareRoomSink.applyPrivateEvent({
+        eventId: 'p2',
+        type: 'PEER_BOARD',
+        ts: 0,
+        payload: { viewer: 0, puzzle: 0, seat: 1, grid: [2, 7, 6, 9, 0, 1, 0, 0, 0] },
+      }),
+    );
+    expect(within(screen.getByRole('grid', { name: '나래의 판' })).getByRole('gridcell', { name: /^2행 1열 9/ })).toBeInTheDocument();
+    // 아직 판을 받지 못한 좌석은 단서 판부터
+    fireEvent.click(within(tabs).getByRole('button', { name: '다솜' }));
+    expect(
+      within(screen.getByRole('grid', { name: '다솜의 판' })).getByRole('gridcell', { name: /^1행 2열 빈 칸/ }),
+    ).toBeInTheDocument();
+
+    // 보던 사람이 완성하면 선택지에서 빠지고 내 판으로 돌아온다
+    act(() => void starSquareRoomSink.applyEvent({ type: 'SOLVED', seq: 3, payload: { seat: 2, place: 2, elapsedMs: 11_000 } }));
+    expect(screen.queryByRole('grid', { name: '다솜의 판' })).toBeNull();
+    const left = within(screen.getByRole('group', { name: '누구 판 보기' })).getAllByRole('button');
+    expect(left.map((b) => b.textContent)).toEqual(['내 판', '나래']);
+    expect(left[0]).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('D-294 남의 판 보기 — 관전자에게는 선택지가 없다(판도 오지 않는다)', () => {
+    seedStore({ seats: [seat(0), seat(1, { solved: true, solvePlace: 1, elapsedMs: 5_000 })] }, null, -1);
+    renderTable({ spectator: true, myUserId: 99 });
+    expect(screen.queryByRole('group', { name: '누구 판 보기' })).toBeNull();
+    expect(screen.getByText('관전 중 — 모두의 진행만 보여요')).toBeInTheDocument();
+  });
+
+  it('D-294 줄 합 — 두 대각선 합은 판 아래 줄이 아니라 모서리 칩이고 읽는 글자는 그대로', () => {
+    seedStore({}, { puzzleIndex: 0, grid: [2, 7, 6, 9, 5, 1, 4, 3, 0], version: 3, solved: false });
+    const { container } = renderTable();
+    expect(container.querySelector('.sq-diag-sums')).toBeNull();
+    const diag = container.querySelector('.sq-sum-diag')!;
+    const anti = container.querySelector('.sq-sum-anti')!;
+    expect(diag).toHaveAttribute('data-state', 'partial');
+    expect(diag).toHaveTextContent('↘ 대각선 합 7, 채우는 중');
+    expect(anti).toHaveAttribute('data-state', 'ok');
+    expect(anti).toHaveTextContent('↙ 대각선 합 15, 맞음');
+    expect(container.querySelector('.sq-sum-row[data-state="ok"]')).toHaveTextContent('1행 합 15, 맞음');
   });
 
   it('스토어가 다시 받기를 청하면 훅의 resync 를 부른다', () => {

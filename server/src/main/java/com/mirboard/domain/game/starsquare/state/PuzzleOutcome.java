@@ -23,7 +23,7 @@ public record PuzzleOutcome(int index, EndReason reason, List<SeatResult> result
     public enum EndReason {
         /** 살아 있는 좌석이 모두 완성. */
         ALL_SOLVED,
-        /** 첫 완성 + 30초. */
+        /** 첫 완성 + 15초. */
         CLOSED,
         /** 퍼즐 제한. */
         TIME_UP

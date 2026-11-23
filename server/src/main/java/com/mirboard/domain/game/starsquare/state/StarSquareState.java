@@ -117,6 +117,19 @@ public record StarSquareState(List<PuzzleSpec> puzzles,
                 matchSeed, result);
     }
 
+    /**
+     * {@code viewer} 가 볼 수 있는 남의 판의 좌석(§11.2, D-294) — 푸는 단계에서 살아 있고 이 퍼즐을 <b>완성한</b> 좌석만 본다. 대상은 살아 있고
+     * 아직 완성하지 않은 다른 좌석(오름차순). 그 밖에는 빈 목록 — 아직 푸는 좌석·탈주한 좌석·범위 밖(관전자)은 아무것도 못 본다.
+     * 봇 좌석을 거르는 것은 부르는 쪽이다(상태는 봇 좌석을 모른다).
+     */
+    public List<Integer> peerSeats(int viewer) {
+        if (phase != Phase.PLAYING || viewer < 0 || viewer >= seatCount() || !alive(viewer)
+                || !board(viewer).solved()) {
+            return List.of();
+        }
+        return aliveSeats().stream().filter(s -> s != viewer && !board(s).solved()).toList();
+    }
+
     /** 완성한 좌석 수(지금 퍼즐, 탈주 포함). */
     public int solvedCount() {
         return (int) boards.stream().filter(SeatBoard::solved).count();

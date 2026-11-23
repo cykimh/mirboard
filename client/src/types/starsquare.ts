@@ -72,12 +72,27 @@ export interface StarSquareTableView {
   result: MatchResult | null;
 }
 
-/** 비공개 뷰 — 내 판(재접속·다른 탭에서 이어 풀기). */
+/** 아직 푸는 좌석의 판 하나 — 내가 이 퍼즐을 완성했을 때만 서버가 본인 큐로 준다(D-294). */
+export interface PeerView {
+  seat: number;
+  grid: Grid;
+}
+
+/** 비공개 뷰 — 내 판(재접속·다른 탭에서 이어 풀기). `peers` 는 내가 완성했을 때만 아직 푸는 남의 판들(그 밖에는 빈 목록). */
 export interface StarSquarePrivateBoard {
   puzzleIndex: number;
   grid: Grid;
   version: number;
   solved: boolean;
+  peers?: PeerView[];
+}
+
+/** 비공개 이벤트 `PEER_BOARD`(순번 없음) — 아직 푸는 좌석 `seat` 의 지금 판. 완성한 사람의 본인 큐로만 온다(D-294). */
+export interface PeerBoardPayload {
+  viewer: number;
+  puzzle: number;
+  seat: number;
+  grid: Grid;
 }
 
 // ── 공개 이벤트 payload ──

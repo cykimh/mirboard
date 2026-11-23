@@ -135,3 +135,13 @@ export function UndoIcon({ className, size = 16 }: ArtProps) {
     </svg>
   );
 }
+
+/** 전체 리셋 — 한 바퀴 도는 화살(처음으로). */
+export function ResetIcon({ className, size = 16 }: ArtProps) {
+  return (
+    <svg className={cls('sq-art-icon', className)} width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M16 10a6 6 0 1 1-2.2-4.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M14.2 2.4v3.4h-3.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

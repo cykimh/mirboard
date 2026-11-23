@@ -9,7 +9,8 @@ import java.util.Set;
 
 /**
  * 상태 → 뷰(`docs/rules-starsquare.md` §11). <b>공개 뷰 타입에는 정답·푸는 중인 남의 판 필드가 없다</b> — 타입을 나눠 은닉한다
- * (State Hiding, D-01). 끝난 퍼즐의 판·정답만 {@link PuzzleOutcome} 으로 실린다. 본인 판은 {@link PrivateBoard} 로 따로.
+ * (State Hiding, D-01). 끝난 퍼즐의 판·정답만 {@link PuzzleOutcome} 으로 실린다. 본인 판은 {@link PrivateBoard} 로 따로 — 이 퍼즐을 완성한
+ * 좌석의 비공개 뷰에만 아직 푸는 남의 판({@link PeerView})이 붙는다(D-294).
  */
 public final class StarSquareStateMapper {
 
@@ -39,8 +40,20 @@ public final class StarSquareStateMapper {
                              MatchResult result) {
     }
 
-    /** 본인 판(비공개 뷰) — 재접속·다른 탭에서 이어 풀기용. */
-    public record PrivateBoard(int puzzleIndex, Grid grid, long version, boolean solved) {
+    /** 아직 푸는 좌석의 판 하나 — 완성한 사람의 비공개 뷰에만 실린다(D-294). */
+    public record PeerView(int seat, Grid grid) {
+    }
+
+    /**
+     * 본인 판(비공개 뷰) — 재접속·다른 탭에서 이어 풀기용.
+     *
+     * @param peers 내가 이 퍼즐을 완성했으면 아직 푸는 남의 판들(D-294), 아니면 빈 목록 — <b>아직 푸는 사람에게는 늘 비어 있다</b>
+     */
+    public record PrivateBoard(int puzzleIndex, Grid grid, long version, boolean solved, List<PeerView> peers) {
+
+        public PrivateBoard {
+            peers = peers == null ? List.of() : List.copyOf(peers);
+        }
     }
 
     public static PublicView toPublicView(StarSquareState state, long remainingMs) {
@@ -74,6 +87,9 @@ public final class StarSquareStateMapper {
             return Optional.empty();
         }
         SeatBoard b = state.board(seat);
-        return Optional.of(new PrivateBoard(state.index(), b.grid(), b.version(), b.solved()));
+        List<PeerView> peers = state.peerSeats(seat).stream()
+                .map(s -> new PeerView(s, state.board(s).grid()))
+                .toList();
+        return Optional.of(new PrivateBoard(state.index(), b.grid(), b.version(), b.solved(), peers));
     }
 }

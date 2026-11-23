@@ -31,7 +31,8 @@ import org.springframework.context.ApplicationEventPublisher;
  *       않고 엔진 타이머가 페이스대로 채운다 — 룰 §10).</li>
  *   <li><b>시간</b> — 준비 끝·봇 이정표·마감·결과 보기 끝은 전부 포트 ⑦ 엔진 타이머다. 시작 시각을 상태에 두므로 {@link #timer} 는 재무장해도
  *       처음부터 세지 않는다. 인프라 턴 데드라인(마지막 액션 + 퍼즐 제한)은 늘 더 늦어 {@link #timeoutAction} 은 폴백으로만 남는다(D-183).</li>
- *   <li><b>은닉</b> — 공개 뷰·이벤트 타입에는 정답·푸는 중인 남의 판 필드가 없다. 내 판은 {@link #privateView} 로만(룰 §11).</li>
+ *   <li><b>은닉</b> — 공개 뷰·공개 이벤트 타입에는 정답·푸는 중인 남의 판 필드가 없다. 내 판은 {@link #privateView} 로만(룰 §11). 이 퍼즐을
+ *       완성한 좌석만 아직 푸는 남의 판을 받는다 — 비공개 뷰의 {@code peers} 와 비공개 이벤트 {@code PEER_BOARD}(D-294).</li>
  * </ul>
  */
 public final class StarSquareGameEngine implements GameEngine {
@@ -123,7 +124,7 @@ public final class StarSquareGameEngine implements GameEngine {
         return StarSquareStateMapper.toPublicView(s, rules.remainingMillis(s, clock.millis()));
     }
 
-    /** 내 판(퍼즐 번호·판·버전·완성) — 준비 단계·봇·범위 밖 좌석은 없다. */
+    /** 내 판(퍼즐 번호·판·버전·완성 + 완성했으면 아직 푸는 남의 판) — 준비 단계·봇·범위 밖 좌석(관전자)은 없다. */
     @Override
     public Optional<Object> privateView(GameState state, int seat) {
         return StarSquareStateMapper.toPrivateBoard(sState(state), seat, config.botSeats()).map(Object.class::cast);
