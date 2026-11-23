@@ -85,14 +85,14 @@
 
 /* 동작 줄이기 — 깜빡임/흔들림 대신 정적 링만. */
 @media (prefers-reduced-motion: reduce) {
-  .seat-avatar.declared,
-  .seat-declared-bell {
+  :root:not(.motion-forced) .seat-avatar.declared,
+  :root:not(.motion-forced) .seat-declared-bell {
     animation: none;
   }
-  .seat-avatar.declared {
+  :root:not(.motion-forced) .seat-avatar.declared {
     box-shadow: 0 0 0 3px rgba(240, 192, 0, 0.85);
   }
-  .seat-avatar.declared-grand {
+  :root:not(.motion-forced) .seat-avatar.declared-grand {
     box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.88);
   }
 }

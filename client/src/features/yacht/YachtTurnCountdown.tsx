@@ -88,6 +88,16 @@ export function YachtFinalCount({ turnSeconds, active, turnKey, animate }: Final
   const seconds = useTurnSecondsLeft(turnSeconds);
   const count = active && seconds !== null && seconds >= 1 && seconds <= FINAL_COUNT_SECONDS ? seconds : null;
 
+  // 리뷰 — 기록은 "지금 차례" 하나만 든다. 차례가 바뀌면(울리지 않고 지나간 차례여도) 바로 비우고, 판이 끝나도 비운다 — 같은 방에서
+  // 다음 판(D-153)을 하면 좌석·라운드 번호가 같은 차례가 다시 오는데, 지난 판의 기록이 남아 있으면 3·2·1 이 소리 없이 지나갔다.
+  const ended = useYachtStore((s) => s.result !== null);
+  useEffect(() => {
+    if (ended) resetFinalCount();
+  }, [ended]);
+  useEffect(() => {
+    if (rung.key !== turnKey) rung = { key: turnKey, seconds: new Set() };
+  }, [turnKey]);
+
   useEffect(() => {
     if (count === null) return;
     if (rung.key !== turnKey) rung = { key: turnKey, seconds: new Set() };

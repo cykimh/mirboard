@@ -1,3 +1,4 @@
+import { motionReduced } from '@/features/theme/cardAnimStore';
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Hand } from '@/types/tichu';
 import { cardKey } from '@/types/tichu';
@@ -101,11 +102,7 @@ export function useGameTableEffects({
     prevTrickKeyRef.current = trickPlayKey;
     if (!trickPlayKey || trickPlayKey === prev || !currentTop) return;
     if (!cardAnimEnabled) return;
-    const reduce =
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) return;
+    if (motionReduced()) return;
 
     const arena = arenaRef.current;
     const center = centerTrickRef.current;

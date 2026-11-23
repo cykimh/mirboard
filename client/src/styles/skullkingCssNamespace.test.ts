@@ -279,7 +279,9 @@ describe('18-skullking-table.css — 촛불 선장실 테마 (D-231)', () => {
   it('움직임 줄이기면 17-responsive 의 테마 블록이 연출을 전부 끈다', () => {
     const code = responsiveCssSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
     expect(code).toContain(
-      '@media (prefers-reduced-motion: reduce) { .sk-theme-cabin *, .sk-theme-cabin *::before, .sk-theme-cabin *::after { ' +
+      // D-291 — 연출을 직접 켠 사람(`motion-forced`)에게는 닿지 않는다.
+      '@media (prefers-reduced-motion: reduce) { :root:not(.motion-forced) .sk-theme-cabin *, ' +
+        ':root:not(.motion-forced) .sk-theme-cabin *::before, :root:not(.motion-forced) .sk-theme-cabin *::after { ' +
         'animation: none !important; transition: none !important; }',
     );
   });

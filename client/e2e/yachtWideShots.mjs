@@ -42,12 +42,43 @@ for (const theme of ['light', 'dark']) {
   }
 }
 
+// 리뷰 — 넓은 화면 2단의 좁은 쪽(1024~1110px, iPad 가로)에서도 주사위가 정사각이고 크기 변수와 같은지 잰다.
+for (const width of [1024, 1080, 1100, 1280]) {
+  await page.setViewportSize({ width, height: 768 });
+  await page.waitForTimeout(300);
+  const m = await page.evaluate(() => {
+    const dice = document.querySelector('.yt-dice');
+    const size = parseFloat(getComputedStyle(dice.querySelector('.yt-die')).width);
+    const boxes = [...dice.querySelectorAll('.yt-die')].map((d) => d.getBoundingClientRect());
+    const row = dice.getBoundingClientRect();
+    return {
+      die: boxes.map((b) => `${Math.round(b.width)}x${Math.round(b.height)}`).join(' '),
+      square: boxes.every((b) => Math.abs(b.width - b.height) < 0.5 && Math.abs(b.width - size) < 0.5),
+      step: Math.round((boxes[1].left - boxes[0].left) * 10) / 10,
+      fits: boxes[0].left >= row.left - 0.5 && boxes[4].right <= row.right + 0.5,
+      noScroll: document.documentElement.scrollWidth <= window.innerWidth,
+    };
+  });
+  console.log(`주사위 ${width}px:`, JSON.stringify(m));
+  if (width === 1024) await page.screenshot({ path: `${out}yacht-1024x768-dark.png` });
+}
+
 // 굴림 연출 한 장면(1920 다크) — 굴리는 도중을 잡는다.
 await page.setViewportSize({ width: 1920, height: 1080 });
 if (await roll.isEnabled().catch(() => false)) {
   await roll.click();
   await page.waitForTimeout(260);
   await page.screenshot({ path: `${out}yacht-1920x1080-dark-rolling.png` });
+  await page.waitForTimeout(1000);
+  // 좁은 2단(1024)에서의 굴림도 한 장 — 정육면체·컵 좌표가 주사위 자리와 맞는지.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  if (await roll.isEnabled().catch(() => false)) {
+    await roll.click();
+    await page.waitForTimeout(260);
+    await page.screenshot({ path: `${out}yacht-1024x768-dark-rolling.png` });
+    await page.waitForTimeout(1000);
+  }
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.waitForTimeout(900);
 }
 

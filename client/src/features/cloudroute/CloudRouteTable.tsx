@@ -1,3 +1,4 @@
+import { motionReduced } from '@/features/theme/cardAnimStore';
 import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
@@ -59,7 +60,7 @@ function motionAllowed(): boolean {
   if (CLOUD_ROUTE_THEME !== 'storybook') return false;
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return false;
-  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return !motionReduced();
 }
 
 /**

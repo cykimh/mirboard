@@ -1,3 +1,4 @@
+import { motionReduced } from '@/features/theme/cardAnimStore';
 /**
  * 티츄 게임판 테마 층 (D-241, 디자인 2차 D-187). 기본 모습 위에 클래스 하나로 "옻칠 찻집"(붉은 옻칠 틀·금박 선·비단 펠트·
  * 등불 빛)을 얹는다. 꾸밈 규칙은 전부 `styles/parts/25-tichu-lacquer.css` 의 `.tc-` 접두 아래에만 있다.
@@ -26,7 +27,7 @@ export const LACQUER_MIN_VISIBLE_STEP = 21;
 /** OS '동작 줄이기' — JS 로 띄우는 연출(딜·쓸어 가기)을 건너뛴다. CSS 연출은 17-responsive 의 `.tc-` 블록이 끈다. */
 export function prefersReducedMotion(): boolean {
   try {
-    return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return motionReduced();
   } catch {
     return false;
   }

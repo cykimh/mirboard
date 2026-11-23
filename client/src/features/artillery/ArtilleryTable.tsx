@@ -3,7 +3,7 @@ import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
-import { useCardAnimStore } from '@/features/theme/cardAnimStore';
+import { motionReduced, useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
 import { ErrorNotice } from '@/components/notice/FloatingNotice';
@@ -133,7 +133,7 @@ export function ArtilleryTable({
   const rules = useTutorialGate(ARTILLERY_TUTORIAL.seenKey, false);
   const animate = useCardAnimStore((st) => st.enabled);
   const reducedMotion =
-    !animate || (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true);
+    !animate || motionReduced();
 
   const layout = useArtilleryLayout();
   // D-253 — 세로 화면에서 한 번 "가로로 돌리면 크게"(닫으면 로컬 기억). 터치 기기만.

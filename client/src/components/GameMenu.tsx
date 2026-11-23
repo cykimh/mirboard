@@ -1,3 +1,4 @@
+import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { REACTIONS } from '@/features/chat/reactionStore';
@@ -76,6 +77,8 @@ export function GameMenu({
   const menuId = useId();
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggle);
+  const motionOn = useCardAnimStore((s) => s.enabled);
+  const toggleMotion = useCardAnimStore((s) => s.toggle);
 
   const place = useCallback(() => {
     const t = triggerRef.current;
@@ -256,6 +259,9 @@ export function GameMenu({
             <div role="group" aria-label="설정" className="gm-group">
               {sound && check('sound', '효과음', !sound.muted, sound.onToggle)}
               {check('theme', '다크 모드', theme === 'dark', toggleTheme)}
+              {/* D-291 — 연출 켜고 끄기는 모든 게임판 메뉴에 있다. 직접 켜면 OS '동작 줄이기'여도 연출이 보인다. 게임이 같은 키
+                  (`card-anim`)로 제 이름의 토글을 주면(티츄 "카드 애니메이션") 그것만 보인다. */}
+              {!toggles?.some((t) => t.key === 'card-anim') && check('card-anim', '연출', motionOn, toggleMotion)}
               {toggles?.map((t) => check(t.key, t.label, t.checked, t.onToggle))}
               {showVoice && voice && (
                 <>

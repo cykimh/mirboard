@@ -138,6 +138,47 @@ describe('얏추 D-293 — 마지막 3초', () => {
     expect(cues()).toEqual(['clock.tick', 'clock.tick']);
   });
 
+  it('리뷰 — 같은 방의 다음 판(D-153): 판이 끝나면 기록을 비워, 좌석·라운드가 같은 차례에서 다시 울린다', () => {
+    // 첫 판 1라운드에서 3 이 울렸다.
+    snapshot(2_900);
+    const first = mount();
+    expect(cues()).toEqual(['clock.tick']);
+    // 판이 끝난다(결과) → 대기실로 → 게임판이 내려간다.
+    snapshot(null, {
+      phase: 'ENDED',
+      turnSeat: -1,
+      result: { reason: 'FINISHED', placements: [] },
+    } as never);
+    first.unmount();
+    // 같은 방에서 다음 판 — 같은 좌석·같은 1라운드.
+    act(() => useYachtStore.getState().reset('r-1'));
+    snapshot(2_900);
+    mount();
+    expect(cues()).toEqual(['clock.tick', 'clock.tick']);
+  });
+
+  it('리뷰 — 울리지 않고 지나간 차례도 기록의 주인을 바꾼다: 지난 판 3라운드의 기록이 다음 판 3라운드를 막지 않는다', () => {
+    const at = (round: number, active = true) => (
+      <>
+        <YachtTurnCountdown turnSeconds={45} />
+        <YachtFinalCount turnSeconds={45} active={active} turnKey={`r-1:0:${round}`} animate />
+      </>
+    );
+    snapshot(2_900, { round: 3 });
+    const { rerender } = render(at(3));
+    expect(cues()).toEqual(['clock.tick']);
+    // 다음 판 1·2라운드는 여유 있게 기록해 한 번도 울리지 않았다.
+    snapshot(40_000, { round: 1 });
+    rerender(at(1));
+    snapshot(40_000, { round: 2 });
+    rerender(at(2));
+    expect(cues()).toHaveLength(1);
+    // 3라운드가 되고, 다시 3초가 남는다 — 울린다.
+    rerender(at(3));
+    snapshot(2_900, { round: 3 });
+    expect(cues()).toEqual(['clock.tick', 'clock.tick']);
+  });
+
   it('내 차례가 아니면(남의 차례·관전·기록을 마친 뒤) 숫자도 소리도 없다', () => {
     snapshot(2_900);
     const { container } = mount({ active: false });

@@ -31,7 +31,7 @@
 
 /* OS '동작 줄이기' 선호 시 토글과 별개의 안전장치로 애니 제거. */
 @media (prefers-reduced-motion: reduce) {
-  .table-center-trick .hand-cards.play-enter {
+  :root:not(.motion-forced) .table-center-trick .hand-cards.play-enter {
     animation: none;
   }
 }

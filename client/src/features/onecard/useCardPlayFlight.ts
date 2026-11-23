@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { OneCardCard } from '@/types/onecard';
 import type { LastPlay } from './onecardStore';
+import { motionReduced } from '@/features/theme/cardAnimStore';
 
 /** 날아가는 시간(ms). CSS `.oc-fly-settled` 의 transition 과 같은 값. */
 export const CARD_FLIGHT_MS = 380;
@@ -21,12 +22,9 @@ export interface CardFlight {
   settled: boolean;
 }
 
+/** D-291 — OS '동작 줄이기'이고 연출을 직접 켜지 않았을 때만 참(단일 기준 `motionReduced`). */
 export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
+  return motionReduced();
 }
 
 export function nextFrame(run: () => void): () => void {
