@@ -11,6 +11,13 @@ import { fillBots } from './lobbyBots';
 
 test.describe.configure({ mode: 'serial', timeout: 300_000 });
 
+/** 판이 나아간 정도 — 머리 줄의 수 표시(배치 중 "돌 놓기", 옮김 중 "N수")와 판 위 돌 개수. */
+async function progress(page: Page): Promise<string> {
+  const badge = (await page.locator('.db-badge').allTextContents()).join(' ');
+  const stones = await page.locator('.db-cell[aria-label*="은돌"]').count();
+  return `${badge}|${stones}`;
+}
+
 async function myMove(page: Page): Promise<boolean> {
   const status = page.locator('.db-status');
   const text = (await status.textContent()) ?? '';
@@ -50,13 +57,13 @@ test('담바둑 — 봇 둘과 한 판을 끝까지 두고 대기실로 돌아�
   const result = page.getByRole('status', { name: '판 결과' });
   let moves = 0;
   for (let i = 0; i < 600 && !(await result.isVisible()); i++) {
+    const before = await progress(page);
     if (await myMove(page)) {
       moves++;
-      // 보낸 수가 반영돼 내 차례가 지나갈 때까지(또는 판이 끝날 때까지) 기다린다.
+      // 보낸 수가 반영될 때까지(돌 수·수 개수가 바뀜) 또는 판이 끝날 때까지 기다린다. "내 차례" 문구로 재지 않는다 — 마지막 돌을 놓은 사람이
+      // 첫 수도 두거나(선이 배치 끝과 같은 좌석), 다른 사람이 모두 건너뛰면 차례가 곧바로 다시 온다.
       await expect
-        .poll(async () => (await result.isVisible()) || !((await page.locator('.db-status').textContent()) ?? '').startsWith('내 차례'), {
-          timeout: 15_000,
-        })
+        .poll(async () => (await result.isVisible()) || (await progress(page)) !== before, { timeout: 15_000 })
         .toBe(true);
     } else {
       await page.waitForTimeout(250);
