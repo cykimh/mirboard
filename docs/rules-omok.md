@@ -213,7 +213,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 
 **코드:** 종료 판정은 `OmokEngine.place`·`lose` · **테스트:** `OmokEnginePlayTest`(5목 1:1·2:2, 기권 2건, 무승부 2건 — 줄무늬 판으로 `BOARD_FULL`, 맨 윗줄
 `XXX_XX` 로 장목만 남긴 `NO_LEGAL_MOVE`) · 무작위 18,000판에서 `BOARD_FULL`·`NO_LEGAL_MOVE` 는 0건이었다(`OmokMatchSimulationTest`)
-**코드(S3b):** `persistence/OmokMatchRecorder`(`omok_match_results/participants`, 팀 평균 ELO `EloCalculator.applyMatch`, 무승부는 `UserGameStatsService.recordDraw`) · `persistence/OmokHeadToHead`(상대 팀만) · **테스트(S3b):** `OmokMatchRecorderIT`(6건 — 1:1 ELO ±20·색/팀 행, 2:2 팀 기권, 무승부 행만, 탈주, 봇 매치, 상대 전적), `infra.ws.OmokRecorderFailureTest`(기록 실패에도 방송·대기실 복귀)
+**코드(S3b):** `persistence/OmokMatchRecorder`(`omok_match_results/participants`, 팀 평균 ELO `EloCalculator.applyMatch`, 무승부는 `UserGameStatsService.recordDraw`) · `persistence/OmokHeadToHead`(상대 팀만) · **테스트(S3b):** `OmokMatchRecorderIT`(6건 — 1:1 ELO +20·−10(D-297)·색/팀 행, 2:2 팀 기권, 무승부 행만, 탈주, 봇 매치, 상대 전적), `infra.ws.OmokRecorderFailureTest`(기록 실패에도 방송·대기실 복귀)
 
 ## 11. 우리가 정한 것
 

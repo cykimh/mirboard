@@ -101,7 +101,7 @@ class OneCardMatchRecorderIT {
         // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20.
         assertThat(oc(a).rating()).isEqualTo(1020);
         assertThat(oc(b).rating()).isEqualTo(1000);
-        assertThat(oc(c).rating()).isEqualTo(980);
+        assertThat(oc(c).rating()).isEqualTo(990);
         assertThat(oc(a).winCount()).isEqualTo(1);
         assertThat(oc(b).loseCount()).isEqualTo(1);
         assertThat(oc(c).loseCount()).isEqualTo(1);
@@ -124,7 +124,7 @@ class OneCardMatchRecorderIT {
         // 공동 1등끼리 무(0.5), 3등에게 승: (0.5−0.5 + 1−0.5) × 40/2 = +10. 3등은 −20.
         assertThat(oc(a).rating()).isEqualTo(1010);
         assertThat(oc(b).rating()).isEqualTo(1010);
-        assertThat(oc(c).rating()).isEqualTo(980);
+        assertThat(oc(c).rating()).isEqualTo(990);
     }
 
     @Test

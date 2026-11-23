@@ -101,7 +101,7 @@ class CloudRouteMatchRecorderIT {
         // 신규(K=40), 3인 동일 레이팅: 1등 +20, 2등 0, 3등 −20.
         assertThat(cr(b).rating()).isEqualTo(1020);
         assertThat(cr(a).rating()).isEqualTo(1000);
-        assertThat(cr(c).rating()).isEqualTo(980);
+        assertThat(cr(c).rating()).isEqualTo(990);
         assertThat(cr(b).winCount()).isEqualTo(1);
         assertThat(cr(a).loseCount()).isEqualTo(1);
     }

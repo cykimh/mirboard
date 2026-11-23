@@ -114,7 +114,7 @@ class OmokMatchRecorderIT {
                 String.class, room)).contains("\"moves\"");
         // 신규(K=40), 동일 레이팅 1:1: ±20.
         assertThat(omok(a).rating()).isEqualTo(1020);
-        assertThat(omok(b).rating()).isEqualTo(980);
+        assertThat(omok(b).rating()).isEqualTo(990);
         assertThat(omok(a).winCount()).isEqualTo(1);
         assertThat(omok(b).loseCount()).isEqualTo(1);
     }
@@ -135,7 +135,7 @@ class OmokMatchRecorderIT {
         assertThat(omok(d).winCount()).isEqualTo(1);
         assertThat(omok(c).desertCount()).as("기권은 탈주가 아니다").isZero();
         assertThat(List.of(omok(a).rating(), omok(b).rating(), omok(c).rating(), omok(d).rating()))
-                .containsExactly(980, 1020, 980, 1020);
+                .containsExactly(990, 1020, 990, 1020);
     }
 
     @Test

@@ -150,7 +150,7 @@ class DambadukMatchRecorderIT {
                 String.class, room)).contains("\"walls\"");
         // 신규(K=40), 같은 레이팅 2인 — 개인전 쌍대 ELO 도 일반 ELO 와 같은 ±20.
         assertThat(dambaduk(a).rating()).isEqualTo(1020);
-        assertThat(dambaduk(b).rating()).isEqualTo(980);
+        assertThat(dambaduk(b).rating()).isEqualTo(990);
         assertThat(dambaduk(a).winCount()).isEqualTo(1);
         assertThat(dambaduk(b).loseCount()).isEqualTo(1);
     }
