@@ -36,6 +36,9 @@ export type TableCue =
   | 'die.release'
   | 'score.commit'
   | 'ui.tap'
+  // 차례 마감 직전(D-293 얏추) — 3·2 는 짧은 "똑", 1 은 조금 높게.
+  | 'clock.tick'
+  | 'clock.last'
   // 좌석·판
   | 'seat.out'
   | 'match.win'
@@ -222,6 +225,16 @@ const RECIPES: Record<TableCue, Recipe> = {
   'ui.tap': (ctx, t, g) => {
     pop(ctx, t, 780, 0.13 * g, 0.055);
     return 0.055;
+  },
+  // 마감 3·2초 전 — 둥근 "똑" 하나(버튼 소리보다 낮고 또렷하게).
+  'clock.tick': (ctx, t, g) => {
+    pop(ctx, t, 660, 0.2 * g, 0.09);
+    return 0.09;
+  },
+  // 마감 1초 전 — 같은 "똑"이 다섯 도 위에서, 조금 길게.
+  'clock.last': (ctx, t, g) => {
+    pop(ctx, t, 990, 0.22 * g, 0.16);
+    return 0.16;
   },
   // 탈락 — 축 처지는 미끄럼 휘파람 + 작은 툭.
   'seat.out': (ctx, t, g) => {

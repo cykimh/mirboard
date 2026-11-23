@@ -23,7 +23,7 @@ import { yachtRoomSink } from './yachtRoomSink';
 import { ROLL_GUARD_MS, SHAKE_KEEPALIVE_MS, SHAKE_STALE_MS, useYachtStore } from './yachtStore';
 import { DiceCup, DiceTray, ROLL_ANIMATION_MS } from './DiceTray';
 import { YachtScorecard } from './YachtScorecard';
-import { YachtTurnCountdown } from './YachtTurnCountdown';
+import { YachtFinalCount, YachtTurnCountdown } from './YachtTurnCountdown';
 import { YachtMatchEnd } from './YachtMatchEnd';
 import {
   BIG_CATEGORIES,
@@ -979,6 +979,13 @@ export function YachtTable({
           )}
         </div>
         {fx && !fx.float && fxLayer}
+        {/* D-293 — 내 차례 마지막 3초의 큰 3·2·1 + "똑". 남의 차례·관전·기록을 마친 뒤·턴 제한 끔에는 없다. */}
+        <YachtFinalCount
+          turnSeconds={turnSeconds}
+          active={myTurn && !roomFinished}
+          turnKey={`${roomId}:${mySeat}:${s.round}`}
+          animate={animate}
+        />
         <DiceTray
           dice={watched ? watched.dice : s.dice}
           held={watched ? (watched.held ?? NO_HOLD) : s.held}

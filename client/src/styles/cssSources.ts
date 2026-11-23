@@ -19,6 +19,7 @@ export const artilleryCssSource = readCss('./parts/23-artillery-table.css');
 export const dambadukCssSource = readCss('./parts/26-dambaduk-table.css');
 export const tichuLacquerCssSource = readCss('./parts/25-tichu-lacquer.css');
 export const gameMenuCssSource = readCss('./parts/24-game-menu.css');
+export const gameSurfaceCssSource = readCss('./parts/28-game-surface.css');
 export const indexCssSource = readCss('./index.css');
 /** D-132 — 스컬킹 옆줄 손패 숨김이 맨 끝 블록인지 원문으로 본다. */
 export const responsiveCssSource = readCss('./parts/17-responsive.css');

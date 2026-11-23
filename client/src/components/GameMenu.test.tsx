@@ -56,18 +56,18 @@ describe('GameMenu', () => {
       ...within(menu()!).getAllByRole('menuitemcheckbox'),
       ...within(menu()!).getAllByRole('menuitem'),
     ];
-    // 다크 모드 → 규칙 보기 → 게임 종료 → 나가기
-    expect(items.map((x) => x.textContent)).toEqual(['다크 모드끔', '규칙 보기', '게임 종료', '나가기']);
+    // 다크 모드 → 연출(D-291 — 모든 게임판 메뉴에 있다) → 규칙 보기 → 게임 종료 → 나가기
+    expect(items.map((x) => x.textContent)).toEqual(['다크 모드끔', '연출켬', '규칙 보기', '게임 종료', '나가기']);
     expect(document.activeElement).toBe(items[0]);
 
     fireEvent.keyDown(menu()!, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(menu()!, { key: 'End' });
-    expect(document.activeElement).toBe(items[3]);
+    expect(document.activeElement).toBe(items[4]);
     fireEvent.keyDown(menu()!, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(menu()!, { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(items[3]);
+    expect(document.activeElement).toBe(items[4]);
     fireEvent.keyDown(menu()!, { key: 'Home' });
     expect(document.activeElement).toBe(items[0]);
   });
