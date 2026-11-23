@@ -8,6 +8,7 @@ import com.mirboard.domain.game.artillery.state.MatchResult;
 import com.mirboard.domain.game.artillery.state.MatchResult.EndReason;
 import com.mirboard.domain.game.artillery.state.MatchResult.Placement;
 import com.mirboard.domain.game.core.HeadToHeadSource;
+import com.mirboard.domain.game.scoring.EloCalculator;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
@@ -87,9 +88,9 @@ class ArtilleryMatchRecorderIT {
                         + " JOIN artillery_match_results r ON r.id = p.match_id WHERE r.room_id = ? ORDER BY p.seat", room))
                 .extracting(r -> r.get("final_rank") + "/" + r.get("final_hp") + "/" + r.get("is_win") + "/" + r.get("deserted"))
                 .containsExactly("2/0/false/false", "1/64/true/false", "3/30/false/true");
-        assertThat(ar(b).rating()).isEqualTo(1020);
-        assertThat(ar(a).rating()).isEqualTo(1000);
-        assertThat(ar(c).rating()).isEqualTo(990);
+        assertThat(ar(b).rating()).isEqualTo(1026);   // +20, 참가 점수 +6(D-301)
+        assertThat(ar(a).rating()).isEqualTo(1006);
+        assertThat(ar(c).rating()).isEqualTo(990);    // 탈주 — 참가 점수 없음
         assertThat(ar(b).winCount()).isEqualTo(1);
         assertThat(ar(c).desertCount()).isEqualTo(1);
         assertThat(headToHead.against(b)).extracting(HeadToHeadSource.Row::opponentId).containsExactlyInAnyOrder(a, c);
@@ -113,10 +114,10 @@ class ArtilleryMatchRecorderIT {
                         + " JOIN artillery_match_results r ON r.id = p.match_id WHERE r.room_id = ? ORDER BY p.seat", room))
                 .extracting(r -> r.get("team") + "/" + r.get("final_rank") + "/" + r.get("is_win") + "/" + r.get("deserted"))
                 .containsExactly("0/1/true/false", "1/2/false/false", "0/4/false/true", "1/2/false/false");
-        assertThat(ar(a).rating()).isEqualTo(1020);
-        assertThat(ar(b).rating()).isEqualTo(990);
-        assertThat(ar(d).rating()).isEqualTo(990);
-        assertThat(ar(c).rating()).isEqualTo(990);   // 이긴 팀이지만 탈주 — 상대 팀에 혼자 졌다
+        assertThat(ar(a).rating()).isEqualTo(1026);
+        assertThat(ar(b).rating()).isEqualTo(996);
+        assertThat(ar(d).rating()).isEqualTo(996);
+        assertThat(ar(c).rating()).isEqualTo(990);   // 이긴 팀이지만 탈주 — 상대 팀에 혼자 졌다, 참가 점수 없음(D-301)
         assertThat(ar(c).desertCount()).isEqualTo(1);
         assertThat(ar(c).winCount()).isZero();
         assertThat(ar(a).winCount()).isEqualTo(1);
@@ -127,7 +128,7 @@ class ArtilleryMatchRecorderIT {
 
     /** D-225 — 팀전 무승부: ELO·승패 변화 없이 행만, 상대 전적은 무승부. */
     @Test
-    void a_team_draw_changes_no_rating_and_counts_as_a_draw() {
+    void a_team_draw_only_adds_the_participation_bonus_and_counts_as_a_draw() {
         long a = human();
         long b = human();
         long c = human();
@@ -137,7 +138,7 @@ class ArtilleryMatchRecorderIT {
                 EndReason.ALL_DOWN, List.of(new Placement(0, 1, 0, false), new Placement(1, 1, 0, false),
                 new Placement(2, 1, 0, false), new Placement(3, 1, 0, false)), true, null)));
         for (long u : List.of(a, b, c, d)) {
-            assertThat(ar(u).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+            assertThat(ar(u).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING + EloCalculator.PARTICIPATION_BONUS);
             assertThat(ar(u).winCount()).isZero();
             assertThat(ar(u).loseCount()).isZero();
         }
@@ -145,13 +146,15 @@ class ArtilleryMatchRecorderIT {
     }
 
     @Test
-    void a_match_with_a_bot_records_win_lose_but_no_elo() {
+    void a_match_with_a_bot_moves_the_human_rating_by_a_quarter() {
         long a = human();
         long bot = bots.getBotIds().get(0);
         String room = UUID.randomUUID().toString();
         publisher.publishEvent(new ArtilleryMatchCompleted(room, List.of(a, bot), new MatchResult(EndReason.NO_HUMANS,
                 List.of(new Placement(1, 1, 80, false), new Placement(0, 2, 0, false)))));
         assertThat(ar(a).loseCount()).isEqualTo(1);
-        assertThat(ar(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        // D-299 — 봇에게 짐: 사람끼리면 −10(K=40 의 절반), 봇 판은 그 1/4 = −2(−2.5 반올림).
+        assertThat(ar(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING - 2 + EloCalculator.BOT_MATCH_PARTICIPATION_BONUS);
+        assertThat(stats.playedGames(bot)).isEmpty();
     }
 }

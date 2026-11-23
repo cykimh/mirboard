@@ -322,8 +322,8 @@
   `playing_or_drawing_a_card_resets_the_pass_streak`, `OneCardEngineDesertionTest`(LAST_STANDING, NO_HUMANS,
   연속 패스 초기화) 중 `the_last_standing_bot_beats_no_humans_when_a_human_deserts_a_two_seat_table`
 - **코드(S3):** 매치 기록 `persistence/OneCardMatchRecorder`(V12 `onecard_match_results`/`participants`) — 승리는 1등
-  전원(동순위 포함), 개인전 ELO 점수는 `좌석 수 − 순위`, 탈주 좌석은 최하위·desert_count, 봇·게스트가 낀 매치는
-  ELO 제외. 기록 이벤트는 매치당 한 번 발행한다 — 정상 종료는 어댑터 `OneCardGameEngine.advance`(매치를 끝낸 전이에서만),
+  전원(동순위 포함), 개인전 ELO 점수는 `좌석 수 − 순위`, 탈주 좌석은 최하위·desert_count, 게스트가 낀 매치도
+  ELO 적용(게스트 본인 것은 저장 안 함)·봇이 낀 매치는 1/4 만(D-299). 기록 이벤트는 매치당 한 번 발행한다 — 정상 종료는 어댑터 `OneCardGameEngine.advance`(매치를 끝낸 전이에서만),
   탈주로 끝난 매치는 `OneCardGameEngine.desert`(`MATCH_ENDED`)가 발행한다. 탈주 종료는 `advance` 를 지나지 않는다.
 - **테스트(S3):** `persistence/OneCardMatchRecorderIT`(4건 — 탈주 좌석의 기록은
   `a_deserter_loses_counts_a_desertion_and_ranks_below_a_bankrupt_seat`), `OneCardGameEngineTest.desertion_maps_to_the_three_port_outcomes`

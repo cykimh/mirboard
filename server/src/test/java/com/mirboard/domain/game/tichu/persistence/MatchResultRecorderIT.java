@@ -118,10 +118,10 @@ class MatchResultRecorderIT {
 
         // Phase 8D — ELO 갱신 검증. 모든 신규 유저 (gamesPlayed=0 → K=40), rating=1000.
         // expected=0.5, delta = 40 * 0.5 = 20. 승팀 +20, 패팀 -20.
-        assertThat(refreshed.get(0).rating()).isEqualTo(1020);
-        assertThat(refreshed.get(2).rating()).isEqualTo(1020);
-        assertThat(refreshed.get(1).rating()).isEqualTo(990);
-        assertThat(refreshed.get(3).rating()).isEqualTo(990);
+        assertThat(refreshed.get(0).rating()).isEqualTo(1026);
+        assertThat(refreshed.get(2).rating()).isEqualTo(1026);
+        assertThat(refreshed.get(1).rating()).isEqualTo(996);
+        assertThat(refreshed.get(3).rating()).isEqualTo(996);
 
         // D-115 — users 의 옛 레이팅 컬럼은 이관 후 쓰기가 멈췄다(DROP 은 별도 마이그레이션).
         assertThat(userRepo.findById(ids.get(0)).orElseThrow().getRating()).isEqualTo(1000);
@@ -130,8 +130,8 @@ class MatchResultRecorderIT {
 
     @Test
     @Transactional
-    void bot_match_records_win_lose_but_skips_elo() {
-        // Phase 16(#4) — 봇 포함 매치: win/lose 는 기록, rating(ELO) 불변.
+    void bot_match_records_win_lose_and_a_quarter_of_the_elo() {
+        // D-299 — 봇 포함 매치: win/lose 는 기록, rating 은 사람끼리의 1/4 만 움직인다(예전에는 불변).
         var humans = registerFour("mrbot_a", "mrbot_b", "mrbot_c"); // 3 명만 등록
         long botId = bots.getBotIds().get(0);
         // 좌석 0,2 = Team A / 1,3 = Team B. 봇을 seat 3 (Team B) 에 배치.
@@ -151,8 +151,12 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(0).winCount()).isEqualTo(1);
         assertThat(refreshed.get(2).winCount()).isEqualTo(1);
         assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
-        // ELO 는 제외 — rating 기본값 1000 유지.
-        assertThat(refreshed).allMatch(u -> u.rating() == 1000);
+        // 신규 K=40, 팀 평균 1000 vs 1000(봇은 1000 으로 계산) → 사람끼리면 +20/−10, 봇 판은 +5/−2(−2.5 반올림). 참가 점수 +2(D-301).
+        assertThat(refreshed.get(0).rating()).isEqualTo(1007);
+        assertThat(refreshed.get(2).rating()).isEqualTo(1007);
+        assertThat(refreshed.get(1).rating()).isEqualTo(1000);
+        // 봇의 레이팅·전적은 저장하지 않는다.
+        assertThat(stats.playedGames(botId)).isEmpty();
     }
 
     @Test
@@ -172,20 +176,21 @@ class MatchResultRecorderIT {
         // 탈주자(seat1, B) — 패배 + 탈주 카운트.
         assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
         assertThat(refreshed.get(1).desertCount()).isEqualTo(1);
-        assertThat(refreshed.get(1).rating()).isLessThan(1000);
+        assertThat(refreshed.get(1).rating()).as("탈주자는 참가 점수가 없다(D-301)").isEqualTo(990);
         // 상대팀(seat0,2 = A) — 승리, 탈주 카운트 없음.
         assertThat(refreshed.get(0).winCount()).isEqualTo(1);
         assertThat(refreshed.get(0).desertCount()).isZero();
-        assertThat(refreshed.get(0).rating()).isGreaterThan(1000);
+        assertThat(refreshed.get(0).rating()).isEqualTo(1026);
         // 탈주자 파트너(seat3, B) — 같이 패배하지만 탈주 카운트 없음.
         assertThat(refreshed.get(3).loseCount()).isEqualTo(1);
         assertThat(refreshed.get(3).desertCount()).isZero();
+        assertThat(refreshed.get(3).rating()).as("끝까지 한 파트너는 참가 점수를 받는다").isEqualTo(996);
     }
 
     @Test
     @Transactional
-    void match_with_guest_records_results_without_elo() {
-        // D-117 — 게스트가 한 명이라도 낀 매치는 전원 ELO 미적용(D-71 봇 규칙 확장). 승패·참가
+    void match_with_guest_rates_the_members_and_never_stores_the_guest_rating() {
+        // D-299 덧붙임 — 게스트가 낀 매치도 가입한 사람의 ELO 는 사람끼리 판과 같다(예전 D-117 은 전원 미적용). 승패·참가
         // 기록은 그대로 — 게스트 정리가 "끝낸 매치"를 user_game_stats 로 판정하기 때문에도 필요.
         var humans = registerFour("mrg_a", "mrg_b", "mrg_c");
         User guest = userRepo.save(User.create("guest-mrg2a3b4",
@@ -210,8 +215,12 @@ class MatchResultRecorderIT {
         assertThat(refreshed.get(2).winCount()).isEqualTo(1);
         assertThat(refreshed.get(1).loseCount()).isEqualTo(1);
         assertThat(refreshed.get(3).loseCount()).isEqualTo(1);
-        // ELO 는 아무도 움직이지 않는다.
-        assertThat(refreshed).allMatch(u -> u.rating() == 1000);
+        // 가입한 사람은 사람끼리 판과 같다: +20/−10(K=40) + 참가 점수 +6(D-301).
+        assertThat(refreshed.get(0).rating()).isEqualTo(1026);
+        assertThat(refreshed.get(2).rating()).isEqualTo(1026);
+        assertThat(refreshed.get(1).rating()).isEqualTo(996);
+        // 게스트 본인의 레이팅은 저장하지 않는다 — 늘 1000.
+        assertThat(refreshed.get(3).rating()).isEqualTo(1000);
     }
 
     private List<User> registerFour(String... usernames) {

@@ -111,7 +111,9 @@ class StarSquareBotMatchSimulationIT {
         assertRecorded(room.roomId(), 3);
         GameStats humanStats = stats.get(human, StarSquareGameDefinition.ID);
         assertThat(humanStats.winCount() + humanStats.loseCount()).as("사람 전적 1판").isEqualTo(1);
-        assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(humanStats.rating())
+                .as("봇이 낀 매치는 ELO 를 1/4 만(D-299, 신규 K=40 이면 +5 ~ −2) + 참가 점수 +2(D-301), 탈주면 참가 점수 없음")
+                .isBetween(UserGameStatsService.DEFAULT_RATING - 2, UserGameStatsService.DEFAULT_RATING + 7);
     }
 
     /** 혼자 하기: "1명으로 시작" → 퍼즐 제한(1초)마다 끝나 판이 끝나고, 기록 0행·전적 없음, 대기실로 돌아간다. */

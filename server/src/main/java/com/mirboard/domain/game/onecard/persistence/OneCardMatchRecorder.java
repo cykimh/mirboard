@@ -28,8 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * D-128 — 원카드 매치 종료를 {@code onecard_match_results/participants} 에 적재하고 게임별 전적(ONE_CARD
- * 행)을 갱신한다. 스컬킹 {@code SkullKingMatchRecorder} 와 같은 규칙: 봇(D-71)·게스트(D-117)가 낀 매치는
- * 승패만, ELO 는 제외({@link RatedMatchPolicy}). 탈주자는 패 + desert_count(D-75).
+ * 행)을 갱신한다. 스컬킹 {@code SkullKingMatchRecorder} 와 같은 규칙: 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 탈주자는 패 + desert_count(D-75).
  *
  * <p>승리는 1등이다 — 동순위면 모두(룰 §11.2). ELO 는 개인전 쌍대 방식({@link EloCalculator#applyFreeForAll})에
  * 순위를 점수로 넘긴다(점수 = 좌석 수 − 순위, 순위가 같으면 무승부). 탈주 좌석은 점수와 무관하게 최하위다.
@@ -68,7 +67,8 @@ public class OneCardMatchRecorder {
         MatchResult result = event.result();
         Map<Integer, Standing> bySeat = new HashMap<>();
         result.standings().forEach(standing -> bySeat.put(standing.seat(), standing));
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO onecard_match_results (room_id, finished_at, end_reason, payload_json)"
@@ -89,7 +89,7 @@ public class OneCardMatchRecorder {
                         playerIds.size() - standing.rank(),
                         standing.status() == SeatStatus.DESERTED));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
@@ -104,7 +104,7 @@ public class OneCardMatchRecorder {
                     matchId, userId, seat, standing.rank(), standing.cardsLeft(), win, deserted);
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted);
+                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
             }
         }
 

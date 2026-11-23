@@ -20,7 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findBots();
 
     /**
-     * D-117 — 매치 참가자 중 게스트가 있는지(ELO 판정, {@code RatedMatchPolicy}).
+     * D-117 — 매치 참가자 중 게스트가 있는지. (D-299 덧붙임 뒤로 ELO 판정에는 쓰지 않는다 — 게스트가 낀 판도 적용.)
      * {@code prefix} 는 {@link GuestPolicy#PREFIX}.
      */
     boolean existsByIdInAndUsernameStartingWith(Collection<Long> ids, String prefix);

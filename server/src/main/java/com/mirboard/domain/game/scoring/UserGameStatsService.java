@@ -133,15 +133,54 @@ public class UserGameStatsService {
     }
 
     /**
-     * 한 매치 결과 1건을 누적한다.
+     * 한 매치 결과 1건을 누적한다 — 참가 점수 없이(ELO 미적용 판). 기록기는 배율을 받는 아래 것을 쓴다.
      *
-     * @param newRating ELO 를 적용하지 않는 매치(봇·게스트 포함, {@link RatedMatchPolicy})면
+     * @param newRating ELO 를 계산하지 않은 판(무승부 등)이면
      *                  null — rating 유지
      */
     @Transactional
     public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted) {
-        repo.record(userId, gameType, newRating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
+        write(userId, gameType, win, newRating, deserted);
+    }
+
+    private void write(long userId, String gameType, boolean win, Integer rating, boolean deserted) {
+        repo.record(userId, gameType, rating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
         recordMonthly(userId, gameType, StatsMonth.current(clock), win ? Outcome.WIN : Outcome.LOSS, deserted);
+    }
+
+    /**
+     * 한 매치 결과 1건을 누적한다. D-301 — 참가 점수({@link EloCalculator#participationBonus})를 ELO 결과에 더해 저장한다.
+     * 아홉 게임 기록기가 모두 이 길을 쓴다(참가 점수를 기록기에서 따로 더하지 말 것).
+     *
+     * <p>D-299 덧붙임 — <b>게스트의 레이팅은 저장하지 않는다</b>: 게스트가 낀 판도 ELO 를 계산하지만(가입한 사람의 것은 그대로
+     * 움직인다) 게스트 본인은 승패 행만 남고 rating 은 1000 그대로다(다음 계산에도 1000 으로 들어간다, 참가 점수도 없다).
+     *
+     * @param newRating ELO 계산 결과(참가 점수를 더하기 전). 계산하지 않은 판이면 null — 지금 rating 에서 참가 점수만 더한다
+     * @param eloFactor 이 판의 배율({@link RatedMatchPolicy#eloFactor}) — 0 이면 참가 점수도 없다
+     */
+    @Transactional
+    public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted,
+                       double eloFactor) {
+        write(userId, gameType, win, withParticipation(userId, gameType, newRating, eloFactor, deserted), deserted);
+    }
+
+    /** 게스트(D-117 — username 규약)인지. 게스트의 레이팅은 저장하지 않는다. */
+    private boolean isGuest(long userId) {
+        return users.findById(userId).map(u -> GuestPolicy.isGuest(u.getUsername())).orElse(false);
+    }
+
+    /** 참가 점수를 더한 저장값. 더할 것이 없으면 받은 값 그대로(null 이면 rating 유지). 게스트면 늘 null. */
+    private Integer withParticipation(long userId, String gameType, Integer newRating, double eloFactor,
+                                      boolean deserted) {
+        if (isGuest(userId)) {
+            return null;
+        }
+        int bonus = EloCalculator.participationBonus(eloFactor, deserted);
+        if (bonus == 0) {
+            return newRating;
+        }
+        int base = newRating != null ? newRating : get(userId, gameType).rating();
+        return base + bonus;
     }
 
     /**
@@ -150,7 +189,17 @@ public class UserGameStatsService {
      */
     @Transactional
     public void recordDraw(long userId, String gameType) {
-        repo.record(userId, gameType, null, 0, 0, 0);
+        recordDraw(userId, gameType, RatedMatchPolicy.UNRATED);
+    }
+
+    /**
+     * 무승부 1건 + 참가 점수(D-301) — 무승부는 ELO 가 움직이지 않지만 레이팅이 적용되는 판(배율 &gt; 0)이면 참가 점수는 받는다.
+     *
+     * @param eloFactor 이 판의 배율({@link RatedMatchPolicy#eloFactor})
+     */
+    @Transactional
+    public void recordDraw(long userId, String gameType, double eloFactor) {
+        repo.record(userId, gameType, withParticipation(userId, gameType, null, eloFactor, false), 0, 0, 0);
         recordMonthly(userId, gameType, StatsMonth.current(clock), Outcome.DRAW, false);
     }
 

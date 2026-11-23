@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 씨앗포 매치 종료를 {@code artillery_match_results/participants} 에 적재하고 게임별 전적(ARTILLERY 행)을 갱신한다 (S2). 요트·원카드
- * 기록기와 같은 규칙: 봇·게스트가 낀 매치는 승패만, ELO 는 제외({@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
+ * 기록기와 같은 규칙: 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
  *
  * <p>승리는 1위다 — 동순위면 모두(룰 §9.3). ELO 는 개인전 쌍대 방식({@link EloCalculator#applyFreeForAll})에 순위를 점수로
  * 넘긴다(점수 = 좌석 수 − 순위). 2인 이상만 시작하므로 1인 판은 없다.
@@ -70,7 +70,8 @@ public class ArtilleryMatchRecorder {
         MatchResult result = event.result();
         Map<Integer, Placement> bySeat = new HashMap<>();
         result.placements().forEach(p -> bySeat.put(p.seat(), p));
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO artillery_match_results (room_id, finished_at, end_reason, payload_json)"
@@ -81,7 +82,7 @@ public class ArtilleryMatchRecorder {
         // ELO 입력은 갱신 전 전적으로 만든다 (K-factor 의 판 수 임계가 정확하도록).
         Map<Long, Integer> newRatings = Map.of();
         if (rated && result.teams()) {
-            newRatings = teamRatings(playerIds, bySeat, result);
+            newRatings = teamRatings(playerIds, bySeat, result, eloFactor);
         } else if (rated) {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -93,7 +94,7 @@ public class ArtilleryMatchRecorder {
                         playerIds.size() - p.rank(),
                         p.deserted()));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
@@ -108,9 +109,9 @@ public class ArtilleryMatchRecorder {
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
                 if (result.draw() && !p.deserted()) {
-                    stats.recordDraw(userId, GAME);
+                    stats.recordDraw(userId, GAME, eloFactor);
                 } else {
-                    stats.record(userId, GAME, win, newRatings.get(userId), p.deserted());
+                    stats.record(userId, GAME, win, newRatings.get(userId), p.deserted(), eloFactor);
                 }
             }
         }
@@ -120,7 +121,8 @@ public class ArtilleryMatchRecorder {
     }
 
     /** 팀 평균 ELO (D-225). 무승부면 탈주자만 바뀐다. */
-    private Map<Long, Integer> teamRatings(List<Long> playerIds, Map<Integer, Placement> bySeat, MatchResult result) {
+    private Map<Long, Integer> teamRatings(List<Long> playerIds, Map<Integer, Placement> bySeat, MatchResult result,
+                                           double eloFactor) {
         List<List<EloCalculator.PlayerInput>> teams = List.of(new ArrayList<>(), new ArrayList<>());
         for (int seat = 0; seat < playerIds.size(); seat++) {
             long userId = playerIds.get(seat);
@@ -129,7 +131,7 @@ public class ArtilleryMatchRecorder {
         }
         Map<Long, Integer> ratings = new HashMap<>();
         if (result.winnerTeam() != null) {
-            ratings.putAll(EloCalculator.applyMatch(teams.get(0), teams.get(1), result.winnerTeam() == 0));
+            ratings.putAll(EloCalculator.applyMatch(teams.get(0), teams.get(1), result.winnerTeam() == 0, eloFactor));
         }
         for (int seat = 0; seat < playerIds.size(); seat++) {
             if (!bySeat.get(seat).deserted() || (result.winnerTeam() != null && seat % 2 != result.winnerTeam())) {
@@ -137,7 +139,7 @@ public class ArtilleryMatchRecorder {
             }
             EloCalculator.PlayerInput me = teams.get(seat % 2).get(seat / 2);
             ratings.put(me.userId(),
-                    EloCalculator.applyMatch(List.of(me), teams.get(1 - seat % 2), false).get(me.userId()));
+                    EloCalculator.applyMatch(List.of(me), teams.get(1 - seat % 2), false, eloFactor).get(me.userId()));
         }
         return ratings;
     }

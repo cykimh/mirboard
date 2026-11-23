@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 오목 매치 종료를 {@code omok_match_results/participants}에 적재하고 게임별 전적(OMOK 행)을 갱신한다 (룰 §10.2). 원카드
- * 기록기와 같은 규칙: 봇·게스트가 낀 매치는 ELO 제외({@link RatedMatchPolicy}), 봇 계정은 전적을 쌓지 않는다, 탈주자는 패 +
+ * 기록기와 같은 규칙: 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}), 봇 계정은 전적을 쌓지 않는다, 탈주자는 패 +
  * desert_count.
  *
  * <p>ELO 는 1:1·2:2 모두 팀 평균 방식({@link EloCalculator#applyMatch} — 1:1 은 한 명짜리 팀). 무승부는 ELO 변화 없이 행만
@@ -69,7 +69,8 @@ public class OmokMatchRecorder {
         OmokState state = event.state();
         MatchResult result = state.result();
         boolean draw = result.isDraw();
-        boolean rated = !draw && ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = !draw && eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO omok_match_results (room_id, finished_at, mode, rule, end_reason, winner_color, payload_json)"
@@ -91,7 +92,7 @@ public class OmokMatchRecorder {
                 (TurnOrder.team(seat) == 0 ? team0 : team1).add(input);
             }
             boolean team0Won = result.winnerSeats().contains(0);
-            newRatings = EloCalculator.applyMatch(team0, team1, team0Won);
+            newRatings = EloCalculator.applyMatch(team0, team1, team0Won, eloFactor);
         }
 
         Map<Long, String> outcome = new LinkedHashMap<>();
@@ -107,9 +108,9 @@ public class OmokMatchRecorder {
                 continue;                                   // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님)
             }
             if (draw) {
-                stats.recordDraw(userId, GAME);
+                stats.recordDraw(userId, GAME, eloFactor);
             } else {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted);
+                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
             }
             outcome.put(userId, draw ? "draw" : win ? "win" : deserted ? "deserted" : "lose");
         }

@@ -98,16 +98,16 @@ class CloudRouteMatchRecorderIT {
                 .extracting(r -> r.get("final_rank") + "/" + r.get("total_assets") + "/" + r.get("status") + "/" + r.get("is_win"))
                 .containsExactly("2/2100/ALIVE/false", "1/3400/ALIVE/true", "3/0/BANKRUPT/false");
 
-        // 신규(K=40), 3인 동일 레이팅: 1등 +20, 2등 0, 3등 −20.
-        assertThat(cr(b).rating()).isEqualTo(1020);
-        assertThat(cr(a).rating()).isEqualTo(1000);
-        assertThat(cr(c).rating()).isEqualTo(990);
+        // 신규(K=40), 3인 동일 레이팅: 1등 +20, 2등 0, 3등 −20 의 절반, 모두 참가 점수 +6(D-301).
+        assertThat(cr(b).rating()).isEqualTo(1026);
+        assertThat(cr(a).rating()).isEqualTo(1006);
+        assertThat(cr(c).rating()).isEqualTo(996);
         assertThat(cr(b).winCount()).isEqualTo(1);
         assertThat(cr(a).loseCount()).isEqualTo(1);
     }
 
     @Test
-    void a_bot_match_records_win_lose_but_skips_elo_and_bot_rows() {
+    void a_bot_match_moves_the_human_rating_by_a_quarter_and_skips_bot_rows() {
         long a = human();
         long bot = bots.getBotIds().get(0);
 
@@ -115,6 +115,7 @@ class CloudRouteMatchRecorderIT {
                 new Standing(1, 1, 4_000, 2_000, SeatStatus.ALIVE),
                 new Standing(0, 2, 0, 0, SeatStatus.BANKRUPT))));
 
+        // D-299 — 봇에게 짐: 사람끼리면 −10(K=40 의 절반), 봇 판은 그 1/4 = −2(−2.5 반올림), 참가 점수 +2(D-301).
         assertThat(cr(a).rating()).isEqualTo(1000);
         assertThat(cr(a).loseCount()).isEqualTo(1);
         assertThat(stats.playedGames(bot)).isEmpty();

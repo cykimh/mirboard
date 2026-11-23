@@ -207,7 +207,7 @@ S1 첫 작업으로 아래 범주마다 정답이 알려진 국면을 좌표로 
 ### 10.2 기록·레이팅
 
 - 레이팅은 오목 하나(`game_type = 'OMOK'`) — 1:1 과 2:2 를 나누지 않는다. **[결정]**
-- ELO 는 `EloCalculator.applyMatch`(팀 평균, 1:1 은 한 명짜리 팀). 봇·게스트가 끼면 미적용(`RatedMatchPolicy`).
+- ELO 는 `EloCalculator.applyMatch`(팀 평균, 1:1 은 한 명짜리 팀). 게스트가 껴도 ELO 적용(게스트 본인 것은 저장 안 함)·봇이 끼면 1/4 만(D-299, `RatedMatchPolicy.eloFactor`).
 - **무승부는 ELO 변화 없음**, 승·패 수도 늘지 않고 전적 행만 남긴다(게스트 정리의 "매치를 끝낸 증거" — `docs/game-port.md` 매치 기록기 계약 2). **[결정]**
 - 상대 전적(`HeadToHeadSource`)은 상대 편만 센다(2:2 의 팀원은 상대가 아니다) — 승·패·무.
 

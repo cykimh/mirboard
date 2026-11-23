@@ -49,7 +49,7 @@ Spring Boot 4 / Java 25 · PostgreSQL · Redis · React + TypeScript ·
 - **재접속·탈주** — 끊김 유예 후 미복귀 시 게임별 규칙으로 처리
 - **UI** — 라이트(기본)/다크 토글, 모바일 반응형
 
-ELO·전적은 **게임별**로 쌓입니다(`user_game_stats`, [D-115](docs/decisions.md)) — 봇·게스트가 낀 매치는 승패만, ELO 는 제외.
+ELO·전적은 **게임별**로 쌓입니다(`user_game_stats`, [D-115](docs/decisions.md)) — 봇이 낀 매치는 ELO 를 1/4 만([D-299](docs/decisions.md)), 게스트가 낀 매치도 적용(게스트 본인의 레이팅은 저장하지 않음), 깎일 때는 절반(D-297), 끝까지 한 판마다 참가 점수(사람끼리 +6·봇 판 +2, D-301).
 
 전체 기능 표: [docs/implementation-status.md](docs/implementation-status.md)
 

@@ -144,7 +144,9 @@ class OmokServerFlowIT {
         GameStats humanStats = stats.get(human, OmokGameDefinition.ID);
         assertThat(humanStats.loseCount()).isEqualTo(1);
         assertThat(humanStats.desertCount()).as("시간패는 탈주가 아니다").isZero();
-        assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(humanStats.rating())
+                .as("봇이 낀 매치는 ELO 를 1/4 만(D-299, 신규 K=40 이면 +5 ~ −2) + 참가 점수 +2(D-301), 탈주면 참가 점수 없음")
+                .isBetween(UserGameStatsService.DEFAULT_RATING - 2, UserGameStatsService.DEFAULT_RATING + 7);
     }
 
     /** 비공개 뷰가 없는 게임 — resync 에 공개 판만 오고 privateHand 는 없다. */

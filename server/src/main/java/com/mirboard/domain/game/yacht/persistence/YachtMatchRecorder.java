@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 요트 매치 종료를 {@code yacht_match_results/participants} 에 적재하고 게임별 전적(YACHT 행)을 갱신한다 (S3). 원카드
- * 기록기와 같은 규칙: 봇·게스트가 낀 매치는 승패만, ELO 는 제외({@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
+ * 기록기와 같은 규칙: 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
  *
  * <p><b>1인 매치는 결과·참가자·전적을 쓰지 않는다</b>(D-181) — 셋 중 일부만 쓰면 게스트 정리 계약(`docs/game-port.md`
  * "매치 기록기 계약" 2)이 깨지고, 상대 없는 판의 승패는 뜻이 없다. 1인 + 봇은 2인 이상 매치다. 대신 끝까지 친 판({@code FINISHED})의
@@ -79,7 +79,8 @@ public class YachtMatchRecorder {
         }
         Map<Integer, Placement> bySeat = new HashMap<>();
         result.placements().forEach(p -> bySeat.put(p.seat(), p));
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO yacht_match_results (room_id, finished_at, end_reason, payload_json)"
@@ -100,7 +101,7 @@ public class YachtMatchRecorder {
                         playerIds.size() - p.rank(),
                         p.deserted()));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
@@ -114,7 +115,7 @@ public class YachtMatchRecorder {
                     matchId, userId, seat, p.rank(), p.total(), win, p.deserted());
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), p.deserted());
+                stats.record(userId, GAME, win, newRatings.get(userId), p.deserted(), eloFactor);
             }
         }
 

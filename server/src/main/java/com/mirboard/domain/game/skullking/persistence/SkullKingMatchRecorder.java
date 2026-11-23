@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * D-115 — 스컬킹 매치 종료를 {@code skullking_match_results/participants} 에 적재하고 게임별
  * 전적(SKULL_KING 행)을 갱신한다. 티츄 {@code MatchResultRecorder} 와 같은 규칙:
- * 봇(D-71)·게스트(D-117)가 낀 매치는 승패만, ELO 는 제외({@link RatedMatchPolicy}).
+ * 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}).
  * 탈주자는 패 + desert_count(D-75).
  *
  * <p>ELO 는 개인전 쌍대 방식({@link EloCalculator#applyFreeForAll}) — 탈주 좌석은 점수와
@@ -62,7 +62,8 @@ public class SkullKingMatchRecorder {
     @Transactional
     public void onMatchCompleted(SkullKingMatchCompleted event) {
         List<Long> playerIds = event.playerIds();
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO skullking_match_results (room_id, finished_at, rounds_played, payload_json)"
@@ -82,7 +83,7 @@ public class SkullKingMatchRecorder {
                         event.finalScores().getOrDefault(seat, 0),
                         event.desertedSeats().contains(seat)));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -94,7 +95,7 @@ public class SkullKingMatchRecorder {
                     matchId, userId, seat, event.finalScores().getOrDefault(seat, 0), win, deserted);
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted);
+                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
             }
         }
 

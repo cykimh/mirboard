@@ -46,7 +46,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 로그인/회원가입 엔드포인트도 헤더/쿠키 식별자를 기록하지 않는다 (IP는 인프라 레벨만).
 - 선택적 코스메틱 아바타는 `users` 가 아니라 **별도 테이블 `user_avatars`**(V5, BYTEA 128px PNG)에 저장(D-80). `users` 화이트리스트는 불변. 조회는 공개 `GET /avatars/{userId}`, 업로드/삭제는 `POST`/`DELETE /api/me/avatar`(본인).
 - **가입 이름은 별명(D-149)** — `UsernamePolicy` 한글·영문·숫자 2~10자, NFC 로 저장·조회(컬럼·API 필드는 `username` 그대로). 회원 초기화는 운영자가 `docs/deploy.md` "회원 초기화"로(배포로 자동 실행 금지).
-- **게스트 계정(D-117)은 컬럼이 아니라 규약으로 식별한다** — username `guest-` 접두(하이픈은 `UsernamePolicy` 밖 문자라 가입으로 위조 불가) + 로그인 불가 sentinel 해시 `__guest_no_login__` + `is_bot=false`. 판정은 `domain.lobby.auth.GuestPolicy` 한 곳. 게스트는 비번 변경·아바타 403, 랭킹 제외, 게스트가 낀 매치는 ELO 미적용(`RatedMatchPolicy.eloApplies`). 레이트리밋: `/api/auth/**` 는 Bearer 와 무관하게 항상 IP 키, IP 는 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`), 버킷 판정은 원본 URI 가 아니라 디코딩·contextPath 제외 경로.
+- **게스트 계정(D-117)은 컬럼이 아니라 규약으로 식별한다** — username `guest-` 접두(하이픈은 `UsernamePolicy` 밖 문자라 가입으로 위조 불가) + 로그인 불가 sentinel 해시 `__guest_no_login__` + `is_bot=false`. 판정은 `domain.lobby.auth.GuestPolicy` 한 곳. 게스트는 비번 변경·아바타 403, 랭킹 제외, **게스트가 낀 매치도 ELO 를 적용한다**(D-299 덧붙임 — 예전 D-117 은 전원 미적용. 가입한 사람은 사람끼리 판과 똑같이 움직이고, **게스트 본인의 레이팅은 저장하지 않는다** — 전적 행은 승패만, rating 은 늘 1000 이고 계산에도 1000: `UserGameStatsService.record(…, eloFactor)` 가 게스트면 rating 을 쓰지 않는다), **봇이 낀 매치는 ELO 를 1/4 만**(D-299 — `RatedMatchPolicy.eloFactor` 한 곳: 봇 `EloCalculator.BOT_MATCH_FACTOR` 0.25·그 밖 1, 봇+게스트는 봇 판 규칙. 봇은 1000 으로 계산만 하고 저장하지 않는다. 기록기는 이 값을 `applyMatch`·`applyFreeForAll` 에 넘길 것 — 조건을 기록기에 따로 쓰지 말 것). 깎일 때는 절반(D-297 `LOSS_FACTOR`), D-300 일괄 +40 은 V23 한 번(백업 `user_game_stats_backup_d300`). **참가 점수(D-301)** — 레이팅이 적용되는 판을 끝까지 마치면 결과와 상관없이 사람끼리 +6·봇 판 +2(탈주·게스트 본인 0, 무승부도 받음): 판정 `EloCalculator.participationBonus`, 더하는 곳은 `UserGameStatsService.record(…, eloFactor)`·`recordDraw(…, eloFactor)` 한 곳 — 기록기는 배율을 넘기기만 한다. 레이트리밋: `/api/auth/**` 는 Bearer 와 무관하게 항상 IP 키, IP 는 `mirboard.ratelimit.client-ip-header`(운영 `Fly-Client-IP`), 버킷 판정은 원본 URI 가 아니라 디코딩·contextPath 제외 경로.
 
 ### 도메인 경계 (Modular Monolith)
 - `domain.lobby` → `domain.game.tichu` 직접 의존 **금지**.
@@ -206,8 +206,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `WsSessionRegistry`, 단일 인스턴스 전제). WAITING 끊김=즉시 leave(빈 방·
   관전자0 방 즉시 소멸 — **D-134 로 플레이어는 준비 해제 + 유예 뒤 leave**, 관전자는 그대로 즉시). IN_GAME 탈주(명시 '나가기' / 끊김 후
   `mirboard.desertion.grace-seconds` 기본 180s(D-158; D-79 120s, 구 30s) 미복귀)=상대팀 승리로
-  매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치 ELO 제외,
-  D-71). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
+  매치 종료 + 탈주자 `desert_count`+1·lose+1·ELO−(봇 매치는 1/4 만 — D-299,
+  예전 D-71 은 제외). 탈주는 합성 `TichuMatchCompleted` 로 기존 `MatchResultRecorder`
   재사용. 패스 카드 선택 UI 는 `arena-actions` 로 통합(로직 불변).
 - D-82(D-81 보정): **방 단위 테이블 칩 내기 모드**(계정 지갑 아님 — 칩을 계정에 안 둠).
   방 게임 시작 시 전원 동일 칩(`STARTING_STACK` 1000), 매치 종료마다 판돈

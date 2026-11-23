@@ -12,6 +12,7 @@ import com.mirboard.domain.game.dambaduk.board.Dir;
 import com.mirboard.domain.game.dambaduk.event.DambadukMatchCompleted;
 import com.mirboard.domain.game.dambaduk.state.DambadukState;
 import com.mirboard.domain.game.dambaduk.state.EndReason;
+import com.mirboard.domain.game.scoring.EloCalculator;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
@@ -148,15 +149,15 @@ class DambadukMatchRecorderIT {
                 .containsExactly("0/1/21/21/null/true/false", "1/2/16/16/null/false/false");
         assertThat(jdbc.queryForObject("SELECT payload_json FROM dambaduk_match_results WHERE room_id = ?",
                 String.class, room)).contains("\"walls\"");
-        // 신규(K=40), 같은 레이팅 2인 — 개인전 쌍대 ELO 도 일반 ELO 와 같은 ±20.
-        assertThat(dambaduk(a).rating()).isEqualTo(1020);
-        assertThat(dambaduk(b).rating()).isEqualTo(990);
+        // 신규(K=40), 같은 레이팅 2인 — 개인전 쌍대 ELO 도 일반 ELO 와 같은 +20/−10, 참가 점수 +6(D-301).
+        assertThat(dambaduk(a).rating()).isEqualTo(1026);
+        assertThat(dambaduk(b).rating()).isEqualTo(996);
         assertThat(dambaduk(a).winCount()).isEqualTo(1);
         assertThat(dambaduk(b).loseCount()).isEqualTo(1);
     }
 
     @Test
-    void a_draw_changes_no_counts_or_rating_but_leaves_a_stats_row() {
+    void a_draw_changes_no_counts_and_only_adds_the_participation_bonus() {
         long a = human();
         long b = human();
         String room = room();
@@ -165,7 +166,9 @@ class DambadukMatchRecorderIT {
         assertThat(statsRows(a)).isEqualTo(1);
         assertThat(statsRows(b)).isEqualTo(1);
         assertThat(dambaduk(a).winCount() + dambaduk(a).loseCount() + dambaduk(a).desertCount()).isZero();
-        assertThat(dambaduk(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(dambaduk(a).rating()).as("무승부는 ELO 변화 없이 참가 점수만(D-301)")
+                .isEqualTo(UserGameStatsService.DEFAULT_RATING + EloCalculator.PARTICIPATION_BONUS);
+        assertThat(dambaduk(b).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING + EloCalculator.PARTICIPATION_BONUS);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM dambaduk_match_participants p"
                         + " JOIN dambaduk_match_results r ON r.id = p.match_id"
                         + " WHERE r.room_id = ? AND p.is_draw AND r.is_draw AND p.final_rank = 1", Integer.class, room))
@@ -192,18 +195,21 @@ class DambadukMatchRecorderIT {
         assertThat(dambaduk(b).loseCount()).isEqualTo(1);
         assertThat(dambaduk(b).desertCount()).isEqualTo(1);
         assertThat(dambaduk(c).rating()).isGreaterThan(UserGameStatsService.DEFAULT_RATING);
-        assertThat(dambaduk(a).rating()).isEqualTo(dambaduk(b).rating())           // 빠진 사람끼리 동순위
+        // 빠진 사람끼리 동순위 — 탈주한 b 만 참가 점수가 없다(D-301), 시간패 a 는 받는다.
+        assertThat(dambaduk(a).rating()).isEqualTo(dambaduk(b).rating() + EloCalculator.PARTICIPATION_BONUS);
+        assertThat(dambaduk(b).rating())
                 .isLessThan(UserGameStatsService.DEFAULT_RATING);
     }
 
     @Test
-    void a_bot_match_records_win_lose_but_skips_elo_and_bot_rows() {
+    void a_bot_match_moves_the_human_rating_by_a_quarter_and_skips_bot_rows() {
         long a = human();
         long bot = bots.getBotIds().get(0);
         publisher.publishEvent(new DambadukMatchCompleted(room(), List.of(a, bot), blackWins21to16()));
 
         assertThat(dambaduk(a).winCount()).isEqualTo(1);
-        assertThat(dambaduk(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        // D-299 — 봇에게 이김: 사람끼리면 +20(K=40), 봇 판은 그 1/4 = +5.
+        assertThat(dambaduk(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING + 5 + EloCalculator.BOT_MATCH_PARTICIPATION_BONUS);
         assertThat(statsRows(bot)).isZero();
     }
 

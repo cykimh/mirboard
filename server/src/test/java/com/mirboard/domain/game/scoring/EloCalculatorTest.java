@@ -123,4 +123,91 @@ class EloCalculatorTest {
         assertThat(out).containsEntry(1L, 1020).containsEntry(2L, 990);
         assertThat(EloCalculator.LOSS_FACTOR).isEqualTo(0.5);
     }
+
+    // ---------- D-299 — 봇이 낀 판의 배율 ----------
+
+    @Test
+    void d299_bot_match_gain_is_a_quarter() {
+        // 2인 K=40, 봇은 1000·0판 → 사람끼리면 +20, 봇 판이면 +20×¼ = +5.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 0, 50), placed(2, 1000, 0, 10)), EloCalculator.BOT_MATCH_FACTOR);
+        assertThat(out).containsEntry(1L, 1005);
+        assertThat(EloCalculator.BOT_MATCH_FACTOR).isEqualTo(0.25);
+    }
+
+    @Test
+    void d299_bot_match_loss_is_a_quarter_of_the_halved_loss() {
+        // K=32: 사람끼리 −16×½ = −8, 봇 판이면 −8×¼ = −2. 반올림은 다 곱한 뒤 한 번.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 50, 10), placed(2, 1000, 50, 50)), EloCalculator.BOT_MATCH_FACTOR);
+        assertThat(out).containsEntry(1L, 998).containsEntry(2L, 1004);
+        // 한 번만 반올림 — −7.4 를 먼저 −7 로 만들고 ¼ 을 곱하지 않는다.
+        assertThat(EloCalculator.delta(-14.8, 0.25)).isEqualTo(-2);
+        assertThat(EloCalculator.delta(14.8, 0.25)).isEqualTo(4);
+    }
+
+    @Test
+    void d299_team_match_scales_both_teams() {
+        // 팀 평균 1000 vs 1000, K=32 → 사람끼리 +16/−8, 봇 판 +4/−2.
+        Map<Long, Integer> out = EloCalculator.applyMatch(
+                List.of(new PlayerInput(1, 1000, 50), new PlayerInput(2, 1000, 50)),
+                List.of(new PlayerInput(3, 1000, 50), new PlayerInput(4, 1000, 50)),
+                true, EloCalculator.BOT_MATCH_FACTOR);
+        assertThat(out).containsEntry(1L, 1004).containsEntry(2L, 1004)
+                .containsEntry(3L, 998).containsEntry(4L, 998);
+    }
+
+    @Test
+    void d299_full_factor_equals_the_plain_call() {
+        List<Placement> placements = List.of(placed(1, 1100, 10, 50), placed(2, 950, 80, 10), placed(3, 1000, 5, 30));
+        assertThat(EloCalculator.applyFreeForAll(placements, EloCalculator.FULL_FACTOR))
+                .isEqualTo(EloCalculator.applyFreeForAll(placements));
+    }
+
+    @Test
+    void d299_factor_out_of_range_is_rejected() {
+        List<Placement> placements = List.of(placed(1, 1000, 0, 50), placed(2, 1000, 0, 10));
+        assertThatThrownBy(() -> EloCalculator.applyFreeForAll(placements, 0.0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> EloCalculator.applyFreeForAll(placements, 1.5))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void d299_beating_a_fixed_1000_bot_stops_paying_near_1470() {
+        // 봇은 늘 1000 — 사람이 오를수록 이겨 얻는 몫이 줄어 반올림 0 이 된다(쉬운 봇 반복의 천장).
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1480, 100, 50), placed(2, 1000, 0, 10)), EloCalculator.BOT_MATCH_FACTOR);
+        assertThat(out).containsEntry(1L, 1480);
+    }
+
+    // ---------- D-301 — 참가 점수 ----------
+
+    @Test
+    void d301_humans_only_match_pays_six_whatever_the_result() {
+        assertThat(EloCalculator.participationBonus(EloCalculator.FULL_FACTOR, false)).isEqualTo(6);
+        assertThat(EloCalculator.PARTICIPATION_BONUS).isEqualTo(6);
+    }
+
+    @Test
+    void d301_bot_match_pays_two() {
+        assertThat(EloCalculator.participationBonus(EloCalculator.BOT_MATCH_FACTOR, false)).isEqualTo(2);
+        assertThat(EloCalculator.BOT_MATCH_PARTICIPATION_BONUS).isEqualTo(2);
+    }
+
+    @Test
+    void d301_deserters_and_unrated_matches_get_nothing() {
+        assertThat(EloCalculator.participationBonus(EloCalculator.FULL_FACTOR, true)).isZero();
+        assertThat(EloCalculator.participationBonus(EloCalculator.BOT_MATCH_FACTOR, true)).isZero();
+        // 배율 0(ELO 를 적용하지 않는 기록)은 참가 점수도 없다.
+        assertThat(EloCalculator.participationBonus(RatedMatchPolicy.UNRATED, false)).isZero();
+    }
+
+    @Test
+    void d301_the_bonus_is_not_inside_the_elo_result() {
+        // 계산 결과는 그대로 +20/−10 — 참가 점수는 저장할 때 UserGameStatsService.record 가 더한다.
+        Map<Long, Integer> out = EloCalculator.applyFreeForAll(List.of(
+                placed(1, 1000, 0, 50), placed(2, 1000, 0, 10)), EloCalculator.FULL_FACTOR);
+        assertThat(out).containsEntry(1L, 1020).containsEntry(2L, 990);
+    }
 }

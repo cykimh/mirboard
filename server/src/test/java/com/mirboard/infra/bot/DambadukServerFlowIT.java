@@ -121,7 +121,9 @@ class DambadukServerFlowIT {
         GameStats humanStats = stats.get(human, DambadukGameDefinition.ID);
         assertThat(humanStats.loseCount()).isEqualTo(1);
         assertThat(humanStats.desertCount()).isEqualTo(1);
-        assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(humanStats.rating())
+                .as("봇이 낀 매치는 ELO 를 1/4 만(D-299, 신규 K=40 이면 +5 ~ −2) + 참가 점수 +2(D-301), 탈주면 참가 점수 없음")
+                .isBetween(UserGameStatsService.DEFAULT_RATING - 2, UserGameStatsService.DEFAULT_RATING + 7);
     }
 
     /** 2인 — 사람이 손을 놓으면 턴 타임아웃이 한 번은 대신 두고, 두 번째에 그 사람이 진다(룰 §8, 탈주 아님). */
