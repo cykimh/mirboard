@@ -7,7 +7,7 @@ import { awaitResume, watchHiddenIdle } from './hiddenIdle';
 /**
  * Phase 13C(#3) — RoomPage 의 2초 `GET /api/rooms/{id}` 폴링을 대체하는 경량 STOMP
  * 구독. `/topic/room/{roomId}/meta` 에서 `ROOM_META_UPDATED`(Room 스냅샷) /
- * `ROOM_DESTROYED` 를 받아 콜백한다. 게임 이벤트용 useStompRoom 과 별개의 가벼운
+ * `ROOM_DESTROYED`(D-290 — `ROOM_MEMBER_KICKED` 도)를 받아 콜백한다. 게임 이벤트용 useStompRoom 과 별개의 가벼운
  * 연결 — RoomPage 가 WAITING/IN_GAME 전 구간에서 메타 변경을 즉시 반영.
  *
  * <p>D-134 — 휴대폰이 백그라운드로 가면 소켓이 죽고(D-79) 그동안의 메타(준비 해제·퇴장·방 소멸)를 놓친다. 다시 구독만 해서는
@@ -20,6 +20,8 @@ export function useRoomMeta(
   onMeta: (room: Room) => void,
   onDestroyed?: () => void,
   onResync?: () => void | Promise<void>,
+  /** D-290 — 방장이 대기실에서 누군가를 내보냈다(`ROOM_MEMBER_KICKED`). 내 id 면 방 화면이 안내하고 메인으로 간다. */
+  onKicked?: (userId: number) => void,
 ) {
   const onMetaRef = useRef(onMeta);
   const onDestroyedRef = useRef(onDestroyed);
@@ -27,6 +29,8 @@ export function useRoomMeta(
   onMetaRef.current = onMeta;
   onDestroyedRef.current = onDestroyed;
   onResyncRef.current = onResync;
+  const onKickedRef = useRef(onKicked);
+  onKickedRef.current = onKicked;
 
   useEffect(() => {
     if (!token) return;
@@ -49,6 +53,9 @@ export function useRoomMeta(
             onMetaRef.current(env.payload as Room);
           } else if (env.type === 'ROOM_DESTROYED') {
             onDestroyedRef.current?.();
+          } else if (env.type === 'ROOM_MEMBER_KICKED') {
+            const kicked = (env.payload as { userId?: number } | null)?.userId;
+            if (typeof kicked === 'number') onKickedRef.current?.(kicked);
           }
         });
         // 구독을 보낸 뒤에 — 다시 맞춘 뒤 바뀐 메타는 이 구독이 받는다.

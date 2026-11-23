@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { GAME_ICON_IDS, GameIcon, hasGameIcon } from './GameIcon';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 
-/** 게임판이 있는 일곱 게임(pages/gameTables 의 키와 같다). */
-const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY', 'STAR_SQUARE'];
+/** 게임판이 있는 게임(담바둑·별자리 수판까지 아홉 — pages/gameTables 의 키와 같다). */
+const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY', 'DAMBADUK', 'STAR_SQUARE'];
 
 const svgOf = (el: HTMLElement) => el.querySelector('svg') as SVGSVGElement;
 
@@ -14,7 +14,7 @@ describe('GameIcon (D-188)', () => {
     useCardAnimStore.setState({ enabled: true });
   });
 
-  it('일곱 게임 모두 전용 아이콘이 있다 (매핑 누락 없음)', () => {
+  it('게임판이 있는 게임 모두 전용 아이콘이 있다 (매핑 누락 없음)', () => {
     expect([...GAME_ICON_IDS].sort()).toEqual([...GAMES].sort());
     for (const id of GAMES) {
       expect(hasGameIcon(id), id).toBe(true);

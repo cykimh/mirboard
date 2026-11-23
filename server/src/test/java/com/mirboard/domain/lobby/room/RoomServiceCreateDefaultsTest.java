@@ -62,7 +62,8 @@ class RoomServiceCreateDefaultsTest {
     private void verifyStored(int capacity, int turnSeconds) {
         verify(repository).create(anyString(), anyLong(), anyString(), anyString(), eq(capacity), anyLong(),
                 eq(TeamPolicy.SEQUENTIAL), anyBoolean(), anyInt(), eq(turnSeconds), anyInt(),
-                eq(java.util.Map.of())); // D-176 — 세 게임은 맵 옵션을 선언하지 않는다
+                // D-176 — 세 게임은 맵 옵션을 선언하지 않는다. D-290 — 정원 범위 두 필드만 같이 쓴다.
+                org.mockito.ArgumentMatchers.argThat(extra -> extra.keySet().equals(Set.of("capMin", "capMax"))));
 
     }
 

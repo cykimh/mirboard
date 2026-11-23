@@ -82,11 +82,24 @@ class HostKickServiceTest {
     }
 
     @Test
-    @DisplayName("진행 중이 아니면 GAME_NOT_IN_PROGRESS")
-    void only_in_game() {
-        when(rooms.getRoom(ROOM_ID)).thenReturn(room(RoomStatus.WAITING));
+    @DisplayName("끝난 방이면 GAME_NOT_IN_PROGRESS")
+    void not_in_a_finished_room() {
+        when(rooms.getRoom(ROOM_ID)).thenReturn(room(RoomStatus.FINISHED));
 
         assertThatThrownBy(() -> service.kick(ROOM_ID, HOST, GONE)).isInstanceOf(GameNotInProgressException.class);
+    }
+
+    @Test
+    @DisplayName("D-290 — 대기실에서는 연결돼 있어도 좌석에서 뺀다(대기실 강퇴로 넘김) — 탈주 처리는 하지 않는다")
+    void waiting_room_kick_goes_to_the_lobby_kick() {
+        when(rooms.getRoom(ROOM_ID)).thenReturn(room(RoomStatus.WAITING));
+        when(presence.hasLiveSession(GONE, ROOM_ID)).thenReturn(true);
+
+        assertThat(service.kick(ROOM_ID, HOST, GONE)).isTrue();
+
+        verify(rooms).kickFromLobby(ROOM_ID, HOST, GONE);
+        verify(desertion, never()).processDesertion(anyString(), anyLong());
+        verify(grace, never()).cancelIfPending(anyString(), anyLong());
     }
 
     @Test

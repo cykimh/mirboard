@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 현황
 
-**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 8종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131), 얏추(화면 이름 — 코드 이름은 `YACHT`·`yacht`·"요트" 그대로, D-207. 1~4인 개인전 — 주사위 5개·12칸, 순차 진행·혼자 하기, D-181~D-183·D-200 공개), 오목(2인 1:1·4인 2:2 팀전 — 렌주·삼삼만·자유 룰, 봇 3단계, D-175~D-180·D-190 공개), 구름항로(2~4인 주사위·부동산 독창 게임 — 포트 확장 0건, D-210~D-214 공개), 씨앗포(2~4인 턴제 포격 독창 게임 — 서버 Q16 정수 탄도·Canvas 재생, 2:2 팀전·포트리스식 딜레이 차례, D-220~D-223 공개, D-224~D-226. S6 실시간 이동·조준 공유 — 걷기 확정 `MOVE`·차례 전체 마감·조준 미리보기, 포트 선택 확장 ⑧ `preview` 1건 D-228·D-229·D-250, 클라 D-251), 별자리 수판(1~4인 마방진 동시 풀기 — 같은 퍼즐 레이스, 퍼즐은 오프라인 자원 + 대칭 16가지, 판 전체 `SYNC`(로컬 우선·0.4초 모아 보내기)·정답·남의 판 은닉, 준비·마감·결과 보기·봇 페이스는 엔진 타이머, 포트 변경 0 — 게임 중립 맵 옵션 `DIFFICULTY`·카탈로그 `turnLimitLabel`(대기실 "퍼즐 제한"·0 = "자동"), D-282~D-287 공개).
+**Mirboard** — 웹 기반 턴제 보드게임 플랫폼. 공통 허브/로비 + **게임 9종**: 티츄(4인 2:2 팀전), 스컬킹(2~8인 개인전), 원카드(2~6인 개인전 + "원카드!/잡기!" 실시간 경쟁, D-123~D-131), 얏추(화면 이름 — 코드 이름은 `YACHT`·`yacht`·"요트" 그대로, D-207. 1~4인 개인전 — 주사위 5개·12칸, 순차 진행·혼자 하기, D-181~D-183·D-200 공개), 오목(2인 1:1·4인 2:2 팀전 — 렌주·삼삼만·자유 룰, 봇 3단계, D-175~D-180·D-190 공개), 구름항로(2~4인 주사위·부동산 독창 게임 — 포트 확장 0건, D-210~D-214 공개), 씨앗포(2~4인 턴제 포격 독창 게임 — 서버 Q16 정수 탄도·Canvas 재생, 2:2 팀전·포트리스식 딜레이 차례, D-220~D-223 공개, D-224~D-226. S6 실시간 이동·조준 공유 — 걷기 확정 `MOVE`·차례 전체 마감·조준 미리보기, 포트 선택 확장 ⑧ `preview` 1건 D-228·D-229·D-250, 클라 D-251), 담바둑(2~3인 돌 옮기기·담 세우기 독창 게임 — 7×7 판, 옮김+담 한 액션, 갈 수 있는 칸·집·점수는 서버 계산, 포트 확장 0건, D-274~D-280, D-281 공개 준비 — `MIRBOARD_DAMBADUK_STATUS`), 별자리 수판(1~4인 마방진 동시 풀기 — 같은 퍼즐 레이스, 퍼즐은 오프라인 자원 + 대칭 16가지, 판 전체 `SYNC`(로컬 우선·0.4초 모아 보내기)·정답·남의 판 은닉, 준비·마감·결과 보기·봇 페이스는 엔진 타이머, 포트 변경 0 — 게임 중립 맵 옵션 `DIFFICULTY`·카탈로그 `turnLimitLabel`(대기실 "퍼즐 제한"·0 = "자동"), D-282~D-287 공개).
 
 현재는 **동작하는 MVP** 상태이며 상용화 트랙(A/C/D/E/G) 진행 중이다(설계 Phase 1 ~ 클라 통합·UI 리디자인 Phase 20 완료, 이후 M0~M7 전부 완료, 결정 이력 D-172까지). 로비/방 → 세 게임 풀게임 → 점수·ELO 영속(게임별, D-115) → 봇과 연습(D-136) → 재접속/탈주 → 라이트/다크 UI 까지 end-to-end로 연결되어 있다. 멀티게임(트랙 E)은 **완료** — 포트 추출(D-98) 후 스컬킹을 룰 명세(D-100)·순수 엔진(D-101)·탈주(D-104)·인게임 배선(D-102)·클라 게임판(D-103)까지 붙였다. 스컬킹 매치 영속·ELO 는 게임별 전적 테이블(`user_game_stats`, D-115)로 해소. 세 번째 게임 원카드는 `GameEngine` 포트 확장 1건(엔진 타이머 `timer`/`onTimer`, D-128)과 D-126 의 `sequenced()` 재정의만으로 붙었고(카탈로그 정의 `GameDefinition` 의 방 만들기 처음 선택 기본값 2개 `defaultPlayers()`·`defaultTurnSeconds()` 는 별도 — D-130, 기본 구현이 기존 동작. 인프라 grep `onecard` 0건) D-131 에서 공개됐다(`MIRBOARD_ONECARD_STATUS` 로 되돌림 — `docs/deploy.md`).
 
@@ -85,7 +85,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **클라 인게임도 게임 중립 (D-103)**: `useStompRoom` 은 게임 스토어를 import 하지 않고
   `RoomEventSink` 를 주입받는다(게임별 sink 파일이 스토어에 꽂는다). sink 는 **모듈 상수**여야
   하고 각 메서드는 **호출 시점에 `getState()`** 를 읽어야 한다(훅이 sink 를 ref 로 잡아
-  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 여덟 게임 모두 이
+  effect deps 에서 빼기 때문). 게임판 분기는 `RoomPage` 의 IN_GAME 한 곳뿐이고(게임판은 `pages/gameTables` 의 지연 로딩으로만 — D-141, 정적 import 금지. 아홉 게임 모두 이
   세션에서 본 IN_GAME→FINISHED 직후에도 게임판을 유지하고 `roomFinished` 를 넘긴다, D-120·D-129·D-240 티츄), 각
   게임판이 자기 소켓·sink 를 소유해 다른 게임의 코드 경로는 실행되지 않는다. 공개 이벤트의 순번
   판정(중복·구멍)은 훅만 한다(D-124) — 게임 스토어는 `lastSeq` 없는 순수 리듀서다.
@@ -119,7 +119,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Build     | Gradle 9.4.1 (wrapper), Kotlin DSL                                                                   |
 | Auth      | JWT HS256 12h, BCrypt. 시크릿은 `MIRBOARD_JWT_SECRET` 환경변수                                     |
 | Migration | **Flyway** — JPA `ddl-auto` 사용 금지                                                          |
-| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129, 요트 `.yt-` 20·오목 `.om-` 21·구름항로 `.cr-` 22·씨앗포 `.ar-` 23 번 part — 번호는 불러오는 순서, 겹치지 않게) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
+| Frontend  | Vite + React 18 + TypeScript, `@stomp/stompjs` + SockJS, `@dnd-kit`, Zustand. **Phase 20(D-76)**: Tailwind v3(`preflight:false`)+shadcn/ui(slate, CSS vars), 라이트/다크 토글(`themeStore`, `<html>.dark`, 기본 light — D-146). shadcn 화면은 `.app-shell` 로 감싼다(스코프 base). 게임판 기하는 `styles/parts/*` 유지(D-94 분할). **게임별 게임판 CSS 는 신규 part + 접두 네임스페이스**(스컬킹 `.sk-` D-103, 원카드 `.oc-` D-129, 요트 `.yt-` 20·오목 `.om-` 21·구름항로 `.cr-` 22·씨앗포 `.ar-` 23·담바둑 `.db-` 26 번 part — 번호는 불러오는 순서, 겹치지 않게) — 공용 클래스 재정의 금지, `17-responsive.css` 는 계속 마지막. 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 안 닿으니 스코프에서 명시할 것 |
 | Data      | PostgreSQL 16 (영속, Phase 7-1 부터 D-39), Redis 7 (실시간 세션/방 상태)                                        |
 | Test      | JUnit 5 + Mockito + Testcontainers / Vitest + RTL                                          |
 
@@ -149,6 +149,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - D-160: 원카드 차례 강조(좌석 "차례" 표시·맥박, 내 차례면 진동 1회 — 빛은 D-173 로 경기장 테두리), 원카드 손패 **최대 2줄**(`OneCardHand.handRows` — 8장까지 한 줄, 넘치면 겹침), 랭킹 탭은 **전체에서 많이 한 게임부터**(`GET /api/users/ranking/games` — *D-199 로 탭은 선택 상자가 됐다. 순서는 그대로, 맨 앞은 "전체"*). 후속 묶음 B·C 계획은 `docs/plans/table-lobby-polish.md`.
 - D-159: 음성 대화는 **한동안 끔**(`features/voice/voiceSwitch.VOICE_ENABLED = false` — 🎧·🎙 비활성 버튼, 다시 켤 땐 이 한 줄).
 - D-158: 연결 끊김 개선 — STOMP **하트비트 10초**(서버 `messageBrokerTaskScheduler`, 클라 두 소켓 + `discardWebsocketOnCommFailure`), JVM SerialGC·힙 55%·C1 만(`Dockerfile`), 탈주 유예 **180s**, 음성 동시 참여 **4명**(`MAX_VOICE_MEMBERS`).
+- D-291: **얏추 PC 넓은 화면 2단** — 1024px 이상이면 왼쪽 좌석 띠 + 주사위 판, 오른쪽 점수표(sticky, 넘치면 그 칸만 스크롤). 규칙은 `17-responsive.css` 의 D-291 블록 하나(게임판 루트의 직계 자식 배치 — 루트에 새 자식을 넣으면 칸을 정해 줄 것). **연출을 보일지는 `cardAnimStore` 한 곳이 정한다** — 메뉴 '연출'(공용 `GameMenu`, 티츄는 "카드 애니메이션")을 직접 켜면(저장값 1) OS '동작 줄이기'여도 보이고(`forced` → `<html>.motion-forced`), 저장값이 없으면 OS 를 따르고, 직접 끄면 항상 꺼진다. CSS 의 `@media (prefers-reduced-motion: reduce)` 안 선택자는 **전부 `:root:not(.motion-forced)` 로 시작**하고(다른 꼴의 동작 줄이기 미디어 금지), 블록 바로 뒤에 **같은 규칙의 `:root.motion-off` 짝**(`motion-off:begin`~`end`)을 둔다 — 연출이 꺼져 있으면 `<html>.motion-off` 라 스토어를 읽지 않는 게임판의 CSS 연출도 꺼진다(블록을 고치면 짝도 똑같이). JS 는 `matchMedia` 를 직접 읽지 말고 `motionReduced()` 로 묻고, 연출 가능 여부를 마운트 때 한 번만 읽지 말 것(스토어 구독 — 구름항로). `motionForced.test` 가 원문 검사.
+- D-292: **게임판은 글자가 선택되지 않는다** — `RoomPage` 의 게임판 `<main class="room-page game-surface">`, 규칙은 `28-game-surface.css` 한 곳(`.game-` 접두, 게임별 part 에 `user-select` 를 새로 흩지 말 것). 복사가 필요한 곳은 입력란이거나 `game-selectable` 을 붙인다(방 채팅 목록). **얏추 흔들기는 판 밖으로 나가면 취소** — `DiceTray.trackPress`(누름을 시작한 포인터가 `.yt-felt` 밖 → `cancelPress(true)`: 굴리지 않음·`shaking:false`·다시 들어와도 버린 누름), 키보드 누름·휴대폰 흔들기는 대상 아님.
+- D-293: **얏추 마지막 3초** — 내 차례(모두 같이면 라운드) 마감 3초 전부터 주사위 판에 큰 3·2·1(`YachtFinalCount`, `pointer-events: none`) + `tableSfx` `clock.tick`(3·2)·`clock.last`(1). 남은 초는 시계 배지와 같은 `useTurnSecondsLeft` 로만 읽고, 같은 차례(`방:좌석:라운드`)의 같은 숫자는 한 번만 울린다(모듈 기록 — resync·다시 그리기에도. 기록의 주인은 울릴 때만 바뀌고 판이 끝나면 비운다 — 차례 키가 바뀔 때마다 비우지 말 것). 소리는 음소거만, 큰 숫자의 움직임은 연출 설정·동작 줄이기를 따른다. 남의 차례·턴 제한 끔에는 없다.
 - D-273: **숨긴 탭은 연결을 끊는다** — 운영 앱·Redis 는 연결이 0 일 때만 잠든다(D-171). 탭이 계속 숨겨진 채 10분(`ws/hiddenIdle.HIDDEN_IDLE_MS`, 진행 중인 판에 앉은 자리는 60분 — `RoomPage` 가 `setHiddenIdleInGame`)이면 `useStompRoom`·`useRoomMeta` 가 `deactivate`, 다시 보이면 기존 복귀 경로(`activate` + resync)로 붙는다. 허브 방 목록 폴링도 숨긴 동안은 쉰다. 새 소켓·폴링을 만들면 이 규칙(`watchHiddenIdle`)을 거칠 것.
 - D-269: **경고·오류 안내는 화면 위에 띄운다** — 재연결 배너·게임판 거절 안내는 공용 `components/notice/FloatingNotice`(body 의 `#floating-notices` 층 포털, 토스트도 같은 층)로만 그린다. 게임 스토어 `setError` 는 `errorNoticePatch`(`errorSeq`·`errorSticky`)로, 게임판은 `ErrorNotice` 로. 안내 본문은 눌림 통과([×] 만 눌림), 닫기는 문구만 지운다(씨앗포 `dismissError` — pending 불변). 게임판 흐름에 안내 줄을 끼우거나 게임별 `.xx-error` 를 다시 만들지 말 것. 대기실 버튼 결과 오류는 `showToast(…, 'error')`.
 - D-157: 버튼을 누른 뒤의 짧은 안내(마이크 오류·초대 링크 복사됨)는 **토스트**(`components/toast` — `showToast`, 앱에 `Toaster` 하나). 버튼 줄에 글을 끼우지 말 것.
@@ -166,6 +169,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - D-271: **효과음은 캐주얼 게임 톤** — `tableSfx` 소리는 둥근 사인 "뽁"·마림바풍 "통"·미끄럼 휘파람만(흰 잡음·sawtooth·square 금지 — `tableSfx.test`), 합성음은 전부 `useSfx.sfxOut(ctx)`(압축기 출구, 약 +3dB)로 내보낸다 — `ctx.destination` 에 직접 잇지 말 것. 박자 상수(`ROLL_SFX_*`·`YACHT_SFX_*`·오목 `WIN_*`)와 이벤트→소리 표는 그대로.
 - D-199·D-209: **메인 랭킹 = 이번 달 전적** — 오른쪽 위 선택 상자(기본 "전체" = 모든 게임 합, 그다음 많이 한 게임부터), 순서는 이번 달 승수 → 승률 → 판수, 칸은 등수·유저(계급 아이콘이 별명 왼쪽 — 계급은 누적 레이팅 그대로)·전적·승률·최근 5경기. `GET /api/users/ranking?gameType=`(생략·`ALL` = 전체). 이번 달 전적은 `user_monthly_stats`(V19, 전체 행 `game_type='*'`, `recent` 최근 5결과)에 `UserGameStatsService.record`·`recordDraw` 가 누적 전적과 **같은 곳에서 같이** 쌓는다(따로 쓰는 경로를 만들지 말 것). 달 경계는 **Asia/Seoul 1일 0시**(`StatsMonth` + 주입 `Clock` — 서버 시계는 UTC), 지우는 배치는 없다(새 달의 행이 0 에서 시작). 메인 목록 카드(랭킹 표·대기 중인 방)는 **높이 고정 + 안쪽 스크롤**(`features/lobby/hubScroll.HUB_SCROLL`) — 목록 길이로 아래 카드를 밀지 말 것.
 - D-241: 티츄 **"옻칠 찻집" 테마 층** — `features/tichu/tichuTheme.TICHU_THEME`(되돌리기 `'classic'` 한 줄), 꾸밈은 `25-tichu-lacquer.css`(`.tc-` 접두·미디어 0개, 폭·동작 줄이기는 17 의 `.tc-` 블록 — 스컬킹 맨 끝 두 블록 앞). 카드·특수 카드 그림은 인라인 SVG(`tichuArt.tsx`, id 금지), 경기장 연출은 `effectStore.arenaFx` 줄 → `ArenaFxLayer`(화면만, 좌석 방향은 `viewPosOf` + 컨테이너 단위).
+- D-290: **대기실 방장 기능** — 봇은 **한 명씩**([＋ 봇 추가] = `POST /api/rooms/{id}/bots?count=1`, 봇 카드 [✕] = `DELETE …/bots/{userId}` — 화면의 일괄 버튼은 없다), **대기실 강퇴**(사람 카드 [✕] → 게임 중과 같은 `POST …/kick` 이 방 상태로 갈린다. `room:{id}:kicked:{userId}` 60초 동안 앉기·관전 `KICKED_FROM_ROOM`, 메타 토픽 `ROOM_MEMBER_KICKED` → 내보내진 화면은 토스트 + 메인), **정원 조절**(설정 "최대 인원 −/＋" = `PUT …/settings` 의 `capacity`, 범위는 방 응답 `minCapacity`~`maxCapacity` — 화면이 게임 규칙으로 범위를 셈하지 말 것). 대기실에서 좌석을 바꾸는 것은 Lua 한 번으로(`room_bot_add.lua`·`room_remove_member.lua` — 방장·WAITING 확인 + 좌석 변경. `room_leave.lua` 를 방장 기능에 쓰지 말 것, 시작된 판의 좌석을 당긴다). 대기실 복귀(D-153)는 **방장이 정한 정원**(`lobbyCapacity`)으로 돌아가고 **기다리던 관전자가 한 명이라도 앉게 되면 봇을 모두 뺀다**(`room_return_waiting.lua` — 앉을 관전자가 없으면 봇은 같이 돌아온다. 대기실 입장에서는 봇이 비켜 주지 않는다, D-133 그대로). 방 화면의 재동기화 입장은 `join-or-reconnect?auto=true`(자동) — 강퇴 기록(`room:{id}:kicked_log`)이 있으면 60초 뒤에도 거절한다. 사용자가 누르지 않은 입장 경로를 새로 만들면 `auto` 를 붙일 것. 옵션이 정원 범위를 바꾸면 정원도 범위 안으로 맞춘다(`putOptionFields`).
 - D-174: **방 종류 없음** — 방 만들기는 게임·이름만, 봇은 대기실에서 방장이 **[빈자리 봇으로 채우기]**(`POST /api/rooms/{id}/bots`, 정원까지·준비 없음)·**[봇 빼기]**(`DELETE …/bots`). 봇이 낀 판도 정상 종료면 **봇과 함께 대기실로**(`MatchProgressService` — `fillWithBots` 방만 FINISHED, 봇에겐 끊김 유예 없음). 봇만 남으면 방 소멸·방장은 사람에게(`RoomService.settleBotsAfterHumanChange`). 대기실 시작 줄은 문구 왼쪽·버튼 오른쪽, 참가자 카드 계급은 이름 왼쪽, 원카드! 버튼은 원형.
 - D-262: 원카드 **판은 내용 높이**(늘어나는 행·휴대폰 최소 높이 없음), **내 자리는 판 안 아래 칸의 좌석 이름표**(`OneCardSeat me` — 표식 `.oc-me` 는 카드 비행·연출 기준점이라 유지), **손패도 판 안 맨 아래 행**(`--oc-hand-bg`). 공격 누적은 가운데 "공격 +N" 만, 내 차례는 테두리 빛 + 가운데 "내 차례" 만(내 자리에 차례·공격 배지 금지).
 - D-173: 원카드 **내 차례 빛은 경기장(`.oc-felt-myturn`) 테두리**(손패 칸·나 줄 빛 제거), **2인 Q 는 상대 차례**(한 번 더는 K·2인 J 만 — `TurnOrder.afterPlay`), 상대 좌석 손패는 **뒷면 최대 3장 뭉치 + "×N"**(`OneCardSeat`).
@@ -270,6 +274,9 @@ MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.
 ./gradlew :server:test --tests "com.mirboard.infra.bot.YachtBotMatchSimulationIT"   # 요트 봇 판·차례 전체 타이머·1인 판 무기록 (Docker)
 ./gradlew :server:test --tests "com.mirboard.domain.game.cloudroute.*"   # 구름항로 엔진·불변식·시뮬레이션·어댑터·봇 강도 + 길이 통계 → server/build/cloudroute-sim-stats.txt (D-211·D-212, 기록기 IT 만 Docker)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.CloudRouteBotMatchSimulationIT"   # 구름항로 봇 완주 2·3·4인 + 손 놓은 사람 (D-212, Docker, ~40s)
+./gradlew :server:test --tests "com.mirboard.domain.game.dambaduk.*"   # 담바둑 엔진·불변식·2·3인 각 2,000판 시뮬레이션·어댑터·봇 + 길이 통계 → server/build/dambaduk-sim-stats.txt (D-276~D-280, 기록기 IT 만 Docker)
+MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.dambaduk.bot.DambadukBotStrengthTest"   # 담바둑 봇 강도 200판 표 → server/build/dambaduk-bot-strength.txt (D-277·D-280)
+./gradlew :server:test --tests "com.mirboard.infra.bot.DambadukServerFlowIT" --tests "com.mirboard.infra.ws.DambadukRecorderFailureTest"   # 담바둑 서버 경로(봇 판 완주 2·3인·탈주) + 기록 실패 격리 (D-278, IT 만 Docker)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.TurnRemainingTest"   # resync 남은 턴 시간·재무장을 락 안에서 (D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.*RecorderFailureTest"   # 매치 기록 실패 격리 3게임 (D-130·D-131)
@@ -332,16 +339,19 @@ D-131 — 남은 턴 시간(`turnRemainingMs`)도 같은 락 안에서 읽으므
   - 스컬킹(D-102): `BIDDING_STARTED`, `BID_SUBMITTED`(값 없음), `BIDS_REVEALED`, `PLAYING_STARTED`, `CARD_PLAYED`, `TURN_CHANGED`, `TRICK_TAKEN`, `ROUND_ENDED`, `SEAT_DESERTED`, `MATCH_ENDED`
   - 원카드(D-128·D-129, D-131 공개): `MATCH_STARTED`(타입만 정의 — 시작 때 발행하지 않는다, 시작 상태는 resync 로), `CARD_PLAYED`, `CARDS_DRAWN`(장수만), `PILE_RESHUFFLED`, `TURN_CHANGED`, `RACE_OPENED`, `RACE_RESOLVED`, `PLAYER_ELIMINATED`, `MATCH_ENDED` — payload 는 결과값
   - 요트(D-181~D-183): `TURN_CHANGED`(차례 전체 `turnSeconds`), `ROUND_STARTED`(D-202 동시 진행 — 방 옵션 `TURN_MODE`, 라운드마다 모두 같이·제한은 라운드 전체), `DICE_HELD`, `DICE_ROLLED`(서버 계산 후보 점수 `candidates`), `SCORED`(`auto` = 만기 자동 기록), `PLAYER_ELIMINATED`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음(`privateHand` null). `DICE_SHAKING`(D-268 — 컵 흔드는 중, 포트 ⑧ 미리보기라 **순번 없음**·resync 에 없음)
+  - 담바둑(D-278): `STONE_PLACED`, `STONE_MOVED`(`path`·`wall`·`jump`), `TURN_CHANGED`(서버 계산 `options`·`territory`), `TURN_SKIPPED`, `SEAT_OUT`, `MATCH_ENDED` — 전부 공개·결과값, 비공개 뷰 없음
 - 서버 → 클라 비공개 `/user/queue/room/{roomId}`
   - 티츄: `HAND_DEALT`, `CARDS_RECEIVED`, `ERROR`
   - 스컬킹: `HAND_DEALT`, `ERROR`
   - 원카드: `HAND_UPDATED`(손패 전체 + `handVersion`, 순번 없음 — D-129), `ERROR` — `HAND_DEALT` 는 타입만 정의돼 시작 때 보내지 않는다(시작 손패는 resync 의 `privateHand`)
   - 요트: `ERROR` 만(인프라가 거절 예외 코드로 — 엔진의 비공개 이벤트 0종)
+  - 담바둑: `ERROR` 만
 - 클라 → 서버 `/app/room/{roomId}/action`
   - 티츄: `DECLARE_GRAND_TICHU`, `DECLARE_TICHU`, `READY`, `PASS_CARDS`, `PLAY_CARD`(마작 포함 시 `wishRank` 동봉, D-109), `PASS_TRICK`, `GIVE_DRAGON_TRICK`
   - 스컬킹: `PLACE_BID`, `PLAY_CARD`(티그리스는 `declaredAs`)
   - 원카드: `PLAY_CARD`(7 은 `declaredSuit`), `DRAW`, `CALL_ONE_CARD`·`CATCH`(`raceId`). 봇 누름·창 만료는 서버의 엔진 타이머(D-128)
   - 요트: `ROLL`(`held?`), `HOLD`(`held`), `SCORE`(`category`). 차례 만기 자동 기록은 서버의 엔진 타이머(D-183). 미리보기 `/app/room/{id}/preview` 로 `SHAKE`(`shaking`, D-268 — 액션 아님)
+  - 담바둑: `PLACE_STONE`(`kind`·`x`·`y`), `MOVE_STONE`(`stoneId`·`path`·`wall`·`jump`) — 옮김과 담이 한 액션이라 인프라 턴 데드라인이 그대로 차례 제한
 
 전체 카탈로그: `docs/stomp-protocol.md`.
 

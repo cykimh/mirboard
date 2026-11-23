@@ -27,6 +27,8 @@ public class RoomRepository {
     private final RedisScript<Long> startNowScript;
     private final RedisScript<Long> returnWaitingScript;
     private final RedisScript<Long> updateSettingsScript;
+    private final RedisScript<Long> botAddScript;
+    private final RedisScript<Long> removeMemberScript;
     private final BotUserRegistry bots;
 
     public RoomRepository(
@@ -40,6 +42,8 @@ public class RoomRepository {
             @Qualifier("roomStartNowScript") RedisScript<Long> startNowScript,
             @Qualifier("roomReturnWaitingScript") RedisScript<Long> returnWaitingScript,
             @Qualifier("roomUpdateSettingsScript") RedisScript<Long> updateSettingsScript,
+            @Qualifier("roomBotAddScript") RedisScript<Long> botAddScript,
+            @Qualifier("roomRemoveMemberScript") RedisScript<Long> removeMemberScript,
             BotUserRegistry bots) {
         this.redis = redis;
         this.createScript = createScript;
@@ -51,6 +55,8 @@ public class RoomRepository {
         this.startNowScript = startNowScript;
         this.returnWaitingScript = returnWaitingScript;
         this.updateSettingsScript = updateSettingsScript;
+        this.botAddScript = botAddScript;
+        this.removeMemberScript = removeMemberScript;
         this.bots = bots;
     }
 
@@ -164,7 +170,9 @@ public class RoomRepository {
         Long result = redis.execute(
                 joinScript,
                 // D-137 — KEYS[4] 관전자 SET: 앉으면 같은 원자 구간에서 관전자 목록에서 뺀다.
-                List.of("room:" + roomId, "room:" + roomId + ":players", ROOMS_OPEN_KEY, spectatorsKey(roomId)),
+                // D-290 — KEYS[5] 강퇴 재입장 금지 키: 살아 있으면 앉지 못한다.
+                List.of("room:" + roomId, "room:" + roomId + ":players", ROOMS_OPEN_KEY, spectatorsKey(roomId),
+                        kickedKey(roomId, userId)),
                 Long.toString(userId),
                 Long.toString(now),
                 roomId);
@@ -173,7 +181,60 @@ public class RoomRepository {
         if (v == -2L) throw new GameAlreadyStartedException(roomId);
         if (v == -3L) throw new RoomFullException(roomId);
         if (v == -4L) throw new AlreadyInRoomException(roomId);
+        if (v == -5L) throw new KickedFromRoomException(roomId);
         return (int) v;
+    }
+
+    /**
+     * D-290 — 대기실에서 방장이 봇을 앉힌다(room_bot_add.lua — 방장·WAITING·판돈 0·정원 확인과 앉히기를 한 번에).
+     *
+     * @param count      앉힐 수, -1 = 정원까지
+     * @param candidates 앉힐 후보 봇(순서대로 — 이미 앉은 봇은 건너뛴다)
+     * @return 앉힌 수(0 이상), -1 방 없음, -2 대기 중 아님, -3 방장 아님, -4 판돈 방
+     */
+    public int addBots(String roomId, long hostUserId, int count, List<Long> candidates, long now) {
+        List<String> args = new ArrayList<>(List.of(Long.toString(hostUserId), Long.toString(now), Integer.toString(count)));
+        candidates.forEach(id -> args.add(Long.toString(id)));
+        Long result = redis.execute(botAddScript,
+                List.of("room:" + roomId, "room:" + roomId + ":players"), args.toArray());
+        return (int) unwrap(result);
+    }
+
+    /**
+     * D-290 — 대기실에서 방장이 다른 좌석 하나를 비운다(room_remove_member.lua — 봇 빼기·강퇴). {@code banSeconds > 0} 이면 같은 원자
+     * 구간에서 그 사람의 재입장 금지 키를 건다.
+     *
+     * @return 남은 좌석 수(1 이상), -1 방 없음, -2 대기 중 아님, -3 방장 아님, -4 대상이 방장 자신이거나 앉아 있지 않다
+     */
+    public int removeMember(String roomId, long hostUserId, long targetUserId, int banSeconds) {
+        Long result = redis.execute(removeMemberScript,
+                List.of("room:" + roomId, "room:" + roomId + ":players", readyKey(roomId),
+                        kickedKey(roomId, targetUserId), kickedLogKey(roomId)),
+                Long.toString(hostUserId), Long.toString(targetUserId), Integer.toString(banSeconds));
+        return (int) unwrap(result);
+    }
+
+    /** D-290 — 방장이 방금 내보내 그 방 재입장 금지가 걸려 있는가. */
+    public boolean isKicked(String roomId, long userId) {
+        return Boolean.TRUE.equals(redis.hasKey(kickedKey(roomId, userId)));
+    }
+
+    /** D-290 — 이 방에서 내보내진 적이 있고 그 뒤 스스로 다시 들어오지 않았는가(방 수명 동안 남는 기록). */
+    public boolean wasKicked(String roomId, long userId) {
+        return Boolean.TRUE.equals(redis.opsForSet().isMember(kickedLogKey(roomId), Long.toString(userId)));
+    }
+
+    /** D-290 — 내보내진 사람이 스스로(링크를 눌러) 다시 들어왔다 — 기록을 지운다. */
+    public void clearKickLog(String roomId, long userId) {
+        redis.opsForSet().remove(kickedLogKey(roomId), Long.toString(userId));
+    }
+
+    private static String kickedLogKey(String roomId) {
+        return "room:" + roomId + ":kicked_log";
+    }
+
+    private static String kickedKey(String roomId, long userId) {
+        return "room:" + roomId + ":kicked:" + userId;
     }
 
     /**
@@ -219,8 +280,11 @@ public class RoomRepository {
 
     /**
      * D-153 — 정상 종료한 친구 방을 대기실로(room_return_waiting.lua). 반환: 돌아간 뒤 좌석 수, -1 방 없음, -2 진행 중 아님(그대로).
+     * D-290 — 정원은 시작 전에 방장이 정해 둔 값({@code maxPlayers} 이하)이고, 기다리던 관전자가 봇보다 먼저 앉는다(봇 id 는 등록부 전체).
      */
     public int returnToWaiting(String roomId, int maxPlayers, long now) {
+        List<String> args = new ArrayList<>(List.of(Integer.toString(maxPlayers), roomId, Long.toString(now)));
+        bots.getBotIds().forEach(id -> args.add(Long.toString(id)));
         Long result = redis.execute(
                 returnWaitingScript,
                 List.of("room:" + roomId,
@@ -229,9 +293,7 @@ public class RoomRepository {
                         spectatorsKey(roomId),
                         spectatorsSinceKey(roomId),
                         ROOMS_OPEN_KEY),
-                Integer.toString(maxPlayers),
-                roomId,
-                Long.toString(now));
+                args.toArray());
         if (result == null) {
             throw new IllegalStateException("room_return_waiting.lua returned null");
         }
@@ -327,6 +389,12 @@ public class RoomRepository {
                 options.put(option, (String) e.getValue());
             }
         }
+        // D-290 — 방장이 고를 수 있는 정원 범위. 없으면(구방) 지금 정원 한 점.
+        int capacity = Integer.parseInt((String) hash.get("capacity"));
+        String rawCapMin = (String) hash.get("capMin");
+        String rawCapMax = (String) hash.get("capMax");
+        int minCapacity = rawCapMin == null ? capacity : Integer.parseInt(rawCapMin);
+        int maxCapacity = rawCapMax == null ? capacity : Integer.parseInt(rawCapMax);
         // botSeats: playerIds 인덱스 중 봇 user id 인 좌석.
         List<Integer> botSeats = new ArrayList<>();
         for (int i = 0; i < playerIds.size(); i++) {
@@ -340,7 +408,7 @@ public class RoomRepository {
                 (String) hash.get("gameType"),
                 Long.parseLong((String) hash.get("hostId")),
                 RoomStatus.valueOf((String) hash.get("status")),
-                Integer.parseInt((String) hash.get("capacity")),
+                capacity,
                 playerIds.size(),
                 playerIds,
                 spectatorIds,
@@ -354,7 +422,9 @@ public class RoomRepository {
                 readyUserIds,
                 raceButtonSize,
                 raceButtonVisibility,
-                options));
+                options,
+                minCapacity,
+                maxCapacity));
     }
 
     /**

@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * D-229 — 포트 ⑧ 미리보기는 옵트인이다. 기본 구현은 아무것도 내지 않고, 구현한 게임 말고는 어느 어댑터도 덮어쓰지 않는다(`docs/plans/
- * artillery-s6.md` §5.1 근거 ①②). 구현 게임은 씨앗포(조준, D-229)와 얏추(컵 흔들기, D-268) 둘이다 — 나머지 다섯 게임의 동작 0 변화.
+ * artillery-s6.md` §5.1 근거 ①②). 구현 게임은 씨앗포(조준, D-229)와 얏추(컵 흔들기, D-268) 둘이다 — 나머지 게임(담바둑·별자리 수판 포함)의 동작 0 변화.
  */
 class GameEnginePreviewDefaultTest {
 
@@ -32,6 +32,7 @@ class GameEnginePreviewDefaultTest {
     void only_artillery_and_yacht_override_preview() throws Exception {
         for (Class<?> adapter : List.of(TichuGameEngine.class, SkullKingGameEngine.class, OneCardGameEngine.class,
                 OmokGameEngine.class, CloudRouteGameEngine.class,
+                com.mirboard.domain.game.dambaduk.DambadukGameEngine.class,
                 com.mirboard.domain.game.starsquare.StarSquareGameEngine.class)) {
             assertThatThrownBy(() -> adapter.getDeclaredMethod("preview", GameState.class, int.class, GameAction.class))
                     .as(adapter.getSimpleName())

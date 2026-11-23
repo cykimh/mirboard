@@ -8,8 +8,25 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-/** 방 입장이 막힌 이유 — `full` 은 자리 없음(꽉 참·이미 시작), `gone` 은 방 없음. */
-export type JoinBlock = 'full' | 'gone';
+/**
+ * 방 입장이 막힌 이유 — `full` 은 자리 없음(꽉 참·이미 시작), `gone` 은 방 없음, `kicked` 는 방장이 방금 내보냄(D-290 — 잠깐 재입장 금지).
+ */
+export type JoinBlock = 'full' | 'gone' | 'kicked';
+
+const TEXT: Record<JoinBlock, { title: string; body: string }> = {
+  full: {
+    title: '자리가 없어요 — 관전할까요?',
+    body: '방이 꽉 찼거나 게임이 이미 시작됐어요. 관전하면 손패 없이 게임을 지켜볼 수 있어요.',
+  },
+  gone: {
+    title: '방이 없어졌어요',
+    body: '초대받은 방이 끝났거나 모두 나갔어요. 메인에서 다른 방을 찾아보세요.',
+  },
+  kicked: {
+    title: '방장이 내보냈어요',
+    body: '이 방에는 잠시 뒤(1분쯤)에 다시 들어올 수 있어요. 메인에서 다른 방을 찾아보세요.',
+  },
+};
 
 interface JoinBlockedPanelProps {
   kind: JoinBlock;
@@ -28,12 +45,8 @@ export function JoinBlockedPanel({ kind, onSpectate, spectating = false }: JoinB
     <div className="app-shell flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">{full ? '자리가 없어요 — 관전할까요?' : '방이 없어졌어요'}</CardTitle>
-          <CardDescription>
-            {full
-              ? '방이 꽉 찼거나 게임이 이미 시작됐어요. 관전하면 손패 없이 게임을 지켜볼 수 있어요.'
-              : '초대받은 방이 끝났거나 모두 나갔어요. 메인에서 다른 방을 찾아보세요.'}
-          </CardDescription>
+          <CardTitle className="text-xl">{TEXT[kind].title}</CardTitle>
+          <CardDescription>{TEXT[kind].body}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {full && (

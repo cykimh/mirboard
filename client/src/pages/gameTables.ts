@@ -13,6 +13,7 @@ const imports = {
   OMOK: () => import('@/features/omok/OmokTable'),
   CLOUD_ROUTE: () => import('@/features/cloudroute/CloudRouteTable'),
   ARTILLERY: () => import('@/features/artillery/ArtilleryTable'),
+  DAMBADUK: () => import('@/features/dambaduk/DambadukTable'),
   STAR_SQUARE: () => import('@/features/starsquare/StarSquareTable'),
 };
 
@@ -31,6 +32,9 @@ export const CloudRouteTable = lazy(() =>
 );
 export const ArtilleryTable = lazy(() =>
   loadWithReload('artillery', imports.ARTILLERY).then((m) => ({ default: m.ArtilleryTable })),
+);
+export const DambadukTable = lazy(() =>
+  loadWithReload('dambaduk', imports.DAMBADUK).then((m) => ({ default: m.DambadukTable })),
 );
 export const StarSquareTable = lazy(() =>
   loadWithReload('starsquare', imports.STAR_SQUARE).then((m) => ({ default: m.StarSquareTable })),

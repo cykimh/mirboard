@@ -84,7 +84,7 @@ export function RoomChat({ myUserId, sendChat, panelOpenRef, onClose, roomId }: 
           ✕
         </button>
       </header>
-      <div ref={listRef} className="room-chat-list">
+      <div ref={listRef} className="room-chat-list game-selectable">
         {messages.length === 0 && (
           <p style={{ opacity: 0.5, fontStyle: 'italic' }}>아직 메시지가 없습니다.</p>
         )}

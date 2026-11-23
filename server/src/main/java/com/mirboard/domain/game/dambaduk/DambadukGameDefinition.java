@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component;
  * 담바둑의 카탈로그 메타데이터 + 엔진 팩토리 (D-274·D-278). {@code GameRegistry} 가 자동 수집한다 — 로비·허브·디스패치 수정 없이 이
  * Bean 등록으로 인게임까지 연결된다.
  *
- * <p><b>공개 상태는 설정이다</b>({@code mirboard.dambaduk.status} = {@code MIRBOARD_DAMBADUK_STATUS}, <b>기본 {@code DISABLED}</b> —
- * 게임판(S3)이 붙고 공개(S4) 때 {@code AVAILABLE} 로 바꾼다). 기본값은 {@code application.yml} 과 아래 {@code @Value} 두 곳에
- * 있고 같아야 한다({@code DambadukGameDefinitionTest}).
+ * <p><b>공개 상태는 설정이다</b>({@code mirboard.dambaduk.status} = {@code MIRBOARD_DAMBADUK_STATUS}, 기본 {@code AVAILABLE} — D-281 공개.
+ * S4 전까지는 {@code DISABLED} 였다). 되돌리기는 운영 시크릿으로 {@code COMING_SOON}·{@code DISABLED}({@code docs/deploy.md}). 기본값은
+ * {@code application.yml} 과 아래 {@code @Value} 두 곳에 있고 같아야 한다({@code DambadukGameDefinitionTest}).
  *
  * <p>2~3인 개인전, 방 설정은 봇 난이도({@code BOT_LEVEL}) 하나 — 목표 점수·팀·내기를 쓰지 않는다(D-106). 담 넘기는 인원에 묶여 옵션이
  * 아니다. 턴 제한은 끔·30·60·90, 기본 60초(룰 §8, W6).
@@ -35,7 +35,7 @@ public final class DambadukGameDefinition implements GameDefinition {
 
     public DambadukGameDefinition(DambadukStateStore stateStore,
                                   ApplicationEventPublisher publisher,
-                                  @Value("${mirboard.dambaduk.status:DISABLED}") GameStatus status) {
+                                  @Value("${mirboard.dambaduk.status:AVAILABLE}") GameStatus status) {
         this.stateStore = stateStore;
         this.publisher = publisher;
         this.status = Objects.requireNonNull(status,

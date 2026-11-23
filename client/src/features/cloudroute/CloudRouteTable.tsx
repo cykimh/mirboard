@@ -1,7 +1,8 @@
+import { motionReduced, useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { GameIcon } from '@/components/GameIcon';
 import type { Tier } from '@/api/users';
 import { TierBadge } from '@/components/TierBadge';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useStompRoom } from '@/ws/useStompRoom';
 import { ReconnectBanner } from '@/components/ReconnectBanner';
@@ -59,7 +60,7 @@ function motionAllowed(): boolean {
   if (CLOUD_ROUTE_THEME !== 'storybook') return false;
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return false;
-  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return !motionReduced();
 }
 
 /**
@@ -114,7 +115,12 @@ export function CloudRouteTable({
   // ── 연출(D-218) — 보여 주는 값은 감독이 붙잡은 것, 없으면 스토어 그대로. ──
   const rootRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
-  const [motion] = useState(motionAllowed);
+  // D-291 리뷰 — 연출 설정을 구독한다(마운트 때 한 번만 읽으면 판 도중 메뉴에서 끄고 켤 때 CSS 와 JS 연출이 어긋난다).
+  // 끄면 감독이 진행 중인 연출을 멈추고 조각을 지운다(`useCloudRouteFx` 의 정리).
+  const animOn = useCardAnimStore((st) => st.enabled);
+  const animForced = useCardAnimStore((st) => st.forced);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- animForced 가 바뀌면 motionReduced() 의 답이 바뀐다.
+  const motion = useMemo(() => animOn && motionAllowed(), [animOn, animForced]);
   const fx = useCloudRouteFx(rootRef, { enabled: motion, hurry: pending !== null, mySeat });
   const shown = fx.view;
   const seats = shown?.seats ?? s.seats;

@@ -42,6 +42,18 @@ public class RedisConfig {
         return scriptOf("lua/room_update_settings.lua");
     }
 
+    /** D-290 — 대기실에서 방장이 봇 앉히기(방장·WAITING·판돈·정원 확인 + 앉히기 한 번에). */
+    @Bean
+    public RedisScript<Long> roomBotAddScript() {
+        return scriptOf("lua/room_bot_add.lua");
+    }
+
+    /** D-290 — 대기실에서 방장이 좌석 하나 비우기(봇 빼기·강퇴 — 강퇴는 재입장 금지 키까지). */
+    @Bean
+    public RedisScript<Long> roomRemoveMemberScript() {
+        return scriptOf("lua/room_remove_member.lua");
+    }
+
     /** D-153 — 정상 종료한 친구 방을 대기실로(관전자 자동 착석). */
     @Bean
     public RedisScript<Long> roomReturnWaitingScript() {

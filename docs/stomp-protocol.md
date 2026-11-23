@@ -43,7 +43,7 @@
 | --- | --- | --- | --- |
 | TOPIC | `/topic/lobby/rooms` | 서버→전체 | 방 목록 변경 (`ROOM_UPDATED`, `ROOM_DESTROYED`) |
 | TOPIC | `/topic/room/{roomId}` | 서버→방 | 게임 공개 이벤트 + `PLAYER_DIS/RECONNECTED` + `CHIPS_SETTLED` |
-| TOPIC | `/topic/room/{roomId}/meta` | 서버→방 | 대기실 메타 (`ROOM_META_UPDATED`, `ROOM_DESTROYED`) — Phase 13C, RoomPage 폴링 대체 |
+| TOPIC | `/topic/room/{roomId}/meta` | 서버→방 | 대기실 메타 (`ROOM_META_UPDATED`, `ROOM_DESTROYED`, D-290 `ROOM_MEMBER_KICKED`) — Phase 13C, RoomPage 폴링 대체 |
 | TOPIC | `/topic/room/{roomId}/chat` | 서버→방 | 인-게임 채팅 (`CHAT`) — 참가자+관전자 |
 | TOPIC | `/topic/room/{roomId}/reaction` | 서버→방 | 이모지 반응 (`REACTION`) |
 | QUEUE | `/user/queue/room/{roomId}` | 서버→본인 | `HAND_DEALT`, `CARDS_RECEIVED`(티츄), `HAND_UPDATED`(원카드), `ERROR` |
@@ -143,7 +143,9 @@
 
 **별도 토픽의 메타 이벤트**: `ROOM_UPDATED`(방 요약, `/topic/lobby/rooms`),
 `ROOM_META_UPDATED`(방 요약, `/topic/room/{id}/meta`), `ROOM_DESTROYED`
-(`{ roomId }`, 위 두 토픽 모두), `CHAT`(`{ userId, username, message }`),
+(`{ roomId }`, 위 두 토픽 모두), `ROOM_MEMBER_KICKED`(D-290 — `{ roomId, userId }`, `/topic/room/{id}/meta` 만. 방장이
+대기실에서 사람을 내보냈다 — `userId` 가 자기면 클라는 "방장이 내보냈어요"를 띄우고 메인으로 간다. 좌석 변화는 뒤따르는
+`ROOM_META_UPDATED` 가 싣는다), `CHAT`(`{ userId, username, message }`),
 `REACTION`(`{ fromSeat, emoji }`).
 
 ---

@@ -251,11 +251,25 @@ public final class DambadukEngine {
     }
 
     /**
+     * 옮김 단계의 끝 판정 (룰 §6 ①②) — 엔진 진행과 봇 수읽기가 같이 쓰는 한 곳. 다툼 터가 없으면 {@code SEPARATED}, 다툼 터의 돌이 하나도
+     * 못 움직이면 {@code FROZEN}, 아니면 null. ③④(빠진 사람)는 판 모양이 아니라 빠짐이 정하므로 여기 없다.
+     *
+     * @param territory {@code TerritoryRule.compute(walls, stones, …)} 의 값(같은 판)
+     */
+    public static EndReason endOf(Territory territory, List<Stone> stones, Walls walls, List<Integer> jumpsLeft,
+                                  Set<Integer> activeSeats) {
+        if (!territory.hasContested()) {
+            return EndReason.SEPARATED;
+        }
+        return isFrozen(stones, walls, jumpsLeft, territory, activeSeats) ? EndReason.FROZEN : null;
+    }
+
+    /**
      * 굳음 (룰 §6 ②) — 다툼 터가 있고, 그 안의 어느 돌도 옮길 수 없다(그 돌 주인의 남은 담 넘기 포함). 다툼 터가 없으면 false.
      */
     public static boolean isFrozen(List<Stone> stones, Walls walls, List<Integer> jumpsLeft, Territory territory,
                                    Set<Integer> activeSeats) {
-        Partition p = Partition.of(walls);
+        Partition p = Partition.of(walls);              // 터 번호는 territory 와 같은 순서(같은 담에서 만든다)
         Set<Integer> contestedRegions = new HashSet<>();
         for (int i = 0; i < territory.regions().size(); i++) {
             if (territory.regions().get(i).kind() == RegionKind.CONTESTED) {
@@ -265,14 +279,9 @@ public final class DambadukEngine {
         if (contestedRegions.isEmpty()) {
             return false;
         }
-        Set<Integer> movable = new HashSet<>();
-        for (int seat : activeSeats) {
-            for (MoveOption o : MoveRules.options(stones, seat, walls, jumpsLeft.get(seat) > 0, false)) {
-                movable.add(o.stoneId());
-            }
-        }
         for (Stone s : stones) {
-            if (contestedRegions.contains(p.regionOf(s.cell())) && movable.contains(s.id())) {
+            if (contestedRegions.contains(p.regionOf(s.cell())) && activeSeats.contains(s.seat())
+                    && MoveRules.hasMove(stones, s, walls, jumpsLeft.get(s.seat()) > 0)) {
                 return false;
             }
         }
@@ -460,12 +469,9 @@ public final class DambadukEngine {
                 return;
             }
             Territory terr = TerritoryRule.compute(walls, stones, n);
-            if (!terr.hasContested()) {
-                end(EndReason.SEPARATED, -1);
-                return;
-            }
-            if (isFrozen(stones, walls, jumpsList(), terr, active)) {
-                end(EndReason.FROZEN, -1);
+            EndReason over = endOf(terr, stones, walls, jumpsList(), active);
+            if (over != null) {
+                end(over, -1);
                 return;
             }
             for (int k = 0; k < n; k++) {

@@ -64,6 +64,36 @@ final class BotBoard {
         return new BotBoard(seatCount, next, walls, jumpsLeft, active);
     }
 
+    List<Integer> jumpsList() {
+        List<Integer> out = new ArrayList<>(jumpsLeft.length);
+        for (int j : jumpsLeft) {
+            out.add(j);
+        }
+        return out;
+    }
+
+    java.util.Set<Integer> activeSet() {
+        java.util.Set<Integer> out = new java.util.HashSet<>();
+        for (int s = 0; s < seatCount; s++) {
+            if (active[s]) {
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    /** 엔진 순위 계산용 — 빠진 좌석(까닭은 순위에 상관없다). */
+    List<com.mirboard.domain.game.dambaduk.state.Exit> exits() {
+        List<com.mirboard.domain.game.dambaduk.state.Exit> out = new ArrayList<>();
+        for (int s = 0; s < seatCount; s++) {
+            if (!active[s]) {
+                out.add(new com.mirboard.domain.game.dambaduk.state.Exit(s,
+                        com.mirboard.domain.game.dambaduk.state.ExitReason.DESERTED));
+            }
+        }
+        return out;
+    }
+
     /** 다음에 옮길 좌석 — {@code after} 다음부터 좌석 +1 로 옮길 수 있는 첫 사람, 없으면 −1. */
     int nextMover(int after) {
         for (int k = 1; k <= seatCount; k++) {

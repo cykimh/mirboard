@@ -1,4 +1,5 @@
 import type { GameSummary, RaceButtonSize, RaceButtonVisibility, Room, RoomOption, RoomSettingsUpdate } from '@/types/api';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
@@ -55,7 +56,8 @@ const stakeLabel = (v: number) => (v === 0 ? '없음' : `${v}칩`);
 
 /**
  * D-161 — 대기실 게임 설정. 방 만들기에서 고르던 턴 제한·목표 점수·판돈과 원카드! 버튼 크기(D-165 — 찾기 난이도도)를 방장이 여기서 바꾼다. 게임이 선언한
- * 설정만 보인다(D-106 — 서버도 같은 집합으로 검증). 다른 사람 화면은 방 메타 갱신으로 바로 바뀐다.
+ * 설정만 보인다(D-106 — 서버도 같은 집합으로 검증). 다른 사람 화면은 방 메타 갱신으로 바로 바뀐다. D-290 — 맨 위 줄은 "최대 인원"
+ * −/＋(방이 준 범위 안에서, 지금 인원 아래로는 못 줄인다).
  */
 export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = false }: Props) {
   const options = game?.supportedRoomOptions ?? [];
@@ -120,11 +122,24 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
     });
   }
 
+  // D-290 — 최대 인원(정원). 서버가 준 범위(게임이 지금 방 옵션으로 정한 시작 인원~정원)가 한 점이면 고를 것이 없어 그리지 않는다.
+  // 지금 앉은 인원보다 작게는 못 줄인다(서버 `TOO_MANY_PLAYERS` — 봇·사람을 먼저 뺀다).
+  const capMin = room.minCapacity;
+  const capMax = room.maxCapacity;
+  const capacityRow = capMin != null && capMax != null && capMax > capMin;
+  const capFloor = Math.max(capMin ?? room.capacity, room.playerCount);
+
   // D-272 — 촘촘하게: 방장은 "이름 왼쪽 · 선택지 오른쪽" 한 줄씩(좁아 안 들어가면 선택지만 아랫줄로), 손님은 값만 한 줄 요약.
   if (!canEdit) {
     return (
       <section aria-label="게임 설정" className="flex flex-col gap-1">
         <dl className="m-0 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          {capacityRow && (
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-xs text-muted-foreground">최대 인원</dt>
+              <dd className="m-0 font-medium">{room.capacity}명</dd>
+            </div>
+          )}
           {rows.map((row) => (
             <div key={row.label} className="flex items-baseline gap-1.5">
               <dt className="text-xs text-muted-foreground">{row.label}</dt>
@@ -139,6 +154,36 @@ export function RoomSettingsPanel({ room, game, canEdit, onChange, pending = fal
 
   return (
     <section aria-label="게임 설정" className="flex flex-col gap-1.5">
+      {capacityRow && (
+        <div role="group" aria-label="최대 인원" className="flex items-center justify-between gap-x-3">
+          <span className="text-xs font-medium text-muted-foreground">최대 인원</span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-10 p-0 text-base"
+              aria-label="최대 인원 줄이기"
+              disabled={pending || room.capacity <= capFloor}
+              onClick={() => onChange({ capacity: room.capacity - 1 })}
+            >
+              −
+            </Button>
+            <span className="min-w-12 text-center text-sm font-semibold tabular-nums" data-testid="capacity-value">
+              {room.capacity}명
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-10 p-0 text-base"
+              aria-label="최대 인원 늘리기"
+              disabled={pending || room.capacity >= capMax}
+              onClick={() => onChange({ capacity: room.capacity + 1 })}
+            >
+              ＋
+            </Button>
+          </div>
+        </div>
+      )}
       {rows.map((row) => (
         <div key={row.label} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
           <Label className="text-xs font-medium text-muted-foreground">{row.label}</Label>

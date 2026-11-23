@@ -1442,4 +1442,192 @@ describe('얏추 D-264', () => {
       expect(sendAction).not.toHaveBeenCalled();
     });
   });
+
+  describe('D-292 — 흔드는 중에 주사위 판 밖으로 나가면 취소', () => {
+    /** 초록 판의 자리를 정해 준다(jsdom 은 배치를 계산하지 않는다) — 가로 100~500, 세로 100~400. */
+    const placeFelt = (container: HTMLElement) => {
+      const felt = container.querySelector('.yt-felt') as HTMLElement;
+      felt.getBoundingClientRect = () =>
+        ({ left: 100, top: 100, right: 500, bottom: 400, width: 400, height: 300, x: 100, y: 100, toJSON: () => ({}) }) as DOMRect;
+    };
+    const INSIDE = { clientX: 300, clientY: 380 };
+    const OUTSIDE = { clientX: 300, clientY: 460 };
+    /** jsdom 에는 PointerEvent 가 없다 — 좌표를 싣는 MouseEvent 에 포인터 번호를 붙여 보낸다. */
+    const ptr = (type: string, at: { clientX: number; clientY: number }, pointerId = 7, more: MouseEventInit = {}) => {
+      const ev = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...at, ...more });
+      Object.defineProperty(ev, 'pointerId', { value: pointerId });
+      fireEvent(rollButton(), ev);
+    };
+    const press = (ms = SHAKE_HOLD_MS + 50) => {
+      ptr('pointerdown', INSIDE);
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    };
+    const move = (at: { clientX: number; clientY: number }, pointerId = 7) => ptr('pointermove', at, pointerId);
+    /** 버튼을 벗어남 — React 의 pointerleave 는 pointerout 에서 나온다. */
+    const leave = (at: { clientX: number; clientY: number }, pointerId = 7) =>
+      ptr('pointerout', at, pointerId, { relatedTarget: document.body });
+    const lift = () => {
+      ptr('pointerup', INSIDE);
+      fireEvent.click(rollButton());
+    };
+
+    it('판 밖으로 나가면 굴리지 않고 흔들기를 끝낸다(남에게도 shaking:false) — 다시 들어와도, 손을 떼도 굴리지 않는다', () => {
+      seed();
+      const { container } = renderTable();
+      placeFelt(container);
+      press();
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
+      expect(sendPreview).toHaveBeenLastCalledWith(expect.objectContaining({ '@action': 'SHAKE', shaking: true }));
+      expect(rollButton()).toHaveTextContent('흔드는 중…');
+
+      move(OUTSIDE);
+      expect(container.querySelector('.yt-dice')).not.toHaveClass('yt-dice-shaking');
+      expect(sendPreview).toHaveBeenLastCalledWith(expect.objectContaining({ '@action': 'SHAKE', shaking: false }));
+      expect(stopShake).toHaveBeenCalledTimes(1);
+      expect(rollButton()).toHaveTextContent('굴리기');
+      expect(sendAction).not.toHaveBeenCalled();
+      const sent = sendPreview.mock.calls.length;
+
+      // 다시 판 안으로 — 이미 버린 누름이다(흔들기가 다시 시작되지 않는다).
+      move(INSIDE);
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_HOLD_MS + 200);
+      });
+      expect(container.querySelector('.yt-dice')).not.toHaveClass('yt-dice-shaking');
+      expect(sendPreview).toHaveBeenCalledTimes(sent);
+
+      lift();
+      expect(sendAction).not.toHaveBeenCalled();
+
+      // 다음 누름은 평소대로 굴린다.
+      act(() => {
+        vi.advanceTimersByTime(CLICK_SWALLOW_MS + 50);
+      });
+      ptr('pointerdown', INSIDE, 8);
+      ptr('pointerup', INSIDE, 8);
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('판 안에서 움직이는 것은 취소가 아니다 — 떼면 한 번 굴린다', () => {
+      seed();
+      const { container } = renderTable();
+      placeFelt(container);
+      press();
+      move({ clientX: 110, clientY: 110 });
+      move({ clientX: 490, clientY: 390 });
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
+      lift();
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('꾹 누르기가 되기 전(톡 누르는 중)에 판 밖으로 나가도 그 누름은 버린다', () => {
+      seed();
+      const { container } = renderTable();
+      placeFelt(container);
+      press(50);
+      move(OUTSIDE);
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_HOLD_MS + 200);
+      });
+      expect(startShake).not.toHaveBeenCalled();
+      expect(sendPreview).not.toHaveBeenCalled();
+      lift();
+      expect(sendAction).not.toHaveBeenCalled();
+    });
+
+    it('포인터를 잡지 못한 채 버튼을 벗어나면(뒤를 따라갈 수 없다) 취소한다', () => {
+      seed();
+      const { container } = renderTable();
+      placeFelt(container);
+      press();
+      leave(INSIDE);
+      expect(container.querySelector('.yt-dice')).not.toHaveClass('yt-dice-shaking');
+      expect(sendPreview).toHaveBeenLastCalledWith(expect.objectContaining({ shaking: false }));
+      lift();
+      expect(sendAction).not.toHaveBeenCalled();
+    });
+
+    it('키보드로 꾹 누르는 중에는 "밖"이 없다 — 마우스가 어디로 가든 유지하고, 떼면 굴린다', () => {
+      seed();
+      const { container } = renderTable();
+      placeFelt(container);
+      fireEvent.keyDown(rollButton(), { key: ' ' });
+      act(() => {
+        vi.advanceTimersByTime(SHAKE_HOLD_MS + 50);
+      });
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
+      move(OUTSIDE, 1);
+      leave(OUTSIDE, 1);
+      expect(container.querySelector('.yt-dice')).toHaveClass('yt-dice-shaking');
+      fireEvent.keyUp(rollButton(), { key: ' ' });
+      fireEvent.click(rollButton());
+      expect(sendAction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('D-293 — 내 차례 마지막 3초', () => {
+    const clockCues = () => playTableSfx.mock.calls.map(([c]) => c).filter((c) => String(c).startsWith('clock.'));
+
+    it('내 차례면 큰 3·2·1 이 주사위 판에 뜨고 초마다 한 번씩 울린다', () => {
+      vi.setSystemTime(2_000_000);
+      seed({ turnRemainingMs: 2_900 });
+      const { container } = renderTable({ turnSeconds: 45 });
+      expect(container.querySelector('.yt-felt .yt-final')).toHaveTextContent('3');
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(container.querySelector('.yt-felt .yt-final')).toHaveTextContent('1');
+      expect(clockCues()).toEqual(['clock.tick', 'clock.tick', 'clock.last']);
+    });
+
+    it('남의 차례에는 숫자도 소리도 없다(시계 배지만)', () => {
+      vi.setSystemTime(3_000_000);
+      seed({ turnSeat: 1, turnRemainingMs: 2_900 });
+      const { container } = renderTable({ turnSeconds: 45 });
+      act(() => {
+        vi.advanceTimersByTime(2_500);
+      });
+      expect(screen.getByRole('timer')).toBeInTheDocument();
+      expect(container.querySelector('.yt-final')).toBeNull();
+      expect(clockCues()).toEqual([]);
+    });
+
+    it('모두 같이 굴리는 판 — 내가 아직 기록 전이면 라운드 마감에 울리고, 기록을 마쳤으면 울리지 않는다', () => {
+      vi.setSystemTime(4_000_000);
+      seed({
+        turnSeat: -1,
+        simultaneous: true,
+        round: 3,
+        turnRemainingMs: 1_900,
+        turns: [
+          { seat: 0, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+          { seat: 1, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+        ],
+      });
+      const first = renderTable({ turnSeconds: 45 });
+      expect(first.container.querySelector('.yt-final')).toHaveTextContent('2');
+      expect(clockCues()).toEqual(['clock.tick']);
+      first.unmount();
+      playTableSfx.mockReset();
+      seed({
+        turnSeat: -1,
+        simultaneous: true,
+        round: 4,
+        turnRemainingMs: 1_900,
+        turns: [
+          { seat: 0, dice: null, held: NONE, rolls: 0, pending: false, candidates: {} },
+          { seat: 1, dice: null, held: NONE, rolls: 0, pending: true, candidates: {} },
+        ],
+      });
+      const second = renderTable({ turnSeconds: 45 });
+      expect(second.container.querySelector('.yt-final')).toBeNull();
+      expect(clockCues()).toEqual([]);
+    });
+  });
 });

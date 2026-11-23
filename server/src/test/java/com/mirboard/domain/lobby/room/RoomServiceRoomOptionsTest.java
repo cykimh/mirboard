@@ -75,7 +75,8 @@ class RoomServiceRoomOptionsTest {
 
         verify(repository).create(anyString(), eq(HOST), eq("방"), eq(TeamModeTestGame.ID), eq(2), anyLong(),
                 eq(TeamPolicy.SEQUENTIAL), eq(false), anyInt(), anyInt(), eq(0),
-                eq(Map.of("opt:TEAM_MODE", "SOLO", "opt:BOT_LEVEL", "NORMAL")));
+                // D-290 — 정원 범위(시작 인원 2 ~ 1:1 정원 2)도 같이.
+                eq(Map.of("opt:TEAM_MODE", "SOLO", "opt:BOT_LEVEL", "NORMAL", "capMin", "2", "capMax", "2")));
     }
 
     @Test
@@ -96,7 +97,50 @@ class RoomServiceRoomOptionsTest {
 
         service.updateSettings(ROOM_ID, HOST, RoomSettingsUpdate.ofOptions(Map.of("TEAM_MODE", "TEAMS_2V2")));
 
-        verify(repository).updateSettings(ROOM_ID, Map.of("opt:TEAM_MODE", "TEAMS_2V2", "capacity", "4"), 4);
+        // D-290 — 옵션이 정원 범위를 바꾸면 범위 필드도 같이 쓴다.
+        verify(repository).updateSettings(ROOM_ID,
+                Map.of("opt:TEAM_MODE", "TEAMS_2V2", "capacity", "4", "capMin", "4", "capMax", "4"), 4);
+    }
+
+    // ── D-290 정원 조절 (이 스탠드인은 모드가 정원을 정해 범위가 한 점이다 — 범위가 있는 게임은 RoomLobbyControlsIT) ──
+
+    @Test
+    @DisplayName("정원이 범위 밖이면 INVALID_CAPACITY — 1:1(2~2)에서 3·1, 저장소를 건드리지 않는다")
+    void capacity_out_of_range() {
+        given(room(RoomStatus.WAITING, 2, solo(), HOST));
+        assertThatThrownBy(() -> service.updateSettings(ROOM_ID, HOST, RoomSettingsUpdate.ofCapacity(3)))
+                .isInstanceOf(InvalidCapacityException.class);
+        assertThatThrownBy(() -> service.updateSettings(ROOM_ID, HOST, RoomSettingsUpdate.ofCapacity(1)))
+                .isInstanceOf(InvalidCapacityException.class);
+        verify(repository, never()).updateSettings(anyString(), anyMap(), anyInt());
+        verify(repository, never()).updateSettings(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("지금 정원과 같은 값은 아무것도 쓰지 않는다")
+    void same_capacity_is_a_no_op() {
+        given(room(RoomStatus.WAITING, 4, teams(), HOST));
+
+        service.updateSettings(ROOM_ID, HOST, RoomSettingsUpdate.ofCapacity(4));
+
+        verify(repository, never()).updateSettings(anyString(), anyMap(), anyInt());
+        verify(repository, never()).updateSettings(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("옵션과 정원을 같이 — 정원은 바뀐 뒤 옵션의 범위로 본다(1:1 → 2:2 에 정원 4 는 되고 3 은 안 된다)")
+    void options_and_capacity_together() {
+        given(room(RoomStatus.WAITING, 2, solo(), HOST, 10L));
+        when(repository.updateSettings(eq(ROOM_ID), anyMap(), eq(4))).thenReturn(1);
+
+        service.updateSettings(ROOM_ID, HOST,
+                new RoomSettingsUpdate(null, null, null, null, null, Map.of("TEAM_MODE", "TEAMS_2V2"), 4));
+
+        verify(repository).updateSettings(ROOM_ID,
+                Map.of("opt:TEAM_MODE", "TEAMS_2V2", "capacity", "4", "capMin", "4", "capMax", "4"), 4);
+        assertThatThrownBy(() -> service.updateSettings(ROOM_ID, HOST,
+                new RoomSettingsUpdate(null, null, null, null, null, Map.of("TEAM_MODE", "TEAMS_2V2"), 3)))
+                .isInstanceOf(InvalidCapacityException.class);
     }
 
     @Test
@@ -142,7 +186,9 @@ class RoomServiceRoomOptionsTest {
 
         service.updateSettings(ROOM_ID, HOST, RoomSettingsUpdate.ofOptions(Map.of("TEAM_MODE", "TEAMS_2V2")));
 
-        verify(repository).updateSettings(ROOM_ID, Map.of("opt:TEAM_MODE", "TEAMS_2V2", "capacity", "4"), 4);
+        // D-290 — 옵션이 정원 범위를 바꾸면 범위 필드도 같이 쓴다.
+        verify(repository).updateSettings(ROOM_ID,
+                Map.of("opt:TEAM_MODE", "TEAMS_2V2", "capacity", "4", "capMin", "4", "capMax", "4"), 4);
     }
 
     @Test

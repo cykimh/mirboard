@@ -16,7 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.io.ClassPathResource;
 
-/** D-278 — 카탈로그 메타데이터, 공개 상태 기본값(S4 전까지 DISABLED), 엔진 팩토리. */
+/** D-278·D-281 — 카탈로그 메타데이터, 공개 상태 기본값(D-281 공개 — AVAILABLE), 엔진 팩토리. */
 class DambadukGameDefinitionTest {
 
     private static DambadukGameDefinition definition(GameStatus status) {
@@ -37,17 +37,17 @@ class DambadukGameDefinitionTest {
         assertThat(def.newEngine(new GameContext("r", List.of(1L, 2L)))).isInstanceOf(DambadukGameEngine.class);
     }
 
-    /** S4 공개 전까지 감춘다 — 설정 없이 띄우면 카탈로그에도 없다. 두 기본값(@Value·application.yml)이 같아야 한다. */
+    /** D-281 — 공개. 설정 없이 띄우면 카탈로그에 보이고 방을 만들 수 있다(되돌리기는 환경 변수). 두 기본값(@Value·application.yml)이 같아야 한다. */
     @Test
-    void the_status_defaults_to_disabled_in_both_places() {
+    void the_status_defaults_to_available_in_both_places() {
         Parameter status = Arrays.stream(DambadukGameDefinition.class.getConstructors()[0].getParameters())
                 .filter(p -> p.getType() == GameStatus.class).findFirst().orElseThrow();
-        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.dambaduk.status:DISABLED}");
+        assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.dambaduk.status:AVAILABLE}");
         YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
         yaml.setResources(new ClassPathResource("application.yml"));
         assertThat(yaml.getObject().getProperty("mirboard.dambaduk.status"))
-                .isEqualTo("${MIRBOARD_DAMBADUK_STATUS:DISABLED}");
-        assertThat(definition(GameStatus.AVAILABLE).status()).isEqualTo(GameStatus.AVAILABLE);
+                .isEqualTo("${MIRBOARD_DAMBADUK_STATUS:AVAILABLE}");
+        assertThat(definition(GameStatus.DISABLED).status()).isEqualTo(GameStatus.DISABLED);
     }
 
     @Test

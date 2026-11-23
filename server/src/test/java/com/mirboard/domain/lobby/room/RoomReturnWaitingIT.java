@@ -18,8 +18,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * D-153 — 정상 종료한 친구 방은 대기실로 돌아간다(room_return_waiting.lua): 정원을 게임 최대 인원으로, 준비를 비우고, 관전자를 들어온
- * 순서대로 빈자리에 앉히고, 방 목록에 다시 올린다.
+ * D-153 — 정상 종료한 친구 방은 대기실로 돌아간다(room_return_waiting.lua): 정원을 시작 전의 방 정원으로(D-290 — 예전엔 게임 최대
+ * 인원), 준비를 비우고, 관전자를 들어온 순서대로 빈자리에 앉히고, 방 목록에 다시 올린다. 봇 자리 양보는 {@code RoomLobbyControlsIT}.
  */
 @SpringBootTest
 @Testcontainers
@@ -73,9 +73,10 @@ class RoomReturnWaitingIT {
         Room back = roomService.returnToWaiting(room.roomId());
 
         assertThat(back.status()).isEqualTo(RoomStatus.WAITING);
-        assertThat(back.capacity()).isEqualTo(6);
-        assertThat(back.playerIds()).containsExactly(101L, 102L, 205L, 203L, 204L);
-        assertThat(back.spectatorIds()).isEmpty();
+        // D-290 — 정원은 게임 최대(6)가 아니라 시작 전의 방 정원으로 돌아간다(이 방은 인원을 생략해 만들어 원카드 기본 4).
+        assertThat(back.capacity()).isEqualTo(4);
+        assertThat(back.playerIds()).containsExactly(101L, 102L, 205L, 203L);
+        assertThat(back.spectatorIds()).containsExactly(204L);
         assertThat(redis.opsForSet().size("room:" + room.roomId() + ":ready")).isZero();
         assertThat(redis.opsForZSet().score("rooms:open", room.roomId())).isNotNull();
     }

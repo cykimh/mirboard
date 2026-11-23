@@ -198,37 +198,67 @@
 
 /* D-160·D-173 — 원카드 차례 맥박(좌석·경기장)은 움직임 줄이기 설정이면 멈춘다(빛은 남는다). 19 는 미디어 0개 규칙이라 여기 둔다. */
 @media (prefers-reduced-motion: reduce) {
-  .oc-seat-turn,
-  .oc-felt-myturn {
+  :root:not(.motion-forced) .oc-seat-turn,
+  :root:not(.motion-forced) .oc-felt-myturn {
     animation: none;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .oc-seat-turn,
+:root.motion-off .oc-felt-myturn {
+  animation: none;
+}
+/* motion-off:end */
 
 /* D-260 — 원카드 네온 파티 테마: 움직임 줄이기면 깜빡임·불꽃·회전을 멈추고(빛은 남는다) 연출 조각은 그리지 않는다
    (`useOneCardFx` 도 만들지 않는다 — 이 블록은 이중 안전망). */
 @media (prefers-reduced-motion: reduce) {
-  .oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level],
-  .oc-theme-neon .oc-top[data-attack] > .oc-card::after,
-  .oc-theme-neon .oc-race-vis-normal .oc-race-btn,
-  .oc-theme-neon .oc-direction-arrow,
-  .oc-fly-fan-card {
+  :root:not(.motion-forced) .oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level],
+  :root:not(.motion-forced) .oc-theme-neon .oc-top[data-attack] > .oc-card::after,
+  :root:not(.motion-forced) .oc-theme-neon .oc-race-vis-normal .oc-race-btn,
+  :root:not(.motion-forced) .oc-theme-neon .oc-direction-arrow,
+  :root:not(.motion-forced) .oc-fly-fan-card {
     animation: none;
   }
 
-  .oc-fx,
-  .oc-fx-race-layer,
-  .oc-party {
+  :root:not(.motion-forced) .oc-fx,
+  :root:not(.motion-forced) .oc-fx-race-layer,
+  :root:not(.motion-forced) .oc-party {
     display: none;
   }
 }
 
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .oc-theme-neon .oc-felt .oc-center-info .oc-attack[data-level],
+:root.motion-off .oc-theme-neon .oc-top[data-attack] > .oc-card::after,
+:root.motion-off .oc-theme-neon .oc-race-vis-normal .oc-race-btn,
+:root.motion-off .oc-theme-neon .oc-direction-arrow,
+:root.motion-off .oc-fly-fan-card {
+  animation: none;
+}
+
+:root.motion-off .oc-fx,
+:root.motion-off .oc-fx-race-layer,
+:root.motion-off .oc-party {
+  display: none;
+}
+/* motion-off:end */
+
 /* 요트 S4 — 굴림 흔들기·내 차례 맥박도 움직임 줄이기면 멈춘다. 20 은 미디어 0개 규칙이라 여기 둔다(스컬킹 맨 끝 두 블록 앞). */
 @media (prefers-reduced-motion: reduce) {
-  .yt-die-rolling,
-  .yt-felt-myturn {
+  :root:not(.motion-forced) .yt-die-rolling,
+  :root:not(.motion-forced) .yt-felt-myturn {
     animation: none;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .yt-die-rolling,
+:root.motion-off .yt-felt-myturn {
+  animation: none;
+}
+/* motion-off:end */
 
 /* D-193·D-195 — 휴대폰 폭에서 오목판은 화면 폭을 거의 다 쓴다(양쪽 4px, 판 틀 3px). 위아래 몫도 줄인다(틈 6px, 판 말고 세로 몫 260px 안쪽). */
 @media (max-width: 720px) {
@@ -278,20 +308,20 @@
 /* 오목 "결" 테마(D-192) — 움직임 줄이기면 연출 없이 끝 상태로 바로. 21 은 미디어 0개 규칙이라 여기 둔다. 연출 조각(파문·먼지·
    금가루·잉크)은 바탕이 투명이라 애니메이션을 끄면 보이지 않고, 돌·5목 줄·현판·놋쇠 고리는 제자리에 바로 선다. */
 @media (prefers-reduced-motion: reduce) {
-  .om-tokens *,
-  .om-tokens *::before,
-  .om-tokens *::after {
+  :root:not(.motion-forced) .om-tokens *,
+  :root:not(.motion-forced) .om-tokens *::before,
+  :root:not(.motion-forced) .om-tokens *::after {
     animation: none !important;
     transition: none !important;
   }
 
   /* D-195 — [두기] 길게 누르기 게이지는 연출이 아니라 조작 안내라 움직임 줄이기에서도 찬다(얼마나 더 누를지 보여야 한다). */
-  .om-tokens .om-place.om-charging .om-hold-gauge {
+  :root:not(.motion-forced) .om-tokens .om-place.om-charging .om-hold-gauge {
     animation: om-hold-fill var(--om-hold-ms, 1500ms) linear forwards !important;
   }
 
   /* D-193 강하게 두기 — 흔들림·낙하·입자 없이 금빛 고리가 한 번 밝아졌다 사라지는 짧은 강조만(불투명도만). */
-  .om-tokens .om-slam-calm {
+  :root:not(.motion-forced) .om-tokens .om-slam-calm {
     display: inline;
     fill: none;
     stroke: var(--om-gold, #f7d36a);
@@ -300,6 +330,28 @@
     animation: om-slam-calm 0.9s ease-out !important;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .om-tokens *,
+:root.motion-off .om-tokens *::before,
+:root.motion-off .om-tokens *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+  :root.motion-off .om-tokens .om-place.om-charging .om-hold-gauge {
+  animation: om-hold-fill var(--om-hold-ms, 1500ms) linear forwards !important;
+}
+
+  :root.motion-off .om-tokens .om-slam-calm {
+  display: inline;
+  fill: none;
+  stroke: var(--om-gold, #f7d36a);
+  stroke-width: 0.12;
+  opacity: 0;
+  animation: om-slam-calm 0.9s ease-out !important;
+}
+/* motion-off:end */
 
 @keyframes om-slam-calm {
   0% {
@@ -313,96 +365,197 @@
 /* D-203 — 요트 "미드나잇 살롱" 연출도 움직임 줄이기면 끈다: 눈·점수만 바로 바뀌고 축하는 상태 줄 배지 하나로만. 테마 규칙과
    명시도를 맞춰야 이긴다(.yt-theme-salon 접두). */
 @media (prefers-reduced-motion: reduce) {
-  .yt-theme-salon .yt-felt-myturn,
-  .yt-theme-salon .yt-felt-party,
-  .yt-theme-salon .yt-felt-myturn.yt-felt-party,
-  .yt-theme-salon .yt-die-rolling .yt-die-face,
-  .yt-theme-salon .yt-die-rolling .yt-die-shadow,
-  .yt-theme-salon .yt-die-rolling .yt-cube,
-  .yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube,
-  .yt-theme-salon .yt-dice-same .yt-die-face,
-  .yt-theme-salon .yt-dice-same::after,
-  .yt-theme-salon .yt-roll:not(:disabled)::after,
-  .yt-theme-salon .yt-cell-flash::after,
-  .yt-theme-salon .yt-die-tag,
-  .yt-theme-salon .yt-seat-total-bump,
-  .yt-theme-salon .yt-cell-flash,
-  .yt-theme-salon .yt-cell-flash .yt-num,
-  .yt-theme-salon .yt-end,
-  .yt-theme-salon .yt-felt-cheer,
-  .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
-  .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
-  .yt-theme-salon .yt-mini-die-rolling,
-  .yt-theme-salon .yt-cell-bonus-new,
-  .yt-theme-salon .yt-cell-bonus-new .yt-num,
-  .yt-theme-salon .yt-cell-bonus-new::after,
-  .yt-theme-salon .yt-end-reveal .yt-end-row,
-  .yt-theme-salon .yt-end-reveal .yt-end-first::after,
-  .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title,
-  .yt-theme-salon .yt-dice-made-live .yt-die-madering,
-  .yt-theme-salon .yt-dice-made-live.yt-dice-made-big .yt-die-madering,
-  .yt-theme-salon .yt-dice-made-live .yt-made-tag,
-  .yt-theme-salon .yt-dice-made-live.yt-dice-made-mid::after,
-  .yt-theme-salon .yt-dice-made-live.yt-dice-made-big::after,
-  .yt-theme-salon .yt-seat-yacht,
-  .yt-theme-salon .yt-seat-party {
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn,
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-party,
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn.yt-felt-party,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-die-face,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-die-shadow,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-rolling .yt-cube,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-same .yt-die-face,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-same::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-roll:not(:disabled)::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-flash::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-tag,
+  :root:not(.motion-forced) .yt-theme-salon .yt-seat-total-bump,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-flash,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-flash .yt-num,
+  :root:not(.motion-forced) .yt-theme-salon .yt-end,
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-cheer,
+  :root:not(.motion-forced) .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
+  :root:not(.motion-forced) .yt-theme-salon .yt-mini-die-rolling,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-bonus-new,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-bonus-new .yt-num,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cell-bonus-new::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-end-reveal .yt-end-row,
+  :root:not(.motion-forced) .yt-theme-salon .yt-end-reveal .yt-end-first::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-made-live .yt-die-madering,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-made-live.yt-dice-made-big .yt-die-madering,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-made-live .yt-made-tag,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-made-live.yt-dice-made-mid::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-dice-made-live.yt-dice-made-big::after,
+  :root:not(.motion-forced) .yt-theme-salon .yt-seat-yacht,
+  :root:not(.motion-forced) .yt-theme-salon .yt-seat-party {
     /* D-206 — 남의 요트: 꼬리표와 금테는 남고 움직임만 끈다. */
     animation: none;
   }
 
-  .yt-theme-salon .yt-lamp,
-  .yt-theme-salon .yt-die-shadow,
-  .yt-theme-salon .yt-die-face,
-  .yt-theme-salon .yt-roll,
-  .yt-theme-salon .yt-pick,
-  .yt-theme-salon .yt-seat {
+  :root:not(.motion-forced) .yt-theme-salon .yt-lamp,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-shadow,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-face,
+  :root:not(.motion-forced) .yt-theme-salon .yt-roll,
+  :root:not(.motion-forced) .yt-theme-salon .yt-pick,
+  :root:not(.motion-forced) .yt-theme-salon .yt-seat {
     transition: none;
   }
 
   /* D-204 — 컵·착지 고리·잠김 빛도 끈다(눈·고정 테만 바로 바뀐다). */
-  .yt-theme-salon .yt-fx,
-  .yt-theme-salon .yt-chip,
-  .yt-theme-salon .yt-cup,
-  .yt-theme-salon .yt-die-impact,
-  .yt-theme-salon .yt-die-sheen,
-  .yt-theme-salon .yt-die-lockring,
-  .yt-burst {
+  :root:not(.motion-forced) .yt-theme-salon .yt-fx,
+  :root:not(.motion-forced) .yt-theme-salon .yt-chip,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cup,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-impact,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-sheen,
+  :root:not(.motion-forced) .yt-theme-salon .yt-die-lockring,
+  :root:not(.motion-forced) .yt-burst {
     display: none;
   }
 }
 
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .yt-theme-salon .yt-felt-myturn,
+:root.motion-off .yt-theme-salon .yt-felt-party,
+:root.motion-off .yt-theme-salon .yt-felt-myturn.yt-felt-party,
+:root.motion-off .yt-theme-salon .yt-die-rolling .yt-die-face,
+:root.motion-off .yt-theme-salon .yt-die-rolling .yt-die-shadow,
+:root.motion-off .yt-theme-salon .yt-die-rolling .yt-cube,
+:root.motion-off .yt-theme-salon .yt-die:nth-child(even).yt-die-rolling .yt-cube,
+:root.motion-off .yt-theme-salon .yt-dice-same .yt-die-face,
+:root.motion-off .yt-theme-salon .yt-dice-same::after,
+:root.motion-off .yt-theme-salon .yt-roll:not(:disabled)::after,
+:root.motion-off .yt-theme-salon .yt-cell-flash::after,
+:root.motion-off .yt-theme-salon .yt-die-tag,
+:root.motion-off .yt-theme-salon .yt-seat-total-bump,
+:root.motion-off .yt-theme-salon .yt-cell-flash,
+:root.motion-off .yt-theme-salon .yt-cell-flash .yt-num,
+:root.motion-off .yt-theme-salon .yt-end,
+:root.motion-off .yt-theme-salon .yt-felt-cheer,
+:root.motion-off .yt-theme-salon .yt-felt-myturn.yt-felt-cheer,
+:root.motion-off .yt-theme-salon .yt-die:nth-child(3).yt-die-rolling .yt-cube,
+:root.motion-off .yt-theme-salon .yt-mini-die-rolling,
+:root.motion-off .yt-theme-salon .yt-cell-bonus-new,
+:root.motion-off .yt-theme-salon .yt-cell-bonus-new .yt-num,
+:root.motion-off .yt-theme-salon .yt-cell-bonus-new::after,
+:root.motion-off .yt-theme-salon .yt-end-reveal .yt-end-row,
+:root.motion-off .yt-theme-salon .yt-end-reveal .yt-end-first::after,
+:root.motion-off .yt-theme-salon .yt-end-reveal.yt-end-solo .yt-end-title,
+:root.motion-off .yt-theme-salon .yt-dice-made-live .yt-die-madering,
+:root.motion-off .yt-theme-salon .yt-dice-made-live.yt-dice-made-big .yt-die-madering,
+:root.motion-off .yt-theme-salon .yt-dice-made-live .yt-made-tag,
+:root.motion-off .yt-theme-salon .yt-dice-made-live.yt-dice-made-mid::after,
+:root.motion-off .yt-theme-salon .yt-dice-made-live.yt-dice-made-big::after,
+:root.motion-off .yt-theme-salon .yt-seat-yacht,
+:root.motion-off .yt-theme-salon .yt-seat-party {
+      animation: none;
+}
+
+:root.motion-off .yt-theme-salon .yt-lamp,
+:root.motion-off .yt-theme-salon .yt-die-shadow,
+:root.motion-off .yt-theme-salon .yt-die-face,
+:root.motion-off .yt-theme-salon .yt-roll,
+:root.motion-off .yt-theme-salon .yt-pick,
+:root.motion-off .yt-theme-salon .yt-seat {
+  transition: none;
+}
+
+  :root.motion-off .yt-theme-salon .yt-fx,
+:root.motion-off .yt-theme-salon .yt-chip,
+:root.motion-off .yt-theme-salon .yt-cup,
+:root.motion-off .yt-theme-salon .yt-die-impact,
+:root.motion-off .yt-theme-salon .yt-die-sheen,
+:root.motion-off .yt-theme-salon .yt-die-lockring,
+:root.motion-off .yt-burst {
+  display: none;
+}
+/* motion-off:end */
+
 /* D-264 — 흔들어 굴리기: 움직임 줄이기면 주사위 떨림·컵 흔들림을 멈춘다. 컵은 기울어진 채 가만히 보여 "흔드는 중"만 알리고
    소리는 그대로 난다(위 블록이 컵을 감추므로 같은 명시도 이상으로 다시 보인다). */
 @media (prefers-reduced-motion: reduce) {
-  .yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
-  .yt-theme-salon .yt-cup.yt-cup-shake {
+  :root:not(.motion-forced) .yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cup.yt-cup-shake {
     animation: none;
   }
 
-  .yt-theme-salon .yt-cup.yt-cup-shake {
+  :root:not(.motion-forced) .yt-theme-salon .yt-cup.yt-cup-shake {
     display: block;
     transform: rotate(-14deg);
   }
 
   /* D-270 — 버튼 떨림·결과를 기다리는 떨림도 멈춘다. 버튼의 글("흔드는 중…"·"굴리는 중…")과 눌린 색은 그대로 바뀐다. */
-  .yt-roll-shaking-live,
-  .yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking-live:not(:disabled),
-  .yt-dice-waiting-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
-  .yt-theme-salon .yt-cup.yt-cup-wait {
+  :root:not(.motion-forced) .yt-roll-shaking-live,
+  :root:not(.motion-forced) .yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking-live:not(:disabled),
+  :root:not(.motion-forced) .yt-dice-waiting-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+  :root:not(.motion-forced) .yt-theme-salon .yt-cup.yt-cup-wait {
     animation: none;
   }
 
-  .yt-theme-salon .yt-cup.yt-cup-wait {
+  :root:not(.motion-forced) .yt-theme-salon .yt-cup.yt-cup-wait {
     display: block;
     transform: rotate(-14deg);
   }
 
   /* D-268 — 남의 흔들기(명패의 작은 컵·작은 주사위)도 멈춘다. 컵은 기울어진 채 남아 "흔드는 중"만 알린다. */
-  .yt-seat-cup-live,
-  .yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
+  :root:not(.motion-forced) .yt-seat-cup-live,
+  :root:not(.motion-forced) .yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
     animation: none;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .yt-dice-shaking-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+:root.motion-off .yt-theme-salon .yt-cup.yt-cup-shake {
+  animation: none;
+}
+
+:root.motion-off .yt-theme-salon .yt-cup.yt-cup-shake {
+  display: block;
+  transform: rotate(-14deg);
+}
+
+  :root.motion-off .yt-roll-shaking-live,
+:root.motion-off .yt-theme-salon .yt-roll.yt-roll-main.yt-roll-shaking-live:not(:disabled),
+:root.motion-off .yt-dice-waiting-live .yt-die:not(.yt-die-held):not(.yt-die-empty) .yt-die-face,
+:root.motion-off .yt-theme-salon .yt-cup.yt-cup-wait {
+  animation: none;
+}
+
+:root.motion-off .yt-theme-salon .yt-cup.yt-cup-wait {
+  display: block;
+  transform: rotate(-14deg);
+}
+
+  :root.motion-off .yt-seat-cup-live,
+:root.motion-off .yt-seat-dice-shaking-live .yt-mini-die:not(.yt-mini-die-held):not(.yt-mini-die-empty) {
+  animation: none;
+}
+/* motion-off:end */
+
+/* D-293 — 마지막 3초의 큰 숫자: 움직임 줄이기면 커졌다 흐려지지 않고 흐리게 바뀌기만 한다(소리는 그대로). */
+@media (prefers-reduced-motion: reduce) {
+  :root:not(.motion-forced) .yt-final.yt-final-live {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .yt-final.yt-final-live {
+  animation: none;
+  opacity: 0.3;
+}
+/* motion-off:end */
 
 /* D-203 — 마우스가 있는 기기에서만 떠오르는 주사위·채워지는 후보 칸(터치에서는 눌린 채 남는 :hover 를 피한다). */
 @media (hover: hover) {
@@ -534,31 +687,55 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cr-table,
-  .cr-table *,
-  .cr-table *::before,
-  .cr-table *::after {
+  :root:not(.motion-forced) .cr-table,
+  :root:not(.motion-forced) .cr-table *,
+  :root:not(.motion-forced) .cr-table *::before,
+  :root:not(.motion-forced) .cr-table *::after {
     animation: none !important;
     transition: none !important;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .cr-table,
+:root.motion-off .cr-table *,
+:root.motion-off .cr-table *::before,
+:root.motion-off .cr-table *::after {
+  animation: none !important;
+  transition: none !important;
+}
+/* motion-off:end */
 
 /* D-231 — 스컬킹 "촛불 선장실" 연출도 움직임 줄이기면 끈다(18 은 미디어 0개 규칙이라 여기 둔다 — 맨 끝 두 블록 앞). 카드·좌석·
    보너스 배지·금화는 제자리에 바로 서고, 촛불 빛은 일렁이지 않고 켜진 채 남는다. 예측 공개 양피지·금화 비는 꾸밈뿐이라 감춘다
    (값은 좌석·점수표에 있다). 포털(튜토리얼)의 카드에는 애니메이션이 없다. */
 @media (prefers-reduced-motion: reduce) {
-  .sk-theme-cabin *,
-  .sk-theme-cabin *::before,
-  .sk-theme-cabin *::after {
+  :root:not(.motion-forced) .sk-theme-cabin *,
+  :root:not(.motion-forced) .sk-theme-cabin *::before,
+  :root:not(.motion-forced) .sk-theme-cabin *::after {
     animation: none !important;
     transition: none !important;
   }
 
-  .sk-theme-cabin .sk-fx-reveal,
-  .sk-theme-cabin .sk-fx-rain {
+  :root:not(.motion-forced) .sk-theme-cabin .sk-fx-reveal,
+  :root:not(.motion-forced) .sk-theme-cabin .sk-fx-rain {
     display: none;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .sk-theme-cabin *,
+:root.motion-off .sk-theme-cabin *::before,
+:root.motion-off .sk-theme-cabin *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+:root.motion-off .sk-theme-cabin .sk-fx-reveal,
+:root.motion-off .sk-theme-cabin .sk-fx-rain {
+  display: none;
+}
+/* motion-off:end */
 
 /* D-186 — 휴대폰 경기장 확대·고정(티츄·스컬킹·원카드·요트·구름항로). 머리 줄이 한 줄(⋮ 메뉴)로 줄어든 만큼 경기장을 키운다.
    높이는 100dvh 기준이라 주소창 때문에 실제 보이는 높이가 작은 휴대폰에서는 예전 최소값으로 돌아간다(그보다 작아지지 않는다).
@@ -621,6 +798,87 @@
   }
 }
 
+/* D-291 — 얏추 PC 넓은 화면(1024px 이상): 2단. 머리 줄은 위 전체, 왼쪽에 좌석 띠 + 주사위 판(+ 결과), 오른쪽에 점수표.
+   760px 기둥 하나라 넓은 화면에서 양옆이 비고 점수표를 스크롤해야 했다. 점수표는 화면에 붙어 따라오고(sticky), 화면 높이를
+   넘으면 그 칸 안에서만 스크롤한다. 줄 높이를 조금 줄여 1280×800 에서도 한 화면에 든다. 주사위는 넓은 판에 맞게 키운다 — 굴림·
+   컵·고리는 `--yt-die-size`·`--yt-step` 을 따라가고, 숫자 비행·금가루 좌표는 게임판이 실측해 그대로 맞는다.
+   1023px 이하(휴대폰·태블릿 세로)는 이 블록이 닿지 않는다. 20 은 미디어 0개 규칙이라 여기 둔다(스컬킹 맨 끝 두 블록 앞). */
+@media (min-width: 1024px) {
+  .yt-table {
+    display: grid;
+    /* 점수표 칸은 화면 폭을 따라 360~460px — 1024px 근처(iPad 가로)에서 왼쪽 주사위 판이 좁아지지 않게. */
+    grid-template-columns: minmax(0, 1fr) clamp(360px, 36vw, 460px);
+    grid-template-rows: auto auto auto 1fr;
+    align-content: start;
+    column-gap: 20px;
+    row-gap: 12px;
+    /* `.room-page` 는 세로 flex 고 게임판은 좌우 auto 여백이라 폭이 내용에 맞춰 줄어든다 — 폭을 명시한다(주사위 크기가 판 폭을
+       따르므로 내용이 폭을 정하게 두면 서로 물고 줄어든다). */
+    width: 100%;
+    max-width: 1240px;
+    padding: 14px 20px 20px;
+  }
+
+  .yt-table > .yt-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .yt-table > .yt-seats {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .yt-table > .yt-felt {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: clamp(320px, 48vh, 480px);
+    justify-content: center;
+  }
+
+  .yt-table > .yt-end {
+    grid-column: 1;
+    grid-row: 4;
+    align-self: start;
+  }
+
+  .yt-table > .yt-card-wrap {
+    grid-column: 2;
+    grid-row: 2 / span 3;
+    align-self: start;
+    position: sticky;
+    top: 12px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .yt-theme-salon .yt-card th,
+  .yt-theme-salon .yt-card td {
+    height: 36px;
+  }
+
+  /* 주사위 크기는 **주사위 칸의 폭에서** 정한다(리뷰 — 고정 84px 이면 1024~1110px 에서 줄이 넘쳐 버튼만 찌그러지고 변수는 그대로라
+     정육면체 면·던지기 출발점·컵·고리가 어긋났다). 초록 판(`.yt-felt`)이 컨테이너고(안쪽 폭 = 주사위 칸 폭), 다섯 개 + 간격 넷이 그 폭에 들어가는 값과 84px 중
+     작은 쪽이다 — `.yt-die` 의 폭·높이와 `--yt-step` 이 모두 이 한 값에서 나온다. */
+  .yt-theme-salon .yt-felt {
+    container-type: inline-size;
+  }
+
+  .yt-theme-salon .yt-tray {
+    width: 100%;
+  }
+
+  .yt-theme-salon .yt-dice {
+    --yt-gap: 18px;
+    --yt-die-size: min(84px, calc((100cqw - 4 * var(--yt-gap)) / 5));
+  }
+
+  .yt-theme-salon .yt-die {
+    flex: none;
+  }
+}
+
 /* D-241 — 티츄 "옻칠 찻집"(`.tc-`). 25 는 미디어 0개 규칙이라 폭·동작 줄이기는 여기 둔다(스컬킹 맨 끝 두 블록 앞).
    ① 휴대폰: 옻칠 틀을 얇게(좌우 좌석이 모서리에 붙는다), 연출 카드·인장·소원 패를 한 단계 작게. */
 @media (max-width: 480px) {
@@ -655,46 +913,149 @@
 
 /* ② 동작 줄이기: 움직임을 끄고 결과만 남긴다(인장·현판·소원 패는 제자리에 떴다 사라진다). 파편·금가루·등불·고리는 그리지 않는다. */
 @media (prefers-reduced-motion: reduce) {
-  .tc-theme-lacquer .seat.turn::after,
-  .tc-theme-lacquer .scoreboard-team,
-  .tc-theme-lacquer .round-ended,
-  .tc-theme-lacquer .round-ended h3 + p,
-  .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
-  .tc-wish-tile,
-  .tc-shake-a,
-  .tc-shake-b,
-  .tc-fx-layer *,
-  .tc-fx-screen * {
+  :root:not(.motion-forced) .tc-theme-lacquer .seat.turn::after,
+  :root:not(.motion-forced) .tc-theme-lacquer .scoreboard-team,
+  :root:not(.motion-forced) .tc-theme-lacquer .round-ended,
+  :root:not(.motion-forced) .tc-theme-lacquer .round-ended h3 + p,
+  :root:not(.motion-forced) .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
+  :root:not(.motion-forced) .tc-wish-tile,
+  :root:not(.motion-forced) .tc-shake-a,
+  :root:not(.motion-forced) .tc-shake-b,
+  :root:not(.motion-forced) .tc-fx-layer *,
+  :root:not(.motion-forced) .tc-fx-screen * {
     animation: none !important;
   }
-  .tc-land-ring,
-  .tc-fx-ring,
-  .tc-fx-shard,
-  .tc-fx-dust,
-  .tc-fx-lantern,
-  .tc-fx-bomb-core,
-  .tc-fx-bomb-ring,
-  .tc-fx-declare-ring {
+  :root:not(.motion-forced) .tc-land-ring,
+  :root:not(.motion-forced) .tc-fx-ring,
+  :root:not(.motion-forced) .tc-fx-shard,
+  :root:not(.motion-forced) .tc-fx-dust,
+  :root:not(.motion-forced) .tc-fx-lantern,
+  :root:not(.motion-forced) .tc-fx-bomb-core,
+  :root:not(.motion-forced) .tc-fx-bomb-ring,
+  :root:not(.motion-forced) .tc-fx-declare-ring {
     display: none;
   }
-  .tc-fx-bomb-flash {
+  :root:not(.motion-forced) .tc-fx-bomb-flash {
     opacity: 0.3;
   }
-  .tc-fx-stamp .tc-seal {
+  :root:not(.motion-forced) .tc-fx-stamp .tc-seal {
     transform: translate(-50%, -50%) rotate(-8deg);
   }
-  .tc-fx-wish {
+  :root:not(.motion-forced) .tc-fx-wish {
     transform: translate(-50%, -50%);
   }
-  .tc-fx-points {
+  :root:not(.motion-forced) .tc-fx-points {
     transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78));
   }
 }
 
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .tc-theme-lacquer .seat.turn::after,
+:root.motion-off .tc-theme-lacquer .scoreboard-team,
+:root.motion-off .tc-theme-lacquer .round-ended,
+:root.motion-off .tc-theme-lacquer .round-ended h3 + p,
+:root.motion-off .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
+:root.motion-off .tc-wish-tile,
+:root.motion-off .tc-shake-a,
+:root.motion-off .tc-shake-b,
+:root.motion-off .tc-fx-layer *,
+:root.motion-off .tc-fx-screen * {
+  animation: none !important;
+}
+:root.motion-off .tc-land-ring,
+:root.motion-off .tc-fx-ring,
+:root.motion-off .tc-fx-shard,
+:root.motion-off .tc-fx-dust,
+:root.motion-off .tc-fx-lantern,
+:root.motion-off .tc-fx-bomb-core,
+:root.motion-off .tc-fx-bomb-ring,
+:root.motion-off .tc-fx-declare-ring {
+  display: none;
+}
+:root.motion-off .tc-fx-bomb-flash {
+  opacity: 0.3;
+}
+:root.motion-off .tc-fx-stamp .tc-seal {
+  transform: translate(-50%, -50%) rotate(-8deg);
+}
+:root.motion-off .tc-fx-wish {
+  transform: translate(-50%, -50%);
+}
+:root.motion-off .tc-fx-points {
+  transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78));
+}
+/* motion-off:end */
+
+/* D-279 — 담바둑(`.db-`). 26 은 미디어 0개 규칙이라 폭·hover·동작 줄이기는 여기 둔다(스컬킹 맨 끝 두 블록 앞).
+   ① 휴대폰 폭: 판이 주인공 — 양옆 여백을 줄여 판이 화면 폭을 거의 다 쓰고(375px 에서 칸 ≈ 51px), 머리 줄·좌석 띠는 낮게. */
+@media (max-width: 480px) {
+  .db-table {
+    --db-reserve: 318px;
+    gap: 8px;
+    padding: 4px 8px 12px;
+  }
+  .db-strip {
+    gap: 5px;
+  }
+  .db-seat {
+    padding: 5px 7px 4px;
+  }
+  .db-seat-name {
+    font-size: 13px;
+  }
+  .db-status {
+    font-size: 14px;
+  }
+  .db-end-banner-text {
+    font-size: 22px;
+  }
+}
+
+/* ② 마우스가 있는 기기에서만 — 누를 수 있는 칸에 옅은 빛, 단추는 살짝 밝게(터치에서는 눌린 채 남는 :hover 를 피한다). */
+@media (hover: hover) {
+  .db-cells .db-cell.db-cell-on:hover:not(:disabled) {
+    background: radial-gradient(circle, rgba(255, 250, 235, 0.42) 0%, rgba(255, 250, 235, 0) 68%);
+  }
+  .db-table .db-primary:hover:not(:disabled),
+  .db-table .db-secondary:hover:not(:disabled),
+  .db-table .db-jump:hover:not(:disabled),
+  .db-table .db-route:hover:not(:disabled),
+  .db-table .db-kind:hover:not(:disabled),
+  .db-table .db-wall-btn:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+/* ③ 동작 줄이기: 연출 없이 끝 상태로 바로(돌은 미끄러지지 않고 옮겨지고, 담·집은 바로 보인다). 차례 테두리·고리·점은 가만히 남는다. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not(.motion-forced) .db-tokens *,
+  :root:not(.motion-forced) .db-tokens *::before,
+  :root:not(.motion-forced) .db-tokens *::after,
+  :root:not(.motion-forced) .db-tokens .db-board-myturn::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  :root:not(.motion-forced) .db-fx-rich .db-stone-movable::after {
+    display: none;
+  }
+}
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .db-tokens *,
+:root.motion-off .db-tokens *::before,
+:root.motion-off .db-tokens *::after,
+:root.motion-off .db-tokens .db-board-myturn::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root.motion-off .db-fx-rich .db-stone-movable::after {
+  display: none;
+}
+/* motion-off:end */
+
 /* D-286 — 별자리 수판(27 은 폭 미디어 0개라 여기 둔다). 기준: 375px 에서 5×5 판 + 합 열 + 7열 숫자판이 가로 스크롤 없이 한 화면.
    ① 넓은 화면은 칸을 키운다(3×3·4×4 는 더 크게). ② 좁은 화면은 틈·안쪽 여백을 줄이고 좌석 띠를 두 줄짜리로 눕힌다(진행도 수 옆에 띠).
-   ③ 360px 아래는 칸을 44px 까지 줄인다(누름 하한). ④ 동작 줄이기: 움직임을 모두 끄고 결과만 남긴다 — 별똥별은 그리지 않는다.
-   (스컬킹 맨 끝 두 블록 앞에 둔다 — `skullkingCssNamespace.test` 가 맨 끝 두 블록을 붙잡는다.) */
+   ③ 360px 아래는 칸을 44px 까지 줄인다(누름 하한). ④ 동작 줄이기: 움직임을 모두 끄고 결과만 남긴다 — 별똥별은 그리지 않는다(D-291 — `:root:not(.motion-forced)` 아래 + 바로 뒤 motion-off 짝).
+   (담바둑 블록 뒤·스컬킹 맨 끝 두 블록 앞에 둔다 — `skullkingCssNamespace.test` 가 맨 끝 두 블록을 붙잡는다.) */
 @media (min-width: 600px) {
   .sq-table {
     gap: 12px;
@@ -794,20 +1155,35 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sq-table,
-  .sq-table *,
-  .sq-table::before,
-  .sq-table::after,
-  .sq-table *::before,
-  .sq-table *::after {
+  :root:not(.motion-forced) .sq-table,
+  :root:not(.motion-forced) .sq-table *,
+  :root:not(.motion-forced) .sq-table::before,
+  :root:not(.motion-forced) .sq-table::after,
+  :root:not(.motion-forced) .sq-table *::before,
+  :root:not(.motion-forced) .sq-table *::after {
     animation: none !important;
     transition: none !important;
   }
-  .sq-fx-layer,
-  .sq-seat-meteor {
+  :root:not(.motion-forced) .sq-fx-layer,
+  :root:not(.motion-forced) .sq-seat-meteor {
     display: none;
   }
 }
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .sq-table,
+:root.motion-off .sq-table *,
+:root.motion-off .sq-table::before,
+:root.motion-off .sq-table::after,
+:root.motion-off .sq-table *::before,
+:root.motion-off .sq-table *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root.motion-off .sq-fx-layer,
+:root.motion-off .sq-seat-meteor {
+  display: none;
+}
+/* motion-off:end */
 
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —

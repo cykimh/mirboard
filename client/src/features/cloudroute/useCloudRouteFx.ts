@@ -730,7 +730,14 @@ export function useCloudRouteFx(rootRef: RefObject<HTMLElement | null>, options:
     return () => {
       c.alive = false;
       c.queue.length = 0;
+      // D-291 리뷰 — 판 도중 연출을 끄면(또는 게임판이 내려가면) 진행 중인 걸음을 바로 끝내고, 떠 있던 조각(WAAPI)을 멈춰 지우고,
+      // 붙잡고 있던 보여 주는 값을 놓는다(화면은 스토어 그대로).
+      c.gen++;
+      c.skip = c.running;
       c.wake?.();
+      const l = layer();
+      if (l) clearParticles(l);
+      setState((s) => ({ ...IDLE, dice: s.dice }));
       cloudrouteFxBus.detach(handler);
       document.removeEventListener('visibilitychange', onHide);
     };

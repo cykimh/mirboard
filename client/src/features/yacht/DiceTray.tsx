@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { MAX_ROLLS, type Dice, type Held } from '@/types/yacht';
 import { YachtDie, YachtDieCube } from './YachtDie';
 import type { MadeTier } from './yachtLabels';
@@ -205,24 +205,25 @@ export function DiceTray({
   // 브라우저는 떼고 나서 click 도 보낸다 — 그 click 은 삼킨다. 누름 없이 온 click(보조기기·스크립트)은 그대로 한 번 굴린다.
   // `cancelled` — 누르는 사이에 새 굴림이 오거나 굴릴 수 없게 됐다: 떼어도 굴리지 않는다(뒤따르는 click 도 삼킨다).
   // `ripe` — 누른 지 `SHAKE_HOLD_MS` 가 지났다(흔들 만큼 눌렀다).
-  const press = useRef<{ timer: number; cancelled: boolean; ripe: boolean } | null>(null);
+  // `pointer` — 이 누름을 시작한 포인터(키보드 누름이면 null). D-292 — 그 포인터가 주사위 판 밖으로 나가면 누름을 버린다.
+  const press = useRef<{ timer: number; cancelled: boolean; ripe: boolean; pointer: number | null } | null>(null);
   const swallow = useRef(0);
   const disarmSwallow = () => {
     window.clearTimeout(swallow.current);
     swallow.current = 0;
   };
-  const startPress = () => {
+  const startPress = (pointer: number | null = null) => {
     if (press.current && !press.current.cancelled) return;
     if (press.current) window.clearTimeout(press.current.timer);
     press.current = null;
     if (!live.current.rollable) {
       // D-270 — 굴릴 수 없을 때(굴림 결과를 기다리는 중) 시작한 누름은 버린 누름으로 기억한다 — 그 사이 결과가 와 굴릴 수 있게 돼도
       // 떼는 순간·뒤따르는 click 으로 굴리지 않는다.
-      press.current = { cancelled: true, ripe: false, timer: 0 };
+      press.current = { cancelled: true, ripe: false, timer: 0, pointer };
       return;
     }
     disarmSwallow();
-    const p = { cancelled: false, ripe: false, timer: 0 };
+    const p = { cancelled: false, ripe: false, timer: 0, pointer };
     p.timer = window.setTimeout(() => {
       p.ripe = true;
       if (press.current === p && !p.cancelled) beginShake('press');
@@ -238,6 +239,23 @@ export function DiceTray({
     else press.current = null;
     endShake(false, 'press');
   }
+  /**
+   * D-292 — 누른 채 손가락·마우스가 주사위 판(초록 판 `.yt-felt`, 없으면 이 주사위 칸) 밖으로 나가면 그 누름을 버린다: 굴리지 않고
+   * 흔들기도 걷는다(남에게 보이던 흔들기는 `onShakeChange(false)` 로 끝난다). 다시 안으로 들어와도 버린 누름이다 — 손을 떼도 굴리지
+   * 않고 뒤따르는 click 도 삼킨다(`cancelPress(true)`). 키보드 누름(`pointer` null)에는 "밖"이 없다.
+   */
+  const leftBoard = (el: HTMLElement, x: number, y: number) => {
+    const board = el.closest('.yt-felt') ?? el.closest('.yt-tray');
+    const r = board?.getBoundingClientRect();
+    // 아직 그려지지 않은 판(크기 0)은 판정하지 않는다.
+    if (!r || (r.width === 0 && r.height === 0)) return false;
+    return x < r.left || x > r.right || y < r.top || y > r.bottom;
+  };
+  const trackPress = (e: ReactPointerEvent<HTMLButtonElement>, left: boolean) => {
+    const p = press.current;
+    if (!p || p.cancelled || p.pointer !== e.pointerId) return;
+    if (left || leftBoard(e.currentTarget, e.clientX, e.clientY)) cancelPress(true);
+  };
   const finishPress = () => {
     const p = press.current;
     if (!p) return;
@@ -395,7 +413,7 @@ export function DiceTray({
             aria-disabled={rollPending || undefined}
             aria-busy={rollPending || undefined}
             aria-label={`굴리기, ${left}번 남음`}
-            title="누르면 굴려요 · 꾹 누르면 컵을 흔들다가 떼면 굴러요"
+            title="누르면 굴려요 · 꾹 누르면 컵을 흔들다가 떼면 굴러요 · 누른 채 판 밖으로 나가면 취소돼요"
             data-yt-quiet=""
             onPointerDown={(e) => {
               if (e.button) return;
@@ -404,8 +422,12 @@ export function DiceTray({
               } catch {
                 // 포인터 잡기 실패 — 그대로 진행.
               }
-              startPress();
+              startPress(e.pointerId);
             }}
+            // D-292 — 누른 채 주사위 판 밖으로 나가면 취소. 포인터를 잡고 있으면(터치는 저절로, 마우스는 위에서 잡는다) 버튼 밖의
+            // 움직임도 여기로 온다. 못 잡았으면 버튼을 벗어난 뒤를 따라갈 수 없으니 버튼을 벗어난 것만으로 취소한다.
+            onPointerMove={(e) => trackPress(e, false)}
+            onPointerLeave={(e) => trackPress(e, !e.currentTarget.hasPointerCapture?.(e.pointerId))}
             onPointerUp={finishPress}
             onPointerCancel={() => cancelPress(false)}
             onContextMenu={(e) => e.preventDefault()}
@@ -414,7 +436,7 @@ export function DiceTray({
               if (!e.repeat) startPress();
               // D-270 — 누름의 시작을 못 본 채 이미 눌려 있는 키(꺼져 있던 버튼이 켜짐·누른 채 초점이 옴): 버린 누름으로 친다 —
               // 자동 반복 click 으로 굴리지 않고, 떼면 끝난다.
-              else if (!press.current) press.current = { cancelled: true, ripe: false, timer: 0 };
+              else if (!press.current) press.current = { cancelled: true, ripe: false, timer: 0, pointer: null };
             }}
             onKeyUp={(e) => {
               if (e.key === ' ' || e.key === 'Enter') finishPress();

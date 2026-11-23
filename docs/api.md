@@ -336,7 +336,8 @@
 ### POST `/api/rooms/{roomId}/join`
 응답 `200` — Room 갱신본. D-137 — 관전자가 부르면(대기실의 [자리에 앉기]) 같은 원자 구간에서 관전자 목록에서도 빠진다(플레이어·관전자
 이중 소속 없음).
-에러: `ROOM_FULL`, `ROOM_NOT_FOUND`, `ALREADY_IN_ROOM`, `GAME_ALREADY_STARTED`.
+에러: `ROOM_FULL`, `ROOM_NOT_FOUND`, `ALREADY_IN_ROOM`, `GAME_ALREADY_STARTED`, `KICKED_FROM_ROOM`(403 — D-290, 방장이 방금 내보낸 사람.
+`join-or-reconnect`·`spectate` 도 같다).
 
 ### ~~POST `/api/rooms/{roomId}/rematch`~~ *(D-82 → D-153 폐기)*
 '한 판 더'(리매치)는 없앴다. 사람만의 방은 매치가 정상으로 끝나면 서버가 방을 **WAITING** 으로 돌린다(정원 = 게임 최대 인원, 준비
@@ -360,8 +361,15 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 친구 방 대기실에서 방장이 게임 설정을 바꾼다. **부분 갱신** — 보낸 항목만 바꾼다.
 ```json
 { "turnSeconds": 10, "targetScore": 500, "stake": 100, "raceButtonSize": "LARGE", "raceButtonVisibility": "HARD",
-  "options": { "TEAM_MODE": "TEAMS_2V2" } }
+  "options": { "TEAM_MODE": "TEAMS_2V2" }, "capacity": 4 }
 ```
+- `capacity`(D-290) 는 최대 인원(정원)이다. 범위는 게임이 지금 방 옵션으로 정한 시작 인원~정원(`playersToStart`~`capacityFor`)이고 Room
+  응답의 `minCapacity`·`maxCapacity` 가 그 범위다(둘이 같으면 고를 것이 없다 — 티츄·오목). 범위 밖은 `INVALID_CAPACITY`(400), 지금 앉은
+  인원(봇 포함)보다 작으면 `TOO_MANY_PLAYERS`(409 — 봇을 저절로 빼지 않는다). `options` 와 같이 보내면 바뀐 뒤 옵션의 범위로 본다. 바꾼
+  정원은 곧바로 방 목록·입장(`ROOM_FULL`)·`join-or-reconnect` 의 관전 판정에 닿고, 시작이 현재 인원으로 줄였다가(D-143) 판이 끝나 대기실로
+  돌아올 때 이 값으로 되돌아온다(`lobbyCapacity`).
+- D-290 — `options` 가 정원 범위를 바꾸는데 `capacity` 를 같이 보내지 않으면: 게임 정원이 달라지면 그 정원으로(D-176), 시작 인원만 올라
+  지금 정원이 범위 아래가 되면 새 시작 인원으로 끌어올린다(씨앗포 정원 2 → 2:2 팀전이면 4).
 - `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
 - `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
 - `stake` 는 허용값 `{0,10,50,100,500}` 이고 `BETTING` 게임만 쓴다. 봇 방이면 0 만 된다.
@@ -379,7 +387,8 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 - `NOT_HOST`(403)
 - `GAME_ALREADY_STARTED`(409)
 - `UNSUPPORTED_ROOM_OPTION`·`INVALID_STAKE`·`INVALID_ROOM_SETTING`(400 — details `setting`)
-- `TOO_MANY_PLAYERS`(409 — D-176, details `roomId`·`capacity`)
+- `INVALID_CAPACITY`(400 — D-290, details `capacity`·`minPlayers`·`maxPlayers` = 허용 범위)
+- `TOO_MANY_PLAYERS`(409 — D-176·D-290, details `roomId`·`capacity`)
 - `ROOM_NOT_FOUND`
 
 ### POST `/api/rooms/{roomId}/start` *(D-136·D-143 — 방장 시작, 방장 전용)*
@@ -390,15 +399,20 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
 응답 `200` — 시작된 Room(`capacity` = 인원). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_ENOUGH_PLAYERS`(409, details
 `minPlayers`), `NOT_IN_ROOM`, `ROOM_NOT_FOUND`. (`PLAYERS_NOT_READY`·`ROOM_ALREADY_FULL` 은 D-143 에서 없앴다.)
 
-### POST `/api/rooms/{roomId}/bots` *(D-174 — 빈자리 봇으로 채우기, 방장 전용)*
-대기실(WAITING)의 빈자리를 정원(친구 방은 게임 최대 인원)까지 봇으로 채운다. 이미 앉은 봇은 그대로 두고 다른 봇을 고른다. 봇은 준비 표시를
-하지 않고(준비는 사람만 센다), 시작은 그대로 방장의 `/start` 다. 빈자리가 없으면 아무것도 하지 않는다. 채우는 도중 사람이 마지막 자리에 먼저
-앉으면 거기서 멈춘다(오류 아님).
+### POST `/api/rooms/{roomId}/bots?count=N` *(D-174·D-290 — 봇 앉히기, 방장 전용)*
+대기실(WAITING)에 봇을 `count` 명 앉힌다 — 화면의 [봇 추가]는 `count=1`. `count` 를 생략하면 예전처럼 정원까지 채운다. 이미 앉은 봇은 그대로
+두고 다른 봇을 고른다. 봇은 준비 표시를 하지 않고(준비는 사람만 센다), 시작은 그대로 방장의 `/start` 다. 방장·WAITING·판돈 0·정원 확인과
+앉히기는 `room_bot_add.lua` 한 번이라 정원을 넘지 않는다(남은 자리가 `count` 보다 적으면 그만큼만).
 응답 `200` — 갱신된 Room(`botSeats` 포함). 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `STAKED_ROOM_NO_BOTS`(400 — 판돈 방),
+`ROOM_FULL`(409 — `count` 를 줬는데 한 명도 못 앉힘. 생략했으면 오류 없이 그대로), `INVALID_ROOM_SETTING`(400 — `count` < 1), `ROOM_NOT_FOUND`.
+
+### DELETE `/api/rooms/{roomId}/bots/{userId}` *(D-290 — 봇 하나 빼기, 방장 전용)*
+대기실의 그 봇만 뺀다(다른 좌석 순서는 그대로). 방장·WAITING 확인과 좌석 빼기는 `room_remove_member.lua` 한 번이다.
+응답 `200` — 갱신된 Room. 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `NOT_IN_ROOM`(409 — 봇이 아니거나 앉아 있지 않음),
 `ROOM_NOT_FOUND`.
 
-### DELETE `/api/rooms/{roomId}/bots` *(D-174 — 봇 빼기, 방장 전용)*
-대기실의 봇을 모두 뺀다(사람 좌석 순서는 그대로). 봇이 없으면 아무것도 하지 않는다.
+### DELETE `/api/rooms/{roomId}/bots` *(D-174 — 봇 모두 빼기, 방장 전용)*
+대기실의 봇을 모두 뺀다(사람 좌석 순서는 그대로). 봇이 없으면 아무것도 하지 않는다. D-290 뒤로 화면은 쓰지 않는다(봇 카드의 [✕]로 하나씩).
 응답 `200` — 갱신된 Room. 에러: `NOT_HOST`(403), `GAME_ALREADY_STARTED`(409), `ROOM_NOT_FOUND`.
 
 > **D-174 — 봇이 있는 대기실의 나가기.** 사람이 나가 봇만 남으면 방을 없앤다(`ROOM_REMOVED`). 방장이 나가면 방장은 남은 **사람** 중 가장
@@ -418,7 +432,11 @@ D-133 — 방을 읽은 뒤(빈자리 있음) 실제로 앉기 전에 마지막 
 ```json
 { "mode": "JOINED" | "RECONNECTED" | "SPECTATING", "room": { ... } }
 ```
-에러: `ROOM_NOT_FOUND`, `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
+D-290 — 쿼리 `auto=true` 는 사용자가 누르지 않은 입장(방 화면의 재동기화 — 다시 연결·다시 보임)이다. 이 방에서 강퇴된 기록이 있고 그 뒤
+스스로 다시 들어온 적이 없으면 `KICKED_FROM_ROOM`(403)으로 거절한다(금지 60초가 지났어도 — 소켓이 끊긴 사이 강퇴된 사람을 조용히 다시 앉히지
+않게). 이미 앉아 있거나 관전 중이면 `auto` 와 상관없이 평소대로 답한다.
+
+에러: `ROOM_NOT_FOUND`, `KICKED_FROM_ROOM`(403 — 금지 60초 안, 또는 `auto=true` 에 강퇴 기록), `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
 
 ### GET `/api/users/{userId}/stats` *(Phase 8D)*
 ELO rating + 누적 전적 + 파생 tier 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
@@ -548,8 +566,17 @@ WAITING 방의 **좌석 순서 정책**을 변경. IN_GAME / FINISHED 방은 거
 `MANUAL` 은 enum 만 예약, 서버 동작은 `SEQUENTIAL` 과 동일 — 후속 청크에서 호스트
 좌석 드래그 UI 도입 시 분기 추가.
 
-### POST `/api/rooms/{roomId}/kick` *(D-162 — 끊긴 사람 내보내기, 방장 전용)*
-body는 `{ "userId": 18 }` 이다. 게임 중(IN_GAME) 연결이 끊긴 사람을 방장이 바로 탈주 처리한다. 3분 유예(D-158)를 기다리지 않는다.
+### POST `/api/rooms/{roomId}/kick` *(D-162 — 끊긴 사람 내보내기 · D-290 — 대기실 강퇴, 방장 전용)*
+body는 `{ "userId": 18 }` 이다. 방 상태로 갈린다.
+
+**대기실(WAITING) — D-290.** 방장이 사람 참가자를 좌석에서 뺀다(연결돼 있어도 된다 — 탈주 기록 없음). 같은 Lua(`room_remove_member.lua`)가
+`room:{id}:kicked:{userId}` 를 60초 걸어, 그동안 그 사람의 `join`·`join-or-reconnect`·`spectate` 를 `KICKED_FROM_ROOM`(403)으로 거절한다
+(만료되면 다시 들어올 수 있다). 방 메타 토픽에 `ROOM_MEMBER_KICKED { roomId, userId }` 가 먼저 나가고 좌석 변화(`ROOM_META_UPDATED`)가
+뒤따른다. 대상이 방장 자신·봇(봇은 `DELETE …/bots/{userId}`)·앉아 있지 않은 사람이면 `NOT_IN_ROOM`. 관전자는 대상이 아니다.
+강퇴 기록은 방 수명 동안 남아(`room:{id}:kicked_log`) **자동 재입장**(`join-or-reconnect?auto=true` — 방 화면의 재동기화)을 60초 뒤에도
+`KICKED_FROM_ROOM` 으로 거절한다. 사용자가 링크를 직접 열어 들어오는 입장(`auto` 없음)은 60초 뒤 허용하고 그때 기록을 지운다.
+
+**게임 중(IN_GAME) — D-162.** 연결이 끊긴 사람을 방장이 바로 탈주 처리한다. 3분 유예(D-158)를 기다리지 않는다.
 - 대상은 방장 자신이 아닌, 이 판의 사람 플레이어여야 한다.
 - 그 방에 라이브 세션이 남아 있으면 거절한다(`RoomPresence` — 유예 만료와 같은 판정).
 - 통과하면 걸린 유예를 지우고 `DesertionService.processDesertion` 을 부른다.
@@ -558,7 +585,7 @@ body는 `{ "userId": 18 }` 이다. 게임 중(IN_GAME) 연결이 끊긴 사람�
 
 응답은 `204` 다. 에러는 아래와 같다.
 - `NOT_HOST`(403)
-- `GAME_NOT_IN_PROGRESS`
+- `GAME_NOT_IN_PROGRESS`(끝난 방)
 - `NOT_IN_ROOM`(409 — 자기 자신·봇·이 판 사람 아님)
 - `PLAYER_CONNECTED`(409 — 아직 연결돼 있음, details `userId`)
 - `ROOM_NOT_FOUND`

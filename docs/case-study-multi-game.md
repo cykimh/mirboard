@@ -441,7 +441,39 @@ p99 46.5ms · 최대 노드 88,356.
 `client/src/features/artillery/`(Canvas 전장·대본 재생) · `테스트:` `ArtilleryCostTest`(한 발 비용) · `ArtillerySimulationTest`(2~6인 무작위) ·
 `ArtilleryGoldenTest`(골든 해시) · `ArtilleryBotMatchSimulationIT` · `ArtilleryTable.test` · `결정:` D-220 · D-221 · D-222 · D-223
 
-## §14 아홉 번째 게임 — 모두가 같은 퍼즐을 동시에 (별자리 수판, D-282~D-287)
+## §13 여덟 번째 게임 — 담과 땅 (담바둑, D-274~D-281)
+
+**문제** — 7×7 판에서 돌을 옮기고 담을 하나씩 쌓아 내 돌만 있는 땅(집)을 두르는 2~3인 게임(예능 프로그램의 벽 게임에서 일반 메커니즘만 따르고
+이름·그림은 새로 만든 독창 게임). 한 차례가 "옮기기"와 "담 세우기" 두 단계이고, 끝(섞인 땅이 없어짐)이 판 전체 모양에 달려 있습니다.
+
+**포트 확장 0건, 인프라 0줄.**
+
+- 한 차례 = 액션 하나 — 옮김과 담을 `MOVE_STONE{stoneId, path, wall, jump}` 하나로 묶었습니다(§12 씨앗포가 이동을 `FIRE` 에 실은 것과 같은 수).
+  인프라 턴 데드라인이 그대로 차례 제한이라 엔진 타이머가 필요 없고, 클라는 돌 → 칸 → 담 면을 고르는 동안 아무것도 보내지 않습니다.
+- 숨길 것이 없어 비공개 뷰는 empty(§10 오목과 같다). 대신 **판정은 전부 서버**입니다 — 갈 수 있는 칸·담 자리(`options`)와 터·점수(`territory`)를
+  `TURN_CHANGED` 에 실어 보내고, 클라의 유일한 "기하"는 면 번호 → 선분(그림 좌표)입니다.
+- 서버 통합(`8bbdf98`)의 게임 밖 변경은 `application.yml` 의 상태 설정과 마이그레이션 `V21` 뿐. 클라(`34f66c1`~`2ad622d`, 31파일 +4,273/−6)의
+  공용 파일은 `RoomPage`·지연 로딩·튜토리얼 목록·CSS 진입점·게임 아이콘·효과음 목록(+3)이고, **공용 훅 한 줄**이 바뀌었습니다 —
+  `useStompRoom.sendAction` 이 보냈는지(boolean)를 돌려줍니다(끊긴 사이에 누른 수에 "응답 대기"를 걸지 않으려고 — S3 리뷰. 다른 게임은 반환값을
+  쓰지 않아 바뀐 것이 없다).
+
+**드러난 것 — 원작이 비운 칸과 "끝"의 정의.**
+
+- S0 — 계획의 "담 세울 면이 없는 칸으로는 못 간다"는 규칙은 일어날 수 없었습니다(마지막 걸음이 지난 면이 늘 비어 있다). 규칙 대신 불변식으로.
+- S1 시뮬레이션 — 섞인 땅의 돌이 모두 갇혀도 판이 끝나지 않으면 남은 사람은 제 집을 깎는 수만 둡니다. "굳음(`FROZEN`)" 끝을 더했고, 탐욕 판의
+  5~6% 가 실제로 이렇게 끝납니다.
+- S2 리뷰 — 봇이 끝난 판을 따로 셈해(집 합계만·굳음 모름·값으로 끝 거르기) 엔진과 어긋났습니다. 끝 판정을 엔진 한 곳(`DambadukEngine.endOf`)으로
+  묶고 봇은 엔진 순위로 매깁니다(D-280).
+- S3 e2e — 3인 판에서 담을 넘어야만 움직이는 돌이 "고를 수 있음"으로 떠서 막혔습니다. 고를 수 있는 돌 = 지금 모드에서 갈 칸이 있는 돌.
+
+**봇** — 영향권(담을 따라 잰 최단 거리) + 집으로 평가, 어려움은 상위 40수에 다음 사람의 응수까지, 시간이 아니라 평가 횟수 상한 2만(결정적).
+200판: 2인 쉬움 대 무작위 0.96·보통 대 쉬움 0.89·어려움 대 보통 0.82, 3인 0.82·0.71·0.40(기준선 0.33), 어려움 한 수 p99 28ms.
+
+`코드:` `domain/game/dambaduk/`(엔진·`rules/`·`bot/`·어댑터) · `client/src/features/dambaduk/`(판 세 겹 — 그림 SVG·돌 DOM·누르는 칸) · `테스트:`
+`DambadukMatchSimulationTest`(2·3인 각 2,000판 — 불변식·이벤트 거울·받아들여짐 ⇔ 합법 수) · `DambadukBotTerminalTest` · `DambadukServerFlowIT` ·
+`DambadukTable.test` · e2e `dambaduk.e2e.ts` · `결정:` D-274 ~ D-281
+
+## §14 아홉 번째 게임 — 모두가 같은 퍼즐을 동시에 (별자리 수판, D-282~D-288)
 
 **문제** — 마방진(1~N² 을 한 번씩 넣어 모든 줄의 합을 같게)은 원래 혼자 푸는 퍼즐입니다. 여럿이 같은 퍼즐을 동시에 푸는 레이스로 바꾸면
 지금까지와 다른 세 가지가 한꺼번에 옵니다 — 차례가 없고(모두가 동시에 수십 번 고친다), **서버만 아는 정답**과 **남에게 숨길 각자의 판**이 있고,
@@ -454,6 +486,8 @@ p99 46.5ms · 최대 노드 88,356.
   마방진인가"(해가 여럿이라).
 - 액션은 **내 판 전체**를 싣는 `SYNC` 하나 — 버전을 달아 멱등이고 마지막 판이 이깁니다. 클라는 로컬이 먼저고 0.4초에 한 번까지 모아 보내므로 칸마다
   방 락을 잡지 않고, 하나가 빠져도 다음 보내기가 메웁니다. 4명이 한꺼번에 입력하는 e2e 에서 `BUSY` 4번이 났고 클라가 다시 보내 넷 모두 서버 판 = 화면 판.
+  §13 담바둑이 바꾼 `sendAction` 반환값(보냈는지)도 씁니다 — 나가지 않은 판은 다시 보낼 것으로 되돌리고, 죽은 소켓으로 나가 닿지 않은 판은
+  연결마다 오는 resync 의 버전이 메웁니다(서버가 모르는 내 입력만 서버 판을 이긴다 — D-288).
 - 은닉은 **타입 분리**로 — 공개 뷰·이벤트 타입에 정답·남의 판 필드 자체가 없고(진행도 수 둘만), 내 판은 비공개 뷰로만. 끝난 퍼즐만 모두의 판과 정답을 공개.
 - 시간(준비 3초·첫 완성 뒤 30초 마감·퍼즐 제한·결과 보기 8초)과 봇은 전부 **엔진 타이머**(⑦) 하나. 봇은 수를 고르지 않는 **페이스 모델** — 퍼즐마다
   완성 시각을 정해 정답 칸을 이정표마다 채우므로 "공개 정보만 본다"는 봇 원칙과 부딪힐 일이 없습니다. 대기 좌석(④)은 미완성 사람만이라 봇 루프·턴
@@ -470,7 +504,7 @@ p99 46.5ms · 최대 노드 88,356.
 `코드:` `domain/game/starsquare/puzzle/`(판정·대칭·풀이기·은행) · `StarSquareEngine`(동시 진행·마감·페이스 봇) · `StarSquareGameEngine`(`timer`·`onTimer`·
 비공개 뷰) · `client/src/features/starsquare/`(로컬 우선 판·`useSyncSender`) · `테스트:` `MagicCheckExhaustiveTest`(3×3 9! 전수) · `SymmetryTest` ·
 `PuzzleBankTest`(자원 재검증·재현) · `StarSquareMatchSimulationTest`(1~4인 각 1,000매치) · `StarSquareBotMatchSimulationIT` · `client/e2e/starsquare.e2e.ts` ·
-`결정:` D-282 · D-283 · D-284 · D-285 · D-286 · D-287
+`결정:` D-282 · D-283 · D-284 · D-285 · D-286 · D-287 · D-288
 
 ## 부록 — 재현 명령
 
@@ -506,7 +540,7 @@ for p in glob.glob('server/build/test-results/test/TEST-*.xml'):
     if not re.search(r'(IT|IntegrationTest)$', outer): d += n
 print(f"tests={t} skipped={s} failed={f} dockerfree={d} ({d/t:.0%})")
 EOF
-# → tests=2309 skipped=7 failed=0 dockerfree=1992 (86%)   (D-288 시점 — 별자리 수판 공개 준비 뒤, 별자리 수판 도메인 68 / 68. D-223 시점 1971 / 1690 — 일곱 게임 공개 뒤, 씨앗포 도메인 51 / 49. D-196 시점 1955 / 1679 — 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
+# → tests=2353 skipped=7 failed=0 dockerfree=2014 (86%)   (D-288 시점 — 아홉 게임, 별자리 수판 도메인 68 / 68. D-281 시점 2302 / 1990 — 여덟 게임, 담바둑 도메인 111 / 106. D-223 시점 1971 / 1690 — 일곱 게임 공개 뒤, 씨앗포 도메인 51 / 49. D-196 시점 1955 / 1679 — 오목 도메인 144 / 138. D-200 시점 1825 / 1567, D-165 시점 1495 / 1253, D-162 시점 1489 / 1248, D-161 시점 1482 / 1242, D-160 시점 1471 / 1233, D-158 시점 1470 / 1233, D-156 시점 1469 / 1233, D-155 시점 1460 / 1224, D-149 시점 1452 / 1221, D-131 시점 1327 / 1121)
 
 # (7) 세 번째 게임(§8) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일 / 클라 통합 규모
 grep -rniE 'onecard|one_card|원카드' server/src/main/java/com/mirboard/infra   # → 0건
@@ -514,11 +548,11 @@ git diff --name-status 36d99e0^1 36d99e0 -- server/src/main/java/com/mirboard/in
 git diff --stat 27910d1^1 27910d1 -- client/src | tail -1
 git diff --name-only 27910d1^1 27910d1 -- client/src | grep -v features/onecard   # 공용 파일(원카드 전용 신규·테스트 포함 목록)
 
-# (8) 포트 뒤 게임별 코드 규모(§8~§12·§14) — main 소스 줄 수
-for d in core tichu skullking onecard yacht omok cloudroute artillery starsquare; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
+# (8) 포트 뒤 게임별 코드 규모(§8~§14) — main 소스 줄 수
+for d in core tichu skullking onecard yacht omok cloudroute artillery dambaduk starsquare; do echo $d $(find server/src/main/java/com/mirboard/domain/game/$d -name '*.java' | xargs cat | wc -l); done
 wc -l server/src/main/java/com/mirboard/domain/game/core/GameEngine.java
-# → core 803 · tichu 6048 · skullking 4802 · onecard 2647 · yacht 2518 · omok 3735 · cloudroute 3106 · artillery 4017 · starsquare 3173, GameEngine.java 204   (D-288 시점)
-# 그 전 → core 733 · tichu 6048 · skullking 3815 · onecard 2647 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756(D-226 시점, D-224 때 3337, S3 때 2654), GameEngine.java 184   (D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
+# → core 803 · tichu 6048 · skullking 4802 · onecard 2647 · yacht 2518 · omok 3735 · cloudroute 3106 · artillery 4017 · dambaduk 3017 · starsquare 3173, GameEngine.java 204   (D-288 시점 — 아홉 게임 병합 뒤)
+# 그 전 → core 782 · tichu 6048 · skullking 4802 · onecard 2647 · yacht 2518 · omok 3735 · cloudroute 3106 · artillery 4017 · dambaduk 3017, GameEngine.java 204   (D-281 시점. D-226 시점 core 733 · skullking 3815 · yacht 2170 · omok 2838 · cloudroute 2840 · artillery 3756, GameEngine.java 184. D-196 시점 — D-214 시점 core 702, D-200 시점 core 684, D-131 시점 core 515 · tichu 6009 · skullking 3766 · onecard 2612)
 
 # (9) 네 번째 게임(§9) — 인프라가 이름을 아는가 / 서버 통합에서 바뀐 공용 파일(요트 S3 커밋) / 클라 공용 파일(요트 S4 커밋)
 grep -rniE 'yacht|요트' server/src/main/java/com/mirboard/infra   # → 0건
@@ -542,7 +576,14 @@ git diff --name-only 666a26c^ 666a26c -- client/src | grep -vE 'features/artille
 ./gradlew :server:test --tests 'com.mirboard.domain.game.artillery.*'   # → 씨앗포 도메인 90건(Docker 불필요 86 — Docker 는 ArtilleryMatchRecorderIT 만) + 서버 경로 IT 4(ArtilleryBotMatchSimulationIT)·기록 실패 격리 1   (D-226 시점 — D-224 때 71 / 69, S3 때 51 / 49)
 npm --prefix client run test -- artillery   # → 42건 (D-226 시점 — D-224 때 36, S3 때 26)
 
-# (12) 별자리 수판(§14) — 인프라가 이름을 아는가 / 도메인 테스트 / 클라 테스트
+# (12) 여덟 번째 게임(§13) — 인프라가 이름을 아는가 / 서버 통합(S2)의 게임 밖 변경 / 클라 통합 규모·공용 파일(S3)
+grep -rniE 'dambaduk|담바둑' server/src/main/java/com/mirboard/infra   # → 0건
+git diff --name-status 8bbdf98^ 8bbdf98 -- server/src/main | grep -v domain/game/dambaduk   # → application.yml · V21__dambaduk_match.sql
+git diff --stat 34f66c1^ 2ad622d -- client/src | tail -1   # → 31 files changed, 4273 insertions(+), 6 deletions(-)
+git diff --name-only 34f66c1^ 2ad622d -- client/src | grep -vE 'features/dambaduk|types/dambaduk|dambaduk-table|dambadukCss'   # → 공용 11파일(useStompRoom 포함)
+./gradlew :server:test --tests 'com.mirboard.domain.game.dambaduk.*'   # → 담바둑 도메인 111건(Docker 불필요 106 — Docker 는 DambadukMatchRecorderIT 만)
+npm --prefix client run test -- dambaduk   # → 38건(게임판·스토어·효과음·튜토리얼 32 + CSS 네임스페이스 6)
+# (13) 아홉 번째 게임 별자리 수판(§14) — 인프라가 이름을 아는가 / 도메인 테스트 / 클라 테스트
 grep -rniE 'starsquare|star_square|별자리' server/src/main/java/com/mirboard/infra   # → 0건
 ./gradlew :server:test --tests 'com.mirboard.domain.game.starsquare.*'   # → 68건(전부 Docker 불필요) + 서버 경로 IT(StarSquareBotMatchSimulationIT)
 npm --prefix client run test -- starsquare   # → 52건 (D-288 시점 — 게임판·스토어·보내기·연출 소리·튜토리얼 47 + CSS 네임스페이스 5)
@@ -554,5 +595,6 @@ npm --prefix client run test -- starsquare   # → 52건 (D-288 시점 — 게�
 [rules-yacht.md](rules-yacht.md) · [plans/yacht.md](plans/yacht.md)(네 번째 게임) ·
 [rules-omok.md](rules-omok.md) · [plans/omok.md](plans/omok.md)(다섯 번째 게임) ·
 [rules-artillery.md](rules-artillery.md) · [plans/artillery.md](plans/artillery.md)(일곱 번째 게임) ·
+[rules-dambaduk.md](rules-dambaduk.md) · [plans/wall-magic-games.md](plans/wall-magic-games.md)(여덟 번째 게임) ·
 [rules-starsquare.md](rules-starsquare.md) · [plans/wall-magic-games.md](plans/wall-magic-games.md)(별자리 수판) ·
-[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-196, D-200, D-220 ~ D-223, D-282 ~ D-288)
+[decisions.md](decisions.md)(D-97 ~ D-104, D-123 ~ D-131, D-175 ~ D-183, D-190, D-196, D-200, D-220 ~ D-223, D-274 ~ D-281, D-282 ~ D-288)

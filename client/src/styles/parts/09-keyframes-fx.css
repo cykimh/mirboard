@@ -31,7 +31,13 @@
 
 /* OS '동작 줄이기' 선호 시 토글과 별개의 안전장치로 애니 제거. */
 @media (prefers-reduced-motion: reduce) {
-  .table-center-trick .hand-cards.play-enter {
+  :root:not(.motion-forced) .table-center-trick .hand-cards.play-enter {
     animation: none;
   }
 }
+
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .table-center-trick .hand-cards.play-enter {
+  animation: none;
+}
+/* motion-off:end */

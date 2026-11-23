@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * D-162 — 방장이 게임 중 끊긴 사람을 내보낸다. 탈주 유예(D-158 — 3분) 내내 기다리면 여러 명이 하는 판이 멈춘다.
+ * D-162 — 방장이 게임 중 끊긴 사람을 내보낸다(D-290 — 대기실에서는 {@link RoomService#kickFromLobby} 로 넘긴다). 탈주 유예(D-158 — 3분) 내내 기다리면 여러 명이 하는 판이 멈춘다.
  *
  * <p>끊김 판정은 유예 만료({@link DesertionGraceScheduler#handle})와 같은 {@link RoomPresence} 다 — 그 방에 라이브 세션이
  * 남아 있으면 내보내지 않는다. 통과하면 걸려 있던 유예를 지우고(뒤늦게 발화해도 멱등이지만 로그가 남지 않게) 유예 만료와 같은
@@ -42,12 +42,17 @@ public class HostKickService {
     }
 
     /**
-     * @return 탈주로 처리됐으면 true. 이미 탈주한 좌석 등으로 처리할 것이 없으면 false(오류 아님).
+     * @return 탈주로 처리됐으면(대기실에서는 내보냈으면) true. 이미 탈주한 좌석 등으로 처리할 것이 없으면 false(오류 아님).
      */
     public boolean kick(String roomId, long hostId, long targetUserId) {
         Room room = rooms.getRoom(roomId);
         if (room.hostId() != hostId) {
             throw new NotHostException(roomId);
+        }
+        // D-290 — 대기실에서는 좌석에서 빼고 잠깐 재입장을 막는다(연결돼 있어도 된다). 탈주 기록은 없다 — 판이 시작되지 않았다.
+        if (room.status() == RoomStatus.WAITING) {
+            rooms.kickFromLobby(roomId, hostId, targetUserId);
+            return true;
         }
         if (room.status() != RoomStatus.IN_GAME) {
             throw new GameNotInProgressException(roomId);

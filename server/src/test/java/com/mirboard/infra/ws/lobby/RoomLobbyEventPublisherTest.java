@@ -65,6 +65,22 @@ class RoomLobbyEventPublisherTest {
         verify(publisher).publishToTopic(eq("/topic/room/r3/meta"), any());
     }
 
+    /** D-290 — 대기실 강퇴는 그 방의 메타 토픽에만(로비 목록에는 좌석 변화가 ROOM_UPDATED 로 따로 간다). */
+    @Test
+    void member_kicked_goes_to_the_room_meta_topic_only() {
+        StompPublisher publisher = Mockito.mock(StompPublisher.class);
+        var sut = new RoomLobbyEventPublisher(publisher, CLOCK);
+
+        sut.onMemberKicked(new com.mirboard.domain.lobby.room.RoomMemberKickedEvent("r4", 42L));
+
+        ArgumentCaptor<Object> cap = ArgumentCaptor.forClass(Object.class);
+        verify(publisher).publishToTopic(eq("/topic/room/r4/meta"), cap.capture());
+        Mockito.verifyNoMoreInteractions(publisher);
+        StompEnvelope<?> envelope = (StompEnvelope<?>) cap.getValue();
+        assertThat(envelope.type()).isEqualTo("ROOM_MEMBER_KICKED");
+        assertThat(envelope.payload()).isEqualTo(new RoomLobbyEventPublisher.RoomMemberKickedPayload("r4", 42L));
+    }
+
     @Test
     void roomMetaTopic_format() {
         assertThat(RoomLobbyEventPublisher.roomMetaTopic("abc")).isEqualTo("/topic/room/abc/meta");

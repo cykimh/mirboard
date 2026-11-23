@@ -14,7 +14,7 @@
 --   -2 = NOT_WAITING (already started / finished)
 --   -3 = NOT_MEMBER (host is not a seated player)
 --   -4 = NOT_ENOUGH_PLAYERS (#players < minPlayers)
---    1 = started (capacity := #players, WAITING -> IN_GAME)
+--    1 = started (lobbyCapacity := capacity, capacity := #players, WAITING -> IN_GAME)
 
 local hostId     = ARGV[1]
 local minPlayers = tonumber(ARGV[2])
@@ -50,6 +50,8 @@ for i = 1, #players do
     redis.call('SADD', KEYS[3], players[i])
 end
 redis.call('EXPIRE', KEYS[3], ttl)
+-- D-290 — 방장이 정한 정원을 적어 둔다. 판이 끝나 대기실로 돌아갈 때 그 정원으로 되돌린다(room_return_waiting.lua).
+redis.call('HSET', KEYS[1], 'lobbyCapacity', redis.call('HGET', KEYS[1], 'capacity'))
 redis.call('HSET', KEYS[1], 'capacity', #players, 'status', 'IN_GAME')
 redis.call('ZREM', KEYS[4], roomId)
 return 1

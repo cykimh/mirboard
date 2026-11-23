@@ -11,6 +11,7 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   ArtilleryTable,
+  DambadukTable,
   CloudRouteTable,
   GameTable,
   OmokTable,
@@ -66,6 +67,7 @@ const BOARD_HELD_GAMES: ReadonlySet<string> = new Set([
   'OMOK',
   'CLOUD_ROUTE',
   'ARTILLERY',
+  'DAMBADUK',
   'STAR_SQUARE',
 ]);
 
@@ -75,6 +77,8 @@ const BOARD_HELD_GAMES: ReadonlySet<string> = new Set([
  */
 function joinBlockOf(code: string): JoinBlock | null {
   if (code === 'ROOM_FULL' || code === 'GAME_ALREADY_STARTED') return 'full';
+  // D-290 — 방장이 방금 내보냈다(잠깐 재입장 금지).
+  if (code === 'KICKED_FROM_ROOM') return 'kicked';
   if (code === 'ROOM_NOT_FOUND') return 'gone';
   return null;
 }
@@ -131,7 +135,7 @@ export function RoomPage() {
   const [settingsPending, setSettingsPending] = useState(false);
   const [readyPending, setReadyPending] = useState(false);
   const [startPending, setStartPending] = useState(false);
-  // D-174 — [빈자리 봇으로 채우기]·[봇 빼기] 요청 중.
+  // D-290 — [봇 추가]·봇 카드 [✕]·사람 카드 [✕](내보내기) 요청 중.
   const [botsPending, setBotsPending] = useState(false);
   // D-137 — 관전자 [자리에 앉기].
   const [sitPending, setSitPending] = useState(false);
@@ -269,7 +273,8 @@ export function RoomPage() {
           }
           if (fresh()) applyRoomMeta(watched);
         } else if (current.status === 'WAITING') {
-          const r = await roomsApi.joinOrReconnect(token, requested);
+          // D-290 — 자동 입장임을 알린다: 끊긴 사이 방장이 내보냈으면 금지 60초가 지났어도 다시 앉지 않는다(아래 KICKED 패널).
+          const r = await roomsApi.joinOrReconnect(token, requested, { auto: true });
           if (!mountedRef.current) {
             // 기다리는 사이 방 화면을 떠났다 — 다시 받은 자리·관전을 거둔다(소켓이 없어 끊김 유예도 걸리지 않는다).
             const undo = r.mode === 'SPECTATING' ? roomsApi.stopSpectating(token, requested) : roomsApi.leave(token, requested);
@@ -284,6 +289,10 @@ export function RoomPage() {
       } catch (err) {
         if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'ROOM_NOT_FOUND') {
           setJoinBlock('gone');
+        }
+        // D-290 — 소켓이 끊긴 사이 방장이 내보냈다(알림을 놓쳤다) — 같은 안내 패널로.
+        if (roomIdRef.current === requested && err instanceof ApiError && err.code === 'KICKED_FROM_ROOM') {
+          setJoinBlock('kicked');
         }
       } finally {
         resyncingRef.current = null;
@@ -330,6 +339,12 @@ export function RoomPage() {
     },
     () => setError('방이 종료되었습니다.'),
     resyncRoom,
+    // D-290 — 방장이 대기실에서 나를 내보냈다: 안내하고 메인으로. 다른 사람이 내보내진 것은 뒤따르는 메타가 좌석을 맞춘다.
+    (kickedUserId) => {
+      if (kickedUserId !== user?.userId) return;
+      showToast('방장이 내보냈어요', 'error');
+      navigate('/games');
+    },
   );
 
   // D-146 — 대기실 참가자 카드의 계급·전적(이 방 게임 기준). 사람만 묻고, 참가자 집합·게임이 바뀔 때만 다시 묻는다.
@@ -472,16 +487,37 @@ export function RoomPage() {
     }
   }
 
-  // D-174 — 대기실의 봇 채우기·빼기(방장). 응답으로 바로 맞추고, 다른 사람은 방 메타 갱신으로 받는다. 실패는 토스트(D-157).
-  async function handleBots(fill: boolean) {
+  // D-290 — 대기실의 봇 한 명 앉히기·한 명 빼기(방장). 응답으로 바로 맞추고, 다른 사람은 방 메타 갱신으로 받는다. 실패는 토스트(D-157).
+  async function handleBot(request: () => Promise<Room>, fallback: string) {
     if (!token || botsPending) return;
     setBotsPending(true);
     try {
-      setRoom(await (fill ? roomsApi.fillBots(token, roomId) : roomsApi.removeBots(token, roomId)));
+      setRoom(await request());
     } catch (err) {
       if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
-      const fallback = fill ? '봇을 앉히지 못했어요' : '봇을 빼지 못했어요';
       showToast(err instanceof ApiError ? errorText(err, fallback) : `${fallback} — 다시 눌러 주세요`, 'error');
+    } finally {
+      setBotsPending(false);
+    }
+  }
+  const handleAddBot = () => handleBot(() => roomsApi.addBot(token!, roomId), '봇을 앉히지 못했어요');
+  const handleRemoveBot = (botUserId: number) =>
+    handleBot(() => roomsApi.removeBot(token!, roomId, botUserId), '봇을 빼지 못했어요');
+
+  // D-290 — 대기실 강퇴(방장). 확인 뒤 내보낸다 — 그 사람은 잠깐(60초) 이 방에 다시 못 들어온다. 좌석은 방 메타 갱신으로 맞춘다.
+  async function handleLobbyKick(userId: number) {
+    if (!token || botsPending) return;
+    const name = usernames[userId] ?? `#${userId}`;
+    if (!window.confirm(`${name}님을 방에서 내보낼까요?`)) return;
+    setBotsPending(true);
+    try {
+      await roomsApi.kick(token, roomId, userId);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
+      showToast(
+        err instanceof ApiError ? errorText(err, '내보내지 못했어요') : '내보내지 못했어요 — 다시 눌러 주세요',
+        'error',
+      );
     } finally {
       setBotsPending(false);
     }
@@ -495,7 +531,11 @@ export function RoomPage() {
       setRoom(await roomsApi.updateSettings(token, roomId, settings));
     } catch (err) {
       if (err instanceof ApiError && err.code === 'GAME_ALREADY_STARTED') return; // 메타가 게임판으로 옮긴다.
-      if (err instanceof ApiError) setError(errorText(err, '설정을 바꾸지 못했어요'));
+      // D-290 — 화면을 오류로 덮지 않고 토스트로(D-269): 정원을 지금 인원보다 작게 줄이려 한 것 등은 고쳐서 다시 누르면 된다.
+      showToast(
+        err instanceof ApiError ? errorText(err, '설정을 바꾸지 못했어요') : '설정을 바꾸지 못했어요 — 다시 눌러 주세요',
+        'error',
+      );
     } finally {
       setSettingsPending(false);
     }
@@ -623,8 +663,7 @@ export function RoomPage() {
   const iAmReady = !!(room && user && (room.readyUserIds ?? []).includes(user.userId));
   // D-225 — 2:2 팀전(TEAM_MODE)은 4명이 다 차야 시작한다(서버 `playersToStart` — 오목·씨앗포 같음). 게임 최소 인원은 개인전 기준이다.
   const startMin = room?.options?.TEAM_MODE === 'TEAMS_2V2' ? 4 : (minPlayers ?? 1);
-  // D-174 — 대기실 봇(방장만 채우고 뺀다). 판돈 방은 봇 금지(D-81).
-  const botCount = room ? (room.botSeats ?? []).length : 0;
+  // D-290 — 대기실 봇(방장만 한 명씩 앉히고 뺀다). 판돈 방은 봇 금지(D-81).
   const emptySeats = room ? room.capacity - room.playerIds.length : 0;
   const stakedRoom = !!room && (room.stake ?? 0) > 0;
   const canStart = !!room && room.status === 'WAITING' && room.playerCount >= startMin;
@@ -732,7 +771,7 @@ export function RoomPage() {
       onBackToRoom,
     };
     return withLiveRegion(
-      <main className="room-page">
+      <main className="room-page game-surface">
         {notice}
         <Suspense fallback={<TableLoading />}>
           {room.gameType === 'ONE_CARD' ? (
@@ -749,6 +788,8 @@ export function RoomPage() {
             <CloudRouteTable {...board} />
           ) : room.gameType === 'ARTILLERY' ? (
             <ArtilleryTable {...board} />
+          ) : room.gameType === 'DAMBADUK' ? (
+            <DambadukTable {...board} />
           ) : room.gameType === 'STAR_SQUARE' ? (
             <StarSquareTable {...board} />
           ) : (
@@ -762,7 +803,7 @@ export function RoomPage() {
   // D-240 — 티츄도 전이를 본 게임판은 FINISHED(봇 판·탈주·강제 종료)·대기실 복귀 뒤에도 유지하고 `roomFinished` 를 넘긴다.
   if (room.status === 'IN_GAME' || (room.gameType === 'TICHU' && boardHeld && roomFinished)) {
     return withLiveRegion(
-      <main className="room-page">
+      <main className="room-page game-surface">
         {notice}
         <Suspense fallback={<TableLoading />}>
           <GameTable
@@ -855,8 +896,8 @@ export function RoomPage() {
         {room.status === 'WAITING' && (
           <Card>
             <CardContent className="flex flex-col gap-2.5 p-3 sm:p-4">
-              {/* D-272 — 머리 줄 하나: "참가자 N/정원" 왼쪽, 방장의 봇 버튼 오른쪽(D-174 — 빈자리를 봇으로 채우거나 모두 뺀다. 시작은
-                  아래 [N명으로 시작]). */}
+              {/* D-272 — 머리 줄 하나: "참가자 N/정원" 왼쪽, 방장의 [봇 추가] 오른쪽(D-290 — 한 명씩 앉힌다. 빼기는 봇 카드의 [✕],
+                  시작은 아래 [N명으로 시작]). 자리가 없으면 버튼을 잠근다 — 정원은 아래 "최대 인원"으로 늘린다. */}
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                 <h2 className="m-0 text-sm font-semibold leading-5">
                   참가자{' '}
@@ -864,33 +905,20 @@ export function RoomPage() {
                     {room.playerCount}/{room.capacity}
                   </span>
                 </h2>
-                {iAmPlayer && iAmHost && (emptySeats > 0 || botCount > 0) && (
+                {iAmPlayer && iAmHost && (
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
-                    {stakedRoom && emptySeats > 0 && (
+                    {stakedRoom && (
                       <span className="text-xs text-muted-foreground">판돈 방에는 봇을 앉힐 수 없어요</span>
                     )}
-                    {emptySeats > 0 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 px-3 text-xs"
-                        onClick={() => handleBots(true)}
-                        disabled={botsPending || stakedRoom}
-                      >
-                        빈자리 봇으로 채우기
-                      </Button>
-                    )}
-                    {botCount > 0 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 px-3 text-xs"
-                        onClick={() => handleBots(false)}
-                        disabled={botsPending}
-                      >
-                        봇 빼기
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 px-3 text-xs"
+                      onClick={handleAddBot}
+                      disabled={botsPending || stakedRoom || emptySeats <= 0}
+                    >
+                      ＋ 봇 추가
+                    </Button>
                   </div>
                 )}
               </div>
@@ -910,6 +938,13 @@ export function RoomPage() {
                       record={records[id]}
                       versusMe={id === user.userId || isBot ? undefined : versus[id]}
                       ready={(room.readyUserIds ?? []).includes(id)}
+                      // D-290 — 방장만: 봇은 빼고 사람은 내보낸다(자기 카드에는 없다).
+                      onRemove={
+                        iAmPlayer && iAmHost && id !== user.userId
+                          ? () => (isBot ? handleRemoveBot(id) : handleLobbyKick(id))
+                          : undefined
+                      }
+                      removePending={botsPending}
                     />
                   );
                 })}

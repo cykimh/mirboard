@@ -37,6 +37,8 @@ const GAMES = [
   { name: '티츄', board: '.game-table-layout' },
   // D-214 — 구름항로 공개. 2~4인이라 봇 3으로 4명 판.
   { name: '구름항로', board: '.cr-table' },
+  // D-281 — 담바둑 공개. 2~3인이라 봇 둘로 3명 판.
+  { name: '담바둑', board: '.db-table' },
   // D-287 — 별자리 수판 공개. 1~4인이라 봇 3으로 4명 판(퍼즐은 준비 3초 뒤 열린다 — 게임판 틀은 바로 뜬다).
   { name: '별자리 수판', board: '.sq-table' },
 ] as const;
