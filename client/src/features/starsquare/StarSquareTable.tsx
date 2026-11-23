@@ -136,6 +136,27 @@ export function StarSquareTable({
   useEffect(() => {
     setWatchPick(null); // 퍼즐이 바뀌면 내 판부터
   }, [puzzleKey]);
+  // 포커스가 있던 탭 단추가 사라지면(그 사람이 완성했거나 나갔다) 포커스가 body 로 떨어진다 — '내 판' 탭으로 옮긴다.
+  // 지워진 요소는 blur 를 믿을 수 없어, 마지막으로 포커스를 받은 탭 좌석을 focusin 으로 적어 둔다(다른 곳으로 옮기면 지워진다).
+  const focusedTabSeat = useRef<number | null>(null);
+  const myTabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const tab = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-watch-seat]') : null;
+      focusedTabSeat.current = tab ? Number(tab.dataset.watchSeat) : null;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+  const watchableKey = watchable.join(',');
+  useEffect(() => {
+    const seat = focusedTabSeat.current;
+    if (seat === null || watchableKey.split(',').includes(String(seat))) return;
+    focusedTabSeat.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body) return; // 포커스가 이미 다른 곳에 있다
+    myTabRef.current?.focus();
+  }, [watchableKey]);
 
   const resyncNonce = s.resyncNonce;
   useEffect(() => {
@@ -336,6 +357,7 @@ export function StarSquareTable({
             {watchable.length > 0 && (
               <div className="sq-watch-tabs" role="group" aria-label="누구 판 보기">
                 <button
+                  ref={myTabRef}
                   type="button"
                   className="sq-watch-tab"
                   aria-pressed={watching === null}
@@ -348,6 +370,7 @@ export function StarSquareTable({
                     key={seat}
                     type="button"
                     className="sq-watch-tab"
+                    data-watch-seat={seat}
                     aria-pressed={watching === seat}
                     onClick={() => setWatchPick(seat)}
                   >

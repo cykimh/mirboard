@@ -1578,4 +1578,6 @@ button.sq-badge {
   display: flex;
   justify-content: center;
   margin-top: 8px;
+  /* 아래 모서리의 대각선 합 알약(판 밖으로 9px)이 잘리거나 다이얼로그 본문에 스크롤을 만들지 않게 그만큼 자리를 준다 */
+  padding: 0 12px 12px;
 }

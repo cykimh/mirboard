@@ -319,6 +319,22 @@ describe('StarSquareTable (S3)', () => {
     expect(left[0]).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('D-294 남의 판 보기 — 포커스가 있던 탭이 사라지면 내 판 탭으로 옮긴다(다른 곳에 있던 포커스는 건드리지 않는다)', () => {
+    seedStore({ seats: [seat(0), seat(1), seat(2)] });
+    renderTable({ playerIds: [10, 20, 30], usernames: { 10: '가람', 20: '나래', 30: '다솜' } });
+    act(() => void starSquareRoomSink.applyEvent({ type: 'SOLVED', seq: 2, payload: { seat: 0, place: 1, elapsedMs: 9_000 } }));
+    const tab = (name: string) => screen.getByRole('button', { name });
+    fireEvent.click(tab('다솜'));
+    act(() => tab('다솜').focus());
+    act(() => void starSquareRoomSink.applyEvent({ type: 'SOLVED', seq: 3, payload: { seat: 2, place: 2, elapsedMs: 11_000 } }));
+    expect(tab('내 판')).toHaveFocus();
+    // 포커스가 채팅 단추에 있을 때 남은 탭이 사라져도 포커스는 그대로
+    act(() => tab('나래').focus());
+    act(() => screen.getByRole('button', { name: /^채팅/ }).focus());
+    act(() => void starSquareRoomSink.applyEvent({ type: 'SEAT_DESERTED', seq: 4, payload: { seat: 1 } }));
+    expect(screen.getByRole('button', { name: /^채팅/ })).toHaveFocus();
+  });
+
   it('D-294 남의 판 보기 — 관전자에게는 선택지가 없다(판도 오지 않는다)', () => {
     seedStore({ seats: [seat(0), seat(1, { solved: true, solvePlace: 1, elapsedMs: 5_000 })] }, null, -1);
     renderTable({ spectator: true, myUserId: 99 });

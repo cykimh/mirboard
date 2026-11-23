@@ -42,6 +42,15 @@ describe('27-starsquare-table.css — 네임스페이스 격리', () => {
     expect(responsive).toBeGreaterThan(sq);
   });
 
+  it('D-294 — 튜토리얼 판은 모서리 대각선 알약이 나가는 만큼(9px) 아래·옆 자리를 둔다(잘림·본문 스크롤 방지)', () => {
+    const out = /\.sq-sum-diag,\s*\.sq-sum-anti\s*\{[^}]*bottom:\s*-(\d+)px/.exec(cssCode);
+    const pad = /\.sq-tutorial-board\s*\{[^}]*padding:\s*0 (\d+)px (\d+)px/.exec(cssCode);
+    expect(out).not.toBeNull();
+    expect(pad).not.toBeNull();
+    expect(Number(pad![1])).toBeGreaterThanOrEqual(Number(out![1]));
+    expect(Number(pad![2])).toBeGreaterThanOrEqual(Number(out![1]));
+  });
+
   it('튜토리얼 포털이 쓰는 판 토큰을 .sq-tokens 가 선언한다', () => {
     const m = /(^|})\s*\.sq-tokens\s*\{([^}]*)\}/.exec(cssCode);
     expect(m).not.toBeNull();
