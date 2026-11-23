@@ -7,7 +7,7 @@ interface Props {
   seats: YachtSeatView[];
   turnSeat: number;
   mySeat: number;
-  /** 차례인 좌석의 빈 칸 → 지금 주사위 점수(서버 계산). */
+  /** 내 빈 칸 → 지금 내 주사위 점수(서버 계산). D-295 — 내 차례의 내 열에만 그린다(남의 열에는 임시 점수를 적지 않는다). */
   candidates: Partial<Record<Category, number>>;
   nameOf: (seat: number) => string;
   /** 내 차례이고 1번 이상 굴렸으면 빈 칸을 눌러 기록한다. */
@@ -18,8 +18,9 @@ interface Props {
 }
 
 /**
- * 점수표 — 칸 × 좌석 열(최대 4열 + 칸 이름, 375px 에서 가로 스크롤 없음). 차례인 좌석 열의 빈 칸에 후보 점수가 흐리게 뜬다
- * (구경꾼도 "어디 넣을까"를 같이 본다). 내 차례면 그 칸이 버튼이다. D-203 — 내 열은 `yt-cell-me`(옅은 황동 물),
+ * 점수표 — 칸 × 좌석 열(최대 4열 + 칸 이름, 375px 에서 가로 스크롤 없음). 내 차례면 <b>내 열</b>의 빈 칸에 후보 점수가 뜨고 그 칸이
+ * 버튼이다. D-295 — 남의 열에는 후보 점수를 적지 않는다(적혔다 지워지는 숫자가 진짜 점수와 헷갈렸다 — 남의 차례·남의 판 구경·관전
+ * 모두). D-203 — 내 열은 `yt-cell-me`(옅은 황동 물),
  * 적힌 칸은 `data-yt-cell`(황동 칩이 날아와 꽂힐 자리).
  */
 export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, onScore, lastScore, bonusSeat = null }: Props) {
@@ -39,7 +40,7 @@ export function YachtScorecard({ seats, turnSeat, mySeat, candidates, nameOf, on
         </td>
       );
     }
-    const candidate = isTurn ? candidates[c] : undefined;
+    const candidate = isTurn && seat.seat === mySeat ? candidates[c] : undefined;
     if (candidate !== undefined && onScore && seat.seat === mySeat) {
       return (
         <td key={seat.seat} className={`yt-cell yt-cell-pick${me}`}>

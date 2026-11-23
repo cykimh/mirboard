@@ -187,14 +187,16 @@ describe('YachtTable', () => {
     confirm.mockRestore();
   });
 
-  it("on someone else's turn the dice are view-only and candidates are dim text", () => {
+  it("on someone else's turn the dice are view-only and no provisional score is written in their column (D-295)", () => {
     seed({ turnSeat: 1, dice: [1, 2, 3, 4, 5], rolls: 1, candidates: { LARGE_STRAIGHT: 30 } });
     renderTable();
     expect(screen.queryByRole('button', { name: /굴리기/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '주사위 1: 1' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /기록/ })).not.toBeInTheDocument();
     const card = screen.getByRole('table', { name: '점수표' });
-    expect(within(card).getByText('30')).toHaveClass('yt-cell-candidate');
+    // D-295 — 남의 열에는 후보 점수를 적지 않는다(내 열에도 — 내 차례가 아니다).
+    expect(within(card).queryByText('30')).toBeNull();
+    expect(card.querySelector('.yt-cell-candidate')).toBeNull();
     expect(screen.getByText(/준호 차례 · 굴림 1\/3/)).toBeInTheDocument();
   });
 
@@ -436,6 +438,45 @@ describe('YachtTable', () => {
     });
   });
 
+  it('D-296 — ⋮ 메뉴 "주사위·판 꾸미기"로 스킨을 고르면 게임판 루트의 판 클래스와 주사위 색이 바뀐다(아무것도 보내지 않는다)', async () => {
+    const { DICE_PALETTES, useYachtSkinStore } = await import('./yachtSkins');
+    seed({ dice: [1, 2, 3, 4, 5], rolls: 1 });
+    const { container } = renderTable();
+    const root = container.querySelector('.yt-table')!;
+    expect(root).toHaveClass('yt-board-felt');
+    fireEvent.click(screen.getByRole('button', { name: '게임 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '주사위·판 꾸미기' }));
+    const dialog = screen.getByRole('dialog', { name: '주사위·판 꾸미기' });
+    fireEvent.click(within(dialog).getByRole('radio', { name: '밤하늘' }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: '옥' }));
+    expect(root).toHaveClass('yt-board-night');
+    expect(root).not.toHaveClass('yt-board-felt');
+    // 가운데 판의 큰 주사위가 고른 색표로 칠해진다.
+    expect(container.querySelector('.yt-dice .yt-die-svg stop')).toHaveAttribute('stop-color', DICE_PALETTES.jade.body[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog', { name: '주사위·판 꾸미기' })).toBeNull();
+    expect(sendAction).not.toHaveBeenCalled();
+    act(() => useYachtSkinStore.setState({ dice: 'ivory', board: 'felt' }));
+    localStorage.removeItem('mirboard.yacht.skin.dice');
+    localStorage.removeItem('mirboard.yacht.skin.board');
+  });
+
+  it('D-295 — 모두 같이 굴릴 때도 후보 점수는 내 열에만(남이 굴린 것은 그 사람 열에 적히지 않는다)', () => {
+    seed({
+      turnSeat: -1,
+      simultaneous: true,
+      turns: [
+        { seat: 0, dice: [1, 2, 3, 4, 5], held: NONE, rolls: 1, pending: true, candidates: { CHOICE: 15 } },
+        { seat: 1, dice: [6, 6, 5, 5, 1], held: NONE, rolls: 1, pending: true, candidates: { SIXES: 12 } },
+      ],
+    });
+    renderTable();
+    const card = screen.getByRole('table', { name: '점수표' });
+    expect(within(card).getByRole('button', { name: '초이스에 15점 기록' })).toBeInTheDocument();
+    expect(within(card).queryByText('12')).toBeNull();
+    expect(card.querySelectorAll('.yt-cell-pick, .yt-cell-candidate')).toHaveLength(1);
+  });
+
   describe('D-205 — 좌석을 눌러 그 사람 판 보기', () => {
     const simul = (over: { myPending?: boolean; remainingMs?: number | null } = {}) =>
       seed({
@@ -471,8 +512,10 @@ describe('YachtTable', () => {
       expect(screen.queryByRole('button', { name: /굴리기/ })).toBeNull();
       expect(screen.queryByRole('button', { name: /기록$/ })).toBeNull();
       const card = screen.getByRole('table', { name: '점수표' });
-      expect(within(card).getByText('12')).toHaveClass('yt-cell-candidate');
+      // D-295 — 구경하는 판의 후보 점수도 점수표에 적지 않는다(내 것도 구경하는 동안에는 없다).
+      expect(within(card).queryByText('12')).toBeNull();
       expect(within(card).queryByText('15')).toBeNull();
+      expect(card.querySelector('.yt-cell-candidate, .yt-cell-pick')).toBeNull();
       // 어느 판을 보는지 — 명패 테·꼬리표, 상태 줄, 안내.
       const li = container.querySelector('[data-yt-seat="1"]')!;
       expect(li).toHaveClass('yt-seat-watch');
@@ -523,7 +566,7 @@ describe('YachtTable', () => {
       });
       expect(screen.getByRole('group', { name: '주사위 6, 6, 6, 2, 3' })).toBeInTheDocument();
       expect(screen.getByText('준호 · 굴림 3/3')).toBeInTheDocument();
-      expect(within(screen.getByRole('table', { name: '점수표' })).getByText('18')).toHaveClass('yt-cell-candidate');
+      expect(within(screen.getByRole('table', { name: '점수표' })).queryByText('18')).toBeNull();
       act(() => {
         useYachtStore.getState().applyEvent({
           type: 'SCORED',
