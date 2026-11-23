@@ -98,10 +98,10 @@ class OneCardMatchRecorderIT {
                 .extracting(r -> r.get("final_rank") + "/" + r.get("cards_left") + "/" + r.get("is_win"))
                 .containsExactly("1/0/true", "2/3/false", "3/5/false");
 
-        // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20.
-        assertThat(oc(a).rating()).isEqualTo(1020);
-        assertThat(oc(b).rating()).isEqualTo(1000);
-        assertThat(oc(c).rating()).isEqualTo(990);
+        // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20 의 절반, 모두 참가 점수 +6(D-301).
+        assertThat(oc(a).rating()).isEqualTo(1026);
+        assertThat(oc(b).rating()).isEqualTo(1006);
+        assertThat(oc(c).rating()).isEqualTo(996);
         assertThat(oc(a).winCount()).isEqualTo(1);
         assertThat(oc(b).loseCount()).isEqualTo(1);
         assertThat(oc(c).loseCount()).isEqualTo(1);
@@ -122,13 +122,13 @@ class OneCardMatchRecorderIT {
         assertThat(oc(b).winCount()).isEqualTo(1);
         assertThat(oc(c).loseCount()).isEqualTo(1);
         // 공동 1등끼리 무(0.5), 3등에게 승: (0.5−0.5 + 1−0.5) × 40/2 = +10. 3등은 −20.
-        assertThat(oc(a).rating()).isEqualTo(1010);
-        assertThat(oc(b).rating()).isEqualTo(1010);
-        assertThat(oc(c).rating()).isEqualTo(990);
+        assertThat(oc(a).rating()).isEqualTo(1016);
+        assertThat(oc(b).rating()).isEqualTo(1016);
+        assertThat(oc(c).rating()).isEqualTo(996);
     }
 
     @Test
-    void a_bot_match_records_win_lose_but_skips_elo_and_bot_rows() {
+    void a_bot_match_moves_human_ratings_by_a_quarter_and_skips_bot_rows() {
         long a = human();
         long b = human();
         long bot = bots.getBotIds().get(0);
@@ -138,7 +138,9 @@ class OneCardMatchRecorderIT {
                 new Standing(0, 2, 2, SeatStatus.ALIVE),
                 new Standing(2, 3, 6, SeatStatus.ALIVE))));
 
-        assertThat(oc(a).rating()).isEqualTo(1000);
+        // D-299 — 봇(1000 으로 계산)이 1등. a 는 1승 1패라 그대로, b 는 2패 → 사람끼리면 −10, 봇 판은 −2(−2.5 반올림). 둘 다 참가 점수 +2(D-301).
+        assertThat(oc(a).rating()).isEqualTo(1002);
+        assertThat(oc(b).rating()).isEqualTo(1000);
         assertThat(oc(a).loseCount()).isEqualTo(1);
         assertThat(oc(b).loseCount()).isEqualTo(1);
         assertThat(stats.playedGames(bot)).isEmpty();

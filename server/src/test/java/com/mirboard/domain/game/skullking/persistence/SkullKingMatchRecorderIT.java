@@ -93,17 +93,17 @@ class SkullKingMatchRecorderIT {
                 .extracting(r -> r.get("final_score") + "/" + r.get("is_win"))
                 .containsExactly("210/true", "90/false", "-30/false");
 
-        // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20.
-        assertThat(sk(a).rating()).isEqualTo(1020);
-        assertThat(sk(b).rating()).isEqualTo(1000);
-        assertThat(sk(c).rating()).isEqualTo(990);
+        // 신규(K=40), 3인 동일 레이팅: 1등 40/2 × (2 − 1) = +20, 2등 0, 3등 −20 의 절반, 모두 참가 점수 +6(D-301).
+        assertThat(sk(a).rating()).isEqualTo(1026);
+        assertThat(sk(b).rating()).isEqualTo(1006);
+        assertThat(sk(c).rating()).isEqualTo(996);
         assertThat(sk(a).winCount()).isEqualTo(1);
         assertThat(sk(b).loseCount()).isEqualTo(1);
         assertThat(sk(c).loseCount()).isEqualTo(1);
     }
 
     @Test
-    void bot_match_records_win_lose_but_skips_elo_and_bot_rows() {
+    void bot_match_moves_human_ratings_by_a_quarter_and_skips_bot_rows() {
         long a = human();
         long b = human();
         long bot = bots.getBotIds().get(0);
@@ -111,7 +111,9 @@ class SkullKingMatchRecorderIT {
         publisher.publishEvent(new SkullKingMatchCompleted(room(), List.of(a, bot, b),
                 Map.of(0, 100, 1, 300, 2, 50), List.of(1), Set.of(), 10));
 
-        assertThat(sk(a).rating()).isEqualTo(1000);
+        // D-299 — 봇(1000 으로 계산)이 1등. a 는 1승 1패라 그대로, b 는 2패 → 사람끼리면 −10, 봇 판은 −2(−2.5 반올림). 둘 다 참가 점수 +2(D-301).
+        assertThat(sk(a).rating()).isEqualTo(1002);
+        assertThat(sk(b).rating()).isEqualTo(1000);
         assertThat(sk(a).loseCount()).isEqualTo(1);
         assertThat(sk(b).loseCount()).isEqualTo(1);
         assertThat(stats.playedGames(bot)).isEmpty();
@@ -134,8 +136,8 @@ class SkullKingMatchRecorderIT {
     }
 
     @Test
-    void match_with_guest_records_results_without_elo() {
-        // D-117 — 게스트가 낀 개인전도 승패·탈주는 누적, rating 은 전원 불변.
+    void match_with_guest_rates_the_members_and_never_stores_the_guest_rating() {
+        // D-299 덧붙임 — 게스트가 낀 개인전도 가입한 사람은 사람끼리 판과 같다. 게스트는 승패만 쌓이고 rating 은 1000 그대로.
         long a = human();
         long b = human();
         long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
@@ -148,8 +150,8 @@ class SkullKingMatchRecorderIT {
         assertThat(sk(guest).loseCount()).isEqualTo(1);
         assertThat(sk(b).loseCount()).isEqualTo(1);
         assertThat(sk(b).desertCount()).isEqualTo(1);
-        assertThat(sk(a).rating()).isEqualTo(1000);
-        assertThat(sk(guest).rating()).isEqualTo(1000);
-        assertThat(sk(b).rating()).isEqualTo(1000);
+        assertThat(sk(a).rating()).as("1등 +20(K=40) + 참가 점수 +6").isEqualTo(1026);
+        assertThat(sk(guest).rating()).as("게스트의 레이팅은 저장하지 않는다").isEqualTo(1000);
+        assertThat(sk(b).rating()).as("탈주로 꼴찌 −10, 참가 점수 없음").isEqualTo(990);
     }
 }

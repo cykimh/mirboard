@@ -196,13 +196,13 @@ class DomainEventSingleDeliveryIT {
                             + " WHERE r.room_id = ?",
                     Integer.class, roomId)).isEqualTo(4);
 
-            // 전적·ELO 는 한 번만(D-115 게임별 행) — 신규 유저 K=40, 기대승률 0.5 → +20 / −10(깎일 때 절반, D-297).
+            // 전적·ELO 는 한 번만(D-115 게임별 행) — 신규 유저 K=40, 기대승률 0.5 → +20 / −10(깎일 때 절반, D-297), 탈주자(좌석 1) 말고는 참가 점수 +6(D-301).
             // 열: win, lose, rating, desert.
             assertThat(ids.stream().map(id -> tichuStats(jdbc, id)).toList()).containsExactly(
-                    List.of(1, 0, 1020, 0),
+                    List.of(1, 0, 1026, 0),
                     List.of(0, 1, 990, 1),
-                    List.of(1, 0, 1020, 0),
-                    List.of(0, 1, 990, 0));
+                    List.of(1, 0, 1026, 0),
+                    List.of(0, 1, 996, 0));
 
             // 칩 정산도 한 번만 — 패자 2명이 100씩 → 승자 2명이 100씩.
             assertThat(chips.stacks(roomId)).containsExactlyInAnyOrderEntriesOf(Map.of(

@@ -228,7 +228,7 @@
 
 ### 9.3 기록
 
-- 2인 이상 매치: 매치 기록기 계약(`docs/game-port.md` "매치 기록기 계약") 그대로 — 비봇 참가자마다 전적, 봇·게스트가 끼면 ELO 미적용,
+- 2인 이상 매치: 매치 기록기 계약(`docs/game-port.md` "매치 기록기 계약") 그대로 — 비봇 참가자마다 전적, 게스트가 껴도 ELO 적용(게스트 본인 것은 저장 안 함)·봇이 끼면 1/4 만(D-299),
   ELO 는 개인전(`applyFreeForAll`, 점수 = 좌석 수 − 순위), 탈주는 `deserted`.
 - **1인 매치: 결과·참가자·`user_game_stats` 는 쓰지 않는다**(D-181). 1인 + 봇은 2인 이상 매치다. 끝까지 친 판(`FINISHED`)의 총점만
   `yacht_solo_scores`(V17)에 남긴다 — 게스트·봇은 쓰지 않는다(D-201).
@@ -238,7 +238,7 @@
 
 - **코드:** `event/YachtEvent`(sealed, JSON 판별자 `@event`), `state/YachtStateMapper.toPublicView(state, turnRemainingMs)`(남은 시간은 어댑터가 `remainingMillis` 로 넣는다). 기록기·상대 전적은 S3.
 - **코드(S3):** `persistence/YachtMatchRecorder`(로컬 발행 `YachtMatchCompleted` 리스너, 1인 판은 바로 반환), `persistence/YachtHeadToHead`(최종 순위), 마이그레이션 `*__yacht_match.sql`(`yacht_match_results`·`yacht_match_participants` — 요트 테이블만).
-- **테스트(S3):** `infra/bot/YachtBotMatchSimulationIT`(2·4봇 판 기록, 사람 + 봇 판의 사람 전적·ELO 제외, 1인 판 기록 0행·전적 0·대기실 복귀), `infra/ws/YachtRecorderFailureTest`(기록 실패에도 마지막 `SCORED`·`MATCH_ENDED` 방송 + 대기실 복귀).
+- **테스트(S3):** `infra/bot/YachtBotMatchSimulationIT`(2·4봇 판 기록, 사람 + 봇 판의 사람 전적·ELO 1/4(D-299), 1인 판 기록 0행·전적 0·대기실 복귀), `infra/ws/YachtRecorderFailureTest`(기록 실패에도 마지막 `SCORED`·`MATCH_ENDED` 방송 + 대기실 복귀).
 - **테스트:** `YachtJsonRoundTripTest`(상태·액션·이벤트 JSON 왕복, envelope 이름, 상태 JSON 에 난수 관련 키 없음),
   시뮬레이션의 "이벤트만 듣는 클라" 대조(§11).
 

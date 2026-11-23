@@ -16,6 +16,10 @@ import java.util.Map;
  *   <li>K-factor: 30게임 미만 신규는 40, 그 외 32</li>
  *   <li>D-297 — 깎일 때는 절반만({@link #LOSS_FACTOR}). 친구끼리 자주 지는 사람도 계급이 오르게 — 증감 합이 0 이 아니라 조금씩
  *       오른다(레이팅 인플레이션을 받아들인다). 탈주도 같다 — 탈주는 패배·탈주 수로 따로 남는다.</li>
+ *   <li>D-299 — 판 전체에 곱하는 배율({@code factor}). 봇이 낀 판은 {@link #BOT_MATCH_FACTOR}(오를 때도 내릴 때도 — 내릴 때는
+ *       절반 위에 더 곱한다), 사람끼리는 1. 어느 판이 어느 배율인지는 {@link RatedMatchPolicy#eloFactor} 가 정한다.</li>
+ *   <li>D-301 — 참가 점수({@link #participationBonus}). 위 계산과 별개로 판마다 더하는 고정값이라 계산 결과에는 들어 있지 않다 —
+ *       {@link UserGameStatsService#record(long, String, boolean, Integer, boolean, double)} 가 저장할 때 더한다.</li>
  * </ul>
  */
 public final class EloCalculator {
@@ -25,6 +29,14 @@ public final class EloCalculator {
     public static final int NEW_PLAYER_THRESHOLD = 30;
     /** D-297 — 레이팅이 내려갈 때 곱하는 비율(오를 때는 그대로). */
     public static final double LOSS_FACTOR = 0.5;
+    /** D-299 — 봇이 낀 판에서 레이팅 변화에 곱하는 비율("확실히 적게" — 사람끼리의 1/4). */
+    public static final double BOT_MATCH_FACTOR = 0.25;
+    /** 사람끼리의 판 — 줄이지 않는다. */
+    public static final double FULL_FACTOR = 1.0;
+    /** D-301 — 사람끼리의 판을 끝까지 마친 사람에게 결과와 상관없이 더하는 점수. */
+    public static final int PARTICIPATION_BONUS = 6;
+    /** D-301 — 봇이 낀 판(연습 판 포함)의 참가 점수. */
+    public static final int BOT_MATCH_PARTICIPATION_BONUS = 2;
 
     private EloCalculator() {}
 
@@ -43,6 +55,19 @@ public final class EloCalculator {
     public static Map<Long, Integer> applyMatch(List<PlayerInput> teamA,
                                                  List<PlayerInput> teamB,
                                                  boolean winnerIsTeamA) {
+        return applyMatch(teamA, teamB, winnerIsTeamA, FULL_FACTOR);
+    }
+
+    /**
+     * D-299 — {@link #applyMatch(List, List, boolean)} 에 판 배율을 곱한 것.
+     *
+     * @param factor 이 판의 레이팅 변화 배율(0 보다 크고 1 이하 — {@link RatedMatchPolicy#eloFactor})
+     */
+    public static Map<Long, Integer> applyMatch(List<PlayerInput> teamA,
+                                                 List<PlayerInput> teamB,
+                                                 boolean winnerIsTeamA,
+                                                 double factor) {
+        requireFactor(factor);
         if (teamA.isEmpty() || teamB.isEmpty()) {
             throw new IllegalArgumentException("Both teams must have at least one player");
         }
@@ -59,12 +84,12 @@ public final class EloCalculator {
         java.util.HashMap<Long, Integer> result = new java.util.HashMap<>();
         for (PlayerInput p : teamA) {
             int k = kFactor(p.gamesPlayed());
-            int delta = delta(k * (scoreA - expectedA));
+            int delta = delta(k * (scoreA - expectedA), factor);
             result.put(p.userId(), p.currentRating() + delta);
         }
         for (PlayerInput p : teamB) {
             int k = kFactor(p.gamesPlayed());
-            int delta = delta(k * (scoreB - expectedB));
+            int delta = delta(k * (scoreB - expectedB), factor);
             result.put(p.userId(), p.currentRating() + delta);
         }
         return java.util.Map.copyOf(result);
@@ -86,6 +111,16 @@ public final class EloCalculator {
      * @return userId → newRating 맵 (전원 포함)
      */
     public static Map<Long, Integer> applyFreeForAll(List<Placement> placements) {
+        return applyFreeForAll(placements, FULL_FACTOR);
+    }
+
+    /**
+     * D-299 — {@link #applyFreeForAll(List)} 에 판 배율을 곱한 것.
+     *
+     * @param factor 이 판의 레이팅 변화 배율(0 보다 크고 1 이하 — {@link RatedMatchPolicy#eloFactor})
+     */
+    public static Map<Long, Integer> applyFreeForAll(List<Placement> placements, double factor) {
+        requireFactor(factor);
         int n = placements.size();
         if (n < 2) {
             throw new IllegalArgumentException("Free-for-all needs at least two players");
@@ -102,7 +137,7 @@ public final class EloCalculator {
                 sum += outcome(me, other) - expected;
             }
             int k = kFactor(me.player().gamesPlayed());
-            int delta = delta(k * sum / (n - 1));
+            int delta = delta(k * sum / (n - 1), factor);
             result.put(me.player().userId(), me.player().currentRating() + delta);
         }
         return java.util.Map.copyOf(result);
@@ -121,8 +156,34 @@ public final class EloCalculator {
 
     /** D-297 — 내려가는 몫은 {@link #LOSS_FACTOR} 만큼만. 반올림은 줄인 뒤에. */
     static int delta(double raw) {
-        double scaled = raw < 0 ? raw * LOSS_FACTOR : raw;
+        return delta(raw, FULL_FACTOR);
+    }
+
+    /** D-299 — 판 배율까지 곱한 뒤 한 번만 반올림한다(내려갈 때는 절반 × 배율). */
+    static int delta(double raw, double factor) {
+        double scaled = (raw < 0 ? raw * LOSS_FACTOR : raw) * factor;
         return (int) Math.round(scaled);
+    }
+
+    /**
+     * D-301 — 참가 점수: 판을 많이 하면 계급이 오르게, ELO 계산 뒤에 더하는 고정값. 레이팅이 적용되는 판(배율 &gt; 0)을
+     * 끝까지 마친 사람만 받는다. 이기든 지든 비기든 같다.
+     *
+     * @param factor   이 판의 배율({@link RatedMatchPolicy#eloFactor}) — 0 이면 ELO 미적용 판이라 0 점
+     * @param deserted 탈주한 사람이면 0 점
+     * @return 사람끼리 {@link #PARTICIPATION_BONUS}, 봇이 낀 판 {@link #BOT_MATCH_PARTICIPATION_BONUS}
+     */
+    public static int participationBonus(double factor, boolean deserted) {
+        if (deserted || !(factor > 0.0)) {
+            return 0;
+        }
+        return factor < FULL_FACTOR ? BOT_MATCH_PARTICIPATION_BONUS : PARTICIPATION_BONUS;
+    }
+
+    private static void requireFactor(double factor) {
+        if (!(factor > 0.0 && factor <= 1.0)) {
+            throw new IllegalArgumentException("Elo factor must be in (0, 1]: " + factor);
+        }
     }
 
     public static int kFactor(int gamesPlayed) {

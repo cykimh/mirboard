@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * D-278 — 담바둑 매치 종료를 {@code dambaduk_match_results/participants} 에 적재하고 게임별 전적(DAMBADUK 행)을 갱신한다. 구름항로와 같은
- * 규칙(`docs/game-port.md` "매치 기록기 계약"): 봇·게스트가 낀 매치는 승패만, ELO 제외({@link RatedMatchPolicy}). 비봇 참가자마다 전적
+ * 규칙(`docs/game-port.md` "매치 기록기 계약"): 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 비봇 참가자마다 전적
  * 행을 남기고, 탈주자는 패 + desert_count(시간패로 빠진 사람은 패만 — 탈주가 아니다, 룰 §8).
  *
  * <p>승리는 1위다 — 동순위면 모두(룰 §7). 빠진 사람 없이 모두 동순위면 무승부: 승·패를 늘리지 않고 ELO 도 바꾸지 않는다(오목 D-178 과
@@ -70,7 +70,8 @@ public class DambadukMatchRecorder {
         DambadukState state = event.state();
         MatchResult result = state.result();
         boolean draw = result.draw();
-        boolean rated = !draw && ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = !draw && eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO dambaduk_match_results (room_id, finished_at, seat_count, end_reason, moves, is_draw,"
@@ -92,7 +93,7 @@ public class DambadukMatchRecorder {
                         playerIds.size() - standing.rank(),
                         standing.exit() != null));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         Map<Long, String> outcome = new LinkedHashMap<>();
@@ -110,9 +111,9 @@ public class DambadukMatchRecorder {
                 continue;                                   // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님)
             }
             if (draw) {
-                stats.recordDraw(userId, GAME);
+                stats.recordDraw(userId, GAME, eloFactor);
             } else {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted);
+                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
             }
             outcome.put(userId, draw ? "draw" : win ? "win" : deserted ? "deserted" : "lose");
         }

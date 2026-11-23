@@ -12,6 +12,7 @@ import com.mirboard.domain.game.omok.event.OmokMatchCompleted;
 import com.mirboard.domain.game.omok.state.EndReason;
 import com.mirboard.domain.game.omok.state.MatchResult;
 import com.mirboard.domain.game.omok.state.OmokState;
+import com.mirboard.domain.game.scoring.EloCalculator;
 import com.mirboard.domain.game.scoring.UserGameStatsService;
 import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.BotUserRegistry;
@@ -112,9 +113,9 @@ class OmokMatchRecorderIT {
                 .containsExactly("0/BLACK/true/false/false", "1/WHITE/false/false/false");
         assertThat(jdbc.queryForObject("SELECT payload_json FROM omok_match_results WHERE room_id = ?",
                 String.class, room)).contains("\"moves\"");
-        // 신규(K=40), 동일 레이팅 1:1: ±20.
-        assertThat(omok(a).rating()).isEqualTo(1020);
-        assertThat(omok(b).rating()).isEqualTo(990);
+        // 신규(K=40), 동일 레이팅 1:1: +20/−10, 참가 점수 +6(D-301).
+        assertThat(omok(a).rating()).isEqualTo(1026);
+        assertThat(omok(b).rating()).isEqualTo(996);
         assertThat(omok(a).winCount()).isEqualTo(1);
         assertThat(omok(b).loseCount()).isEqualTo(1);
     }
@@ -135,11 +136,11 @@ class OmokMatchRecorderIT {
         assertThat(omok(d).winCount()).isEqualTo(1);
         assertThat(omok(c).desertCount()).as("기권은 탈주가 아니다").isZero();
         assertThat(List.of(omok(a).rating(), omok(b).rating(), omok(c).rating(), omok(d).rating()))
-                .containsExactly(990, 1020, 990, 1020);
+                .containsExactly(996, 1026, 996, 1026);
     }
 
     @Test
-    void a_draw_changes_no_counts_or_rating_but_leaves_a_stats_row() {
+    void a_draw_changes_no_counts_and_only_adds_the_participation_bonus() {
         long a = human();
         long b = human();
         OmokState base = blackFiveSolo();
@@ -151,7 +152,8 @@ class OmokMatchRecorderIT {
         assertThat(statsRows(a)).isEqualTo(1);
         assertThat(statsRows(b)).isEqualTo(1);
         assertThat(omok(a).winCount() + omok(a).loseCount() + omok(a).desertCount()).isZero();
-        assertThat(omok(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(omok(a).rating()).as("무승부는 ELO 변화 없이 참가 점수만(D-301)")
+                .isEqualTo(UserGameStatsService.DEFAULT_RATING + EloCalculator.PARTICIPATION_BONUS);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM omok_match_participants p"
                         + " JOIN omok_match_results r ON r.id = p.match_id"
                         + " WHERE r.room_id = ? AND p.is_draw AND r.winner_color IS NULL", Integer.class, room))
@@ -172,13 +174,14 @@ class OmokMatchRecorderIT {
     }
 
     @Test
-    void a_bot_match_records_win_lose_but_skips_elo_and_bot_rows() {
+    void a_bot_match_moves_the_human_rating_by_a_quarter_and_skips_bot_rows() {
         long a = human();
         long bot = bots.getBotIds().get(0);
         publisher.publishEvent(new OmokMatchCompleted(room(), List.of(a, bot), blackFiveSolo()));
 
         assertThat(omok(a).winCount()).isEqualTo(1);
-        assertThat(omok(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        // D-299 — 봇에게 이김: 사람끼리면 +20(K=40), 봇 판은 그 1/4 = +5.
+        assertThat(omok(a).rating()).isEqualTo(UserGameStatsService.DEFAULT_RATING + 5 + EloCalculator.BOT_MATCH_PARTICIPATION_BONUS);
         assertThat(statsRows(bot)).isZero();
     }
 

@@ -28,8 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * D-212 — 구름항로 매치 종료를 {@code cloudroute_match_results/participants}에 적재하고 게임별 전적(CLOUD_ROUTE 행)을 갱신한다.
- * 원카드 {@code OneCardMatchRecorder} 와 같은 규칙(`docs/game-port.md` "매치 기록기 계약"): 봇·게스트가 낀 매치는 승패만, ELO 제외
- * ({@link RatedMatchPolicy}). 비봇 참가자마다 전적 행을 남기고, 탈주자는 패 + desert_count.
+ * 원카드 {@code OneCardMatchRecorder} 와 같은 규칙(`docs/game-port.md` "매치 기록기 계약"): 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 비봇 참가자마다 전적 행을 남기고, 탈주자는 패 + desert_count.
  *
  * <p>승리는 1등이다 — 동순위면 모두(룰 §12.2). ELO 는 개인전 쌍대 방식({@link EloCalculator#applyFreeForAll})에 순위를 점수로 넘긴다
  * (점수 = 좌석 수 − 순위). 탈주 좌석은 점수와 무관하게 최하위다.
@@ -68,7 +67,8 @@ public class CloudRouteMatchRecorder {
         MatchResult result = event.result();
         Map<Integer, Standing> bySeat = new HashMap<>();
         result.standings().forEach(standing -> bySeat.put(standing.seat(), standing));
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO cloudroute_match_results (room_id, finished_at, end_reason, rounds, payload_json)"
@@ -90,7 +90,7 @@ public class CloudRouteMatchRecorder {
                         playerIds.size() - standing.rank(),
                         standing.status() == SeatStatus.DESERTED));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
@@ -106,7 +106,7 @@ public class CloudRouteMatchRecorder {
                     deserted);
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted);
+                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
             }
         }
 

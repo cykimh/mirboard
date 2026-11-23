@@ -111,7 +111,9 @@ class OneCardBotMatchSimulationIT {
         assertRecorded(roomId, 4);
         GameStats humanStats = stats.get(human, OneCardGameDefinition.ID);
         assertThat(humanStats.winCount() + humanStats.loseCount()).as("사람 전적 1판").isEqualTo(1);
-        assertThat(humanStats.rating()).as("봇이 낀 매치는 ELO 제외").isEqualTo(UserGameStatsService.DEFAULT_RATING);
+        assertThat(humanStats.rating())
+                .as("봇이 낀 매치는 ELO 를 1/4 만(D-299, 신규 K=40 이면 +5 ~ −2) + 참가 점수 +2(D-301), 탈주면 참가 점수 없음")
+                .isBetween(UserGameStatsService.DEFAULT_RATING - 2, UserGameStatsService.DEFAULT_RATING + 7);
     }
 
     private void runAllBotMatch(int capacity) {

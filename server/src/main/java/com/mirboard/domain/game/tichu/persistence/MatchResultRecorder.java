@@ -86,10 +86,10 @@ public class MatchResultRecorder {
 
     /** 한 트랜잭션 — 매치·참가자 행과 게임별 전적. */
     private void record(TichuMatchCompleted event) {
-        // Phase 16(#4) — 봇 포함 매치도 win/lose·match_result 는 기록하되 ELO(rating)
-        // 만 제외 (rating 인플레이션 방지). D-117 — 게스트가 낀 매치도 같은 규칙.
-        // 정회원 4인 매치만 ELO 반영.
-        boolean rated = ratedMatchPolicy.eloApplies(event.playerIds());
+        // D-299 덧붙임 — 게스트가 낀 매치도 ELO 를 적용한다(게스트 본인의 rating 은 stats.record 가 저장하지 않는다).
+        // D-299 — 봇이 낀 매치는 ELO 를 1/4 만(예전 Phase 16(#4) 에서는 제외), 정회원 4인 매치는 그대로.
+        double eloFactor = ratedMatchPolicy.eloFactor(event.playerIds());
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
         String payloadJson;
         try {
             payloadJson = objectMapper.writeValueAsString(Map.of(
@@ -122,9 +122,9 @@ public class MatchResultRecorder {
             if (Team.ofSeat(seat) == Team.A) teamAInput.add(input);
             else teamBInput.add(input);
         }
-        // 봇·게스트 포함 매치는 ELO 미적용 — 빈 맵이면 아래 record 가 rating 을 유지.
+        // 봇 자리는 전적 행이 없어 기본값 1000 으로 계산에만 든다(게스트 자리도 rating 이 늘 1000).
         Map<Long, Integer> newRatings = rated
-                ? EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A)
+                ? EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A, eloFactor)
                 : Map.of();
 
         for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -138,7 +138,7 @@ public class MatchResultRecorder {
             boolean deserted = event.deserterUserId() != null && event.deserterUserId() == userId;
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님, D-71).
             if (!bots.isBot(userId)) {
-                stats.record(userId, TichuGameDefinition.ID, isWin, newRatings.get(userId), deserted);
+                stats.record(userId, TichuGameDefinition.ID, isWin, newRatings.get(userId), deserted, eloFactor);
             }
         }
         if (event.deserterUserId() != null) {

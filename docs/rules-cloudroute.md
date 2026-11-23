@@ -365,7 +365,7 @@
 | 포트 어댑터 — 상태 I/O, 공개 뷰(편지 순서 제외 — §13), 비공개 뷰 empty, 엔진 타이머 없음, 봇 안전망, 기록 발행, 탈주 3치 | `CloudRouteGameEngine`, `state/CloudRouteStateMapper`, `persistence/CloudRouteStateStore`(`room:{id}:state`) | `CloudRouteGameEngineTest`(6건) |
 | 판 시작 — `GameStartingEvent` → 시작 상태 저장 → 봇 루프·턴 타이머 | `lifecycle/CloudRouteRoundStarter` | `lifecycle/CloudRouteRoundStarterTest`(3건) |
 | 봇 — 공개 뷰만, 안전 잔고 = 남의 최대 통행료의 15%, 끝 3라운드 인수 안 함 | `bot/CloudRouteBotPolicy`·`CloudRouteBotView` | `bot/CloudRouteBotPolicyTest`(7건 — 강도 1,000판 포함) |
-| 기록 — `cloudroute_match_results`·`_participants`, 개인전 ELO(점수 = 좌석 수 − 순위), 봇·게스트 판 ELO 제외, 상대 전적 | `persistence/CloudRouteMatchRecorder`·`CloudRouteHeadToHead`, `event/CloudRouteMatchCompleted` | `persistence/CloudRouteMatchRecorderIT`(4건, Docker) |
+| 기록 — `cloudroute_match_results`·`_participants`, 개인전 ELO(점수 = 좌석 수 − 순위), 게스트 판도 ELO 적용·봇 판 1/4(D-299), 상대 전적 | `persistence/CloudRouteMatchRecorder`·`CloudRouteHeadToHead`, `event/CloudRouteMatchCompleted` | `persistence/CloudRouteMatchRecorderIT`(4건, Docker) |
 | 기록 실패 격리 — 마지막 굴림이 DB 장애에도 방송·대기실 복귀 | 어댑터 `record` | `infra/ws/CloudRouteRecorderFailureTest`(1건) |
 | 봇 완주 — 2·3·4인 봇 방 + 손을 놓은 사람(턴 제한 1초) | 전 배선 | `infra/bot/CloudRouteBotMatchSimulationIT`(4건, Docker, 약 40초) |
 

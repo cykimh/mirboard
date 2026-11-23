@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 별자리 수판 매치 종료를 {@code star_square_match_results/participants}(V22)에 적재하고 게임별 전적(STAR_SQUARE 행)을 갱신한다(S2).
- * 얏추 기록기와 같은 규칙: 봇·게스트가 낀 매치는 승패만, ELO 는 제외({@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
+ * 얏추 기록기와 같은 규칙: 게스트가 낀 매치도 ELO 적용(게스트 본인 것은 저장 안 함 — D-299 덧붙임), 봇이 낀 매치는 ELO 를 1/4 만(D-299 — {@link RatedMatchPolicy}). 탈주자는 패 + 탈주 수.
  *
  * <p><b>1인 매치는 아무것도 쓰지 않는다</b>(룰 §12.2, D-181 과 같다 — 혼자 판 최단 시간 기록은 v1 에 없다). 1인 + 봇은 여럿 판이다.
  *
@@ -72,7 +72,8 @@ public class StarSquareMatchRecorder {
         }
         Map<Integer, Placement> bySeat = new HashMap<>();
         result.placements().forEach(p -> bySeat.put(p.seat(), p));
-        boolean rated = ratedMatchPolicy.eloApplies(playerIds);
+        double eloFactor = ratedMatchPolicy.eloFactor(playerIds);
+        boolean rated = eloFactor > RatedMatchPolicy.UNRATED;
 
         Long matchId = jdbc.queryForObject(
                 "INSERT INTO star_square_match_results (room_id, finished_at, end_reason, payload_json)"
@@ -93,7 +94,7 @@ public class StarSquareMatchRecorder {
                         playerIds.size() - p.rank(),
                         p.deserted()));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements);
+            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
@@ -107,7 +108,7 @@ public class StarSquareMatchRecorder {
                     matchId, userId, seat, p.rank(), p.points(), p.firsts(), win, p.deserted());
             // 봇 계정 자신은 전적을 쌓지 않는다(랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), p.deserted());
+                stats.record(userId, GAME, win, newRatings.get(userId), p.deserted(), eloFactor);
             }
         }
 

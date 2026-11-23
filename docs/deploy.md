@@ -444,6 +444,38 @@ sideinfra 마이그레이션이 만들고, 테이블은 이 저장소 Flyway 가
 보관 → 새 비밀번호 설정 → 앱 머신 내리기 → 덤프 → 스키마 이름 변경 → 한 트랜잭션 복원 → 행 수 대조 → 접속 정보 교체 → 같은 이미지로 다시 배포.
 앱이 몇 분 멈추므로 게임이 없을 때. 1주일 문제없으면 `flyctl apps destroy mirboard-db`(되돌릴 수 없다)와 보관 파일 두 개를 지운다.
 
+## 레이팅 일괄 올리기 (D-300)
+
+`V23__rating_raise_d300.sql` 이 배포 때 **한 번** 돈다(Flyway). 사람 계정(봇·게스트 제외)의 한 판 이상 한 `user_game_stats` 행을 +40 올리고,
+올리기 전 값을 `user_game_stats_backup_d300`(`rating` = 올리기 전 값, `raised_by` = 올린 점수 0 또는 40)에 남긴다. 배포 뒤 확인:
+
+```sql
+set search_path = mirboard;
+select count(*) filter (where raised_by > 0) as raised, count(*) as backed_up from user_game_stats_backup_d300;
+```
+
+**되돌리기** — Supabase SQL 편집기에서, 첫 줄에 `set search_path = mirboard;`. 앱을 내릴 필요는 없다(계급은 레이팅에서 바로 계산된다).
+
+- (가) 올린 만큼만 빼기(권장 — 그 뒤 판으로 바뀐 레이팅은 지킨다). 둘을 한 번에 실행한다. 다시 실행해도 또 빠지지 않는다.
+  ```sql
+  begin;
+  update user_game_stats s set rating = s.rating - b.raised_by
+    from user_game_stats_backup_d300 b
+   where b.user_id = s.user_id and b.game_type = s.game_type and b.raised_by > 0;
+  update user_game_stats_backup_d300 set raised_by = 0 where raised_by > 0;
+  commit;
+  ```
+- (나) 백업 시점 값으로 통째 복원(그 뒤 판의 레이팅 변화도 사라진다 — 배포 직후에만).
+  ```sql
+  update user_game_stats s set rating = b.rating
+    from user_game_stats_backup_d300 b
+   where b.user_id = s.user_id and b.game_type = s.game_type;
+  ```
+
+문제없으면 백업 테이블은 `drop table user_game_stats_backup_d300;` 으로 지워도 된다(앱은 읽지 않는다). 회원 초기화(아래)를 해도 백업 행은
+남는다(FK 없음 — 해롭지 않다). 봇 판 배율(D-299)·참가 점수(D-301)는 데이터가 아니라 코드라 되돌리려면 `EloCalculator.BOT_MATCH_FACTOR`·
+`PARTICIPATION_BONUS`·`BOT_MATCH_PARTICIPATION_BONUS` 를 고쳐 배포한다(이미 쌓인 점수는 그대로 남는다).
+
 ## 회원 초기화 (D-149)
 
 사람 계정과 그에 딸린 기록(전적·랭킹·매치 기록·아바타·신고·관리자 권한, 게스트 포함)을 모두 지우고 시드 봇 8명만 남긴다. **되돌릴 수 없다.**

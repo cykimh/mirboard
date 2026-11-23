@@ -38,7 +38,7 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
 
     /**
      * 한 매치 결과를 누적한다. 행이 없으면 기본값(1000)에서 시작하고, {@code rating} 이
-     * null 이면(봇 매치 등 ELO 미적용) 현재 rating 을 유지한다. 판정과 증분이 한 문장이라
+     * null 이면(무승부·게스트 본인 등 rating 을 쓰지 않는 기록) 현재 rating 을 유지한다. 판정과 증분이 한 문장이라
      * 같은 유저의 동시 기록에도 갱신이 사라지지 않는다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

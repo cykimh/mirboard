@@ -203,7 +203,7 @@
   +248(기존 −3), 자가대전 적중률 약 0.68(`rules-skullking.md` §16). D-119 휴리스틱은 `OddsHeuristic` 으로 비교 기준만.
 - 두 정책 모두 예외·비합법 수를 내면 ERROR 로그 후 `timeoutAction`(최약수)으로 폴백한다.
   `timeoutAction`·탈주 유령 자동조종은 최약수 그대로(D-104).
-- 봇 라벨은 UI에서 제거(D-76 후속), 봇 매치는 ELO 집계 제외(D-71).
+- 봇 라벨은 UI에서 제거(D-76 후속), 봇 매치는 ELO 를 1/4 만(D-299 — 예전 D-71 은 제외).
 - `TurnTimeoutScheduler` 가 무응답 차례를 자동 처리.
 
 ---
@@ -241,7 +241,7 @@
   - **스컬킹**(개인전) → `MATCH_CONTINUES`. 좌석을 지우지 않고 **유령 좌석 + 자동조종**
     으로 남은 사람끼리 계속한다(`seatCount` 가 트릭 크기·턴 모듈러·카드 보존 불변식에
     동시에 묶여 있어 좌석 제거가 불가). 잔존 좌석 < 2 이거나 잔존 사람 0 이면 조기 종료.
-- 탈주자 패널티(`desert_count`+1·lose+1·ELO−, 봇 매치 ELO 제외)는 영속이 있는
+- 탈주자 패널티(`desert_count`+1·lose+1·ELO−, 봇 매치는 1/4 만 — D-299)는 영속이 있는
   티츄에만 적용된다 — 스컬킹 매치 영속은 D-02 게임별 rating 분리 선행으로 별건.
 - 유예 내 복귀 시 세션 복원.
 - **좌석 고정·종료 방 정지(D-122)**: 시작된 게임의 좌석 목록은 매치가 끝나기 전엔 바뀌지 않는다 —
@@ -264,7 +264,10 @@
 - **게임별**(D-115): 전적·레이팅은 `user_game_stats`(V11, `user_id+game_type`)에 쌓인다.
   티츄 기존 값은 V11 이 TICHU 행으로 이관했고 `users` 의 옛 컬럼은 쓰기를 멈췄다(DROP 예정).
 - ELO: 티츄는 팀 평균(`applyMatch`), 스컬킹은 개인전 쌍대(`applyFreeForAll` — 탈주 좌석
-  최하위). K=40(30판 미만)/32. 봇이 낀 매치는 승패만 기록, ELO 제외(D-71).
+  최하위). K=40(30판 미만)/32. 깎일 때는 절반(D-297). 봇이 낀 매치는 레이팅 변화의 1/4 만(D-299 —
+  `RatedMatchPolicy.eloFactor`, 봇은 1000 으로 계산만), 게스트가 낀 매치도 적용(게스트 본인 것은 저장 안 함). D-300 — 일괄 +40(V23, 한 번).
+  D-301 — 참가 점수: 레이팅이 적용되는 판을 끝까지 마치면 사람끼리 +6·봇 판 +2(탈주·게스트 본인 0, 무승부 포함 —
+  `EloCalculator.participationBonus`, `UserGameStatsService.record` 가 더한다).
 - 스컬킹 매치는 `skullking_match_results/participants` 에 남는다(`SkullKingMatchRecorder`).
 - **tier** 는 컬럼이 아니라 rating 구간에서 계산(BRONZE→…→MASTER, derived).
 - 엔드포인트: `GET /api/users/{id}/stats`(`games[]`), `GET /api/users/ranking?gameType=`
@@ -366,7 +369,7 @@
   앱 `mirboard-redis`(D-114), DB 는 Fly Postgres `mirboard-db`.
 - **게스트 체험(D-117, D-105 데모 계정 대체)**: `POST /api/auth/guest` 가 방문자마다 일회용 `users`
   행(규약 `guest-`+sentinel 해시, D-02 불변)을 만들고 JWT 를 준다. 비번/아바타 403, 랭킹 제외,
-  게스트 포함 매치 ELO 미적용(`RatedMatchPolicy`). IP(IPv6 /64)당 하루 10회 + UTC 하루 전역 200명
+  게스트 포함 매치도 ELO 적용 — 게스트 본인의 레이팅만 저장하지 않는다(D-299 덧붙임, 예전에는 전원 미적용). IP(IPv6 /64)당 하루 10회 + UTC 하루 전역 200명
   (Lua 원자 카운터, fail-closed). 48h 미참여 게스트 자동 정리(10분 1회). 킬스위치
   `MIRBOARD_GUEST_ENABLED`. 공유 데모 계정은 같은 계정 동시 접속이 좌석 탈취·손패 유출을 일으켜 폐기.
 - **허브 서비스 토큰(D-170)**: 허브 서버가 `/api/admin/**` 를 서버끼리 부르는 인증. `JwtAuthFilter` 안의

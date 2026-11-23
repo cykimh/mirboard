@@ -157,11 +157,19 @@ FINISHED 로 만들었다. 스컬킹의 "남은 사람끼리 계속"(D-104)은 2
 ELO·전적은 포트 밖이지만, 새 게임의 매치 기록기(`MatchResultRecorder`·`SkullKingMatchRecorder`
 같은, 게임별 매치 종료 이벤트 리스너)는 다음 세 가지를 지켜야 한다.
 
-1. **ELO 적용 여부는 `RatedMatchPolicy.eloApplies(playerIds)` 하나로 판정한다.** 봇(D-71)이나
-   게스트(D-117)가 한 명이라도 낀 매치는 전원 미적용이다(승패·탈주는 기록). 조건을 기록기마다
-   따로 쓰면 한쪽만 고쳐진다 — 실제로 D-117 전에는 두 기록기에 `hasBots` 가 각각 있었다.
-2. **비봇 참가자마다 `user_game_stats` 행을 남긴다**(`UserGameStatsService.record`, ELO 미적용이면
-   `newRating=null`). 게스트 정리(`GuestAccountSweeper`)가 이 행을 "매치를 끝낸 증거"로 쓴다.
+1. **ELO 를 얼마나 적용할지는 `RatedMatchPolicy.eloFactor(playerIds)` 하나로 판정한다(D-299).** 봇이 낀
+   매치는 `EloCalculator.BOT_MATCH_FACTOR`(0.25 — 게스트가 같이 끼어도), 그 밖은 1 이다. **게스트가 낀 매치도
+   적용한다**(D-299 덧붙임 — 예전 D-117 은 전원 미적용): 게스트도 계산에 들어가되 rating 이 늘 1000 이고(저장하지
+   않는다 — `UserGameStatsService.record(…, eloFactor)` 가 게스트면 rating 을 쓰지 않고 승패만 남긴다) 가입한
+   사람의 것만 움직인다. 기록기는 그 값을
+   `EloCalculator.applyMatch(…, factor)`·`applyFreeForAll(…, factor)` 에 그대로 넘긴다(깎일 때 절반 D-297 과
+   반올림은 계산기 안에서). 봇 자리는 전적 행이 없어 1000·0판으로 계산에만 들어가고 봇의 레이팅은 쓰지 않는다
+   (아래 2 — 비봇만). 조건을 기록기마다 따로 쓰면 한쪽만 고쳐진다 — 실제로 D-117 전에는 두 기록기에
+   `hasBots` 가 각각 있었다. *(D-299 전에는 `eloApplies` 로 봇·게스트 매치가 전원 미적용이었다.)*
+   **같은 배율을 전적 기록에도 넘긴다(D-301)** — `UserGameStatsService.record(…, deserted, eloFactor)`·
+   `recordDraw(…, eloFactor)` 가 참가 점수(`EloCalculator.participationBonus` — 사람끼리 +6·봇 판 +2, 탈주·게스트
+   본인 0, 무승부도 받음)를 ELO 결과에 더해 저장한다. 기록기에서 따로 더하지 말 것.
+2. **비봇 참가자마다 `user_game_stats` 행을 남긴다**(`UserGameStatsService.record` — 게스트도 승패 행은 남는다, rating 만 안 쓴다). 게스트 정리(`GuestAccountSweeper`)가 이 행을 "매치를 끝낸 증거"로 쓴다.
    참가자 테이블에만 쓰고 stats 를 빠뜨리면, 그 게스트는 48h 뒤 정리 대상이 됐다가 참가자 FK
    때문에 삭제가 매번 실패한다(그 행만 건너뛰고 warn — 정리 자체는 커서로 계속 진행).
 3. **기록 실패는 진행 경로로 새지 않는다(D-130·D-131).** 매치 종료 이벤트는 동기 로컬 발행(D-116)이라 리스너
