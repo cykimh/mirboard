@@ -178,8 +178,10 @@ public class RoomController {
      */
     @PostMapping("/{roomId}/join-or-reconnect")
     public JoinOrReconnectResponse joinOrReconnect(@PathVariable String roomId,
-                                                   @AuthenticationPrincipal AuthPrincipal me) {
-        JoinOrReconnectResult result = rooms.joinOrReconnect(roomId, me.userId());
+                                                   @AuthenticationPrincipal AuthPrincipal me,
+                                                   // D-290 — 화면의 자동 재동기화 입장(사용자가 누르지 않음). 강퇴 기록이 있으면 거절한다.
+                                                   @RequestParam(defaultValue = "false") boolean auto) {
+        JoinOrReconnectResult result = rooms.joinOrReconnect(roomId, me.userId(), auto);
         return new JoinOrReconnectResponse(result.mode().name(), result.room());
     }
 

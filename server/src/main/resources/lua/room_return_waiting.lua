@@ -3,8 +3,9 @@
 -- 게임 최대 인원. D-143 시작이 현재 인원으로 줄였다), 준비 비우기,
 -- 관전자를 들어온 순서(spectators_since 점수)대로 빈자리에 앉히기, 방 목록에 다시 올리기. 한 번에 원자적으로 한다.
 -- 관전 순서 ZSET 에 남은 지난 관전자(이미 나간 사람)는 SET 과 맞춰 걸러낸다.
--- D-290 — 기다리던 관전자가 봇보다 먼저다: 빈자리가 모자라면 뒤쪽 봇부터 빼고 그 자리에 앉힌다(사람은 빼지 않는다). 판 도중
--- 링크로 온 친구에게 "다음 판에 함께해요"라고 해 놓고 봇이 자리를 쥐고 있어 관전자로 남던 것을 고친다.
+-- D-290 — 사람이 오면 봇은 모두 빠진다: 기다리던 관전자가 한 명이라도 앉게 되면(봇을 뺐을 때 자리가 있으면) 봇을 전부 빼고
+-- 관전자를 앉힌다(사람은 빼지 않는다 — 봇이 필요하면 방장이 [봇 추가]로 다시 넣는다). 앉을 관전자가 없으면 봇은 같이 돌아온다.
+-- 판 도중 링크로 온 친구에게 "다음 판에 함께해요"라고 해 놓고 봇이 자리를 쥐고 있어 관전자로 남던 것을 고친다.
 --
 -- KEYS[1] = room:{roomId}
 -- KEYS[2] = room:{roomId}:players
@@ -66,25 +67,27 @@ for i = 1, #rest do
     end
 end
 
-for i = 1, #queue do
-    if seated >= capacity then
-        -- 빈자리가 없다 — 가장 뒤에 앉은 봇 하나를 빼고 그 자리를 준다. 봇이 없으면 남은 사람은 계속 관전한다.
-        local evicted = false
-        for p = #players, 1, -1 do
-            if isBot[players[p]] then
-                redis.call('LREM', KEYS[2], -1, players[p])
-                table.remove(players, p)
-                seated = seated - 1
-                evicted = true
-                break
-            end
-        end
-        if not evicted then
-            break
+-- 봇을 뺐을 때 관전자가 한 명이라도 앉을 수 있으면 봇을 모두 뺀다.
+local humans = 0
+for i = 1, #players do
+    if not isBot[players[i]] then
+        humans = humans + 1
+    end
+end
+if #queue > 0 and humans < capacity and humans < seated then
+    for i = 1, #players do
+        if isBot[players[i]] then
+            redis.call('LREM', KEYS[2], 0, players[i])
         end
     end
+    seated = humans
+end
+
+for i = 1, #queue do
+    if seated >= capacity then
+        break
+    end
     redis.call('RPUSH', KEYS[2], queue[i])
-    players[#players + 1] = queue[i]
     redis.call('SREM', KEYS[4], queue[i])
     redis.call('ZREM', KEYS[5], queue[i])
     seated = seated + 1

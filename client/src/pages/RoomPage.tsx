@@ -262,7 +262,8 @@ export function RoomPage() {
           }
           if (fresh()) applyRoomMeta(watched);
         } else if (current.status === 'WAITING') {
-          const r = await roomsApi.joinOrReconnect(token, requested);
+          // D-290 — 자동 입장임을 알린다: 끊긴 사이 방장이 내보냈으면 금지 60초가 지났어도 다시 앉지 않는다(아래 KICKED 패널).
+          const r = await roomsApi.joinOrReconnect(token, requested, { auto: true });
           if (!mountedRef.current) {
             // 기다리는 사이 방 화면을 떠났다 — 다시 받은 자리·관전을 거둔다(소켓이 없어 끊김 유예도 걸리지 않는다).
             const undo = r.mode === 'SPECTATING' ? roomsApi.stopSpectating(token, requested) : roomsApi.leave(token, requested);

@@ -243,6 +243,21 @@ class RoomServiceBotsTest {
         verify(repository, never()).addSpectator(anyString(), anyLong());
     }
 
+    @Test
+    @DisplayName("강퇴 기록이 있으면 자동 재입장(재동기화)은 KICKED_FROM_ROOM, 직접 입장은 들어오고 기록을 지운다")
+    void auto_rejoin_is_refused_after_a_kick() {
+        when(repository.findById(ROOM_ID)).thenReturn(Optional.of(waiting(HOST)));
+        when(repository.wasKicked(ROOM_ID, GUEST)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.joinOrReconnect(ROOM_ID, GUEST, true)).isInstanceOf(KickedFromRoomException.class);
+        verify(repository, never()).join(anyString(), anyLong(), anyLong());
+        verify(repository, never()).clearKickLog(anyString(), anyLong());
+
+        service.joinOrReconnect(ROOM_ID, GUEST, false);
+        verify(repository).join(eq(ROOM_ID), eq(GUEST), anyLong());
+        verify(repository).clearKickLog(ROOM_ID, GUEST);
+    }
+
     // ---------- 나가기 ----------
 
     @Test

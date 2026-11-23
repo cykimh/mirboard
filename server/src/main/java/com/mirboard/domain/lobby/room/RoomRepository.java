@@ -209,7 +209,7 @@ public class RoomRepository {
     public int removeMember(String roomId, long hostUserId, long targetUserId, int banSeconds) {
         Long result = redis.execute(removeMemberScript,
                 List.of("room:" + roomId, "room:" + roomId + ":players", readyKey(roomId),
-                        kickedKey(roomId, targetUserId)),
+                        kickedKey(roomId, targetUserId), kickedLogKey(roomId)),
                 Long.toString(hostUserId), Long.toString(targetUserId), Integer.toString(banSeconds));
         return (int) unwrap(result);
     }
@@ -217,6 +217,20 @@ public class RoomRepository {
     /** D-290 — 방장이 방금 내보내 그 방 재입장 금지가 걸려 있는가. */
     public boolean isKicked(String roomId, long userId) {
         return Boolean.TRUE.equals(redis.hasKey(kickedKey(roomId, userId)));
+    }
+
+    /** D-290 — 이 방에서 내보내진 적이 있고 그 뒤 스스로 다시 들어오지 않았는가(방 수명 동안 남는 기록). */
+    public boolean wasKicked(String roomId, long userId) {
+        return Boolean.TRUE.equals(redis.opsForSet().isMember(kickedLogKey(roomId), Long.toString(userId)));
+    }
+
+    /** D-290 — 내보내진 사람이 스스로(링크를 눌러) 다시 들어왔다 — 기록을 지운다. */
+    public void clearKickLog(String roomId, long userId) {
+        redis.opsForSet().remove(kickedLogKey(roomId), Long.toString(userId));
+    }
+
+    private static String kickedLogKey(String roomId) {
+        return "room:" + roomId + ":kicked_log";
     }
 
     private static String kickedKey(String roomId, long userId) {

@@ -366,6 +366,8 @@ WAITING→IN_GAME 전이 + 게임 시작. 에러: `ROOM_NOT_FOUND`,
   인원(봇 포함)보다 작으면 `TOO_MANY_PLAYERS`(409 — 봇을 저절로 빼지 않는다). `options` 와 같이 보내면 바뀐 뒤 옵션의 범위로 본다. 바꾼
   정원은 곧바로 방 목록·입장(`ROOM_FULL`)·`join-or-reconnect` 의 관전 판정에 닿고, 시작이 현재 인원으로 줄였다가(D-143) 판이 끝나 대기실로
   돌아올 때 이 값으로 되돌아온다(`lobbyCapacity`).
+- D-290 — `options` 가 정원 범위를 바꾸는데 `capacity` 를 같이 보내지 않으면: 게임 정원이 달라지면 그 정원으로(D-176), 시작 인원만 올라
+  지금 정원이 범위 아래가 되면 새 시작 인원으로 끌어올린다(씨앗포 정원 2 → 2:2 팀전이면 4).
 - `turnSeconds` 는 0~600 이다. 화면 선택지는 게임이 선언한 `turnSecondsChoices` 다.
 - `targetScore` 는 100~10000 이고 `TARGET_SCORE` 게임만 쓴다.
 - `stake` 는 허용값 `{0,10,50,100,500}` 이고 `BETTING` 게임만 쓴다. 봇 방이면 0 만 된다.
@@ -428,7 +430,11 @@ D-133 — 방을 읽은 뒤(빈자리 있음) 실제로 앉기 전에 마지막 
 ```json
 { "mode": "JOINED" | "RECONNECTED" | "SPECTATING", "room": { ... } }
 ```
-에러: `ROOM_NOT_FOUND`, `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
+D-290 — 쿼리 `auto=true` 는 사용자가 누르지 않은 입장(방 화면의 재동기화 — 다시 연결·다시 보임)이다. 이 방에서 강퇴된 기록이 있고 그 뒤
+스스로 다시 들어온 적이 없으면 `KICKED_FROM_ROOM`(403)으로 거절한다(금지 60초가 지났어도 — 소켓이 끊긴 사이 강퇴된 사람을 조용히 다시 앉히지
+않게). 이미 앉아 있거나 관전 중이면 `auto` 와 상관없이 평소대로 답한다.
+
+에러: `ROOM_NOT_FOUND`, `KICKED_FROM_ROOM`(403 — 금지 60초 안, 또는 `auto=true` 에 강퇴 기록), `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
 
 ### GET `/api/users/{userId}/stats` *(Phase 8D)*
 ELO rating + 누적 전적 + 파생 tier 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
@@ -565,6 +571,8 @@ body는 `{ "userId": 18 }` 이다. 방 상태로 갈린다.
 `room:{id}:kicked:{userId}` 를 60초 걸어, 그동안 그 사람의 `join`·`join-or-reconnect`·`spectate` 를 `KICKED_FROM_ROOM`(403)으로 거절한다
 (만료되면 다시 들어올 수 있다). 방 메타 토픽에 `ROOM_MEMBER_KICKED { roomId, userId }` 가 먼저 나가고 좌석 변화(`ROOM_META_UPDATED`)가
 뒤따른다. 대상이 방장 자신·봇(봇은 `DELETE …/bots/{userId}`)·앉아 있지 않은 사람이면 `NOT_IN_ROOM`. 관전자는 대상이 아니다.
+강퇴 기록은 방 수명 동안 남아(`room:{id}:kicked_log`) **자동 재입장**(`join-or-reconnect?auto=true` — 방 화면의 재동기화)을 60초 뒤에도
+`KICKED_FROM_ROOM` 으로 거절한다. 사용자가 링크를 직접 열어 들어오는 입장(`auto` 없음)은 60초 뒤 허용하고 그때 기록을 지운다.
 
 **게임 중(IN_GAME) — D-162.** 연결이 끊긴 사람을 방장이 바로 탈주 처리한다. 3분 유예(D-158)를 기다리지 않는다.
 - 대상은 방장 자신이 아닌, 이 판의 사람 플레이어여야 한다.

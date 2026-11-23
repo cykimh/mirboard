@@ -21,6 +21,7 @@
 | `room:{roomId}:chips` | HASH | 6h | 방 단위 테이블 칩 `userId`→칩(D-82) | 내기 방만. 게임 시작 시 전원 동일 칩 init(다음 판 — D-153 대기실 복귀 뒤 — 에도 유지, 새로 앉은 사람은 재바이인), 매치 종료마다 `RoomChipService` 정산. 계정 아님 — 방 소멸 시 TTL 정리 |
 | `room:{roomId}:spectators` | SET | 6h (FINISHED 후 600s) | 관전자 `userId` | D-75: 빈 방 destroy(`room_leave.lua`) 및 `room_delete.lua` 가 함께 삭제 — 고아 키 방지 |
 | `room:{roomId}:kicked:{userId}` | STRING | 60s | `"1"` | D-290. 방장이 대기실에서 내보낸 사람의 재입장 금지. `room_remove_member.lua` 가 좌석 빼기와 같은 원자 구간에서 `SET … EX 60`. 살아 있는 동안 `room_join.lua` 가 `-5`(KICKED), 관전은 서비스가 거절 |
+| `room:{roomId}:kicked_log` | SET | 6h | 이 방에서 강퇴된 `userId` | D-290. `room_remove_member.lua` 가 강퇴 때 `SADD`. 방 화면의 자동 재입장(`join-or-reconnect?auto=true`)이 이 기록이 있으면 거절한다(60초 금지가 지났어도). 그 사람이 직접 다시 들어오면 `SREM`. 방이 먼저 사라져도 TTL 로 지워진다 |
 | `room:{roomId}:spectators_since` | ZSET | 6h | member=관전자 `userId`, score=관전 시작 `epochMillis` | D-153. 다음 판 자동 착석 순서. `addSpectator` 가 `ZADD`(다시 관전하면 시각 갱신). 나간 관전자는 지우지 않고 `room_return_waiting.lua` 가 SET 과 맞춰 거른다(순서 기록 없는 관전자는 뒤에 userId 순). 앉으면 `ZREM` |
 | `room:{roomId}:seq` | STRING(INTEGER) | 6h | 이벤트 단조 카운터 | `room_seq_next.lua`(INCR+EXPIRE)로만 변경. TTL 은 **이벤트 발행마다 갱신**(슬라이딩) — 활동 중인 방에서 만료돼 1부터 다시 시작하면 클라 seq gap 판정이 깨진다 |
 | `room:{roomId}:lock` | STRING | 2s | 액션 직렬화 락 — 값은 획득 때의 무작위 토큰 | `SET key token NX EX 2`. D-140: 해제는 `room_lock_release.lua`(`GET == token` 일 때만 `DEL`) — TTL 이 지나 남이 잡은 락을 늦게 돌아온 스레드가 지우지 않는다 |
@@ -121,10 +122,10 @@ WAITING→IN_GAME 전이는 `room_ready.lua`(정원 + 전원 준비 — D-143 �
 다뤄 확인과 앉히기 사이에 누가 들어와 정원을 넘는 일이 없다. 봇은 준비 집합에 넣지 않는다.
 
 ### `room_remove_member.lua` *(D-290)*
-입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, room:{id}:kicked:{targetId}]`, `ARGV = [hostId, targetId, banSeconds]`.
+입력: `KEYS = [room:{id}, room:{id}:players, room:{id}:ready, room:{id}:kicked:{targetId}, room:{id}:kicked_log]`, `ARGV = [hostId, targetId, banSeconds]`.
 
 처리: 방 없음 `-1`, status≠WAITING `-2`, `hostId` 가 방장이 아님 `-3`, 대상이 방장 자신이거나 좌석에 없음 `-4` → 아니면 `LREM players`·
-`SREM ready` 하고 `banSeconds > 0`(강퇴)이면 `SET kicked 1 EX banSeconds` → 남은 좌석 수. 봇 빼기(`banSeconds=0`)와 대기실 강퇴(60)가 같이
+`SREM ready` 하고 `banSeconds > 0`(강퇴)이면 `SET kicked 1 EX banSeconds` + `SADD kicked_log targetId`(6h) → 남은 좌석 수. 봇 빼기(`banSeconds=0`)와 대기실 강퇴(60)가 같이
 쓴다. WAITING 확인과 `LREM` 이 한 번이라 확인 뒤 시작된 판의 좌석이 당겨지지 않는다(D-122) — 예전 봇 빼기는 `room_leave.lua` 라 그 틈이 있었다.
 방장은 대상이 될 수 없어 방이 비거나 방장이 바뀌는 일이 없다.
 
@@ -286,8 +287,9 @@ TTL 도 있다" 가 항상 참이다.
   - 준비를 지운다(`DEL ready`).
   - 정원을 정한다(D-290): `lobbyCapacity`(시작 직전에 방장이 정해 둔 정원)가 있으면 그 값, 없으면 `maxPlayers` — `maxPlayers` 를 넘지 않고
     지금 앉은 인원보다 작지 않게.
-  - 관전자를 들어온 순서대로 그 정원까지 `RPUSH players`·`SREM`·`ZREM` 한다. **빈자리가 없으면 가장 뒤에 앉은 봇 하나를 `LREM` 하고 그
-    자리를 준다**(D-290 — 봇이 없으면 남은 관전자는 계속 관전, 사람은 빼지 않는다).
+  - **기다리던 관전자가 한 명이라도 앉게 되면(사람 수 < 정원) 봇을 모두 `LREM` 한다**(D-290 "사람이 오면 봇 모두 빼기" — 앉을
+    관전자가 없으면 봇은 그대로 돌아온다, 사람은 빼지 않는다).
+  - 관전자를 들어온 순서대로 그 정원까지 `RPUSH players`·`SREM`·`ZREM` 한다.
   - `status=WAITING`, `capacity=<그 정원>` 으로 두고 `HDEL lobbyCapacity`.
   - `ZADD rooms:open now roomId` 로 방 목록에 다시 올리고, 메타·좌석 TTL 을 6h 로 되돌린다.
 - 반환:

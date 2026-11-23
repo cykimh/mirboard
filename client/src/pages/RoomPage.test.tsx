@@ -911,7 +911,7 @@ describe('RoomPage — 대기실 화면 재동기화 (D-134)', () => {
     });
 
     expect(joinOrReconnect).toHaveBeenCalledTimes(2);
-    expect(joinOrReconnect).toHaveBeenLastCalledWith('tok', 'r1');
+    expect(joinOrReconnect).toHaveBeenLastCalledWith('tok', 'r1', { auto: true }); // D-290 — 자동 입장 표시
     expect(await screen.findByText(/원카드 · 대기 중 · 2\/4/)).toBeInTheDocument();
   });
 
@@ -1979,6 +1979,23 @@ describe('RoomPage — 대기실 봇·강퇴·정원·시작 줄 (D-174·D-290)'
 
     expect(screen.queryByText('메인 화면')).toBeNull();
     expect(toasts()).toEqual([]);
+  });
+
+  it('끊긴 사이 내보내졌으면 — 화면이 돌아와 재동기화가 자동 입장(auto)을 부르고, 거절되면 다시 앉지 않고 패널을 띄운다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: '철수' } as never });
+    renderWithHub(waiting({}));
+    await screen.findByText(/방장이 시작하면 게임이 시작돼요/);
+    joinOrReconnect.mockRejectedValue(
+      new ApiError(403, { error: { code: 'KICKED_FROM_ROOM', message: '방장이 내보냈어요 — 잠시 뒤에 다시 들어올 수 있어요' } }),
+    );
+
+    await act(async () => {
+      await vi.mocked(useRoomMeta).mock.calls.at(-1)![4]!();
+    });
+
+    expect(joinOrReconnect).toHaveBeenLastCalledWith('tok', 'r1', { auto: true });
+    expect(await screen.findByText('방장이 내보냈어요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '준비' })).toBeNull();
   });
 
   it('내보내진 직후 같은 링크로 오면 "방장이 내보냈어요" 패널 — 관전 제안은 없다', async () => {

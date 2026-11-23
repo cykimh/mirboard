@@ -226,6 +226,76 @@ class RoomLobbyControlsIT {
     }
 
     @Test
+    @DisplayName("끊긴 사이 강퇴된 사람 — 금지 60초가 지나도 화면의 자동 재입장은 거절, 링크를 직접 열면 들어오고 그 뒤 재동기화는 평소대로")
+    void auto_rejoin_does_not_undo_a_kick() {
+        Room room = oneCardRoom();
+        String id = room.roomId();
+        roomService.joinRoom(id, FRIEND);
+        roomService.kickFromLobby(id, HOST, FRIEND);
+        redis.delete("room:" + id + ":kicked:" + FRIEND); // 60초가 지났다
+
+        // 화면이 다시 보여 재동기화가 자동으로 부른 입장 — 조용히 다시 앉히지 않는다.
+        assertThatThrownBy(() -> roomService.joinOrReconnect(id, FRIEND, true)).isInstanceOf(KickedFromRoomException.class);
+        assertThat(roomService.getRoom(id).playerIds()).containsExactly(HOST);
+
+        // 사용자가 링크를 직접 열었다 — 들어온다. 그 뒤의 자동 재동기화는 재접속일 뿐이다.
+        assertThat(roomService.joinOrReconnect(id, FRIEND, false).mode()).isEqualTo(JoinOrReconnectResult.Mode.JOINED);
+        assertThat(roomService.joinOrReconnect(id, FRIEND, true).mode()).isEqualTo(JoinOrReconnectResult.Mode.RECONNECTED);
+        // 스스로 들어온 뒤 유예로 자리를 잃었다면(D-134) 자동 재입장이 다시 앉힌다 — 강퇴 기록은 지워졌다.
+        roomService.leaveRoom(id, FRIEND);
+        assertThat(roomService.joinOrReconnect(id, FRIEND, true).mode()).isEqualTo(JoinOrReconnectResult.Mode.JOINED);
+    }
+
+    @Test
+    @DisplayName("강퇴된 적 없는 사람의 자동 재입장은 그대로다 — 유예가 지나 자리를 잃었으면 다시 앉는다(D-134)")
+    void auto_rejoin_without_a_kick_is_unchanged() {
+        Room room = oneCardRoom();
+        String id = room.roomId();
+        roomService.joinRoom(id, FRIEND);
+        roomService.leaveRoom(id, FRIEND); // 끊김 유예 만료
+
+        assertThat(roomService.joinOrReconnect(id, FRIEND, true).mode()).isEqualTo(JoinOrReconnectResult.Mode.JOINED);
+    }
+
+    @Test
+    @DisplayName("옵션이 시작 인원만 올리면 정원도 끌어올린다 — 씨앗포 정원 2 에서 2:2 팀전(4명)으로, 갇힌 방이 되지 않는다")
+    void raising_the_start_count_raises_capacity() {
+        Room room = roomService.createRoom(HOST, "teams", "ARTILLERY", TeamPolicy.SEQUENTIAL, false,
+                RoomService.DEFAULT_TARGET_SCORE, 0, 0, 2);
+        String id = room.roomId();
+        assertThat(room.capacity()).isEqualTo(2);
+        assertThat(room.minCapacity()).isEqualTo(2);
+        assertThat(room.maxCapacity()).isEqualTo(4);
+        roomService.joinRoom(id, FRIEND);
+
+        Room teams = roomService.updateSettings(id, HOST,
+                RoomSettingsUpdate.ofOptions(java.util.Map.of("TEAM_MODE", "TEAMS_2V2")));
+
+        assertThat(teams.capacity()).isEqualTo(4);
+        assertThat(teams.minCapacity()).isEqualTo(4);
+        assertThat(teams.maxCapacity()).isEqualTo(4);
+        // 채우고 시작할 수 있다.
+        assertThat(roomService.addBots(id, HOST, 2).playerIds()).hasSize(4);
+        assertThat(roomService.startNow(id, HOST).status()).isEqualTo(RoomStatus.IN_GAME);
+    }
+
+    @Test
+    @DisplayName("팀전에서 개인전으로 돌아오면 정원(4)은 그대로이고 범위만 2~4 로 넓어진다")
+    void lowering_the_start_count_keeps_capacity() {
+        Room room = roomService.createRoom(HOST, "solo", "ARTILLERY", TeamPolicy.SEQUENTIAL, false,
+                RoomService.DEFAULT_TARGET_SCORE, 0, 0, 3);
+        String id = room.roomId();
+        roomService.updateSettings(id, HOST, RoomSettingsUpdate.ofOptions(java.util.Map.of("TEAM_MODE", "TEAMS_2V2")));
+
+        Room solo = roomService.updateSettings(id, HOST,
+                RoomSettingsUpdate.ofOptions(java.util.Map.of("TEAM_MODE", "SOLO")));
+
+        assertThat(solo.capacity()).isEqualTo(4);
+        assertThat(solo.minCapacity()).isEqualTo(2);
+        assertThat(solo.maxCapacity()).isEqualTo(4);
+    }
+
+    @Test
     @DisplayName("강퇴는 방장만·대기실에서만 — 손님은 못 내보내고, 방장 자신은 대상이 아니다")
     void only_the_host_kicks_while_waiting() {
         Room room = oneCardRoom();
@@ -319,12 +389,11 @@ class RoomLobbyControlsIT {
     }
 
     @Test
-    @DisplayName("재현 — 봇으로 꽉 채워 하는 판에 링크로 온 친구는 관전자가 되고, 다음 판에 뒤쪽 봇 자리를 받는다(예전엔 봇이 자리를 쥐어 관전자로 남았다)")
-    void friends_who_arrived_mid_game_take_bot_seats_next_round() throws Exception {
+    @DisplayName("재현 — 봇으로 꽉 채워 하는 판에 링크로 온 친구는 관전자가 되고, 다음 판에는 봇이 모두 빠지고 친구가 앉는다(예전엔 봇이 자리를 쥐어 관전자로 남았다)")
+    void friends_who_arrived_mid_game_replace_all_bots_next_round() throws Exception {
         Room room = oneCardRoom();
         String id = room.roomId();
         roomService.addBots(id, HOST, null); // 정원(6)까지 — 방장 + 봇 5
-        List<Long> seatedBots = roomService.getRoom(id).playerIds().subList(1, 6);
         roomService.startNow(id, HOST);
 
         // 판 도중 초대 링크로 두 명이 온다 — 자리가 없어 관전("이 판이 끝나면 다음 판에 함께해요").
@@ -335,25 +404,64 @@ class RoomLobbyControlsIT {
         Room back = roomService.returnToWaiting(id);
 
         assertThat(back.capacity()).isEqualTo(6);
-        assertThat(back.playerIds())
-                .containsExactly(HOST, seatedBots.get(0), seatedBots.get(1), seatedBots.get(2), FRIEND, FRIEND_2);
+        assertThat(back.playerIds()).containsExactly(HOST, FRIEND, FRIEND_2);
+        assertThat(back.botSeats()).isEmpty();
         assertThat(back.spectatorIds()).isEmpty();
         assertThat(back.hostId()).isEqualTo(HOST);
     }
 
     @Test
-    @DisplayName("빈자리가 있으면 봇은 그대로 두고 빈자리에 앉힌다 — 봇과 친구가 같이 대기실에 있게 된다(봇은 방장이 [✕]로 뺀다)")
-    void with_free_seats_bots_stay() throws Exception {
+    @DisplayName("빈자리가 있어도 관전자가 한 명이라도 앉으면 봇은 모두 빠진다 — 사람이 오면 봇 모두 빼기")
+    void one_seated_spectator_removes_every_bot() throws Exception {
+        Room room = oneCardRoom();
+        String id = room.roomId();
+        roomService.addBots(id, HOST, 2);
+        roomService.startNow(id, HOST);
+        roomService.joinOrReconnect(id, FRIEND);
+
+        Room back = roomService.returnToWaiting(id);
+
+        assertThat(back.playerIds()).containsExactly(HOST, FRIEND);
+        assertThat(back.botSeats()).isEmpty();
+        // 봇이 필요하면 방장이 다시 넣는다.
+        assertThat(roomService.addBots(id, HOST, 1).botSeats()).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("앉을 관전자가 없으면 봇은 예전처럼 같이 대기실로 돌아온다(D-174) — 관전하다 나간 사람은 세지 않는다")
+    void without_waiting_spectators_bots_come_back() throws Exception {
         Room room = oneCardRoom();
         String id = room.roomId();
         roomService.addBots(id, HOST, 2);
         List<Long> seatedBots = roomService.getRoom(id).playerIds().subList(1, 3);
         roomService.startNow(id, HOST);
         roomService.joinOrReconnect(id, FRIEND);
+        roomService.stopSpectating(id, FRIEND);
 
         Room back = roomService.returnToWaiting(id);
 
-        assertThat(back.playerIds()).containsExactly(HOST, seatedBots.get(0), seatedBots.get(1), FRIEND);
+        assertThat(back.playerIds()).containsExactly(HOST, seatedBots.get(0), seatedBots.get(1));
+        assertThat(back.hostId()).isEqualTo(HOST);
+    }
+
+    @Test
+    @DisplayName("사람 둘 + 봇 판에 관전자가 정원보다 많이 기다리면 — 봇이 모두 빠지고 들어온 순서대로 정원까지만 앉는다")
+    void spectators_fill_up_to_capacity_after_bots_leave() throws Exception {
+        Room room = roomService.createRoom(HOST, "three", "ONE_CARD", TeamPolicy.SEQUENTIAL, false,
+                RoomService.DEFAULT_TARGET_SCORE, 0, 0, 3);
+        String id = room.roomId();
+        roomService.joinRoom(id, FRIEND);
+        roomService.addBots(id, HOST, 1);
+        roomService.startNow(id, HOST);
+        roomService.joinOrReconnect(id, FRIEND_2);
+        Thread.sleep(5);
+        roomService.joinOrReconnect(id, 5004L);
+
+        Room back = roomService.returnToWaiting(id);
+
+        assertThat(back.capacity()).isEqualTo(3);
+        assertThat(back.playerIds()).containsExactly(HOST, FRIEND, FRIEND_2);
+        assertThat(back.spectatorIds()).containsExactly(5004L);
     }
 
     @Test

@@ -427,11 +427,14 @@ public class RoomService {
             fields.put("capacity", Integer.toString(wanted));
             return wanted;
         }
-        if (after == before) {
+        // 옵션으로 게임의 정원이 달라지면 그 정원으로(D-176). 정원은 같은데 시작 인원만 올라 지금 정원이 범위 아래로 떨어지면
+        // (씨앗포 정원 2·3 에서 2:2 팀전 — 시작 인원 4) 범위 안으로 끌어올린다 — 그대로 두면 채울 수도 시작할 수도 없는 방이 된다.
+        int adjusted = after != before ? after : Math.max(room.capacity(), minAfter);
+        if (adjusted == room.capacity() && after == before) {
             return -1;
         }
-        fields.put("capacity", Integer.toString(after));
-        return after;
+        fields.put("capacity", Integer.toString(adjusted));
+        return adjusted;
     }
 
     public Room getRoom(String roomId) {
@@ -720,6 +723,17 @@ public class RoomService {
      * 아니면 자동으로 관전자로 흡수 (손패 노출 방지의 1차 방어선).
      */
     public JoinOrReconnectResult joinOrReconnect(String roomId, long userId) {
+        return joinOrReconnect(roomId, userId, false);
+    }
+
+    /**
+     * D-290 — {@code auto} 는 사용자가 누르지 않은 입장이다(방 화면의 재동기화 — 다시 연결·다시 보임, D-134). 소켓이 끊긴 사이 방장이
+     * 내보낸 사람은 알림을 못 받았으므로, 재입장 금지(60초)가 풀린 뒤 화면으로 돌아와도 자동 입장이 조용히 다시 앉히면 강퇴가
+     * 물러진다. 그래서 방 수명 동안 남는 강퇴 기록이 있으면 자동 입장은 {@code KICKED_FROM_ROOM} 이다. 사용자가 링크를 직접 열어
+     * 들어오는 입장({@code auto=false})은 금지가 풀린 뒤 허용하고 그때 기록을 지운다 — 그 뒤의 재동기화는 다시 평소대로다(유예가 지나
+     * 자리를 잃은 사람이 다시 앉는 D-134 동작은 강퇴 기록이 없으므로 그대로).
+     */
+    public JoinOrReconnectResult joinOrReconnect(String roomId, long userId, boolean auto) {
         Room room = getRoom(roomId);
         if (room.playerIds().contains(userId)) {
             log.info("Room reconnect: roomId={} userId={} status={}",
@@ -729,6 +743,18 @@ public class RoomService {
         if (room.spectatorIds().contains(userId)) {
             return new JoinOrReconnectResult(JoinOrReconnectResult.Mode.SPECTATING, room);
         }
+        if (auto && repository.wasKicked(roomId, userId)) {
+            throw new KickedFromRoomException(roomId);
+        }
+        JoinOrReconnectResult result = enter(room, userId);
+        if (!auto) {
+            repository.clearKickLog(roomId, userId);
+        }
+        return result;
+    }
+
+    private JoinOrReconnectResult enter(Room room, long userId) {
+        String roomId = room.roomId();
         if (room.status() == RoomStatus.WAITING && room.playerCount() < room.capacity()) {
             try {
                 Room joined = joinRoom(roomId, userId);

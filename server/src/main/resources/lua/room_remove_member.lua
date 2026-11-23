@@ -7,6 +7,7 @@
 -- KEYS[2] = room:{roomId}:players
 -- KEYS[3] = room:{roomId}:ready
 -- KEYS[4] = room:{roomId}:kicked:{targetId}
+-- KEYS[5] = room:{roomId}:kicked_log  (강퇴 기록 SET — 방 수명 동안. 화면의 자동 재동기화 입장이 강퇴를 무르지 않게 한다)
 -- ARGV    = hostId, targetId, banSeconds(0 = 금지 안 함)
 --
 -- Return codes:
@@ -38,5 +39,7 @@ end
 redis.call('SREM', KEYS[3], targetId)
 if banSeconds > 0 then
     redis.call('SET', KEYS[4], '1', 'EX', banSeconds)
+    redis.call('SADD', KEYS[5], targetId)
+    redis.call('EXPIRE', KEYS[5], 21600)
 end
 return redis.call('LLEN', KEYS[2])

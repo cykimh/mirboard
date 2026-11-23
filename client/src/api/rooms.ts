@@ -103,8 +103,12 @@ export const roomsApi = {
 
 
   /** Phase 8A — 직접 링크 진입 자동 분기 (JOINED / RECONNECTED / SPECTATING). */
-  joinOrReconnect(token: string, roomId: string): Promise<JoinOrReconnectResponse> {
-    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join-or-reconnect`, {
+  /**
+   * D-290 — `auto` 는 사용자가 누르지 않은 입장(방 화면 재동기화)이다. 소켓이 끊긴 사이 방장이 내보냈으면 서버가 `KICKED_FROM_ROOM` 으로
+   * 거절한다(금지 60초가 지났어도) — 링크를 직접 열어 들어오는 첫 입장은 `auto` 없이 부른다.
+   */
+  joinOrReconnect(token: string, roomId: string, opts?: { auto?: boolean }): Promise<JoinOrReconnectResponse> {
+    return apiRequest(`/api/rooms/${encodeURIComponent(roomId)}/join-or-reconnect${opts?.auto ? '?auto=true' : ''}`, {
       method: 'POST',
       token,
     });
