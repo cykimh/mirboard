@@ -1101,6 +1101,8 @@ button.yt-badge {
   --yt-s-danger: #a3271c;
   --yt-s-on-felt: #f7f0dc;
   --yt-s-felt-pad: rgba(8, 26, 18, 0.62);
+  /* D-296 — 판 무늬 한 겹(스킨이 바꾼다). 층마다 padding-box 를 직접 적는다. */
+  --yt-board-pattern: linear-gradient(transparent, transparent) padding-box;
   --yt-die-held: #d6b25e;
 }
 
@@ -1370,6 +1372,7 @@ html.dark .yt-theme-salon {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E")
       padding-box,
     radial-gradient(70% 55% at 50% 38%, rgba(255, 244, 200, 0.13), transparent 70%) padding-box,
+    var(--yt-board-pattern),
     radial-gradient(130% 100% at 50% 0%, var(--yt-s-felt-hi), var(--yt-s-felt) 50%, var(--yt-s-felt-lo)) padding-box,
     repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 7px, rgba(255, 255, 255, 0.05) 7px 8px, transparent 8px 13px)
       border-box,
@@ -3467,4 +3470,263 @@ html.dark .yt-theme-salon {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── 스킨(D-296) — 주사위·경기판을 내 화면에서만 바꾼다 ─────────────────────────────────────────────
+ * 경기판: 게임판 루트(와 꾸미기 창의 견본)에 `yt-board-*` 클래스 하나. 판·레일 토큰과 무늬 한 겹(`--yt-board-pattern` — 층마다
+ * `padding-box` 를 직접 적는다: 레일 테두리로 번지지 않게)만 바꾼다. 모든 판은 가운데가 어두운 쪽이라 판 위 글자 규칙(어두운 받침 위
+ * 밝은 글자)이 그대로 통한다. 무늬는 인라인 SVG·CSS 그라데이션뿐이다. 주사위 색은 CSS 가 아니라 `yachtSkins.DICE_PALETTES`.
+ * 이 구역은 `.yt-theme-salon` 토큰 뒤에 와야 한다(같은 명시도 — 뒤가 이긴다). */
+.yt-board-felt {
+  --yt-s-felt: #2a7354;
+  --yt-s-felt-hi: #3d9a70;
+  --yt-s-felt-lo: #1d563f;
+  --yt-s-rail: #6b4226;
+  --yt-s-rail-hi: #94623c;
+  --yt-s-rail-lo: #4a2c18;
+  --yt-s-felt-pad: rgba(8, 26, 18, 0.62);
+  --yt-board-pattern: linear-gradient(transparent, transparent) padding-box;
+}
+
+html.dark .yt-board-felt {
+  --yt-s-felt: #17503a;
+  --yt-s-felt-hi: #23704f;
+  --yt-s-felt-lo: #0c3023;
+  --yt-s-rail: #3a2417;
+  --yt-s-rail-hi: #5e3d26;
+  --yt-s-rail-lo: #24150c;
+}
+
+/* 바다 — 청록 물빛에 잔물결, 바랜 유목 레일. */
+.yt-board-ocean {
+  --yt-s-felt: #1d6f8a;
+  --yt-s-felt-hi: #2f95b0;
+  --yt-s-felt-lo: #124c63;
+  --yt-s-rail: #7d6f5c;
+  --yt-s-rail-hi: #a59684;
+  --yt-s-rail-lo: #564a3c;
+  --yt-s-felt-pad: rgba(5, 24, 34, 0.64);
+  --yt-board-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='48'%3E%3Cpath d='M0 14 Q15 4 30 14 T60 14 T90 14 T120 14' fill='none' stroke='white' stroke-opacity='.13' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M-30 38 Q-15 28 0 38 T30 38 T60 38 T90 38 T120 38 T150 38' fill='none' stroke='white' stroke-opacity='.07' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") padding-box;
+}
+
+html.dark .yt-board-ocean {
+  --yt-s-felt: #124a61;
+  --yt-s-felt-hi: #1b6883;
+  --yt-s-felt-lo: #082b3b;
+  --yt-s-rail: #463d32;
+  --yt-s-rail-hi: #655949;
+  --yt-s-rail-lo: #2a241d;
+}
+
+/* 밤하늘 — 남색 하늘에 별과 별똥별 한 줄, 푸른 강철 레일. */
+.yt-board-night {
+  --yt-s-felt: #2e3072;
+  --yt-s-felt-hi: #4649a6;
+  --yt-s-felt-lo: #1c1d4c;
+  --yt-s-rail: #3d4356;
+  --yt-s-rail-hi: #5d667d;
+  --yt-s-rail-lo: #272b39;
+  --yt-s-felt-pad: rgba(8, 8, 30, 0.64);
+  --yt-board-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='86' cy='42' r='1.4' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='22' cy='141' r='0.7' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='153' cy='18' r='0.9' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='26' cy='115' r='1.4' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='65' cy='27' r='1.4' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='148' cy='35' r='0.9' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='151' cy='153' r='1.4' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='60' cy='15' r='0.9' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='111' cy='40' r='0.7' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='147' cy='178' r='0.9' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='152' cy='150' r='0.9' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='28' cy='144' r='0.7' fill='white' fill-opacity='.35'/%3E%3Ccircle cx='162' cy='56' r='1.4' fill='white' fill-opacity='.85'/%3E%3Ccircle cx='84' cy='123' r='1.4' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='80' cy='67' r='0.9' fill='white' fill-opacity='.5'/%3E%3Ccircle cx='24' cy='151' r='1.1' fill='white' fill-opacity='.85'/%3E%3Ccircle cx='91' cy='190' r='1.4' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='159' cy='22' r='0.7' fill='white' fill-opacity='.85'/%3E%3Ccircle cx='46' cy='91' r='0.9' fill='white' fill-opacity='.85'/%3E%3Ccircle cx='111' cy='14' r='0.7' fill='white' fill-opacity='.7'/%3E%3Ccircle cx='91' cy='181' r='1.1' fill='white' fill-opacity='.85'/%3E%3Ccircle cx='152' cy='120' r='0.7' fill='white' fill-opacity='.35'/%3E%3Cpath d='M48 55 Q48 62 55 62 Q48 62 48 69 Q48 62 41 62 Q48 62 48 55Z' fill='%23fff6d0' fill-opacity='.8'/%3E%3Cpath d='M150 133 Q150 138 155 138 Q150 138 150 143 Q150 138 145 138 Q150 138 150 133Z' fill='%23fff6d0' fill-opacity='.65'/%3E%3Cpath d='M118 40 L150 28' stroke='white' stroke-opacity='.18' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") padding-box;
+}
+
+html.dark .yt-board-night {
+  --yt-s-felt: #1a1b47;
+  --yt-s-felt-hi: #2a2c70;
+  --yt-s-felt-lo: #0b0c25;
+  --yt-s-rail: #252a3d;
+  --yt-s-rail-hi: #3c435c;
+  --yt-s-rail-lo: #141724;
+}
+
+/* 타탄 체크 — 짙은 자주 천에 어두운 띠와 금실 줄, 흑단 레일. */
+.yt-board-tartan {
+  --yt-s-felt: #7c2432;
+  --yt-s-felt-hi: #a03342;
+  --yt-s-felt-lo: #55141f;
+  --yt-s-rail: #2c2824;
+  --yt-s-rail-hi: #4b443d;
+  --yt-s-rail-lo: #171412;
+  --yt-s-felt-pad: rgba(30, 6, 10, 0.68);
+  --yt-board-pattern:
+    repeating-linear-gradient(0deg, transparent 0 32px, rgba(246, 226, 164, 0.2) 32px 34px, transparent 34px 44px) padding-box,
+    repeating-linear-gradient(90deg, transparent 0 32px, rgba(246, 226, 164, 0.2) 32px 34px, transparent 34px 44px) padding-box,
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 22px, transparent 22px 44px) padding-box,
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0 22px, transparent 22px 44px) padding-box;
+}
+
+html.dark .yt-board-tartan {
+  --yt-s-felt: #571722;
+  --yt-s-felt-hi: #76212f;
+  --yt-s-felt-lo: #350b13;
+  --yt-s-rail: #1f1c19;
+  --yt-s-rail-hi: #38332d;
+  --yt-s-rail-lo: #0f0d0c;
+}
+
+/* 나무 판 — 호두나무 널(이음매·결), 무쇠 레일. */
+.yt-board-wood {
+  --yt-s-felt: #7b5331;
+  --yt-s-felt-hi: #9d6d41;
+  --yt-s-felt-lo: #563720;
+  --yt-s-rail: #3c4046;
+  --yt-s-rail-hi: #5c6169;
+  --yt-s-rail-lo: #25282c;
+  --yt-s-felt-pad: rgba(24, 13, 4, 0.68);
+  --yt-board-pattern:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0 2px, rgba(255, 255, 255, 0.05) 2px 3px, transparent 3px 96px) padding-box,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='260'%3E%3Cg fill='none' stroke='black' stroke-opacity='.13' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M22 0 C30 60 14 130 22 260'/%3E%3Cpath d='M40 0 C34 90 46 170 40 260'/%3E%3Cpath d='M58 0 C50 80 66 170 58 260'/%3E%3Cpath d='M120 0 C128 70 112 190 120 260'/%3E%3Cpath d='M140 0 C134 60 148 150 140 260'/%3E%3Cpath d='M160 0 C152 90 170 160 160 260'/%3E%3C/g%3E%3Cg fill='none' stroke='white' stroke-opacity='.06' stroke-width='1'%3E%3Cpath d='M76 0 C84 90 70 180 76 260'/%3E%3Cpath d='M178 0 C172 120 184 200 178 260'/%3E%3C/g%3E%3C/svg%3E") padding-box;
+}
+
+html.dark .yt-board-wood {
+  --yt-s-felt: #563821;
+  --yt-s-felt-hi: #734a2b;
+  --yt-s-felt-lo: #372212;
+  --yt-s-rail: #2a2d32;
+  --yt-s-rail-hi: #43474e;
+  --yt-s-rail-lo: #17191c;
+}
+
+/* 꾸미기 창 — ⋮ 메뉴 "주사위·판 꾸미기". 게임판 안에 뜨는 작은 창(라디오 두 묶음), 고르면 뒤의 판이 바로 바뀐다. */
+.yt-skin-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.yt-skin-panel {
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 14px 14px 16px;
+  border: 1px solid var(--yt-s-line, var(--color-border, #8884));
+  border-radius: 16px;
+  background: var(--yt-s-plaque, var(--color-surface, #fff));
+  color: var(--yt-s-ink, inherit);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+.yt-skin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.yt-skin-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.yt-skin-close {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--yt-s-line, currentColor);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.yt-skin-close:focus-visible {
+  outline: 2px solid var(--yt-s-brass-ink, currentColor);
+  outline-offset: 2px;
+}
+
+.yt-skin-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--yt-s-ink-soft, inherit);
+}
+
+.yt-skin-group {
+  min-width: 0;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.yt-skin-legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.yt-skin-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.yt-skin-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 84px;
+  padding: 8px 2px 6px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* 진짜 라디오는 칸 전체를 덮은 채 투명하다(키보드·보조기기는 그대로 라디오로 다룬다). */
+.yt-skin-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* 고른 것은 테두리 + ✓ 글자 둘 다로 알린다(색만으로 가르지 않는다). */
+.yt-skin-option-on {
+  border-color: var(--yt-s-brass, currentColor);
+  background: var(--yt-s-me-wash, transparent);
+  font-weight: 700;
+}
+
+.yt-skin-option:focus-within {
+  outline: 2px solid var(--yt-s-brass-ink, currentColor);
+  outline-offset: 2px;
+}
+
+.yt-skin-die {
+  display: block;
+  width: 42px;
+  height: 42px;
+}
+
+.yt-skin-die .yt-die-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.yt-skin-board {
+  display: block;
+  width: min(100%, 56px);
+  height: 44px;
+  border: 5px solid transparent;
+  border-radius: 12px;
+  background:
+    var(--yt-board-pattern),
+    radial-gradient(130% 100% at 50% 0%, var(--yt-s-felt-hi), var(--yt-s-felt) 50%, var(--yt-s-felt-lo)) padding-box,
+    linear-gradient(var(--yt-s-rail-hi), var(--yt-s-rail) 30%, var(--yt-s-rail-lo)) border-box;
+  box-shadow: 0 0 0 1px var(--yt-s-brass-lo, rgba(0, 0, 0, 0.4));
 }

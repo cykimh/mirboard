@@ -297,7 +297,7 @@
 클라는 판정하지 않는다 — 점수·후보 점수·거절은 전부 서버 값이다. 경로는 `client/src/features/yacht/` 기준.
 
 - **코드(S4):** `YachtTable`(조립 루트·자기 소켓 — D-103), `yachtStore`(순번 없는 순수 리듀서, 결과값 이벤트), `yachtRoomSink`(거절 문구 — `HOLD_UNCHANGED` 는 조용히),
-  `DiceTray`(홀드 = 실제 `<button aria-pressed>`), `YachtScorecard`(칸 × 좌석, 차례 열 후보 점수, 내 차례면 칸이 버튼 — 0점은 확인 창), `YachtTurnCountdown`
+  `DiceTray`(홀드 = 실제 `<button aria-pressed>`), `YachtScorecard`(칸 × 좌석, 내 차례의 내 열에만 후보 점수 — 칸이 버튼, 0점은 확인 창. 남의 열에는 적지 않는다 D-295), `YachtTurnCountdown`
   (`tableView.turnRemainingMs` 기준 — §6), `YachtMatchEnd`, `tutorial/`(6단계 + "어디에 넣을까?" 퀴즈), CSS `styles/parts/20-yacht-table.css`(`.yt-`).
 - **홀드 전송**: 마지막 탭 뒤 250ms 에 마스크 전체를 한 번(`HOLD`), 굴리기는 지금 홀드를 실어 바로(§4-2). 내 좌석의 `DICE_HELD` 메아리는 반영하지 않는다.
 - **BUSY 재전송(S5, D-200)**: `ROLL`·`SCORE` 가 방 락 경합 `BUSY` 로 거절되면 150ms 뒤 한 번 다시 보낸다(보낸 지 2초 안, 결과 이벤트가 오면 취소). 두 번째 `BUSY` 는 문구를 보인다.

@@ -3,6 +3,9 @@
 // 게스트로 들어가 봇 하나와 얏추를 시작하고, 내 차례마다 ① 가만히 있기 ② 톡 굴리기 ③ 꾹 눌러 흔들다 굴리기를 재서
 // 조건(휴대폰 흉내 375px·CPU 4배 느리게 / PC 1920px)마다 프레임 간격과 메인 스레드·래스터 시간을 JSON 으로 찍는다.
 //   PERF_TURNS=3  잴 차례 수(기본 3)   PERF_SKIN_DICE / PERF_SKIN_BOARD  잴 스킨(저장값을 미리 심는다)
+//   PERF_CSS='…'  고칠 후보를 CSS 로 덮어 보고 잰다(실험)   PERF_DUMP=1  구간마다 트레이스 상위 항목을 stderr 로
+// 읽는 법: 프레임 간격(rAF)은 메인 스레드가 막힐 때만 벌어진다 — transform 애니메이션의 끊김은 안 잡히므로, 프레임마다 드는
+// 스타일·배치·그리기·GPU 시간을 같이 본다(이 값이 작을수록 느린 기기에서 프레임을 덜 놓친다).
 import { chromium } from '@playwright/test';
 
 const base = process.env.SHOT_BASE_URL ?? 'http://localhost:5173';

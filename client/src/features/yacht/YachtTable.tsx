@@ -41,6 +41,8 @@ import { useYachtBest } from './useYachtBest';
 import { isGuestName } from '@/features/stats/playerTiers';
 import { salonTheme, seatAccent, yachtThemeClass } from './yachtTheme';
 import { GoldBurst } from './GoldBurst';
+import { YachtSkinPicker } from './YachtSkinPicker';
+import { boardSkinClass, useYachtSkinStore } from './yachtSkins';
 import { showToast } from '@/components/toast/toastStore';
 import {
   loadMotionPreference,
@@ -218,6 +220,9 @@ export function YachtTable({
   const chatUnread = useRoomChatStore((st) => st.unreadCount);
   const rules = useTutorialGate(YACHT_TUTORIAL.seenKey, false);
   const animate = useCardAnimStore((st) => st.enabled);
+  // D-296 — 경기판 스킨(내 화면만). 주사위 스킨은 `YachtDie` 가 스토어에서 직접 읽는다.
+  const boardSkin = useYachtSkinStore((st) => st.board);
+  const [skinsOpen, setSkinsOpen] = useState(false);
 
   const s = useYachtStore();
   const seatCount = s.seats.length || playerIds.length;
@@ -789,7 +794,11 @@ export function YachtTable({
   );
 
   return (
-    <div className={`yt-table${yachtThemeClass}`} ref={rootRef} onClickCapture={tapSound}>
+    <div
+      className={`yt-table${yachtThemeClass}${salonTheme ? ` ${boardSkinClass(boardSkin)}` : ''}`}
+      ref={rootRef}
+      onClickCapture={tapSound}
+    >
       <header className="yt-header gm-header">
         <div className="yt-header-badges gm-header-info">
           <GameIcon gameId="YACHT" size={22} />
@@ -819,6 +828,8 @@ export function YachtTable({
                 : undefined
             }
             onRules={rules.show}
+            // D-296 — 주사위·경기판 스킨 고르기(내 화면만).
+            views={salonTheme ? [{ key: 'skins', label: '주사위·판 꾸미기', onSelect: () => setSkinsOpen(true) }] : undefined}
             onReaction={spectator ? undefined : sendReaction}
             voice={voice}
             onAbort={onAbort && !roomFinished ? onAbort : undefined}
@@ -946,100 +957,100 @@ export function YachtTable({
       {/* D-295 — 판을 감싸는 칸: 내 차례 맥박 빛(`yt-felt-glow`)이 판 밖으로 번지는데 판은 `overflow: hidden` 이라 판과 나란히 둔다.
           빛은 투명도만 움직인다(판의 box-shadow 를 움직이면 프레임마다 판 전체를 다시 그린다). */}
       <div className="yt-felt-wrap">
-      <div
-        ref={feltRef}
-        className={`yt-felt${myTurn && watching === null ? ' yt-felt-myturn' : ''}${watching !== null ? ' yt-felt-watch' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
-        style={
-          watching !== null
-            ? { ['--yt-accent' as string]: seatAccent(watching) }
-            : myTurn
-              ? { ['--yt-accent' as string]: seatAccent(mySeat) }
-              : undefined
-        }
-      >
-        {salonTheme && (
-          <span
-            className={`yt-lamp${lampSeat >= 0 ? ' yt-lamp-on' : ''}`}
-            aria-hidden="true"
-            style={{ transform: `translateX(${lampX}px)` }}
+        <div
+          ref={feltRef}
+          className={`yt-felt${myTurn && watching === null ? ' yt-felt-myturn' : ''}${watching !== null ? ' yt-felt-watch' : ''}${fx ? (fx.kind === 'yacht' ? ' yt-felt-party' : ' yt-felt-cheer') : ''}`}
+          style={
+            watching !== null
+              ? { ['--yt-accent' as string]: seatAccent(watching) }
+              : myTurn
+                ? { ['--yt-accent' as string]: seatAccent(mySeat) }
+                : undefined
+          }
+        >
+          {salonTheme && (
+            <span
+              className={`yt-lamp${lampSeat >= 0 ? ' yt-lamp-on' : ''}`}
+              aria-hidden="true"
+              style={{ transform: `translateX(${lampX}px)` }}
+            />
+          )}
+          <div className="yt-felt-status">
+            {!roomFinished && (turnSeat >= 0 || simultaneous) && <YachtTurnCountdown turnSeconds={turnSeconds} />}
+            {myTurn && <span className="yt-badge yt-badge-turn">내 차례</span>}
+            {watching !== null && <span className="yt-badge yt-badge-watch">{nameOf(watching)} 판 보는 중</span>}
+            {/* D-206 — 상태 줄 축하 배지도 내 기록만. */}
+            {flash && flash.seat === mySeat && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
+              <span className="yt-badge yt-celebrate">🎉 {CATEGORY_LABEL[flash.category]}!</span>
+            )}
+            {bonusParty && <span className="yt-badge yt-celebrate">보너스 +{bonusParty.points}!</span>}
+            {!roomFinished && s.result === null && (turnSeat >= 0 || myTurn || watched?.pending) && (
+              <span className="yt-rolls" aria-hidden="true" title={`굴림 ${trayRolls}/${MAX_ROLLS}`}>
+                {Array.from({ length: MAX_ROLLS }, (_, i) => (
+                  <span key={i} className={`yt-rolls-dot${i < trayRolls ? ' yt-rolls-dot-used' : ''}`} />
+                ))}
+              </span>
+            )}
+          </div>
+          {fx && !fx.float && fxLayer}
+          {/* D-293 — 내 차례 마지막 3초의 큰 3·2·1 + "똑". 남의 차례·관전·기록을 마친 뒤·턴 제한 끔에는 없다. */}
+          <YachtFinalCount
+            turnSeconds={turnSeconds}
+            active={myTurn && !roomFinished}
+            turnKey={`${roomId}:${mySeat}:${s.round}`}
+            animate={animate}
           />
-        )}
-        <div className="yt-felt-status">
-          {!roomFinished && (turnSeat >= 0 || simultaneous) && <YachtTurnCountdown turnSeconds={turnSeconds} />}
-          {myTurn && <span className="yt-badge yt-badge-turn">내 차례</span>}
-          {watching !== null && <span className="yt-badge yt-badge-watch">{nameOf(watching)} 판 보는 중</span>}
-          {/* D-206 — 상태 줄 축하 배지도 내 기록만. */}
-          {flash && flash.seat === mySeat && BIG_CATEGORIES.has(flash.category) && flash.points > 0 && (
-            <span className="yt-badge yt-celebrate">🎉 {CATEGORY_LABEL[flash.category]}!</span>
-          )}
-          {bonusParty && <span className="yt-badge yt-celebrate">보너스 +{bonusParty.points}!</span>}
-          {!roomFinished && s.result === null && (turnSeat >= 0 || myTurn || watched?.pending) && (
-            <span className="yt-rolls" aria-hidden="true" title={`굴림 ${trayRolls}/${MAX_ROLLS}`}>
-              {Array.from({ length: MAX_ROLLS }, (_, i) => (
-                <span key={i} className={`yt-rolls-dot${i < trayRolls ? ' yt-rolls-dot-used' : ''}`} />
-              ))}
-            </span>
-          )}
+          <DiceTray
+            dice={watched ? watched.dice : s.dice}
+            held={watched ? (watched.held ?? NO_HOLD) : s.held}
+            rolls={trayRolls}
+            rollNonce={watched ? watchRoll.current.nonce : s.rollNonce}
+            viewKey={watching ?? -1}
+            canHold={canHold}
+            canRoll={canRoll}
+            rollPending={rollPending}
+            animate={animate}
+            onToggle={watching === null ? toggleHold : undefined}
+            onRoll={myTurn && watching === null ? roll : undefined}
+            // D-264 — 가운데 판에서 구르는 굴림의 소리. 내 굴림은 또렷하게, 가운데 판에 보이는 남의 굴림(차례대로의 남의 차례·남의 판
+            // 구경)은 작게. 모두 같이 굴릴 때 좌석 띠에서만 구르는 남의 굴림은 소리가 없다. 연출 설정과 무관하게 음소거만 따른다.
+            onRollSound={() => playRoll(mySeat >= 0 && watching === null && (simultaneous || turnSeat === mySeat))}
+            onShakeSound={startShake}
+            // D-268 — 내 흔들기를 남들에게 알리고, 가운데 판이 남의 것이면 그 사람의 흔들기를 비춘다(소리는 내 것만).
+            onShakeChange={sendShake}
+            remoteShake={trayRemoteShake}
+            motionShake={motionOffered && motionShake}
+            turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
+            note={
+              s.result !== null || roomFinished
+                ? '판이 끝났습니다'
+                : watching !== null && watched
+                  ? watched.pending
+                    ? `${nameOf(watching)} · 굴림 ${watched.rolls}/${MAX_ROLLS}`
+                    : `${nameOf(watching)} · 기록함 ✓`
+                  : simultaneous && !myTurn
+                    ? mySeat >= 0 && !iAmOut
+                      ? '기록했어요 · 다른 사람을 기다리는 중'
+                      : '모두 같이 굴리는 중 · 좌석을 누르면 그 판을 봐요'
+                    : undefined
+            }
+            onBack={watching !== null ? () => setWatchSeat(null) : undefined}
+            backLabel={spectator || mySeat < 0 ? '그만 보기' : myTurn ? '내 차례 · 내 판으로' : '내 판으로'}
+            backUrgent={myTurn}
+            made={
+              madeShown
+                ? {
+                    nonce: madeShown.nonce,
+                    tier: madeShown.tier,
+                    label: `${CATEGORY_LABEL[madeShown.category]}!`,
+                    indices: madeShown.indices,
+                    ms: MADE_FX_MS[madeShown.tier],
+                  }
+                : null
+            }
+          />
         </div>
-        {fx && !fx.float && fxLayer}
-        {/* D-293 — 내 차례 마지막 3초의 큰 3·2·1 + "똑". 남의 차례·관전·기록을 마친 뒤·턴 제한 끔에는 없다. */}
-        <YachtFinalCount
-          turnSeconds={turnSeconds}
-          active={myTurn && !roomFinished}
-          turnKey={`${roomId}:${mySeat}:${s.round}`}
-          animate={animate}
-        />
-        <DiceTray
-          dice={watched ? watched.dice : s.dice}
-          held={watched ? (watched.held ?? NO_HOLD) : s.held}
-          rolls={trayRolls}
-          rollNonce={watched ? watchRoll.current.nonce : s.rollNonce}
-          viewKey={watching ?? -1}
-          canHold={canHold}
-          canRoll={canRoll}
-          rollPending={rollPending}
-          animate={animate}
-          onToggle={watching === null ? toggleHold : undefined}
-          onRoll={myTurn && watching === null ? roll : undefined}
-          // D-264 — 가운데 판에서 구르는 굴림의 소리. 내 굴림은 또렷하게, 가운데 판에 보이는 남의 굴림(차례대로의 남의 차례·남의 판
-          // 구경)은 작게. 모두 같이 굴릴 때 좌석 띠에서만 구르는 남의 굴림은 소리가 없다. 연출 설정과 무관하게 음소거만 따른다.
-          onRollSound={() => playRoll(mySeat >= 0 && watching === null && (simultaneous || turnSeat === mySeat))}
-          onShakeSound={startShake}
-          // D-268 — 내 흔들기를 남들에게 알리고, 가운데 판이 남의 것이면 그 사람의 흔들기를 비춘다(소리는 내 것만).
-          onShakeChange={sendShake}
-          remoteShake={trayRemoteShake}
-          motionShake={motionOffered && motionShake}
-          turnName={turnSeat >= 0 ? nameOf(turnSeat) : null}
-          note={
-            s.result !== null || roomFinished
-              ? '판이 끝났습니다'
-              : watching !== null && watched
-                ? watched.pending
-                  ? `${nameOf(watching)} · 굴림 ${watched.rolls}/${MAX_ROLLS}`
-                  : `${nameOf(watching)} · 기록함 ✓`
-                : simultaneous && !myTurn
-                  ? mySeat >= 0 && !iAmOut
-                    ? '기록했어요 · 다른 사람을 기다리는 중'
-                    : '모두 같이 굴리는 중 · 좌석을 누르면 그 판을 봐요'
-                  : undefined
-          }
-          onBack={watching !== null ? () => setWatchSeat(null) : undefined}
-          backLabel={spectator || mySeat < 0 ? '그만 보기' : myTurn ? '내 차례 · 내 판으로' : '내 판으로'}
-          backUrgent={myTurn}
-          made={
-            madeShown
-              ? {
-                  nonce: madeShown.nonce,
-                  tier: madeShown.tier,
-                  label: `${CATEGORY_LABEL[madeShown.category]}!`,
-                  indices: madeShown.indices,
-                  ms: MADE_FX_MS[madeShown.tier],
-                }
-              : null
-          }
-        />
-      </div>
-      {myTurn && watching === null && <span className="yt-felt-glow" aria-hidden="true" />}
+        {myTurn && watching === null && <span className="yt-felt-glow" aria-hidden="true" />}
       </div>
 
       <YachtScorecard
@@ -1135,6 +1146,8 @@ export function YachtTable({
           roomId={roomId}
         />
       )}
+
+      {skinsOpen && <YachtSkinPicker onClose={() => setSkinsOpen(false)} />}
 
       <TutorialDialog tutorial={YACHT_TUTORIAL} open={rules.open} onClose={rules.close} />
     </div>

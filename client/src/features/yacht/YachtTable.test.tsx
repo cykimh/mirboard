@@ -438,6 +438,29 @@ describe('YachtTable', () => {
     });
   });
 
+  it('D-296 — ⋮ 메뉴 "주사위·판 꾸미기"로 스킨을 고르면 게임판 루트의 판 클래스와 주사위 색이 바뀐다(아무것도 보내지 않는다)', async () => {
+    const { DICE_PALETTES, useYachtSkinStore } = await import('./yachtSkins');
+    seed({ dice: [1, 2, 3, 4, 5], rolls: 1 });
+    const { container } = renderTable();
+    const root = container.querySelector('.yt-table')!;
+    expect(root).toHaveClass('yt-board-felt');
+    fireEvent.click(screen.getByRole('button', { name: '게임 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '주사위·판 꾸미기' }));
+    const dialog = screen.getByRole('dialog', { name: '주사위·판 꾸미기' });
+    fireEvent.click(within(dialog).getByRole('radio', { name: '밤하늘' }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: '옥' }));
+    expect(root).toHaveClass('yt-board-night');
+    expect(root).not.toHaveClass('yt-board-felt');
+    // 가운데 판의 큰 주사위가 고른 색표로 칠해진다.
+    expect(container.querySelector('.yt-dice .yt-die-svg stop')).toHaveAttribute('stop-color', DICE_PALETTES.jade.body[0]);
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog', { name: '주사위·판 꾸미기' })).toBeNull();
+    expect(sendAction).not.toHaveBeenCalled();
+    act(() => useYachtSkinStore.setState({ dice: 'ivory', board: 'felt' }));
+    localStorage.removeItem('mirboard.yacht.skin.dice');
+    localStorage.removeItem('mirboard.yacht.skin.board');
+  });
+
   it('D-295 — 모두 같이 굴릴 때도 후보 점수는 내 열에만(남이 굴린 것은 그 사람 열에 적히지 않는다)', () => {
     seed({
       turnSeat: -1,
