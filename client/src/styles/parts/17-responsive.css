@@ -691,6 +691,60 @@
   }
 }
 
+/* D-279 — 담바둑(`.db-`). 26 은 미디어 0개 규칙이라 폭·hover·동작 줄이기는 여기 둔다(스컬킹 맨 끝 두 블록 앞).
+   ① 휴대폰 폭: 판이 주인공 — 양옆 여백을 줄여 판이 화면 폭을 거의 다 쓰고(375px 에서 칸 ≈ 51px), 머리 줄·좌석 띠는 낮게. */
+@media (max-width: 480px) {
+  .db-table {
+    --db-reserve: 318px;
+    gap: 8px;
+    padding: 4px 8px 12px;
+  }
+  .db-strip {
+    gap: 5px;
+  }
+  .db-seat {
+    padding: 5px 7px 4px;
+  }
+  .db-seat-name {
+    font-size: 13px;
+  }
+  .db-status {
+    font-size: 14px;
+  }
+  .db-end-banner-text {
+    font-size: 22px;
+  }
+}
+
+/* ② 마우스가 있는 기기에서만 — 누를 수 있는 칸에 옅은 빛, 단추는 살짝 밝게(터치에서는 눌린 채 남는 :hover 를 피한다). */
+@media (hover: hover) {
+  .db-cells .db-cell.db-cell-on:hover:not(:disabled) {
+    background: radial-gradient(circle, rgba(255, 250, 235, 0.42) 0%, rgba(255, 250, 235, 0) 68%);
+  }
+  .db-table .db-primary:hover:not(:disabled),
+  .db-table .db-secondary:hover:not(:disabled),
+  .db-table .db-jump:hover:not(:disabled),
+  .db-table .db-route:hover:not(:disabled),
+  .db-table .db-kind:hover:not(:disabled),
+  .db-table .db-wall-btn:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+/* ③ 동작 줄이기: 연출 없이 끝 상태로 바로(돌은 미끄러지지 않고 옮겨지고, 담·집은 바로 보인다). 차례 테두리·고리·점은 가만히 남는다. */
+@media (prefers-reduced-motion: reduce) {
+  .db-tokens *,
+  .db-tokens *::before,
+  .db-tokens *::after,
+  .db-tokens .db-board-myturn::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .db-fx-rich .db-stone-movable::after {
+    display: none;
+  }
+}
+
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —
    가운데(트릭 레일·방향)를 옆줄 아래 전체 폭으로 내린다. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이는 빈다. 넓은 화면은

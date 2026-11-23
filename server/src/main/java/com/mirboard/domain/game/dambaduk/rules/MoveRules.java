@@ -95,6 +95,24 @@ public final class MoveRules {
         return out;
     }
 
+    /**
+     * 돌 하나가 지금 옮길 수 있나(첫 수를 찾으면 바로 참) — 굳음 판정(룰 §6 ②)이 다툼 터의 돌마다 부른다. {@link #options} 와 같은 조건이다.
+     */
+    public static boolean hasMove(List<Stone> stones, Stone stone, Walls walls, boolean canJump) {
+        boolean[] occ = occupancy(stones, stone.id());
+        for (List<Dir> path : Paths.of(stone.kind())) {
+            Walk w = walk(stone.cell(), path, walls, occ);
+            if (w.blocked() || w.crossed().size() > 1 || (w.crossed().size() == 1 && !canJump)) {
+                continue;
+            }
+            Walls after = w.crossed().isEmpty() ? walls : walls.without(w.crossed().getFirst());
+            if (!wallSides(w.to(), after).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean hasOption(List<Stone> stones, int seat, Walls walls, boolean canJump) {
         return !options(stones, seat, walls, canJump, false).isEmpty();
     }

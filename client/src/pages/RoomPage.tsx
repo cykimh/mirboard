@@ -11,6 +11,7 @@ import { loadGame } from '@/api/games';
 import { useAuthStore } from '@/features/auth/authStore';
 import {
   ArtilleryTable,
+  DambadukTable,
   CloudRouteTable,
   GameTable,
   OmokTable,
@@ -58,7 +59,15 @@ import {
  * 보여 준다. 이 게임판들은 같은 props 계약(`roomFinished` 포함)을 따른다. 티츄도 결과 화면을 유지하지만(D-240) props 가
  * 달라 아래 별도 분기다.
  */
-const BOARD_HELD_GAMES: ReadonlySet<string> = new Set(['SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY']);
+const BOARD_HELD_GAMES: ReadonlySet<string> = new Set([
+  'SKULL_KING',
+  'ONE_CARD',
+  'YACHT',
+  'OMOK',
+  'CLOUD_ROUTE',
+  'ARTILLERY',
+  'DAMBADUK',
+]);
 
 /**
  * D-133 — 첫 입장(`join-or-reconnect`)이 막힌 이유. 자리 없음은 관전을, 방 없음은 메인으로를 제안한다. 그 밖의 오류는
@@ -740,6 +749,8 @@ export function RoomPage() {
             <CloudRouteTable {...board} />
           ) : room.gameType === 'ARTILLERY' ? (
             <ArtilleryTable {...board} />
+          ) : room.gameType === 'DAMBADUK' ? (
+            <DambadukTable {...board} />
           ) : (
             <SkullKingTable {...board} />
           )}

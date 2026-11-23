@@ -27,6 +27,10 @@ export type TableCue =
   // 돌
   | 'stone.place'
   | 'move.rejected'
+  // 담바둑(D-279) — 돌이 판 위를 미끄러지는 소리, 담 한 칸이 쌓이는 소리, 집이 새로 생기는(넓어지는) 소리.
+  | 'stone.slide'
+  | 'wall.build'
+  | 'home.made'
   // 주사위·점수표·버튼(D-268 얏추) — 누른 사람 손끝의 짧은 "뽁".
   | 'die.hold'
   | 'die.release'
@@ -176,6 +180,25 @@ const RECIPES: Record<TableCue, Recipe> = {
     tone(ctx, { f: 640, to: 400, at: t, dur: 0.08, peak: 0.27 * g });
     tone(ctx, { f: 1280, to: 960, at: t, dur: 0.03, peak: 0.08 * g, type: 'triangle' });
     return 0.08;
+  },
+  // 담바둑 돌 미끄러짐 — 나무판 위를 스치는 짧고 작은 미끄럼 휘파람(잡음 없이 "스윽", 끝에서 살짝 가라앉는다).
+  'stone.slide': (ctx, t, g) => {
+    tone(ctx, { f: 470, to: 300, at: t, dur: 0.12, peak: 0.075 * g });
+    tone(ctx, { f: 940, to: 620, at: t, dur: 0.05, peak: 0.02 * g });
+    return 0.12;
+  },
+  // 담바둑 담 쌓기 — 돌을 얹는 "통-똑": 낮게 내려앉는 둥근 "통"(큰 돌) 뒤에 짧고 높은 마림바 "똑"(작은 돌).
+  'wall.build': (ctx, t, g) => {
+    tone(ctx, { f: 330, to: 196, glide: 0.06, at: t, dur: 0.11, peak: 0.22 * g });
+    tone(ctx, { f: 660, to: 420, at: t, dur: 0.03, peak: 0.06 * g, type: 'triangle' });
+    pluck(ctx, t + 0.085, 587.33, 0.14 * g, 0.07);
+    return 0.16;
+  },
+  // 담바둑 새 집 — 먹물 한 방울이 번지는 "퐁~"(아래에서 튀어 오른 방울 + 다섯 도 위로 길게 남는 마림바).
+  'home.made': (ctx, t, g) => {
+    pop(ctx, t, 392, 0.13 * g, 0.1);
+    pluck(ctx, t + 0.09, 587.33, 0.12 * g, 0.26);
+    return 0.35;
   },
   // 둘 수 없는 자리 — 낮고 순한 "봉-봉"(두 번).
   'move.rejected': (ctx, t, g) => {

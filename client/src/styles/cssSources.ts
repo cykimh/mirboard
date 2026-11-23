@@ -16,6 +16,7 @@ export const yachtCssSource = readCss('./parts/20-yacht-table.css');
 export const omokCssSource = readCss('./parts/21-omok-table.css');
 export const cloudrouteCssSource = readCss('./parts/22-cloudroute-table.css');
 export const artilleryCssSource = readCss('./parts/23-artillery-table.css');
+export const dambadukCssSource = readCss('./parts/26-dambaduk-table.css');
 export const tichuLacquerCssSource = readCss('./parts/25-tichu-lacquer.css');
 export const gameMenuCssSource = readCss('./parts/24-game-menu.css');
 export const indexCssSource = readCss('./index.css');

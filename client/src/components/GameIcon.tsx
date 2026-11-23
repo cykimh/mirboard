@@ -156,6 +156,31 @@ const ICONS: Record<string, IconDef> = {
       </>
     ),
   },
+  // 담바둑 — 쪽빛 타일, 나무판 위에 ㄱ자로 두른 돌담과 그 안의 흑돌(집), 담 밖의 모난 백돌. 작을 때는 먹선·돌 이음을 뺀다.
+  DAMBADUK: {
+    tile: { hi: '#74abc8', lo: '#215676', deep: '#0d2a3d' },
+    glyph: ({ detail, deep }) => (
+      <>
+        <rect x="8" y="8" width="32" height="32" rx="4.5" fill="#f1d49b" {...line(deep)} />
+        <path d="M9.5 9.5h19.8v19.8H9.5z" fill={deep} fillOpacity="0.2" />
+        {detail && (
+          <path d="M18.7 9v30M29.3 30v9M9 18.7h30M30 29.3h9" stroke={deep} strokeOpacity="0.32" strokeWidth="1" />
+        )}
+        <path d="M29.3 9.5v19.8H9.5" fill="none" stroke={deep} strokeWidth="5.4" strokeLinejoin="round" />
+        <path
+          d="M29.3 10v19.3H10"
+          fill="none"
+          stroke="#c9c1b2"
+          strokeWidth="2.8"
+          strokeLinejoin="round"
+          strokeDasharray={detail ? '5.4 1.3' : undefined}
+        />
+        <circle cx="18.6" cy="18.6" r={detail ? 5.4 : 5.8} fill="#1d1a17" />
+        {detail && <circle cx="16.8" cy="16.7" r="1.4" fill="#fff" fillOpacity="0.45" />}
+        <rect x="30.4" y="30.4" width="7.8" height="7.8" rx="2.4" fill={CREAM} stroke={deep} strokeWidth="1.2" />
+      </>
+    ),
+  },
   // 구름항로 — 하늘색 타일, 줄무늬 열기구와 솜구름.
   CLOUD_ROUTE: {
     tile: { hi: '#8fd8ff', lo: '#3486dc', deep: '#143f7c' },

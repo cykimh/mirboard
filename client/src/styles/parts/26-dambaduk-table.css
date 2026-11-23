@@ -1,0 +1,1268 @@
+/* 담바둑 게임판 (D-274·D-279) — 오목(21)·씨앗포(23)와 같은 규칙을 따른다.
+ *
+ * ⚠ 캐스케이드: index.css 에서 25 다음, **17-responsive 앞**에 import 된다. 이 파일에는 미디어 쿼리가 **0개**다(폭·동작 줄이기·hover 는
+ *   17-responsive 의 `.db-` 블록).
+ * ⚠ 네임스페이스: 모든 선택자는 `.db-` 클래스를 포함한다. 공용 클래스를 단독으로 재정의하지 않는다. 글꼴은 앱 기본 하나.
+ * ⚠ 백분율 여백·크기는 칸이 아니라 **판 폭** 기준이다 — 칸 몫은 `calc(100% / 7 * 비율)` 로 나눈다.
+ * 구성: ① 토큰 → ② 배치·납작한 기본 모습(테마를 꺼도 쓸 수 있게) → ③ 테마 층 `.db-theme-classic`(나무 바둑판·먹선·돌담 결·바둑돌)
+ *       → ④ 연출 `.db-fx-rich`(담 쌓임·집 번짐·발자국·차례 빛·맥박·배너). 테마·연출은 `dambadukTheme.ts` 상수 한 줄로 끈다.
+ * 박자: 돌 미끄러짐 `--db-slide`(0.22s — `dambadukSfx.WALL_AFTER_SLIDE_SEC` 와 같은 값) → 담 쌓임(돌마다 50ms 간격) → 집 번짐.
+ */
+
+.db-table,
+.db-table *,
+.db-table *::before,
+.db-table *::after,
+.db-board,
+.db-board *,
+.db-board *::before,
+.db-board *::after {
+  box-sizing: border-box;
+}
+
+/* ── ① 토큰 (튜토리얼 포털도 쓰도록 .db-tokens) ─────────────────────── */
+.db-tokens {
+  /* 나무판 — 라이트·다크 모두 밝은 나무색(돌 대비). */
+  --db-wood: #e8c285;
+  --db-wood-hi: #f5dcab;
+  --db-wood-deep: #a9742f;
+  --db-wood-side: #8a5c23;
+  --db-ink: #2e1f10;
+  --db-line: rgba(46, 31, 16, 0.5);
+  /* 돌담 — 따뜻한 잿빛 돌 셋과 짙은 틈. */
+  --db-wall: #8f8779;
+  --db-wall-stone: #b6ad9c;
+  --db-wall-dark: #736b5f;
+  --db-wall-edge: #37302a;
+  /* 좌석 색 — 흑·백·청(쪽빛). */
+  --db-black: #17181b;
+  --db-white: #fbfaf5;
+  --db-blue: #2a6c8e;
+  --db-black-wash: rgba(24, 22, 30, 0.26);
+  --db-white-wash: rgba(255, 255, 255, 0.62);
+  --db-blue-wash: rgba(34, 104, 142, 0.38);
+  /* 강조 — 인주(주홍). 글자로 쓸 때는 -ink(다크에서 밝아진다). */
+  --db-accent: #c2371a;
+  --db-accent-deep: #8f2710;
+  --db-accent-ink: #b5341a;
+  --db-on-accent: #ffffff;
+  --db-dest: #c2371a;
+  --db-paper: #fbf3df;
+  --db-border: var(--color-border);
+  --db-muted: var(--color-text-muted);
+  --db-surface: var(--color-bg-surface);
+  --db-surface-2: var(--color-bg-surface-elevated);
+  --db-board-shadow: rgba(46, 26, 4, 0.28);
+  --db-slide: 0.22s;
+}
+/* 다크 — 방(바깥)만 어두워진다. 판은 눈부심만 한 톤 낮춘 밝은 나무. */
+.dark .db-tokens {
+  --db-wood: #ddb576;
+  --db-wood-hi: #ecd09a;
+  --db-accent-ink: #f08a63;
+  --db-board-shadow: rgba(0, 0, 0, 0.55);
+}
+
+/* ── ② 배치 ─────────────────────────────────────────────────────────── */
+.db-table {
+  /* 판 말고 세로로 쓰는 몫(머리 줄·좌석 띠·안내·조작) — 판은 남는 높이와 폭 가운데 작은 쪽을 다 쓴다. */
+  --db-reserve: 330px;
+  --db-board-max: min(560px, max(280px, calc(100dvh - var(--db-reserve))));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 16px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.db-header,
+.db-strip,
+.db-status,
+.db-controls,
+.db-end {
+  width: 100%;
+}
+
+/* ── 머리 줄 배지·버튼 ── */
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--db-border);
+  border-radius: 999px;
+  background: var(--db-surface);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.db-badge-title {
+  font-weight: 700;
+}
+.db-badge-warn {
+  border-color: var(--db-accent-ink);
+  color: var(--db-accent-ink);
+}
+.db-header-badges,
+.db-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* ── 좌석 띠 — 이름 줄(색 점·계급·이름) + 점수 줄. 남은 시간은 카드 오른쪽 위 모서리에 걸친 꼬리표라 이름을 밀지 않는다. ── */
+.db-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.db-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 8px 5px;
+  border: 1px solid var(--db-border);
+  border-radius: 10px;
+  background: var(--db-surface);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.db-seat-turn {
+  border-color: var(--db-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-accent) 32%, transparent);
+}
+.db-seat-out {
+  opacity: 0.55;
+}
+.db-seat-out .db-seat-name {
+  text-decoration: line-through;
+}
+.db-seat-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.db-seat-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.db-seat-me .db-seat-name {
+  font-weight: 800;
+}
+.db-seat-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--db-muted);
+  white-space: nowrap;
+}
+.db-seat-score b {
+  color: var(--color-text, inherit);
+  font-size: 15px;
+}
+/* 가운뎃점은 글로만 남기고(읽기·검사용) 화면에서는 틈으로 나눈다 — 좁은 카드에서 줄이 바뀌어도 점이 줄 머리에 남지 않게. */
+.db-seat-sep {
+  display: none;
+}
+.db-seat .db-countdown {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  z-index: 2;
+  min-height: 20px;
+  padding: 1px 7px;
+  gap: 0;
+  border-color: transparent;
+  background: var(--db-accent);
+  color: var(--db-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.db-seat .db-countdown-urgent {
+  background: var(--db-accent-deep);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-accent) 40%, transparent);
+}
+/* 좌석 카드 안의 딱지(빠짐·끊김)는 작게. 누르는 것(내보내기)은 크기를 지킨다. */
+.db-seat > span.db-badge {
+  align-self: flex-start;
+  min-height: 20px;
+  padding: 1px 7px;
+  font-size: 11px;
+}
+.db-seat > button.db-badge {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+/* 채팅 한 줄 — 카드 아래로 드리운 말풍선(위 모서리는 남은 시간 꼬리표 자리). */
+.db-seat-chat {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: calc(100% - 5px);
+  z-index: 6;
+  padding: 3px 7px;
+  border: 1px solid var(--db-border);
+  border-radius: 4px 10px 10px 10px;
+  background: var(--db-surface-2);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.db-dot {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+.db-dot.db-c-black {
+  background: var(--db-black);
+}
+.db-dot.db-c-white {
+  background: var(--db-white);
+}
+.db-dot.db-c-blue {
+  background: var(--db-blue);
+}
+.db-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── 판: 세 겹(그림·돌·누르는 칸) ── */
+.db-stage {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.db-board-wrap {
+  position: relative;
+  width: 100%;
+  max-width: var(--db-board-max);
+}
+.db-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.db-board-mini {
+  width: min(100%, 240px);
+  margin: 8px auto 12px;
+}
+.db-board-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 2.6%;
+}
+.db-wood {
+  fill: var(--db-wood);
+}
+.db-frame {
+  fill: none;
+  stroke: var(--db-wood-deep);
+  stroke-width: 8;
+}
+.db-frame-lip {
+  display: none;
+  fill: none;
+}
+.db-line {
+  stroke: var(--db-line);
+  stroke-width: 2;
+}
+.db-home.db-c-black {
+  fill: var(--db-black-wash);
+}
+.db-home.db-c-white {
+  fill: var(--db-white-wash);
+}
+.db-home.db-c-blue {
+  fill: var(--db-blue-wash);
+}
+/* 돌 놓기 동안은 집을 물들이지 않는다 — 담이 없어 판 전체가 한 사람 땅으로 잡히고, 점수도 아직 세지 않는다. */
+.db-board-placing .db-home {
+  display: none;
+}
+.db-trail {
+  stroke: var(--db-ink);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 14;
+  opacity: 0.38;
+}
+.db-wall-candidate {
+  stroke: var(--db-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 8 10;
+}
+.db-wall-shadow {
+  fill: rgba(40, 22, 4, 0.3);
+}
+.db-wall-base {
+  fill: var(--db-wall-edge);
+}
+.db-wall-stone-a {
+  fill: var(--db-wall-stone);
+}
+.db-wall-stone-b {
+  fill: var(--db-wall);
+}
+.db-wall-stone-c {
+  fill: var(--db-wall-dark);
+}
+.db-wall-pending {
+  opacity: 0.5;
+}
+
+.db-stones,
+.db-cells {
+  position: absolute;
+  inset: 0;
+}
+.db-stones {
+  pointer-events: none;
+}
+.db-stone,
+.db-dest,
+.db-cell,
+.db-wall-pick {
+  position: absolute;
+  left: calc(var(--db-x) * 100% / 7);
+  top: calc(var(--db-y) * 100% / 7);
+  width: calc(100% / 7);
+  height: calc(100% / 7);
+}
+.db-stone {
+  /* 백분율 여백은 칸이 아니라 판 폭 기준이라 칸 몫으로 나눈다(칸의 9%). */
+  padding: calc(100% / 7 * 0.09);
+  transition:
+    left var(--db-slide) ease-out,
+    top var(--db-slide) ease-out;
+}
+.db-stone-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.db-stone-shadow {
+  fill: rgba(0, 0, 0, 0.25);
+}
+.db-stone-body {
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 3;
+}
+.db-stone-gloss {
+  fill: rgba(255, 255, 255, 0.25);
+}
+.db-stone-mark,
+.db-stone-mark-lip {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.db-stone-mark-lip {
+  stroke: none;
+}
+.db-c-black .db-stone-body {
+  fill: var(--db-black);
+}
+.db-c-black .db-stone-mark {
+  stroke: rgba(255, 255, 255, 0.55);
+}
+.db-c-white .db-stone-body {
+  fill: var(--db-white);
+}
+.db-c-white .db-stone-mark {
+  stroke: rgba(0, 0, 0, 0.45);
+}
+.db-c-blue .db-stone-body {
+  fill: var(--db-blue);
+}
+.db-c-blue .db-stone-mark {
+  stroke: rgba(255, 255, 255, 0.6);
+}
+.db-stone-ghost,
+.db-stone-pending {
+  opacity: 0.7;
+}
+.db-stone-selected .db-stone-body {
+  stroke: var(--db-accent);
+  stroke-width: 8;
+}
+.db-stone-movable .db-stone-body {
+  stroke: var(--db-accent);
+  stroke-width: 5;
+}
+.db-dest::after {
+  content: '';
+  position: absolute;
+  left: 38%;
+  top: 38%;
+  width: 24%;
+  height: 24%;
+  border-radius: 50%;
+  background: var(--db-dest);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-paper) 85%, transparent);
+}
+.db-dest-jump::after {
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+.db-dest-chosen::after {
+  opacity: 0;
+}
+
+.db-cell,
+.db-cells .db-cell:hover:not(:disabled) {
+  /* 공용 button:hover 바탕(01-base)이 칸을 덮지 않게 — 칸은 늘 투명한 누름 판이다. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+.db-cells .db-cell-on,
+.db-cells .db-cell-on:hover:not(:disabled) {
+  cursor: pointer;
+}
+.db-cell:focus-visible {
+  outline: 3px solid var(--db-accent);
+  outline-offset: -3px;
+}
+/* 담 고르기 손잡이 — 도착 칸의 면 위에 길쭉하게(면 길이의 60%·두께 22px). 네 개가 서로 겹치지 않는다. */
+.db-wall-pick,
+.db-cells .db-wall-pick:hover:not(:disabled) {
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--db-accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--db-paper) 78%, var(--db-accent));
+  box-shadow: 0 2px 5px rgba(60, 20, 0, 0.35);
+  cursor: pointer;
+}
+.db-wall-pick:focus-visible {
+  outline: 3px solid var(--db-ink);
+  outline-offset: 2px;
+}
+.db-wall-pick-up,
+.db-wall-pick-down,
+.db-cells .db-wall-pick-up:hover:not(:disabled),
+.db-cells .db-wall-pick-down:hover:not(:disabled) {
+  width: calc(100% / 7 * 0.6);
+  height: 22px;
+  margin-left: calc(100% / 7 * 0.2);
+}
+.db-wall-pick-up,
+.db-cells .db-wall-pick-up:hover:not(:disabled) {
+  margin-top: -11px;
+}
+.db-wall-pick-down,
+.db-cells .db-wall-pick-down:hover:not(:disabled) {
+  margin-top: calc(100% / 7 - 11px);
+}
+.db-wall-pick-left,
+.db-wall-pick-right,
+.db-cells .db-wall-pick-left:hover:not(:disabled),
+.db-cells .db-wall-pick-right:hover:not(:disabled) {
+  width: 22px;
+  height: calc(100% / 7 * 0.6);
+  margin-top: calc(100% / 7 * 0.2);
+}
+.db-wall-pick-left,
+.db-cells .db-wall-pick-left:hover:not(:disabled) {
+  margin-left: -11px;
+}
+.db-wall-pick-right,
+.db-cells .db-wall-pick-right:hover:not(:disabled) {
+  margin-left: calc(100% / 7 - 11px);
+}
+
+/* ── 안내·조작 ── */
+.db-status {
+  margin: 0;
+  min-height: 1.5em;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.db-status-note {
+  font-weight: 400;
+  color: var(--db-muted);
+}
+.db-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+/* 공용 button(01-base)의 hover 바탕이 덮지 않게 hover 도 같이 적는다. */
+.db-table .db-primary,
+.db-table .db-secondary,
+.db-table .db-jump,
+.db-table .db-route,
+.db-table .db-kind,
+.db-table .db-wall-btn,
+.db-table .db-secondary:hover:not(:disabled),
+.db-table .db-jump:hover:not(:disabled),
+.db-table .db-route:hover:not(:disabled),
+.db-table .db-kind:hover:not(:disabled),
+.db-table .db-wall-btn:hover:not(:disabled) {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--db-border);
+  background: var(--db-surface);
+  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.db-table .db-primary,
+.db-table .db-primary:hover:not(:disabled) {
+  border-color: var(--db-accent-deep);
+  background: var(--db-accent);
+  color: var(--db-on-accent);
+}
+.db-table .db-primary:disabled,
+.db-table .db-wall-btn:disabled,
+.db-table .db-kind:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.db-table .db-jump-on,
+.db-table .db-route[aria-pressed='true'],
+.db-table .db-kind[aria-pressed='true'],
+.db-table .db-jump-on:hover:not(:disabled),
+.db-table .db-route[aria-pressed='true']:hover:not(:disabled),
+.db-table .db-kind[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--db-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--db-accent) 35%, transparent);
+}
+/* 담을 넘어야만 옮길 수 있을 때 — 담 넘기는 켜진 채 잠긴다(누를 수 없지만 안내라 또렷이 읽혀야 한다). */
+.db-table .db-jump:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.db-kind-pick,
+.db-routes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.db-table .db-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.db-kind-art {
+  display: inline-block;
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+/* 담 방향 패드 — 판 위 손잡이의 44px 대체 수단. 가운데 돌 둘레로 네 면. 단추마다 그 면에 놓일 담 토막을 작게 그린다. */
+.db-wall-pad {
+  display: grid;
+  grid-template-columns: 80px 62px 80px;
+  grid-template-areas:
+    '. up .'
+    'left center right'
+    '. down .';
+  gap: 4px;
+  align-items: center;
+  justify-items: stretch;
+}
+.db-table .db-wall-btn,
+.db-table .db-wall-btn:hover:not(:disabled) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 4px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.db-wall-btn::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 6px;
+  border: 1px solid var(--db-wall-edge);
+  border-radius: 3px;
+  background: var(--db-wall-stone);
+}
+.db-wall-btn-up {
+  grid-area: up;
+  flex-direction: column;
+}
+.db-wall-btn-down {
+  grid-area: down;
+  flex-direction: column-reverse;
+}
+.db-wall-btn-left {
+  grid-area: left;
+}
+.db-wall-btn-right {
+  grid-area: right;
+  flex-direction: row-reverse;
+}
+.db-wall-btn-left::before,
+.db-wall-btn-right::before {
+  width: 6px;
+  height: 18px;
+}
+.db-wall-pad-center {
+  grid-area: center;
+  justify-self: center;
+  width: 38px;
+  height: 38px;
+}
+
+/* ── 끝 ── */
+.db-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px;
+  border: 1px solid var(--db-border);
+  border-top: 4px solid var(--db-border);
+  border-radius: 12px;
+  background: var(--db-surface);
+}
+.db-end-won {
+  border-top-color: var(--db-accent);
+}
+.db-end-lost {
+  border-top-color: var(--db-wall-dark);
+}
+.db-end-draw {
+  border-top-color: var(--db-wall-stone);
+}
+.db-end-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+.db-end-won .db-end-title {
+  color: var(--db-accent-ink);
+}
+.db-end-line {
+  margin: 0;
+}
+.db-end-muted {
+  color: var(--db-muted);
+  font-size: 14px;
+}
+.db-end-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.db-end-table th,
+.db-end-table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--db-border);
+  text-align: left;
+}
+.db-end-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--db-muted);
+}
+.db-end-table .db-dot {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.db-end-winner td {
+  font-weight: 700;
+}
+.db-end-me td:first-child {
+  color: var(--db-accent-ink);
+}
+.db-end-out td {
+  opacity: 0.6;
+}
+.db-end-actions {
+  display: flex;
+  gap: 8px;
+}
+.db-end-banner {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 86%;
+  padding: 10px 26px;
+  border-radius: 14px;
+  background: var(--db-surface-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  pointer-events: none;
+}
+.db-end-banner-text {
+  font-size: 26px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.db-end-banner-who {
+  font-size: 14px;
+  color: var(--db-muted);
+}
+
+/* ── 튜토리얼 ── */
+.db-tut-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.db-tut-pair .db-board-mini {
+  width: 100%;
+}
+.db-mark::after {
+  background: var(--db-accent);
+}
+
+/* ══ ③ 테마 층 — 클래식(나무 바둑판·먹선·돌담 결·바둑돌) ═══════════════════ */
+
+/* 나무판 — 곧은결(비자·은행나무 느낌)을 겹친 그라데이션으로. */
+.db-theme-classic .db-board {
+  border-radius: 2.6%;
+  background:
+    linear-gradient(135deg, rgba(255, 250, 235, 0.3) 0%, rgba(255, 250, 235, 0) 38%, rgba(110, 62, 14, 0.14) 100%),
+    repeating-linear-gradient(
+      91deg,
+      transparent 0 9px,
+      rgba(140, 88, 30, 0.11) 9px 10px,
+      transparent 10px 23px,
+      rgba(140, 88, 30, 0.07) 23px 25px,
+      transparent 25px 41px,
+      rgba(120, 72, 22, 0.1) 41px 42px,
+      transparent 42px 57px
+    ),
+    repeating-linear-gradient(
+      89deg,
+      rgba(255, 240, 205, 0.12) 0 30px,
+      transparent 30px 74px,
+      rgba(150, 96, 36, 0.08) 74px 96px,
+      transparent 96px 131px
+    ),
+    var(--db-wood);
+}
+/* 바깥담 — 판 테두리는 처음부터 담이다: 판 밖으로 돌을 이어 두른 굵은 테(변마다 돌 이음 간격이 다르다) + 아래 두께와 그림자.
+   판 뒤에 깔려 테만 보인다(`.db-board-wrap` 이 쌓임 맥락). 판 둘레에 테 두께만큼 자리를 낸다. */
+.db-theme-classic .db-board-wrap {
+  --db-rim: 6px;
+  isolation: isolate;
+  padding: var(--db-rim) var(--db-rim) calc(var(--db-rim) + 5px);
+}
+.db-theme-classic .db-board::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--db-rim, 5px) * -1);
+  z-index: -1;
+  border-radius: calc(2.6% + var(--db-rim, 5px));
+  background:
+    repeating-linear-gradient(90deg, transparent 0 31px, var(--db-wall-edge) 31px 32.5px, transparent 32.5px 71px, var(--db-wall-edge) 71px 72.5px)
+      top / 100% var(--db-rim, 5px) no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 44px, var(--db-wall-edge) 44px 45.5px, transparent 45.5px 79px, var(--db-wall-edge) 79px 80.5px)
+      bottom / 100% var(--db-rim, 5px) no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 38px, var(--db-wall-edge) 38px 39.5px, transparent 39.5px 67px, var(--db-wall-edge) 67px 68.5px)
+      left / var(--db-rim, 5px) 100% no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 27px, var(--db-wall-edge) 27px 28.5px, transparent 28.5px 75px, var(--db-wall-edge) 75px 76.5px)
+      right / var(--db-rim, 5px) 100% no-repeat,
+    linear-gradient(135deg, var(--db-wall-stone) 0%, var(--db-wall) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 1px var(--db-wall-edge),
+    0 4px 0 1px #554e45,
+    0 12px 20px var(--db-board-shadow);
+  pointer-events: none;
+}
+.db-theme-classic .db-board-mini {
+  --db-rim: 4px;
+  margin: 12px auto 18px;
+}
+.db-theme-classic .db-tut-pair .db-board-mini {
+  width: calc(100% - 8px);
+}
+.db-theme-classic .db-wood {
+  fill: transparent;
+}
+.db-theme-classic .db-frame {
+  stroke: var(--db-wall-edge);
+  stroke-width: 7;
+}
+.db-theme-classic .db-frame-lip {
+  display: inline;
+  stroke: rgba(46, 26, 4, 0.28);
+  stroke-width: 3;
+}
+/* 먹선 — 붓으로 그은 가는 선. */
+.db-theme-classic .db-line {
+  stroke: var(--db-line);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+/* 집 — 먹물이 번진 듯 은은하게. 백은 나무 위에서 묻히지 않게 흰 테를 한 줄 더. */
+.db-theme-classic .db-home.db-c-white {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 3;
+  paint-order: stroke;
+}
+/* 담 — 돌마다 밝은 윗모서리. */
+.db-theme-classic .db-wall-stone {
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 0.8;
+}
+
+/* 바둑돌 — 몸통은 svg 바탕의 방사형 그라데이션(왼쪽 위 광원). 납작한 몸통 그림은 숨긴다. 곧은돌 = 둥근 돌, 꺾은돌 = 모난 돌. */
+.db-theme-classic .db-stone {
+  padding: calc(100% / 7 * 0.125);
+}
+.db-theme-classic .db-stone-shadow,
+.db-theme-classic .db-stone-body,
+.db-theme-classic .db-stone-gloss {
+  display: none;
+}
+.db-theme-classic .db-stone-art {
+  border-radius: 50%;
+  box-shadow:
+    0 2px 3px rgba(40, 20, 0, 0.5),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  transition:
+    transform 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+.db-theme-classic .db-stone-art-bent {
+  border-radius: 24%;
+}
+.db-theme-classic .db-c-black .db-stone-art {
+  background: radial-gradient(circle at 32% 26%, #70737b 0%, #303238 26%, #141518 68%, #050506 100%);
+}
+.db-theme-classic .db-c-white .db-stone-art {
+  background: radial-gradient(circle at 32% 26%, #ffffff 0%, #f8f4e9 42%, #ddd6c3 84%, #bfb69e 100%);
+  box-shadow:
+    0 0 0 1px rgba(70, 48, 20, 0.55),
+    0 2px 3px rgba(40, 20, 0, 0.5),
+    inset 0 -2px 3px rgba(90, 70, 30, 0.25);
+}
+.db-theme-classic .db-c-blue .db-stone-art {
+  background: radial-gradient(circle at 32% 26%, #9bcce0 0%, #3a7fa2 30%, #1e5373 72%, #11344a 100%);
+}
+/* 각인 — 파인 홈(어두운 줄) + 아래 턱(밝은 줄). 몸통이 svg 를 꽉 채우므로 조금 키운다. */
+.db-theme-classic .db-stone-marks {
+  transform-origin: 50px 50px;
+  transform: scale(1.2);
+}
+.db-theme-classic .db-stone-mark,
+.db-theme-classic .db-stone-mark-lip {
+  stroke-width: 6.5;
+}
+.db-theme-classic .db-c-black .db-stone-mark {
+  stroke: #000000;
+}
+.db-theme-classic .db-c-black .db-stone-mark-lip {
+  stroke: rgba(255, 255, 255, 0.42);
+}
+.db-theme-classic .db-c-white .db-stone-mark {
+  stroke: rgba(84, 66, 36, 0.62);
+}
+.db-theme-classic .db-c-white .db-stone-mark-lip {
+  stroke: rgba(255, 255, 255, 0.95);
+}
+.db-theme-classic .db-c-blue .db-stone-mark {
+  stroke: rgba(6, 26, 40, 0.8);
+}
+.db-theme-classic .db-c-blue .db-stone-mark-lip {
+  stroke: rgba(190, 228, 244, 0.6);
+}
+/* 고를 수 있는 내 돌 — 인주 고리(나무색 틈을 두고). 고른 돌은 살짝 들린다. */
+.db-theme-classic .db-stone-movable .db-stone-art {
+  box-shadow:
+    0 0 0 2px var(--db-wood-hi),
+    0 0 0 4.5px var(--db-accent),
+    0 3px 5px rgba(40, 20, 0, 0.5);
+}
+.db-theme-classic .db-stone-selected .db-stone-art {
+  transform: translateY(-2px) scale(1.07);
+  box-shadow:
+    0 0 0 3px var(--db-accent),
+    0 0 0 5px color-mix(in srgb, var(--db-paper) 80%, transparent),
+    0 7px 10px rgba(40, 20, 0, 0.5);
+}
+.db-theme-classic .db-stone-ghost .db-stone-art {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--db-accent) 80%, transparent),
+    0 2px 3px rgba(40, 20, 0, 0.3);
+}
+/* 좌석 색 점 — 작은 바둑돌. */
+.db-theme-classic .db-dot {
+  border: 0;
+  box-shadow:
+    0 0 0 1px rgba(60, 40, 16, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.db-theme-classic .db-dot.db-c-black {
+  background: radial-gradient(circle at 32% 26%, #70737b 0%, #24262b 45%, #070708 100%);
+}
+.db-theme-classic .db-dot.db-c-white {
+  background: radial-gradient(circle at 32% 26%, #ffffff 0%, #f4efe2 55%, #cfc7b2 100%);
+}
+.db-theme-classic .db-dot.db-c-blue {
+  background: radial-gradient(circle at 32% 26%, #9bcce0 0%, #2f7396 45%, #12384f 100%);
+}
+
+/* 내 차례 — 판 둘레의 인주 빛(연출을 꺼도 테두리는 남는다). */
+.db-theme-classic .db-board-myturn::after {
+  content: '';
+  position: absolute;
+  inset: -3px -3px 2px;
+  border-radius: calc(2.6% + 9px);
+  border: 2px solid color-mix(in srgb, var(--db-accent) 75%, transparent);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--db-accent) 42%, transparent);
+  pointer-events: none;
+}
+.db-theme-classic .db-status-mine {
+  color: var(--db-accent-ink);
+}
+
+/* 좌석 카드 — 차례인 자리는 종이 빛. */
+.db-theme-classic .db-seat-turn {
+  background: color-mix(in srgb, var(--db-accent) 7%, var(--db-surface));
+}
+
+/* 단추 — 살짝 도드라진 나무 패. 누르면 내려앉는다. */
+.db-theme-classic.db-table .db-primary,
+.db-theme-classic.db-table .db-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d4492b 0%, #b8351a 100%);
+  box-shadow:
+    0 2px 0 var(--db-accent-deep),
+    0 5px 10px rgba(140, 40, 10, 0.25);
+  text-shadow: 0 1px 0 rgba(90, 20, 0, 0.4);
+}
+.db-theme-classic.db-table .db-secondary,
+.db-theme-classic.db-table .db-jump,
+.db-theme-classic.db-table .db-route,
+.db-theme-classic.db-table .db-kind,
+.db-theme-classic.db-table .db-wall-btn {
+  box-shadow: 0 2px 0 var(--db-border);
+}
+.db-theme-classic.db-table .db-primary:active:not(:disabled),
+.db-theme-classic.db-table .db-secondary:active:not(:disabled),
+.db-theme-classic.db-table .db-jump:active:not(:disabled),
+.db-theme-classic.db-table .db-route:active:not(:disabled),
+.db-theme-classic.db-table .db-kind:active:not(:disabled),
+.db-theme-classic.db-table .db-wall-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.db-theme-classic.db-table .db-jump-on,
+.db-theme-classic.db-table .db-route[aria-pressed='true'],
+.db-theme-classic.db-table .db-kind[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--db-accent) 9%, var(--db-surface));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--db-accent) 35%, transparent),
+    0 2px 0 var(--db-accent-deep);
+}
+
+/* 종료 배너 — 한지 현판: 위아래 인주 줄, 먹 글씨. 다크에서도 종이는 밝다. */
+.db-theme-classic .db-end-banner {
+  border: 1px solid rgba(90, 60, 20, 0.45);
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--db-accent), var(--db-accent)) top / 100% 4px no-repeat,
+    linear-gradient(var(--db-accent), var(--db-accent)) bottom / 100% 4px no-repeat,
+    var(--db-paper);
+  color: var(--db-ink);
+  box-shadow:
+    0 3px 0 rgba(90, 60, 20, 0.5),
+    0 12px 26px rgba(30, 14, 0, 0.4);
+  padding: 14px 28px;
+}
+.db-theme-classic .db-end-banner-who {
+  color: rgba(46, 31, 16, 0.7);
+}
+
+/* ══ ④ 연출 — `.db-fx-rich`(동작 줄이기면 17 에서 끈다) ═══════════════════ */
+
+/* 방금 세운 담 — 돌이 닿은 뒤(미끄러짐 뒤) 자리 그늘 위로 돌이 하나씩 얹힌다. */
+.db-fx-rich .db-wall-fresh .db-wall-base,
+.db-fx-rich .db-wall-fresh .db-wall-shadow {
+  animation: db-wall-footing 0.18s ease-out both;
+  animation-delay: var(--db-slide);
+}
+.db-fx-rich .db-wall-fresh .db-wall-stone {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-stack 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  animation-delay: calc(var(--db-slide) + 0.04s + var(--db-i, 0) * 0.05s);
+}
+@keyframes db-wall-footing {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes db-wall-stack {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.3);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 새 집 — 담이 다 쌓인 뒤 칸 가운데에서 먹물이 번지듯 물든다. */
+.db-fx-rich .db-home {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-home-bloom 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--db-slide) + 0.4s);
+}
+@keyframes db-home-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+  45% {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 지난 수 발자국 — 먹점이 찍혔다 옅게 남는다. */
+.db-fx-rich .db-trail {
+  animation: db-trail-in 0.9s ease-out both;
+}
+@keyframes db-trail-in {
+  from {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 0.38;
+  }
+}
+
+/* 내 차례 — 판 둘레 빛이 숨 쉬듯. */
+.db-fx-rich .db-board-myturn::after {
+  animation: db-turn-breathe 2.4s ease-in-out infinite;
+}
+@keyframes db-turn-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 고를 수 있는 내 돌 — 고리가 은은히 퍼진다(돌 모양을 따라). */
+.db-fx-rich .db-stone-movable::after {
+  content: '';
+  position: absolute;
+  inset: 12.5%;
+  border-radius: 50%;
+  border: 2px solid var(--db-accent);
+  opacity: 0;
+  animation: db-stone-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+.db-fx-rich .db-stone-movable.db-kind-bent::after {
+  border-radius: 24%;
+}
+@keyframes db-stone-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.38);
+  }
+}
+
+/* 갈 수 있는 칸·담 자리 — 살짝 뛴다. */
+.db-fx-rich .db-dest::after {
+  animation: db-dest-beat 1.4s ease-in-out infinite;
+}
+.db-fx-rich .db-dest-jump::after {
+  animation-name: db-dest-beat-jump;
+}
+.db-fx-rich .db-mark::after {
+  animation: none;
+}
+@keyframes db-dest-beat {
+  0%,
+  100% {
+    transform: scale(0.85);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+@keyframes db-dest-beat-jump {
+  0%,
+  100% {
+    transform: rotate(45deg) scale(0.85);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.12);
+  }
+}
+.db-fx-rich .db-wall-candidate {
+  animation: db-candidate-march 0.9s linear infinite;
+}
+@keyframes db-candidate-march {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+.db-fx-rich .db-wall-pick {
+  animation: db-pick-breathe 1.4s ease-in-out infinite;
+}
+@keyframes db-pick-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 5px rgba(60, 20, 0, 0.35),
+      0 0 0 0 color-mix(in srgb, var(--db-accent) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 2px 5px rgba(60, 20, 0, 0.35),
+      0 0 0 4px color-mix(in srgb, var(--db-accent) 0%, transparent);
+  }
+}
+
+/* 흐린 돌(놓을 자리·갈 자리)이 내려앉는다. */
+.db-fx-rich .db-stone-ghost .db-stone-art {
+  animation: db-ghost-in 0.16s ease-out both;
+}
+@keyframes db-ghost-in {
+  from {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 남은 시간이 급하면 꼬리표가 뛴다. */
+.db-fx-rich .db-seat .db-countdown-urgent {
+  animation: db-urgent 1s ease-in-out infinite;
+}
+@keyframes db-urgent {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* 종료 배너·결과 현판 등장. */
+.db-fx-rich .db-end-banner {
+  animation: db-banner-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) 0.3s both;
+}
+@keyframes db-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7) rotate(-3deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+.db-fx-rich .db-end {
+  animation: db-end-in 0.4s ease-out 0.5s both;
+}
+@keyframes db-end-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 다크 — 좌석 색 점(특히 흑)이 어두운 카드에 묻히지 않게 밝은 테. */
+.dark .db-theme-classic .db-dot {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
