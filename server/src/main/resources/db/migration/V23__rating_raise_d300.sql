@@ -2,7 +2,8 @@
 --
 -- 대상: 사람 계정(봇 is_bot · 게스트 'guest-' 접두 제외 — GuestPolicy 규약)의 user_game_stats 행 중
 --       한 판 이상 한 행. "한 판"은 승+패 > 0 이거나, 승패가 0 이어도 그 게임의 이번 달 전적 행
---       (user_monthly_stats — 무승부도 행을 남긴다, D-209)이 있는 것.
+--       (user_monthly_stats — 무승부도 행을 남긴다, D-209)이 있는 것. 이번 달 전적이 생기기 전(V19)에 무승부만 한
+--       오목·씨앗포 판은 참가 테이블로 잡는다.
 -- user_monthly_stats 는 레이팅 컬럼이 없어(승·패·탈주·최근 결과) 건드리지 않는다.
 -- 스키마 이름을 적지 않는다 — Flyway 기본 스키마(운영 MIRBOARD_DB_SCHEMA, D-169)를 따른다.
 --
@@ -38,7 +39,12 @@ WITH fresh AS (
                  AND u.username NOT LIKE 'guest-%'
                  AND (s.win_count + s.lose_count > 0
                       OR EXISTS (SELECT 1 FROM user_monthly_stats m
-                                  WHERE m.user_id = s.user_id AND m.game_type = s.game_type))
+                                  WHERE m.user_id = s.user_id AND m.game_type = s.game_type)
+                      -- 이번 달 전적(V19) 이전에 무승부만 한 판(오목·씨앗포)도 한 판으로 친다.
+                      OR (s.game_type = 'OMOK' AND EXISTS (SELECT 1 FROM omok_match_participants p
+                                                            WHERE p.user_id = s.user_id))
+                      OR (s.game_type = 'ARTILLERY' AND EXISTS (SELECT 1 FROM artillery_match_participants p
+                                                                 WHERE p.user_id = s.user_id)))
                 THEN 40 ELSE 0 END
     FROM user_game_stats s
     JOIN users u ON u.id = s.user_id

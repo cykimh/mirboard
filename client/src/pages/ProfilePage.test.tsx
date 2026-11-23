@@ -40,6 +40,22 @@ describe('ProfilePage — 프로필 이미지 (D-154)', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('AVATAR_DIALOG');
   });
 
+  it('D-302 — 회원은 아바타를 눌러도 설정 창을 연다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 1, username: '철수' } as never });
+    renderProfile();
+
+    fireEvent.click(await screen.findByRole('button', { name: '내 아바타 — 눌러서 이미지 바꾸기' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('AVATAR_DIALOG');
+  });
+
+  it('D-302 — 게스트의 아바타는 누를 수 없다', async () => {
+    useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'guest-ab12cd34', guest: true } as never });
+    renderProfile();
+
+    await screen.findByRole('button', { name: '프로필 이미지 바꾸기' });
+    expect(screen.queryByRole('button', { name: '내 아바타 — 눌러서 이미지 바꾸기' })).toBeNull();
+  });
+
   it('게스트는 버튼이 잠겨 있다', async () => {
     useAuthStore.setState({ token: 'tok', user: { userId: 2, username: 'guest-ab12cd34', guest: true } as never });
     renderProfile();

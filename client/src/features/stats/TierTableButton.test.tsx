@@ -25,8 +25,8 @@ describe('TierTableButton (D-266)', () => {
     expect(rows[13]).toHaveTextContent('미사일');
     expect(rows[13]).toHaveTextContent('1000점 이상');
     expect(rows[15]).toHaveTextContent('940점 미만');
-    expect(dialog).toHaveTextContent('처음 1000점(미사일)에서 시작해 이기면 오르고 지면 내려가요');
-    expect(dialog).toHaveTextContent('봇이나 게스트가 낀 판은 점수가 바뀌지 않아요');
+    expect(dialog).toHaveTextContent('처음 1000점(미사일)에서 시작해 이기면 오르고, 지면 조금만');
+    expect(dialog).toHaveTextContent('많이 할수록 계급이 올라가요');
     expect(dialog).toHaveTextContent('티츄 기준');
   });
 

@@ -1,7 +1,7 @@
 import { GameIcon } from '@/components/GameIcon';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import { useAuthStore } from '@/features/auth/authStore';
 import { usersApi, type HeadToHeadEntry, type UserStats } from '@/api/users';
 import { headToHeadText } from '@/features/stats/headToHead';
@@ -67,10 +67,32 @@ export function ProfilePage() {
         </header>
 
         <section className="flex items-center gap-4 rounded-lg border p-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={avatarSrc(user.userId, avatarVersion || undefined)} alt="" />
-            <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          {/* D-302 — 아바타를 눌러도 이미지 바꾸기 창이 열린다(게스트는 못 바꾸므로 그냥 그림). 오른쪽 아래 작은 연필로 누를 수 있음을 보인다. */}
+          {user.guest ? (
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={avatarSrc(user.userId, avatarVersion || undefined)} alt="" />
+              <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAvatarOpen(true)}
+              aria-label="내 아바타 — 눌러서 이미지 바꾸기"
+              title="눌러서 이미지 바꾸기"
+              className="group relative shrink-0 rounded-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Avatar className="h-16 w-16 transition-opacity group-hover:opacity-85">
+                <AvatarImage src={avatarSrc(user.userId, avatarVersion || undefined)} alt="" />
+                <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+              </span>
+            </button>
+          )}
           <div className="flex flex-col gap-1">
             <span className="text-lg font-semibold">{user.username}</span>
             {/* D-266 — 계급 옆 [계급표]. 한 판도 안 했으면 시작 계급(미사일)을 강조, 게스트는 강조 없음. */}

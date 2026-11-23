@@ -73,8 +73,8 @@ export function TierTableButton({ myTier, basis, onOpen, className }: Props) {
         <DialogHeader className="pr-6 text-left">
           <DialogTitle>계급표</DialogTitle>
           <DialogDescription>
-            레이팅은 게임마다 따로예요. 처음 {STARTING_RATING}점(미사일)에서 시작해 이기면 오르고 지면 내려가요. 봇이나 게스트가
-            낀 판은 점수가 바뀌지 않아요.
+            레이팅은 게임마다 따로예요. 처음 {STARTING_RATING}점(미사일)에서 시작해 이기면 오르고, 지면 조금만
+            내려가요. 판을 끝까지 하면 결과와 상관없이 점수를 더 받아서, 많이 할수록 계급이 올라가요. 봇이 낀 판은 덜 움직여요.
           </DialogDescription>
         </DialogHeader>
         {myTier && (
