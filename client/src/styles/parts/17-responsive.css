@@ -949,6 +949,43 @@
   }
 }
 
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .tc-theme-lacquer .seat.turn::after,
+:root.motion-off .tc-theme-lacquer .scoreboard-team,
+:root.motion-off .tc-theme-lacquer .round-ended,
+:root.motion-off .tc-theme-lacquer .round-ended h3 + p,
+:root.motion-off .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
+:root.motion-off .tc-wish-tile,
+:root.motion-off .tc-shake-a,
+:root.motion-off .tc-shake-b,
+:root.motion-off .tc-fx-layer *,
+:root.motion-off .tc-fx-screen * {
+  animation: none !important;
+}
+:root.motion-off .tc-land-ring,
+:root.motion-off .tc-fx-ring,
+:root.motion-off .tc-fx-shard,
+:root.motion-off .tc-fx-dust,
+:root.motion-off .tc-fx-lantern,
+:root.motion-off .tc-fx-bomb-core,
+:root.motion-off .tc-fx-bomb-ring,
+:root.motion-off .tc-fx-declare-ring {
+  display: none;
+}
+:root.motion-off .tc-fx-bomb-flash {
+  opacity: 0.3;
+}
+:root.motion-off .tc-fx-stamp .tc-seal {
+  transform: translate(-50%, -50%) rotate(-8deg);
+}
+:root.motion-off .tc-fx-wish {
+  transform: translate(-50%, -50%);
+}
+:root.motion-off .tc-fx-points {
+  transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78));
+}
+/* motion-off:end */
+
 /* D-279 — 담바둑(`.db-`). 26 은 미디어 0개 규칙이라 폭·hover·동작 줄이기는 여기 둔다(스컬킹 맨 끝 두 블록 앞).
    ① 휴대폰 폭: 판이 주인공 — 양옆 여백을 줄여 판이 화면 폭을 거의 다 쓰고(375px 에서 칸 ≈ 51px), 머리 줄·좌석 띠는 낮게. */
 @media (max-width: 480px) {
@@ -1012,43 +1049,6 @@
 }
 :root.motion-off .db-fx-rich .db-stone-movable::after {
   display: none;
-}
-/* motion-off:end */
-
-/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
-:root.motion-off .tc-theme-lacquer .seat.turn::after,
-:root.motion-off .tc-theme-lacquer .scoreboard-team,
-:root.motion-off .tc-theme-lacquer .round-ended,
-:root.motion-off .tc-theme-lacquer .round-ended h3 + p,
-:root.motion-off .tc-theme-lacquer .hand-cards > .tc-hand-slot > .tc-card,
-:root.motion-off .tc-wish-tile,
-:root.motion-off .tc-shake-a,
-:root.motion-off .tc-shake-b,
-:root.motion-off .tc-fx-layer *,
-:root.motion-off .tc-fx-screen * {
-  animation: none !important;
-}
-:root.motion-off .tc-land-ring,
-:root.motion-off .tc-fx-ring,
-:root.motion-off .tc-fx-shard,
-:root.motion-off .tc-fx-dust,
-:root.motion-off .tc-fx-lantern,
-:root.motion-off .tc-fx-bomb-core,
-:root.motion-off .tc-fx-bomb-ring,
-:root.motion-off .tc-fx-declare-ring {
-  display: none;
-}
-:root.motion-off .tc-fx-bomb-flash {
-  opacity: 0.3;
-}
-:root.motion-off .tc-fx-stamp .tc-seal {
-  transform: translate(-50%, -50%) rotate(-8deg);
-}
-:root.motion-off .tc-fx-wish {
-  transform: translate(-50%, -50%);
-}
-:root.motion-off .tc-fx-points {
-  transform: translate(calc(-50% + var(--tc-tx) * 0.78), calc(-50% + var(--tc-ty) * 0.78));
 }
 /* motion-off:end */
 
