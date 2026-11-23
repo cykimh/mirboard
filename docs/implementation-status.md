@@ -42,6 +42,7 @@
 | 15 | 테이블 좌석 배치 (원카드·스컬킹 시계 방향 테이블형 좌석 + "다음" 표시·방향 화살표, 티츄 +1 을 왼쪽에 — 클라만) | ✅ | `client/src/components/seatOrder.ts`(`tableLayout`), `features/tichu/seatView.ts`, `docs/plans/table-seating.md` (D-132) |
 | 16 | 방 초대 링크 (공유창·복사·수동, 방마다 다른 카톡 미리보기, 로그인·게스트·가입 뒤 그 방으로, 자리 없음 → 바로 관전 + 안내, 대기실 끊김 120초 유예·화면 재동기화) | ✅ | `features/lobby/InviteLinkButton.tsx`·`shareRoomLink.ts`·`SpectateNotice.tsx`, `features/auth/returnPath.ts`, `infra.web.RoomPagePreviewController`, `infra.ws.WaitingLeaveGraceScheduler`, `ws/useRoomMeta.ts`, `docs/plans/room-invite.md` (D-133·D-134) |
 | 17 | 대기실 방장 기능 (봇 한 명씩 넣고 빼기, 대기실 강퇴 + 60초 재입장 금지, 최대 인원 조절 — 대기실 복귀도 그 정원으로, 판 도중 온 관전자가 다음 판에 앉으면 봇은 모두 빠짐) | ✅ | `room_bot_add.lua`·`room_remove_member.lua`·`room_return_waiting.lua`, `RoomService.addBots`·`removeBot`·`kickFromLobby`·`updateSettings(capacity)`, `features/lobby/ParticipantCard.tsx`·`RoomSettingsPanel.tsx` (D-290) |
+| 18 | 메인 "열린 방"에 게임 중인 방도 (대기 중 위·게임 중 아래, 게임 중 표시·인원(봇)·관전자 수, [관전] — 봇과 연습 방 제외) | ✅ | `rooms:playing`(`room_start_now.lua` 넣기 · `room_finish`·`room_return_waiting`·`room_delete`·`room_leave` 빼기), `RoomService.listPlayingRooms`, `GET /api/rooms?status=IN_GAME`, `pages/GameHubPage.tsx`, `RoomModesIntegrationTest`, `docs/design/hub-playing-rooms/` (D-298) |
 
 설계 단계(Phase 1)부터 클라이언트 통합·UI 리디자인(Phase 20)까지 로드맵 항목이 완료
 표시되어 있다(`docs/plans/mvp-roadmap.md`).

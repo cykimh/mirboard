@@ -876,4 +876,27 @@ public class RoomService {
                 .filter(r -> gameTypeFilter == null || gameTypeFilter.equals(r.gameType()))
                 .toList();
     }
+
+    /**
+     * D-298 — 게임 중인 방(봇과 연습 방 제외). {@code rooms:playing} 은 IN_GAME 을 벗어나는 Lua 가 모두 비우지만, 방 키가 TTL 로
+     * 사라진 항목은 남는다 — 방이 없거나 IN_GAME 이 아니면 걸러 내고 그 자리에서 목록에서도 뺀다.
+     */
+    public List<Room> listPlayingRooms(String gameTypeFilter) {
+        List<Room> result = new ArrayList<>();
+        for (String roomId : repository.playingRoomIds()) {
+            Optional<Room> found = repository.findById(roomId);
+            if (found.isEmpty() || found.get().status() != RoomStatus.IN_GAME) {
+                repository.dropPlaying(roomId);
+                continue;
+            }
+            Room room = found.get();
+            if (room.fillWithBots()) {
+                continue;
+            }
+            if (gameTypeFilter == null || gameTypeFilter.equals(room.gameType())) {
+                result.add(room);
+            }
+        }
+        return result;
+    }
 }

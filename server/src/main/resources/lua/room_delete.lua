@@ -8,6 +8,7 @@
 -- KEYS[3] = room:{roomId}:ready
 -- KEYS[4] = room:{roomId}:spectators
 -- KEYS[5] = rooms:open
+-- KEYS[6] = rooms:playing  (D-298)
 -- ARGV    = roomId
 --
 -- Returns: 1 if room existed and was removed, 0 if it did not exist.
@@ -20,4 +21,5 @@ end
 
 redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4])
 redis.call('ZREM', KEYS[5], roomId)
+redis.call('ZREM', KEYS[6], roomId)
 return 1

@@ -16,6 +16,8 @@ import org.springframework.stereotype.Repository;
 public class RoomRepository {
 
     private static final String ROOMS_OPEN_KEY = "rooms:open";
+    /** D-298 — 게임 중인 방 목록(봇과 연습 방 제외). 시작 Lua 가 넣고, IN_GAME 을 벗어나는 Lua 가 모두 뺀다. */
+    private static final String ROOMS_PLAYING_KEY = "rooms:playing";
 
     private final StringRedisTemplate redis;
     private final RedisScript<Long> createScript;
@@ -74,7 +76,8 @@ public class RoomRepository {
                         "room:" + roomId + ":players",
                         readyKey(roomId),
                         spectatorsKey(roomId),
-                        ROOMS_OPEN_KEY),
+                        ROOMS_OPEN_KEY,
+                        ROOMS_PLAYING_KEY),
                 roomId);
         return result != null && result == 1L;
     }
@@ -268,7 +271,8 @@ public class RoomRepository {
                 List.of("room:" + roomId,
                         "room:" + roomId + ":players",
                         readyKey(roomId),
-                        ROOMS_OPEN_KEY),
+                        ROOMS_OPEN_KEY,
+                        ROOMS_PLAYING_KEY),
                 Long.toString(hostUserId),
                 Integer.toString(minPlayers),
                 roomId);
@@ -292,7 +296,8 @@ public class RoomRepository {
                         readyKey(roomId),
                         spectatorsKey(roomId),
                         spectatorsSinceKey(roomId),
-                        ROOMS_OPEN_KEY),
+                        ROOMS_OPEN_KEY,
+                        ROOMS_PLAYING_KEY),
                 args.toArray());
         if (result == null) {
             throw new IllegalStateException("room_return_waiting.lua returned null");
@@ -310,7 +315,8 @@ public class RoomRepository {
         Long result = redis.execute(
                 finishScript,
                 List.of("room:" + roomId, ROOMS_OPEN_KEY,
-                        "room:" + roomId + ":players", readyKey(roomId), spectatorsKey(roomId)),
+                        "room:" + roomId + ":players", readyKey(roomId), spectatorsKey(roomId),
+                        ROOMS_PLAYING_KEY),
                 roomId,
                 Long.toString(now));
         long v = unwrap(result);
@@ -330,7 +336,8 @@ public class RoomRepository {
                 "room:" + roomId + ":players",
                 ROOMS_OPEN_KEY,
                 readyKey(roomId),
-                spectatorsKey(roomId));
+                spectatorsKey(roomId),
+                ROOMS_PLAYING_KEY);
         Long result = redis.execute(
                 leaveScript,
                 keys,
@@ -473,6 +480,17 @@ public class RoomRepository {
     public List<String> openRoomIds() {
         Set<String> ids = redis.opsForZSet().range(ROOMS_OPEN_KEY, 0, -1);
         return ids == null ? List.of() : new ArrayList<>(ids);
+    }
+
+    /** D-298 — 게임 중인 방 id(시작한 순서). 방 키가 만료된 항목이 남아 있을 수 있다 — 읽는 쪽이 걸러 낸다. */
+    public List<String> playingRoomIds() {
+        Set<String> ids = redis.opsForZSet().range(ROOMS_PLAYING_KEY, 0, -1);
+        return ids == null ? List.of() : new ArrayList<>(ids);
+    }
+
+    /** D-298 — 게임 중 목록에서 낡은 항목(방 키 만료 등)을 뺀다. */
+    public void dropPlaying(String roomId) {
+        redis.opsForZSet().remove(ROOMS_PLAYING_KEY, roomId);
     }
 
     private static List<String> keysFor(String roomId) {

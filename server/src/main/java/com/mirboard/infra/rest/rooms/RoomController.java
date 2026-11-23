@@ -81,9 +81,12 @@ public class RoomController {
     @GetMapping
     public ListResponse list(@RequestParam(required = false) String gameType,
                              @RequestParam(required = false, defaultValue = "WAITING") RoomStatus status) {
-        List<Room> result = status == RoomStatus.WAITING
-                ? rooms.listWaitingRooms(gameType)
-                : List.of();
+        // D-298 — IN_GAME 은 게임 중인 방 목록(관전용, 봇과 연습 방 제외). FINISHED 는 목록이 없다.
+        List<Room> result = switch (status) {
+            case WAITING -> rooms.listWaitingRooms(gameType);
+            case IN_GAME -> rooms.listPlayingRooms(gameType);
+            case FINISHED -> List.<Room>of();
+        };
         return new ListResponse(result);
     }
 

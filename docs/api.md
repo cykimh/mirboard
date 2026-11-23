@@ -257,7 +257,11 @@
 ### GET `/api/rooms`
 쿼리:
 - `gameType` (선택, 미지정 시 모든 게임 — 일반적으로 클라이언트는 항상 명시).
-- `status` (선택, 기본 `WAITING`. `IN_GAME|FINISHED|ALL` 도 지원).
+- `status` (선택, 기본 `WAITING`).
+  - `WAITING` — 대기 중인 방(`rooms:open`).
+  - `IN_GAME` — **게임 중인 방**(D-298, `rooms:playing`, 시작한 순서). 메인의 [관전] 목록용이다. 봇과 연습 방(`fillWithBots`)은
+    들어 있지 않다. 방 키가 만료됐거나 이미 IN_GAME 이 아닌 항목은 서버가 걸러 낸다. D-298 배포 전에 시작된 방은 없다.
+  - `FINISHED` — 늘 빈 목록.
 
 `gameType` 값은 `GameRegistry` 에 등록된 ID여야 하며, 미등록 값이면 `INVALID_INPUT`
 응답.
