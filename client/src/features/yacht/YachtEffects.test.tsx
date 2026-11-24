@@ -189,7 +189,7 @@ describe('요트 연출 고도화 (D-204)', () => {
       expect(celebrationDice('LARGE_STRAIGHT', [5, 3, 6, 2, 4])).toEqual([2, 3, 4, 5, 6]);
       expect(celebrationDice('FULL_HOUSE', [6, 2, 6, 2, 2])).toEqual([2, 2, 2, 6, 6]);
       expect(celebrationDice('FULL_HOUSE', [1, 5, 5, 1, 5])).toEqual([5, 5, 5, 1, 1]);
-      expect(celebrationDice('FULL_HOUSE', [4, 4, 4, 4, 4])).toEqual([4, 4, 4, 4, 4]);
+      expect(celebrationDice('FULL_HOUSE', [4, 4, 4, 4, 4])).toBeNull(); // D-309
       expect(celebrationDice('YACHT', [3, 3, 3, 3, 3])).toEqual([3, 3, 3, 3, 3]);
     });
 

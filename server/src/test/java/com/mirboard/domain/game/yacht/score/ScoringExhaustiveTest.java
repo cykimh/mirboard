@@ -34,7 +34,7 @@ class ScoringExhaustiveTest {
             case SIXES -> 6 * counts[6];
             case CHOICE -> sum;
             case FOUR_OF_A_KIND -> shape[shape.length - 1] >= 4 ? sum : 0;
-            case FULL_HOUSE -> Arrays.equals(shape, new int[] {2, 3}) || Arrays.equals(shape, new int[] {5}) ? sum : 0;
+            case FULL_HOUSE -> Arrays.equals(shape, new int[] {2, 3}) ? sum : 0;
             case SMALL_STRAIGHT -> distinct.contains("1234") || distinct.contains("2345") || distinct.contains("3456")
                     ? 15 : 0;
             case LARGE_STRAIGHT -> distinct.equals("12345") || distinct.equals("23456") ? 30 : 0;

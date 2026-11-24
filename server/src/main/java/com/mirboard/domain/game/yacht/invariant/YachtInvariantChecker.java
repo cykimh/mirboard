@@ -57,7 +57,8 @@ public final class YachtInvariantChecker {
     private static int maxPoints(Category c) {
         return switch (c) {
             case ONES, TWOS, THREES, FOURS, FIVES, SIXES -> c.face() * Dice.COUNT;
-            case CHOICE, FOUR_OF_A_KIND, FULL_HOUSE -> Dice.FACES * Dice.COUNT;
+            case CHOICE, FOUR_OF_A_KIND -> Dice.FACES * Dice.COUNT;
+            case FULL_HOUSE -> Dice.FACES * 3 + (Dice.FACES - 1) * 2; // 6 6 6 5 5 = 28 (D-309 — 5개 같음 제외)
             case SMALL_STRAIGHT -> 15;
             case LARGE_STRAIGHT -> 30;
             case YACHT -> 50;

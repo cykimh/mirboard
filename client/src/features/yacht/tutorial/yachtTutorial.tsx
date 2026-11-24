@@ -65,7 +65,7 @@ export const YACHT_TUTORIAL_STEPS: TutorialStep[] = [
           <strong>포 카드</strong> — 같은 눈 4개 이상이면 다섯 개의 합.
         </li>
         <li>
-          <strong>풀 하우스</strong> — 같은 눈 3개 + 2개(5개 모두 같아도 됨)면 다섯 개의 합.
+          <strong>풀 하우스</strong> — 같은 눈 3개 + 다른 눈 2개면 다섯 개의 합(5개 모두 같으면 0점).
         </li>
         <li>
           <strong>스몰 스트레이트</strong> — 연속 4개면 15점. <strong>라지 스트레이트</strong> — 연속 5개면 30점.

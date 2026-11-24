@@ -30,14 +30,14 @@ class ScorecardTest {
     }
 
     @Test
-    void the_best_possible_card_is_325() {
+    void the_best_possible_card_is_323() {
         Scorecard best = Scorecard.EMPTY
                 .with(Category.ONES, 5).with(Category.TWOS, 10).with(Category.THREES, 15)
                 .with(Category.FOURS, 20).with(Category.FIVES, 25).with(Category.SIXES, 30)
-                .with(Category.CHOICE, 30).with(Category.FOUR_OF_A_KIND, 30).with(Category.FULL_HOUSE, 30)
+                .with(Category.CHOICE, 30).with(Category.FOUR_OF_A_KIND, 30).with(Category.FULL_HOUSE, 28)
                 .with(Category.SMALL_STRAIGHT, 15).with(Category.LARGE_STRAIGHT, 30).with(Category.YACHT, 50);
         assertThat(best.isFull()).isTrue();
-        assertThat(best.total()).isEqualTo(325);
+        assertThat(best.total()).isEqualTo(323);
     }
 
     @Test

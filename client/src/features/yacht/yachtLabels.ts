@@ -27,7 +27,7 @@ export const CATEGORY_HINT: Record<Category, string> = {
   SIXES: '6 눈의 합',
   CHOICE: '다섯 개의 합',
   FOUR_OF_A_KIND: '같은 눈 4개 이상 — 다섯 개의 합',
-  FULL_HOUSE: '3개 + 2개(5개 같음도 됨) — 다섯 개의 합',
+  FULL_HOUSE: '3개 + 2개(서로 다른 눈) — 다섯 개의 합',
   SMALL_STRAIGHT: '연속 4개 — 15점',
   LARGE_STRAIGHT: '연속 5개 — 30점',
   YACHT: '5개 모두 같음 — 50점',
@@ -62,7 +62,7 @@ export function celebrationDice(category: Category, dice: readonly number[] | nu
     return counts.size === 5 && sorted[4] - sorted[0] === 4 ? sorted : null;
   }
   if (category === 'FULL_HOUSE') {
-    if (counts.size === 1) return sorted;
+    // D-309 — 5개 같음은 풀 하우스가 아니다.
     if (counts.size !== 2 || ![...counts.values()].includes(3)) return null;
     return [...sorted].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a - b);
   }
@@ -105,7 +105,7 @@ export function madeDice(category: Category, dice: readonly number[] | null | un
       return face === undefined ? null : all.filter((i) => dice[i] === face);
     }
     case 'FULL_HOUSE':
-      return counts.size === 1 || (counts.size === 2 && [...counts.values()].includes(3)) ? all : null;
+      return counts.size === 2 && [...counts.values()].includes(3) ? all : null;
     case 'LARGE_STRAIGHT':
       return counts.size === 5 && Math.max(...dice) - Math.min(...dice) === 4 ? all : null;
     case 'SMALL_STRAIGHT': {

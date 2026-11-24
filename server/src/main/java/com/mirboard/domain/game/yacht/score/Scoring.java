@@ -73,14 +73,11 @@ public final class Scoring {
         return max;
     }
 
-    /** {3, 2} 또는 {5} — 5개 같음도 인정한다(D-182 하우스 룰). */
+    /** 눈별 개수가 {3, 2} 일 때만 — 5개 같음은 풀 하우스가 아니다(D-309, D-182 의 하우스 룰을 뒤집음). */
     private static boolean fullHouse(int[] counts) {
         boolean three = false;
         boolean two = false;
         for (int v = 1; v <= Dice.FACES; v++) {
-            if (counts[v] == Dice.COUNT) {
-                return true;
-            }
             if (counts[v] == 3) {
                 three = true;
             } else if (counts[v] == 2) {

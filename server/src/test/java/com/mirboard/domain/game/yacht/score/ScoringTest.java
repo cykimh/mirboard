@@ -21,7 +21,7 @@ class ScoringTest {
     @ParameterizedTest(name = "{0} → 포카드 {1} · 풀하우스 {2} · 스몰 {3} · 라지 {4} · 요트 {5}")
     @CsvSource({
             // §5.2 표 각 행
-            "6 6 6 6 6, 30, 30, 0, 0, 50",
+            "6 6 6 6 6, 30, 0, 0, 0, 50",
             "3 3 3 3 5, 17, 0, 0, 0, 0",
             "2 2 3 3 3, 0, 13, 0, 0, 0",
             "1 2 3 4 5, 0, 0, 15, 30, 0",
@@ -32,6 +32,8 @@ class ScoringTest {
             // 순서와 무관
             "5 4 3 2 6, 0, 0, 15, 30, 0",
             "3 2 3 2 3, 0, 13, 0, 0, 0",
+            // D-309 — 5개 같음은 풀 하우스가 아니다
+            "1 1 1 1 1, 5, 0, 0, 0, 50",
     })
     void special_categories(String faces, int four, int full, int small, int large, int yacht) {
         Dice d = dice(faces);
