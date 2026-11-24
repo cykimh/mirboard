@@ -21,7 +21,6 @@ await page.getByRole('button', { name: '새 방 만들기' }).click();
 const dialog = page.getByRole('dialog');
 await dialog.getByRole('combobox', { name: '게임 선택' }).click();
 await page.getByRole('option', { name: '얏추' }).click();
-await dialog.getByLabel('방 이름').fill('넓은 화면 확인');
 await dialog.getByRole('button', { name: '방 만들기' }).click();
 // D-290 — 봇은 [＋ 봇 추가]로 한 명씩(얏추 정원 4 → 봇 셋).
 for (let i = 0; i < 3; i++) {

@@ -30,7 +30,6 @@ await page.getByRole('button', { name: '새 방 만들기' }).click();
 const dialog = page.getByRole('dialog');
 await dialog.getByRole('combobox', { name: '게임 선택' }).click();
 await page.getByRole('option', { name: '얏추' }).click();
-await dialog.getByLabel('방 이름').fill('스킨 확인');
 await dialog.getByRole('button', { name: '방 만들기' }).click();
 const add = page.getByRole('button', { name: /봇 추가/ });
 await add.waitFor();

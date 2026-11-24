@@ -106,7 +106,6 @@ const KO = {
   'auth.guest.or': '또는',
   'auth.guest.cta': '게스트로 바로 체험하기',
   'auth.guest.creating': '입장 중...',
-  'auth.guest.caption': '가입 없이 12시간 · 전적은 랭킹에 오르지 않아요',
   'auth.guest.error.rateLimited':
     '이 네트워크에서 오늘 만들 수 있는 게스트 수를 다 썼어요. 회원가입하면 바로 이어서 즐길 수 있어요.',
   'auth.guest.error.unavailable':

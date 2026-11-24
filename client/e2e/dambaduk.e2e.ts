@@ -46,7 +46,6 @@ test('담바둑 — 봇 둘과 한 판을 끝까지 두고 대기실로 돌아�
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('combobox', { name: '게임 선택' }).click();
   await page.getByRole('option', { name: '담바둑' }).click();
-  await dialog.getByLabel('방 이름').fill('담바둑 한 판');
   await dialog.getByRole('button', { name: '방 만들기' }).click();
   await expect(page).toHaveURL(/\/rooms\/[^/]+$/);
 

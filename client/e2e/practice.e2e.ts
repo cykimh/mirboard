@@ -51,7 +51,6 @@ for (const game of GAMES) {
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('combobox', { name: '게임 선택' }).click();
     await page.getByRole('option', { name: game.name }).click();
-    await dialog.getByLabel('방 이름').fill(`${game.name} 봇 판`);
     await dialog.getByRole('button', { name: '방 만들기' }).click();
 
     await expect(page).toHaveURL(/\/rooms\/[^/]+$/);

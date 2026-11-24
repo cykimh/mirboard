@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateRoomModal } from './CreateRoomModal';
 import { roomsApi } from '@/api/rooms';
+import { useAuthStore } from '@/features/auth/authStore';
 import type { GameSummary } from '@/types/api';
 
 vi.mock('@/api/rooms', () => ({ roomsApi: { create: vi.fn() } }));
@@ -60,7 +61,6 @@ function openModal(games: GameSummary[]) {
 }
 
 function submit() {
-  fireEvent.change(screen.getByLabelText('방 이름'), { target: { value: '테스트 방' } });
   fireEvent.click(screen.getByRole('button', { name: '방 만들기' }));
 }
 
@@ -77,10 +77,10 @@ describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
     createMock.mockResolvedValue({ roomId: 'room-1' });
   });
 
-  it('인원 선택이 없고 최소·최대 인원과 방장 시작을 알린다', () => {
+  it('인원 선택이 없다 (인원은 게임 선택지 오른쪽에 작게 — D-308)', () => {
     openModal([VARIABLE]);
     expect(screen.queryByRole('group', { name: '인원 선택' })).toBeNull();
-    expect(screen.getByText('최소 2명 · 최대 8명 — 대기실에서 방장이 시작해요')).toBeInTheDocument();
+    expect(screen.queryByText(/대기실에서 방장이 시작해요/)).toBeNull();
   });
 
   it('정원은 게임 최대 인원이다 — 게임이 선언한 처음 인원이 아니다', async () => {
@@ -92,7 +92,6 @@ describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
 
   it('인원 고정 게임은 인원만 알리고 capacity 를 보내지 않는다 (요청 본문 무변경)', async () => {
     openModal([FIXED]);
-    expect(screen.getByText('4명 — 모이면 대기실에서 방장이 시작해요')).toBeInTheDocument();
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().capacity).toBeUndefined();
@@ -103,20 +102,24 @@ describe('CreateRoomModal — 인원 (D-99·D-143)', () => {
  * D-161·D-174 — 게임·방 이름만 고른다. 턴 제한·목표 점수·판돈은 대기실에서 방장이 바꾸고(`RoomSettingsPanel`), 봇도 대기실의
  * [봇 추가]로 앉힌다 — 요청에 싣지 않는다(서버가 게임 선언 기본으로 연다).
  */
-describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () => {
+describe('CreateRoomModal — 게임만 고른다 (D-174·D-308)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockResolvedValue({ roomId: 'room-1' });
+    useAuthStore.setState({ token: 'tok', expiresAt: null, user: { userId: 1, username: '테스트 방' } });
+  });
+  afterEach(() => {
+    useAuthStore.setState({ token: null, expiresAt: null, user: null });
   });
 
-  it('방 종류·인원 선택·턴 제한·목표 점수·판돈이 없고, 봇과 설정은 대기실에서라고 알린다', () => {
+  it('방 종류·방 이름·인원 선택·턴 제한·목표 점수·판돈이 없다', () => {
     openModal([FIXED]);
+    expect(screen.queryByLabelText('방 이름')).toBeNull();
     expect(screen.queryByRole('group', { name: '방 종류' })).toBeNull();
     expect(screen.queryByRole('radio', { name: '봇과 연습' })).toBeNull();
     expect(screen.queryByText('턴 제한')).toBeNull();
     expect(screen.queryByText('목표 점수')).toBeNull();
     expect(screen.queryByLabelText('판돈(내기) 켜기/끄기')).toBeNull();
-    expect(screen.getByText(/대기실에서 \[봇 추가\]/)).toBeInTheDocument();
   });
 
   it('fillWithBots·targetScore·stake·turnSeconds 를 보내지 않는다', async () => {
@@ -131,9 +134,13 @@ describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () =
     expect(createMock.mock.calls[0][1]).toBe('테스트 방');
   });
 
-  it('방 이름이 없으면 만들 수 없다', () => {
+  it('방 이름은 만드는 사람의 별명이다 — 별명이 없으면 "새 방"', async () => {
+    useAuthStore.setState({ user: null });
     openModal([FIXED]);
-    expect(screen.getByRole('button', { name: '방 만들기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '방 만들기' })).toBeEnabled();
+    submit();
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toBe('새 방');
   });
 
   it('D-176 — 정원을 방 설정이 정하는 게임(값을 가진 방 옵션)은 capacity 를 보내지 않는다', async () => {
@@ -146,7 +153,6 @@ describe('CreateRoomModal — 방 종류 없이 게임·이름만 (D-174)', () =
       roomOptionChoices: [{ option: 'TEAM_MODE', values: ['SOLO', 'TEAMS_2V2'], defaultValue: 'SOLO' }],
     };
     openModal([BY_SETTINGS]);
-    expect(screen.getByText('2~4명 — 대기실의 게임 설정(모드)이 정원을 정해요')).toBeInTheDocument();
     submit();
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(lastCreateOpts().capacity).toBeUndefined();
@@ -168,7 +174,6 @@ describe('CreateRoomModal — 서버 깨우는 중 안내 (D-197)', () => {
     createMock.mockReturnValue(new Promise((res) => (resolveCreate = res)));
     openModal([VARIABLE]);
 
-    fireEvent.change(await screen.findByLabelText('방 이름'), { target: { value: '우리 방' } });
     fireEvent.click(screen.getByRole('button', { name: '방 만들기' }));
 
     const pending = await screen.findByRole('button', { name: '생성 중...' });

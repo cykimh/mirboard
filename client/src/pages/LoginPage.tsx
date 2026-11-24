@@ -7,7 +7,6 @@ import { safeReturnPath } from '@/features/auth/returnPath';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -123,6 +122,17 @@ export function LoginPage() {
       <Button type="submit" disabled={submitting || guestSubmitting}>
         {submitting ? '로그인 중...' : '로그인'}
       </Button>
+      {/* D-308 — 가입 안내는 로그인 버튼 바로 아래(카드 맨 끝이 아니라). */}
+      <p className="-mt-2 text-center text-sm text-muted-foreground">
+        계정이 없나요?{' '}
+        <Link
+          to="/register"
+          state={registerState}
+          className="text-primary underline-offset-4 hover:underline"
+        >
+          회원가입
+        </Link>
+      </p>
     </form>
   );
 
@@ -151,9 +161,6 @@ export function LoginPage() {
             ? t('auth.invite.guestCta')
             : t('auth.guest.cta')}
       </Button>
-      <p className="mt-2 text-center text-xs text-muted-foreground">
-        {t('auth.guest.caption')}
-      </p>
       {guestError && (
         <Alert className="mt-3">
           <AlertDescription className="flex flex-col items-start gap-2">
@@ -174,7 +181,6 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">로그인</CardTitle>
-          <CardDescription>티츄·스컬킹·원카드를 친구와 바로 즐겨요.</CardDescription>
         </CardHeader>
         <CardContent>
           {invited ? (
@@ -194,17 +200,6 @@ export function LoginPage() {
               {guestEntry}
             </>
           )}
-
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            계정이 없나요?{' '}
-            <Link
-              to="/register"
-              state={registerState}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              회원가입
-            </Link>
-          </p>
         </CardContent>
       </Card>
     </div>

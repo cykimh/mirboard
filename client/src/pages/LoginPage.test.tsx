@@ -70,10 +70,18 @@ describe('LoginPage — 게스트 체험 (D-117)', () => {
     useAuthStore.setState({ token: null, expiresAt: null, user: null });
   });
 
-  it('게스트 버튼과 안내 캡션을 보여 준다', () => {
+  it('게스트 버튼을 보여 주고, 부제·게스트 캡션은 없다 (D-308)', () => {
     renderLogin();
     expect(guestButton()).toBeTruthy();
-    expect(screen.getByText('가입 없이 12시간 · 전적은 랭킹에 오르지 않아요')).toBeTruthy();
+    expect(screen.queryByText(/12시간/)).toBeNull();
+    expect(screen.queryByText(/친구와 바로 즐겨요/)).toBeNull();
+  });
+
+  it('회원가입 안내는 로그인 버튼 바로 아래(같은 폼 안)에 있다 (D-308)', () => {
+    renderLogin();
+    const loginButton = screen.getByRole('button', { name: '로그인' });
+    const signup = screen.getByRole('link', { name: '회원가입' });
+    expect(loginButton.nextElementSibling).toBe(signup.parentElement);
   });
 
   it('누르면 게스트를 만들고 메인으로 간다', async () => {
