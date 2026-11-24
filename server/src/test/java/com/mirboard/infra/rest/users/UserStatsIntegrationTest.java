@@ -91,9 +91,9 @@ class UserStatsIntegrationTest {
         long me = registerAndGetId("rkuser", "validpass1");
         String token = login("rkuser", "validpass1");
         // D-199·D-209 — 랭킹은 이번 달에 한 판이라도 기록된 사람만 싣는다. gameType 을 안 주면 전체(모든 게임 합).
-        gameStats.record(me, "TICHU", true, 1020, false);
+        gameStats.record(me, "TICHU", true, 20, false);
         gameStats.record(me, "ONE_CARD", false, null, false);
-        gameStats.record(me, "TICHU", true, 1040, false);
+        gameStats.record(me, "TICHU", true, 20, false);
 
         mockMvc.perform(get("/api/users/ranking?limit=100")
                         .header("Authorization", "Bearer " + token))
@@ -126,8 +126,8 @@ class UserStatsIntegrationTest {
     void stats_lists_per_game_records_and_puts_the_unified_rating_at_top_level() throws Exception {
         long userId = registerAndGetId("gsmulti", "validpass1");
         String token = login("gsmulti", "validpass1");
-        gameStats.record(userId, "TICHU", true, 1020, false);
-        gameStats.record(userId, "SKULL_KING", false, 985, true);
+        gameStats.record(userId, "TICHU", true, 20, false);
+        gameStats.record(userId, "SKULL_KING", false, -35, true);
 
         mockMvc.perform(get("/api/users/" + userId + "/stats")
                         .header("Authorization", "Bearer " + token))
@@ -151,8 +151,8 @@ class UserStatsIntegrationTest {
         long sk = registerAndGetId("gsskonly", "validpass1");
         long tc = registerAndGetId("gstconly", "validpass1");
         String token = login("gsskonly", "validpass1");
-        gameStats.record(sk, "SKULL_KING", true, 1300, false);
-        gameStats.record(tc, "TICHU", true, 1400, false);
+        gameStats.record(sk, "SKULL_KING", true, 300, false);
+        gameStats.record(tc, "TICHU", true, 400, false);
 
         mockMvc.perform(get("/api/users/ranking?gameType=SKULL_KING&limit=100")
                         .header("Authorization", "Bearer " + token))
@@ -209,7 +209,7 @@ class UserStatsIntegrationTest {
     void the_top_gold_badge_wears_the_star_crown() throws Exception {
         long top = registerAndGetId("gscrown", "validpass1");
         String token = login("gscrown", "validpass1");
-        gameStats.record(top, "ONE_CARD", true, 9000, false);
+        gameStats.record(top, "ONE_CARD", true, 8000, false);
 
         mockMvc.perform(get("/api/users/" + top + "/stats").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -230,8 +230,8 @@ class UserStatsIntegrationTest {
         long hon = registerAndGetId(nfd, "validpass1");
         long other = registerAndGetId("hnother", "validpass1");
         String token = login(nfd, "validpass1");
-        gameStats.record(hon, "YACHT", false, 950, false);    // 점수로는 총알
-        gameStats.record(other, "YACHT", true, 1100, false);  // 점수로는 은별
+        gameStats.record(hon, "YACHT", false, -50, false);    // 점수로는 총알
+        gameStats.record(other, "YACHT", true, 100, false);  // 점수로는 은별
 
         // 전적: 한 게임 줄·최상위(통합)·fixedTier 모두 명예 계급, 레이팅은 그대로.
         mockMvc.perform(get("/api/users/" + hon + "/stats").header("Authorization", "Bearer " + token))

@@ -80,9 +80,9 @@ public class ArtilleryMatchRecorder {
                 event.roomId(), Timestamp.from(Instant.now(clock)), result.reason().name(), payload(result));
 
         // ELO 입력은 갱신 전 전적으로 만든다 (K-factor 의 판 수 임계가 정확하도록).
-        Map<Long, Integer> newRatings = Map.of();
+        Map<Long, Integer> ratingDeltas = Map.of();
         if (rated && result.teams()) {
-            newRatings = teamRatings(playerIds, bySeat, result, eloFactor);
+            ratingDeltas = teamRatings(playerIds, bySeat, result, eloFactor);
         } else if (rated) {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -93,11 +93,12 @@ public class ArtilleryMatchRecorder {
                         playerIds.size() - p.rank(),
                         p.deserted()));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
+            ratingDeltas = EloCalculator.freeForAllDeltas(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             Placement p = bySeat.get(seat);
             boolean win = winners.contains(seat);
@@ -110,13 +111,13 @@ public class ArtilleryMatchRecorder {
                 if (result.draw() && !p.deserted()) {
                     stats.recordDraw(userId, GAME, eloFactor);
                 } else {
-                    stats.record(userId, GAME, win, newRatings.get(userId), p.deserted(), eloFactor);
+                    stats.record(userId, GAME, win, ratingDeltas.get(userId), p.deserted(), eloFactor);
                 }
             }
         }
 
-        log.info("Artillery match recorded: room={} matchId={} reason={} winners={} eloApplied={} ratings={}",
-                event.roomId(), matchId, result.reason(), winners, rated, newRatings);
+        log.info("Artillery match recorded: room={} matchId={} reason={} winners={} eloApplied={} ratingDeltas={}",
+                event.roomId(), matchId, result.reason(), winners, rated, ratingDeltas);
     }
 
     /** 팀 평균 ELO (D-225). 무승부면 탈주자만 바뀐다. */
@@ -129,7 +130,7 @@ public class ArtilleryMatchRecorder {
         }
         Map<Long, Integer> ratings = new HashMap<>();
         if (result.winnerTeam() != null) {
-            ratings.putAll(EloCalculator.applyMatch(teams.get(0), teams.get(1), result.winnerTeam() == 0, eloFactor));
+            ratings.putAll(EloCalculator.matchDeltas(teams.get(0), teams.get(1), result.winnerTeam() == 0, eloFactor));
         }
         for (int seat = 0; seat < playerIds.size(); seat++) {
             if (!bySeat.get(seat).deserted() || (result.winnerTeam() != null && seat % 2 != result.winnerTeam())) {
@@ -137,7 +138,7 @@ public class ArtilleryMatchRecorder {
             }
             EloCalculator.PlayerInput me = teams.get(seat % 2).get(seat / 2);
             ratings.put(me.userId(),
-                    EloCalculator.applyMatch(List.of(me), teams.get(1 - seat % 2), false, eloFactor).get(me.userId()));
+                    EloCalculator.matchDeltas(List.of(me), teams.get(1 - seat % 2), false, eloFactor).get(me.userId()));
         }
         return ratings;
     }

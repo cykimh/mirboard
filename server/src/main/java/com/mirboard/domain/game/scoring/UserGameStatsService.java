@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code GameDefinition.id()} 를 넘긴다.
  *
  * <p>D-305 — <b>계급은 통합 레이팅 하나</b>에서 나온다: {@code user_game_stats} 의 {@link UserGameStats#ALL_GAMES} 행
- * ({@link #unified}). 기록기는 ELO 입력을 {@link #ratingInput} 에서 읽고, {@link #record}·{@link #recordDraw} 가 통합 행과
- * 게임 행에 같은 증감을 더한다. 게임별 rating 은 기록용이고 계급에 쓰지 않는다.
+ * ({@link #unified}). 기록기는 ELO 입력을 {@link #ratingInput} 에서 읽어 <b>증감</b>을 계산하고,
+ * {@link #record}·{@link #recordDraw} 가 통합 행과 게임 행에 그 증감을 더한다(절대값 저장 없음 — 동시 기록에 안전). 게임별 rating 은 기록용이고 계급에 쓰지 않는다.
  */
 @Service
 public class UserGameStatsService {
@@ -156,30 +156,46 @@ public class UserGameStatsService {
     /**
      * 한 매치 결과 1건을 누적한다 — 참가 점수 없이(ELO 미적용 판). 기록기는 배율을 받는 아래 것을 쓴다.
      *
-     * @param newRating 새 <b>통합</b> 레이팅. ELO 를 계산하지 않은 판이면 null — rating 유지
+     * @param ratingDelta 통합 레이팅 <b>증감</b>. ELO 를 계산하지 않은 판이면 null — rating 유지
      */
     @Transactional
-    public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted) {
-        record(userId, gameType, win, newRating, deserted, RatedMatchPolicy.UNRATED);
+    public void record(long userId, String gameType, boolean win, Integer ratingDelta, boolean deserted) {
+        record(userId, gameType, win, ratingDelta, deserted, RatedMatchPolicy.UNRATED);
     }
 
     /**
-     * 한 매치 결과 1건을 누적한다. D-301 — 참가 점수({@link EloCalculator#participationBonus})를 ELO 결과에 더해 저장한다.
+     * 한 매치 결과 1건을 누적한다. D-301 — 참가 점수({@link EloCalculator#participationBonus})를 ELO 증감에 더해 저장한다.
      * 아홉 게임 기록기가 모두 이 길을 쓴다(참가 점수를 기록기에서 따로 더하지 말 것).
      *
-     * <p>D-305 — {@code newRating} 은 {@link #ratingInput} 의 통합 레이팅으로 계산한 <b>새 통합 레이팅</b>이다. 그 증감(+ 참가
-     * 점수)을 통합 행과 게임 행에 똑같이 더한다 — 통합 행의 승·패·탈주도 같이 쌓는다(이번 달 전적까지 한 곳, D-199).
+     * <p>D-305 — {@code ratingDelta} 는 {@link #ratingInput} 의 통합 레이팅으로 계산한 <b>증감</b>
+     * ({@link EloCalculator#matchDeltas}·{@link EloCalculator#freeForAllDeltas})이다. 그 증감(+ 참가 점수)을 통합 행과 게임 행에
+     * 똑같이 <b>더한다</b>({@code rating = rating + 증감} 한 문장) — 통합 행의 승·패·탈주도 같이 쌓는다(이번 달 전적까지 한 곳,
+     * D-199). <b>새 레이팅(절대값)을 받지 않는다</b>: 같은 사람의 두 판(다른 방)이 거의 동시에 끝나면 둘 다 같은 입력값으로
+     * 계산하므로, 절대값으로 쓰거나 기록 시점에 다시 읽어 차이를 내면 뒤 판이 앞 판의 변화를 지우거나 두 번 센다.
+     *
+     * <p>한 매치 안에서는 <b>userId 오름차순</b>으로 부를 것({@link #seatsInUserIdOrder}) — 두 사람이 같이 낀 두 판이 동시에
+     * 끝날 때 통합 행을 서로 반대 순서로 잠가 교착하지 않게.
      *
      * <p>D-299 덧붙임 — <b>게스트의 레이팅은 저장하지 않는다</b>: 게스트가 낀 판도 ELO 를 계산하지만(가입한 사람의 것은 그대로
      * 움직인다) 게스트 본인은 게임 행의 승패만 남고 rating 은 1000 그대로이며 통합 행은 만들지 않는다(참가 점수도 없다).
      *
-     * @param newRating ELO 계산 결과(참가 점수를 더하기 전). 계산하지 않은 판이면 null — 참가 점수만 더한다
-     * @param eloFactor 이 판의 배율({@link RatedMatchPolicy#eloFactor}) — 0 이면 참가 점수도 없다
+     * @param ratingDelta ELO 증감(참가 점수를 더하기 전). 계산하지 않은 판이면 null — 참가 점수만 더한다
+     * @param eloFactor   이 판의 배율({@link RatedMatchPolicy#eloFactor}) — 0 이면 참가 점수도 없다
      */
     @Transactional
-    public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted,
+    public void record(long userId, String gameType, boolean win, Integer ratingDelta, boolean deserted,
                        double eloFactor) {
-        write(userId, gameType, win ? Outcome.WIN : Outcome.LOSS, newRating, deserted, eloFactor);
+        write(userId, gameType, win ? Outcome.WIN : Outcome.LOSS, ratingDelta, deserted, eloFactor);
+    }
+
+    /**
+     * D-305 — 좌석 번호를 그 좌석 사람의 userId 오름차순으로. 기록기의 전적 쓰기 루프가 이 순서로 돈다(행 잠금 순서를 매치마다
+     * 같게 — 교착 방지).
+     */
+    public static int[] seatsInUserIdOrder(List<Long> playerIds) {
+        return java.util.stream.IntStream.range(0, playerIds.size()).boxed()
+                .sorted(java.util.Comparator.comparingLong(playerIds::get))
+                .mapToInt(Integer::intValue).toArray();
     }
 
     /**
@@ -201,8 +217,8 @@ public class UserGameStatsService {
         write(userId, gameType, Outcome.DRAW, null, false, eloFactor);
     }
 
-    /** 누적 전적의 유일한 쓰기 경로: 게임 행 + 통합 행(게스트 제외) + 이번 달 전적. */
-    private void write(long userId, String gameType, Outcome outcome, Integer newUnifiedRating, boolean deserted,
+    /** 누적 전적의 유일한 쓰기 경로: 게임 행 + 통합 행(게스트 제외) + 이번 달 전적. 레이팅은 읽지 않고 증감만 더한다. */
+    private void write(long userId, String gameType, Outcome outcome, Integer ratingDelta, boolean deserted,
                        double eloFactor) {
         int win = outcome == Outcome.WIN ? 1 : 0;
         int lose = outcome == Outcome.LOSS ? 1 : 0;
@@ -210,10 +226,7 @@ public class UserGameStatsService {
         if (isGuest(userId)) {
             repo.record(userId, gameType, 0, win, lose, desert);
         } else {
-            int delta = EloCalculator.participationBonus(eloFactor, deserted);
-            if (newUnifiedRating != null) {
-                delta += newUnifiedRating - unified(userId).rating();
-            }
+            int delta = EloCalculator.participationBonus(eloFactor, deserted) + (ratingDelta == null ? 0 : ratingDelta);
             repo.record(userId, gameType, delta, win, lose, desert);
             repo.record(userId, UserGameStats.ALL_GAMES, delta, win, lose, desert);
         }

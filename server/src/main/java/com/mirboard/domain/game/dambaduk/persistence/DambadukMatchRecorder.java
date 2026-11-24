@@ -81,7 +81,7 @@ public class DambadukMatchRecorder {
                 state.moveCount(), draw, payload(state));
 
         // ELO 입력은 갱신 전 전적으로 만든다 (K-factor 의 판 수 임계가 정확하도록).
-        Map<Long, Integer> newRatings = Map.of();
+        Map<Long, Integer> ratingDeltas = Map.of();
         if (rated) {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -92,11 +92,12 @@ public class DambadukMatchRecorder {
                         playerIds.size() - standing.rank(),
                         standing.exit() != null));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
+            ratingDeltas = EloCalculator.freeForAllDeltas(placements, eloFactor);
         }
 
         Map<Long, String> outcome = new LinkedHashMap<>();
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             Standing standing = result.standings().get(seat);
             boolean win = result.winners().contains(seat);
@@ -112,13 +113,13 @@ public class DambadukMatchRecorder {
             if (draw) {
                 stats.recordDraw(userId, GAME, eloFactor);
             } else {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
+                stats.record(userId, GAME, win, ratingDeltas.get(userId), deserted, eloFactor);
             }
             outcome.put(userId, draw ? "draw" : win ? "win" : deserted ? "deserted" : "lose");
         }
 
-        log.info("Dambaduk match recorded: room={} matchId={} seats={} reason={} outcome={} eloApplied={} ratings={}",
-                event.roomId(), matchId, state.seatCount(), result.reason(), outcome, rated, newRatings);
+        log.info("Dambaduk match recorded: room={} matchId={} seats={} reason={} outcome={} eloApplied={} ratingDeltas={}",
+                event.roomId(), matchId, state.seatCount(), result.reason(), outcome, rated, ratingDeltas);
     }
 
     private String payload(DambadukState state) {

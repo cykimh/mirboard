@@ -50,6 +50,7 @@ class UserGameStatsServiceIT {
 
     @Autowired UserGameStatsService stats;
     @Autowired UserRepository users;
+    @Autowired org.springframework.transaction.PlatformTransactionManager txManager;
 
     private long newUser() {
         String name = "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -79,7 +80,7 @@ class UserGameStatsServiceIT {
         long me = newUser();
         String game = freshGame();
 
-        stats.record(me, game, true, 1016, false);
+        stats.record(me, game, true, 16, false);
         stats.record(me, game, false, null, true);   // 봇 매치처럼 ELO 미적용 + 탈주
 
         GameStats s = stats.get(me, game);
@@ -123,7 +124,7 @@ class UserGameStatsServiceIT {
         String gameA = freshGame();
         String gameB = freshGame();
 
-        stats.record(me, gameA, true, 1016, false);
+        stats.record(me, gameA, true, 16, false);
         stats.record(me, gameB, false, null, true);
         stats.recordDraw(me, gameA);
 
@@ -150,7 +151,7 @@ class UserGameStatsServiceIT {
         String game = freshGame();
         LocalDate october = freshMonth();
         LocalDate november = october.plusMonths(1);
-        stats.record(me, game, true, 1100, false);   // 누적(계급 근거)
+        stats.record(me, game, true, 100, false);   // 누적(계급 근거)
         play(me, game, october, "WWL");
         play(me, game, november, "L");
 
@@ -221,9 +222,9 @@ class UserGameStatsServiceIT {
         play(spread, gameA, month, "WL");
         play(spread, gameB, month, "WW");
         // 통합 레이팅: 1000 → 1050(gameA) → 1210 → 1205(gameB).
-        stats.record(spread, gameA, true, 1050, false);
-        stats.record(spread, gameB, true, 1210, false);
-        stats.record(spread, gameB, false, 1205, false);
+        stats.record(spread, gameA, true, 50, false);
+        stats.record(spread, gameB, true, 160, false);
+        stats.record(spread, gameB, false, -5, false);
 
         List<MonthlyRankRow> rows = stats.monthlyRanking(null, month, 10);
 
@@ -252,8 +253,8 @@ class UserGameStatsServiceIT {
         String gameB = freshGame();
         assertThat(stats.ratingInput(me)).isEqualTo(new EloCalculator.PlayerInput(me, 1000, 0));
 
-        stats.record(me, gameA, true, 1020, false);    // 통합 1000 → 1020
-        stats.record(me, gameB, false, 1012, true);    // 통합 1020 → 1012 (gameB 에서 −8)
+        stats.record(me, gameA, true, 20, false);      // 통합 1000 → 1020
+        stats.record(me, gameB, false, -8, true);      // 통합 1020 → 1012 (gameB 에서 −8)
         stats.record(me, gameA, true, null, false);    // ELO 미적용 — 그대로
 
         GameStats unified = stats.unified(me);
@@ -279,7 +280,7 @@ class UserGameStatsServiceIT {
         long me = newUser();
         String game = freshGame();
 
-        stats.record(me, game, true, 1020, false, EloCalculator.FULL_FACTOR);   // +20 +6
+        stats.record(me, game, true, 20, false, EloCalculator.FULL_FACTOR);   // +20 +6
         stats.recordDraw(me, game, EloCalculator.FULL_FACTOR);                  // +6
         stats.record(me, game, false, null, true, EloCalculator.FULL_FACTOR);   // 탈주 — 참가 점수 없음
 
@@ -290,13 +291,104 @@ class UserGameStatsServiceIT {
         assertThat(stats.unified(me).loseCount()).isEqualTo(1);
     }
 
+    /**
+     * 같은 사람의 두 판(다른 방·다른 게임)이 거의 동시에 끝난다: 둘 다 같은 입력값(통합 1000)으로 ELO 를 계산해 놓고 기록한다.
+     * 저장이 "지금 값 + 증감"이라 어느 쪽이 먼저 쓰든 두 증감이 모두 남아야 한다(절대값 저장이면 뒤 판이 앞 판을 지운다).
+     */
+    @Test
+    void two_matches_finishing_at_once_both_count() throws Exception {
+        long me = newUser();
+        String gameA = freshGame();
+        String gameB = freshGame();
+        int rounds = 20;
+        int bonus = EloCalculator.participationBonus(EloCalculator.FULL_FACTOR, false);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < rounds; i++) {
+                // 두 기록기가 저마다 입력값을 먼저 읽는다 — 이 시점에는 서로의 결과를 모른다.
+                EloCalculator.PlayerInput seenByA = stats.ratingInput(me);
+                EloCalculator.PlayerInput seenByB = stats.ratingInput(me);
+                assertThat(seenByA).isEqualTo(seenByB);
+                java.util.concurrent.CyclicBarrier gate = new java.util.concurrent.CyclicBarrier(2);
+                var a = pool.submit(() -> {
+                    gate.await();
+                    stats.record(me, gameA, true, 20, false, EloCalculator.FULL_FACTOR);
+                    return null;
+                });
+                var b = pool.submit(() -> {
+                    gate.await();
+                    stats.record(me, gameB, false, -10, false, EloCalculator.FULL_FACTOR);
+                    return null;
+                });
+                a.get(20, java.util.concurrent.TimeUnit.SECONDS);
+                b.get(20, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        // 증감 합: 통합 = 두 게임의 합, 게임 행은 저마다 제 몫만.
+        assertThat(stats.get(me, gameA).rating()).isEqualTo(1000 + rounds * (20 + bonus));
+        assertThat(stats.get(me, gameB).rating()).isEqualTo(1000 + rounds * (-10 + bonus));
+        GameStats unified = stats.unified(me);
+        assertThat(unified.rating()).isEqualTo(1000 + rounds * (10 + 2 * bonus));
+        assertThat(unified.winCount()).isEqualTo(rounds);
+        assertThat(unified.loseCount()).isEqualTo(rounds);
+    }
+
+    /** 두 사람이 같이 낀 두 판이 동시에 끝나도 교착 없이 끝난다 — 기록기는 userId 오름차순으로 쓴다. */
+    @Test
+    void two_matches_sharing_two_players_do_not_deadlock_when_written_in_user_id_order() throws Exception {
+        List<Long> seated = List.of(newUser(), newUser());
+        List<Long> reversed = List.of(seated.get(1), seated.get(0));   // 다른 방에서는 좌석이 반대
+        assertThat(UserGameStatsService.seatsInUserIdOrder(seated)).containsExactly(0, 1);
+        assertThat(UserGameStatsService.seatsInUserIdOrder(reversed)).containsExactly(1, 0);
+        String gameA = freshGame();
+        String gameB = freshGame();
+        int rounds = 20;
+        org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(txManager);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < rounds; i++) {
+                java.util.concurrent.CyclicBarrier gate = new java.util.concurrent.CyclicBarrier(2);
+                var a = pool.submit(() -> {
+                    gate.await();
+                    tx.executeWithoutResult(t -> {
+                        for (int seat : UserGameStatsService.seatsInUserIdOrder(seated)) {
+                            stats.record(seated.get(seat), gameA, seat == 0, seat == 0 ? 20 : -10, false);
+                        }
+                    });
+                    return null;
+                });
+                var b = pool.submit(() -> {
+                    gate.await();
+                    tx.executeWithoutResult(t -> {
+                        for (int seat : UserGameStatsService.seatsInUserIdOrder(reversed)) {
+                            stats.record(reversed.get(seat), gameB, seat == 0, seat == 0 ? 20 : -10, false);
+                        }
+                    });
+                    return null;
+                });
+                a.get(20, java.util.concurrent.TimeUnit.SECONDS);
+                b.get(20, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        // 두 사람 모두 한 판은 +20, 한 판은 −10.
+        assertThat(stats.unified(seated.get(0)).rating()).isEqualTo(1000 + rounds * 10);
+        assertThat(stats.unified(seated.get(1)).rating()).isEqualTo(1000 + rounds * 10);
+    }
+
     @Test
     void guests_get_no_unified_row_and_always_enter_at_1000() {
         long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
                 GuestPolicy.NO_LOGIN_HASH, Clock.systemUTC())).getId();
         String game = freshGame();
 
-        stats.record(guest, game, true, 1030, false, EloCalculator.FULL_FACTOR);
+        stats.record(guest, game, true, 30, false, EloCalculator.FULL_FACTOR);
         stats.recordDraw(guest, game, EloCalculator.FULL_FACTOR);
 
         assertThat(stats.get(guest, game).rating()).isEqualTo(1000);
@@ -310,8 +402,8 @@ class UserGameStatsServiceIT {
         // D-164·D-305 — 금훈장 이상이면 통합 레이팅 순위로 왕관. 이 DB 에서 가장 높은 값으로 1위를 만든다.
         long top = newUser();
         long second = newUser();
-        stats.record(top, freshGame(), true, 9_000, false);
-        stats.record(second, freshGame(), true, 8_999, false);
+        stats.record(top, freshGame(), true, 8_000, false);
+        stats.record(second, freshGame(), true, 7_999, false);
 
         assertThat(stats.tierOf(users.findById(top).orElseThrow())).isEqualTo(Tier.STAR_CROWN.name());
         assertThat(stats.tierOf(users.findById(second).orElseThrow())).isEqualTo(Tier.GOLD_CROWN.name());

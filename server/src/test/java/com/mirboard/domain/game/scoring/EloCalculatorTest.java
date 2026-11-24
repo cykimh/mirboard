@@ -210,4 +210,22 @@ class EloCalculatorTest {
                 placed(1, 1000, 0, 50), placed(2, 1000, 0, 10)), EloCalculator.FULL_FACTOR);
         assertThat(out).containsEntry(1L, 1020).containsEntry(2L, 990);
     }
+
+    /** D-305 — 기록기는 새 레이팅이 아니라 증감을 넘긴다: 증감 = 새 값 − 입력값. */
+    @Test
+    void deltas_are_the_new_ratings_minus_the_inputs() {
+        var a = new EloCalculator.PlayerInput(1L, 1051, 2);
+        var b = new EloCalculator.PlayerInput(2L, 1000, 0);
+        var c = new EloCalculator.PlayerInput(3L, 980, 40);
+
+        var match = EloCalculator.applyMatch(List.of(a), List.of(b, c), true, EloCalculator.FULL_FACTOR);
+        assertThat(EloCalculator.matchDeltas(List.of(a), List.of(b, c), true, EloCalculator.FULL_FACTOR))
+                .isEqualTo(java.util.Map.of(1L, match.get(1L) - 1051, 2L, match.get(2L) - 1000, 3L, match.get(3L) - 980));
+
+        var placements = List.of(new EloCalculator.Placement(a, 3, false),
+                new EloCalculator.Placement(b, 2, false), new EloCalculator.Placement(c, 1, false));
+        var ffa = EloCalculator.applyFreeForAll(placements, EloCalculator.BOT_MATCH_FACTOR);
+        assertThat(EloCalculator.freeForAllDeltas(placements, EloCalculator.BOT_MATCH_FACTOR))
+                .isEqualTo(java.util.Map.of(1L, ffa.get(1L) - 1051, 2L, ffa.get(2L) - 1000, 3L, ffa.get(3L) - 980));
+    }
 }
