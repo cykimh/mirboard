@@ -51,6 +51,8 @@ interface WallArtProps {
   fresh?: boolean;
   /** 보낸 담(응답 전) — 흐리게. */
   pending?: boolean;
+  /** 담 넘기로 방금 지운 담(D-307) — 그 자리에서 부서지듯 흩어진다. 연출이 없으면 보이지 않는다. */
+  gone?: boolean;
 }
 
 /** 담 두께의 절반(판 그림 단위 — 칸 = 100). */
@@ -99,7 +101,7 @@ const LANE: Record<0 | 1 | 2, readonly [number, number]> = {
 const TONES = ['a', 'b', 'c'] as const;
 
 /** 담 한 칸 — 먹선 위에 쌓은 낮은 돌담(납작한 돌을 겹친 모양). 좌표는 판 그림 단위(칸 = 100). */
-export function WallArt({ x1, y1, x2, y2, fresh = false, pending = false }: WallArtProps) {
+export function WallArt({ x1, y1, x2, y2, fresh = false, pending = false, gone = false }: WallArtProps) {
   const vertical = x1 === x2;
   const len = vertical ? y2 - y1 : x2 - x1;
   const k = len / 100;
@@ -111,7 +113,7 @@ export function WallArt({ x1, y1, x2, y2, fresh = false, pending = false }: Wall
   const pattern = PATTERNS[Math.abs(Math.round(x1 / 100) * 3 + Math.round(y1 / 100) * 5 + (vertical ? 1 : 0)) % PATTERNS.length];
   const base = box(-OVER, 100 + OVER, -HALF, HALF);
   return (
-    <g className={`db-wall${fresh ? ' db-wall-fresh' : ''}${pending ? ' db-wall-pending' : ''}`}>
+    <g className={`db-wall${fresh ? ' db-wall-fresh' : ''}${pending ? ' db-wall-pending' : ''}${gone ? ' db-wall-gone' : ''}`}>
       <rect className="db-wall-shadow" {...base} x={base.x + 2} y={base.y + 4} rx="6" />
       <rect className="db-wall-base" {...base} rx="6" />
       {pattern.map(([a0, a1, lane], i) => (
@@ -123,6 +125,80 @@ export function WallArt({ x1, y1, x2, y2, fresh = false, pending = false }: Wall
           style={{ '--db-i': i } as CSSProperties}
         />
       ))}
+    </g>
+  );
+}
+
+/**
+ * 돌가루·먹점 — `[길이 위치(0~100), 옆(-1·1), 튀는 거리, 길이 방향으로 밀리는 양, 크기, 늦음(초)]`. 정해 둔 값이라 그릴 때마다 같다
+ * (난수를 쓰지 않는다 — 그리기는 순수하게).
+ */
+const GRIT: readonly (readonly [number, -1 | 1, number, number, number, number])[] = [
+  [4, -1, 62, -30, 9, 0],
+  [13, 1, 88, -18, 7, 0.03],
+  [25, -1, 104, -10, 11, 0.01],
+  [33, 1, 58, 6, 8, 0.05],
+  [43, -1, 78, 4, 7, 0.04],
+  [50, 1, 112, 0, 12, 0],
+  [57, -1, 56, -6, 10, 0.06],
+  [66, 1, 82, 12, 7, 0.02],
+  [75, -1, 98, 16, 11, 0.03],
+  [83, 1, 64, 22, 9, 0.01],
+  [91, -1, 86, 28, 8, 0.05],
+  [97, 1, 94, 34, 10, 0.02],
+];
+
+/**
+ * D-307 — 담이 "쿵" 닿는 순간의 연출 조각: 번쩍이는 빛무리, 담 둘레의 빛 테두리, 먹 번짐 고리, 양옆으로 튀는 돌가루·먹점. 담 그림(`WallArt`)과 따로
+ * 그린다 — 담은 떨어지며 움직이고 이 조각들은 닿는 자리에 머문다. 기본은 전부 투명이고 연출(`.db-fx-rich`)이 보여 준다.
+ */
+export function WallImpactArt({ x1, y1, x2, y2 }: Pick<WallArtProps, 'x1' | 'y1' | 'x2' | 'y2'>) {
+  const vertical = x1 === x2;
+  const len = vertical ? y2 - y1 : x2 - x1;
+  const k = len / 100;
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+  /** 길이 방향 a, 두께 방향 b → 판 좌표. */
+  const at = (a: number, b: number) => (vertical ? { x: x1 + b, y: y1 + a * k } : { x: x1 + a * k, y: y1 + b });
+  const halo = (pad: number) =>
+    vertical
+      ? { x: x1 - HALF - pad, y: y1 - OVER - pad, width: (HALF + pad) * 2, height: len + (OVER + pad) * 2 }
+      : { x: x1 - OVER - pad, y: y1 - HALF - pad, width: len + (OVER + pad) * 2, height: (HALF + pad) * 2 };
+  return (
+    <g className="db-wall-fx">
+      {/* 번쩍 — 옅은 빛 세 겹을 겹쳐 가운데가 밝은 빛무리로(그라데이션 id 없이). */}
+      {[1, 0.72, 0.46].map((f) => (
+        <ellipse
+          key={f}
+          className="db-wall-flash"
+          cx={cx}
+          cy={cy}
+          rx={(vertical ? 58 : 104) * f}
+          ry={(vertical ? 104 : 58) * f}
+        />
+      ))}
+      <ellipse className="db-wall-ring" cx={cx} cy={cy} rx={vertical ? 46 : 92} ry={vertical ? 92 : 46} />
+      <rect className="db-wall-glow db-wall-glow-wide" {...halo(11)} rx="19" />
+      <rect className="db-wall-glow" {...halo(4)} rx="11" />
+      {GRIT.map(([a, side, far, drift, size, late], i) => {
+        const p = at(a, side * (HALF + 2));
+        const d = vertical ? { dx: side * far, dy: drift } : { dx: drift, dy: side * far };
+        const style = { '--db-dx': `${d.dx}px`, '--db-dy': `${d.dy}px`, '--db-late': `${late}s` } as CSSProperties;
+        // 짝수 = 돌가루(둥근 알), 홀수 = 먹점(튀는 쪽으로 길쭉한 방울).
+        return i % 2 === 0 ? (
+          <circle key={i} className="db-wall-grit" cx={p.x} cy={p.y} r={size} style={style} />
+        ) : (
+          <ellipse
+            key={i}
+            className="db-wall-grit db-wall-grit-ink"
+            cx={p.x}
+            cy={p.y}
+            rx={vertical ? size * 1.4 : size * 0.55}
+            ry={vertical ? size * 0.55 : size * 1.4}
+            style={style}
+          />
+        );
+      })}
     </g>
   );
 }

@@ -4,11 +4,15 @@ import type { DambadukRoomState } from './dambadukStore';
 
 /** 남의 수는 조금 작게. */
 export const OTHERS_GAIN = 0.6;
-/** 담이 쌓이는 소리는 돌이 닿은 뒤(CSS 돌 미끄러짐 `--db-slide` 와 같은 값, 초). */
+/** 담은 돌이 닿은 뒤에 떨어지기 시작한다(CSS 돌 미끄러짐 `--db-slide` 와 같은 값, 초). */
 export const WALL_AFTER_SLIDE_SEC = 0.22;
+/** D-307 — 담이 떨어져 판에 닿기까지(CSS `--db-drop` 과 같은 값, 초). "쿵" 소리·빛·돌가루·판 흔들림이 이때다. */
+export const WALL_DROP_SEC = 0.13;
+/** 담 소리가 울리는 때 — 돌이 닿고, 담이 떨어져 닿는 순간. */
+export const WALL_THUD_SEC = WALL_AFTER_SLIDE_SEC + WALL_DROP_SEC;
 
-/** 새 집 소리는 담이 다 쌓인 뒤(CSS `db-home-bloom` 지연 `--db-slide + 0.4s` 와 같은 값, 초). */
-export const HOME_AFTER_SLIDE_SEC = WALL_AFTER_SLIDE_SEC + 0.4;
+/** 새 집 소리는 담이 다 내려앉은 뒤(CSS `db-home-bloom` 지연 `--db-slide + 0.5s` 와 같은 값, 초 — D-307 로 0.1초 늦췄다). */
+export const HOME_AFTER_SLIDE_SEC = WALL_AFTER_SLIDE_SEC + 0.5;
 
 /** 좌석별 집 칸 수가 늘었는지 — 서버가 계산한 `territory.scores` 만 견준다(판정하지 않는다). */
 function homeGrowth(before: DambadukRoomState, after: DambadukRoomState) {
@@ -65,7 +69,7 @@ export function dambadukCues(
       const gain = p.seat === mySeat ? 1 : OTHERS_GAIN;
       return [
         { cue: 'stone.slide', gain },
-        { cue: 'wall.build', gain, delaySec: WALL_AFTER_SLIDE_SEC },
+        { cue: 'wall.build', gain, delaySec: WALL_THUD_SEC },
       ];
     }
     case 'TURN_CHANGED': {

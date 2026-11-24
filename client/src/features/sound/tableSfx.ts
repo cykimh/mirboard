@@ -199,18 +199,22 @@ const RECIPES: Record<TableCue, Recipe> = {
     tone(ctx, { f: 940, to: 620, at: t, dur: 0.05, peak: 0.02 * g });
     return 0.12;
   },
-  // 담바둑 담 쌓기 — 돌을 얹는 "통-똑": 낮게 내려앉는 둥근 "통"(큰 돌) 뒤에 짧고 높은 마림바 "똑"(작은 돌).
+  // 담바둑 담 세우기(D-307) — 담이 떨어져 닿는 "쿵—똑·또각": 낮게 내려앉는 둥근 몸통 + 더 낮은 밑소리 + 휴대폰 스피커에서도 들리는
+  // 짧은 두드림, 뒤이어 튀는 박자(닿은 뒤 0.11초)에 맞춘 마림바 "똑"과 작은 돌 "또각". 음마다 꼭대기는 0.3 아래, 겹쳐서 키운다.
   'wall.build': (ctx, t, g) => {
-    tone(ctx, { f: 330, to: 196, glide: 0.06, at: t, dur: 0.11, peak: 0.22 * g });
-    tone(ctx, { f: 660, to: 420, at: t, dur: 0.03, peak: 0.06 * g, type: 'triangle' });
-    pluck(ctx, t + 0.085, 587.33, 0.14 * g, 0.07);
-    return 0.16;
+    tone(ctx, { f: 220, to: 98, glide: 0.08, at: t, dur: 0.28, peak: 0.29 * g });
+    tone(ctx, { f: 110, to: 62, glide: 0.1, at: t, dur: 0.22, peak: 0.2 * g });
+    tone(ctx, { f: 440, to: 220, at: t, dur: 0.05, peak: 0.12 * g, type: 'triangle' });
+    pluck(ctx, t + 0.11, 392, 0.2 * g, 0.12);
+    pluck(ctx, t + 0.2, 587.33, 0.1 * g, 0.08);
+    return 0.3;
   },
-  // 담바둑 새 집 — 먹물 한 방울이 번지는 "퐁~"(아래에서 튀어 오른 방울 + 다섯 도 위로 길게 남는 마림바).
+  // 담바둑 새 집 — 먹물 한 방울이 번지는 "퐁~"(아래에서 튀어 오른 방울 + 다섯 도 위로 길게 남는 마림바, D-307 — 낮은 받침음을 깔아 조금 크게).
   'home.made': (ctx, t, g) => {
-    pop(ctx, t, 392, 0.13 * g, 0.1);
-    pluck(ctx, t + 0.09, 587.33, 0.12 * g, 0.26);
-    return 0.35;
+    pop(ctx, t, 392, 0.18 * g, 0.1);
+    tone(ctx, { f: 196, at: t, dur: 0.2, peak: 0.1 * g });
+    pluck(ctx, t + 0.09, 587.33, 0.16 * g, 0.3);
+    return 0.39;
   },
   // 둘 수 없는 자리 — 낮고 순한 "봉-봉"(두 번).
   'move.rejected': (ctx, t, g) => {

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   BOARD_SIZE,
   FACE_COUNT,
@@ -11,7 +11,7 @@ import {
 } from '@/types/dambaduk';
 import { COLOR_KEY, COLOR_NAME } from './dambadukTheme';
 import { DIR_LABEL, cellIndex, cellName, faceOf, segmentOf } from './dambadukGeometry';
-import { StoneArt, WallArt } from './dambadukArt';
+import { StoneArt, WallArt, WallImpactArt } from './dambadukArt';
 
 /** 판 그림 좌표 — 칸 하나가 100. */
 const U = 100;
@@ -73,6 +73,40 @@ function homeOwners(territory: DambadukTerritory): Map<number, number> {
   return out;
 }
 
+/** 새로 생긴 집 둘레의 고리 하나(D-307) — 주인 좌석과 판 그림 좌표의 네모. */
+interface HomeRing {
+  owner: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 방금 새로 집이 된 칸들을 주인별로 묶어 둘레 네모로. 판정이 아니다 — 서버가 보낸 터의 앞뒤만 견준다. */
+function newHomeRings(prev: Map<number, number>, now: Map<number, number>): HomeRing[] {
+  const box = new Map<number, { x0: number; y0: number; x1: number; y1: number }>();
+  for (const [idx, owner] of now) {
+    if (prev.get(idx) === owner) continue;
+    const x = idx % BOARD_SIZE;
+    const y = Math.floor(idx / BOARD_SIZE);
+    const b = box.get(owner);
+    if (!b) box.set(owner, { x0: x, y0: y, x1: x, y1: y });
+    else {
+      b.x0 = Math.min(b.x0, x);
+      b.y0 = Math.min(b.y0, y);
+      b.x1 = Math.max(b.x1, x);
+      b.y1 = Math.max(b.y1, y);
+    }
+  }
+  return Array.from(box.entries()).map(([owner, b]) => ({
+    owner,
+    x: b.x0 * U + 6,
+    y: b.y0 * U + 6,
+    width: (b.x1 - b.x0 + 1) * U - 12,
+    height: (b.y1 - b.y0 + 1) * U - 12,
+  }));
+}
+
 const cellPos = (c: DambadukCell): CSSProperties =>
   ({ '--db-x': c.x, '--db-y': c.y }) as CSSProperties;
 
@@ -118,9 +152,29 @@ export function DambadukBoard({
 
   const faces = Array.from({ length: FACE_COUNT }, (_, f) => f);
 
+  // D-307 — 큰 연출(담이 닿는 순간의 빛·돌가루·판 흔들림, 지운 담, 새 집 고리)은 이 화면이 **받은 수**에만 돈다. 처음 그릴 때의
+  // `fxSeq` 를 기억해 두고, 판을 다시 그린 것(재입장·튜토리얼 작은 판)에는 돌지 않는다.
+  const mountFx = useRef(fxSeq);
+  const live = !mini && fxSeq !== mountFx.current;
+  const impactFace = live && lastWallFace >= 0 && wallSet.has(lastWallFace) ? lastWallFace : -1;
+  const goneFace = live && lastTrail && lastTrail.jumpedFace >= 0 && !wallSet.has(lastTrail.jumpedFace) ? lastTrail.jumpedFace : -1;
+  // 새 집 고리 — 터는 옮김 뒤의 TURN_CHANGED 가 싣는다. 앞선 터와 견줘 새로 집이 된 칸이 있을 때만 한 번.
+  const prevHomes = useRef<Map<number, number> | null>(null);
+  const [homeFx, setHomeFx] = useState<{ key: number; rings: HomeRing[] } | null>(null);
+  useEffect(() => {
+    const now = homeOwners(territory);
+    const prev = prevHomes.current;
+    prevHomes.current = now;
+    if (!prev || mini) return;
+    const rings = newHomeRings(prev, now);
+    if (rings.length > 0) setHomeFx((was) => ({ key: (was?.key ?? 0) + 1, rings }));
+  }, [territory, mini]);
+
   return (
     <div
-      className={`db-board${mini ? ' db-board-mini' : ''}${interactive ? ' db-board-live' : ''}`}
+      className={`db-board${mini ? ' db-board-mini' : ''}${interactive ? ' db-board-live' : ''}${
+        impactFace >= 0 ? ` db-board-thud-${fxSeq % 2 === 0 ? 'a' : 'b'}` : ''
+      }`}
       role={mini ? 'img' : undefined}
       aria-label={mini ? label : undefined}
       data-fx={fxSeq}
@@ -176,7 +230,9 @@ export function DambadukBoard({
             />
           );
         })}
-        {/* 담 — 돌담 결. 방금 세운 담은 쌓이는 연출. */}
+        {/* D-307 — 새 담이 닿는 자리의 빛·먹 번짐·돌가루. 담 아래에 깐다(빛무리가 담을 가리지 않게). */}
+        {impactFace >= 0 && <WallImpactArt key={`i${fxSeq}`} {...scaled(segmentOf(impactFace))} />}
+        {/* 담 — 돌담 결. 방금 세운 담은 위에서 떨어져 닿는 연출. */}
         {walls.map((f) => {
           const sg = segmentOf(f);
           return (
@@ -193,6 +249,19 @@ export function DambadukBoard({
         {pendingMove && pendingMove.wallFace >= 0 && !wallSet.has(pendingMove.wallFace) && (
           <WallArt {...scaled(segmentOf(pendingMove.wallFace))} pending />
         )}
+        {/* D-307 — 담 넘기로 지운 담이 흩어지고, 새 집 둘레에 주인 색 고리가 퍼진다. */}
+        {goneFace >= 0 && <WallArt key={`g${fxSeq}`} {...scaled(segmentOf(goneFace))} gone />}
+        {homeFx?.rings.map((r) => (
+          <rect
+            key={`r${homeFx.key}-${r.owner}`}
+            className={`db-home-ring db-c-${COLOR_KEY[seatColors[r.owner] ?? 0]}`}
+            x={r.x}
+            y={r.y}
+            width={r.width}
+            height={r.height}
+            rx="14"
+          />
+        ))}
         <rect className="db-frame" x="4" y="4" width={SIZE - 8} height={SIZE - 8} rx="16" />
         {/* 바깥담 장식 — 테 안쪽의 가는 그늘(테마 층에서만 보인다). 돌 테는 CSS(`.db-board::before`)가 판 밖에 두른다. */}
         <rect className="db-frame-lip" x="9.5" y="9.5" width={SIZE - 19} height={SIZE - 19} rx="11" />

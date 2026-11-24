@@ -75,6 +75,38 @@ describe('DambadukTable (S3)', () => {
     expect(sendAction).toHaveBeenCalledWith({ '@action': 'PLACE_STONE', kind: 'BENT', x: 0, y: 0 });
   });
 
+  it('D-307 — 받은 수로 담이 서면 닿는 연출(빛·먹 고리·돌가루·판 흔들림)이 붙고, 판을 다시 그리면 붙지 않는다', () => {
+    seed(playingView());
+    const first = renderTable();
+    const board = () => document.querySelector('.db-board')!;
+    expect(board().querySelector('.db-wall-fx')).toBeNull();
+    const move = (seq: number, stoneId: number, fromX: number, toX: number, y: number, seat: number) =>
+      act(() => {
+        useDambadukStore.getState().applyEvent({
+          type: 'STONE_MOVED',
+          seq,
+          payload: { seat, stoneId, path: ['RIGHT'], fromX, fromY: y, toX, toY: y, wall: 'UP', wallFace: 60 + seq, jumpedFace: -1, timedOut: false },
+        });
+      });
+    move(2, 5, 4, 5, 3, 1); // 남의 수(봇 수도 같은 이벤트)
+    expect(board().querySelectorAll('.db-wall-fresh')).toHaveLength(1);
+    expect(board().querySelectorAll('.db-wall-fx')).toHaveLength(1);
+    expect(board().querySelectorAll('.db-wall-fx .db-wall-glow')).toHaveLength(2);
+    expect(board().querySelectorAll('.db-wall-fx .db-wall-ring')).toHaveLength(1);
+    expect(board().querySelectorAll('.db-wall-fx .db-wall-grit')).toHaveLength(12);
+    const shake = board().className.match(/db-board-thud-[ab]/)?.[0];
+    expect(shake).toBeDefined();
+    // 연달아 두면 흔들림 이름이 바뀌어 다시 돈다. 연출 조각은 새 담 하나에만.
+    move(3, 4, 2, 3, 3, 0);
+    expect(board().className.match(/db-board-thud-[ab]/)?.[0]).not.toBe(shake);
+    expect(board().querySelectorAll('.db-wall-fx')).toHaveLength(1);
+    // 판을 다시 그린 것(재입장)에는 큰 연출이 돌지 않는다.
+    first.unmount();
+    renderTable();
+    expect(board().querySelector('.db-wall-fx')).toBeNull();
+    expect(board().className).not.toMatch(/db-board-thud/);
+  });
+
   it('옮김 — 내 돌 → 갈 칸 → 담 면을 누르면 MOVE_STONE 한 번', () => {
     seed(playingView());
     renderTable();

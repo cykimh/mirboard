@@ -127,6 +127,34 @@ describe('tableSfx — 소리', () => {
     expect(Math.min(...audioLog.tones.map((t) => t.freq))).toBeGreaterThan(400);
   });
 
+  it('D-307 — 담 세우기는 묵직한 "쿵": 낮은 몸통이 깔리고, 돌 놓기보다 크게 겹쳐 울리며, 남의 수는 0.6 배', async () => {
+    const sfx = await fresh();
+    const measure = (cue: TableCue, gain = 1) => {
+      audioLog.reset();
+      sfx.resetTableSfx();
+      expect(sfx.playTableSfx(cue, { gain })).toBe(true);
+      const tones = [...audioLog.tones];
+      const first = Math.min(...tones.map((t) => t.start));
+      return {
+        tones,
+        // 한 번에 울리는 꼭대기 합(같은 순간에 시작하는 음들) — 음 하나의 상한(0.3)은 지키면서 겹쳐서 키운다.
+        attack: tones.filter((t) => t.start - first < 1e-6).reduce((sum, t) => sum + t.peak, 0),
+        total: tones.reduce((sum, t) => sum + t.peak, 0),
+      };
+    };
+    const wall = measure('wall.build');
+    const stone = measure('stone.place');
+    // 고치기 전: 꼭대기 합 0.28(0.22 + 0.06), 전체 0.45.
+    expect(wall.attack).toBeGreaterThan(0.55);
+    expect(wall.total).toBeGreaterThan(0.9);
+    expect(wall.attack).toBeGreaterThan(stone.attack * 1.5);
+    // 묵직함 — 100Hz 아래로 내려앉는 사인 몸통과 밑소리가 있다(기록되는 값은 시작 주파수).
+    expect(wall.tones.filter((t) => t.type === 'sine' && t.freq <= 220).length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...wall.tones.map((t) => t.peak))).toBeLessThan(0.3);
+    const others = measure('wall.build', 0.6);
+    expect(others.attack).toBeCloseTo(wall.attack * 0.6, 5);
+  });
+
   it('버튼 "뽁"은 아래에서 위로 튀고, 주사위 고정은 내려앉고 풀기는 올라간다', async () => {
     const sfx = await fresh();
     const first = (cue: TableCue) => {

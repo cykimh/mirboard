@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useDambadukStore } from './dambadukStore';
-import { HOME_AFTER_SLIDE_SEC, OTHERS_GAIN, WALL_AFTER_SLIDE_SEC, dambadukCues, dambadukErrorCues } from './dambadukSfx';
+import {
+  HOME_AFTER_SLIDE_SEC,
+  OTHERS_GAIN,
+  WALL_AFTER_SLIDE_SEC,
+  WALL_DROP_SEC,
+  WALL_THUD_SEC,
+  dambadukCues,
+  dambadukErrorCues,
+} from './dambadukSfx';
+import { dambadukCssSource } from '@/styles/cssSources';
 import { placingView, playingView, snapshot } from './dambadukFixtures';
 
 const run = (ev: { type: string; seq?: number; payload: unknown }, mySeat: number) => {
@@ -15,7 +24,7 @@ describe('dambadukCues — 공개 이벤트 → 효과음(순수 함수)', () =>
     useDambadukStore.getState().applySnapshot(snapshot(playingView()));
   });
 
-  it('옮김 = 미끄러짐 + 돌이 닿은 뒤 담 쌓기, 남의 수는 작게', () => {
+  it('옮김 = 미끄러짐 + 담이 떨어져 닿는 순간의 "쿵"(D-307), 남의 수는 작게', () => {
     const ev = {
       type: 'STONE_MOVED',
       seq: 2,
@@ -23,9 +32,20 @@ describe('dambadukCues — 공개 이벤트 → 효과음(순수 함수)', () =>
     };
     expect(run(ev, 0)).toEqual([
       { cue: 'stone.slide', gain: OTHERS_GAIN },
-      { cue: 'wall.build', gain: OTHERS_GAIN, delaySec: WALL_AFTER_SLIDE_SEC },
+      { cue: 'wall.build', gain: OTHERS_GAIN, delaySec: WALL_THUD_SEC },
     ]);
     expect(run(ev, 0)).toEqual([]); // 이미 적용한 이벤트는 조용하다
+  });
+
+  it('D-307 — 소리 박자는 CSS 연출과 같은 값이다(미끄러짐·담이 닿는 때·집 번짐)', () => {
+    expect(dambadukCssSource).toContain(`--db-slide: ${WALL_AFTER_SLIDE_SEC}s;`);
+    expect(dambadukCssSource).toContain(`--db-drop: ${WALL_DROP_SEC}s;`);
+    expect(WALL_THUD_SEC).toBeCloseTo(WALL_AFTER_SLIDE_SEC + WALL_DROP_SEC, 9);
+    // 떨어지는 움직임(0.325s)의 40% 가 닿는 순간이다.
+    expect(dambadukCssSource).toContain('animation: db-wall-drop 0.325s linear both;');
+    expect(0.325 * 0.4).toBeCloseTo(WALL_DROP_SEC, 9);
+    const homeDelay = (HOME_AFTER_SLIDE_SEC - WALL_AFTER_SLIDE_SEC).toFixed(1);
+    expect(dambadukCssSource.split(`animation-delay: calc(var(--db-slide) + ${homeDelay}s);`).length - 1).toBe(2);
   });
 
   it('집이 새로 생기면 터를 싣는 TURN_CHANGED 에서 "퐁" — 내 집은 크게, 남의 집은 작게, 배치 단계는 조용하다', () => {
