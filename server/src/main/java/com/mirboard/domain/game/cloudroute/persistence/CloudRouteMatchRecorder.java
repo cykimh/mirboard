@@ -84,9 +84,8 @@ public class CloudRouteMatchRecorder {
             for (int seat = 0; seat < playerIds.size(); seat++) {
                 long userId = playerIds.get(seat);
                 Standing standing = bySeat.get(seat);
-                GameStats current = stats.get(userId, GAME);
                 placements.add(new EloCalculator.Placement(
-                        new EloCalculator.PlayerInput(userId, current.rating(), current.gamesPlayed()),
+                        stats.ratingInput(userId),
                         playerIds.size() - standing.rank(),
                         standing.status() == SeatStatus.DESERTED));
             }

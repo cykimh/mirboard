@@ -124,15 +124,15 @@
 > D-115: `winCount`/`loseCount` 는 **전 게임 합**이다. 게임별 값은
 > `GET /api/users/{userId}/stats` 의 `games[]`.
 
-### PUT `/api/me/password` *(D-85 — 본인 비밀번호 변경)*
+### PUT `/api/me/password` *(D-85 — 본인 비밀번호 변경, D-304 — 현재 비밀번호를 묻지 않는다)*
 요청 (인증 필요)
 ```json
-{ "currentPassword": "old-pass-1", "newPassword": "new-pass-12" }
+{ "newPassword": "new-pass-12" }
 ```
-현재 비밀번호 재검증 → `PasswordPolicy`(4~64자, D-156) 검증 → BCrypt 재해시 후 `users.password_hash`
-갱신. **스키마 무변경**. 응답 `204`. 변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
-에러: `BAD_CREDENTIALS` (401 — 현재 비번 불일치), `INVALID_INPUT` (400 — 새 비번 정책 위반),
-`GUEST_FORBIDDEN` (403 — 게스트 계정, D-117).
+`PasswordPolicy`(4~64자, D-156) 검증 → BCrypt 재해시 후 `users.password_hash` 갱신. 로그인한 본인(Bearer)이면
+현재 비밀번호 없이 바꾼다(D-304 — 옛 클라가 보내는 `currentPassword` 는 무시). **스키마 무변경**. 응답 `204`.
+변경 후 기존 발급 JWT 는 만료(12h)까지 유지된다(D-85).
+에러: `INVALID_INPUT` (400 — 새 비번 정책 위반), `GUEST_FORBIDDEN` (403 — 게스트 계정, D-117).
 
 ---
 
@@ -442,8 +442,8 @@ D-290 — 쿼리 `auto=true` 는 사용자가 누르지 않은 입장(방 화면
 
 에러: `ROOM_NOT_FOUND`, `KICKED_FROM_ROOM`(403 — 금지 60초 안, 또는 `auto=true` 에 강퇴 기록), `ROOM_FULL`·`GAME_ALREADY_STARTED`(위 경합). 손패 노출 방지 차원에서 비-참여자는 절대 player 로 흡수되지 않음.
 
-### GET `/api/users/{userId}/stats` *(Phase 8D)*
-ELO rating + 누적 전적 + 파생 tier 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
+### GET `/api/users/{userId}/stats` *(Phase 8D, 통합 레이팅 D-305)*
+통합 레이팅 + 파생 tier + 게임별 전적 반환. 식별 정보 (email/phone 등) 노출 0건 — D-02
 schema constraint 유지.
 
 응답 `200`
@@ -453,24 +453,28 @@ schema constraint 유지.
   "username": "alice",
   "winCount": 5,
   "loseCount": 3,
-  "rating": 1120,
-  "tier": "SILVER",
+  "rating": 1126,
+  "tier": "GOLD_STAR",
   "desertCount": 1,
   "games": [
-    { "gameType": "TICHU", "rating": 1120, "tier": "SILVER",
+    { "gameType": "TICHU", "rating": 1120, "tier": "GOLD_STAR",
       "winCount": 5, "loseCount": 3, "desertCount": 1 },
-    { "gameType": "SKULL_KING", "rating": 985, "tier": "BRONZE",
+    { "gameType": "SKULL_KING", "rating": 985, "tier": "GOLD_STAR",
       "winCount": 0, "loseCount": 2, "desertCount": 0, "bestScore": null },
-    { "gameType": "YACHT", "rating": 1000, "tier": "MISSILE",
+    { "gameType": "YACHT", "rating": 1000, "tier": "GOLD_STAR",
       "winCount": 0, "loseCount": 0, "desertCount": 0, "bestScore": 231 }
   ],
   "fixedTier": null
 }
 ```
 
-**D-115 — 전적은 게임별이다.** `games[]` 는 한 판이라도 한 게임만 싣는다(저장소
-`user_game_stats`). 최상위 `winCount`~`desertCount`·`rating`·`tier` 는 D-115 이전 클라
-호환용으로 **TICHU 값**을 그대로 둔다(안 해 봤으면 기본값 1000/0/0/0).
+**D-305 — 계급은 통합 레이팅 하나다.** 최상위 `rating` 은 **통합 레이팅**(모든 게임의 판이 움직인다 — 저장소
+`user_game_stats` 의 `game_type='*'` 행, 한 판도 안 했거나 게스트면 1000), 최상위 `tier` 는 그 계급이다. 계급을 그릴 때는
+이 `tier` 하나를 쓴다. `games[].tier` 도 같은 통합 계급이고(게임마다 다르지 않다), `games[].rating` 은 그 게임에서 얻고 잃은
+점수가 쌓인 **기록용** 값이라 계급에 쓰지 않는다.
+
+**D-115 — 전적(승·패·탈주)은 게임별이다.** `games[]` 는 한 판이라도 한 게임만 싣는다(통합 행 `'*'` 는 싣지 않는다).
+최상위 `winCount`·`loseCount`·`desertCount` 는 D-115 이전 클라 호환용으로 **TICHU 값**을 그대로 둔다(안 해 봤으면 0).
 
 **D-201 — `bestScore`**: 개인 최고 점수. 점수를 겨루는 게임(`BestScoreSource` 를 둔 게임 — 지금은 요트)만 값이 있고 나머지·기록 없음·게스트·봇은
 `null`. 요트는 혼자 끝까지 친 판(`yacht_solo_scores`)과 탈주 없이 끝까지 친 여럿 판의 총점 중 최고다. 최고 점수만 있는 게임(혼자만 한 요트)도
@@ -490,12 +494,12 @@ tier 는 derived 값이다(D-164·D-167 — 포트리스2식 16단계, 서버 `T
 | `BRONZE_MEDAL`·`SILVER_MEDAL`·`GOLD_MEDAL` | 1160·1200·1250 |
 | `BRONZE_BADGE`·`SILVER_BADGE`·`GOLD_BADGE` | 1300·1350·1400 |
 
-금훈장(1400+)이면 그 게임 순위(봇·게스트 제외)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위 `SILVER_CROWN`,
-11~30위 `BRONZE_CROWN`. 랭킹은 목록 순위를 쓰고, 전적 조회는 나보다 점수가 높은 사람 수 +1 을 쓴다.
+금훈장(1400+)이면 **통합 레이팅 순위**(봇·게스트 제외, D-305)로 왕관이 된다: 1위 `STAR_CROWN`, 2~3위 `GOLD_CROWN`, 4~10위
+`SILVER_CROWN`, 11~30위 `BRONZE_CROWN`. 순위 = 나보다 통합 레이팅이 높은 사람 수 + 1(전적·랭킹 모두 같은 셈).
 
 **D-198 — 명예 계급**: 설정 `mirboard.tier.honorary-usernames`(기본 `창엽2`, NFC 비교, 게스트·봇 제외)에 든 계정은 모든 게임에서
-`tier` 가 `STAR_CROWN` 이다 — 전적 `games[]`·최상위 `tier`·랭킹 `entries[].tier` 모두. 레이팅·랭킹 순서·다른 사람의 왕관 순위는 그대로다.
-전적 응답의 `fixedTier` 는 그런 계정이면 `"GOLD_MEDAL"`(D-263), 아니면 `null` — 클라가 `games[]` 에 없는 게임(안 해 본 게임)에도 같은 계급을 그린다.
+`tier` 가 명예 계급(`GOLD_MEDAL`, D-263)이다 — 전적 `games[]`·최상위 `tier`·랭킹 `entries[].tier` 모두. 레이팅·랭킹 순서·다른 사람의 왕관 순위는 그대로다.
+전적 응답의 `fixedTier` 는 그런 계정이면 `"GOLD_MEDAL"`(D-263), 아니면 `null` — D-305 뒤로는 최상위 `tier` 가 이미 같은 값이라 옛 클라용으로만 남긴다.
 
 ### GET `/api/users/ranking` *(Phase 16 #5, 게임별 D-115, 이번 달 D-199·D-209)*
 **이번 달**(Asia/Seoul 달력, 매달 1일 0시에 새로 시작) 랭킹. 쿼리 `limit` (기본 20, 1~100 clamp), `gameType` — 생략 또는
@@ -505,8 +509,8 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
 
 - `winCount`·`loseCount`·`desertCount`·`winRate`·`recent` 는 **이번 달** 값이다. `winRate` 는 % 반올림(승·패가 없으면 `null` — 무승부만 한 경우).
 - `recent` 는 이번 달 최근 결과를 **오래된 것 → 최근** 순으로 최대 5글자(`W` 승 · `L` 패 · `D` 무). 전체에서는 게임을 넘나든 순서다.
-- `tier`·`rating` 은 달과 상관없이 **누적 레이팅**에서 온다(D-164 왕관 순위·D-198 명예 계급 포함). 게임별이면 그 게임, 전체면 그 사람이
-  가장 많이 한 게임(누적 승+패, 동률은 게임 id 순)이고 그 게임이 `tierGameType` 이다(누적 승·패가 없으면 `null` + 시작 계급).
+- `tier`·`rating` 은 달·게임과 상관없이 **통합 레이팅**에서 온다(D-305 — D-164 왕관 순위·D-198 명예 계급 포함). 전체든 게임별이든
+  같은 사람은 같은 값이다(`tierGameType` 필드는 D-305 에서 없앴다).
 - `month` 는 집계한 달 `YYYY-MM`.
 
 응답 `200`
@@ -516,7 +520,7 @@ username 외 식별 정보 노출 0건 — D-02 constraint.
   "month": "2026-11",
   "entries": [
     { "rank": 1, "userId": 17, "username": "alice", "rating": 1240,
-      "tier": "GOLD_MEDAL", "tierGameType": "ONE_CARD",
+      "tier": "GOLD_MEDAL",
       "winCount": 12, "loseCount": 4, "desertCount": 0, "winRate": 75, "recent": "WWLWW" }
   ]
 }

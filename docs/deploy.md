@@ -476,6 +476,42 @@ select count(*) filter (where raised_by > 0) as raised, count(*) as backed_up fr
 남는다(FK 없음 — 해롭지 않다). 봇 판 배율(D-299)·참가 점수(D-301)는 데이터가 아니라 코드라 되돌리려면 `EloCalculator.BOT_MATCH_FACTOR`·
 `PARTICIPATION_BONUS`·`BOT_MATCH_PARTICIPATION_BONUS` 를 고쳐 배포한다(이미 쌓인 점수는 그대로 남는다).
 
+## 통합 레이팅 (D-305)
+
+`V24__unified_rating_d305.sql` 이 배포 때 **한 번** 돈다(Flyway). 사람 계정(봇·게스트 제외)마다 `user_game_stats` 에 `game_type='*'`
+행(통합 레이팅)을 만든다 — 시작값은 게임별 레이팅을 **판 수(승+패)로 가중 평균**해 반올림한 값(승·패가 0 인 사람은 가진 행의 단순 평균,
+전적 행이 없으면 행을 만들지 않고 앱이 1000 으로 읽는다), 승·패·탈주는 모든 게임 합이다. 그때의 게임별 레이팅 전부와 만든 통합 시작값을
+`user_game_stats_backup_d305`(`game_type` = 게임 id 또는 `'*'`)에 남긴다. 계급은 이 뒤로 통합 레이팅에서만 나온다. 배포 뒤 확인:
+
+```sql
+set search_path = mirboard;
+select u.username, s.rating, s.win_count, s.lose_count
+  from user_game_stats s join users u on u.id = s.user_id
+ where s.game_type = '*' order by s.rating desc limit 20;
+```
+
+**되돌리기** — Supabase SQL 편집기에서, 첫 줄에 `set search_path = mirboard;`.
+
+- (가) 통합 레이팅만 시작값으로 다시 맞추기(코드는 그대로). 통합 행을 지운 뒤 `V24` 파일의 `WITH fresh AS (…)` 문장을 그대로 다시
+  실행한다 — **지금의** 게임별 레이팅으로 다시 평균한다(백업의 `'*'` 값은 처음 것 그대로 남는다).
+  ```sql
+  delete from user_game_stats where game_type = '*';
+  ```
+- (나) 게임별 계급으로 돌아가기 — **코드를 D-305 이전으로 먼저 배포**한 뒤(옛 코드는 `'*'` 행을 게임 줄로 읽는다), 통합 행을 지우고
+  게임별 레이팅을 백업 시점 값으로 되돌린다(그 뒤 판의 레이팅 변화는 사라진다 — 승·패 수는 그대로).
+  ```sql
+  begin;
+  delete from user_game_stats where game_type = '*';
+  update user_game_stats s set rating = b.rating
+    from user_game_stats_backup_d305 b
+   where b.user_id = s.user_id and b.game_type = s.game_type and b.game_type <> '*';
+  commit;
+  ```
+  백업 뒤에 처음 한 게임의 행은 백업에 없어 그대로 남는다.
+
+문제없으면 `drop table user_game_stats_backup_d305;`(앱은 읽지 않는다). 위 "레이팅 일괄 올리기"의 되돌리기 (가)·(나)는 게임별 행만
+고치므로 D-305 뒤에는 계급에 영향이 없다 — 통합 레이팅에서 +40 을 빼려면 `'*'` 행을 직접 고친다.
+
 ## 회원 초기화 (D-149)
 
 사람 계정과 그에 딸린 기록(전적·랭킹·매치 기록·아바타·신고·관리자 권한, 게스트 포함)을 모두 지우고 시드 봇 8명만 남긴다. **되돌릴 수 없다.**

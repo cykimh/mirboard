@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-/** D-85 — 비밀번호 변경 폼. 클라 검증(4~64자 — D-156·확인 일치) 후 PUT /api/me/password. */
+/**
+ * D-85 — 비밀번호 변경 폼. 클라 검증(4~64자 — D-156·확인 일치) 후 PUT /api/me/password.
+ * D-304 — 현재 비밀번호는 묻지 않는다(새 비밀번호 + 확인만).
+ */
 export function ChangePasswordForm({ token }: { token: string }) {
-  const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -28,15 +30,12 @@ export function ChangePasswordForm({ token }: { token: string }) {
     }
     setBusy(true);
     try {
-      await meApi.changePassword(token, current, next);
+      await meApi.changePassword(token, next);
       setDone(true);
-      setCurrent('');
       setNext('');
       setConfirm('');
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'BAD_CREDENTIALS') {
-        setError('현재 비밀번호가 일치하지 않습니다.');
-      } else if (err instanceof ApiError && err.code === 'INVALID_INPUT') {
+      if (err instanceof ApiError && err.code === 'INVALID_INPUT') {
         setError('새 비밀번호는 4자 이상이어야 합니다.');
       } else {
         setError('비밀번호 변경에 실패했습니다.');
@@ -47,31 +46,27 @@ export function ChangePasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3">
-      <Input
-        type="password"
-        aria-label="현재 비밀번호"
-        placeholder="현재 비밀번호"
-        value={current}
-        onChange={(e) => setCurrent(e.target.value)}
-        autoComplete="current-password"
-      />
-      <Input
-        type="password"
-        aria-label="새 비밀번호"
-        placeholder="새 비밀번호 (4자 이상)"
-        value={next}
-        onChange={(e) => setNext(e.target.value)}
-        autoComplete="new-password"
-      />
-      <Input
-        type="password"
-        aria-label="새 비밀번호 확인"
-        placeholder="새 비밀번호 확인"
-        value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
-        autoComplete="new-password"
-      />
+    <form onSubmit={onSubmit} className="flex flex-col gap-2">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input
+          type="password"
+          aria-label="새 비밀번호"
+          placeholder="새 비밀번호 (4자 이상)"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          autoComplete="new-password"
+          className="h-10"
+        />
+        <Input
+          type="password"
+          aria-label="새 비밀번호 확인"
+          placeholder="새 비밀번호 확인"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          autoComplete="new-password"
+          className="h-10"
+        />
+      </div>
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -82,7 +77,7 @@ export function ChangePasswordForm({ token }: { token: string }) {
           <AlertDescription>비밀번호가 변경되었습니다.</AlertDescription>
         </Alert>
       )}
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy} className="h-10">
         비밀번호 변경
       </Button>
     </form>

@@ -6,6 +6,7 @@ import com.mirboard.domain.game.scoring.UserGameStatsService.GameStats;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.auth.AuthService;
 import com.mirboard.domain.lobby.auth.UserRepository;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -53,7 +54,7 @@ public class MeController {
                 adminAuth.isAdmin(user.getId()));
     }
 
-    /** D-85 — 본인 비밀번호 변경. 현재 비번 재검증 후 갱신(스키마 무변경). */
+    /** D-85·D-304 — 본인 비밀번호 변경. 현재 비밀번호는 묻지 않는다(로그인한 본인이면 된다). 스키마 무변경. */
     @PutMapping("/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@AuthenticationPrincipal AuthPrincipal principal,
@@ -61,12 +62,14 @@ public class MeController {
         if (principal == null) {
             throw new ResponseStatusException(UNAUTHORIZED);
         }
-        authService.changePassword(principal.userId(), req.currentPassword(), req.newPassword());
+        authService.changePassword(principal.userId(), req.newPassword());
     }
 
     public record MeResponse(long userId, String username, int winCount, int loseCount, boolean admin) {
     }
 
-    public record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {
+    /** D-304 — 새 비밀번호만. 옛 클라가 보내는 {@code currentPassword} 는 무시한다. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ChangePasswordRequest(@NotBlank String newPassword) {
     }
 }

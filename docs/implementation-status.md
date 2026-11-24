@@ -266,6 +266,9 @@
 - ELO: 티츄는 팀 평균(`applyMatch`), 스컬킹은 개인전 쌍대(`applyFreeForAll` — 탈주 좌석
   최하위). K=40(30판 미만)/32. 깎일 때는 절반(D-297). 봇이 낀 매치는 레이팅 변화의 1/4 만(D-299 —
   `RatedMatchPolicy.eloFactor`, 봇은 1000 으로 계산만), 게스트가 낀 매치도 적용(게스트 본인 것은 저장 안 함). D-300 — 일괄 +40(V23, 한 번).
+  D-305 — **계급은 통합 레이팅 하나**(`user_game_stats` 의 `game_type='*'` 행, 시작값 V24 = 게임별 레이팅의 판 수 가중 평균). 아홉 기록기가
+  `UserGameStatsService.ratingInput` 으로 ELO 를 계산하고 `record`·`recordDraw` 가 통합 행·게임 행에 같은 증감을 쌓는다. 왕관은 통합 순위.
+  D-303 — 프로필 촘촘한 배치(아바타만 눌러 이미지 바꾸기·머리에 레이팅 숫자). D-304 — 비밀번호 변경에 현재 비밀번호를 묻지 않는다. D-306 — 랭킹 설명 "이번 달 전적".
   D-301 — 참가 점수: 레이팅이 적용되는 판을 끝까지 마치면 사람끼리 +6·봇 판 +2(탈주·게스트 본인 0, 무승부 포함 —
   `EloCalculator.participationBonus`, `UserGameStatsService.record` 가 더한다).
 - 스컬킹 매치는 `skullking_match_results/participants` 에 남는다(`SkullKingMatchRecorder`).

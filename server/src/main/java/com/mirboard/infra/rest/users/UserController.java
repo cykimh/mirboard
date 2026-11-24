@@ -97,7 +97,7 @@ public class UserController {
      * limit 1~100. 식별 정보는 username 만 (D-02 schema constraint).
      *
      * <p>{@code gameType} 생략 또는 {@code ALL} 이면 모든 게임 합, 게임 id 면 그 게임만. 등록되지 않은 게임이면 404. 계급은
-     * 누적 레이팅에서 온다(전체는 그 사람이 가장 많이 한 게임 — {@code tierGameType}).
+     * 통합 레이팅에서 온다(D-305 — 어느 게임 랭킹이어도 같은 계급).
      */
     @GetMapping("/ranking")
     public RankingResponse ranking(@RequestParam(defaultValue = "20") int limit,
@@ -114,7 +114,6 @@ public class UserController {
                         r.rating(),
                         // D-164 왕관 + D-198 명예 계급 — 서비스가 정한다.
                         r.tier(),
-                        r.tierGameType(),
                         r.winCount(),
                         r.loseCount(),
                         r.desertCount(),
@@ -142,8 +141,7 @@ public class UserController {
     }
 
     /**
-     * @param rating       계급 근거 게임의 누적 레이팅
-     * @param tierGameType 계급 근거 게임(전체 랭킹이면 가장 많이 한 게임, 없으면 null)
+     * @param rating       통합 레이팅(D-305) — {@code tier} 의 근거. 어느 게임 랭킹이어도 같다
      * @param winCount     이번 달 승(loseCount·desertCount 도 이번 달)
      * @param winRate      이번 달 승률(%) — 승·패가 없으면 null
      * @param recent       이번 달 최근 결과, 오래된 것 → 최근, 최대 5글자(W 승·L 패·D 무)
@@ -154,7 +152,6 @@ public class UserController {
             String username,
             int rating,
             String tier,
-            String tierGameType,
             int winCount,
             int loseCount,
             int desertCount,
@@ -171,19 +168,22 @@ public class UserController {
 
     private UserStatsResponse toResponse(User u) {
         GameStats legacy = gameStats.get(u.getId(), LEGACY_GAME);
+        // D-305 — 계급은 통합 레이팅 하나. 게임 줄의 tier 도 같은 값이다(게임별 rating 은 기록용).
+        GameStats unified = gameStats.unified(u.getId());
+        String tier = gameStats.tierOf(u);
         // D-201 — 최고 점수를 내는 게임은 그 값을 싣고, 최고 점수만 있는 게임(혼자만 한 요트)은 0승 0패 줄로 덧붙인다.
         Map<String, Integer> best = bestScores.bestScores(u);
         List<GameRecord> played = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (GameStats g : gameStats.playedGames(u.getId())) {
             seen.add(g.gameType());
-            played.add(new GameRecord(g.gameType(), g.rating(), gameStats.tierOf(u, g),
+            played.add(new GameRecord(g.gameType(), g.rating(), tier,
                     g.winCount(), g.loseCount(), g.desertCount(), best.get(g.gameType())));
         }
         best.forEach((gameType, score) -> {
             if (seen.add(gameType)) {
                 GameStats g = gameStats.get(u.getId(), gameType);
-                played.add(new GameRecord(gameType, g.rating(), gameStats.tierOf(u, g),
+                played.add(new GameRecord(gameType, g.rating(), tier,
                         g.winCount(), g.loseCount(), g.desertCount(), score));
             }
         });
@@ -192,16 +192,18 @@ public class UserController {
                 u.getUsername(),
                 legacy.winCount(),
                 legacy.loseCount(),
-                legacy.rating(),
-                gameStats.tierOf(u, legacy),
+                unified.rating(),
+                tier,
                 legacy.desertCount(),
                 played,
                 gameStats.fixedTier(u));
     }
 
     /**
-     * @param games 한 판이라도 한 게임별 전적 (D-115) + 최고 점수만 있는 게임(D-201). 최상위 필드는 TICHU 호환 값.
-     * @param fixedTier D-198 — 모든 게임에서 이 계급으로 보이는 명예 계정이면 그 계급, 아니면 null. {@code games[]} 에 없는 게임에도 쓴다.
+     * @param rating    D-305 — <b>통합 레이팅</b>(모든 게임이 움직인다). 한 판도 안 했거나 게스트면 1000
+     * @param tier      D-305 — 통합 레이팅의 계급(왕관은 통합 순위, 명예 계정은 D-198)
+     * @param games     한 판이라도 한 게임별 전적 (D-115) + 최고 점수만 있는 게임(D-201). 최상위 승·패·탈주는 TICHU 호환 값.
+     * @param fixedTier D-198 — 명예 계정이면 그 계급, 아니면 null(옛 클라용 — {@code tier} 가 이미 같은 값이다)
      */
     public record UserStatsResponse(
             long userId,
@@ -215,7 +217,11 @@ public class UserController {
             String fixedTier) {
     }
 
-    /** @param bestScore D-201 — 개인 최고 점수. 점수를 겨루는 게임(요트)만, 셀 판이 없거나 게스트면 null. */
+    /**
+     * @param rating    그 게임에서 쌓인 레이팅 — 기록용(D-305 — 계급에 쓰지 않는다)
+     * @param tier      통합 계급(최상위 {@code tier} 와 같은 값)
+     * @param bestScore D-201 — 개인 최고 점수. 점수를 겨루는 게임(요트)만, 셀 판이 없거나 게스트면 null.
+     */
     public record GameRecord(
             String gameType,
             int rating,

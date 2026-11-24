@@ -9,8 +9,8 @@ import { STARTING_RATING, TIER_ORDER, tierRequirement } from './tierTable';
 interface Props {
   /** 강조할 내 계급. 없으면(게스트·아직 모름) 강조하지 않는다. */
   myTier?: Tier | null;
-  /** 내 계급의 기준(예: "티츄 기준"). */
-  basis?: string;
+  /** D-305 — 내 통합 레이팅. 있으면 내 계급 옆에 "1126점"으로 보인다. */
+  rating?: number | null;
   /** 창을 열 때 — 부르는 쪽이 내 계급을 그때 받아 올 수 있게. */
   onOpen?: () => void;
   className?: string;
@@ -54,7 +54,7 @@ function TierRows({ tiers, myTier }: { tiers: Tier[]; myTier?: Tier | null }) {
 }
 
 /** D-266 — [계급표] 버튼과 16단계 표 창. 메인 랭킹 카드·프로필이 쓴다. */
-export function TierTableButton({ myTier, basis, onOpen, className }: Props) {
+export function TierTableButton({ myTier, rating, onOpen, className }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog
@@ -73,7 +73,7 @@ export function TierTableButton({ myTier, basis, onOpen, className }: Props) {
         <DialogHeader className="pr-6 text-left">
           <DialogTitle>계급표</DialogTitle>
           <DialogDescription>
-            레이팅은 게임마다 따로예요. 처음 {STARTING_RATING}점(미사일)에서 시작해 이기면 오르고, 지면 조금만
+            계급은 모든 게임이 함께 올리는 통합 레이팅 하나로 정해져요. 처음 {STARTING_RATING}점(미사일)에서 시작해 이기면 오르고, 지면 조금만
             내려가요. 판을 끝까지 하면 결과와 상관없이 점수를 더 받아서, 많이 할수록 계급이 올라가요. 봇이 낀 판은 덜 움직여요.
           </DialogDescription>
         </DialogHeader>
@@ -82,14 +82,14 @@ export function TierTableButton({ myTier, basis, onOpen, className }: Props) {
             <TierBadge tier={myTier} size={20} />
             <span>
               내 계급 <b>{tierLabel(myTier)}</b>
-              {basis && <span className="text-muted-foreground"> · {basis}</span>}
+              {rating != null && <span className="tabular-nums text-muted-foreground"> · {rating}점</span>}
             </span>
           </p>
         )}
         <div data-testid="tier-table-scroll" className="-mx-2 min-h-0 flex-1 space-y-3 overflow-y-auto px-2">
           <section aria-labelledby="tier-table-crowns">
             <h3 id="tier-table-crowns" className="m-0 mb-1 px-2 text-xs font-semibold text-muted-foreground">
-              왕관 — 금훈장 이상 중 그 게임 순위로
+              왕관 — 금훈장 이상 중 통합 레이팅 순위로
             </h3>
             <TierRows tiers={CROWNS} myTier={myTier} />
           </section>

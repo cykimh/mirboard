@@ -86,9 +86,8 @@ public class OmokMatchRecorder {
             List<EloCalculator.PlayerInput> team1 = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
                 long userId = playerIds.get(seat);
-                GameStats current = stats.get(userId, GAME);
                 EloCalculator.PlayerInput input =
-                        new EloCalculator.PlayerInput(userId, current.rating(), current.gamesPlayed());
+                        stats.ratingInput(userId);
                 (TurnOrder.team(seat) == 0 ? team0 : team1).add(input);
             }
             boolean team0Won = result.winnerSeats().contains(0);

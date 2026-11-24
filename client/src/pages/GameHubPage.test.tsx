@@ -404,9 +404,19 @@ describe('GameHubPage — 로비 정리 (D-146)', () => {
     stats.mockResolvedValue({
       userId: 1,
       username: 'me',
+      rating: 1130,
+      tier: 'GOLD_STAR',
       games: [{ gameType: 'TICHU', rating: 1200, tier: 'GOLD_STAR', winCount: 3, loseCount: 2, desertCount: 1 }],
     });
     useAuthStore.setState({ token: 'tok', user: { userId: 1, username: 'me' } as never });
+  });
+
+  it('D-305 — 머리의 계급 배지는 통합 계급(stats.tier)이고 기준 게임 문구가 없다', async () => {
+    stats.mockResolvedValue({ userId: 1, username: 'me', rating: 1210, tier: 'SILVER_MEDAL', games: [] });
+    renderHub();
+
+    const badge = await screen.findByRole('img', { name: '은메달' });
+    expect(badge.closest('[title$="기준"]')).toBeNull();
   });
 
   it('색약 모드 버튼·전적 합계·로비 채팅이 없다 — 계급 배지는 남는다', async () => {

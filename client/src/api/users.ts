@@ -22,7 +22,9 @@ export type Tier =
 /** D-115 — 한 게임의 전적. */
 export interface GameRecord {
   gameType: string;
+  /** 그 게임에서 쌓인 레이팅 — 기록용(D-305 — 계급에 쓰지 않는다). */
   rating: number;
+  /** D-305 — 통합 계급(`UserStats.tier` 와 같은 값). */
   tier: Tier;
   winCount: number;
   loseCount: number;
@@ -32,8 +34,8 @@ export interface GameRecord {
 }
 
 /**
- * 최상위 winCount~desertCount 는 D-115 이전 호환용(= TICHU). 게임별 값은 `games`
- * (한 판이라도 한 게임만).
+ * D-305 — 최상위 `rating`·`tier` 는 **통합 레이팅**과 그 계급(모든 게임이 움직인다, 명예 계급 D-198 포함)이다. 계급을 그릴 때는
+ * 늘 이 `tier` 를 쓴다. 최상위 승·패·탈주는 D-115 이전 호환용(= TICHU), 게임별 값은 `games`(한 판이라도 한 게임만).
  */
 export interface UserStats {
   userId: number;
@@ -44,23 +46,21 @@ export interface UserStats {
   tier: Tier;
   desertCount: number;
   games: GameRecord[];
-  /** D-198 — 명예 계정이면 모든 게임에서 보일 계급(`games` 에 없는 게임에도), 아니면 null. 옛 서버면 없다. */
+  /** D-198 — 명예 계정이면 그 계급, 아니면 null. D-305 뒤로 `tier` 가 이미 같은 값이라 클라는 쓰지 않는다. */
   fixedTier?: Tier | null;
 }
 
 /** D-199 — 랭킹 "전체"(모든 게임 합)를 가리키는 `gameType` 값. */
 export const RANKING_ALL = 'ALL';
 
-/** D-199·D-209 — 이번 달 랭킹 한 줄. 승·패·탈주·승률·최근 결과는 이번 달 것, 계급·점수는 누적 레이팅 것. */
+/** D-199·D-209 — 이번 달 랭킹 한 줄. 승·패·탈주·승률·최근 결과는 이번 달 것, 계급·점수는 통합 레이팅 것(D-305). */
 export interface RankEntry {
   rank: number;
   userId: number;
   username: string;
-  /** 계급 근거 게임의 누적 레이팅. */
+  /** 통합 레이팅 — 어느 게임 랭킹이어도 같다. */
   rating: number;
   tier: Tier;
-  /** 계급 근거 게임 — 전체 랭킹이면 그 사람이 가장 많이 한 게임(없으면 null). */
-  tierGameType?: string | null;
   winCount: number;
   loseCount: number;
   desertCount: number;

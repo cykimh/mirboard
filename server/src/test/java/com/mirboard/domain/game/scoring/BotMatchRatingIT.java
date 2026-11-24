@@ -142,6 +142,9 @@ class BotMatchRatingIT {
 
         assertThat(yacht(winner).rating()).isEqualTo(1026);
         assertThat(yacht(loser).rating()).isEqualTo(996);
+        // D-305 — 통합 레이팅이 같이 움직인다(첫 판이라 게임별 값과 같다).
+        assertThat(stats.unified(winner).rating()).isEqualTo(1026);
+        assertThat(stats.unified(loser).rating()).isEqualTo(996);
     }
 
     @Test
@@ -154,7 +157,12 @@ class BotMatchRatingIT {
         starMatch(List.of(member, guest), 0);
         // 가입한 사람이 게스트에게 이김: 사람끼리 판처럼 +20(K=40) + 참가 점수 +6. 진 게스트는 1000 그대로.
         assertThat(yacht(member).rating()).isEqualTo(1026);
-        assertThat(star(member).rating()).isEqualTo(1026);
+        // D-305 — 두 번째 판(별자리)의 ELO 입력은 통합 레이팅 1026·1판: 40 × (1 − 0.537) ≈ +19, 참가 점수 +6.
+        // 게임별 레이팅은 그 게임에서 얻은 만큼만(1000 + 25), 통합은 둘의 합.
+        assertThat(star(member).rating()).isEqualTo(1025);
+        assertThat(stats.unified(member).rating()).isEqualTo(1051);
+        assertThat(stats.unified(guest).rating()).as("게스트는 통합 행도 없다").isEqualTo(1000);
+        assertThat(stats.unified(guest).gamesPlayed()).isZero();
         assertThat(yacht(guest).rating()).isEqualTo(1000);
         assertThat(yacht(guest).loseCount()).as("게스트도 승패 행은 남는다").isEqualTo(1);
 
@@ -166,8 +174,10 @@ class BotMatchRatingIT {
                                 new com.mirboard.domain.game.starsquare.state.MatchResult.Placement(2, 2, 9, 1, false),
                                 new com.mirboard.domain.game.starsquare.state.MatchResult.Placement(0, 3, 4, 0, false)))));
 
-        // 1026 인 정회원이 1000 둘(게스트·봇)에게 짐: 40 × (0 − 0.537) × ½ × ¼ ≈ −2.7 → −3, 참가 점수 +2.
-        assertThat(star(member).rating()).isEqualTo(1025);
+        // 통합 1051 인 정회원이 1000 둘(게스트·봇)에게 짐: 40 × (0 − 0.573) × ½ × ¼ ≈ −2.9 → −3, 참가 점수 +2.
+        assertThat(star(member).rating()).isEqualTo(1024);
+        assertThat(stats.unified(member).rating()).isEqualTo(1050);
+        assertThat(stats.unified(member).gamesPlayed()).isEqualTo(3);
         assertThat(star(member).winCount()).isEqualTo(1);
         assertThat(star(member).loseCount()).isEqualTo(1);
         assertThat(star(guest).rating()).as("이긴 게스트도 레이팅은 저장하지 않는다").isEqualTo(1000);

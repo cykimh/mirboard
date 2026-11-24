@@ -77,9 +77,8 @@ public class SkullKingMatchRecorder {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
                 long userId = playerIds.get(seat);
-                GameStats current = stats.get(userId, GAME);
                 placements.add(new EloCalculator.Placement(
-                        new EloCalculator.PlayerInput(userId, current.rating(), current.gamesPlayed()),
+                        stats.ratingInput(userId),
                         event.finalScores().getOrDefault(seat, 0),
                         event.desertedSeats().contains(seat)));
             }

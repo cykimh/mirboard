@@ -9,7 +9,6 @@ import { roomsApi } from '@/api/rooms';
 import { usersApi, type UserStats } from '@/api/users';
 import { RankingCard } from '@/features/stats/RankingCard';
 import { HUB_SCROLL } from '@/features/lobby/hubScroll';
-import { primaryGame } from '@/features/stats/primaryGame';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useIsAdmin } from '@/features/auth/useIsAdmin';
 import { TierBadge } from '@/components/TierBadge';
@@ -201,8 +200,6 @@ export function GameHubPage() {
   }
 
   const availableGames = (games ?? []).filter((g) => g.status === 'AVAILABLE');
-  const played = stats?.games ?? [];
-  const primary = primaryGame(played);
   const gameName = (id: string) => games?.find((g) => g.id === id)?.displayName ?? id;
   // D-298 — 두 요청 사이에 상태가 바뀐 방이 양쪽에 다 올 수 있다. 대기 목록이 이긴다(위에 한 번만).
   const waitingIds = new Set(rooms.map((r) => r.roomId));
@@ -234,17 +231,8 @@ export function GameHubPage() {
                 {user.guest && <Badge variant="secondary">{t('hub.guest.badge')}</Badge>}
               </div>
             )}
-            {/* D-115 — 레이팅은 게임별이라 가장 많이 한 게임의 티어를 대표로. D-146 — 전적 합계는 뺐다(프로필에 있다). */}
-            {/* D-198 — 명예 계정은 어느 게임이든 같은 계급이라 기준 게임을 밝히지 않는다. */}
-            {stats?.fixedTier ? (
-              <TierBadge tier={stats.fixedTier} size={24} />
-            ) : (
-              primary && (
-                <span title={`${gameName(primary.gameType)} 기준`}>
-                  <TierBadge tier={primary.tier} size={24} />
-                </span>
-              )
-            )}
+            {/* D-305 — 계급은 통합 레이팅 하나(명예 계급 D-198 포함). 게스트는 계급이 없다. D-146 — 전적 합계는 프로필에. */}
+            {stats?.tier && !user?.guest && <TierBadge tier={stats.tier} size={24} />}
             {isAdmin && (
               <Button
                 type="button"

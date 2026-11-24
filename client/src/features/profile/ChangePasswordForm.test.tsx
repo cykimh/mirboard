@@ -14,7 +14,6 @@ describe('ChangePasswordForm', () => {
 
   it('rejects mismatched confirmation without calling the API', () => {
     render(<ChangePasswordForm token="tok" />);
-    fill('현재 비밀번호', 'oldpass12');
     fill('새 비밀번호', 'newpass34');
     fill('새 비밀번호 확인', 'different5');
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
@@ -25,22 +24,27 @@ describe('ChangePasswordForm', () => {
   // D-156 — 4자 이상이면 된다. 3자는 막는다.
   it('rejects a too-short new password', () => {
     render(<ChangePasswordForm token="tok" />);
-    fill('현재 비밀번호', 'oldpass12');
     fill('새 비밀번호', 'abc');
     fill('새 비밀번호 확인', 'abc');
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(meApi.changePassword).not.toHaveBeenCalled();
   });
 
+  it('D-304 — 현재 비밀번호 칸이 없다', () => {
+    render(<ChangePasswordForm token="tok" />);
+    expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
+    expect(screen.getByLabelText('새 비밀번호')).toBeInTheDocument();
+    expect(screen.getByLabelText('새 비밀번호 확인')).toBeInTheDocument();
+  });
+
   it('calls the API with valid input', async () => {
     (meApi.changePassword as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
     render(<ChangePasswordForm token="tok" />);
-    fill('현재 비밀번호', 'oldpass12');
     fill('새 비밀번호', 'newpass34');
     fill('새 비밀번호 확인', 'newpass34');
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     await waitFor(() =>
-      expect(meApi.changePassword).toHaveBeenCalledWith('tok', 'oldpass12', 'newpass34'),
+      expect(meApi.changePassword).toHaveBeenCalledWith('tok', 'newpass34'),
     );
   });
 });

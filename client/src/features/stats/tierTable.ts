@@ -31,7 +31,7 @@ export const TIER_FLOORS: readonly number[] = [940, 1000, 1040, 1080, 1120, 1160
 /** 처음 점수 — 미사일의 시작과 같다. */
 export const STARTING_RATING = 1000;
 
-/** 왕관 넷 — 금훈장(1400점) 이상인 사람의 게임별 순위 범위(봇·게스트 제외). */
+/** 왕관 넷 — 금훈장(1400점) 이상인 사람의 통합 레이팅 순위 범위(봇·게스트 제외, D-305). */
 export const CROWN_RANKS: Readonly<Record<'STAR_CROWN' | 'GOLD_CROWN' | 'SILVER_CROWN' | 'BRONZE_CROWN', readonly [number, number]>> = {
   STAR_CROWN: [1, 1],
   GOLD_CROWN: [2, 3],
@@ -43,11 +43,11 @@ function isCrown(tier: Tier): tier is keyof typeof CROWN_RANKS {
   return tier in CROWN_RANKS;
 }
 
-/** 그 계급이 되는 조건 한 줄(예: "1040점 이상", "금훈장 + 게임 순위 2~3위"). */
+/** 그 계급이 되는 조건 한 줄(예: "1040점 이상", "금훈장 + 순위 2~3위"). */
 export function tierRequirement(tier: Tier): string {
   if (isCrown(tier)) {
     const [from, to] = CROWN_RANKS[tier];
-    return `금훈장 + 게임 순위 ${from === to ? `${from}위` : `${from}~${to}위`}`;
+    return `금훈장 + 순위 ${from === to ? `${from}위` : `${from}~${to}위`}`;
   }
   const index = TIER_ORDER.indexOf(tier);
   if (index === 0) return `${TIER_FLOORS[0]}점 미만`;

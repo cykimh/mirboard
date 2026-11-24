@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RANKING_ALL, usersApi, type RankEntry, type Tier, type UserStats } from '@/api/users';
+import { RANKING_ALL, usersApi, type RankEntry, type UserStats } from '@/api/users';
 import type { GameSummary } from '@/types/api';
 import { TierBadge } from '@/components/TierBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HUB_SCROLL } from '@/features/lobby/hubScroll';
 import { cn } from '@/lib/utils';
-import { isGuestName, STARTING_TIER } from './playerTiers';
-import { primaryGame } from './primaryGame';
+import { isGuestName } from './playerTiers';
 import { TierTableButton } from './TierTableButton';
 
 interface Props {
@@ -50,20 +49,8 @@ function RecentDots({ recent }: { recent: string }) {
 }
 
 /**
- * D-266 — 계급표에서 강조할 내 계급. 고른 게임의 계급, "전체"면 가장 많이 한 게임 것(프로필 헤더와 같은 규칙 — 서버 전체 랭킹의
- * 계급도 같다). 안 해 본 게임은 시작 계급, 게스트는 없음.
- */
-function myTierOf(stats: UserStats, gameType: string): Tier | null {
-  if (isGuestName(stats.username)) return null;
-  if (stats.fixedTier) return stats.fixedTier;
-  const records = stats.games ?? [];
-  const rec = gameType === RANKING_ALL ? primaryGame(records) : records.find((g) => g.gameType === gameType);
-  return rec?.tier ?? STARTING_TIER;
-}
-
-/**
  * D-199·D-209 — 이번 달 랭킹. 오른쪽 위에서 게임을 고른다 — 기본은 "전체"(모든 게임 합), 선택지는 많이 한 게임부터(D-160).
- * 순서는 서버가 정한다(이번 달 승수 → 승률 → 판수). 계급은 누적 레이팅 것이라 별명 왼쪽에 아이콘으로만 둔다.
+ * 순서는 서버가 정한다(이번 달 승수 → 승률 → 판수). 계급은 통합 레이팅 것(D-305 — 어느 게임을 골라도 같다)이라 별명 왼쪽에 아이콘으로만 둔다.
  */
 export function RankingCard({ token, games, myUserId }: Props) {
   const [gameType, setGameType] = useState<string>(RANKING_ALL);
@@ -115,11 +102,11 @@ export function RankingCard({ token, games, myUserId }: Props) {
     };
   }, [token, gameType]);
 
-  const gameName = (id: string) => games.find((g) => g.id === id)?.displayName ?? id;
-
-  // 내 전적을 받기 전에는 목록 속 내 줄의 계급으로.
-  const myEntryTier = entries?.find((e) => e.userId === myUserId)?.tier ?? null;
-  const myTier = myStats ? myTierOf(myStats, gameType) : myEntryTier;
+  // D-266·D-305 — 계급표에서 강조할 내 계급(통합 계급, 게스트는 없음). 내 전적을 받기 전에는 목록 속 내 줄의 것으로.
+  const myEntry = entries?.find((e) => e.userId === myUserId) ?? null;
+  const myGuest = myStats ? isGuestName(myStats.username) : false;
+  const myTier = myStats ? (myGuest ? null : (myStats.tier ?? null)) : (myEntry?.tier ?? null);
+  const myRating = myStats ? (myGuest ? null : (myStats.rating ?? null)) : (myEntry?.rating ?? null);
   const loadMyStats = () => {
     if (myUserId === undefined) return;
     usersApi
@@ -133,15 +120,12 @@ export function RankingCard({ token, games, myUserId }: Props) {
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div className="min-w-0 space-y-1">
           <CardTitle>랭킹</CardTitle>
-          <p className="m-0 text-xs text-muted-foreground">이번 달 전적 · 매달 1일 0시 초기화</p>
+          {/* D-306 — 설명은 이 한 마디만. */}
+          <p className="m-0 text-xs text-muted-foreground">이번 달 전적</p>
         </div>
         {/* D-266 — [계급표]는 게임 선택 상자 왼쪽. 휴대폰 폭에서 둘이 한 줄에 들도록 선택 상자 폭을 줄였다. */}
         <div className="flex shrink-0 items-center gap-1.5">
-          <TierTableButton
-            myTier={myTier}
-            basis={gameType === RANKING_ALL ? '가장 많이 한 게임 기준' : `${gameName(gameType)} 기준`}
-            onOpen={loadMyStats}
-          />
+          <TierTableButton myTier={myTier} rating={myRating} onOpen={loadMyStats} />
           <select
             aria-label="랭킹 게임"
             value={gameType}
@@ -196,15 +180,7 @@ export function RankingCard({ token, games, myUserId }: Props) {
                         <span className="inline-flex shrink-0">
                           <TierBadge tier={e.tier} size={22} />
                         </span>
-                        {/* 계급은 누적 레이팅 — 전체 랭킹이면 가장 많이 한 게임 기준이라 별명 풍선말에 그 게임을 밝힌다. */}
-                        <span
-                          className="max-w-[4rem] truncate sm:max-w-[12rem]"
-                          title={
-                            gameType === RANKING_ALL && e.tierGameType
-                              ? `${e.username} · 계급은 ${gameName(e.tierGameType)} 기준`
-                              : e.username
-                          }
-                        >
+                        <span className="max-w-[4rem] truncate sm:max-w-[12rem]" title={e.username}>
                           {e.username}
                         </span>
                       </span>
