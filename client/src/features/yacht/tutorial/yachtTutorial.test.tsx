@@ -32,7 +32,7 @@ describe('얏추(요트) 튜토리얼', () => {
     for (const needle of ['1~4명', '12라운드', '최대 3번', '63점 이상', '+35점', '15점', '30점', '50점', '0점']) {
       expect(text, needle).toContain(needle);
     }
-    expect(text).toContain('5개 모두 같아도 됨');
+    expect(text).toContain('5개 모두 같으면 0점'); // D-309 — 풀 하우스 아님
   });
 
   it('퀴즈 정답은 그 문제에서 가장 점수가 높은 보기다', () => {
