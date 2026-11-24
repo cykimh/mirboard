@@ -6,7 +6,6 @@ import com.mirboard.domain.lobby.auth.UserRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,6 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * D-115 — 게임별 전적·레이팅의 읽기/쓰기 창구. 게임 이름을 모른다 — 호출자가
  * {@code GameDefinition.id()} 를 넘긴다.
+ *
+ * <p>D-305 — <b>계급은 통합 레이팅 하나</b>에서 나온다: {@code user_game_stats} 의 {@link UserGameStats#ALL_GAMES} 행
+ * ({@link #unified}). 기록기는 ELO 입력을 {@link #ratingInput} 에서 읽고, {@link #record}·{@link #recordDraw} 가 통합 행과
+ * 게임 행에 같은 증감을 더한다. 게임별 rating 은 기록용이고 계급에 쓰지 않는다.
  */
 @Service
 public class UserGameStatsService {
@@ -64,27 +67,22 @@ public class UserGameStatsService {
                     s.getWinCount(), s.getLoseCount(), s.getDesertCount());
         }
 
-        /** K-factor 판정용 누적 판 수 (티츄 MatchResultRecorder 와 같은 정의). */
+        /** 누적 판 수(승+패). 통합 행이면 모든 게임 합 — K-factor 판정에 쓴다. */
         public int gamesPlayed() {
             return winCount + loseCount;
         }
 
-        /** 점수 구간 계급(D-164). 왕관은 순위가 있어야 정해진다 — {@link UserGameStatsService#tierOf}. */
-        public String tier() {
-            return Tier.fromRating(rating).name();
-        }
     }
 
     /**
-     * D-199 — 이번 달 랭킹 한 줄. 승·패·탈주·최근 결과는 이번 달 것이고, 계급·점수는 누적(D-115)에서 온다.
+     * D-199 — 이번 달 랭킹 한 줄. 승·패·탈주·최근 결과는 이번 달 것이고, 계급·점수는 통합 레이팅(D-305)에서 온다.
      *
-     * @param recent       이번 달 최근 결과, 오래된 것 → 최근, 최대 5글자(W·L·D)
-     * @param rating       계급의 근거가 된 게임의 누적 레이팅
-     * @param tier         순위까지 본 계급(D-164) — 명예 계정이면 {@link HonoraryTierPolicy#HONORARY_TIER}(D-198)
-     * @param tierGameType 계급의 근거가 된 게임. 게임별 랭킹이면 그 게임, 전체면 그 사람이 가장 많이 한 게임(없으면 null)
+     * @param recent 이번 달 최근 결과, 오래된 것 → 최근, 최대 5글자(W·L·D)
+     * @param rating 통합 레이팅
+     * @param tier   순위까지 본 통합 계급(D-164) — 명예 계정이면 {@link HonoraryTierPolicy#HONORARY_TIER}(D-198)
      */
     public record MonthlyRankRow(int rank, long userId, String username, int winCount, int loseCount,
-                                 int desertCount, String recent, int rating, String tier, String tierGameType) {
+                                 int desertCount, String recent, int rating, String tier) {
 
         /** 승률(%) 반올림. 승·패가 없으면(무승부만) null. */
         public Integer winRate() {
@@ -94,28 +92,51 @@ public class UserGameStatsService {
     }
 
     /**
-     * D-164 — 순위까지 본 계급. 점수로 금훈장(1430+)이면 나보다 높은 사람 수로 순위를 구해 왕관을 정한다. 그 아래는 점수 구간 그대로라
-     * 조회가 없다.
+     * D-164·D-305 — 순위까지 본 계급(통합 레이팅). 점수로 금훈장(1400+)이면 나보다 통합 레이팅이 높은 사람 수로 순위를 구해
+     * 왕관을 정한다. 그 아래는 점수 구간 그대로라 조회가 없다. 계급을 내보내는 출구는 전부 이 메서드를 거친다(D-198).
      */
     @Transactional(readOnly = true)
-    public String tierOf(User user, GameStats stats) {
-        // D-198 — 명예 계정은 순위를 셀 것도 없이 별왕관(표시만 — 레이팅·순위는 그대로).
+    public String tierOf(User user) {
+        return tierOf(user, unified(user.getId()).rating());
+    }
+
+    private String tierOf(User user, int unifiedRating) {
+        // D-198 — 명예 계정은 순위를 셀 것도 없이 고정 계급(표시만 — 레이팅·순위는 그대로).
         if (honorary.isHonorary(user)) {
             return HonoraryTierPolicy.HONORARY_TIER.name();
         }
-        if (Tier.fromRating(stats.rating()) != Tier.GOLD_BADGE) {
-            return stats.tier();
+        Tier base = Tier.fromRating(unifiedRating);
+        if (base != Tier.GOLD_BADGE) {
+            return base.name();
         }
-        long above = repo.countRankedAbove(stats.gameType(), GuestPolicy.LIKE_PATTERN, stats.rating());
-        return Tier.withRank(stats.rating(), (int) Math.min(above + 1, Integer.MAX_VALUE)).name();
+        long above = repo.countRankedAbove(UserGameStats.ALL_GAMES, GuestPolicy.LIKE_PATTERN, unifiedRating);
+        return Tier.withRank(unifiedRating, (int) Math.min(above + 1, Integer.MAX_VALUE)).name();
     }
 
     /**
-     * D-198 — 게임과 상관없이 고정된 계급(명예 계정만, 아니면 null). 클라가 그 게임을 아직 안 해 본 사람(전적 줄 없음)에게도 같은 계급을
-     * 그리도록 전적 응답에 싣는다.
+     * D-198 — 고정된 계급(명예 계정만, 아니면 null). D-305 로 계급이 통합 하나가 돼 {@link #tierOf} 만으로 충분하지만 옛 클라가
+     * 읽으므로 전적 응답에 계속 싣는다.
      */
     public String fixedTier(User user) {
         return honorary.isHonorary(user) ? HonoraryTierPolicy.HONORARY_TIER.name() : null;
+    }
+
+    /**
+     * D-305 — 통합 레이팅 행. 행이 없으면(한 판도 안 했거나 게스트·봇) 1000·0판. 승·패·탈주는 모든 게임 합이다.
+     */
+    @Transactional(readOnly = true)
+    public GameStats unified(long userId) {
+        return get(userId, UserGameStats.ALL_GAMES);
+    }
+
+    /**
+     * D-305 — 기록기가 ELO 계산에 넣는 값: 통합 레이팅과 전체 판 수(K 판정). 게스트·봇은 통합 행이 없어 늘 1000·0판이다
+     * (D-299 — 저장하지 않는다).
+     */
+    @Transactional(readOnly = true)
+    public EloCalculator.PlayerInput ratingInput(long userId) {
+        GameStats u = unified(userId);
+        return new EloCalculator.PlayerInput(userId, u.rating(), u.gamesPlayed());
     }
 
     /** 안 해 본 게임이면 기본값. */
@@ -126,61 +147,39 @@ public class UserGameStatsService {
                 .orElseGet(() -> GameStats.initial(gameType));
     }
 
-    /** 한 판이라도 기록된 게임만. */
+    /** 한 판이라도 기록된 게임만(통합 행은 게임이 아니라 없다). */
     @Transactional(readOnly = true)
     public List<GameStats> playedGames(long userId) {
-        return repo.findByUserIdOrderByGameTypeAsc(userId).stream().map(GameStats::of).toList();
+        return repo.findGamesOf(userId).stream().map(GameStats::of).toList();
     }
 
     /**
      * 한 매치 결과 1건을 누적한다 — 참가 점수 없이(ELO 미적용 판). 기록기는 배율을 받는 아래 것을 쓴다.
      *
-     * @param newRating ELO 를 계산하지 않은 판(무승부 등)이면
-     *                  null — rating 유지
+     * @param newRating 새 <b>통합</b> 레이팅. ELO 를 계산하지 않은 판이면 null — rating 유지
      */
     @Transactional
     public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted) {
-        write(userId, gameType, win, newRating, deserted);
-    }
-
-    private void write(long userId, String gameType, boolean win, Integer rating, boolean deserted) {
-        repo.record(userId, gameType, rating, win ? 1 : 0, win ? 0 : 1, deserted ? 1 : 0);
-        recordMonthly(userId, gameType, StatsMonth.current(clock), win ? Outcome.WIN : Outcome.LOSS, deserted);
+        record(userId, gameType, win, newRating, deserted, RatedMatchPolicy.UNRATED);
     }
 
     /**
      * 한 매치 결과 1건을 누적한다. D-301 — 참가 점수({@link EloCalculator#participationBonus})를 ELO 결과에 더해 저장한다.
      * 아홉 게임 기록기가 모두 이 길을 쓴다(참가 점수를 기록기에서 따로 더하지 말 것).
      *
-     * <p>D-299 덧붙임 — <b>게스트의 레이팅은 저장하지 않는다</b>: 게스트가 낀 판도 ELO 를 계산하지만(가입한 사람의 것은 그대로
-     * 움직인다) 게스트 본인은 승패 행만 남고 rating 은 1000 그대로다(다음 계산에도 1000 으로 들어간다, 참가 점수도 없다).
+     * <p>D-305 — {@code newRating} 은 {@link #ratingInput} 의 통합 레이팅으로 계산한 <b>새 통합 레이팅</b>이다. 그 증감(+ 참가
+     * 점수)을 통합 행과 게임 행에 똑같이 더한다 — 통합 행의 승·패·탈주도 같이 쌓는다(이번 달 전적까지 한 곳, D-199).
      *
-     * @param newRating ELO 계산 결과(참가 점수를 더하기 전). 계산하지 않은 판이면 null — 지금 rating 에서 참가 점수만 더한다
+     * <p>D-299 덧붙임 — <b>게스트의 레이팅은 저장하지 않는다</b>: 게스트가 낀 판도 ELO 를 계산하지만(가입한 사람의 것은 그대로
+     * 움직인다) 게스트 본인은 게임 행의 승패만 남고 rating 은 1000 그대로이며 통합 행은 만들지 않는다(참가 점수도 없다).
+     *
+     * @param newRating ELO 계산 결과(참가 점수를 더하기 전). 계산하지 않은 판이면 null — 참가 점수만 더한다
      * @param eloFactor 이 판의 배율({@link RatedMatchPolicy#eloFactor}) — 0 이면 참가 점수도 없다
      */
     @Transactional
     public void record(long userId, String gameType, boolean win, Integer newRating, boolean deserted,
                        double eloFactor) {
-        write(userId, gameType, win, withParticipation(userId, gameType, newRating, eloFactor, deserted), deserted);
-    }
-
-    /** 게스트(D-117 — username 규약)인지. 게스트의 레이팅은 저장하지 않는다. */
-    private boolean isGuest(long userId) {
-        return users.findById(userId).map(u -> GuestPolicy.isGuest(u.getUsername())).orElse(false);
-    }
-
-    /** 참가 점수를 더한 저장값. 더할 것이 없으면 받은 값 그대로(null 이면 rating 유지). 게스트면 늘 null. */
-    private Integer withParticipation(long userId, String gameType, Integer newRating, double eloFactor,
-                                      boolean deserted) {
-        if (isGuest(userId)) {
-            return null;
-        }
-        int bonus = EloCalculator.participationBonus(eloFactor, deserted);
-        if (bonus == 0) {
-            return newRating;
-        }
-        int base = newRating != null ? newRating : get(userId, gameType).rating();
-        return base + bonus;
+        write(userId, gameType, win ? Outcome.WIN : Outcome.LOSS, newRating, deserted, eloFactor);
     }
 
     /**
@@ -199,8 +198,31 @@ public class UserGameStatsService {
      */
     @Transactional
     public void recordDraw(long userId, String gameType, double eloFactor) {
-        repo.record(userId, gameType, withParticipation(userId, gameType, null, eloFactor, false), 0, 0, 0);
-        recordMonthly(userId, gameType, StatsMonth.current(clock), Outcome.DRAW, false);
+        write(userId, gameType, Outcome.DRAW, null, false, eloFactor);
+    }
+
+    /** 누적 전적의 유일한 쓰기 경로: 게임 행 + 통합 행(게스트 제외) + 이번 달 전적. */
+    private void write(long userId, String gameType, Outcome outcome, Integer newUnifiedRating, boolean deserted,
+                       double eloFactor) {
+        int win = outcome == Outcome.WIN ? 1 : 0;
+        int lose = outcome == Outcome.LOSS ? 1 : 0;
+        int desert = deserted ? 1 : 0;
+        if (isGuest(userId)) {
+            repo.record(userId, gameType, 0, win, lose, desert);
+        } else {
+            int delta = EloCalculator.participationBonus(eloFactor, deserted);
+            if (newUnifiedRating != null) {
+                delta += newUnifiedRating - unified(userId).rating();
+            }
+            repo.record(userId, gameType, delta, win, lose, desert);
+            repo.record(userId, UserGameStats.ALL_GAMES, delta, win, lose, desert);
+        }
+        recordMonthly(userId, gameType, StatsMonth.current(clock), outcome, deserted);
+    }
+
+    /** 게스트(D-117 — username 규약)인지. 게스트의 레이팅은 저장하지 않는다. */
+    private boolean isGuest(long userId) {
+        return users.findById(userId).map(u -> GuestPolicy.isGuest(u.getUsername())).orElse(false);
     }
 
     /**
@@ -245,9 +267,10 @@ public class UserGameStatsService {
         List<Long> ids = rows.stream().map(UserMonthlyStats::getUserId).toList();
         Map<Long, User> byId = users.findAllById(ids).stream()
                 .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
-        // 계급은 누적 레이팅에서(D-164·D-198) — 달이 바뀌어도 그대로다.
-        Map<Long, List<UserGameStats>> cumulative = ids.isEmpty() ? Map.of()
-                : repo.findByUserIdIn(ids).stream().collect(Collectors.groupingBy(UserGameStats::getUserId));
+        // 계급은 통합 레이팅에서(D-164·D-198·D-305) — 달이 바뀌어도, 어느 게임 랭킹이어도 같다.
+        Map<Long, Integer> unifiedRatings = ids.isEmpty() ? Map.of()
+                : repo.findByGameTypeAndUserIdIn(UserGameStats.ALL_GAMES, ids).stream()
+                        .collect(Collectors.toMap(UserGameStats::getUserId, UserGameStats::getRating, (a, b) -> a));
 
         List<MonthlyRankRow> out = new ArrayList<>(rows.size());
         for (UserMonthlyStats row : rows) {
@@ -255,30 +278,11 @@ public class UserGameStatsService {
             if (user == null) {
                 continue;
             }
-            GameStats basis = tierBasis(gameType, cumulative.getOrDefault(row.getUserId(), List.of()));
-            String tier = basis == null
-                    ? honorary.apply(user, Tier.fromRating(DEFAULT_RATING).name())
-                    : tierOf(user, basis);
+            int rating = unifiedRatings.getOrDefault(row.getUserId(), DEFAULT_RATING);
             out.add(new MonthlyRankRow(out.size() + 1, row.getUserId(), user.getUsername(),
                     row.getWinCount(), row.getLoseCount(), row.getDesertCount(), row.getRecent(),
-                    basis == null ? DEFAULT_RATING : basis.rating(), tier,
-                    basis == null ? null : basis.gameType()));
+                    rating, tierOf(user, rating)));
         }
         return out;
-    }
-
-    /**
-     * 랭킹 한 줄의 계급 근거. 게임별이면 그 게임의 누적 전적, 전체면 가장 많이 한 게임(승+패, 동률은 게임 id 순 — 클라 헤더의
-     * {@code primaryGame} 과 같은 규칙). 승·패가 한 판도 없으면 null.
-     */
-    private static GameStats tierBasis(String gameType, List<UserGameStats> cumulative) {
-        if (gameType != null) {
-            return cumulative.stream().filter(s -> s.getGameType().equals(gameType))
-                    .findFirst().map(GameStats::of).orElseGet(() -> GameStats.initial(gameType));
-        }
-        return cumulative.stream().map(GameStats::of)
-                .filter(g -> g.gamesPlayed() > 0)
-                .min(Comparator.comparingInt((GameStats g) -> -g.gamesPlayed()).thenComparing(GameStats::gameType))
-                .orElse(null);
     }
 }

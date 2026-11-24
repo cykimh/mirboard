@@ -17,6 +17,12 @@ import java.util.Objects;
 @IdClass(UserGameStats.Pk.class)
 public class UserGameStats {
 
+    /**
+     * D-305 — 통합 레이팅 행의 {@code game_type}. 게임 id 로 쓸 수 없는 글자라 실제 게임과 겹치지 않는다
+     * ({@link UserMonthlyStats#ALL_GAMES} 와 같은 값). 이 행의 rating 이 계급의 근거이고 승·패·탈주는 모든 게임 합이다.
+     */
+    public static final String ALL_GAMES = "*";
+
     @Id
     @Column(name = "user_id")
     private Long userId;

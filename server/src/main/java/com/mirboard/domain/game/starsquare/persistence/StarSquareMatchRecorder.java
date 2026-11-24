@@ -88,9 +88,8 @@ public class StarSquareMatchRecorder {
             for (int seat = 0; seat < playerIds.size(); seat++) {
                 long userId = playerIds.get(seat);
                 Placement p = bySeat.get(seat);
-                GameStats current = stats.get(userId, GAME);
                 placements.add(new EloCalculator.Placement(
-                        new EloCalculator.PlayerInput(userId, current.rating(), current.gamesPlayed()),
+                        stats.ratingInput(userId),
                         playerIds.size() - p.rank(),
                         p.deserted()));
             }

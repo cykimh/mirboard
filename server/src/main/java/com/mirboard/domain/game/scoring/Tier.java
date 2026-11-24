@@ -5,7 +5,7 @@ package com.mirboard.domain.game.scoring;
  *
  * <p>포트리스는 상위 %로 정하지만 우리는 사람이 적어 들쭉날쭉하므로 <b>점수 구간</b>으로 정한다({@link #fromRating}). 시작 1000점이
  * 미사일이고, 40~50점마다 한 칸이다. 같은 수준을 이기면 약 +16(K=32)이라 두세 판마다 오르내린다. 그림이 여러 개인 계급(총알 II·III,
- * 미사일 II·III, 쌍금별)은 D-167 에서 뺐다. 왕관 넷은 점수가 아니라 금훈장 이상인 사람의 게임별 순위로 정한다({@link #withRank}).
+ * 미사일 II·III, 쌍금별)은 D-167 에서 뺐다. 왕관 넷은 점수가 아니라 금훈장 이상인 사람의 통합 레이팅 순위로(D-305) 정한다({@link #withRank}).
  */
 public enum Tier {
     SKULL,
@@ -51,9 +51,9 @@ public enum Tier {
     }
 
     /**
-     * 순위까지 본 계급. 금훈장 이상이면 게임별 순위로 왕관이다: 1위 별왕관, 2~3위 금왕관, 4~10위 은왕관, 11~30위 동왕관.
+     * 순위까지 본 계급. 금훈장 이상이면 통합 레이팅 순위(D-305)로 왕관이다: 1위 별왕관, 2~3위 금왕관, 4~10위 은왕관, 11~30위 동왕관.
      *
-     * @param rank 그 게임 랭킹 순위(1부터, 봇·게스트 제외)
+     * @param rank 통합 레이팅 순위(1부터, 봇·게스트 제외)
      */
     public static Tier withRank(int rating, int rank) {
         Tier base = fromRating(rating);

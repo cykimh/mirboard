@@ -117,8 +117,7 @@ public class MatchResultRecorder {
         List<EloCalculator.PlayerInput> teamBInput = new ArrayList<>();
         for (int seat = 0; seat < playerIds.size(); seat++) {
             long userId = playerIds.get(seat);
-            GameStats current = stats.get(userId, TichuGameDefinition.ID);
-            var input = new EloCalculator.PlayerInput(userId, current.rating(), current.gamesPlayed());
+            var input = stats.ratingInput(userId);
             if (Team.ofSeat(seat) == Team.A) teamAInput.add(input);
             else teamBInput.add(input);
         }

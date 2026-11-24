@@ -59,9 +59,9 @@ describe('tierRequirement (D-266)', () => {
     expect(tierRequirement('MISSILE')).toBe('1000점 이상');
     expect(tierRequirement('GOLD_MEDAL')).toBe('1250점 이상');
     expect(tierRequirement('GOLD_BADGE')).toBe('1400점 이상');
-    expect(tierRequirement('STAR_CROWN')).toBe('금훈장 + 게임 순위 1위');
-    expect(tierRequirement('GOLD_CROWN')).toBe('금훈장 + 게임 순위 2~3위');
-    expect(tierRequirement('SILVER_CROWN')).toBe('금훈장 + 게임 순위 4~10위');
-    expect(tierRequirement('BRONZE_CROWN')).toBe('금훈장 + 게임 순위 11~30위');
+    expect(tierRequirement('STAR_CROWN')).toBe('금훈장 + 순위 1위');
+    expect(tierRequirement('GOLD_CROWN')).toBe('금훈장 + 순위 2~3위');
+    expect(tierRequirement('SILVER_CROWN')).toBe('금훈장 + 순위 4~10위');
+    expect(tierRequirement('BRONZE_CROWN')).toBe('금훈장 + 순위 11~30위');
   });
 });

@@ -8,13 +8,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface UserGameStatsRepository extends JpaRepository<UserGameStats, UserGameStats.Pk> {
 
-    List<UserGameStats> findByUserIdOrderByGameTypeAsc(long userId);
+    /** 한 사람의 게임별 전적. D-305 — 통합 행({@link UserGameStats#ALL_GAMES})은 게임이 아니라 뺀다. */
+    @Query("SELECT s FROM UserGameStats s WHERE s.userId = :userId AND s.gameType <> '*' ORDER BY s.gameType ASC")
+    List<UserGameStats> findGamesOf(@Param("userId") long userId);
 
-    /** D-199 — 랭킹에 오른 사람들의 누적 전적(계급 근거)을 한 번에. */
-    List<UserGameStats> findByUserIdIn(java.util.Collection<Long> userIds);
+    /** D-199·D-305 — 랭킹에 오른 사람들의 통합 레이팅(계급 근거)을 한 번에. */
+    List<UserGameStats> findByGameTypeAndUserIdIn(String gameType, java.util.Collection<Long> userIds);
 
     /**
      * D-164 — 나보다 점수가 높은 사람 수(봇·게스트 제외). 순위 = 이 값 + 1 — 금훈장 이상의 왕관 판정에만 쓴다.
+     * D-305 — {@code gameType} 은 늘 통합 행({@link UserGameStats#ALL_GAMES})이다.
      */
     @Query("SELECT COUNT(s) FROM UserGameStats s, User u"
             + " WHERE u.id = s.userId AND u.isBot = false AND s.gameType = :gameType"
@@ -29,7 +32,7 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
      */
     @Query("SELECT new com.mirboard.domain.game.scoring.UserGameStatsRepository$GamePlays(s.gameType,"
             + " SUM(s.winCount + s.loseCount))"
-            + " FROM UserGameStats s, User u WHERE u.id = s.userId AND u.isBot = false"
+            + " FROM UserGameStats s, User u WHERE u.id = s.userId AND u.isBot = false AND s.gameType <> '*'"
             + " GROUP BY s.gameType ORDER BY SUM(s.winCount + s.loseCount) DESC, s.gameType ASC")
     List<GamePlays> countPlaysByGame();
 
@@ -37,16 +40,16 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
     }
 
     /**
-     * 한 매치 결과를 누적한다. 행이 없으면 기본값(1000)에서 시작하고, {@code rating} 이
-     * null 이면(무승부·게스트 본인 등 rating 을 쓰지 않는 기록) 현재 rating 을 유지한다. 판정과 증분이 한 문장이라
-     * 같은 유저의 동시 기록에도 갱신이 사라지지 않는다.
+     * 한 매치 결과를 누적한다. 행이 없으면 기본값(1000)에서 시작하고 rating 에 {@code ratingDelta} 를 더한다(0 이면 그대로 —
+     * 무승부·게스트 본인 등). D-305 — 절대값이 아니라 증감을 받는다: 같은 증감을 통합 행과 게임 행 둘에 더하기 때문이다. 판정과
+     * 증분이 한 문장이라 같은 유저의 동시 기록에도 갱신이 사라지지 않는다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             INSERT INTO user_game_stats (user_id, game_type, rating, win_count, lose_count, desert_count, updated_at)
-            VALUES (:userId, :gameType, COALESCE(CAST(:rating AS INTEGER), 1000), :win, :lose, :desert, CURRENT_TIMESTAMP)
+            VALUES (:userId, :gameType, 1000 + :ratingDelta, :win, :lose, :desert, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id, game_type) DO UPDATE SET
-                rating       = COALESCE(CAST(:rating AS INTEGER), user_game_stats.rating),
+                rating       = user_game_stats.rating + :ratingDelta,
                 win_count    = user_game_stats.win_count + EXCLUDED.win_count,
                 lose_count   = user_game_stats.lose_count + EXCLUDED.lose_count,
                 desert_count = user_game_stats.desert_count + EXCLUDED.desert_count,
@@ -54,7 +57,7 @@ public interface UserGameStatsRepository extends JpaRepository<UserGameStats, Us
             """, nativeQuery = true)
     void record(@Param("userId") long userId,
                 @Param("gameType") String gameType,
-                @Param("rating") Integer rating,
+                @Param("ratingDelta") int ratingDelta,
                 @Param("win") int win,
                 @Param("lose") int lose,
                 @Param("desert") int desert);

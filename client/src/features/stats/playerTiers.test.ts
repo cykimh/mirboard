@@ -31,33 +31,33 @@ describe('playerTiers (D-166)', () => {
   });
 });
 
-/** D-198 — 명예 계정(`fixedTier`)은 안 해 본 게임에도 그 계급 줄이 생긴다. */
-describe('gameRecordOf (D-198)', () => {
-  const stats = (games: GameRecord[], fixedTier?: UserStats['fixedTier']): UserStats => ({
+/** D-305 — 계급은 통합 하나(`stats.tier`): 어느 게임 줄이든, 안 해 본 게임이든 같은 계급이다. */
+describe('gameRecordOf (D-305)', () => {
+  const stats = (games: GameRecord[], tier: UserStats['tier'], username = '철수'): UserStats => ({
     userId: 1,
-    username: '창엽2',
+    username,
     winCount: 0,
     loseCount: 0,
-    rating: 1000,
-    tier: 'MISSILE',
+    rating: 1130,
+    tier,
     desertCount: 0,
     games,
-    fixedTier,
   });
 
-  it('보통 계정은 그 게임 줄 그대로, 없으면 null', () => {
-    expect(gameRecordOf(stats([rec('GOLD_STAR')]), 'ONE_CARD')?.tier).toBe('GOLD_STAR');
-    expect(gameRecordOf(stats([rec('GOLD_STAR')]), 'YACHT')).toBeNull();
-    expect(gameRecordOf(stats([rec('GOLD_STAR')], null), 'YACHT')).toBeNull();
-  });
-
-  it('명예 계정은 있는 줄도 없는 줄도 고정 계급', () => {
-    expect(gameRecordOf(stats([rec('MISSILE')], 'STAR_CROWN'), 'ONE_CARD')).toMatchObject({
-      tier: 'STAR_CROWN',
+  it('해 본 게임 줄은 전적 그대로 + 통합 계급', () => {
+    expect(gameRecordOf(stats([rec('MISSILE')], 'GOLD_STAR'), 'ONE_CARD')).toMatchObject({
+      tier: 'GOLD_STAR',
       winCount: 1,
     });
-    const none = gameRecordOf(stats([], 'STAR_CROWN'), 'YACHT');
-    expect(none).toMatchObject({ gameType: 'YACHT', tier: 'STAR_CROWN', winCount: 0, loseCount: 0 });
-    expect(playerTiers([1], [], { 1: '창엽2' }, { 1: none })).toEqual({ 1: 'STAR_CROWN' });
+  });
+
+  it('안 해 본 게임도 0승 0패 줄에 통합 계급 — 좌석·대기실 카드가 같은 계급을 그린다', () => {
+    const none = gameRecordOf(stats([rec('GOLD_STAR')], 'GOLD_STAR'), 'YACHT');
+    expect(none).toMatchObject({ gameType: 'YACHT', tier: 'GOLD_STAR', winCount: 0, loseCount: 0 });
+    expect(playerTiers([1], [], { 1: '철수' }, { 1: none })).toEqual({ 1: 'GOLD_STAR' });
+  });
+
+  it('게스트는 계급이 없다 — 줄이 없으면 null', () => {
+    expect(gameRecordOf(stats([], 'MISSILE', 'guest-ab12'), 'YACHT')).toBeNull();
   });
 });

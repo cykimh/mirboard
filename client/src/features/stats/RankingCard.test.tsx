@@ -23,7 +23,6 @@ const entry = (userId: number, username: string, over: Record<string, unknown> =
   username,
   rating: 1000,
   tier: 'MISSILE' as const,
-  tierGameType: 'TICHU',
   winCount: 1,
   loseCount: 0,
   desertCount: 0,
@@ -61,7 +60,9 @@ describe('RankingCard (D-199 — 이번 달 랭킹, 전체·게임별)', () => {
     expect(ranking).toHaveBeenCalledTimes(1);
     expect(ranking).toHaveBeenCalledWith('tok', 20, 'ALL');
     expect(screen.queryByRole('tab')).toBeNull();
-    expect(screen.getByText('이번 달 전적 · 매달 1일 0시 초기화')).toBeTruthy();
+    // D-306 — 설명은 "이번 달 전적" 한 마디.
+    expect(screen.getByText('이번 달 전적')).toBeTruthy();
+    expect(screen.queryByText(/초기화/)).toBeNull();
   });
 
   it('게임을 고르면 그 게임 랭킹을 다시 받는다', async () => {
@@ -106,14 +107,14 @@ describe('RankingCard (D-199 — 이번 달 랭킹, 전체·게임별)', () => {
     );
   });
 
-  it('계급 아이콘은 별명 왼쪽, 같은 칸 안에 있다 — 전체에서는 기준 게임을 밝힌다', async () => {
+  it('계급 아이콘은 별명 왼쪽, 같은 칸 안에 있다 — 통합 계급이라 기준 게임을 밝히지 않는다(D-305)', async () => {
     render(<RankingCard token="tok" games={CATALOG} />);
     const name = await screen.findByText('all_top');
 
     const cell = name.closest('td')!;
     const icon = within(cell).getByRole('img', { name: '미사일' });
     expect(icon.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(name).toHaveAttribute('title', 'all_top · 계급은 티츄 기준');
+    expect(name).toHaveAttribute('title', 'all_top');
   });
 
   it('승률과 최근 5경기 점(오래된 것 → 최근)을 그린다', async () => {
@@ -168,12 +169,12 @@ describe('RankingCard (D-199 — 이번 달 랭킹, 전체·게임별)', () => {
   });
 });
 
-/** D-266 — 머리 줄 [계급표]: 고른 게임 기준으로 내 계급을 강조한다(내 전적은 열 때 받는다). */
-describe('RankingCard — 계급표 (D-266)', () => {
-  const rec = (gameType: string, tier: string, w: number) => ({
+/** D-266·D-305 — 머리 줄 [계급표]: 내 통합 계급을 강조한다(내 전적은 열 때 받는다). 어느 게임을 골라도 같다. */
+describe('RankingCard — 계급표 (D-266·D-305)', () => {
+  const rec = (gameType: string, w: number) => ({
     gameType,
     rating: 1000,
-    tier,
+    tier: 'SILVER_MEDAL',
     winCount: w,
     loseCount: 0,
     desertCount: 0,
@@ -190,7 +191,9 @@ describe('RankingCard — 계급표 (D-266)', () => {
     stats.mockResolvedValue({
       userId: 1,
       username: '철수',
-      games: [rec('TICHU', 'SILVER_MEDAL', 9), rec('ONE_CARD', 'BULLET', 2)],
+      rating: 1215,
+      tier: 'SILVER_MEDAL',
+      games: [rec('TICHU', 9), rec('ONE_CARD', 2)],
     });
   });
 
@@ -200,7 +203,7 @@ describe('RankingCard — 계급표 (D-266)', () => {
       .filter((li) => li.getAttribute('aria-current') === 'true')
       .map((li) => li.getAttribute('data-tier'));
 
-  it('선택 상자 옆 버튼으로 열고, "전체"면 가장 많이 한 게임의 계급을 강조한다', async () => {
+  it('선택 상자 옆 버튼으로 열고, 내 통합 계급과 레이팅을 보인다', async () => {
     render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
     await screen.findByText('someone');
 
@@ -211,21 +214,26 @@ describe('RankingCard — 계급표 (D-266)', () => {
     expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(16);
     expect(stats).toHaveBeenCalledWith('tok', 1);
     await waitFor(() => expect(current()).toEqual(['SILVER_MEDAL']));
-    expect(screen.getByRole('dialog')).toHaveTextContent('가장 많이 한 게임 기준');
+    expect(screen.getByRole('dialog')).toHaveTextContent('1215점');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('기준');
   });
 
-  it('게임을 고르면 그 게임 계급, 안 해 본 게임이면 시작 계급(미사일)', async () => {
+  it('게임을 골라도 같은 통합 계급이다 — 안 해 본 게임이어도', async () => {
     render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
     await screen.findByText('someone');
 
-    fireEvent.change(select(), { target: { value: 'ONE_CARD' } });
-    fireEvent.click(screen.getByRole('button', { name: '계급표' }));
-    await waitFor(() => expect(current()).toEqual(['BULLET']));
-    expect(screen.getByRole('dialog')).toHaveTextContent('원카드 기준');
-
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     fireEvent.change(select(), { target: { value: 'SKULL_KING' } });
     fireEvent.click(screen.getByRole('button', { name: '계급표' }));
-    await waitFor(() => expect(current()).toEqual(['MISSILE']));
+    await waitFor(() => expect(current()).toEqual(['SILVER_MEDAL']));
+  });
+
+  it('게스트는 강조하지 않는다', async () => {
+    stats.mockResolvedValue({ userId: 1, username: 'guest-ab12cd34', rating: 1000, tier: 'MISSILE', games: [] });
+    render(<RankingCard token="tok" games={CATALOG} myUserId={1} />);
+    await screen.findByText('someone');
+
+    fireEvent.click(screen.getByRole('button', { name: '계급표' }));
+    await waitFor(() => expect(stats).toHaveBeenCalled());
+    await waitFor(() => expect(current()).toEqual([]));
   });
 });

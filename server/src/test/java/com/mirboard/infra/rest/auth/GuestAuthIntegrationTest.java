@@ -161,7 +161,7 @@ class GuestAuthIntegrationTest {
         mockMvc.perform(put("/api/me/password").header("Authorization", bearer)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
-                                Map.of("currentPassword", "whatever1", "newPassword", "newpass123"))))
+                                Map.of("newPassword", "newpass123"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("GUEST_FORBIDDEN"));
 

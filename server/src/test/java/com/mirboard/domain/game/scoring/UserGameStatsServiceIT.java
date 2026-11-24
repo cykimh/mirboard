@@ -26,7 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** D-115 — 게임별 전적 저장소의 읽기 기본값·누적 계약. D-199·D-209 — 이번 달 전적·랭킹(V19 는 이 컨텍스트 기동이 Flyway + validate 로 대조). */
+/** D-115 — 게임별 전적 저장소의 읽기 기본값·누적 계약. D-305 — 통합 레이팅(게임 행과 같은 증감, 게스트 미저장, 통합 순위 왕관). D-199·D-209 — 이번 달 전적·랭킹(V19 는 이 컨텍스트 기동이 Flyway + validate 로 대조). */
 @SpringBootTest
 @Testcontainers
 @TestPropertySource(properties = {
@@ -166,7 +166,6 @@ class UserGameStatsServiceIT {
             // 계급·레이팅은 달과 상관없이 누적에서.
             assertThat(r.rating()).isEqualTo(1100);
             assertThat(r.tier()).isEqualTo(Tier.fromRating(1100).name());
-            assertThat(r.tierGameType()).isEqualTo(game);
         });
         assertThat(stats.monthlyRanking(game, november.plusMonths(1), 10)).isEmpty();
     }
@@ -211,7 +210,8 @@ class UserGameStatsServiceIT {
     }
 
     @Test
-    void all_games_ranking_sums_every_game_and_takes_the_tier_from_the_most_played_game() {
+    void every_ranking_takes_the_tier_from_the_unified_rating() {
+        // D-305 — 전체든 게임별이든 계급·레이팅은 통합 레이팅 하나.
         LocalDate month = freshMonth();
         String gameA = freshGame();
         String gameB = freshGame();
@@ -220,10 +220,9 @@ class UserGameStatsServiceIT {
         play(focused, gameA, month, "WW");
         play(spread, gameA, month, "WL");
         play(spread, gameB, month, "WW");
-        // 누적: spread 는 gameB 를 더 많이 했다(3판 > 1판).
+        // 통합 레이팅: 1000 → 1050(gameA) → 1210 → 1205(gameB).
         stats.record(spread, gameA, true, 1050, false);
         stats.record(spread, gameB, true, 1210, false);
-        stats.record(spread, gameB, true, 1220, false);
         stats.record(spread, gameB, false, 1205, false);
 
         List<MonthlyRankRow> rows = stats.monthlyRanking(null, month, 10);
@@ -231,12 +230,91 @@ class UserGameStatsServiceIT {
         assertThat(rows).extracting(MonthlyRankRow::userId).containsExactly(spread, focused);
         assertThat(rows.getFirst().winCount()).isEqualTo(3);
         assertThat(rows.getFirst().loseCount()).isEqualTo(1);
-        assertThat(rows.getFirst().tierGameType()).isEqualTo(gameB);
         assertThat(rows.getFirst().rating()).isEqualTo(1205);
         assertThat(rows.getFirst().tier()).isEqualTo(Tier.fromRating(1205).name());
-        // 누적 승·패가 없는 사람(이 테스트는 달만 직접 썼다)은 시작 계급.
-        assertThat(rows.get(1).tierGameType()).isNull();
+        // 통합 행이 없는 사람(이 테스트는 달만 직접 썼다)은 시작 계급.
+        assertThat(rows.get(1).rating()).isEqualTo(1000);
         assertThat(rows.get(1).tier()).isEqualTo(Tier.fromRating(1000).name());
+        // 게임별 랭킹에서도 같은 통합 값이다(그 게임에서 얻은 +50 이 아니라).
+        assertThat(stats.monthlyRanking(gameA, month, 10)).filteredOn(r -> r.userId() == spread)
+                .singleElement().satisfies(r -> {
+                    assertThat(r.rating()).isEqualTo(1205);
+                    assertThat(r.tier()).isEqualTo(Tier.fromRating(1205).name());
+                });
+    }
+
+    // ---------- D-305 — 통합 레이팅 ----------
+
+    @Test
+    void every_game_moves_the_one_unified_rating_and_the_game_row_gets_the_same_change() {
+        long me = newUser();
+        String gameA = freshGame();
+        String gameB = freshGame();
+        assertThat(stats.ratingInput(me)).isEqualTo(new EloCalculator.PlayerInput(me, 1000, 0));
+
+        stats.record(me, gameA, true, 1020, false);    // 통합 1000 → 1020
+        stats.record(me, gameB, false, 1012, true);    // 통합 1020 → 1012 (gameB 에서 −8)
+        stats.record(me, gameA, true, null, false);    // ELO 미적용 — 그대로
+
+        GameStats unified = stats.unified(me);
+        assertThat(unified.rating()).isEqualTo(1012);
+        assertThat(unified.winCount()).isEqualTo(2);
+        assertThat(unified.loseCount()).isEqualTo(1);
+        assertThat(unified.desertCount()).isEqualTo(1);
+        // 다음 판의 ELO 입력: 통합 레이팅 + 모든 게임 판 수.
+        assertThat(stats.ratingInput(me)).isEqualTo(new EloCalculator.PlayerInput(me, 1012, 3));
+        // 게임별 레이팅은 그 게임에서 얻고 잃은 만큼만(기록용).
+        assertThat(stats.get(me, gameA).rating()).isEqualTo(1020);
+        assertThat(stats.get(me, gameB).rating()).isEqualTo(992);
+        // 통합 행은 게임 목록에 끼지 않는다.
+        assertThat(stats.playedGames(me)).extracting(GameStats::gameType)
+                .containsExactlyInAnyOrder(gameA, gameB);
+        assertThat(stats.playsByGame()).extracting(UserGameStatsRepository.GamePlays::gameType)
+                .doesNotContain(UserGameStats.ALL_GAMES);
+        assertThat(stats.tierOf(users.findById(me).orElseThrow())).isEqualTo(Tier.fromRating(1012).name());
+    }
+
+    @Test
+    void participation_bonus_goes_to_the_unified_rating_too_and_draws_keep_counts() {
+        long me = newUser();
+        String game = freshGame();
+
+        stats.record(me, game, true, 1020, false, EloCalculator.FULL_FACTOR);   // +20 +6
+        stats.recordDraw(me, game, EloCalculator.FULL_FACTOR);                  // +6
+        stats.record(me, game, false, null, true, EloCalculator.FULL_FACTOR);   // 탈주 — 참가 점수 없음
+
+        int bonus = EloCalculator.participationBonus(EloCalculator.FULL_FACTOR, false);
+        assertThat(stats.unified(me).rating()).isEqualTo(1020 + 2 * bonus);
+        assertThat(stats.get(me, game).rating()).isEqualTo(1020 + 2 * bonus);
+        assertThat(stats.unified(me).winCount()).isEqualTo(1);
+        assertThat(stats.unified(me).loseCount()).isEqualTo(1);
+    }
+
+    @Test
+    void guests_get_no_unified_row_and_always_enter_at_1000() {
+        long guest = users.save(User.create(GuestPolicy.newUsername(new SplittableRandom()),
+                GuestPolicy.NO_LOGIN_HASH, Clock.systemUTC())).getId();
+        String game = freshGame();
+
+        stats.record(guest, game, true, 1030, false, EloCalculator.FULL_FACTOR);
+        stats.recordDraw(guest, game, EloCalculator.FULL_FACTOR);
+
+        assertThat(stats.get(guest, game).rating()).isEqualTo(1000);
+        assertThat(stats.get(guest, game).winCount()).isEqualTo(1);   // 게임 행은 남는다(끝낸 증거)
+        assertThat(stats.unified(guest)).isEqualTo(new GameStats(UserGameStats.ALL_GAMES, 1000, 0, 0, 0));
+        assertThat(stats.ratingInput(guest)).isEqualTo(new EloCalculator.PlayerInput(guest, 1000, 0));
+    }
+
+    @Test
+    void crowns_follow_the_unified_rating_rank() {
+        // D-164·D-305 — 금훈장 이상이면 통합 레이팅 순위로 왕관. 이 DB 에서 가장 높은 값으로 1위를 만든다.
+        long top = newUser();
+        long second = newUser();
+        stats.record(top, freshGame(), true, 9_000, false);
+        stats.record(second, freshGame(), true, 8_999, false);
+
+        assertThat(stats.tierOf(users.findById(top).orElseThrow())).isEqualTo(Tier.STAR_CROWN.name());
+        assertThat(stats.tierOf(users.findById(second).orElseThrow())).isEqualTo(Tier.GOLD_CROWN.name());
     }
 
     @Test

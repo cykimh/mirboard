@@ -106,8 +106,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].loseCount").value(1))
                 .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].winRate").value(67))
                 .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].recent").value("WLW"))
-                // 전체의 계급은 가장 많이 한 게임(티츄 2판)의 누적 레이팅에서.
-                .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].tierGameType").value("TICHU"))
+                // 계급은 통합 레이팅에서(D-305).
                 .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].rating").value(1040))
                 .andExpect(jsonPath("$.entries[?(@.username == 'rkuser')].tier").value("BRONZE_STAR"));
 
@@ -124,7 +123,7 @@ class UserStatsIntegrationTest {
     // ---------- D-115 — 게임별 전적 ----------
 
     @Test
-    void stats_lists_per_game_records_and_keeps_tichu_at_top_level() throws Exception {
+    void stats_lists_per_game_records_and_puts_the_unified_rating_at_top_level() throws Exception {
         long userId = registerAndGetId("gsmulti", "validpass1");
         String token = login("gsmulti", "validpass1");
         gameStats.record(userId, "TICHU", true, 1020, false);
@@ -133,11 +132,16 @@ class UserStatsIntegrationTest {
         mockMvc.perform(get("/api/users/" + userId + "/stats")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                // 최상위 필드는 기존 클라 호환용 = TICHU.
-                .andExpect(jsonPath("$.rating").value(1020))
+                // D-305 — 최상위 rating·tier 는 통합 레이팅(1000 → 1020 → 985). 승·패는 TICHU 호환 값 그대로.
+                .andExpect(jsonPath("$.rating").value(985))
+                .andExpect(jsonPath("$.tier").value("BULLET"))
                 .andExpect(jsonPath("$.winCount").value(1))
+                // 통합 행('*')은 게임 목록에 없다.
                 .andExpect(jsonPath("$.games.length()").value(2))
-                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].rating").value(985))
+                // 게임별 rating 은 그 게임에서 얻고 잃은 만큼(기록용), tier 는 어느 줄이든 통합 계급.
+                .andExpect(jsonPath("$.games[?(@.gameType == 'TICHU')].rating").value(1020))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'TICHU')].tier").value("BULLET"))
+                .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].rating").value(965))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].desertCount").value(1))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'SKULL_KING')].tier").value("BULLET"));
     }
@@ -155,7 +159,6 @@ class UserStatsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gameType").value("SKULL_KING"))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].rating").value(1300))
-                .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].tierGameType").value("SKULL_KING"))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].winRate").value(100))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gsskonly')].recent").value("W"))
                 .andExpect(jsonPath("$.entries[?(@.username == 'gstconly')]").isEmpty());
@@ -201,7 +204,7 @@ class UserStatsIntegrationTest {
                 .andExpect(jsonPath("$.loseCount").value(1));
     }
 
-    /** D-164 — 금훈장(1430+) 이상은 게임별 순위로 왕관. 이 게임 최고점이면 별왕관이다. */
+    /** D-164·D-305 — 금훈장(1400+) 이상은 통합 레이팅 순위로 왕관. 최고점이면 별왕관이다. */
     @Test
     void the_top_gold_badge_wears_the_star_crown() throws Exception {
         long top = registerAndGetId("gscrown", "validpass1");
@@ -210,6 +213,7 @@ class UserStatsIntegrationTest {
 
         mockMvc.perform(get("/api/users/" + top + "/stats").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tier").value("STAR_CROWN"))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'ONE_CARD')].tier").value("STAR_CROWN"));
         // D-199 — 랭킹 순서는 이번 달 승수지만 계급은 그대로 누적 레이팅 순위에서 온다.
         mockMvc.perform(get("/api/users/ranking?gameType=ONE_CARD&limit=100").header("Authorization", "Bearer " + token))
@@ -229,12 +233,12 @@ class UserStatsIntegrationTest {
         gameStats.record(hon, "YACHT", false, 950, false);    // 점수로는 총알
         gameStats.record(other, "YACHT", true, 1100, false);  // 점수로는 은별
 
-        // 전적: 한 게임 줄·최상위(TICHU 호환, 안 해 봤다)·fixedTier 모두 별왕관, 레이팅은 그대로.
+        // 전적: 한 게임 줄·최상위(통합)·fixedTier 모두 명예 계급, 레이팅은 그대로.
         mockMvc.perform(get("/api/users/" + hon + "/stats").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("창엽2"))
                 .andExpect(jsonPath("$.tier").value("GOLD_MEDAL"))
-                .andExpect(jsonPath("$.rating").value(1000))
+                .andExpect(jsonPath("$.rating").value(950))
                 .andExpect(jsonPath("$.fixedTier").value("GOLD_MEDAL"))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].tier").value("GOLD_MEDAL"))
                 .andExpect(jsonPath("$.games[?(@.gameType == 'YACHT')].rating").value(950));

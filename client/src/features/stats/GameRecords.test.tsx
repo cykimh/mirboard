@@ -30,6 +30,21 @@ describe('GameRecords (D-115 — 프로필 게임별 전적)', () => {
       />,
     );
     expect(screen.getByText('최고 231점')).toBeTruthy();
+    // 최고 점수만 있는 줄은 0승 0패를 쓰지 않는다(D-303).
+    expect(screen.queryByText(/0승 0패/)).toBeNull();
+  });
+
+  it('D-303·D-305 — 촘촘한 한 줄 칩: 게임별 계급 배지가 없다(계급은 통합 하나)', () => {
+    render(
+      <GameRecords
+        records={[{ gameType: 'TICHU', rating: 1020, tier: 'GOLD_STAR', winCount: 3, loseCount: 1, desertCount: 0 }]}
+        names={{ TICHU: '티츄' }}
+      />,
+    );
+    expect(screen.queryByRole('img', { name: '금별' })).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    // 게임별 레이팅은 기록용 — 풍선말로만.
+    expect(screen.getByRole('listitem')).toHaveAttribute('title', '이 게임에서 쌓인 레이팅 1020');
   });
 
   it('표시명을 모르면 게임 id 로 폴백', () => {

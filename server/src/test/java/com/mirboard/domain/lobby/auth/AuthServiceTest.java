@@ -131,7 +131,7 @@ class AuthServiceTest {
         setId(guest, 9L);
         given(userRepository.findById(9L)).willReturn(Optional.of(guest));
 
-        assertThatThrownBy(() -> service.changePassword(9L, "anything1", "newpass123"))
+        assertThatThrownBy(() -> service.changePassword(9L, "newpass123"))
                 .isInstanceOf(GuestForbiddenException.class);
         verify(passwordEncoder, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any());

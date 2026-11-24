@@ -166,6 +166,8 @@ ELO·전적은 포트 밖이지만, 새 게임의 매치 기록기(`MatchResultR
    반올림은 계산기 안에서). 봇 자리는 전적 행이 없어 1000·0판으로 계산에만 들어가고 봇의 레이팅은 쓰지 않는다
    (아래 2 — 비봇만). 조건을 기록기마다 따로 쓰면 한쪽만 고쳐진다 — 실제로 D-117 전에는 두 기록기에
    `hasBots` 가 각각 있었다. *(D-299 전에는 `eloApplies` 로 봇·게스트 매치가 전원 미적용이었다.)*
+   **ELO 입력은 통합 레이팅이다(D-305)** — 게임별 전적(`stats.get(userId, GAME)`)이 아니라 `UserGameStatsService.ratingInput(userId)`
+   (통합 레이팅·전체 판 수)로 `PlayerInput` 을 만들고, 계산 결과(새 통합 레이팅)를 그대로 `record` 에 넘긴다. 통합 행·게임 행에 쌓는 일은 `record` 가 한다.
    **같은 배율을 전적 기록에도 넘긴다(D-301)** — `UserGameStatsService.record(…, deserted, eloFactor)`·
    `recordDraw(…, eloFactor)` 가 참가 점수(`EloCalculator.participationBonus` — 사람끼리 +6·봇 판 +2, 탈주·게스트
    본인 0, 무승부도 받음)를 ELO 결과에 더해 저장한다. 기록기에서 따로 더하지 말 것.

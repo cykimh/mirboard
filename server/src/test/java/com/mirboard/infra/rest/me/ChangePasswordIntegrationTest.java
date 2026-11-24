@@ -74,7 +74,7 @@ class ChangePasswordIntegrationTest {
 
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("currentPassword", "oldpass12", "newPassword", "newpass34"))))
+                .content(body(Map.of("newPassword", "newpass34"))))
                 .andExpect(status().isNoContent());
 
         // 새 비번 로그인 성공.
@@ -88,13 +88,23 @@ class ChangePasswordIntegrationTest {
     }
 
     @Test
-    void wrong_current_password_is_rejected() throws Exception {
+    void current_password_is_not_asked_and_ignored_when_sent() throws Exception {
+        // D-304 — 옛 클라가 보내는 currentPassword 는 틀려도 무시한다.
         String token = registerAndLogin("pwwrongcur", "oldpass12");
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body(Map.of("currentPassword", "WRONGcur99", "newPassword", "newpass34"))))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("BAD_CREDENTIALS"));
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(body(Map.of("username", "pwwrongcur", "password", "newpass34"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void unauthenticated_request_is_rejected() throws Exception {
+        mockMvc.perform(put("/api/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content(body(Map.of("newPassword", "newpass34"))))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -102,7 +112,7 @@ class ChangePasswordIntegrationTest {
         String token = registerAndLogin("pwweaknew", "oldpass12");
         mockMvc.perform(put("/api/me/password").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("currentPassword", "oldpass12", "newPassword", "abc"))))
+                .content(body(Map.of("newPassword", "abc"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
     }
