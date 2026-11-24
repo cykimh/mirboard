@@ -1026,7 +1026,8 @@
   }
 }
 
-/* ③ 동작 줄이기: 연출 없이 끝 상태로 바로(돌은 미끄러지지 않고 옮겨지고, 담·집은 바로 보인다). 차례 테두리·고리·점은 가만히 남는다. */
+/* ③ 동작 줄이기: 연출 없이 끝 상태로 바로(돌은 미끄러지지 않고 옮겨지고, 담·집은 바로 보인다). 차례 테두리·고리·점은 가만히 남는다.
+   새 담은 둘레 빛만 0.7초(D-307). */
 @media (prefers-reduced-motion: reduce) {
   :root:not(.motion-forced) .db-tokens *,
   :root:not(.motion-forced) .db-tokens *::before,
@@ -1037,6 +1038,10 @@
   }
   :root:not(.motion-forced) .db-fx-rich .db-stone-movable::after {
     display: none;
+  }
+  /* D-307 — 새 담 둘레의 빛만 짧게 스친다(움직임 없음, 바로 시작). 돌가루·고리·흔들림은 기본이 투명이라 그려지지 않는다. */
+  :root:not(.motion-forced) .db-fx-rich .db-wall-fx .db-wall-glow {
+    animation: db-wall-glow 0.7s ease-out both !important;
   }
 }
 /* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
@@ -1049,6 +1054,10 @@
 }
 :root.motion-off .db-fx-rich .db-stone-movable::after {
   display: none;
+}
+/* D-307 — 새 담 둘레의 빛만 짧게 스친다(움직임 없음, 바로 시작). 돌가루·고리·흔들림은 기본이 투명이라 그려지지 않는다. */
+:root.motion-off .db-fx-rich .db-wall-fx .db-wall-glow {
+  animation: db-wall-glow 0.7s ease-out both !important;
 }
 /* motion-off:end */
 

@@ -6,7 +6,8 @@
  * ⚠ 백분율 여백·크기는 칸이 아니라 **판 폭** 기준이다 — 칸 몫은 `calc(100% / 7 * 비율)` 로 나눈다.
  * 구성: ① 토큰 → ② 배치·납작한 기본 모습(테마를 꺼도 쓸 수 있게) → ③ 테마 층 `.db-theme-classic`(나무 바둑판·먹선·돌담 결·바둑돌)
  *       → ④ 연출 `.db-fx-rich`(담 쌓임·집 번짐·발자국·차례 빛·맥박·배너). 테마·연출은 `dambadukTheme.ts` 상수 한 줄로 끈다.
- * 박자: 돌 미끄러짐 `--db-slide`(0.22s — `dambadukSfx.WALL_AFTER_SLIDE_SEC` 와 같은 값) → 담 쌓임(돌마다 50ms 간격) → 집 번짐.
+ * 박자: 돌 미끄러짐 `--db-slide`(0.22s — `dambadukSfx.WALL_AFTER_SLIDE_SEC` 와 같은 값) → 담이 떨어져 닿음 `--db-drop`(0.13s —
+ *       `WALL_DROP_SEC`. 이때 "쿵" 소리·빛·돌가루·판 흔들림, D-307) → 살짝 튐 → 집 번짐(`--db-slide + 0.5s` — `HOME_AFTER_SLIDE_SEC`).
  */
 
 .db-table,
@@ -54,6 +55,9 @@
   --db-surface-2: var(--color-bg-surface-elevated);
   --db-board-shadow: rgba(46, 26, 4, 0.28);
   --db-slide: 0.22s;
+  /* D-307 — 담이 떨어져 닿기까지(`db-wall-drop` 0.325s 의 40%). `dambadukSfx.WALL_DROP_SEC` 와 같은 값. */
+  --db-drop: 0.13s;
+  --db-wall-glow: #fff0bd;
 }
 /* 다크 — 방(바깥)만 어두워진다. 판은 눈부심만 한 톤 낮춘 밝은 나무. */
 .dark .db-tokens {
@@ -353,6 +357,61 @@
 }
 .db-wall-pending {
   opacity: 0.5;
+}
+/* D-307 — 담이 닿는 순간의 조각들(빛 테두리·먹 번짐 고리·돌가루·먹점), 지운 담, 새 집 고리. 기본은 투명 — 연출(④)이 보여 준다
+   (연출을 끄거나 동작 줄이기면 그려지지 않는다. 빛 테두리만 17 에서 짧게 켠다). */
+.db-wall-glow,
+.db-wall-flash,
+.db-wall-ring,
+.db-wall-grit,
+.db-wall-gone,
+.db-home-ring {
+  opacity: 0;
+  pointer-events: none;
+}
+.db-wall-glow {
+  fill: none;
+  stroke: var(--db-wall-glow);
+  stroke-width: 7;
+}
+.db-wall-glow-wide {
+  stroke-width: 20;
+  stroke-opacity: 0.42;
+}
+.db-wall-flash {
+  fill: var(--db-wall-glow);
+  fill-opacity: 0.3;
+}
+.db-wall-ring {
+  fill: none;
+  stroke: var(--db-ink);
+  stroke-width: 5;
+}
+.db-wall-grit {
+  fill: var(--db-wall-stone);
+  stroke: var(--db-wall-edge);
+  stroke-width: 1.6;
+}
+.db-wall-grit-ink {
+  fill: var(--db-ink);
+  stroke: none;
+}
+.db-home-ring {
+  fill: none;
+  stroke-width: 10;
+  stroke-linejoin: round;
+}
+.db-home-ring.db-c-black {
+  stroke: var(--db-black);
+}
+.db-home-ring.db-c-white {
+  stroke: var(--db-white);
+}
+.db-home-ring.db-c-blue {
+  stroke: var(--db-blue);
+}
+.db-board-placing .db-home-ring {
+  display: none;
 }
 
 .db-stones,
@@ -1041,58 +1100,264 @@
 
 /* ══ ④ 연출 — `.db-fx-rich`(동작 줄이기면 17 에서 끈다) ═══════════════════ */
 
-/* 방금 세운 담 — 돌이 닿은 뒤(미끄러짐 뒤) 자리 그늘 위로 돌이 하나씩 얹힌다. */
-.db-fx-rich .db-wall-fresh .db-wall-base,
-.db-fx-rich .db-wall-fresh .db-wall-shadow {
-  animation: db-wall-footing 0.18s ease-out both;
+/* 방금 세운 담(D-307) — 돌이 닿은 뒤(미끄러짐 뒤) 담 한 칸이 통째로 위에서 떨어져 "쿵" 닿고(40% = `--db-drop`) 살짝 튄다.
+   닿는 순간에 돌마다 작게 들썩이고, 빛 테두리·먹 번짐 고리·돌가루가 터지고, 판이 짧게 흔들린다. */
+.db-fx-rich .db-wall-fresh {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-drop 0.325s linear both;
   animation-delay: var(--db-slide);
 }
 .db-fx-rich .db-wall-fresh .db-wall-stone {
   transform-box: fill-box;
   transform-origin: center;
-  animation: db-wall-stack 0.24s cubic-bezier(0.3, 1.5, 0.5, 1) both;
-  animation-delay: calc(var(--db-slide) + 0.04s + var(--db-i, 0) * 0.05s);
+  animation: db-wall-settle 0.2s ease-out both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop) + var(--db-i, 0) * 0.022s);
 }
-@keyframes db-wall-footing {
-  from {
-    opacity: 0.3;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes db-wall-stack {
-  from {
+@keyframes db-wall-drop {
+  0% {
     opacity: 0;
-    transform: translateY(-16px) scale(1.3);
+    transform: translateY(-120px) scale(1.8);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
   }
-  55% {
+  14% {
     opacity: 1;
   }
-  to {
+  40% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  62% {
+    transform: translateY(-16px) scale(1.07);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+  82% {
+    transform: translateY(0) scale(1);
+    animation-timing-function: ease-out;
+  }
+  91% {
+    transform: translateY(-4px) scale(1.015);
+    animation-timing-function: ease-in;
+  }
+  100% {
     opacity: 1;
     transform: none;
   }
 }
+@keyframes db-wall-settle {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: translateY(-3px) scale(1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* 빛 테두리 — 닿는 순간 번쩍, 1초에 걸쳐 스러진다. */
+.db-fx-rich .db-wall-fx .db-wall-glow {
+  animation: db-wall-glow 1.05s ease-out both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop));
+}
+@keyframes db-wall-glow {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* 번쩍 — 닿는 순간 빛무리가 터졌다 바로 꺼진다. */
+.db-fx-rich .db-wall-fx .db-wall-flash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-flash 0.38s ease-out both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop));
+}
+@keyframes db-wall-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+/* 먹 번짐 고리 — 닿은 자리에서 먹물이 한 번 퍼진다. */
+.db-fx-rich .db-wall-fx .db-wall-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-ring 0.6s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop));
+}
+@keyframes db-wall-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+    stroke-width: 11;
+  }
+  14% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+    stroke-width: 1.5;
+  }
+}
+/* 돌가루·먹점 — 담 양옆으로 튀어 흩어진다(방향·거리는 조각마다 `--db-dx`·`--db-dy`). */
+.db-fx-rich .db-wall-fx .db-wall-grit {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-grit 0.62s cubic-bezier(0.12, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop) + var(--db-late, 0s));
+}
+@keyframes db-wall-grit {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.7);
+  }
+  10% {
+    opacity: 0.95;
+  }
+  65% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--db-dx, 0), var(--db-dy, 0)) scale(0.4);
+  }
+}
+/* 판 흔들림 — 닿는 순간 아래로 꾹 눌렸다 잦아든다. 연달아 두어도 다시 돌게 같은 움직임에 이름 둘(-a·-b)을 번갈아 쓴다.
+   ⚠ `.db-board` 자체를 움직이지 않는다 — 쌓임 맥락이 생겨 판 뒤의 돌 테(`::before`, z-index −1)가 나무 바탕 위로 올라와 판을 덮는다.
+   판 안의 세 겹(그림·돌·누르는 칸)과 돌 테를 같이 움직인다. */
+.db-fx-rich .db-board-thud-a > *,
+.db-fx-rich .db-board-thud-a::before {
+  animation: db-board-thud-a 0.34s ease-out both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop));
+}
+.db-fx-rich .db-board-thud-b > *,
+.db-fx-rich .db-board-thud-b::before {
+  animation: db-board-thud-b 0.34s ease-out both;
+  animation-delay: calc(var(--db-slide) + var(--db-drop));
+}
+@keyframes db-board-thud-a {
+  0% {
+    transform: none;
+  }
+  14% {
+    transform: translate(0, 5px);
+  }
+  34% {
+    transform: translate(-2.5px, -2.5px);
+  }
+  56% {
+    transform: translate(2px, 2px);
+  }
+  78% {
+    transform: translate(-1px, 0);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes db-board-thud-b {
+  0% {
+    transform: none;
+  }
+  14% {
+    transform: translate(0, 5px);
+  }
+  34% {
+    transform: translate(-2.5px, -2.5px);
+  }
+  56% {
+    transform: translate(2px, 2px);
+  }
+  78% {
+    transform: translate(-1px, 0);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* 담 넘기로 지운 담 — 돌이 넘어가는 동안 그 자리에서 부풀며 흩어진다. */
+.db-fx-rich .db-wall-gone {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-wall-gone 0.42s ease-out both;
+}
+@keyframes db-wall-gone {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  30% {
+    opacity: 0.85;
+    transform: translateY(-5px) scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.7);
+  }
+}
 
-/* 새 집 — 담이 다 쌓인 뒤 칸 가운데에서 먹물이 번지듯 물든다. */
+/* 새 집 — 담이 다 내려앉은 뒤 칸 가운데에서 먹물이 번지듯 물든다(D-307 — 조금 넘치게 피었다 가라앉는다). */
 .db-fx-rich .db-home {
   transform-box: fill-box;
   transform-origin: center;
-  animation: db-home-bloom 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  animation-delay: calc(var(--db-slide) + 0.4s);
+  animation: db-home-bloom 0.75s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--db-slide) + 0.5s);
 }
 @keyframes db-home-bloom {
   from {
     opacity: 0;
-    transform: scale(0.25);
+    transform: scale(0.2);
   }
-  45% {
-    opacity: 0.75;
+  50% {
+    opacity: 1;
+    transform: scale(1.07);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+/* 새 집 고리(D-307) — 새로 집이 된 칸들 둘레에 주인 색 고리가 한 번 퍼졌다 스러진다. */
+.db-fx-rich .db-home-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: db-home-ring 0.95s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--db-slide) + 0.5s);
+}
+@keyframes db-home-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  60% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06);
   }
 }
 
