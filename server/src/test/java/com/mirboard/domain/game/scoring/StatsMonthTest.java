@@ -45,8 +45,8 @@ class StatsMonthTest {
                 new HonoraryTierPolicy(List.of()), at("2026-10-31T15:00:00Z"));
         LocalDate november = LocalDate.of(2026, 11, 1);
 
-        service.record(7L, "ONE_CARD", true, 1016, false);
-        // D-305 — 증감(통합 1000 → 1016 = +16)을 게임 행과 통합 행에 같이.
+        service.record(7L, "ONE_CARD", true, 16, false);
+        // D-305 — 증감(+16)을 게임 행과 통합 행에 같이.
         verify(repo).record(7L, "ONE_CARD", 16, 1, 0, 0);
         verify(repo).record(7L, UserGameStats.ALL_GAMES, 16, 1, 0, 0);
         verify(monthly).record(7L, "ONE_CARD", november, 1, 0, 0, "W");

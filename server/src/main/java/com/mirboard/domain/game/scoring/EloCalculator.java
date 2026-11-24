@@ -189,4 +189,32 @@ public final class EloCalculator {
     public static int kFactor(int gamesPlayed) {
         return gamesPlayed < NEW_PLAYER_THRESHOLD ? NEW_PLAYER_K : DEFAULT_K;
     }
+
+    /**
+     * D-305 — {@link #applyMatch(List, List, boolean, double)} 의 결과를 <b>증감</b>(새 값 − 입력값)으로. 기록기는 이 값을
+     * {@link UserGameStatsService#record(long, String, boolean, Integer, boolean, double)} 에 넘긴다 — 저장은 "지금 값 + 증감"이라
+     * 같은 사람의 두 판이 동시에 끝나도 서로의 변화를 덮어쓰지 않는다(절대값으로 저장하면 뒤에 쓰는 판이 앞 판을 지운다).
+     */
+    public static Map<Long, Integer> matchDeltas(List<PlayerInput> teamA, List<PlayerInput> teamB,
+                                                 boolean winnerIsTeamA, double factor) {
+        Map<Long, Integer> ratings = applyMatch(teamA, teamB, winnerIsTeamA, factor);
+        Map<Long, Integer> out = new java.util.HashMap<>();
+        for (PlayerInput p : teamA) {
+            out.put(p.userId(), ratings.get(p.userId()) - p.currentRating());
+        }
+        for (PlayerInput p : teamB) {
+            out.put(p.userId(), ratings.get(p.userId()) - p.currentRating());
+        }
+        return out;
+    }
+
+    /** D-305 — {@link #applyFreeForAll(List, double)} 의 결과를 증감으로({@link #matchDeltas} 와 같은 이유). */
+    public static Map<Long, Integer> freeForAllDeltas(List<Placement> placements, double factor) {
+        Map<Long, Integer> ratings = applyFreeForAll(placements, factor);
+        Map<Long, Integer> out = new java.util.HashMap<>();
+        for (Placement p : placements) {
+            out.put(p.player().userId(), ratings.get(p.player().userId()) - p.player().currentRating());
+        }
+        return out;
+    }
 }

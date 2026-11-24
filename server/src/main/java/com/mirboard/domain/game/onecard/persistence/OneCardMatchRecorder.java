@@ -77,7 +77,7 @@ public class OneCardMatchRecorder {
                 event.roomId(), Timestamp.from(Instant.now(clock)), result.reason().name(), payload(result));
 
         // ELO 입력은 갱신 전 전적으로 만든다 (K-factor 의 판 수 임계가 정확하도록).
-        Map<Long, Integer> newRatings = Map.of();
+        Map<Long, Integer> ratingDeltas = Map.of();
         if (rated) {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -88,11 +88,12 @@ public class OneCardMatchRecorder {
                         playerIds.size() - standing.rank(),
                         standing.status() == SeatStatus.DESERTED));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
+            ratingDeltas = EloCalculator.freeForAllDeltas(placements, eloFactor);
         }
 
         List<Integer> winners = result.winners();
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             Standing standing = bySeat.get(seat);
             boolean win = winners.contains(seat);
@@ -103,12 +104,12 @@ public class OneCardMatchRecorder {
                     matchId, userId, seat, standing.rank(), standing.cardsLeft(), win, deserted);
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
+                stats.record(userId, GAME, win, ratingDeltas.get(userId), deserted, eloFactor);
             }
         }
 
-        log.info("OneCard match recorded: room={} matchId={} reason={} winners={} eloApplied={} ratings={}",
-                event.roomId(), matchId, result.reason(), winners, rated, newRatings);
+        log.info("OneCard match recorded: room={} matchId={} reason={} winners={} eloApplied={} ratingDeltas={}",
+                event.roomId(), matchId, result.reason(), winners, rated, ratingDeltas);
     }
 
     private String payload(MatchResult result) {

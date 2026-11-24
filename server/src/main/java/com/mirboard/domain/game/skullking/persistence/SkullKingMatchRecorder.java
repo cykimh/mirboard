@@ -72,7 +72,7 @@ public class SkullKingMatchRecorder {
                 event.roomId(), Timestamp.from(Instant.now(clock)), event.roundsPlayed(), payload(event));
 
         // ELO 입력은 갱신 전 전적으로 만든다 (K-factor 의 판 수 임계가 정확하도록).
-        Map<Long, Integer> newRatings = Map.of();
+        Map<Long, Integer> ratingDeltas = Map.of();
         if (rated) {
             List<EloCalculator.Placement> placements = new ArrayList<>();
             for (int seat = 0; seat < playerIds.size(); seat++) {
@@ -82,10 +82,11 @@ public class SkullKingMatchRecorder {
                         event.finalScores().getOrDefault(seat, 0),
                         event.desertedSeats().contains(seat)));
             }
-            newRatings = EloCalculator.applyFreeForAll(placements, eloFactor);
+            ratingDeltas = EloCalculator.freeForAllDeltas(placements, eloFactor);
         }
 
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             boolean win = event.winners().contains(seat);
             boolean deserted = event.desertedSeats().contains(seat);
@@ -94,13 +95,13 @@ public class SkullKingMatchRecorder {
                     matchId, userId, seat, event.finalScores().getOrDefault(seat, 0), win, deserted);
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님).
             if (!bots.isBot(userId)) {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
+                stats.record(userId, GAME, win, ratingDeltas.get(userId), deserted, eloFactor);
             }
         }
 
-        log.info("SkullKing match recorded: room={} matchId={} winners={} deserted={} rounds={} eloApplied={} ratings={}",
+        log.info("SkullKing match recorded: room={} matchId={} winners={} deserted={} rounds={} eloApplied={} ratingDeltas={}",
                 event.roomId(), matchId, event.winners(), event.desertedSeats(),
-                event.roundsPlayed(), rated, newRatings);
+                event.roundsPlayed(), rated, ratingDeltas);
     }
 
     private String payload(SkullKingMatchCompleted event) {

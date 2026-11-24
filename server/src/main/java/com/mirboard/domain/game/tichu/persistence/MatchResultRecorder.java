@@ -122,11 +122,12 @@ public class MatchResultRecorder {
             else teamBInput.add(input);
         }
         // 봇 자리는 전적 행이 없어 기본값 1000 으로 계산에만 든다(게스트 자리도 rating 이 늘 1000).
-        Map<Long, Integer> newRatings = rated
-                ? EloCalculator.applyMatch(teamAInput, teamBInput, winner == Team.A, eloFactor)
+        Map<Long, Integer> ratingDeltas = rated
+                ? EloCalculator.matchDeltas(teamAInput, teamBInput, winner == Team.A, eloFactor)
                 : Map.of();
 
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             Team team = Team.ofSeat(seat);
             boolean isWin = team == winner;
@@ -137,7 +138,7 @@ public class MatchResultRecorder {
             boolean deserted = event.deserterUserId() != null && event.deserterUserId() == userId;
             // 봇 계정 자신은 전적을 쌓지 않는다 (랭킹 대상 아님, D-71).
             if (!bots.isBot(userId)) {
-                stats.record(userId, TichuGameDefinition.ID, isWin, newRatings.get(userId), deserted, eloFactor);
+                stats.record(userId, TichuGameDefinition.ID, isWin, ratingDeltas.get(userId), deserted, eloFactor);
             }
         }
         if (event.deserterUserId() != null) {
@@ -145,9 +146,9 @@ public class MatchResultRecorder {
                     event.roomId(), event.deserterUserId());
         }
 
-        log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, eloApplied={}, ratings={}",
+        log.info("Match recorded: room={}, winner={}, A={}/B={}, rounds={}, eloApplied={}, ratingDeltas={}",
                 event.roomId(), winner,
                 event.cumulativeTeamAScore(), event.cumulativeTeamBScore(),
-                event.roundScores().size(), rated, newRatings);
+                event.roundScores().size(), rated, ratingDeltas);
     }
 }

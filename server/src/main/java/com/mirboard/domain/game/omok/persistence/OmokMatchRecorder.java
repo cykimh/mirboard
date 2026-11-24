@@ -80,7 +80,7 @@ public class OmokMatchRecorder {
                 result.reason().name(), draw ? null : result.winnerColor().name(), payload(state));
 
         // ELO 입력은 갱신 전 전적으로 만든다(K-factor 의 판 수 임계가 정확하도록). 팀 = seat % 2.
-        Map<Long, Integer> newRatings = Map.of();
+        Map<Long, Integer> ratingDeltas = Map.of();
         if (rated) {
             List<EloCalculator.PlayerInput> team0 = new ArrayList<>();
             List<EloCalculator.PlayerInput> team1 = new ArrayList<>();
@@ -91,11 +91,12 @@ public class OmokMatchRecorder {
                 (TurnOrder.team(seat) == 0 ? team0 : team1).add(input);
             }
             boolean team0Won = result.winnerSeats().contains(0);
-            newRatings = EloCalculator.applyMatch(team0, team1, team0Won, eloFactor);
+            ratingDeltas = EloCalculator.matchDeltas(team0, team1, team0Won, eloFactor);
         }
 
         Map<Long, String> outcome = new LinkedHashMap<>();
-        for (int seat = 0; seat < playerIds.size(); seat++) {
+        // D-305 — userId 오름차순(통합 행 잠금 순서를 매치마다 같게 — 동시에 끝난 두 판의 교착 방지).
+        for (int seat : UserGameStatsService.seatsInUserIdOrder(playerIds)) {
             long userId = playerIds.get(seat);
             boolean win = result.winnerSeats().contains(seat);
             boolean deserted = result.reason() == EndReason.DESERTED && result.causeSeat() == seat;
@@ -109,13 +110,13 @@ public class OmokMatchRecorder {
             if (draw) {
                 stats.recordDraw(userId, GAME, eloFactor);
             } else {
-                stats.record(userId, GAME, win, newRatings.get(userId), deserted, eloFactor);
+                stats.record(userId, GAME, win, ratingDeltas.get(userId), deserted, eloFactor);
             }
             outcome.put(userId, draw ? "draw" : win ? "win" : deserted ? "deserted" : "lose");
         }
 
-        log.info("Omok match recorded: room={} matchId={} mode={} reason={} outcome={} eloApplied={} ratings={}",
-                event.roomId(), matchId, state.mode(), result.reason(), outcome, rated, newRatings);
+        log.info("Omok match recorded: room={} matchId={} mode={} reason={} outcome={} eloApplied={} ratingDeltas={}",
+                event.roomId(), matchId, state.mode(), result.reason(), outcome, rated, ratingDeltas);
     }
 
     private String payload(OmokState state) {
