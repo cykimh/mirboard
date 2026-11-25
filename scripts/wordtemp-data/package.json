@@ -1,0 +1,20 @@
+{
+  "name": "mirboard-wordtemp-data",
+  "private": true,
+  "type": "module",
+  "description": "낱말 온도(WORD_TEMP) 정답 은행·유사도 표 만들기 도구 (S1a)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "bank": "node 01-bank.mjs",
+    "vocab": "node 02-vocab.mjs",
+    "candidates": "node 03-candidates.mjs",
+    "score": "node 04-score.mjs",
+    "consistency": "node 05-consistency.mjs",
+    "build": "node 06-build.mjs",
+    "review": "node 07-review-sample.mjs",
+    "validate": "node validate.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.14.0"
+  }
+}
