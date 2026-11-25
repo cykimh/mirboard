@@ -88,6 +88,7 @@ domain.game.wordtemp
 └─ persistence/                매치 기록기·엔티티·HeadToHeadSource
 ```
 
+- *S1b 구현(D-315)*: 순수 계층은 `engine/` 한 묶음이 아니라 별자리 수판·담바둑처럼 `WordTempEngine`(루트) + `rules`·`state`·`action`·`event`·`bot`·`invariant`·`words` 로 나눴다(위치 표는 룰 §18). 채점 결과 반영은 `applyScore`, 단계 마감은 `onTimer`/`TICK`.
 - 순수 엔진은 `SimilarityTable`·시각·난수 씨앗을 **인자로** 받는다. 테스트는 작은 고정 표를 쓴다(Redis·DB·네트워크 없음).
 - 채점기·SDK 는 게임 패키지 안에 둔다 — 인프라에 게임 이름을 넣지 않으려는 것이다(`grep -rni "wordtemp\|word_temp" server/src/main/java/com/mirboard/infra` 0건이 완료 조건).
 - 의존성: `server/build.gradle.kts` 에 `com.anthropic:anthropic-java`(버전은 S2 착수 때 최신 안정판으로 고정). 저장소의 첫 외부 API 클라이언트다.
