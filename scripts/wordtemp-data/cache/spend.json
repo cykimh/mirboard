@@ -1,0 +1,85 @@
+{
+ "totalUsd": 8.7939,
+ "entries": [
+  {
+   "step": "bank-draft",
+   "mode": "sync",
+   "requests": 15,
+   "input": 14498,
+   "output": 27399,
+   "usd": 0.303
+  },
+  {
+   "step": "bank-review",
+   "mode": "sync",
+   "requests": 15,
+   "input": 32463,
+   "output": 10726,
+   "usd": 0.1722
+  },
+  {
+   "step": "vocab",
+   "mode": "sync",
+   "requests": 25,
+   "input": 14715,
+   "output": 11888,
+   "usd": 0.1483
+  },
+  {
+   "step": "candidates",
+   "mode": "sync",
+   "requests": 6,
+   "input": 5714,
+   "output": 3223,
+   "usd": 0.0437
+  },
+  {
+   "step": "candidates",
+   "mode": "batch",
+   "requests": 346,
+   "input": 327753,
+   "output": 183587,
+   "usd": 1.2457
+  },
+  {
+   "step": "score",
+   "mode": "sync",
+   "requests": 10,
+   "input": 29245,
+   "output": 4610,
+   "usd": 0.1046
+  },
+  {
+   "step": "score",
+   "mode": "batch",
+   "requests": 1220,
+   "input": 3685449,
+   "output": 540837,
+   "usd": 6.3896
+  },
+  {
+   "step": "score",
+   "mode": "batch",
+   "requests": 10,
+   "input": 30264,
+   "output": 4461,
+   "usd": 0.0526
+  },
+  {
+   "step": "score",
+   "mode": "batch",
+   "requests": 2,
+   "input": 6100,
+   "output": 917,
+   "usd": 0.0107
+  },
+  {
+   "step": "consistency",
+   "mode": "batch",
+   "requests": 61,
+   "input": 185230,
+   "output": 27662,
+   "usd": 0.3235
+  }
+ ]
+}

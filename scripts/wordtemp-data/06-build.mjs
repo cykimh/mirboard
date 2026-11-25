@@ -1,0 +1,74 @@
+// 6단계 — 묶기: 채점 결과(캐시)를 읽어 은행 기준을 통과한 정답만 남기고 서버 자원으로 쓴다. Claude 를 부르지 않는다.
+//   server/src/main/resources/wordtemp/table-v1.tsv.gz  유사도 표
+//   server/src/main/resources/wordtemp/bank.tsv         정답 은행(낱말·범주·뜻풀이·같은 말)
+//   server/src/main/resources/wordtemp/blocked.txt      금칙어
+//   server/src/main/resources/wordtemp/score-v1.md      채점 기준문(실시간 채점과 공용)
+//   data/stats.txt · data/bank-dropped.tsv
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { ROOT, DATA, RESOURCES, MODEL, PROMPT_VERSION, TABLE_VERSION, writeBank, byCodeUnit } from './lib.mjs';
+
+export const BANDS = ['96+', '75-95', '40-74', '0-39'];
+export const bandOf = (s) => (s >= 96 ? '96+' : s >= 75 ? '75-95' : s >= 40 ? '40-74' : '0-39');
+// 은행에 남기는 기준 — 설계서 §5.1 의 어림(96+ 1~5 · 75~95 15개 · 40~74 60개)을 실측 뒤 D-313 에서 고쳤다.
+export const CRITERIA = { max96: 5, min75: 3, min40: 40 };
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const { readScores } = await import('./04-score.mjs');
+  const { loadBank, loadBlocked, isOffensive, isHangulWord, hintBlockedByAnswer } = await import('./lib.mjs');
+  const scores = readScores(); // 4단계가 적어 둔 정본 — 여기서는 Claude 를 부르지 않는다
+  const blocked = loadBlocked();
+  const rows = new Map();
+  let notNoun = 0;
+  const bank = loadBank();
+  for (const a of bank) {
+    const answers = [a.word, ...a.aliases];
+    const hints = new Map();
+    for (const [hint, s] of scores.get(a.word) ?? []) {
+      if (s < 0) notNoun++;
+      // 은행(같은 말 목록)·금칙어를 채점 뒤에 고쳤을 수 있으니 여기서 한 번 더 거른다
+      else if (isHangulWord(hint) && !isOffensive(hint, blocked) && !hintBlockedByAnswer(hint, answers)) hints.set(hint, s);
+    }
+    rows.set(a.word, hints);
+  }
+
+  const kept = [];
+  const dropped = ['# 은행 기준을 못 채워 뺀 낱말\t까닭\t96+\t75-95\t40-74\t0-39'];
+  for (const a of bank) {
+    const hints = rows.get(a.word) ?? new Map();
+    const count = Object.fromEntries(BANDS.map((b) => [b, 0]));
+    for (const s of hints.values()) count[bandOf(s)]++;
+    const reasons = [];
+    if (!scores.has(a.word)) reasons.push('채점 안 됨(4단계를 돌릴 것)');
+    if (count['96+'] > CRITERIA.max96) reasons.push(`96+ ${count['96+']}개 > ${CRITERIA.max96}`);
+    if (count['75-95'] < CRITERIA.min75) reasons.push(`75-95 ${count['75-95']}개 < ${CRITERIA.min75}`);
+    if (count['40-74'] < CRITERIA.min40) reasons.push(`40-74 ${count['40-74']}개 < ${CRITERIA.min40}`);
+    if (reasons.length) dropped.push([a.word, reasons.join('; '), ...BANDS.map((b) => count[b])].join('\t'));
+    else kept.push({ ...a, table: hints, count });
+  }
+  kept.sort((x, y) => byCodeUnit(x.word, y.word));
+
+  const created = process.env.WORDTEMP_CREATED ?? new Date().toISOString().slice(0, 10);
+  const pairs = kept.reduce((s, a) => s + a.table.size, 0);
+  const header = ['#wordtemp-table', `version=${TABLE_VERSION}`, `promptVersion=${PROMPT_VERSION}`, `model=${MODEL}`, `created=${created}`, `answers=${kept.length}`, `pairs=${pairs}`].join('\t');
+  const body = kept.map((a) => `${a.word}\t${[...a.table].sort((x, y) => byCodeUnit(x[0], y[0])).map(([h, s]) => `${h}:${s}`).join(',')}`);
+  const text = [header, ...body].join('\n') + '\n';
+  fs.mkdirSync(RESOURCES, { recursive: true });
+  const tableFile = path.join(RESOURCES, `table-${TABLE_VERSION}.tsv.gz`);
+  fs.writeFileSync(tableFile, zlib.gzipSync(Buffer.from(text, 'utf8'), { level: 9 }));
+  writeBank(path.join(RESOURCES, 'bank.tsv'), kept, `낱말 온도 정답 은행 — 표 ${TABLE_VERSION} 와 짝(만든 날 ${created}). scripts/wordtemp-data 가 만든다 — 손으로 고치지 말 것`);
+  fs.copyFileSync(path.join(DATA, 'blocked.txt'), path.join(RESOURCES, 'blocked.txt'));
+  fs.copyFileSync(path.join(ROOT, 'prompts', `${PROMPT_VERSION}.md`), path.join(RESOURCES, `${PROMPT_VERSION}.md`));
+  fs.writeFileSync(path.join(DATA, 'bank-dropped.tsv'), dropped.join('\n') + '\n');
+
+  const total = Object.fromEntries(BANDS.map((b) => [b, kept.reduce((s, a) => s + a.count[b], 0)]));
+  const stats = [
+    `낱말 온도 표 ${TABLE_VERSION} — ${created} · ${MODEL} · ${PROMPT_VERSION}`,
+    `정답 ${kept.length}개(후보 ${kept.length + dropped.length - 1}개 가운데 ${dropped.length - 1}개 뺌) · 쌍 ${pairs}개 · 명사 아님으로 버린 쌍 ${notNoun}개`,
+    `띠: ${BANDS.map((b) => `${b} ${total[b]}(${((100 * total[b]) / pairs).toFixed(1)}%)`).join(' · ')}`,
+    `파일: ${fs.statSync(tableFile).size} 바이트(gzip) · 풀면 ${Buffer.byteLength(text)} 바이트`,
+  ];
+  fs.writeFileSync(path.join(DATA, 'stats.txt'), stats.join('\n') + '\n');
+  console.log(stats.join('\n'));
+}
