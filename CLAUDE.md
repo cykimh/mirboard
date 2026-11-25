@@ -285,6 +285,8 @@ MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.
 ./gradlew :server:test --tests "com.mirboard.domain.game.dambaduk.*"   # 담바둑 엔진·불변식·2·3인 각 2,000판 시뮬레이션·어댑터·봇 + 길이 통계 → server/build/dambaduk-sim-stats.txt (D-276~D-280, 기록기 IT 만 Docker)
 MIRBOARD_BOT_EVAL=1 ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.dambaduk.bot.DambadukBotStrengthTest"   # 담바둑 봇 강도 200판 표 → server/build/dambaduk-bot-strength.txt (D-277·D-280)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.DambadukServerFlowIT" --tests "com.mirboard.infra.ws.DambadukRecorderFailureTest"   # 담바둑 서버 경로(봇 판 완주 2·3인·탈주) + 기록 실패 격리 (D-278, IT 만 Docker)
+./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"   # 낱말 온도 엔진·어댑터·은닉·진짜 표(힙 → server/build/wordtemp-heap.txt)·채점기(가짜 모델)·시뮬레이션 (D-315~D-318, 기록기 IT 만 Docker, ~1m30s)
+./gradlew :server:test --tests "com.mirboard.infra.bot.WordTempBotMatchSimulationIT" --tests "com.mirboard.infra.ws.WordTempRecorderFailureTest"   # 낱말 온도 서버 경로(봇 3~6인 완주·실시간 채점 전 갈래) + 기록 실패 격리 (IT 만 Docker, ~1m)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.EngineTimerSchedulerTest"   # 포트 엔진 타이머 무장·발화 (D-128)
 ./gradlew :server:test --tests "com.mirboard.infra.bot.TurnRemainingTest"   # resync 남은 턴 시간·재무장을 락 안에서 (D-131)
 ./gradlew :server:test --tests "com.mirboard.infra.ws.*RecorderFailureTest"   # 매치 기록 실패 격리 3게임 (D-130·D-131)

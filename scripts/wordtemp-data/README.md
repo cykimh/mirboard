@@ -52,6 +52,7 @@ export ANTHROPIC_API_KEY=...     # 없으면 ~/.config/mirboard/anthropic.key �
 | 파일 | 버전 | 쓰는 곳 |
 | --- | --- | --- |
 | `prompts/score-v1.md` | `score-v1` | 4·5단계의 시스템 프롬프트 앞부분, 그리고 **실시간 채점(S2)** — 6단계가 `server/src/main/resources/wordtemp/score-v1.md` 로 복사한다. 바꾸면 버전을 올린다(표 머리 줄·실시간 캐시 키) |
+| `prompts/score-v2.md` | `score-v2` | **실시간 채점(S2, D-317)** — 명사 판정을 5b 어휘 청소의 갈래(고유명사·비하 표현·명사 아님)와 맞췄다. 띠·예시는 v1 과 같다. 서버 자원 `score-v2.md` 와 같은 파일(손으로 같이 고친다). 다음 표(v2)는 이 기준문으로 만들 것(`lib.mjs` 의 `PROMPT_VERSION`) |
 | 묶음 입출력 껍데기 | `04-score.mjs` 의 `BATCH_IO` | 표 만들기에만(여러 힌트를 번호로 받아 `[번호, 온도]` 로 돌려줌, 명사 아님 = -1) |
 | 은행 초안·검토·어휘·후보 | 각 스크립트의 `*_SYSTEM` 상수 | 그 단계에만. 바꾸면 요청 해시가 달라져 그 단계가 새로 나간다 |
 

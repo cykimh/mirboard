@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/wordtemp/` 기준(예정).
 
-> **상태:** **S1b — 순수 엔진·봇 정책·시뮬레이션(D-315, 어댑터·기록·채점기는 S2)** · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
+> **상태:** **S2 — 서버 연결(D-316 어댑터·정의·표 싣기 · D-317 실시간 채점기 · D-318 기록, 클라는 S3)** · S1b 순수 엔진·봇 정책·시뮬레이션(D-315) · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
 > 설계(포트 대응·비동기 채점 경로·데이터 만들기·단계)는 `docs/plans/wordtemp.md`, 검토 기록은 `docs/plans/word-temperature-review.md`.
 >
 > **독창 게임.** "낱말을 내면 정답과 얼마나 가까운지 숫자로 알려 주고, 그 숫자를 보고 정답을 맞힌다"는 **일반 메커니즘**만 가져왔다.
@@ -238,13 +238,13 @@
 
 | | 쉬움 `EASY` | 보통 `NORMAL` | 어려움 `HARD` |
 | --- | --- | --- | --- |
-| 출제(힌트 고르기) | 넉넉하게 — 공개될 힌트 80~92° | 65~85° | 최저 온도 바로 위(최저 ~ 최저+12°) |
+| 출제(힌트 고르기) | 넉넉하게 — 공개될 힌트 72~92°(D-316 — 진짜 표에서 80~92 는 후보가 모자랐다) | 65~85° | 최저 온도 바로 위(최저 ~ 최저+12°) |
 | 힌트 개수 | 1~2개 | 2~3개 | 2~4개(가장 높은 것이 목표 띠에 들게) |
 | 추리 — 아는 은행 | 은행의 30% (정답 포함 여부도 운) | 60% | 100% |
 | 추리 — 온도 읽기 잡음 | ±15 | ±8 | ±3 |
 | 추리 — 차수당 맞힐 확률 상한 | 10% | 30% | 50% |
 
-- 수치는 전부 **[수치]** — S2 에서 `MIRBOARD_BOT_EVAL` 표(봇끼리·사람 흉내 상대 승률, 차수별 적중률)로 재서 고친다.
+- 수치는 전부 **[수치]** — S4 시험판 전에 `MIRBOARD_BOT_EVAL` 표(S2 에서는 만들지 않았다 — 출제 띠만 진짜 표로 확인, D-316)(봇끼리·사람 흉내 상대 승률, 차수별 적중률)로 재서 고친다.
 - **출제 봇**: 정답의 표 이웃에서 목표 띠의 낱말을 고른다. 96 이상은 피한다. 후보 고르기는 무작위.
 - **추리 봇**: 공개된 힌트·온도들과 표가 맞는 정답 후보를 (아는 은행 안에서) 거꾸로 찾아 가장 그럴듯한 것을 낸다. 상한 확률에 걸리면
   두 번째 후보나 패스를 낸다. 이미 틀린 답은 다시 내지 않는다.
@@ -313,6 +313,8 @@
 | `HINT_VOID` | 출제자 | `text`, `reason`(`NOT_A_NOUN`·`SCORING_FAILED`), 지금 개수 |
 | `GUESS_ACCEPTED` | 낸 추리자 | 내가 낸 답 |
 | `ERROR` | 본인 | §5 의 코드 |
+
+판 시작 때는 이벤트를 보내지 않는다 — 1라운드의 낱말 고르기와 내 후보는 resync(공개 뷰·비공개 뷰)로 받고, `WORD_SELECT_STARTED`·`WORD_CANDIDATES` 는 2라운드부터 온다(D-316).
 
 비공개 뷰(`privateView`)는 같은 내용을 통째로 준다 — 내 후보·고른 낱말, (출제자면) 이번 차례의 힌트·온도·채점 중 표시, (추리자면) 이번 차수에 낸 내 답.
 
@@ -408,3 +410,16 @@
 - 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(Docker 불필요, 약 1분).
 - 테스트의 표는 메모리 구현(`InMemorySimilarityTable`)이고 시뮬레이션의 은행·표는 합성(`SyntheticWords`)이다 — 진짜 은행·표는 S1 데이터 작업.
 - S1b 에서 룰의 빈칸을 닫은 것은 D-315 ①~⑩. **[수치]** 는 바꾸지 않았다(최저 온도 50·60·70, 시간 20·30·5·6초 — 근거는 통계 파일의 [2]).
+
+### 18.1 서버 연결 (S2, D-316~D-318)
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 정의·방 설정 해석(§2) | `WordTempGameDefinition`·`WordTempSettings` | `WordTempGameDefinitionTest` |
+| 포트 어댑터 — 뷰·타이머 합성·`TICK`·탈주(§9·§10·§12) | `WordTempGameEngine` | `WordTempGameEngineTest`, `WordTempAdapterSecrecyTest`(JSON 은닉) |
+| 시작(§3.1) | `lifecycle/WordTempRoundStarter` | `infra/bot/WordTempBotMatchSimulationIT` |
+| 표·은행·금칙어 싣기(§6.1) | `words/WordTempWords`·`words/PackedSimilarityTable` | `words/PackedSimilarityTableTest`, `words/WordTempRealDataTest`(진짜 자원·힙 실측) |
+| 실시간 채점(§6.2·§6.3) | `scoring/LiveHintScorer`·`AsyncLiveHintScorer`·`ClaudeHintJudge`·`JdbcLiveScoreStore`, 기준문 `resources/wordtemp/score-v2.md` | `scoring/AsyncLiveHintScorerTest`, `WordTempBotMatchSimulationIT`(서버 경로), `scoring/ClaudeHintJudgeLiveSmokeTest`(진짜 API — 평소 꺼짐) |
+| 기록(§13) | `persistence/WordTempMatchRecorder`·`WordTempHeadToHead`, `V25__word_temp.sql` | `persistence/WordTempMatchRecorderIT`, `infra/ws/WordTempRecorderFailureTest` |
+
+- 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(기록기 IT 만 Docker) · `--tests "com.mirboard.infra.bot.WordTempBotMatchSimulationIT" --tests "com.mirboard.infra.ws.WordTempRecorderFailureTest"`.

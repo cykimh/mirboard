@@ -46,6 +46,10 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("io.sentry:sentry-logback:8.16.0")
 
+    // 낱말 온도 실시간 채점(D-312·D-316) — 공식 Anthropic Java SDK. 저장소의 첫 외부 API 클라이언트다.
+    // 게임 패키지(domain.game.wordtemp.scoring) 밖에서는 쓰지 않는다.
+    implementation("com.anthropic:anthropic-java:3.3.0")
+
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     // Spring Boot 4.0 에서 WebMVC test 슬라이스 (AutoConfigureMockMvc 등) 가

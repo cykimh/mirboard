@@ -635,6 +635,61 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 `lastPuzzle` 은 방금 끝난 퍼즐(결과 보기·끝)의 `{index, reason, results, grids, solution}`. **`privateHand` = 내 판** `{ puzzleIndex, grid, version, solved, peers: [{seat, grid}] }`
 (준비 단계·봇·관전자는 없음) — 재접속한 클라는 이 버전보다 큰 번호부터 보낸다. `peers` 는 내가 이 퍼즐을 완성했을 때만 아직 푸는 좌석들의 판이고(D-294), 그 밖에는 빈 목록이다.
 
+## 낱말 온도 (gameType=WORD_TEMP, D-310~D-318 — S4 전까지 `DISABLED`)
+
+같은 목적지·같은 envelope 를 쓴다. 좌석은 **0 ~ seatCount−1** (3~6). 룰 정본은 `docs/rules-wordtemp.md`(§12 가 표의 정본). 시간은 남은 ms 로 싣는다.
+`round`·`turnNo`·`attempt` 는 늦게 도착한 프레임을 거르는 기준이다(지금과 다르면 `NOT_YOUR_PHASE`).
+
+**클라 → 서버 `@action`**:
+
+| @action | 추가 필드 | 비고 |
+| --- | --- | --- |
+| `SELECT_WORD` | `round`, `index`(내 후보 번호 0 부터) | 모두, `WORD_SELECT`. 한 번 고르면 못 바꾼다 |
+| `SUBMIT_HINT` | `turnNo`, `attempt`, `text` | 출제자, `HINT`. 서버가 NFC·공백 제거·한글 1~10자 검사 |
+| `END_HINTS` | `turnNo`, `attempt` | 출제자, 힌트 1개 이상·채점 중 아님 |
+| `SUBMIT_GUESS` | `turnNo`, `attempt`, `text`(빈 문자열 = 패스) | 추리자, `GUESS`. 한 번만 |
+| `TICK` | `turnNo`, `attempt`, `phase` | 서버 `timeoutAction` 용 — 그 단계의 마감이 지났을 때만 엔진 타이머와 같은 전이, 아니면 무변경(클라가 보내도 해가 없다) |
+
+단계 마감·봇의 힌트와 추리·**실시간 채점 결과 반영**은 서버 엔진 타이머다(클라가 보낼 수 없다).
+
+**서버 → 클라 (공개)** — 전부 순번 있음. **후보·진행 중인 정답·미공개 힌트·공개 전 추리는 어디에도 없다**:
+
+| type | payload | 의미 |
+| --- | --- | --- |
+| `WORD_SELECT_STARTED` | `{ round, remainingMs }` | 낱말 고르기 시작(2라운드부터 — 1라운드는 resync 로 받는다) |
+| `WORD_SELECTED` | `{ seat }` | 골랐다(무엇인지는 없다). 마감 때 안 고른 좌석·봇도 한꺼번에 |
+| `TURN_STARTED` | `{ turnNo, round, setterSeat }` | 출제 차례 시작 |
+| `HINT_PHASE_STARTED` | `{ turnNo, attempt, remainingMs }` | 힌트 단계 |
+| `HINT_COUNT` | `{ count, max }` | 이번 차수 힌트 개수(확정 + 채점 중). 무효가 되면 줄어든 값이 다시 온다 |
+| `HINT_REVEALED` | `{ attempt, text, temp, floor, floorMet }` | 차수의 가장 높은 힌트 공개. 힌트 0개면 `text` null·`temp` −1 |
+| `GUESS_PHASE_STARTED` | `{ attempt, remainingMs, seats }` | 추리 단계, 추리할 좌석들 |
+| `GUESS_SUBMITTED` | `{ seat }` | 냈다(내용 없음) |
+| `GUESSES_REVEALED` | `{ attempt, guesses: [{seat, text, pass, correct, masked}], setterSeat, setterGain, scores: [{seat, delta, total}] }` | 동시 공개. 금칙어를 품은 답은 `text` 가 `···`(원문 없음) |
+| `TURN_ENDED` | `{ turnNo, answer, hints: [{attempt, text, temp, revealed}], reason, totals }` | 정답과 그 차례의 확정 힌트 전체. `reason`: `SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT` |
+| `SEAT_OUT` | `{ seat }` | 탈주·강퇴 |
+| `MATCH_ENDED` | `{ result: { endReason, standings: [{seat, rank, total, setterPoints, guessPoints, out}], draw } }` | `endReason`: `FINISHED`·`LAST_SEAT`·`NO_HUMANS`. 안 쓴 후보는 없다 |
+
+**서버 → 클라 (비공개)** — 전부 **순번 없음**(D-126), 살아 있는 사람 한 좌석의 본인 큐로만(봇·빠진 좌석·관전자에게는 없다):
+
+| type | 받는 사람 | payload |
+| --- | --- | --- |
+| `WORD_CANDIDATES` | 각자(2라운드부터) | `{ seat, round, candidates: [{index, word, category, available}] }` |
+| `HINT_SCORED` | 출제자 | `{ seat, text, temp, count }` — 표 힌트는 `SUBMIT_HINT` 에 바로, 표 밖 힌트는 채점 뒤(보통 2~3초) |
+| `HINT_PENDING` | 출제자 | `{ seat, text }` — 채점 중. 풀릴 때까지 새 힌트·[힌트 끝]은 `SCORING_IN_PROGRESS` |
+| `HINT_VOID` | 출제자 | `{ seat, text, reason, count }` — `NOT_A_NOUN`(고유명사·비하 표현 포함)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다 |
+| `GUESS_ACCEPTED` | 낸 추리자 | `{ seat, text }` |
+
+그리고 `ERROR` — 낱말 온도 고유 코드 `MATCH_OVER`·`INVALID_ACTION`·`NOT_YOUR_PHASE`·`BAD_CHOICE`·`ALREADY_CHOSEN`·`HINT_FORMAT`·`HINT_IS_ANSWER`·
+`HINT_INSIDE_ANSWER`·`HINT_DUPLICATE`·`HINT_LIMIT`·`SCORING_IN_PROGRESS`·`UNKNOWN_WORD`·`NO_HINTS_YET`·`GUESS_FORMAT`·`ALREADY_GUESSED`(룰 §5).
+`UNKNOWN_WORD` 는 표에 없는 낱말인데 실시간 채점이 꺼져 있거나(끄기 스위치·API 키 없음) 하루·판 상한에 닿은 것이다 — 개수는 줄지 않는다.
+
+**resync**: `phase` = `WORD_SELECT`·`HINT`·`GUESS`·`ATTEMPT_RESULT`·`TURN_END`·`FINISHED`, `tableView` = `{ phase, round, rounds, turnNo, setterSeat,
+attempt, phaseRemainingMs, hintCount, maxHints, revealed, guessedSeats, attempts, seats: [{seat, alive, bot, setterPoints, guessPoints, total, chosen}],
+order, history, turnReveal, result }` — `turnReveal`(정답·힌트 전체)은 `TURN_END` 동안만, 그 밖에는 null. 화면의 남은 시간은 `phaseRemainingMs` 를 쓴다
+(바깥 `turnRemainingMs` 는 이 게임에서 단계 시간이 아니다). **`privateHand`** = `{ seat, candidates, chosen, answer, hints: [{text, attempt, status, temp}], myGuess }` —
+`answer`·`hints` 는 출제자만(`status`: `SCORED`·`PENDING`·`VOID`), `myGuess` 는 추리 단계의 내 답. **판 시작 때는 이벤트를 보내지 않는다** — 첫
+낱말 고르기와 내 후보는 resync 로 받는다.
+
 ## 보안 검토 체크리스트
 
 - [x] 본인 큐 페이로드가 토픽으로 발행되지 않는지 통합 테스트로 검증.

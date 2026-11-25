@@ -1,6 +1,6 @@
 # 낱말 온도 — 열 번째 게임 설계 (S0)
 
-> 상태: **S0 설계(코드 없음)** · 작성 2026-11-25 · 사용자 승인 전(Phase Gate) — main 병합·푸시 안 함
+> 상태: **S2 서버 연결까지(D-316~D-318 — 사용자 검토 대기), 다음 S3 클라** · 작성 2026-11-25 · 사용자 승인 전(Phase Gate) — main 병합·푸시 안 함
 > 결정: D-310(채택·자원 예약) · D-311(룰 v1) · D-312(채점 방식). 룰 정본 `docs/rules-wordtemp.md`.
 > 근거: 검토 `docs/plans/word-temperature-review.md`(비평가 정정·추가 위험 포함) · 포트 계약 `docs/game-port.md` ·
 > 선례 별자리 수판(자원 은행·엔진 타이머·은닉 함수 D-294)·얏추(차례 전체 마감 D-183)·원카드(엔진 타이머 D-128).
@@ -88,6 +88,12 @@ domain.game.wordtemp
 └─ persistence/                매치 기록기·엔티티·HeadToHeadSource
 ```
 
+- *S2 구현(D-316~D-318)*: 위 그림과 달라진 것 — 순수 계층은 아래 줄대로, `words/` 에 `WordTempWords`(자원 Bean)·`PackedSimilarityTable`, `scoring/` 은
+  `LiveHintScorer` ← `AsyncLiveHintScorer`(가상 스레드·상한·결과함) + `HintJudge` ← `ClaudeHintJudge`(SDK 호출 한 번) + `LiveScoreStore` ← `JdbcLiveScoreStore`,
+  스타터는 `lifecycle/`. **설정 이름**은 §5.5 의 `mirboard.wordtemp.live.*` 가 아니라 `mirboard.wordtemp.model` + `mirboard.wordtemp.live-scoring.*`(D-317),
+  기다림 상한 8초는 설정이 아니라 `WordTempTuning.liveWaitMs`. 시작 이벤트는 방송하지 않는다(§3.1 의 "스타터가 낸다"를 바꿈 — resync 로).
+  저장된 실시간 점수의 "메모리 캐시 조회"(§4.2 ①)는 두지 않았다 — 이미 매긴 쌍도 채점 중으로 들어가 작업이 Postgres 를 읽고 다음 폴링(≤250ms)에 반영된다.
+  봇 강도 표(`MIRBOARD_BOT_EVAL`)와 Fly 리전 지연 측정은 하지 않았다(S4 전). 실제 키 확인은 한 판이 아니라 호출 6번(스모크 테스트)이다 — 클라가 없어 판을 돌릴 수 없다.
 - *S1b 구현(D-315)*: 순수 계층은 `engine/` 한 묶음이 아니라 별자리 수판·담바둑처럼 `WordTempEngine`(루트) + `rules`·`state`·`action`·`event`·`bot`·`invariant`·`words` 로 나눴다(위치 표는 룰 §18). 채점 결과 반영은 `applyScore`, 단계 마감은 `onTimer`/`TICK`.
 - 순수 엔진은 `SimilarityTable`·시각·난수 씨앗을 **인자로** 받는다. 테스트는 작은 고정 표를 쓴다(Redis·DB·네트워크 없음).
 - 채점기·SDK 는 게임 패키지 안에 둔다 — 인프라에 게임 이름을 넣지 않으려는 것이다(`grep -rni "wordtemp\|word_temp" server/src/main/java/com/mirboard/infra` 0건이 완료 조건).

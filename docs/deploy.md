@@ -418,6 +418,45 @@ flyctl secrets set MIRBOARD_STAR_SQUARE_STATUS=COMING_SOON -a mirboard
 # 다시 열기(시크릿을 지워 코드 기본값 — 공개)
 flyctl secrets unset MIRBOARD_STAR_SQUARE_STATUS -a mirboard
 ```
+## 낱말 온도 — 공개 상태·실시간 채점 (`MIRBOARD_WORD_TEMP_STATUS`·`ANTHROPIC_API_KEY`, D-310·D-316·D-317)
+
+**공개 상태**: 코드 기본값 **`DISABLED`**(S4 공개 전 — 카탈로그에도 없고 새 방 거절. `application.yml` 과 `WordTempGameDefinition` 의 `@Value`,
+테스트가 둘을 대조한다). 공개(S4)는 두 기본값을 `AVAILABLE` 로 바꿔 배포하고, 그 뒤의 되돌리기는 다른 게임과 같다(시크릿
+`MIRBOARD_WORD_TEMP_STATUS=COMING_SOON`). 공개 전에 운영에서만 미리 열어 보려면 시크릿 `MIRBOARD_WORD_TEMP_STATUS=AVAILABLE`.
+매치·캐시 테이블은 `V25__word_temp.sql`(배포 때 Flyway 가 적용), 낱말 자원(은행·표 약 390KB·금칙어·기준문)은 서버 jar 안에 있고 기동 때 읽는다
+(힙 약 1.1MB — 하나라도 없거나 어긋나면 기동 실패). 시간 배율 `mirboard.wordtemp.time-scale` 은 운영 1.0 그대로(통합 테스트 전용).
+
+**실시간 채점**(표 밖 힌트만 Claude 가 매긴다 — "운영 무료" 원칙의 이 게임 한정 예외, D-312): 두 가지가 **다 있어야** 켜진다.
+
+| 무엇 | 어디 | 값 |
+| --- | --- | --- |
+| 끄기 스위치 | `fly.toml [env]` `MIRBOARD_WORD_TEMP_LIVE_SCORING` | `"true"`(저장소에 들어 있다). 코드 기본값은 false — 로컬·테스트는 호출 0 |
+| API 키 | **Fly 시크릿** `ANTHROPIC_API_KEY` | 운영자가 넣는다. 저장소·로그·문서에 값을 남기지 않는다 |
+| 모델 | `MIRBOARD_WORD_TEMP_MODEL`(선택) | 기본 `claude-sonnet-5-5`. 바꾸면 캐시 키가 갈려 새로 매긴다 |
+| 하루 상한 | `MIRBOARD_WORD_TEMP_DAILY_CAP`(선택) | 기본 500회(Asia/Seoul 하루, 최악 약 $1.1) — 닿으면 그날은 표만으로 |
+
+```bash
+# 켜기 — 키만 넣으면 된다(스위치는 fly.toml 에 이미 true)
+flyctl secrets set ANTHROPIC_API_KEY=<키> -a mirboard
+# 급히 끄기(배포 없이) — 시크릿이 fly.toml [env] 를 덮는다. 다시 켜려면 unset
+flyctl secrets set MIRBOARD_WORD_TEMP_LIVE_SCORING=false -a mirboard
+flyctl secrets unset MIRBOARD_WORD_TEMP_LIVE_SCORING -a mirboard
+# 키 빼기(= 끄기)
+flyctl secrets unset ANTHROPIC_API_KEY -a mirboard
+```
+
+- 꺼져 있거나 키가 없거나 상한에 닿으면 표 밖 힌트는 "아직 모르는 낱말이에요"(`UNKNOWN_WORD`)로 거절되고 **게임은 표만으로 계속된다**.
+  기동 로그 한 줄이 상태를 말한다: `Word temperature live scoring is ON …` / `… is OFF …` / `… enabled but ANTHROPIC_API_KEY is not set`.
+- 키가 틀리거나(401) 모델 이름이 틀리면(400·404) ERROR `Word temperature live scoring SUSPENDED on this instance` 뒤 그 인스턴스는 표만으로
+  돈다 — 고친 뒤 재배포·재시작하면 풀린다.
+- **Anthropic Console 에서 월 지출 한도를 건다**(상한의 마지막 줄 — Console → Settings → Limits). 어림: 월 약 $2(표 밖 30% 가정).
+- 보내는 것은 낱말뿐이다(정답·뜻풀이·힌트 — 사용자·방 식별자 없음). 응답은 `word_temp_live_scores` 에 낱말·점수·횟수로 남는다(다음 표의 재료):
+  `SELECT answer, hint, valid, score, hits FROM mirboard.word_temp_live_scores ORDER BY hits DESC LIMIT 50;`
+- 사내망에서는 로컬 `flyctl` 이 막힌다 — 시크릿은 Fly 대시보드(Secrets)에서 넣어도 된다.
+- 로컬에서 실제 키로 한 번 확인(약 $0.02, CI 에서는 돌지 않는다):
+  `MIRBOARD_WORDTEMP_LIVE_SMOKE=1 ANTHROPIC_API_KEY=… ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.wordtemp.scoring.ClaudeHintJudgeLiveSmokeTest"`
+- 서버 jar 는 SDK 때문에 약 47MB 늘었다(82MB → 130MB).
+
 ## 운영 Redis (D-171)
 
 `mirboard-redis` 는 Flycast 사설 주소(`mirboard-redis.flycast:6379`)로만 받고, Fly 프록시가 연결이 없으면 머신을 멈춘다. 앱이 켜지며

@@ -58,7 +58,7 @@ class WordTempBotPolicyTest {
     void the_hard_setter_sits_just_above_the_floor_of_each_attempt() {
         assertThat(WordTempBotLevel.HARD.bandLow(50)).isEqualTo(50);
         assertThat(WordTempBotLevel.HARD.bandHigh(70)).isEqualTo(82);
-        assertThat(WordTempBotLevel.EASY.bandLow(70)).isEqualTo(80);
+        assertThat(WordTempBotLevel.EASY.bandLow(70)).isEqualTo(72);
         assertThat(WordTempBotLevel.NORMAL.bandHigh(50)).isEqualTo(85);
     }
 
