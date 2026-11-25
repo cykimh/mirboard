@@ -1,5 +1,5 @@
 {
- "totalUsd": 8.7939,
+ "totalUsd": 9.2362,
  "entries": [
   {
    "step": "bank-draft",
@@ -80,6 +80,22 @@
    "input": 185230,
    "output": 27662,
    "usd": 0.3235
+  },
+  {
+   "step": "classify",
+   "mode": "sync",
+   "requests": 3,
+   "input": 6721,
+   "output": 3030,
+   "usd": 0.0437
+  },
+  {
+   "step": "classify",
+   "mode": "batch",
+   "requests": 55,
+   "input": 123208,
+   "output": 55070,
+   "usd": 0.3986
   }
  ]
 }

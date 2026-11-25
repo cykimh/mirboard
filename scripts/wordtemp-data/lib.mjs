@@ -49,12 +49,17 @@ export function hintBlockedByAnswer(hint, answers) {
   return answers.some((a) => hint.includes(a) || (hint.length >= 2 && a.includes(hint)));
 }
 
+const listFile = (name) =>
+  fs.existsSync(path.join(DATA, name))
+    ? fs.readFileSync(path.join(DATA, name), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
+    : [];
+/** 금칙어 = 손으로 쓴 목록(blocked.txt) + 5b단계가 찾은 비하 표현(blocked-derogatory.txt). 부분 일치로 쓴다. */
 export function loadBlocked() {
-  return fs
-    .readFileSync(path.join(DATA, 'blocked.txt'), 'utf8')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'));
+  return [...new Set([...listFile('blocked.txt'), ...listFile('blocked-derogatory.txt')])];
+}
+/** 5b단계가 힌트 어휘에서 뺀 낱말(고유명사·비하 표현·명사 아님) → 갈래. */
+export function loadFlagged() {
+  return new Map(listFile('flagged.tsv').map((l) => l.split('\t')));
 }
 export const isOffensive = (word, blocked) => blocked.some((b) => word.includes(b));
 

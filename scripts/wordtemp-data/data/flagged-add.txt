@@ -1,0 +1,8 @@
+# 분류가 놓쳐 운영자가 손으로 더한 낱말 — "낱말 갈래"(proper_noun · derogatory_or_slur · not_a_noun). 고친 뒤 05b → 06 → validate.
+거지 derogatory_or_slur
+벙어리 derogatory_or_slur
+귀머거리 derogatory_or_slur
+장님 derogatory_or_slur
+꼽추 derogatory_or_slur
+곱추 derogatory_or_slur
+병신 derogatory_or_slur
