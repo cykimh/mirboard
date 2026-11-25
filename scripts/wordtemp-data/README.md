@@ -26,7 +26,8 @@ export ANTHROPIC_API_KEY=...     # 없으면 ~/.config/mirboard/anthropic.key �
 | 3 | `node 03-candidates.mjs --pilot 6` 뒤 `node 03-candidates.mjs` | 정답마다 낼 법한 힌트 명사(가까움·강함·느슨함) | `bank.tsv` → `data/candidates.tsv` | 배치 정답당 1건 |
 | 4 | `node 04-score.mjs --pilot 10` 뒤 `node 04-score.mjs` | **채점** — 정답 1 × 힌트 최대 100개 묶음, 기준문 `prompts/score-v1.md` | 후보 + 같은 범주 어휘·정답 + 흔한 명사 표본 50 → `cache/score.jsonl`·`data/scores.tsv.gz` | 배치 정답당 3~4건 |
 | 5 | `node 05-consistency.mjs` | 정답 5% 를 다르게 섞은 묶음으로 다시 채점해 견줌 | → `data/consistency.txt` | 배치 약 60건 |
-| 6 | `node 06-build.mjs` | 은행 기준으로 걸러 서버 자원으로 묶기 | `data/scores.tsv.gz`·`data/bank.tsv` → `server/src/main/resources/wordtemp/*`·`data/stats.txt`·`data/bank-dropped.tsv` | 없음 |
+| 5b | `node 05b-classify.mjs --pilot 3` 뒤 `node 05b-classify.mjs` | **어휘 청소** — 채점된 힌트 낱말 전부를 낱말 하나씩 갈라 고유명사·비하 표현·명사 아님을 찾는다(200개 묶음) | `data/scores.tsv.gz`·`flagged-add.txt`·`flagged-keep.txt` → `data/flagged.tsv`·`data/blocked-derogatory.txt` | 배치 58건 |
+| 6 | `node 06-build.mjs` | 은행 기준으로 걸러 서버 자원으로 묶기(5b 가 뺀 낱말·금칙어 제외) | `data/scores.tsv.gz`·`data/bank.tsv`·`data/flagged.tsv` → `server/src/main/resources/wordtemp/*`·`data/stats.txt`·`data/bank-dropped.tsv`·`data/vocab-clean.txt` | 없음 |
 | 7 | `node 07-review-sample.mjs` | 사람 검수 표본(띠별 150쌍) + 96 이상 전부 | 실린 표 → `review/*.csv` | 없음 |
 | 8 | `node validate.mjs` | **실린 파일만** 읽어 불변식 확인·통계(의존성 없음) | `server/src/main/resources/wordtemp/*` | 없음 |
 
@@ -60,13 +61,17 @@ export ANTHROPIC_API_KEY=...     # 없으면 ~/.config/mirboard/anthropic.key �
 | --- | --- |
 | `table-v1.tsv.gz` | gzip 텍스트. 첫 줄 `#wordtemp-table⇥version=v1⇥promptVersion=score-v1⇥model=…⇥created=…⇥answers=N⇥pairs=M`. 그다음 정답 한 줄씩 `정답⇥힌트:온도,힌트:온도,…` |
 | `bank.tsv` | `낱말⇥범주⇥뜻풀이⇥같은 말(쉼표)` — 표의 정답과 1:1 |
-| `blocked.txt` | 금칙어(부분 일치), 한 줄에 하나 |
+| `blocked.txt` | 금칙어(부분 일치), 한 줄에 하나 — 손으로 쓴 욕설 목록 + 5b 가 찾은 비하 표현(멀쩡한 낱말의 일부가 되는 것은 제외: 거지 ⊂ 설거지) |
 | `score-v1.md` | 채점 기준문 |
 
 - **정렬**: 정답 줄도, 줄 안의 힌트도 **UTF-16 코드 단위 오름차순**(Java `String.compareTo` 와 같은 순서), 중복 없음.
   서버는 줄을 읽으며 힌트를 정렬된 어휘 `String[]` 의 인덱스로 바꾸면 정답마다 `int[]`(이미 오름차순) + `byte[]` 가 됩니다(설계서 §5.4).
 - 온도는 정수 0~100. **표에 없는 쌍 = 모름**(낮은 점수가 아님 — 실시간 채점 또는 거절, S2).
 - 명사가 아니라고 판정된 낱말은 표에 넣지 않았습니다(실시간 채점이 다시 판정).
+- **고유명사(사람·캐릭터·상표·작품·지명)·비하 표현도 표에 없습니다**(5b 단계, `data/flagged.tsv`). 묶음 채점은 이런 낱말을 거의 걸러 내지 못해 낱말만 따로 검사했습니다.
+  잘못 걸린 낱말은 `data/flagged-keep.txt`, 놓친 낱말은 `data/flagged-add.txt` 에 적고 5b → 6 → 8 (Claude 재호출 없음).
+  `data/vocab/*.txt`·`data/candidates.tsv` 는 채점 **입력 기록**이라 그대로 두었고(고치면 4단계 캐시가 어긋남), 청소된 어휘는 `data/vocab-clean.txt` 입니다.
+- `data/consistency.txt` 는 청소 전 점수로 잰 값입니다(점수 자체는 그대로라 다시 재지 않았습니다).
 - 표의 힌트는 룰 §5.2 를 통과한 것만: 정답·같은 말과 같거나 포함하지 않고, 2자 이상이면 정답·같은 말 안에 들어 있지 않음.
 
 ## v1 결과 (2026-11-25)

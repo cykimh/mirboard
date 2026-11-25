@@ -16,11 +16,13 @@ export const CRITERIA = { max96: 5, min75: 3, min40: 40 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { readScores } = await import('./04-score.mjs');
-  const { loadBank, loadBlocked, isOffensive, isHangulWord, hintBlockedByAnswer } = await import('./lib.mjs');
+  const { loadBank, loadBlocked, loadFlagged, isOffensive, isHangulWord, hintBlockedByAnswer } = await import('./lib.mjs');
   const scores = readScores(); // 4단계가 적어 둔 정본 — 여기서는 Claude 를 부르지 않는다
   const blocked = loadBlocked();
+  const flagged = loadFlagged(); // 5b단계: 고유명사·비하 표현·명사 아님
   const rows = new Map();
   let notNoun = 0;
+  const cleaned = { proper_noun: 0, derogatory_or_slur: 0, not_a_noun: 0, blocked: 0 };
   const bank = loadBank();
   for (const a of bank) {
     const answers = [a.word, ...a.aliases];
@@ -28,7 +30,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const [hint, s] of scores.get(a.word) ?? []) {
       if (s < 0) notNoun++;
       // 은행(같은 말 목록)·금칙어를 채점 뒤에 고쳤을 수 있으니 여기서 한 번 더 거른다
-      else if (isHangulWord(hint) && !isOffensive(hint, blocked) && !hintBlockedByAnswer(hint, answers)) hints.set(hint, s);
+      else if (flagged.has(hint)) cleaned[flagged.get(hint)]++;
+      else if (isOffensive(hint, blocked)) cleaned.blocked++;
+      else if (isHangulWord(hint) && !hintBlockedByAnswer(hint, answers)) hints.set(hint, s);
     }
     rows.set(a.word, hints);
   }
@@ -58,7 +62,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const tableFile = path.join(RESOURCES, `table-${TABLE_VERSION}.tsv.gz`);
   fs.writeFileSync(tableFile, zlib.gzipSync(Buffer.from(text, 'utf8'), { level: 9 }));
   writeBank(path.join(RESOURCES, 'bank.tsv'), kept, `낱말 온도 정답 은행 — 표 ${TABLE_VERSION} 와 짝(만든 날 ${created}). scripts/wordtemp-data 가 만든다 — 손으로 고치지 말 것`);
-  fs.copyFileSync(path.join(DATA, 'blocked.txt'), path.join(RESOURCES, 'blocked.txt'));
+  const hand = fs.readFileSync(path.join(DATA, 'blocked.txt'), 'utf8').trimEnd();
+  const derogatory = blocked.filter((b) => !hand.split('\n').includes(b));
+  fs.writeFileSync(path.join(RESOURCES, 'blocked.txt'), [hand, '# ── 아래는 어휘 청소(05b-classify.mjs)가 찾은 비하·혐오 표현 ──', ...derogatory].join('\n') + '\n');
+  const vocab = [...new Set(kept.flatMap((a) => [...a.table.keys()]))].sort(byCodeUnit);
+  fs.writeFileSync(path.join(DATA, 'vocab-clean.txt'), `# 표 ${TABLE_VERSION} 에 실린 힌트 어휘(청소 뒤) — 6단계가 만든다\n${vocab.join('\n')}\n`);
   fs.copyFileSync(path.join(ROOT, 'prompts', `${PROMPT_VERSION}.md`), path.join(RESOURCES, `${PROMPT_VERSION}.md`));
   fs.writeFileSync(path.join(DATA, 'bank-dropped.tsv'), dropped.join('\n') + '\n');
 
@@ -66,6 +74,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const stats = [
     `낱말 온도 표 ${TABLE_VERSION} — ${created} · ${MODEL} · ${PROMPT_VERSION}`,
     `정답 ${kept.length}개(후보 ${kept.length + dropped.length - 1}개 가운데 ${dropped.length - 1}개 뺌) · 쌍 ${pairs}개 · 명사 아님으로 버린 쌍 ${notNoun}개`,
+    `어휘 청소로 뺀 쌍: 고유명사 ${cleaned.proper_noun} · 비하 표현 ${cleaned.derogatory_or_slur} · 명사 아님 ${cleaned.not_a_noun} · 금칙어 부분 일치 ${cleaned.blocked} (낱말 수는 data/flagged.tsv)`,
     `띠: ${BANDS.map((b) => `${b} ${total[b]}(${((100 * total[b]) / pairs).toFixed(1)}%)`).join(' · ')}`,
     `파일: ${fs.statSync(tableFile).size} 바이트(gzip) · 풀면 ${Buffer.byteLength(text)} 바이트`,
   ];
