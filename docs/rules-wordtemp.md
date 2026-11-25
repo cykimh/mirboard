@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/wordtemp/` 기준(예정).
 
-> **상태:** **S0 — 룰 v1(코드 없음)** · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
+> **상태:** **S1b — 순수 엔진·봇 정책·시뮬레이션(D-315, 어댑터·기록·채점기는 S2)** · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
 > 설계(포트 대응·비동기 채점 경로·데이터 만들기·단계)는 `docs/plans/wordtemp.md`, 검토 기록은 `docs/plans/word-temperature-review.md`.
 >
 > **독창 게임.** "낱말을 내면 정답과 얼마나 가까운지 숫자로 알려 주고, 그 숫자를 보고 정답을 맞힌다"는 **일반 메커니즘**만 가져왔다.
@@ -386,3 +386,25 @@
 - 시뮬레이션: 3~6인 × 판 길이 3종 각 2,000판 완주(무한 루프·예외 0), 판 길이·점수 분포 통계 파일.
 - 경계 사례: §5·§7 의 표 전부가 테스트.
 - 타이머: 같은 상태에서 `TICK` 과 `onTimer` 가 같은 결과, 낡은 `TICK` 은 무변경.
+
+## 18. 구현 위치 (S1b, D-315)
+
+경로는 `server/src/{main,test}/java/com/mirboard/domain/game/wordtemp/` 기준. 순수 계층뿐이다 — 포트 어댑터·기록기·정의·실시간 채점기는 S2.
+
+| 절 | 코드 | 테스트 |
+| --- | --- | --- |
+| §3 흐름·§3.4·§4 점수·§8 끝 | `WordTempEngine`(`start`·`apply`·`onTimer`), `rules/MatchRanking` | `WordTempEngineFlowTest`, `rules/WordTempRulesTest` |
+| §3.1 후보 | `rules/CandidateDealer` | `rules/WordTempRulesTest` |
+| §5.1 정규화·§5.2 포함 규칙 | `rules/WordNormalizer`·`rules/HintRules`·`rules/AnswerForms` | `rules/WordTempRulesTest`, `WordTempEngineFlowTest` |
+| §5.2·§5.3 거절 코드 | `action/RejectionReason`(판정 순서는 D-315 ①) | `WordTempEngineFlowTest` |
+| §6 채점(표·채점 중 → 반영·무효) | `words/SimilarityTable`(주입), `WordTempEngine.applyScore`·`LiveScore` | `WordTempEngineLiveScoreTest` |
+| §7 정답 판정 | `rules/AnswerJudge` | `rules/WordTempRulesTest`(§7 표 전부) |
+| §9 시간·`TICK` | `WordTempEngine.timer`·`onTimer`·`deadline`, 수치 `WordTempTuning` | `WordTempEngineTimerAndDesertionTest` |
+| §10 탈주·강퇴 | `WordTempEngine.desert` | `WordTempEngineTimerAndDesertionTest` |
+| §11 봇 | `bot/WordTempBotPolicy`·`bot/WordTempBotLevel`, 엔진의 `botPlan` | `bot/WordTempBotPolicyTest`, `WordTempEngineBotTest` |
+| §12 공개·비공개 | `state/WordTempVisibility`(판정 한 곳)·`state/WordTempViews`, `event/WordTempEvent` | `WordTempSecrecyTest` |
+| §17 불변식·시뮬레이션 | `invariant/WordTempInvariantChecker` | `invariant/WordTempInvariantCheckerTest`, `WordTempMatchSimulationTest` → `server/build/wordtemp-sim-stats.txt` |
+
+- 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(Docker 불필요, 약 1분).
+- 테스트의 표는 메모리 구현(`InMemorySimilarityTable`)이고 시뮬레이션의 은행·표는 합성(`SyntheticWords`)이다 — 진짜 은행·표는 S1 데이터 작업.
+- S1b 에서 룰의 빈칸을 닫은 것은 D-315 ①~⑩. **[수치]** 는 바꾸지 않았다(최저 온도 50·60·70, 시간 20·30·5·6초 — 근거는 통계 파일의 [2]).
