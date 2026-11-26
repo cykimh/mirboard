@@ -13,7 +13,7 @@ package com.mirboard.domain.game.wordtemp.bot;
  * @param hitCapPct   추리 — 차수마다 "가장 그럴듯한 답"을 그대로 내는 확률(%) = 맞힐 확률의 상한. 걸리면 두 번째 후보나 패스
  */
 public enum WordTempBotLevel {
-    EASY(80, 92, false, 1, 2, 30, 15, 10),
+    EASY(72, 92, false, 1, 2, 30, 15, 10),
     NORMAL(65, 85, false, 2, 3, 60, 8, 30),
     HARD(0, 12, true, 2, 4, 100, 3, 50);
 

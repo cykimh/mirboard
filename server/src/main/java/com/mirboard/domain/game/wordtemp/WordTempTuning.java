@@ -56,4 +56,22 @@ public record WordTempTuning(List<Integer> floors,
         return new WordTempTuning(List.of(first, second, third), closeTemp, maxHints, maxAttempts, selectMs, guessMs,
                 resultMs, turnEndMs, liveWaitMs, botHintMinMs, botHintMaxMs, botGuessMinMs, botGuessMaxMs, botQuickMs);
     }
+
+    /**
+     * 시간만 배율로 줄인 수치(S2) — 낱말 고르기·추리·결과·차례 끝·봇 간격. 운영은 1.0 이고 봇끼리 도는 통합 테스트만 줄인다
+     * ({@code mirboard.wordtemp.time-scale}). 힌트 제한(방 설정)과 채점 기다림 상한은 줄이지 않는다.
+     */
+    public WordTempTuning scaled(double scale) {
+        if (scale == 1.0) {
+            return this;
+        }
+        return new WordTempTuning(floors, closeTemp, maxHints, maxAttempts, scale(selectMs, scale), scale(guessMs, scale),
+                scale(resultMs, scale), scale(turnEndMs, scale), liveWaitMs, scale(botHintMinMs, scale),
+                scale(botHintMaxMs, scale), scale(botGuessMinMs, scale), scale(botGuessMaxMs, scale),
+                scale(botQuickMs, scale));
+    }
+
+    private static long scale(long ms, double scale) {
+        return Math.max(1L, Math.round(ms * scale));
+    }
 }

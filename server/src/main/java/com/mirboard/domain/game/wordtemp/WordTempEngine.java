@@ -41,6 +41,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.SplittableRandom;
+import java.util.function.BiConsumer;
 
 /**
  * 낱말 온도 순수 룰 엔진(`docs/rules-wordtemp.md`). 저장소·시계·네트워크가 없다 — 시각은 인자로, 유사도 표는 {@link SimilarityTable} 로
@@ -65,12 +66,23 @@ public final class WordTempEngine {
     private final WordTempTuning tuning;
     private final SimilarityTable table;
     private final WordTempBotPolicy botPolicy;
+    private final BiConsumer<String, RuntimeException> botFault;
 
     public WordTempEngine(WordTempConfig config, SimilarityTable table) {
+        this(config, table, (what, fault) -> {
+        });
+    }
+
+    /**
+     * @param botFault 봇 정책이 예외를 냈을 때 불린다(무엇을 하다가, 예외) — 엔진은 그 좌석을 [힌트 끝]·패스로 넘기고 계속한다. 순수 엔진은
+     *                 로그를 모르므로 포트 어댑터가 여기에 ERROR 로그를 꽂는다(D-118·D-119).
+     */
+    public WordTempEngine(WordTempConfig config, SimilarityTable table, BiConsumer<String, RuntimeException> botFault) {
         this.config = config;
         this.tuning = config.tuning();
         this.table = table;
         this.botPolicy = new WordTempBotPolicy(table);
+        this.botFault = botFault;
     }
 
     public WordTempConfig config() {
@@ -540,6 +552,7 @@ public final class WordTempEngine {
                     tuning.closeTemp(), tuning.maxHints(), usedEarlier, s.hintCount(), config.botLevel(),
                     seedOf(d, d.setterSeat, 0x200)));
         } catch (RuntimeException policyFault) {
+            botFault.accept("hint seat=" + d.setterSeat + " turnNo=" + d.turnNo + " attempt=" + d.attempt, policyFault);
             next = Optional.empty();
         }
         OptionalInt temp = next.isPresent() && legalBotHint(d, next.get())
@@ -605,6 +618,7 @@ public final class WordTempEngine {
             text = botPolicy.guess(new WordTempBotPolicy.GuesserView(clues, ruledOut, config.botLevel(),
                     WordTempBotPolicy.mix(d.seed, 0x400 + seat), seedOf(d, seat, 0x500)));
         } catch (RuntimeException policyFault) {
+            botFault.accept("guess seat=" + seat + " turnNo=" + d.turnNo + " attempt=" + d.attempt, policyFault);
             text = "";
         }
         if (text == null || (!text.isEmpty() && WordNormalizer.normalize(text).filter(text::equals).isEmpty())) {

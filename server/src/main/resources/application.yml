@@ -221,6 +221,30 @@ mirboard:
     status: ${MIRBOARD_STAR_SQUARE_STATUS:AVAILABLE}
     # 준비·첫 완성 뒤 마감·결과 보기·봇 페이스 배율(D-285). 운영은 1.0 — 봇끼리 도는 통합 테스트만 줄인다.
     time-scale: 1.0
+  wordtemp:
+    # 낱말 온도(D-310) 공개 상태. S4 공개 전까지 기본 DISABLED(카탈로그에도 없음, 새 방 거절). 공개는 이 기본값과
+    # WordTempGameDefinition 의 @Value 기본값을 같이 AVAILABLE 로 바꾼다(WordTempGameDefinitionTest). 런북은 docs/deploy.md.
+    status: ${MIRBOARD_WORD_TEMP_STATUS:DISABLED}
+    # 낱말 고르기·추리·결과·차례 끝·봇 간격 배율(D-316). 운영은 1.0 — 봇끼리 도는 통합 테스트만 줄인다.
+    time-scale: 1.0
+    # 실시간 채점·(나중에) 표 만들기에 쓰는 모델(D-312). 바꾸면 실시간 캐시 키가 갈려 새로 매긴다.
+    model: ${MIRBOARD_WORD_TEMP_MODEL:claude-sonnet-5-5}
+    live-scoring:
+      # 표 밖 힌트의 Claude 실시간 채점(D-312·D-317) — 끄기 스위치. 기본 꺼짐(로컬·테스트는 네트워크 호출 0), 운영은 fly.toml [env] 에서 켠다.
+      # 켜져 있어도 ANTHROPIC_API_KEY 가 없으면 꺼진 것과 같다 — 표 밖 힌트는 UNKNOWN_WORD 로 거절되고 게임은 표만으로 진행한다.
+      enabled: ${MIRBOARD_WORD_TEMP_LIVE_SCORING:false}
+      # Fly secrets 로만 넣는다(저장소·로그에 남기지 않는다). docs/deploy.md "낱말 온도 실시간 채점".
+      api-key: ${ANTHROPIC_API_KEY:}
+      # 채점 기준문(resources/wordtemp/<버전>.md) — 캐시 키의 일부. 표 v1 은 score-v1 로 만들었고 실시간은 청소한 표에 맞춘 score-v2.
+      prompt-version: score-v2
+      # 하루(Asia/Seoul) 호출 상한 — 닿으면 그날은 표만으로 진행한다. 500회 ≈ 최악 하루 약 $1.1(Sonnet 5.5).
+      daily-cap: ${MIRBOARD_WORD_TEMP_DAILY_CAP:500}
+      # 한 판의 실시간 채점 상한(매치 상태로 센다).
+      per-match-cap: 60
+      # 동시에 나가는 호출 수(전 서버).
+      max-concurrent: 2
+      # SDK 시간 제한(ms), 재시도 0. 엔진 쪽 기다림 상한은 8초(룰 §6.2).
+      timeout-ms: 5000
   moderation:
     # D-86 — 채팅 금칙어(같은 길이 '*' 마스킹, 대소문자 무시). 운영자가 콤마로 커스터마이즈.
     # 자모 분리 우회 등 고급 회피 대응은 범위 밖. 비우면 마스킹 없음. (예시: 비속어)
