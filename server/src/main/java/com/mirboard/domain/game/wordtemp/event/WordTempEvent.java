@@ -131,7 +131,7 @@ public sealed interface WordTempEvent extends GameEvent
      * @param scores     좌석별 점수 증감·총점(모든 좌석)
      */
     record GuessesRevealed(int attempt, List<RevealedGuess> guesses, int setterSeat, int setterGain,
-                           List<ScoreChange> scores) implements WordTempEvent {
+                           List<ScoreChange> scores, long remainingMs) implements WordTempEvent {
 
         public GuessesRevealed {
             guesses = List.copyOf(guesses);
@@ -154,8 +154,8 @@ public sealed interface WordTempEvent extends GameEvent
      * @param hints  그 차례의 확정 힌트 전체와 온도({@code revealed} = 차수의 공개 힌트였는가). 무효·채점 중이던 것은 없다
      * @param totals 좌석별 총점
      */
-    record TurnEnded(int turnNo, String answer, List<HintInfo> hints, TurnEndReason reason, List<Integer> totals)
-            implements WordTempEvent {
+    record TurnEnded(int turnNo, String answer, List<HintInfo> hints, TurnEndReason reason, List<Integer> totals,
+                     long remainingMs) implements WordTempEvent {
 
         public TurnEnded {
             hints = List.copyOf(hints);
@@ -201,7 +201,8 @@ public sealed interface WordTempEvent extends GameEvent
         }
     }
 
-    record CandidateInfo(int index, String word, String category, boolean available) {
+    /** {@code category} 는 화면에 그대로 쓰는 범주 이름(한글), {@code gloss} 는 뜻풀이 한 줄(없으면 빈 문자열). */
+    record CandidateInfo(int index, String word, String category, String gloss, boolean available) {
     }
 
     /** 힌트의 온도가 확정됐다(표는 바로, 실시간은 반영될 때). {@code count} = 지금 개수. */

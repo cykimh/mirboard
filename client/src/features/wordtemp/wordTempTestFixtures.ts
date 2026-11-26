@@ -18,6 +18,7 @@ export function view(over: Partial<WordTempTableView> = {}): WordTempTableView {
     phaseRemainingMs: 90_000,
     hintCount: 0,
     maxHints: 5,
+    floors: [50, 60, 70],
     revealed: [],
     guessedSeats: [],
     attempts: [],
@@ -35,9 +36,9 @@ export function mine(over: Partial<WordTempPrivateView> = {}): WordTempPrivateVi
   return {
     seat: 0,
     candidates: [
-      { index: 0, word: '바다', category: 'nature', available: true },
-      { index: 1, word: '자전거', category: 'vehicle', available: true },
-      { index: 2, word: '김밥', category: 'food', available: true },
+      { index: 0, word: '바다', category: '자연', gloss: '소금물이 넓게 고여 있는 곳', available: true },
+      { index: 1, word: '자전거', category: '탈것', gloss: '페달을 밟아 두 바퀴로 가는 탈것', available: true },
+      { index: 2, word: '김밥', category: '음식', gloss: '', available: true },
     ],
     chosen: 0,
     answer: null,

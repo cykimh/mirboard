@@ -340,7 +340,7 @@ WordTempState
 - 입력란은 공개 힌트 판 바로 아래, 머리 줄(시계)은 붙박이 — 자판이 올라온 높이(375×480)에서도 공개 힌트·시계·입력란이 같이 보인다(스크린샷 `05b`·`07b`).
 - 넓은 화면(900px~)은 왼쪽 온도계 판·오른쪽 내 칸 두 단.
 - 소리는 `temp.send`·`temp.scored`·`temp.reveal`·`temp.boil`·`temp.correct`·`temp.wrong`·`temp.answer`(차례 끝의 정답 공개).
-- 클라가 든 표시용 값(서버가 주지 않는다): 차수별 최저 온도 50·60·70, 범주 코드의 한글 이름. 후보의 뜻풀이는 비공개 뷰에 없어 범주만 보인다 — S4 전 후속 후보.
+- 화면이 쓰는 값은 서버가 싣는다(D-319 덧붙임): 공개 뷰 `floors`(차수별 최저 온도), 후보의 범주 이름·뜻풀이, 결과 보기·차례 끝의 남은 시간, 판 시작 때 저장 뒤 `WORD_SELECT_STARTED`. 클라의 표시용 상수·범주 표는 걷었다.
 - e2e: `client/e2e/wordtemp.e2e.ts`(봇 둘과 짧은 판 끝까지, `E2E_WORD_TEMP=1`), 스크린샷 도구 `client/e2e/wordtempShots.mjs` → `client/e2e/wordtemp-shots/`.
 
 ## 8. 단계 (Phase Gate — 단계마다 사용자 검토 뒤 다음)

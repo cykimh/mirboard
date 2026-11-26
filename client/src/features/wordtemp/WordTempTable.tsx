@@ -18,20 +18,29 @@ import { HintBoard } from './HintBoard';
 import { SeatStrip } from './SeatStrip';
 import { WordTempMatchEnd } from './WordTempMatchEnd';
 import { AttemptResultPanel, GuessPanel, SetterPanel, TurnEndPanel, WordPicker } from './WordTempPanels';
-import { ATTEMPT_FLOORS, clockText } from './wordTempMath';
+import { clockText } from './wordTempMath';
 import { wordTempRoomSink } from './wordTempRoomSink';
-import { SEND_GUARD_MS, iAmPlaying, iAmSetter, scoringInProgress, useWordTempStore, type PhaseClock } from './wordTempStore';
+import {
+  SEND_GUARD_MS,
+  floorOf,
+  iAmPlaying,
+  iAmSetter,
+  scoringInProgress,
+  useWordTempStore,
+  type PhaseClock,
+} from './wordTempStore';
 import { WORD_TEMP_TOKENS_CLASS } from './wordTempTheme';
 import { WORD_TEMP_TUTORIAL } from './tutorial/wordTempTutorial';
 
 /** `BUSY` 뒤 다시 보내기까지(ms) — 방 락이 풀릴 틈. */
 export const BUSY_RETRY_DELAY_MS = 150;
 /**
- * 첫 판을 아직 못 받았을 때 다시 청하는 간격(ms)과 횟수. 이 게임은 판 시작 때 이벤트를 보내지 않는다(첫 낱말 고르기는 resync 로 받는다 —
- * 룰 §12.3) — 방이 막 시작돼 서버가 상태를 쓰기 전에 첫 resync 가 닿으면 다음 공개 이벤트(20초 뒤)까지 판이 비어 낱말을 고를 수 없다.
+ * 첫 판을 아직 못 받았을 때 다시 청하는 간격(ms)과 횟수 — <b>안전망</b>이다. 방이 막 시작돼 서버가 상태를 쓰기 전에 첫 resync 가 닿으면 판이
+ * 비는데, 서버가 상태를 저장한 뒤 `WORD_SELECT_STARTED` 를 방송해(D-319) 그 프레임이 다시 받게 한다. 그 프레임을 놓쳤을 때(구독 전에
+ * 지나갔고 resync 는 실패)만 여기가 돈다 — 몇 번만 하고 그친다.
  */
-export const LOAD_RETRY_MS = 700;
-export const LOAD_RETRY_MAX = 20;
+export const LOAD_RETRY_MS = 1500;
+export const LOAD_RETRY_MAX = 4;
 /** 남은 시간이 이 아래면 시계가 재촉한다(초). */
 const CLOCK_WARN_SEC = 10;
 
@@ -327,8 +336,8 @@ export function WordTempTable({
             <h2 className="wt-phase-title">{title}</h2>
             {inTurn && (
               <ol className="wt-attempts" aria-label="차수">
-                {ATTEMPT_FLOORS.map((floor, i) => {
-                  const a = i + 1;
+                {Array.from({ length: s.floors.length || 3 }, (_, i) => i + 1).map((a) => {
+                  const floor = floorOf(s, a);
                   const state = a < s.attempt ? 'done' : a === s.attempt ? 'now' : 'todo';
                   return (
                     <li
@@ -337,7 +346,7 @@ export function WordTempTable({
                       aria-current={state === 'now' ? 'step' : undefined}
                     >
                       <span className="wt-attempt-no">{a}차</span>
-                      <span className="wt-attempt-floor">최저 {floor}°</span>
+                      {floor !== null && <span className="wt-attempt-floor">최저 {floor}°</span>}
                     </li>
                   );
                 })}
@@ -391,6 +400,7 @@ export function WordTempTable({
           <SetterPanel
             answer={s.answer}
             attempt={s.attempt}
+            floor={floorOf(s, s.attempt)}
             hints={s.hints}
             hintCount={s.hintCount}
             maxHints={s.maxHints}

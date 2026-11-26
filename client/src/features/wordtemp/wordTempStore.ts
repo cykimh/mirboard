@@ -64,6 +64,8 @@ export interface WordTempRoomState {
   clock: PhaseClock | null;
   hintCount: number;
   maxHints: number;
+  /** 차수별 최저 온도(서버가 준다 — 판정도 서버). */
+  floors: number[];
   revealed: Revealed[];
   /** 이번 차수에 추리할 좌석들. */
   guessSeats: number[];
@@ -151,6 +153,7 @@ const INITIAL: Omit<WordTempRoomState, 'disconnectedSeats' | 'mySeat'> = {
   clock: null,
   hintCount: 0,
   maxHints: 5,
+  floors: [],
   revealed: [],
   guessSeats: [],
   guessedSeats: [],
@@ -174,6 +177,10 @@ const INITIAL: Omit<WordTempRoomState, 'disconnectedSeats' | 'mySeat'> = {
 };
 
 let sendSeq = 0;
+
+/** 단계 시작 이벤트가 실어 온 남은 시간 → 시계. */
+const clockOf = (remainingMs: number | undefined): PhaseClock | null =>
+  typeof remainingMs === 'number' ? { since: Date.now(), remainingMs } : null;
 
 const guessersOf = (seats: SeatView[], setterSeat: number) =>
   seats.filter((s) => s.alive && s.seat !== setterSeat).map((s) => s.seat);
@@ -214,6 +221,7 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
       clock: over ? null : { since: Date.now(), remainingMs: t.phaseRemainingMs },
       hintCount: t.hintCount,
       maxHints: t.maxHints,
+      floors: t.floors ?? [],
       revealed: t.revealed ?? [],
       guessSeats: guessersOf(t.seats, t.setterSeat),
       guessedSeats: t.guessedSeats ?? [],
@@ -420,7 +428,7 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
           freshResult: p.attempt,
           freshReveal: null,
           fxSeq: state.fxSeq + 1,
-          clock: null,
+          clock: clockOf(p.remainingMs),
           sending: null,
         });
         return 'applied';
@@ -449,7 +457,7 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
           history: [...state.history, summary],
           seats: state.seats.map((s) => (p.totals[s.seat] === undefined ? s : { ...s, total: p.totals[s.seat] })),
           deltas: {},
-          clock: null,
+          clock: clockOf(p.remainingMs),
           freshReveal: null,
           freshResult: null,
           fxSeq: state.fxSeq + 1,
@@ -569,6 +577,11 @@ export function iAmSetter(s: Pick<WordTempRoomState, 'mySeat' | 'setterSeat'>): 
 }
 
 /** 채점 중인 내 힌트가 있는가 — 풀릴 때까지 새 힌트·[힌트 끝]을 받지 않는다(§6.2). */
+/** 그 차수의 최저 온도 — 서버가 주지 않았으면 null(눈금을 그리지 않는다). */
+export function floorOf(s: Pick<WordTempRoomState, 'floors'>, attempt: number): number | null {
+  return s.floors[attempt - 1] ?? null;
+}
+
 export function scoringInProgress(s: Pick<WordTempRoomState, 'hints'>): boolean {
   return s.hints.some((h) => h.status === 'PENDING');
 }

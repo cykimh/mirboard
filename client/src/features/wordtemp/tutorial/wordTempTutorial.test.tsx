@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GAME_TUTORIALS, tutorialFor } from '@/features/tutorial/gameTutorials';
-import { ATTEMPT_FLOORS, BOIL_FROM, HOT_FROM, WARM_FROM } from '../wordTempMath';
+import { BOIL_FROM, HOT_FROM, WARM_FROM } from '../wordTempMath';
 import { WORD_TEMP_TUTORIAL } from './wordTempTutorial';
 import { WORD_TEMP_TUTORIAL_STEPS } from './wordTempTutorialSteps';
 
@@ -40,9 +40,8 @@ describe('낱말 온도 튜토리얼', () => {
     expect(text(5)).toContain('채팅으로 정답을 알려 주지 않기');
   });
 
-  it('튜토리얼의 수치가 화면이 쓰는 값과 같다(띠 경계·최저 온도)', () => {
+  it('튜토리얼의 띠 경계가 화면이 쓰는 값과 같다(최저 온도는 서버가 준다 — 문구는 룰 §3.4)', () => {
     expect([WARM_FROM, HOT_FROM, BOIL_FROM]).toEqual([40, 75, 96]);
-    expect(ATTEMPT_FLOORS).toEqual([50, 60, 70]);
   });
 
   it('단계마다 룰 문서 근거(§)가 있다', () => {

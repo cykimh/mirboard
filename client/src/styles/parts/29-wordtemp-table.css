@@ -977,6 +977,12 @@ button.wt-badge {
   overflow-wrap: anywhere;
 }
 
+.wt-cand-gloss {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+
 .wt-cand-tag {
   position: absolute;
   top: 6px;

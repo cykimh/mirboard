@@ -74,8 +74,25 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
   });
   expect(put.ok(), await put.text()).toBeTruthy();
 
+  // 게임판이 뜬 때와 첫 낱말 고르기가 보인 때를 잰다 — 서버가 상태를 저장한 뒤 WORD_SELECT_STARTED 를 방송하므로(D-319) 첫 resync 가
+  // 빈손이어도 곧 판을 받는다. 클라의 안전망(1.5초 뒤 다시 청하기)이 돌기 전이어야 한다.
+  await page.evaluate(() => {
+    const w = window as unknown as { __wt: { mounted: number; select: number } };
+    w.__wt = { mounted: 0, select: 0 };
+    new MutationObserver(() => {
+      const t = document.querySelector('.wt-table');
+      if (t && !w.__wt.mounted) w.__wt.mounted = performance.now();
+      if (t?.getAttribute('data-phase') === 'WORD_SELECT' && !w.__wt.select) w.__wt.select = performance.now();
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
+  });
   await page.getByRole('button', { name: '3명으로 시작' }).click();
   await expect(page.locator('.wt-table')).toBeVisible();
+  await expect(page.locator('.wt-table[data-phase="WORD_SELECT"]')).toBeVisible();
+  const timing = await page.evaluate(() => (window as unknown as { __wt: { mounted: number; select: number } }).__wt);
+  expect(timing.select - timing.mounted, '첫 낱말 고르기까지(ms)').toBeLessThan(1200);
+  // 후보 카드에 서버가 준 범주 이름(한글)과 뜻풀이가 보인다
+  await expect(page.locator('.wt-cand-category').first()).toHaveText(/[가-힣]/);
+  await expect(page.locator('.wt-cand-gloss').first()).toBeVisible();
 
   const result = page.getByRole('status', { name: '판 결과' });
   const seen = new Set<string>();

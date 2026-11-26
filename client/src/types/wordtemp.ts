@@ -90,6 +90,8 @@ export interface WordTempTableView {
   phaseRemainingMs: number;
   hintCount: number;
   maxHints: number;
+  /** 차수별 최저 온도(1·2·3차) — 공개 전에도 눈금을 그린다(D-319). */
+  floors: number[];
   revealed: Revealed[];
   guessedSeats: number[];
   attempts: PublicAttempt[];
@@ -103,7 +105,10 @@ export interface WordTempTableView {
 export interface CandidateInfo {
   index: number;
   word: string;
+  /** 범주의 화면 이름(한글 — 서버가 붙인다). */
   category: string;
+  /** 뜻풀이 한 줄(없으면 빈 문자열). */
+  gloss: string;
   available: boolean;
 }
 
@@ -167,6 +172,8 @@ export interface GuessesRevealedPayload {
   setterSeat: number;
   setterGain: number;
   scores: ScoreChange[];
+  /** 결과 보기 단계의 남은 시간. */
+  remainingMs: number;
 }
 export interface TurnEndedPayload {
   turnNo: number;
@@ -174,6 +181,8 @@ export interface TurnEndedPayload {
   hints: HintInfo[];
   reason: TurnEndReason;
   totals: number[];
+  /** 차례 끝 단계의 남은 시간. */
+  remainingMs: number;
 }
 export interface MatchEndedPayload {
   result: MatchResult;

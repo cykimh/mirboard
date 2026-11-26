@@ -1415,6 +1415,15 @@
   .wt-input {
     flex-basis: 110px;
   }
+  /* 후보는 한 줄에 하나 — 뜻풀이가 좁은 칸에서 여러 줄로 꺾이지 않게 */
+  .wt-cands {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .wt-cand {
+    min-height: 56px;
+    padding: 8px 12px;
+  }
 }
 
 @media (max-width: 359px) {

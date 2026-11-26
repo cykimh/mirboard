@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, audioLog } from '@/features/sound/testAudio';
 import type { TableCue } from '@/features/sound/tableSfx';
 import type { MatchResult } from '@/types/wordtemp';
-import { attemptDeltas, categoryLabel, clockText, floorOf, normalizeWord, tempBand } from './wordTempMath';
+import { attemptDeltas, clockText, normalizeWord, tempBand } from './wordTempMath';
 import { BOIL_AFTER_REVEAL_SEC, OTHERS_CORRECT_GAIN, wordTempCues, wordTempPrivateCues } from './wordTempSfx';
 import { useWordTempStore, type WordTempRoomState } from './wordTempStore';
 import { seedStore } from './wordTempTestFixtures';
@@ -21,22 +21,11 @@ describe('wordTempMath', () => {
     expect([0, 39, 40, 74, 75, 95, 96, 100].map(tempBand)).toEqual(['cold', 'cold', 'warm', 'warm', 'hot', 'hot', 'boil', 'boil']);
   });
 
-  it('차수별 최저 온도 눈금 — 50 · 60 · 70', () => {
-    expect([1, 2, 3].map(floorOf)).toEqual([50, 60, 70]);
-  });
-
   it('보내기 전 다듬기 — NFC 로 합치고 공백을 뺀다', () => {
     const decomposed = '사과'; // "사과"를 풀어 쓴 자모(NFD)
     expect(normalizeWord(decomposed)).toBe('사과');
     expect(normalizeWord(' 사 과　')).toBe('사과');
     expect(normalizeWord('   ')).toBe('');
-  });
-
-  it('범주 코드 → 화면 이름. 모르는 코드는 그대로', () => {
-    expect(categoryLabel('fruitveg')).toBe('과일·채소');
-    expect(categoryLabel('animal')).toBe('동물');
-    expect(categoryLabel('newcode')).toBe('newcode');
-    expect(categoryLabel('toString')).toBe('toString');
   });
 
   it('남은 시간 글자', () => {

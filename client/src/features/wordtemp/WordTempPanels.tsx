@@ -7,7 +7,7 @@ import type {
   TurnReveal,
 } from '@/types/wordtemp';
 import { TempGauge, ThermometerArt } from './wordTempArt';
-import { BOIL_FROM, categoryLabel, floorOf } from './wordTempMath';
+import { BOIL_FROM } from './wordTempMath';
 import { WordInput } from './WordInput';
 
 // ───────────────────────── 낱말 고르기 ─────────────────────────
@@ -45,8 +45,9 @@ export function WordPicker({ round, candidates, chosen, busy, onPick }: PickerPr
                   if (!picked && !busy) onPick(c.index);
                 }}
               >
-                <span className="wt-cand-category">{categoryLabel(c.category)}</span>
+                <span className="wt-cand-category">{c.category}</span>
                 <span className="wt-cand-word">{c.word}</span>
+                {c.gloss && <span className="wt-cand-gloss">{c.gloss}</span>}
                 {mine && <span className="wt-cand-tag">고름</span>}
                 {off && <span className="wt-cand-tag">이미 냄</span>}
               </button>
@@ -63,6 +64,8 @@ export function WordPicker({ round, candidates, chosen, busy, onPick }: PickerPr
 interface SetterProps {
   answer: string | null;
   attempt: number;
+  /** 이번 차수의 최저 온도(서버가 준 값) — 없으면 눈금·안내를 그리지 않는다. */
+  floor: number | null;
   hints: OwnHint[];
   hintCount: number;
   maxHints: number;
@@ -79,11 +82,12 @@ interface SetterProps {
 
 /**
  * 출제자 칸(§3.2) — <b>출제자 본인에게만 그린다.</b> 정답, 이번 출제 차례에 낸 힌트와 온도(채점 중이면 "채점 중…"), 힌트 입력, [힌트 끝].
- * 채점 중에는 입력을 잠근다(한 번에 하나 — §6.2). 관 위의 선은 이번 차수의 최저 온도다.
+ * 채점 중에는 입력을 잠근다(한 번에 하나 — §6.2). 관 위의 선은 이번 차수의 최저 온도다(서버가 공개 뷰에 실어 준다).
  */
 export function SetterPanel({
   answer,
   attempt,
+  floor,
   hints,
   hintCount,
   maxHints,
@@ -95,7 +99,6 @@ export function SetterPanel({
   onHint,
   onEnd,
 }: SetterProps) {
-  const floor = floorOf(attempt);
   const current = hints.filter((h) => h.attempt === attempt);
   const earlier = hints.filter((h) => h.attempt < attempt);
   const scoring = current.some((h) => h.status === 'PENDING');
@@ -122,7 +125,13 @@ export function SetterPanel({
       </div>
       {hinting && (
         <p className="wt-panel-help">
-          가장 높은 힌트 하나만 모두에게 공개돼요. <strong>최저 {floor}°</strong>는 넘기되 정답이 떠오르지 않게!
+          가장 높은 힌트 하나만 모두에게 공개돼요.{' '}
+          {floor !== null && (
+            <>
+              <strong>최저 {floor}°</strong>는 넘기되{' '}
+            </>
+          )}
+          정답이 떠오르지 않게!
         </p>
       )}
       {(current.length > 0 || earlier.length > 0) && (
@@ -149,7 +158,7 @@ export function SetterPanel({
                     채점 중…
                   </span>
                 ) : (
-                  <TempGauge temp={h.temp} floor={floor} small fresh={fresh} />
+                  <TempGauge temp={h.temp} floor={floor ?? undefined} small fresh={fresh} />
                 )}
                 {h.status === 'SCORED' && h.temp === best && <span className="wt-own-tag">{hinting ? '공개될 힌트' : '공개'}</span>}
               </li>
@@ -180,7 +189,7 @@ export function SetterPanel({
           </button>
         </WordInput>
       )}
-      {hinting && best >= 0 && best < floor && (
+      {hinting && floor !== null && best >= 0 && best < floor && (
         <p className="wt-floor-warn" role="note">
           지금 가장 높은 힌트가 최저 {floor}° 에 못 미쳐요 — 이대로면 이번 차수 점수가 없어요.
         </p>

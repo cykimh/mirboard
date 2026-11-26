@@ -63,6 +63,8 @@ describe('WordTempTable (S3)', () => {
     renderTable();
     const picker = screen.getByRole('region', { name: '낱말 고르기' });
     expect(within(picker).getByRole('button', { name: /자연\s*바다/ })).toBeInTheDocument();
+    // 범주 이름·뜻풀이는 서버가 준 그대로(D-319)
+    expect(within(picker).getByText('소금물이 넓게 고여 있는 곳')).toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveTextContent('20');
     // 남의 상태 — 내용 없이 "고르는 중 / 골랐어요", 봇은 "생각 중…"
     const seats = screen.getByRole('list', { name: '좌석' });
@@ -337,6 +339,27 @@ describe('WordTempTable (S3)', () => {
     expect(within(board).getByRole('img', { name: '온도 97도, 거의 정답' })).toBeInTheDocument();
     expect(board.querySelector('.wt-fx-boil')).not.toBeNull();
     expect(board.querySelector('.wt-fx-boil')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('결과 보기·차례 끝에도 시계가 돈다 — 이벤트가 남은 시간을 싣는다(D-319)', () => {
+    seedStore({ phase: 'GUESS', revealed: [{ attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true }] });
+    renderTable();
+    pub('GUESSES_REVEALED', { attempt: 1, setterSeat: 1, setterGain: 1, guesses: [], scores: [], remainingMs: 5_000 });
+    expect(screen.getByRole('timer', { name: '결과 남은 시간' })).toHaveTextContent('5');
+    pub('TURN_ENDED', { turnNo: 1, answer: '바다', reason: 'THREE_ATTEMPTS', totals: [0, 1, 0, 0], hints: [], remainingMs: 6_000 });
+    expect(screen.getByRole('timer', { name: '다음 남은 시간' })).toHaveTextContent('6');
+  });
+
+  it('최저 온도는 서버가 준 값으로 그린다 — 값이 다르면 그대로, 없으면 눈금·안내 없이', () => {
+    seedStore({ setterSeat: 0, floors: [45, 55, 65], hintCount: 1 }, mine({ answer: '바다', hints: [{ text: '여행', attempt: 1, status: 'SCORED', temp: 44 }] }));
+    const { unmount } = renderTable();
+    expect(screen.getByRole('list', { name: '차수' })).toHaveTextContent('1차최저 45°');
+    expect(screen.getByRole('note')).toHaveTextContent('최저 45° 에 못 미쳐요');
+    unmount();
+    seedStore({ setterSeat: 0, floors: [], hintCount: 1 }, mine({ answer: '바다', hints: [{ text: '여행', attempt: 1, status: 'SCORED', temp: 44 }] }));
+    renderTable();
+    expect(screen.getByRole('list', { name: '차수' })).not.toHaveTextContent('최저');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
   it('차례 끝 — 정답과 출제자가 낸 힌트 전체·온도, 다음 출제자', () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BUSY_RETRY_WINDOW_MS, iAmPlaying, iAmSetter, scoringInProgress, useWordTempStore } from './wordTempStore';
+import { BUSY_RETRY_WINDOW_MS, floorOf, iAmPlaying, iAmSetter, scoringInProgress, useWordTempStore } from './wordTempStore';
 import { mine, seat, seedStore, view } from './wordTempTestFixtures';
 
 const st = () => useWordTempStore.getState();
@@ -23,6 +23,9 @@ describe('wordTempStore — 스냅샷', () => {
     expect(st().guessSeats).toEqual([0, 2, 3]);
     expect(st().candidates).toHaveLength(3);
     expect(st().chosen).toBe(0);
+    expect(st().floors).toEqual([50, 60, 70]);
+    expect(floorOf(st(), 2)).toBe(60);
+    expect(floorOf({ floors: [] }, 1)).toBeNull(); // 서버가 주지 않으면 눈금 없음
   });
 
   it('관전자·봇(비공개 뷰 null)은 본인 칸이 전부 비어 있다', () => {
@@ -123,9 +126,11 @@ describe('wordTempStore — 공개 이벤트', () => {
         { seat: 0, delta: 0, total: 0 },
         { seat: 1, delta: 1, total: 1 },
       ],
+      remainingMs: 5_000,
     };
     ev('GUESSES_REVEALED', revealed);
     expect(st().phase).toBe('ATTEMPT_RESULT');
+    expect(st().clock?.remainingMs).toBe(5_000); // D-319 — 결과 보기도 시계가 돈다
     expect(st().attempts).toHaveLength(1);
     expect(st().seats[1]).toMatchObject({ total: 1, setterPoints: 1, guessPoints: 0 });
     expect(st().deltas).toEqual({ 1: 1 });
@@ -153,6 +158,7 @@ describe('wordTempStore — 공개 이벤트', () => {
       answer: '바다',
       reason: 'SOLVED',
       totals: [1, 1, 0, 0],
+      remainingMs: 6_000,
       hints: [
         { attempt: 1, text: '여름', temp: 58, revealed: false },
         { attempt: 1, text: '갈매기', temp: 71, revealed: true },
@@ -161,6 +167,7 @@ describe('wordTempStore — 공개 이벤트', () => {
     };
     ev('TURN_ENDED', ended);
     expect(st().phase).toBe('TURN_END');
+    expect(st().clock?.remainingMs).toBe(6_000);
     expect(st().turnReveal?.answer).toBe('바다');
     expect(st().turnReveal?.hints).toHaveLength(3);
     expect(st().history).toEqual([
@@ -226,9 +233,9 @@ describe('wordTempStore — 공개 이벤트', () => {
       seat: 0,
       round: 2,
       candidates: [
-        { index: 0, word: '바다', category: 'nature', available: false },
-        { index: 1, word: '자전거', category: 'vehicle', available: true },
-        { index: 2, word: '김밥', category: 'food', available: true },
+        { index: 0, word: '바다', category: '자연', gloss: '', available: false },
+        { index: 1, word: '자전거', category: '탈것', gloss: '', available: true },
+        { index: 2, word: '김밥', category: '음식', gloss: '', available: true },
       ],
     });
     expect(st().candidatesRound).toBe(2);

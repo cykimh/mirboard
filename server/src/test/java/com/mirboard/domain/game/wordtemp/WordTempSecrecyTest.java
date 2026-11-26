@@ -289,4 +289,31 @@ class WordTempSecrecyTest {
         assertThat(new WordTempEvent.WordCandidates(0, 1, List.of()).envelopeType()).isEqualTo("WORD_CANDIDATES");
         assertThat(AnswerEntry.of("바다", "자연").aliases()).isEmpty();
     }
+
+    // ---- D-319: 화면이 쓰는 값은 서버가 싣는다 ----
+
+    @Test
+    void the_public_view_carries_the_attempt_floors() {
+        WordTempFixtures.Game g = WordTempFixtures.game();
+        assertThat(WordTempViews.publicView(g.state, g.engine.config(), g.now).floors())
+                .isEqualTo(g.engine.config().tuning().floors())
+                .containsExactly(50, 60, 70);
+    }
+
+    @Test
+    void candidates_carry_a_korean_category_label_and_the_gloss_only_to_their_owner() {
+        var entry = new com.mirboard.domain.game.wordtemp.words.AnswerEntry("강아지", "animal", "개의 새끼", java.util.List.of());
+        var seat = new com.mirboard.domain.game.wordtemp.state.WordTempState.Seat(true, 0, 0,
+                java.util.List.of(entry, com.mirboard.domain.game.wordtemp.words.AnswerEntry.of("우산", "생활")),
+                java.util.List.of(), -1);
+        var infos = WordTempViews.candidateInfos(seat);
+        assertThat(infos.get(0).category()).isEqualTo("동물");
+        assertThat(infos.get(0).gloss()).isEqualTo("개의 새끼");
+        // 모르는 범주 코드는 그대로, 뜻풀이가 없으면 빈 문자열
+        assertThat(infos.get(1).category()).isEqualTo("생활");
+        assertThat(infos.get(1).gloss()).isEmpty();
+        // 공개 뷰 타입에는 후보가 없다 — 뜻풀이가 새 길이 없다
+        WordTempFixtures.Game g = WordTempFixtures.game();
+        assertThat(json(WordTempViews.publicView(g.state, g.engine.config(), g.now))).doesNotContain("gloss").doesNotContain("candidates");
+    }
 }
