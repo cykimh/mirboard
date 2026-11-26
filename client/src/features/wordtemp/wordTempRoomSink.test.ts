@@ -51,7 +51,7 @@ describe('wordTempRoomSink (D-103)', () => {
   it('내 힌트 채점 — 스토어에 넣고 온도만큼 높은 한 음', () => {
     wordTempRoomSink.applyPrivateEvent(env('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 }));
     expect(st().hints).toHaveLength(1);
-    expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.scored', level: 58 }]);
+    expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.scored', level: 50 }]);
   });
 
   it('남의 좌석 앞 프레임은 스토어도 소리도 건드리지 않는다', () => {

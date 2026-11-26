@@ -95,7 +95,8 @@ describe('wordTempCues — 공개 이벤트', () => {
   });
 
   it('본인 큐 — 채점된 내 힌트만 소리가 난다', () => {
-    expect(wordTempPrivateCues('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 })).toEqual([{ cue: 'temp.scored', level: 58 }]);
+    expect(wordTempPrivateCues('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 })).toEqual([{ cue: 'temp.scored', level: 50 }]); // 온도와 무관한 같은 높이
+    expect(wordTempPrivateCues('HINT_SCORED', { seat: 0, text: '바다물', temp: 97, count: 1 })).toEqual([{ cue: 'temp.scored', level: 50 }]);
     expect(wordTempPrivateCues('HINT_PENDING', { seat: 0, text: '짠맛' })).toEqual([]);
   });
 });

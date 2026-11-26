@@ -252,7 +252,7 @@ export function WordTempTable({
       : s.myGuess !== null
         ? '모두가 내면 한꺼번에 공개돼요'
         : '공개된 힌트와 온도를 보고 정답을 맞혀 보세요';
-  else if (s.phase === 'ATTEMPT_RESULT') status = '답이 공개됐어요';
+  else if (s.phase === 'ATTEMPT_RESULT') status = '모두의 추리를 공개했어요';
   else status = '정답과 힌트가 모두 공개됐어요';
 
   const showClock = remaining !== null && s.phase !== null && s.phase !== 'FINISHED';
@@ -271,7 +271,7 @@ export function WordTempTable({
           <span className="wt-badge wt-badge-title">낱말 온도</span>
           {s.phase !== null && (
             <span className="wt-badge" aria-label={`${s.round}라운드, 모두 ${s.rounds}라운드`}>
-              {s.round}/{s.rounds}R
+              {s.round}/{s.rounds} 라운드
             </span>
           )}
           {spectator && <span className="wt-badge">👀 관전 중</span>}
@@ -373,7 +373,8 @@ export function WordTempTable({
           <WordPicker
             round={s.round}
             candidates={s.candidates}
-            chosen={s.chosen}
+            // 확정은 비공개 뷰가 정한다 — 내 WORD_SELECTED 뒤 다시 받기 전까지는 보낸 후보로 고른 표시만 이어 준다.
+            chosen={s.chosen >= 0 ? s.chosen : (s.seats.find((x) => x.seat === s.mySeat)?.chosen ? (s.pickSent ?? -1) : -1)}
             busy={busy}
             onPick={(index) => send({ '@action': 'SELECT_WORD', round: s.round, index })}
           />

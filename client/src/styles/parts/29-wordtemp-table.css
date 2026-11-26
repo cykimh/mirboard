@@ -116,6 +116,8 @@
 /* ── 틀 ── */
 .wt-table {
   box-sizing: border-box;
+  word-break: keep-all; /* 한글 안내문이 낱말 한가운데서 끊기지 않게 */
+  overflow-wrap: anywhere;
   position: relative;
   isolation: isolate;
   display: flex;

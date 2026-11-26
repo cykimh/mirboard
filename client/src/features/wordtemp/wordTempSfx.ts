@@ -1,5 +1,5 @@
 import type { TableCueCall } from '@/features/sound/tableSfx';
-import type { GuessesRevealedPayload, HintRevealedPayload, HintScoredPayload, TurnEndedPayload } from '@/types/wordtemp';
+import type { GuessesRevealedPayload, HintRevealedPayload, TurnEndedPayload } from '@/types/wordtemp';
 import { BOIL_FROM } from './wordTempMath';
 import type { WordTempRoomState } from './wordTempStore';
 
@@ -59,8 +59,12 @@ export function wordTempCues(
   }
 }
 
-/** 본인 큐 → 효과음. 내 힌트가 채점되면 온도만큼 높은 한 음(출제자만 듣는다 — 온도는 출제자만 안다). */
-export function wordTempPrivateCues(type: string, payload: unknown): TableCueCall[] {
+/**
+ * 본인 큐 → 효과음. 내 힌트가 채점되면 짧은 한 음 — **온도와 무관한 같은 높이**다. 친구들이 한자리에 모여 할 때 출제자 휴대폰의
+ * 음 높이로 비밀 온도가 들리지 않게(온도에 따른 높이는 모두가 보는 공개 순간의 `temp.reveal` 만).
+ */
+export const SCORED_NEUTRAL_LEVEL = 50;
+export function wordTempPrivateCues(type: string, _payload: unknown): TableCueCall[] {
   if (type !== 'HINT_SCORED') return [];
-  return [{ cue: 'temp.scored', level: (payload as HintScoredPayload).temp }];
+  return [{ cue: 'temp.scored', level: SCORED_NEUTRAL_LEVEL }];
 }

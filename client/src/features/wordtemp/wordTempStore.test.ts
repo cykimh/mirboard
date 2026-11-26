@@ -55,6 +55,22 @@ describe('wordTempStore — 스냅샷', () => {
     expect(scoringInProgress(st())).toBe(true);
   });
 
+  it('채점 결과가 먼저 닿고 낡은 스냅샷이 뒤에 와도 확정 온도를 "채점 중"으로 되돌리지 않는다', () => {
+    seedStore({ setterSeat: 0, hintCount: 1 }, mine({ answer: '바다', hints: [{ text: '짠맛', attempt: 1, status: 'PENDING', temp: -1 }] }));
+    st().applyPrivate('HINT_SCORED', { seat: 0, text: '짠맛', temp: 64, count: 1 });
+    expect(scoringInProgress(st())).toBe(false);
+    st().applySnapshot({
+      roomId: 'r1',
+      phase: 'HINT',
+      eventSeq: 3,
+      tableView: view({ setterSeat: 0, hintCount: 1 }),
+      privateHand: mine({ answer: '바다', hints: [{ text: '짠맛', attempt: 1, status: 'PENDING', temp: -1 }] }),
+      turnRemainingMs: 0,
+    });
+    expect(st().hints).toEqual([{ text: '짠맛', attempt: 1, status: 'SCORED', temp: 64 }]);
+    expect(scoringInProgress(st())).toBe(false);
+  });
+
   it('결과 보기 단계의 스냅샷은 방금 차수의 점수 증감을 다시 만든다(맞힌 사람 +1×라운드)', () => {
     seedStore({
       phase: 'ATTEMPT_RESULT',
@@ -212,16 +228,39 @@ describe('wordTempStore — 공개 이벤트', () => {
     expect(st().resyncNonce).toBe(1);
   });
 
-  it('내가 고른 낱말 — 보낸 번호가 내 WORD_SELECTED 로 확정된다', () => {
+  it('내가 고른 낱말 — 보낸 번호를 믿지 않고 비공개 뷰로 확정한다(마감 직전 서버의 대신 고르기와 엇갈릴 수 있다)', () => {
     seedStore({ phase: 'WORD_SELECT', setterSeat: -1, seats: [seat(0, { chosen: false }), seat(1, { chosen: false })] }, mine({ chosen: -1 }));
     st().noteSent({ '@action': 'SELECT_WORD', round: 1, index: 2 });
     expect(st().sending).not.toBeNull();
     ev('WORD_SELECTED', { seat: 1 });
     expect(st().chosen).toBe(-1);
-    ev('WORD_SELECTED', { seat: 0 });
-    expect(st().chosen).toBe(2);
-    expect(st().sending).toBeNull();
     expect(st().resyncNonce).toBe(0);
+    ev('WORD_SELECTED', { seat: 0 });
+    expect(st().chosen).toBe(-1); // 보낸 2 로 확정하지 않는다
+    expect(st().pickSent).toBe(2); // 고른 표시는 다시 받을 때까지 이어진다
+    expect(st().sending).toBeNull();
+    expect(st().resyncNonce).toBe(1);
+  });
+
+  it('마감 직전 고르기가 거절되고 서버가 다른 후보를 골랐다 — 출제 차례에도 보낸 후보를 정답으로 보이지 않는다', () => {
+    seedStore({ phase: 'WORD_SELECT', setterSeat: -1, seats: [seat(0, { chosen: false }), seat(1, { chosen: false })] }, mine({ chosen: -1 }));
+    st().noteSent({ '@action': 'SELECT_WORD', round: 1, index: 2 });
+    ev('WORD_SELECTED', { seat: 0 }); // 실제로는 서버가 0 번을 골랐다
+    ev('TURN_STARTED', { turnNo: 1, round: 1, setterSeat: 0 });
+    expect(st().answer).toBeNull();
+    expect(st().resyncNonce).toBe(2);
+    st().setError('지금은 할 수 없어요');
+    // 다시 받은 비공개 뷰가 정본이다
+    st().applySnapshot({
+      roomId: 'r1',
+      phase: 'HINT',
+      eventSeq: 9,
+      tableView: view({ phase: 'HINT', setterSeat: 0 }),
+      privateHand: mine({ chosen: 0, answer: '바다' }),
+      turnRemainingMs: 0,
+    });
+    expect(st().answer).toBe('바다');
+    expect(st().chosen).toBe(0);
   });
 
   it('다음 라운드 낱말 고르기 — 고른 표시를 지우고, 방금 쓴 내 후보는 새 목록이 오기 전에도 못 고르게', () => {

@@ -193,6 +193,20 @@ const guessersOf = (seats: SeatView[], setterSeat: number) =>
  * 뷰·본인 큐로 온다(룰 §12). 그래서 추리자·관전자의 스토어에는 출제자의 힌트·온도가 <b>들어올 길이 없다</b>({@link applyPrivate} 도 내 좌석
  * 것만 받는다). 화면은 그 위에 한 번 더 — 내가 출제자일 때만 `hints` 를 그린다.
  */
+/**
+ * 스냅샷의 내 힌트 목록과 지금 목록을 합친다. 실시간 채점 결과(비공개 `HINT_SCORED`)는 공개 순번을 올리지 않으므로, 채점 중에 나간
+ * resync 의 응답이 결과 프레임보다 늦게 닿으면 같은 순번의 낡은 스냅샷이 확정 온도를 "채점 중"으로 되돌려 입력이 잠긴다(리뷰 지적).
+ * 같은 차례·차수의 같은 낱말이 이미 확정이면 확정을 지킨다 — 확정은 되돌아가지 않는다(D-312).
+ */
+function mergeOwnHints(prev: { turnNo: number; attempt: number; hints: OwnHint[] }, turnNo: number, attempt: number, next: OwnHint[]): OwnHint[] {
+  if (prev.turnNo !== turnNo || prev.attempt !== attempt) return next;
+  return next.map((h) => {
+    if (h.status !== 'PENDING') return h;
+    const known = prev.hints.find((k) => k.text === h.text && k.attempt === h.attempt && k.status === 'SCORED');
+    return known ?? h;
+  });
+}
+
 export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set, get) => ({
   ...INITIAL,
   mySeat: -1,
@@ -237,7 +251,12 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
       candidatesRound: p ? t.round : 0,
       chosen: p?.chosen ?? -1,
       answer: p?.answer ?? null,
-      hints: (p?.hints ?? []).filter((h) => h.status !== 'VOID'),
+      hints: mergeOwnHints(
+        get(),
+        t.turnNo,
+        t.attempt,
+        (p?.hints ?? []).filter((h) => h.status !== 'VOID'),
+      ),
       myGuess: p?.myGuess ?? null,
       ...NO_FX,
       sending: null,
@@ -298,14 +317,14 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
       case 'WORD_SELECTED': {
         const { seat } = payload as { seat: number };
         const mine = seat === state.mySeat;
-        // 서버가 대신 골랐다(시간 초과) — 무엇인지는 비공개 뷰에만 있다.
-        const unknown = mine && state.chosen < 0 && state.pickSent === null;
+        // 무엇이 골라졌는지는 비공개 뷰에만 있다. 마감 직전에 보낸 고르기는 서버의 대신 고르기와 엇갈릴 수 있으므로(보낸 것이
+        // 거절되고 무작위가 골라짐 — 리뷰 지적) 보낸 후보를 믿지 않고, 아직 확정을 모르면 늘 다시 받는다. 그동안 고른 표시는
+        // `pickSent` 가 이어 준다(스냅샷이 비운다).
+        const unknown = mine && state.chosen < 0;
         set({
           seats: state.seats.map((s) => (s.seat === seat ? { ...s, chosen: true } : s)),
           ...(mine
             ? {
-                chosen: state.chosen >= 0 ? state.chosen : (state.pickSent ?? -1),
-                pickSent: null,
                 sending: null,
                 resyncNonce: unknown ? state.resyncNonce + 1 : state.resyncNonce,
               }
