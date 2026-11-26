@@ -1,0 +1,1506 @@
+/*
+ * 낱말 온도 게임판(D-319) — `.wt-` 접두 전용. 공용 클래스 재정의 금지, 미디어 0개(폭·동작 줄이기는 17-responsive 의 `.wt-` 블록).
+ * 게임판은 `.app-shell` 밖이라 tailwind border-box 리셋이 닿지 않는다 — 여기서 명시한다. 글꼴은 지정하지 않는다(앱 기본 글꼴).
+ *
+ * 테마 "겨울 창가의 유리 온도계": 바탕은 성에 낀 창(위는 서늘한 하늘빛, 아래는 방 안의 살구빛), 판은 뿌연 유리. 힌트마다 <b>눕힌 유리
+ * 온도계</b> 한 줄 — 왼쪽 둥근 구에서 관으로 수은주가 온도만큼 차 있고 오른쪽에 큰 숫자. 띠는 네 가지(차가움 파랑 · 미지근 호박 · 뜨거움
+ * 주황 · 거의 정답 진분홍)이고 색만으로 가르지 않게 숫자와 띠 이름을 늘 같이 둔다. 관 위의 짙은 세로 선은 그 차수의 최저 온도다.
+ *
+ * 움직임은 전부 `.wt-anim`(앱 연출 설정이 켜졌을 때만 게임판이 붙인다) 아래에만 둔다. `prefers-reduced-motion` 은 17 이 한 번 더 끈다.
+ * 연출 층(`.wt-fx-*`)은 기본이 투명이고 `pointer-events: none` — 연출이 꺼져 있으면 보이지 않고 입력을 막지 않는다.
+ */
+
+/* ── 토큰 — 튜토리얼 포털(body)도 쓰도록 `.wt-tokens` 에 둔다 ── */
+.wt-tokens {
+  --wt-bg: #eaf2f5;
+  --wt-sky: linear-gradient(180deg, #dfeef4 0%, #eef3f2 48%, #fdebdd 100%);
+  --wt-panel: #fcfdfd;
+  --wt-glass-panel: linear-gradient(160deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 250, 252, 0.86) 100%);
+  --wt-row: #f1f6f8;
+  --wt-field: #ffffff;
+  --wt-ink: #16303a;
+  --wt-muted: #4a626c;
+  --wt-line: #c6d8de;
+  --wt-accent: #c63d21;
+  --wt-on-accent: #ffffff;
+  --wt-accent-soft: #fde6de;
+  --wt-ok: #0b7052;
+  --wt-ok-soft: #dcf4ea;
+  --wt-warn: #a3261a;
+  --wt-note: #fff3bf;
+  --wt-note-ink: #4a3a00;
+  /* 온도계 */
+  --wt-glass: #ffffff;
+  --wt-tube: #e6eff3;
+  --wt-tube-line: #9fb7c0;
+  --wt-tick: rgba(22, 48, 58, 0.16);
+  --wt-mercury: #e2452c;
+  /* 띠 — 채움 / 글자 / 옅은 바탕 */
+  --wt-cold: #4b9be8;
+  --wt-cold-ink: #17508f;
+  --wt-cold-soft: #deecfb;
+  --wt-warm: #efb21f;
+  --wt-warm-ink: #7a4d00;
+  --wt-warm-soft: #fdf1cf;
+  --wt-hot: #f2703a;
+  --wt-hot-ink: #a8320f;
+  --wt-hot-soft: #fde4d7;
+  --wt-boil: #e8336d;
+  --wt-boil-ink: #a3103f;
+  --wt-boil-soft: #fddce7;
+}
+
+.dark .wt-tokens,
+.wt-tokens.dark {
+  --wt-bg: #0d181e;
+  --wt-sky: linear-gradient(180deg, #0b1a24 0%, #101c22 50%, #21170f 100%);
+  --wt-panel: #15252d;
+  --wt-glass-panel: linear-gradient(160deg, rgba(30, 50, 60, 0.9) 0%, rgba(20, 36, 44, 0.86) 100%);
+  --wt-row: #1b2f38;
+  --wt-field: #0f1d24;
+  --wt-ink: #e6f1f4;
+  --wt-muted: #a3b8c0;
+  --wt-line: #2c434d;
+  --wt-accent: #ff8f6b;
+  --wt-on-accent: #2b0e05;
+  --wt-accent-soft: #3a2018;
+  --wt-ok: #5fdcab;
+  --wt-ok-soft: #123a2e;
+  --wt-warn: #ff9d8f;
+  --wt-note: #4a3f12;
+  --wt-note-ink: #fff1b8;
+  --wt-glass: #1d323c;
+  --wt-tube: #0f1e25;
+  --wt-tube-line: #4c6772;
+  --wt-tick: rgba(230, 241, 244, 0.16);
+  --wt-mercury: #ff6b4f;
+  --wt-cold: #4b9be8;
+  --wt-cold-ink: #9ccbff;
+  --wt-cold-soft: #132b42;
+  --wt-warm: #efb21f;
+  --wt-warm-ink: #ffd879;
+  --wt-warm-soft: #3a2e0c;
+  --wt-hot: #f2703a;
+  --wt-hot-ink: #ffa580;
+  --wt-hot-soft: #40200f;
+  --wt-boil: #f04c80;
+  --wt-boil-ink: #ff9cbb;
+  --wt-boil-soft: #43142a;
+}
+
+/* ── 띠 — 채움·글자·바탕 한 벌을 고른다 ── */
+.wt-band-cold {
+  --wt-fill: var(--wt-cold);
+  --wt-band-ink: var(--wt-cold-ink);
+  --wt-band-soft: var(--wt-cold-soft);
+}
+
+.wt-band-warm {
+  --wt-fill: var(--wt-warm);
+  --wt-band-ink: var(--wt-warm-ink);
+  --wt-band-soft: var(--wt-warm-soft);
+}
+
+.wt-band-hot {
+  --wt-fill: var(--wt-hot);
+  --wt-band-ink: var(--wt-hot-ink);
+  --wt-band-soft: var(--wt-hot-soft);
+}
+
+.wt-band-boil {
+  --wt-fill: var(--wt-boil);
+  --wt-band-ink: var(--wt-boil-ink);
+  --wt-band-soft: var(--wt-boil-soft);
+}
+
+/* ── 틀 ── */
+.wt-table {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 10px 16px;
+  color: var(--wt-ink);
+  background: var(--wt-bg);
+  background-image: var(--wt-sky);
+  /* 판이 짧아도 창(성에 → 살구빛)이 화면 끝까지 이어지게 — `.room-page` 의 위아래 여백만큼 뺀다 */
+  min-height: calc(100dvh - 24px);
+}
+
+.wt-table *,
+.wt-table *::before,
+.wt-table *::after,
+.wt-tokens .wt-gauge,
+.wt-tokens .wt-gauge * {
+  box-sizing: border-box;
+}
+
+.wt-art {
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.wt-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 머리 줄 — 붙박이(자판이 올라와 화면이 밀려도 시계가 남는다) */
+.wt-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 -10px;
+  padding: 8px 10px 6px;
+  background: var(--wt-bg);
+  border-bottom: 1px solid var(--wt-line);
+}
+
+.wt-header-info,
+.wt-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wt-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--wt-line);
+  background: var(--wt-panel);
+  color: var(--wt-ink);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+button.wt-badge {
+  cursor: pointer;
+}
+
+.wt-table button:focus-visible {
+  outline: 3px solid var(--wt-accent);
+  outline-offset: 2px;
+}
+
+/* 입력란은 테두리가 이미 굵다 — 바깥 고리는 붙여서 한 겹으로 보이게 */
+.wt-table .wt-input:focus-visible {
+  outline: 2px solid var(--wt-accent);
+  outline-offset: 0;
+}
+
+.wt-badge-title {
+  font-weight: 700;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 2px;
+}
+
+.wt-clock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wt-clock-label {
+  font-size: 12px;
+  color: var(--wt-muted);
+}
+
+.wt-clock-value {
+  font-size: 17px;
+  font-weight: 800;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.wt-clock-warn {
+  border-color: var(--wt-hot);
+  background: var(--wt-hot-soft);
+  color: var(--wt-hot-ink);
+}
+
+.wt-clock-warn .wt-clock-label {
+  color: inherit;
+}
+
+.wt-anim .wt-clock-warn {
+  animation: wt-pulse 1s ease-in-out infinite;
+}
+
+@keyframes wt-pulse {
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+/* ── 좌석 띠 ── */
+.wt-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
+}
+
+/* 네 명은 2×2 — 3+1 로 한 자리만 떨어지지 않게 */
+.wt-strip[data-count='4'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wt-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+  font-size: 13px;
+}
+
+.wt-seat-me {
+  box-shadow: inset 0 0 0 1.5px var(--wt-ink);
+}
+
+.wt-seat-setter {
+  border-color: var(--wt-accent);
+  background: linear-gradient(120deg, var(--wt-accent-soft), var(--wt-panel) 75%);
+}
+
+.wt-seat-out {
+  opacity: 0.55;
+}
+
+.wt-seat-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wt-seat-mark {
+  display: inline-flex;
+  color: var(--wt-accent);
+}
+
+.wt-seat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.wt-seat-points {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.wt-seat-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--wt-muted);
+}
+
+.wt-seat-doing-done {
+  color: var(--wt-ok);
+  font-weight: 700;
+}
+
+.wt-seat-delta {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--wt-ok-soft);
+  color: var(--wt-ok);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-anim .wt-seat-delta {
+  animation: wt-pop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+.wt-seat-chat {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--wt-row);
+  font-size: 12px;
+}
+
+.wt-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--wt-line);
+  background: var(--wt-panel);
+  color: var(--wt-ink);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wt-tag-warn {
+  color: var(--wt-warn);
+  border-color: var(--wt-warn);
+}
+
+.wt-tag-btn {
+  min-height: 28px;
+  cursor: pointer;
+}
+
+/* ── 무대 ── */
+.wt-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wt-phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+
+.wt-phase-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.wt-attempts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.wt-attempt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wt-attempt-no {
+  font-weight: 700;
+}
+
+.wt-attempt-floor {
+  color: var(--wt-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-attempt-now {
+  border-color: var(--wt-accent);
+  background: var(--wt-accent-soft);
+}
+
+.wt-attempt-done {
+  opacity: 0.6;
+}
+
+.wt-attempt-todo .wt-attempt-floor {
+  display: none;
+}
+
+/* ── 온도계 한 줄 ── */
+.wt-gauge {
+  --wt-h: 16px;
+  display: flex;
+  align-items: center;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.wt-gauge-bulb {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: calc(var(--wt-h) + 10px);
+  height: calc(var(--wt-h) + 10px);
+  margin-right: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--wt-tube-line);
+  background:
+    radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.85) 0 14%, transparent 16%),
+    var(--wt-fill, var(--wt-cold));
+}
+
+.wt-gauge-tube {
+  position: relative;
+  flex: 1;
+  min-width: 40px;
+  height: var(--wt-h);
+  overflow: hidden;
+  border: 2px solid var(--wt-tube-line);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--wt-tick) calc(10% - 1px) 10%),
+    var(--wt-tube);
+}
+
+.wt-gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--wt-temp, 0) * 100%);
+  border-radius: 0 999px 999px 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0 30%, transparent 32%),
+    var(--wt-fill, var(--wt-cold));
+  transform-origin: 0 50%;
+}
+
+.wt-gauge-floor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--wt-floor, 0) * 100% - 1px);
+  width: 2.5px;
+  background: var(--wt-ink);
+}
+
+.wt-gauge-num {
+  flex: none;
+  min-width: 3.1ch;
+  margin-left: 8px;
+  text-align: right;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--wt-band-ink, var(--wt-ink));
+}
+
+.wt-gauge-deg {
+  font-size: 0.7em;
+  vertical-align: top;
+}
+
+.wt-gauge-sm {
+  --wt-h: 10px;
+  flex-basis: 96px;
+}
+
+.wt-gauge-sm .wt-gauge-num {
+  font-size: 16px;
+  margin-left: 6px;
+}
+
+/* 96 이상 — 관 안에서 방울이 올라온다 */
+.wt-gauge-bubble {
+  position: absolute;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  opacity: 0.7;
+}
+
+.wt-gauge-bubble:nth-child(2) {
+  left: 22%;
+}
+
+.wt-gauge-bubble:nth-child(3) {
+  left: 51%;
+}
+
+.wt-gauge-bubble:nth-child(4) {
+  left: 78%;
+}
+
+.wt-anim .wt-gauge-bubble {
+  animation: wt-bubble 1.3s ease-in infinite;
+}
+
+.wt-anim .wt-gauge-bubble:nth-child(3) {
+  animation-delay: 0.45s;
+}
+
+.wt-anim .wt-gauge-bubble:nth-child(4) {
+  animation-delay: 0.85s;
+}
+
+@keyframes wt-bubble {
+  0% {
+    transform: translateY(2px) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-14px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* 방금 공개·채점됨 — 수은주가 0 에서 차오르고, 닿으면 숫자가 톡 */
+.wt-anim .wt-gauge-fresh .wt-gauge-fill {
+  animation: wt-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.wt-anim .wt-gauge-fresh .wt-gauge-num {
+  animation: wt-pop 0.36s 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes wt-rise {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes wt-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── 온도계 판(공개된 힌트) ── */
+.wt-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--wt-line);
+  background: var(--wt-glass-panel);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+
+.wt-board-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wt-board-sub {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--wt-muted);
+}
+
+.wt-board-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-reveals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wt-reveals:empty {
+  display: none;
+}
+
+.wt-reveal {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px 9px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  background: var(--wt-band-soft, var(--wt-row));
+}
+
+.wt-reveal > .wt-gauge,
+.wt-reveal > .wt-reveal-note,
+.wt-reveal > .wt-pips {
+  grid-column: 1 / -1;
+}
+
+.wt-reveal-attempt {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--wt-panel);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wt-reveal-word {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.wt-reveal-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+}
+
+.wt-band-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wt-band-ink);
+  background: var(--wt-band-soft);
+  color: var(--wt-band-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wt-floor-ok {
+  color: var(--wt-ok);
+  font-weight: 700;
+}
+
+.wt-floor-miss {
+  color: var(--wt-warn);
+  font-weight: 700;
+}
+
+.wt-reveal.wt-band-boil {
+  border-color: var(--wt-boil);
+}
+
+.wt-anim .wt-reveal-fresh {
+  animation: wt-drop-in 0.32s ease-out both;
+}
+
+@keyframes wt-drop-in {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 힌트 단계 — 낱말·온도 없이 개수만 */
+.wt-reveal-wait {
+  border: 1.5px dashed var(--wt-line);
+  background: transparent;
+}
+
+.wt-reveal-wait .wt-reveal-word-wait {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wt-muted);
+}
+
+.wt-pips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wt-pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--wt-tube-line);
+  background: var(--wt-tube);
+}
+
+.wt-pip-on {
+  border-color: var(--wt-accent);
+  background: var(--wt-accent);
+}
+
+.wt-anim .wt-pip-on {
+  animation: wt-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.wt-pips-text {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 96 이상 — 줄 위로 끓어오르는 방울(장식). 기본은 투명 — 연출이 꺼져 있으면 보이지 않는다 */
+.wt-fx-boil,
+.wt-fx-cheer {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.wt-fx-bubble {
+  position: absolute;
+  bottom: 30%;
+  left: calc(8% + var(--wt-i) * 11.5%);
+  width: calc(8px + var(--wt-i) * 1px);
+  height: calc(8px + var(--wt-i) * 1px);
+  border-radius: 50%;
+  border: 2px solid var(--wt-boil);
+  background: var(--wt-boil-soft);
+  opacity: 0;
+}
+
+.wt-anim .wt-fx-bubble {
+  animation: wt-boil-up 0.9s ease-out both;
+  animation-delay: calc(0.45s + var(--wt-i) * 60ms);
+}
+
+@keyframes wt-boil-up {
+  0% {
+    transform: translateY(10px) scale(0.3);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-58px) scale(1.25);
+    opacity: 0;
+  }
+}
+
+.wt-anim .wt-reveal-fresh.wt-band-boil {
+  animation:
+    wt-drop-in 0.32s ease-out both,
+    wt-boil-glow 1.1s 0.45s ease-out both;
+}
+
+@keyframes wt-boil-glow {
+  0% {
+    box-shadow: 0 0 0 0 var(--wt-boil);
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+/* ── 내 칸(공통) ── */
+.wt-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--wt-line);
+  background: var(--wt-panel);
+}
+
+.wt-panel-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.wt-panel-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-wait {
+  margin: 0;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--wt-muted);
+}
+
+.wt-primary,
+.wt-secondary {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wt-primary {
+  border: 0;
+  background: var(--wt-accent);
+  color: var(--wt-on-accent);
+}
+
+.wt-secondary {
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+  color: var(--wt-ink);
+}
+
+.wt-primary:disabled,
+.wt-secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wt-primary[aria-disabled='true'],
+.wt-secondary[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.wt-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wt-input {
+  flex: 1 1 130px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 2px solid var(--wt-line);
+  background: var(--wt-field);
+  color: var(--wt-ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.wt-input:focus {
+  border-color: var(--wt-accent);
+}
+
+.wt-input:disabled {
+  opacity: 0.6;
+}
+
+/* ── 낱말 고르기 ── */
+.wt-cands {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.wt-cand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--wt-line);
+  background: var(--wt-note);
+  color: var(--wt-note-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wt-cand-category {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.wt-cand-word {
+  font-size: 20px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.wt-cand-tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--wt-accent);
+  color: var(--wt-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wt-cand-picked {
+  border-color: var(--wt-accent);
+  box-shadow: 0 0 0 2px var(--wt-accent-soft);
+}
+
+.wt-cand:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wt-cand-used .wt-cand-word {
+  text-decoration: line-through;
+}
+
+.wt-cand-used .wt-cand-tag {
+  background: var(--wt-muted);
+}
+
+.wt-anim .wt-cand:not(:disabled):not([aria-disabled='true']):active {
+  transform: scale(0.97);
+}
+
+/* ── 출제자 ── */
+.wt-setter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wt-answer,
+.wt-my-guess {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--wt-note);
+  color: var(--wt-note-ink);
+  align-self: flex-start;
+}
+
+.wt-answer-label,
+.wt-my-guess-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.wt-answer-word,
+.wt-my-guess-word {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.wt-setter-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wt-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 입력란 곁의 작은 시계 — 자판이 올라와 화면이 밀려도(머리 줄이 가려져도) 남은 시간이 보인다 */
+.wt-inline-clock {
+  flex: none;
+  min-width: 2.4em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-row);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-count {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wt-own-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wt-own-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  background: var(--wt-row);
+  color: var(--wt-ink);
+}
+
+.wt-own-attempt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--wt-muted);
+}
+
+.wt-own-word {
+  flex: 0 1 auto;
+  min-width: 3.2em;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.wt-own-hint-best {
+  border-color: var(--wt-accent);
+}
+
+.wt-own-hint-past {
+  opacity: 0.7;
+}
+
+.wt-own-hint-pending {
+  border: 1.5px dashed var(--wt-line);
+}
+
+.wt-own-tag {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--wt-accent-soft);
+  color: var(--wt-accent);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wt-own-tag-boil {
+  background: var(--wt-boil-soft);
+  color: var(--wt-boil-ink);
+}
+
+.wt-scoring {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-scoring-dots {
+  width: 26px;
+  height: 8px;
+  background:
+    radial-gradient(circle, var(--wt-cold) 0 3px, transparent 3.5px) 0 50% / 9px 8px repeat-x;
+}
+
+.wt-anim .wt-scoring-dots {
+  animation: wt-scoring 0.9s steps(3, jump-none) infinite;
+}
+
+@keyframes wt-scoring {
+  from {
+    width: 8px;
+  }
+  to {
+    width: 26px;
+  }
+}
+
+.wt-floor-warn {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--wt-hot-soft);
+  color: var(--wt-hot-ink);
+  font-size: 12.5px;
+}
+
+.wt-tutorial-samples {
+  margin: 8px 0;
+}
+
+/* ── 차수 결과 ── */
+.wt-guesses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wt-guess-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: var(--wt-row);
+}
+
+.wt-guess-name {
+  flex: 0 0 34%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-guess-word {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.wt-guess-mark {
+  flex: none;
+  font-size: 12px;
+  color: var(--wt-muted);
+}
+
+.wt-guess-pass .wt-guess-word {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wt-muted);
+}
+
+.wt-guess-correct {
+  border-color: var(--wt-ok);
+  background: var(--wt-ok-soft);
+}
+
+.wt-guess-correct .wt-guess-mark {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--wt-ok);
+  color: var(--wt-panel);
+  font-weight: 800;
+}
+
+.wt-result-summary {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.wt-anim .wt-result-fresh .wt-guess-row {
+  animation: wt-flip-in 0.36s ease-out both;
+  animation-delay: calc(var(--wt-i) * 90ms);
+}
+
+@keyframes wt-flip-in {
+  from {
+    transform: rotateX(80deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateX(0);
+    opacity: 1;
+  }
+}
+
+.wt-anim .wt-result-fresh .wt-guess-correct .wt-guess-mark {
+  animation: wt-pop 0.4s 0.5s cubic-bezier(0.3, 1.8, 0.5, 1) both;
+}
+
+/* 정답 축하 — 패널 가운데에서 퍼지는 따뜻한 방울 열 개 */
+.wt-fx-spark {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin: -4px;
+  border-radius: 50%;
+  background: var(--wt-warm);
+  opacity: 0;
+  --wt-a: calc(var(--wt-i) * 36deg);
+}
+
+.wt-fx-spark:nth-child(3n) {
+  background: var(--wt-hot);
+}
+
+.wt-fx-spark:nth-child(3n + 1) {
+  background: var(--wt-boil);
+}
+
+.wt-anim .wt-fx-spark {
+  animation: wt-cheer 0.8s 0.45s ease-out both;
+}
+
+.wt-fx-cheer-mine .wt-fx-spark {
+  width: 12px;
+  height: 12px;
+}
+
+@keyframes wt-cheer {
+  0% {
+    transform: rotate(var(--wt-a)) translateX(0) scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--wt-a)) translateX(120px) scale(1);
+    opacity: 0;
+  }
+}
+
+/* ── 차례 끝 ── */
+.wt-turn-end-reason,
+.wt-turn-next {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-turn-answer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--wt-ink);
+}
+
+.wt-turn-answer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wt-turn-answer-word {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.wt-anim .wt-turn-answer-word {
+  animation: wt-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+/* ── 상태 줄 ── */
+.wt-status {
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+/* ── 판 끝 ── */
+.wt-end {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--wt-line);
+  background: var(--wt-panel);
+}
+
+.wt-end-art {
+  align-self: center;
+}
+
+.wt-end-title {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.wt-end-won .wt-end-title {
+  color: var(--wt-accent);
+}
+
+.wt-end-reason {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-end-rows,
+.wt-end-turns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wt-end-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--wt-row);
+  font-size: 14px;
+}
+
+.wt-end-me {
+  box-shadow: inset 0 0 0 1.5px var(--wt-ink);
+}
+
+.wt-end-out {
+  opacity: 0.6;
+}
+
+.wt-end-rank {
+  flex: none;
+  min-width: 2.6em;
+  font-weight: 800;
+}
+
+.wt-end-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.wt-end-split {
+  flex: none;
+  font-size: 12px;
+  color: var(--wt-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-end-points {
+  flex: none;
+  min-width: 3em;
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-end-history > summary {
+  padding: 6px 2px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wt-end-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--wt-row);
+  font-size: 13px;
+}
+
+.wt-end-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.wt-end-turn-round {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--wt-muted);
+}
+
+.wt-end-turn-setter {
+  color: var(--wt-muted);
+}
+
+.wt-end-turn-answer {
+  font-size: 16px;
+}
+
+.wt-end-turn-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--wt-muted);
+}
+
+.wt-end-turn-solvers {
+  font-size: 12px;
+  color: var(--wt-muted);
+}
+
+.wt-end-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}

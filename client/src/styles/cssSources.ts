@@ -19,6 +19,7 @@ export const artilleryCssSource = readCss('./parts/23-artillery-table.css');
 export const dambadukCssSource = readCss('./parts/26-dambaduk-table.css');
 export const tichuLacquerCssSource = readCss('./parts/25-tichu-lacquer.css');
 export const starsquareCssSource = readCss('./parts/27-starsquare-table.css');
+export const wordtempCssSource = readCss('./parts/29-wordtemp-table.css');
 export const gameMenuCssSource = readCss('./parts/24-game-menu.css');
 export const gameSurfaceCssSource = readCss('./parts/28-game-surface.css');
 export const indexCssSource = readCss('./index.css');

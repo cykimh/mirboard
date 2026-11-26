@@ -18,6 +18,7 @@ import {
   OneCardTable,
   SkullKingTable,
   StarSquareTable,
+  WordTempTable,
   YachtTable,
   preloadGameTable,
 } from '@/pages/gameTables';
@@ -69,6 +70,7 @@ const BOARD_HELD_GAMES: ReadonlySet<string> = new Set([
   'ARTILLERY',
   'DAMBADUK',
   'STAR_SQUARE',
+  'WORD_TEMP',
 ]);
 
 /**
@@ -792,6 +794,8 @@ export function RoomPage() {
             <DambadukTable {...board} />
           ) : room.gameType === 'STAR_SQUARE' ? (
             <StarSquareTable {...board} />
+          ) : room.gameType === 'WORD_TEMP' ? (
+            <WordTempTable {...board} />
           ) : (
             <SkullKingTable {...board} />
           )}

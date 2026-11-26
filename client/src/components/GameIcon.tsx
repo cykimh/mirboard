@@ -262,6 +262,29 @@ const ICONS: Record<string, IconDef> = {
       );
     },
   },
+  // 낱말 온도 — 노을빛(살구→진분홍) 타일, 낱말 쪽지 옆에 선 유리 온도계(붉은 수은주). 작을 때는 온도계와 쪽지 윤곽만.
+  WORD_TEMP: {
+    tile: { hi: '#ffa46b', lo: '#d2356c', deep: '#5c0f2b' },
+    glyph: ({ detail, deep }) => (
+      <>
+        <path d="M6.5 14.5a3.5 3.5 0 0 1 3.5-3.5h10a3.5 3.5 0 0 1 3.5 3.5v8a3.5 3.5 0 0 1-3.5 3.5h-6l-4.5 4v-4.2a3.5 3.5 0 0 1-3-3.3z" fill={CREAM} {...line(deep)} />
+        {detail ? (
+          <path d="M10.5 16h9M10.5 20.5h6" stroke={deep} strokeWidth="1.8" strokeLinecap="round" />
+        ) : (
+          <path d="M10.5 18.5h9" stroke={deep} strokeWidth="2.2" strokeLinecap="round" />
+        )}
+        <path d="M29.5 10a4 4 0 0 1 8 0v18.3a7.5 7.5 0 1 1-8 0z" fill={CREAM} {...line(deep)} />
+        <path d="M32.2 17h2.6v14h-2.6z" fill="#e2352c" />
+        <circle cx="33.5" cy="34.5" r="4.3" fill="#e2352c" />
+        {detail && (
+          <>
+            <path d="M39.5 13h2.5M39.5 18h2.5M39.5 23h2.5" stroke={CREAM} strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="32" cy="33" r="1.2" fill="#fff" fillOpacity="0.8" />
+          </>
+        )}
+      </>
+    ),
+  },
 };
 
 /** 모르는 게임 — 회색 타일의 말(폰). */

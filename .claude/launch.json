@@ -30,6 +30,18 @@
       "runtimeExecutable": "env",
       "runtimeArgs": ["VITE_PORT=5203", "MIRBOARD_DEV_API=http://localhost:8203", "npm", "--prefix", "client", "run", "dev"],
       "port": 5203
+    },
+    {
+      "name": "wordtemp-server",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["MIRBOARD_PORT=8219", "MIRBOARD_REDIS_DATABASE=9", "MIRBOARD_DB_SCHEMA=wt_dev", "MIRBOARD_ALLOWED_ORIGINS=http://localhost:5219", "MIRBOARD_WORD_TEMP_STATUS=AVAILABLE", "MIRBOARD_RATELIMIT_ENABLED=false", "MIRBOARD_GUEST_DAILY_CAP=100000", "./gradlew", ":server:bootRun"],
+      "port": 8219
+    },
+    {
+      "name": "wordtemp-client",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_PORT=5219", "MIRBOARD_DEV_API=http://localhost:8219", "npm", "--prefix", "client", "run", "dev"],
+      "port": 5219
     }
   ]
 }

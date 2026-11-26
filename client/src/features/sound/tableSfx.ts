@@ -53,7 +53,16 @@ export type TableCue =
   | 'star.complete'
   | 'star.solved'
   | 'star.closing'
-  | 'star.open';
+  | 'star.open'
+  // 낱말 온도(D-319) — 유리 온도계: 보내기 "뽁", 내 힌트 채점(온도만큼 높은 음), 공개(수은주가 차오르는 미끄럼 + 온도 음), 96 이상 보글보글,
+  // 정답·오답, 차례 끝의 정답 공개.
+  | 'temp.send'
+  | 'temp.scored'
+  | 'temp.reveal'
+  | 'temp.boil'
+  | 'temp.correct'
+  | 'temp.wrong'
+  | 'temp.answer';
 
 export interface TableCueCall {
   cue: TableCue;
@@ -61,7 +70,7 @@ export interface TableCueCall {
   gain?: number;
   /** `card.draw` — 먹은 장수(최대 {@link DRAW_REPEAT_MAX} 번 반복). */
   count?: number;
-  /** `card.attack` — 세기 1~3. `star.line` — 새로 이어진 줄 수 1~3. */
+  /** `card.attack` — 세기 1~3. `star.line` — 새로 이어진 줄 수 1~3. `temp.scored`·`temp.reveal` — 온도 0~100(높을수록 높은 음). */
   level?: number;
   /** 이만큼 뒤에 울린다(초). */
   delaySec?: number;
@@ -321,7 +330,54 @@ const RECIPES: Record<TableCue, Recipe> = {
     tone(ctx, { f: 392, to: 523.25, at: t, dur: 0.22, peak: 0.07 * g });
     return 0.12 + plucks(ctx, t + 0.12, [783.99, 1174.66, 1567.98], 0.09, 0.14, 0.12 * g, 0.36);
   },
+  // ── 낱말 온도 ──
+  // 낱말 보내기 — 종이쪽지를 내미는 작은 "뽁".
+  'temp.send': (ctx, t, g) => {
+    pop(ctx, t, 698.46, 0.12 * g, 0.06);
+    return 0.06;
+  },
+  // 내 힌트 채점 — 유리관을 두드리는 한 음. 온도가 높을수록 높다(차가우면 낮고 둥글게, 뜨거우면 맑고 높게).
+  'temp.scored': (ctx, t, g, call) => {
+    pluck(ctx, t, tempPitch(call.level), 0.15 * g, 0.16);
+    return 0.16;
+  },
+  // 공개 — 수은주가 그 온도까지 차오르는 미끄럼 휘파람, 닿는 곳에서 "딩".
+  'temp.reveal': (ctx, t, g, call) => {
+    const top = tempPitch(call.level);
+    tone(ctx, { f: 261.63, to: top, at: t, dur: 0.34, peak: 0.1 * g });
+    pluck(ctx, t + 0.32, top, 0.17 * g, 0.3);
+    return 0.62;
+  },
+  // 96 이상 — 끓는다: 보글보글 올라가는 방울들 + 맑은 꼭대기 음.
+  'temp.boil': (ctx, t, g) => {
+    for (let i = 0; i < 7; i++) pop(ctx, t + i * 0.05, 660 + i * 110 + (i % 2) * 60, 0.11 * g, 0.05);
+    pluck(ctx, t + 0.36, 1975.53, 0.15 * g, 0.34);
+    return 0.7;
+  },
+  // 정답 — 따뜻하게 올라가는 네 음 + 높은 반짝임.
+  'temp.correct': (ctx, t, g) => {
+    const run = plucks(ctx, t, [659.25, 830.61, 987.77, 1318.51], 0.075, 0.12, 0.16 * g, 0.38);
+    tone(ctx, { f: 2637.02, at: t + 0.3, dur: 0.3, peak: 0.045 * g });
+    return run;
+  },
+  // 모두 오답 — 식어 가는 낮은 두 음(놀리지 않게 작고 둥글게).
+  'temp.wrong': (ctx, t, g) => {
+    tone(ctx, { f: 349.23, to: 311.13, at: t, dur: 0.14, peak: 0.12 * g, type: 'triangle' });
+    tone(ctx, { f: 277.18, to: 233.08, at: t + 0.13, dur: 0.2, peak: 0.12 * g, type: 'triangle' });
+    return 0.33;
+  },
+  // 차례 끝 — 정답 낱말이 드러나는 느린 세 음.
+  'temp.answer': (ctx, t, g) => plucks(ctx, t, [523.25, 783.99, 1046.5], 0.11, 0.16, 0.13 * g, 0.4),
 };
+
+/** 온도 0~100 → 음 높이: 0° 는 낮은 미(329.63Hz), 100° 는 그 두 옥타브 위. 5음계 계단에 맞춰 어느 온도든 고운 음이 난다. */
+export function tempPitch(level: number | undefined): number {
+  const temp = Math.max(0, Math.min(100, Math.round(level ?? 50)));
+  const SCALE = [0, 2, 4, 7, 9];
+  const step = Math.round((temp / 100) * 10);
+  const semis = Math.floor(step / 5) * 12 + SCALE[step % 5];
+  return 329.63 * Math.pow(2, semis / 12);
+}
 
 // ── 재생 규칙 상태(모듈 전역 — 게임판은 한 번에 하나만 떠 있다) ──
 const lastAt = new Map<TableCue, number>();

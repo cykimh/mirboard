@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/wordtemp/` 기준(예정).
 
-> **상태:** **S2 — 서버 연결(D-316 어댑터·정의·표 싣기 · D-317 실시간 채점기 · D-318 기록, 클라는 S3)** · S1b 순수 엔진·봇 정책·시뮬레이션(D-315) · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
+> **상태:** **S3 — 클라 게임판(D-319, §18.2)** · S2 서버 연결(D-316 어댑터·정의·표 싣기 · D-317 실시간 채점기 · D-318 기록) · S1b 순수 엔진·봇 정책·시뮬레이션(D-315) · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
 > 설계(포트 대응·비동기 채점 경로·데이터 만들기·단계)는 `docs/plans/wordtemp.md`, 검토 기록은 `docs/plans/word-temperature-review.md`.
 >
 > **독창 게임.** "낱말을 내면 정답과 얼마나 가까운지 숫자로 알려 주고, 그 숫자를 보고 정답을 맞힌다"는 **일반 메커니즘**만 가져왔다.
@@ -423,3 +423,21 @@
 | 기록(§13) | `persistence/WordTempMatchRecorder`·`WordTempHeadToHead`, `V25__word_temp.sql` | `persistence/WordTempMatchRecorderIT`, `infra/ws/WordTempRecorderFailureTest` |
 
 - 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(기록기 IT 만 Docker) · `--tests "com.mirboard.infra.bot.WordTempBotMatchSimulationIT" --tests "com.mirboard.infra.ws.WordTempRecorderFailureTest"`.
+
+### 18.2 클라 (S3, D-319)
+
+경로는 `client/src/features/wordtemp/` 기준. 판정은 전부 서버다 — 클라는 받은 결과를 그리고, 보내기 전 NFC·공백 제거만 한다.
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 상태(순수 리듀서 — 공개 이벤트·스냅샷·본인 큐, `lastSeq` 없음) | `wordTempStore` | `wordTempStore.test` |
+| 소켓 경계·거절 문구(§5)·무효 안내(§6.2)·`BUSY` 재전송 | `wordTempRoomSink` | `wordTempRoomSink.test` |
+| 게임판(단계별 화면 §3 · 비밀 §12 — 출제자 칸은 출제자에게만) | `WordTempTable`·`HintBoard`·`SeatStrip`·`WordTempPanels`·`WordTempMatchEnd` | `WordTempTable.test` |
+| 한글 입력(§5.1 — 조합 중 Enter 버림, NFC) | `WordInput`·`wordTempMath.normalizeWord` | `WordInput.test` |
+| 온도계·띠(§1)·표시용 최저 온도(§3.4)·범주 이름 | `wordTempArt`·`wordTempMath` | `wordTempSfx.test`(수식) |
+| 효과음(`tableSfx` 의 `temp.*`) | `wordTempSfx` | `wordTempSfx.test` |
+| 튜토리얼 6단계(§12 의 "채팅으로 정답을 알려 주지 않기" 포함) | `tutorial/` | `tutorial/wordTempTutorial.test`, `features/tutorial/gameTutorials.test` |
+| CSS `.wt-`(part 29 + 17 의 블록, 동작 줄이기 짝) | `styles/parts/29-wordtemp-table.css` | `styles/wordtempCssNamespace.test`, `features/theme/motionForced.test` |
+
+- 재현: `npm --prefix client run test -- wordtemp` · 화면 한 판 `E2E_WORD_TEMP=1 E2E_BASE_URL=http://localhost:5219 npm --prefix client run e2e -- wordtemp`(`.claude/launch.json` 의 wordtemp-server·wordtemp-client) · 단계별 스크린샷 `node client/e2e/wordtempShots.mjs` → `client/e2e/wordtemp-shots/`.
+- 클라가 든 **표시용** 값: 차수별 최저 온도 50·60·70(`wordTempMath.ATTEMPT_FLOORS` — §3.4 를 바꾸면 같이), 범주 코드의 한글 이름. 후보의 뜻풀이는 서버가 보내지 않아 화면에 없다(D-319 후속).

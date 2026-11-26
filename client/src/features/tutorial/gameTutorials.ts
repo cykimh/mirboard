@@ -7,6 +7,7 @@ import { CLOUD_ROUTE_TUTORIAL } from '@/features/cloudroute/tutorial/cloudrouteT
 import { ARTILLERY_TUTORIAL } from '@/features/artillery/tutorial/artilleryTutorial';
 import { DAMBADUK_TUTORIAL } from '@/features/dambaduk/tutorial/dambadukTutorial';
 import { STAR_SQUARE_TUTORIAL } from '@/features/starsquare/tutorial/starSquareTutorial';
+import { WORD_TEMP_TUTORIAL } from '@/features/wordtemp/tutorial/wordTempTutorial';
 import type { GameTutorial } from './types';
 
 /**
@@ -26,6 +27,7 @@ export const GAME_TUTORIALS: Readonly<Record<string, GameTutorial>> = {
   ARTILLERY: ARTILLERY_TUTORIAL,
   DAMBADUK: DAMBADUK_TUTORIAL,
   STAR_SQUARE: STAR_SQUARE_TUTORIAL,
+  WORD_TEMP: WORD_TEMP_TUTORIAL,
 };
 
 /** 서버 게임 id(`TICHU` 등)로 조회한다. 대소문자는 `loadGame` 과 같이 대문자로 정규화한다. */
