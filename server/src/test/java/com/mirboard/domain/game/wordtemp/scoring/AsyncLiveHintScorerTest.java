@@ -166,7 +166,8 @@ class AsyncLiveHintScorerTest {
         assertThat(await(s, "짠맛")).isEqualTo(new LiveScore.Failed());
         assertThat(store.rows).isEmpty();
         assertThat(s.available()).as("일시적 실패는 멈추지 않는다").isTrue();
-        // 무효가 된 힌트를 다시 내면 다시 묻는다
+        // 무효가 된 힌트를 (실패를 붙잡아 두는 짧은 시간 뒤에) 다시 내면 다시 묻는다
+        clock.advance(AsyncLiveHintScorer.FAILED_HOLD_MS + 1);
         s.request(SEA, "짠맛");
         Awaitility.await().atMost(Duration.ofSeconds(5)).until(() -> s.poll(SEA, "짠맛")
                 .filter(r -> r instanceof LiveScore.Scored).isPresent());
@@ -220,6 +221,21 @@ class AsyncLiveHintScorerTest {
         AsyncLiveHintScorer s = scorer(true, 500, judge.say("짠맛", new Verdict(true, 64, "")));
         s.request(SEA, "짠맛");
         assertThat(await(s, "짠맛")).isEqualTo(new LiveScore.Scored(64));
+    }
+
+    @Test
+    void a_fresh_failure_is_held_so_another_room_polling_the_same_pair_still_sees_it() {
+        AtomicInteger attempt = new AtomicInteger();
+        AsyncLiveHintScorer s = scorer(true, 500, (answer, hint) -> {
+            attempt.incrementAndGet();
+            throw new JudgeException(false, "timeout");
+        });
+        s.request(SEA, "짠맛");
+        assertThat(await(s, "짠맛")).isEqualTo(new LiveScore.Failed());
+        // 방 A 의 timer() 가 실패를 본 직후 방 B 가 같은 쌍을 요청해도, 방 A 의 onTimer() 는 같은 실패를 본다
+        s.request(SEA, "짠맛");
+        assertThat(s.poll(SEA, "짠맛")).contains(new LiveScore.Failed());
+        assertThat(attempt.get()).isEqualTo(1);
     }
 
     @Test

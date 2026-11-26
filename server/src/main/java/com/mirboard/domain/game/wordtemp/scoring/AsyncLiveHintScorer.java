@@ -46,6 +46,11 @@ public class AsyncLiveHintScorer implements LiveHintScorer {
     private static final ZoneId DAY_ZONE = ZoneId.of("Asia/Seoul");
     /** 결과함에 결과를 두는 시간 — 엔진의 기다림 상한(8초)보다 훨씬 길어야 한다. */
     static final long RESULT_TTL_MS = Duration.ofMinutes(10).toMillis();
+    /**
+     * 방금 난 실패는 이만큼 그대로 둔다 — 같은 쌍을 기다리던 다른 방의 {@code timer()}(0)와 {@code onTimer()} 사이에 새 요청이 실패를
+     * 지우면 그 방의 onTimer 가 빈손이 되어 엔진 타이머가 다시 걸리지 않는다(리뷰 지적). 폴링 주기(250ms)보다 넉넉히.
+     */
+    static final long FAILED_HOLD_MS = 2_000;
     /** 동시 실행 칸을 기다리는 상한 — 이보다 늦게 시작하면 어차피 기다림 상한(8초) 안에 못 끝난다. */
     private static final long SLOT_WAIT_MS = 2_500L;
     private static final int RESULT_SWEEP_SIZE = 512;
@@ -135,7 +140,12 @@ public class AsyncLiveHintScorer implements LiveHintScorer {
         if (known != null && !(known.score() instanceof LiveScore.Failed)) {
             return; // 방금 매긴 쌍 — 다음 폴링이 바로 가져간다
         }
-        results.remove(pair); // 지난 실패는 지우고 다시 묻는다(무효가 된 힌트는 다시 낼 수 있다 — 룰 §5.2)
+        if (known != null && clock.millis() - known.at() < FAILED_HOLD_MS) {
+            return; // 방금 난 실패 — 다른 방이 아직 가져가는 중일 수 있다. 이 요청도 같은 실패를 받는다(무효·개수 돌려줌)
+        }
+        if (known != null) {
+            results.remove(pair, known); // 지난 실패는 지우고 다시 묻는다(무효가 된 힌트는 다시 낼 수 있다 — 룰 §5.2)
+        }
         submit(pair, answer);
     }
 
