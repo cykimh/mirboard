@@ -4,7 +4,7 @@
 이 문서와 결정(`docs/decisions.md`)을 함께 고친다. 구현이 붙으면 각 절 끝에 `rules-onecard.md` 와 같은 표기(**코드:** / **테스트:**)로
 위치를 단다. 경로는 `server/src/{main,test}/java/com/mirboard/domain/game/wordtemp/` 기준(예정).
 
-> **상태:** **S2 — 서버 연결(D-316 어댑터·정의·표 싣기 · D-317 실시간 채점기 · D-318 기록, 클라는 S3)** · S1b 순수 엔진·봇 정책·시뮬레이션(D-315) · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
+> **상태:** **S3 — 클라 게임판(D-319, §18.2)** · S2 서버 연결(D-316 어댑터·정의·표 싣기 · D-317 실시간 채점기 · D-318 기록) · S1b 순수 엔진·봇 정책·시뮬레이션(D-315) · 채택 D-310 · 룰 D-311 · 채점 방식 D-312 — 2026-11-25. 코드·테스트 위치는 §18. 공개 설정 `MIRBOARD_WORD_TEMP_STATUS` 는 S4 전까지 `DISABLED`.
 > 설계(포트 대응·비동기 채점 경로·데이터 만들기·단계)는 `docs/plans/wordtemp.md`, 검토 기록은 `docs/plans/word-temperature-review.md`.
 >
 > **독창 게임.** "낱말을 내면 정답과 얼마나 가까운지 숫자로 알려 주고, 그 숫자를 보고 정답을 맞힌다"는 **일반 메커니즘**만 가져왔다.
@@ -298,8 +298,8 @@
 | `HINT_REVEALED` | `attempt`, `text`, `temp`, `floor`(이 차수 최저 온도), `floorMet` — 힌트 0개면 `text` 없음 |
 | `GUESS_PHASE_STARTED` | `attempt`, 남은 시간, 추리할 좌석들 |
 | `GUESS_SUBMITTED` | `seat`(내용 없음) |
-| `GUESSES_REVEALED` | `attempt`, 좌석별 `{text｜패스, correct, masked}`, `setterGain`, 좌석별 점수 증감·총점 |
-| `TURN_ENDED` | `answer`, 그 차례의 힌트 전체 `{attempt, text, temp, revealed}`, `reason`(`SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT`), 총점 |
+| `GUESSES_REVEALED` | `attempt`, 좌석별 `{text｜패스, correct, masked}`, `setterGain`, 좌석별 점수 증감·총점, 결과 보기 남은 시간 |
+| `TURN_ENDED` | `answer`, 그 차례의 힌트 전체 `{attempt, text, temp, revealed}`, `reason`(`SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT`), 총점, 차례 끝 남은 시간 |
 | `SEAT_OUT` | `seat` |
 | `MATCH_ENDED` | 순위·총점(출제·추리 점수 나눠서)·`endReason`. 안 쓴 후보는 없다 |
 
@@ -307,14 +307,14 @@
 
 | 이벤트 | 받는 사람 | 실리는 것 |
 | --- | --- | --- |
-| `WORD_CANDIDATES` | 각자 | 내 후보(낱말·범주), 이번 라운드에 고를 수 있는 것 |
+| `WORD_CANDIDATES` | 각자 | 내 후보(낱말·범주 이름·뜻풀이), 이번 라운드에 고를 수 있는 것 |
 | `HINT_SCORED` | 출제자 | `text`, `temp`, 지금 개수 |
 | `HINT_PENDING` | 출제자 | `text`(채점 중) |
 | `HINT_VOID` | 출제자 | `text`, `reason`(`NOT_A_NOUN`·`SCORING_FAILED`), 지금 개수 |
 | `GUESS_ACCEPTED` | 낸 추리자 | 내가 낸 답 |
 | `ERROR` | 본인 | §5 의 코드 |
 
-판 시작 때는 이벤트를 보내지 않는다 — 1라운드의 낱말 고르기와 내 후보는 resync(공개 뷰·비공개 뷰)로 받고, `WORD_SELECT_STARTED`·`WORD_CANDIDATES` 는 2라운드부터 온다(D-316).
+판 시작 때는 상태를 저장한 **뒤에** 공개 `WORD_SELECT_STARTED` 하나만 보낸다(D-319 — 첫 resync 가 저장보다 빨랐던 클라가 이것을 받고 다시 받는다). 1라운드의 내 후보는 resync 의 비공개 뷰로 받고, `WORD_CANDIDATES` 는 2라운드부터 온다(D-316).
 
 비공개 뷰(`privateView`)는 같은 내용을 통째로 준다 — 내 후보·고른 낱말, (출제자면) 이번 차례의 힌트·온도·채점 중 표시, (추리자면) 이번 차수에 낸 내 답.
 
@@ -417,9 +417,27 @@
 | --- | --- | --- |
 | 정의·방 설정 해석(§2) | `WordTempGameDefinition`·`WordTempSettings` | `WordTempGameDefinitionTest` |
 | 포트 어댑터 — 뷰·타이머 합성·`TICK`·탈주(§9·§10·§12) | `WordTempGameEngine` | `WordTempGameEngineTest`, `WordTempAdapterSecrecyTest`(JSON 은닉) |
-| 시작(§3.1) | `lifecycle/WordTempRoundStarter` | `infra/bot/WordTempBotMatchSimulationIT` |
+| 시작(§3.1 — 저장 뒤 `WORD_SELECT_STARTED` 방송, D-319) | `lifecycle/WordTempRoundStarter` | `lifecycle/WordTempRoundStarterTest`, `infra/bot/WordTempBotMatchSimulationIT` |
 | 표·은행·금칙어 싣기(§6.1) | `words/WordTempWords`·`words/PackedSimilarityTable` | `words/PackedSimilarityTableTest`, `words/WordTempRealDataTest`(진짜 자원·힙 실측) |
 | 실시간 채점(§6.2·§6.3) | `scoring/LiveHintScorer`·`AsyncLiveHintScorer`·`ClaudeHintJudge`·`JdbcLiveScoreStore`, 기준문 `resources/wordtemp/score-v2.md` | `scoring/AsyncLiveHintScorerTest`, `WordTempBotMatchSimulationIT`(서버 경로), `scoring/ClaudeHintJudgeLiveSmokeTest`(진짜 API — 평소 꺼짐) |
 | 기록(§13) | `persistence/WordTempMatchRecorder`·`WordTempHeadToHead`, `V25__word_temp.sql` | `persistence/WordTempMatchRecorderIT`, `infra/ws/WordTempRecorderFailureTest` |
 
 - 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(기록기 IT 만 Docker) · `--tests "com.mirboard.infra.bot.WordTempBotMatchSimulationIT" --tests "com.mirboard.infra.ws.WordTempRecorderFailureTest"`.
+
+### 18.2 클라 (S3, D-319)
+
+경로는 `client/src/features/wordtemp/` 기준. 판정은 전부 서버다 — 클라는 받은 결과를 그리고, 보내기 전 NFC·공백 제거만 한다.
+
+| 무엇 | 코드 | 테스트 |
+| --- | --- | --- |
+| 상태(순수 리듀서 — 공개 이벤트·스냅샷·본인 큐, `lastSeq` 없음) | `wordTempStore` | `wordTempStore.test` |
+| 소켓 경계·거절 문구(§5)·무효 안내(§6.2)·`BUSY` 재전송 | `wordTempRoomSink` | `wordTempRoomSink.test` |
+| 게임판(단계별 화면 §3 · 비밀 §12 — 출제자 칸은 출제자에게만) | `WordTempTable`·`HintBoard`·`SeatStrip`·`WordTempPanels`·`WordTempMatchEnd` | `WordTempTable.test` |
+| 한글 입력(§5.1 — 조합 중 Enter 버림, NFC) | `WordInput`·`wordTempMath.normalizeWord` | `WordInput.test` |
+| 온도계·띠(§1) | `wordTempArt`·`wordTempMath` | `wordTempSfx.test`(수식) |
+| 효과음(`tableSfx` 의 `temp.*`) | `wordTempSfx` | `wordTempSfx.test` |
+| 튜토리얼 6단계(§12 의 "채팅으로 정답을 알려 주지 않기" 포함) | `tutorial/` | `tutorial/wordTempTutorial.test`, `features/tutorial/gameTutorials.test` |
+| CSS `.wt-`(part 29 + 17 의 블록, 동작 줄이기 짝) | `styles/parts/29-wordtemp-table.css` | `styles/wordtempCssNamespace.test`, `features/theme/motionForced.test` |
+
+- 재현: `npm --prefix client run test -- wordtemp` · 화면 한 판 `E2E_WORD_TEMP=1 E2E_BASE_URL=http://localhost:5219 npm --prefix client run e2e -- wordtemp`(`.claude/launch.json` 의 wordtemp-server·wordtemp-client) · 단계별 스크린샷 `node client/e2e/wordtempShots.mjs` → `client/e2e/wordtemp-shots/`.
+- 화면이 쓰는 값은 서버가 싣는다(D-319): 차수별 최저 온도는 공개 뷰 `floors`, 후보의 범주 이름·뜻풀이는 비공개 뷰·`WORD_CANDIDATES`(`words/AnswerCategory`), 결과 보기·차례 끝의 남은 시간은 `GUESSES_REVEALED`·`TURN_ENDED`. 클라에 룰 수치는 없다(튜토리얼 문구의 50·60·70 은 §3.4 의 글).

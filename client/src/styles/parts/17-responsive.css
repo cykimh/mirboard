@@ -1360,6 +1360,142 @@
 }
 /* motion-off:end */
 
+/* D-319 — 낱말 온도(29 는 미디어 0개라 여기 둔다). 기준: 375×812 에서 좌석 띠(6인 3열 2줄) + 공개 힌트 + 입력 칸이 가로 스크롤 없이,
+   자판이 올라온 높이(약 480px)에서도 붙박이 머리 줄의 시계와 공개 힌트·입력란이 같이 보인다.
+   ① 좁은 화면: 여백·글자를 줄이고 좌석 띠는 3열 고정, 입력 줄의 버튼은 한 줄에 남는다.
+   ② 넓은 화면(900px~): 왼쪽에 온도계 판, 오른쪽에 내 칸 — 두 단.
+   ③ 동작 줄이기: 움직임을 모두 끄고 결과만 남긴다 — 끓는 방울·축하 방울은 그리지 않는다(D-291 — `:root:not(.motion-forced)` 아래 + 바로 뒤 motion-off 짝). */
+@media (max-width: 480px) {
+  .wt-table {
+    gap: 6px;
+    padding: 0 8px 12px;
+  }
+  .wt-header {
+    margin: 0 -8px;
+    padding: 6px 8px 5px;
+  }
+  .wt-badge-title {
+    display: none;
+  }
+  .wt-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .wt-strip[data-count='4'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wt-seat {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .wt-seat-status {
+    font-size: 11px;
+  }
+  .wt-phase-title {
+    font-size: 15px;
+  }
+  .wt-board,
+  .wt-panel {
+    padding: 8px 10px 10px;
+    border-radius: 16px;
+  }
+  .wt-board-sub {
+    display: none;
+  }
+  .wt-reveal {
+    padding: 6px 8px 7px;
+  }
+  .wt-reveal-word {
+    font-size: 19px;
+  }
+  .wt-primary,
+  .wt-secondary {
+    padding: 0 12px;
+  }
+  .wt-input {
+    flex-basis: 110px;
+  }
+  /* 후보는 한 줄에 하나 — 뜻풀이가 좁은 칸에서 여러 줄로 꺾이지 않게 */
+  .wt-cands {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .wt-cand {
+    min-height: 56px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 359px) {
+  .wt-attempt-floor {
+    display: none;
+  }
+  .wt-seat-points {
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 900px) {
+  .wt-table {
+    max-width: 980px;
+  }
+  .wt-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+  .wt-stage > .wt-phase {
+    grid-column: 1 / -1;
+  }
+  .wt-stage > .wt-picker,
+  .wt-stage > .wt-wait,
+  .wt-stage > .wt-turn-end {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (hover: hover) {
+  .wt-cand:not(:disabled):not([aria-disabled='true']):hover {
+    border-color: var(--wt-accent);
+  }
+  button.wt-badge:hover,
+  .wt-secondary:not(:disabled):hover {
+    border-color: var(--wt-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not(.motion-forced) .wt-table,
+  :root:not(.motion-forced) .wt-table *,
+  :root:not(.motion-forced) .wt-table::before,
+  :root:not(.motion-forced) .wt-table::after,
+  :root:not(.motion-forced) .wt-table *::before,
+  :root:not(.motion-forced) .wt-table *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  :root:not(.motion-forced) .wt-fx-boil,
+  :root:not(.motion-forced) .wt-fx-cheer {
+    display: none;
+  }
+}
+/* motion-off:begin — 위 동작 줄이기 블록의 짝(D-291). 메뉴에서 연출을 끄면 OS 설정과 무관하게 같은 규칙이 적용된다. 손으로 고치지 말고 위 블록을 고친 뒤 똑같이 맞출 것(motionForced.test 가 대조). */
+:root.motion-off .wt-table,
+:root.motion-off .wt-table *,
+:root.motion-off .wt-table::before,
+:root.motion-off .wt-table::after,
+:root.motion-off .wt-table *::before,
+:root.motion-off .wt-table *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root.motion-off .wt-fx-boil,
+:root.motion-off .wt-fx-cheer {
+  display: none;
+}
+/* motion-off:end */
+
 /* D-132 — 스컬킹 테이블(18 은 폭 미디어 0개라 여기 맨 끝에 둔다, D-88). 좁은 화면에서
    ① 가운데 칸(390px ≈138px, 481~560px 도 ≈190~240px)에서는 트릭 레일이 한 줄에 1~2장씩 쌓여 8인 천이 ≈800~1000px 가 된다 —
    가운데(트릭 레일·방향)를 옆줄 아래 전체 폭으로 내린다. 좌·우·위 자리와 시계 방향은 그대로이고 옆줄 사이는 빈다. 넓은 화면은

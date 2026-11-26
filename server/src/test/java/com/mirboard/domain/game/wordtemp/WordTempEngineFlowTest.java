@@ -92,6 +92,8 @@ class WordTempEngineFlowTest {
                 new WordTempEvent.GuessSubmitted(2));
         g.guess(3, "");
         WordTempEvent.GuessesRevealed first = g.event(WordTempEvent.GuessesRevealed.class);
+        // D-319 — 결과 보기·차례 끝도 남은 시간을 싣는다(화면 시계)
+        assertThat(first.remainingMs()).isEqualTo(g.engine.config().tuning().resultMs());
         assertThat(first.setterGain()).isEqualTo(1);
         assertThat(first.guesses()).containsExactly(
                 new WordTempEvent.RevealedGuess(1, "항구", false, false, false),
@@ -121,6 +123,7 @@ class WordTempEngineFlowTest {
         g.timer(); // 결과 보기 → 차례 끝
         assertThat(g.state.phase()).isEqualTo(Phase.TURN_END);
         WordTempEvent.TurnEnded ended = g.event(WordTempEvent.TurnEnded.class);
+        assertThat(ended.remainingMs()).isEqualTo(g.engine.config().tuning().turnEndMs());
         assertThat(ended.answer()).isEqualTo("바다");
         assertThat(ended.reason()).isEqualTo(TurnEndReason.SOLVED);
         assertThat(ended.hints()).containsExactly(new WordTempEvent.HintInfo(1, "여름", 58, false),

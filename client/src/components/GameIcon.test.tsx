@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { GAME_ICON_IDS, GameIcon, hasGameIcon } from './GameIcon';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 
-/** 게임판이 있는 게임(담바둑·별자리 수판까지 아홉 — pages/gameTables 의 키와 같다). */
-const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY', 'DAMBADUK', 'STAR_SQUARE'];
+/** 게임판이 있는 게임(담바둑·별자리 수판·낱말 온도까지 열 — pages/gameTables 의 키와 같다). */
+const GAMES = ['TICHU', 'SKULL_KING', 'ONE_CARD', 'YACHT', 'OMOK', 'CLOUD_ROUTE', 'ARTILLERY', 'DAMBADUK', 'STAR_SQUARE', 'WORD_TEMP'];
 
 const svgOf = (el: HTMLElement) => el.querySelector('svg') as SVGSVGElement;
 

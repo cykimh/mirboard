@@ -13,6 +13,8 @@ import com.mirboard.domain.game.wordtemp.state.WordTempState.MatchResult;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.Revealed;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.Seat;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.TurnSummary;
+import com.mirboard.domain.game.wordtemp.words.AnswerCategory;
+import com.mirboard.domain.game.wordtemp.words.AnswerEntry;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,7 @@ public final class WordTempViews {
      *
      * @param phaseRemainingMs 단계 마감까지 남은 시간(엔진 계산 — 화면은 바깥 {@code turnRemainingMs} 가 아니라 이것을 쓴다, §9)
      * @param hintCount        이번 차수 힌트 개수(확정 + 채점 중)
+     * @param floors           차수별 최저 온도(1·2·3차) — 비밀이 아니다. 화면이 공개 전에도 눈금을 그린다(§3.4, D-319)
      * @param revealed         차수별 공개 힌트(쌓여 보인다)
      * @param guessedSeats     이번 차수에 추리를 낸 좌석(내용 없음)
      * @param attempts         이번 출제 차례의 끝난 차수 — 동시 공개된 답(금칙어는 가림)
@@ -38,7 +41,8 @@ public final class WordTempViews {
      * @param result           끝났으면 결과
      */
     public record PublicView(Phase phase, int round, int rounds, int turnNo, int setterSeat, int attempt,
-                             long phaseRemainingMs, int hintCount, int maxHints, List<Revealed> revealed,
+                             long phaseRemainingMs, int hintCount, int maxHints, List<Integer> floors,
+                             List<Revealed> revealed,
                              List<Integer> guessedSeats, List<PublicAttempt> attempts, List<SeatView> seats,
                              List<Integer> order, List<TurnSummary> history, TurnReveal turnReveal,
                              MatchResult result) {
@@ -86,7 +90,7 @@ public final class WordTempViews {
         long remaining = state.ended() ? 0 : Math.max(0, state.phaseStartedAt() + config.phaseMs(state.phase()) - now);
         return new PublicView(state.phase(), state.round(), config.rounds(), state.turnNo(), state.setterSeat(),
                 state.attempt(), remaining, state.turnInProgress() ? state.hintCount() : 0,
-                config.tuning().maxHints(), state.revealed(),
+                config.tuning().maxHints(), config.tuning().floors(), state.revealed(),
                 state.guesses().stream().map(Guess::seat).sorted().toList(), attempts, seats, state.order(),
                 state.history(), reveal, state.result());
     }
@@ -114,7 +118,8 @@ public final class WordTempViews {
     public static List<CandidateInfo> candidateInfos(Seat seat) {
         List<CandidateInfo> infos = new ArrayList<>(seat.candidates().size());
         for (int i = 0; i < seat.candidates().size(); i++) {
-            infos.add(new CandidateInfo(i, seat.candidates().get(i).word(), seat.candidates().get(i).category(),
+            AnswerEntry entry = seat.candidates().get(i);
+            infos.add(new CandidateInfo(i, entry.word(), AnswerCategory.label(entry.category()), entry.gloss(),
                     seat.available(i)));
         }
         return infos;

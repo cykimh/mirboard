@@ -202,4 +202,13 @@ class WordTempRealDataTest {
         }
         return used;
     }
+
+    @Test
+    void every_bank_category_has_a_korean_label_and_every_answer_has_a_gloss() {
+        for (AnswerEntry answer : WORDS.bank()) {
+            assertThat(AnswerCategory.known(answer.category())).as("범주 %s (%s)", answer.category(), answer.word()).isTrue();
+            assertThat(AnswerCategory.label(answer.category())).matches("[가-힣·]+");
+            assertThat(answer.gloss()).as("뜻풀이 %s", answer.word()).isNotBlank();
+        }
+    }
 }

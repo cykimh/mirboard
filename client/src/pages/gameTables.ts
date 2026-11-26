@@ -15,6 +15,7 @@ const imports = {
   ARTILLERY: () => import('@/features/artillery/ArtilleryTable'),
   DAMBADUK: () => import('@/features/dambaduk/DambadukTable'),
   STAR_SQUARE: () => import('@/features/starsquare/StarSquareTable'),
+  WORD_TEMP: () => import('@/features/wordtemp/WordTempTable'),
 };
 
 // 게임판에 들어갈 때만 "못 받으면 한 번 새로고침" — 배포 전에 연 탭이 사라진 조각을 찾는 경우(lazyWithReload).
@@ -38,6 +39,9 @@ export const DambadukTable = lazy(() =>
 );
 export const StarSquareTable = lazy(() =>
   loadWithReload('starsquare', imports.STAR_SQUARE).then((m) => ({ default: m.StarSquareTable })),
+);
+export const WordTempTable = lazy(() =>
+  loadWithReload('wordtemp', imports.WORD_TEMP).then((m) => ({ default: m.WordTempTable })),
 );
 
 /**

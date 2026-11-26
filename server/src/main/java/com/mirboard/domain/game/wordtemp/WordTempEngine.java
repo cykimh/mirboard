@@ -686,7 +686,7 @@ public final class WordTempEngine {
             scores.add(new ScoreChange(seat, delta[seat], d.seats.get(seat).total()));
         }
         events.add(new WordTempEvent.GuessesRevealed(d.attempt, WordTempViews.revealedGuesses(result), d.setterSeat,
-                setterGain, scores));
+                setterGain, scores, tuning.resultMs()));
     }
 
     // ---- 출제 차례 끝·판 끝 (§3·§8) ----
@@ -708,7 +708,7 @@ public final class WordTempEngine {
         d.phaseStartedAt = now;
         WordTempState s = d.peek();
         events.add(new WordTempEvent.TurnEnded(d.turnNo, d.answer.word(), WordTempViews.hintInfos(s), reason,
-                s.totals()));
+                s.totals(), tuning.turnEndMs()));
     }
 
     private void finish(Draft d, EndReason reason, long now, List<WordTempEvent> events) {

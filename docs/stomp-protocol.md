@@ -656,7 +656,7 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 
 | type | payload | 의미 |
 | --- | --- | --- |
-| `WORD_SELECT_STARTED` | `{ round, remainingMs }` | 낱말 고르기 시작(2라운드부터 — 1라운드는 resync 로 받는다) |
+| `WORD_SELECT_STARTED` | `{ round, remainingMs }` | 낱말 고르기 시작. **판 시작 때도 온다**(D-319 — 상태를 저장한 뒤에 방송한다. 첫 resync 가 저장보다 빨라 빈손인 클라가 이것을 받고 다시 resync 한다) |
 | `WORD_SELECTED` | `{ seat }` | 골랐다(무엇인지는 없다). 마감 때 안 고른 좌석·봇도 한꺼번에 |
 | `TURN_STARTED` | `{ turnNo, round, setterSeat }` | 출제 차례 시작 |
 | `HINT_PHASE_STARTED` | `{ turnNo, attempt, remainingMs }` | 힌트 단계 |
@@ -664,8 +664,8 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | `HINT_REVEALED` | `{ attempt, text, temp, floor, floorMet }` | 차수의 가장 높은 힌트 공개. 힌트 0개면 `text` null·`temp` −1 |
 | `GUESS_PHASE_STARTED` | `{ attempt, remainingMs, seats }` | 추리 단계, 추리할 좌석들 |
 | `GUESS_SUBMITTED` | `{ seat }` | 냈다(내용 없음) |
-| `GUESSES_REVEALED` | `{ attempt, guesses: [{seat, text, pass, correct, masked}], setterSeat, setterGain, scores: [{seat, delta, total}] }` | 동시 공개. 금칙어를 품은 답은 `text` 가 `···`(원문 없음) |
-| `TURN_ENDED` | `{ turnNo, answer, hints: [{attempt, text, temp, revealed}], reason, totals }` | 정답과 그 차례의 확정 힌트 전체. `reason`: `SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT` |
+| `GUESSES_REVEALED` | `{ attempt, guesses: [{seat, text, pass, correct, masked}], setterSeat, setterGain, scores: [{seat, delta, total}], remainingMs }` | 동시 공개. 금칙어를 품은 답은 `text` 가 `···`(원문 없음) |
+| `TURN_ENDED` | `{ turnNo, answer, hints: [{attempt, text, temp, revealed}], reason, totals, remainingMs }` | 정답과 그 차례의 확정 힌트 전체. `reason`: `SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT` |
 | `SEAT_OUT` | `{ seat }` | 탈주·강퇴 |
 | `MATCH_ENDED` | `{ result: { endReason, standings: [{seat, rank, total, setterPoints, guessPoints, out}], draw } }` | `endReason`: `FINISHED`·`LAST_SEAT`·`NO_HUMANS`. 안 쓴 후보는 없다 |
 
@@ -673,7 +673,7 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 
 | type | 받는 사람 | payload |
 | --- | --- | --- |
-| `WORD_CANDIDATES` | 각자(2라운드부터) | `{ seat, round, candidates: [{index, word, category, available}] }` |
+| `WORD_CANDIDATES` | 각자(2라운드부터 — 1라운드의 후보는 resync 의 비공개 뷰) | `{ seat, round, candidates: [{index, word, category, gloss, available}] }` — `category` 는 범주의 화면 이름(한글), `gloss` 는 뜻풀이 한 줄(D-319) |
 | `HINT_SCORED` | 출제자 | `{ seat, text, temp, count }` — 표 힌트는 `SUBMIT_HINT` 에 바로, 표 밖 힌트는 채점 뒤(보통 2~3초) |
 | `HINT_PENDING` | 출제자 | `{ seat, text }` — 채점 중. 풀릴 때까지 새 힌트·[힌트 끝]은 `SCORING_IN_PROGRESS` |
 | `HINT_VOID` | 출제자 | `{ seat, text, reason, count }` — `NOT_A_NOUN`(고유명사·비하 표현 포함)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다 |
@@ -684,11 +684,11 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 `UNKNOWN_WORD` 는 표에 없는 낱말인데 실시간 채점이 꺼져 있거나(끄기 스위치·API 키 없음) 하루·판 상한에 닿은 것이다 — 개수는 줄지 않는다.
 
 **resync**: `phase` = `WORD_SELECT`·`HINT`·`GUESS`·`ATTEMPT_RESULT`·`TURN_END`·`FINISHED`, `tableView` = `{ phase, round, rounds, turnNo, setterSeat,
-attempt, phaseRemainingMs, hintCount, maxHints, revealed, guessedSeats, attempts, seats: [{seat, alive, bot, setterPoints, guessPoints, total, chosen}],
+attempt, phaseRemainingMs, hintCount, maxHints, floors, revealed, guessedSeats, attempts, seats: [{seat, alive, bot, setterPoints, guessPoints, total, chosen}],
 order, history, turnReveal, result }` — `turnReveal`(정답·힌트 전체)은 `TURN_END` 동안만, 그 밖에는 null. 화면의 남은 시간은 `phaseRemainingMs` 를 쓴다
 (바깥 `turnRemainingMs` 는 이 게임에서 단계 시간이 아니다). **`privateHand`** = `{ seat, candidates, chosen, answer, hints: [{text, attempt, status, temp}], myGuess }` —
-`answer`·`hints` 는 출제자만(`status`: `SCORED`·`PENDING`·`VOID`), `myGuess` 는 추리 단계의 내 답. **판 시작 때는 이벤트를 보내지 않는다** — 첫
-낱말 고르기와 내 후보는 resync 로 받는다.
+`answer`·`hints` 는 출제자만(`status`: `SCORED`·`PENDING`·`VOID`), `myGuess` 는 추리 단계의 내 답. `floors` 는 차수별 최저 온도(1·2·3차 — 비밀이 아니다, 화면이 공개 전에도 눈금을 그린다). `GUESSES_REVEALED`·`TURN_ENDED` 의 `remainingMs` 는 결과 보기·차례 끝 단계의 남은 시간이다(D-319).
+**판 시작 때는 공개 `WORD_SELECT_STARTED` 하나만 보낸다**(저장 뒤) — 내 후보는 resync 의 비공개 뷰로 받는다(시작 때 비공개 이벤트 없음).
 
 ## 보안 검토 체크리스트
 
