@@ -52,7 +52,11 @@ class WordTempGameDefinitionTest {
     /** S4 공개 전 — 설정 없이 띄우면 카탈로그에 없다. 두 기본값(@Value·application.yml)이 같아야 한다. 실시간 채점은 기본 꺼짐. */
     @Test
     void the_status_defaults_to_disabled_and_live_scoring_defaults_to_off() {
-        Parameter status = Arrays.stream(WordTempGameDefinition.class.getConstructors()[0].getParameters())
+        // 스프링이 쓰는 생성자(@Autowired — D-321 로 생성자가 둘이 됐다)
+        java.lang.reflect.Constructor<?> springCtor = Arrays.stream(WordTempGameDefinition.class.getConstructors())
+                .filter(c -> c.isAnnotationPresent(org.springframework.beans.factory.annotation.Autowired.class))
+                .findFirst().orElseThrow();
+        Parameter status = Arrays.stream(springCtor.getParameters())
                 .filter(p -> p.getType() == GameStatus.class).findFirst().orElseThrow();
         assertThat(status.getAnnotation(Value.class).value()).isEqualTo("${mirboard.wordtemp.status:DISABLED}");
         YamlPropertiesFactoryBean yaml = new YamlPropertiesFactoryBean();
