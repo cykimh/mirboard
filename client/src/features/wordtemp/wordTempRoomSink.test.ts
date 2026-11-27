@@ -36,7 +36,7 @@ describe('wordTempRoomSink (D-103)', () => {
   });
 
   it('공개 이벤트 — 적용한 것만 소리를 낸다(스냅샷·버린 프레임은 조용히)', () => {
-    const reveal = { type: 'HINT_REVEALED', payload: { attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true } };
+    const reveal = { type: 'HINT_REVEALED', payload: { attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true } };
     expect(wordTempRoomSink.applyEvent(reveal)).toBe('applied');
     expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.reveal', level: 71 }]);
     playCues.mockClear();
@@ -48,29 +48,41 @@ describe('wordTempRoomSink (D-103)', () => {
     expect(playCues).not.toHaveBeenCalled();
   });
 
-  it('내 힌트 채점 — 스토어에 넣고 온도만큼 높은 한 음', () => {
-    wordTempRoomSink.applyPrivateEvent(env('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 }));
+  it('힌트는 공개 이벤트(D-320) — 모두의 스토어에 쌓이고 온도만큼 높은 한 음(남의 것은 작게)', () => {
+    expect(wordTempRoomSink.applyEvent({ type: 'HINT_SCORED', payload: { seat: 0, text: '여름', temp: 58, count: 1 } })).toBe('applied');
+    expect(st().hints).toEqual([{ text: '여름', attempt: 1, status: 'SCORED', temp: 58 }]);
+    expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.scored', level: 58, gain: 1 }]);
+    // 추리자의 스토어에도 그대로 쌓인다
+    seedStore();
+    wordTempRoomSink.applyEvent({ type: 'HINT_SCORED', payload: { seat: 1, text: '갈매기', temp: 71, count: 1 } });
     expect(st().hints).toHaveLength(1);
-    expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.scored', level: 50 }]);
+    expect(playCues).toHaveBeenLastCalledWith([{ cue: 'temp.scored', level: 71, gain: 0.6 }]);
   });
 
-  it('남의 좌석 앞 프레임은 스토어도 소리도 건드리지 않는다', () => {
-    wordTempRoomSink.applyPrivateEvent(env('HINT_SCORED', { seat: 1, text: '갈매기', temp: 71, count: 1 }));
+  it('본인 큐로 온 힌트 프레임(옛 서버)은 받지 않는다 — 힌트는 공개 토픽으로만 쌓인다', () => {
+    wordTempRoomSink.applyPrivateEvent(env('HINT_SCORED', { seat: 0, text: '갈매기', temp: 71, count: 1 }));
     expect(st().hints).toEqual([]);
     expect(playCues).not.toHaveBeenCalled();
   });
 
-  it('무효가 된 힌트 — 채점 중 줄을 지우고 화면 위 안내로 이유를 말한다(저절로 닫힌다)', () => {
-    wordTempRoomSink.applyPrivateEvent(env('HINT_PENDING', { seat: 0, text: '달려' }));
+  it('무효가 된 힌트 — 채점 중 줄을 지우고, 낸 사람(출제자)에게만 화면 위 안내로 이유를 말한다', () => {
+    wordTempRoomSink.applyEvent({ type: 'HINT_PENDING', payload: { seat: 0, text: '달려' } });
+    expect(st().hints).toHaveLength(1);
     const seq = st().errorSeq;
-    wordTempRoomSink.applyPrivateEvent(env('HINT_VOID', { seat: 0, text: '달려', reason: 'NOT_A_NOUN', count: 0 }));
+    wordTempRoomSink.applyEvent({ type: 'HINT_VOID', payload: { seat: 0, text: '달려', reason: 'NOT_A_NOUN', count: 0 } });
     expect(st().hints).toEqual([]);
     expect(st().errorMessage).toBe(wordTempVoidLabels.NOT_A_NOUN);
     expect(st().errorSeq).toBe(seq + 1);
     expect(st().errorSticky).toBe(false);
-    wordTempRoomSink.applyPrivateEvent(env('HINT_PENDING', { seat: 0, text: '짠맛' }));
-    wordTempRoomSink.applyPrivateEvent(env('HINT_VOID', { seat: 0, text: '짠맛', reason: 'SCORING_FAILED', count: 0 }));
+    wordTempRoomSink.applyEvent({ type: 'HINT_PENDING', payload: { seat: 0, text: '짠맛' } });
+    wordTempRoomSink.applyEvent({ type: 'HINT_VOID', payload: { seat: 0, text: '짠맛', reason: 'SCORING_FAILED', count: 0 } });
     expect(st().errorMessage).toBe('채점이 늦어졌어요. 다시 내 주세요.');
+    // 추리자에게는 줄만 사라지고 안내는 없다
+    seedStore();
+    wordTempRoomSink.applyEvent({ type: 'HINT_PENDING', payload: { seat: 1, text: '달려' } });
+    wordTempRoomSink.applyEvent({ type: 'HINT_VOID', payload: { seat: 1, text: '달려', reason: 'NOT_A_NOUN', count: 0 } });
+    expect(st().hints).toEqual([]);
+    expect(st().errorMessage).toBeNull();
   });
 
   it('거절 — 게임 문구로 보이고 보내기 막음이 풀린다', () => {

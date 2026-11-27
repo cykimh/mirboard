@@ -237,7 +237,8 @@ public final class WordTempEngine {
             int count = d.peek().hintCount();
             events.add(new WordTempEvent.HintScored(seat, text, t, count));
             events.add(new WordTempEvent.HintCount(count, tuning.maxHints()));
-            if (t >= tuning.closeTemp() || count >= tuning.maxHints()) {
+            // D-320 — 기준 온도를 넘긴 힌트가 나오면 그 자리에서 추리로("통과"). 10개를 다 써도 추리로 간다.
+            if (t >= tuning.floor(d.attempt) || count >= tuning.maxHints()) {
                 closeHint(d, now, events);
             }
             return;
@@ -317,7 +318,7 @@ public final class WordTempEngine {
             d.hints.set(index, pending.scored(t));
             int count = d.peek().hintCount();
             events.add(new WordTempEvent.HintScored(d.setterSeat, pending.text(), t, count));
-            if (closing || t >= tuning.closeTemp() || count >= tuning.maxHints()) {
+            if (closing || t >= tuning.floor(d.attempt) || count >= tuning.maxHints()) {
                 closeHint(d, now, events);
             }
         } else {
@@ -416,7 +417,7 @@ public final class WordTempEngine {
                 if (d.peek().solvedThisAttempt()) {
                     endTurn(d, TurnEndReason.SOLVED, now, events);
                 } else if (d.attempt >= tuning.maxAttempts()) {
-                    endTurn(d, TurnEndReason.THREE_ATTEMPTS, now, events);
+                    endTurn(d, TurnEndReason.ALL_ATTEMPTS, now, events);
                 } else {
                     d.attempt++;
                     startHint(d, now, events);
@@ -521,19 +522,19 @@ public final class WordTempEngine {
         return between(rng(d, d.setterSeat, 0x100 + nth), tuning.botHintMinMs(), tuning.botHintMaxMs());
     }
 
-    /** 힌트 단계 끝 — 이번 차수의 가장 높은 힌트를 공개하고 추리로. 힌트 0개면 출제 차례가 끝난다. */
+    /**
+     * 힌트 단계 끝 → 추리(D-320). 힌트는 낼 때마다 이미 모두에게 공개됐다 — 여기서는 이 차수가 <b>기준 온도를 넘겼는지</b>만 정해 알린다
+     * (가장 높은 힌트 ≥ 기준). 못 넘겼으면(시간 초과·10개 소진·힌트 0개) 그래도 추리로 가되, 아무도 못 맞혀도 출제자는 이 차수 점수가 없다.
+     */
     private void closeHint(Draft d, long now, List<WordTempEvent> events) {
         d.botPlan.clear();
         Hint best = d.peek().bestHint();
         int floor = tuning.floor(d.attempt);
-        if (best == null) {
-            events.add(new WordTempEvent.HintRevealed(d.attempt, null, -1, floor, false));
-            endTurn(d, TurnEndReason.NO_HINTS, now, events);
-            return;
-        }
-        boolean floorMet = best.temp() >= floor;
-        d.revealed.add(new Revealed(d.attempt, best.text(), best.temp(), floor, floorMet));
-        events.add(new WordTempEvent.HintRevealed(d.attempt, best.text(), best.temp(), floor, floorMet));
+        boolean floorMet = best != null && best.temp() >= floor;
+        String text = best == null ? null : best.text();
+        int temp = best == null ? -1 : best.temp();
+        d.revealed.add(new Revealed(d.attempt, text, temp, floor, floorMet));
+        events.add(new WordTempEvent.HintRevealed(d.attempt, text, temp, floor, floorMet));
         startGuess(d, now, events);
     }
 
@@ -549,7 +550,7 @@ public final class WordTempEngine {
         Optional<String> next;
         try {
             next = botPolicy.nextHint(new WordTempBotPolicy.SetterView(d.answer, tuning.floor(d.attempt),
-                    tuning.closeTemp(), tuning.maxHints(), usedEarlier, s.hintCount(), config.botLevel(),
+                    tuning.maxHints(), usedEarlier, s.hintCount(), config.botLevel(),
                     seedOf(d, d.setterSeat, 0x200)));
         } catch (RuntimeException policyFault) {
             botFault.accept("hint seat=" + d.setterSeat + " turnNo=" + d.turnNo + " attempt=" + d.attempt, policyFault);
@@ -565,7 +566,8 @@ public final class WordTempEngine {
         d.hints.add(new Hint(next.get(), d.attempt, HintStatus.SCORED, t, HintSource.TABLE, 0L));
         int count = d.peek().hintCount();
         events.add(new WordTempEvent.HintCount(count, tuning.maxHints()));
-        if (t >= tuning.closeTemp() || count >= tuning.maxHints()) {
+        events.add(new WordTempEvent.HintScored(d.setterSeat, next.get(), t, count));
+        if (t >= tuning.floor(d.attempt) || count >= tuning.maxHints()) {
             closeHint(d, now, events);
         } else {
             d.botPlan.add(new BotMove(d.setterSeat, now + hintDelay(d, count), BotMoveKind.HINT));
@@ -600,8 +602,9 @@ public final class WordTempEngine {
 
     /** 봇 추리자의 답 — 공개 정보(공개 힌트·온도, 공개된 틀린 답)와 표만 본다. 정책이 예외·비합법 답을 내면 패스(§11). */
     private void botGuess(Draft d, int seat, List<WordTempEvent> events) {
-        List<WordTempBotPolicy.Clue> clues = d.revealed.stream()
-                .map(r -> new WordTempBotPolicy.Clue(r.text(), r.temp())).toList();
+        // D-320 — 힌트는 전부 공개다: 이 출제 차례의 확정 힌트 모두가 단서다.
+        List<WordTempBotPolicy.Clue> clues = d.hints.stream().filter(h -> h.status() == HintStatus.SCORED)
+                .map(h -> new WordTempBotPolicy.Clue(h.text(), h.temp())).toList();
         Set<String> ruledOut = new LinkedHashSet<>();
         for (AttemptResult a : d.attempts) {
             for (GuessEntry g : a.guesses()) {

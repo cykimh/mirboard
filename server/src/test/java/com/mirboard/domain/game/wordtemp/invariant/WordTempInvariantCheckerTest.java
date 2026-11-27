@@ -31,7 +31,7 @@ class WordTempInvariantCheckerTest {
     }
 
     private static Game guessing() {
-        return game().selectAll(0).hint("여름").hint("갈매기").endHints().guess(1, "항구");
+        return game().selectAll(0).hint("여름").hint("갈매기").guess(1, "항구");
     }
 
     @Test
@@ -55,11 +55,12 @@ class WordTempInvariantCheckerTest {
     void catches_too_many_hints_or_attempts_and_a_second_pending_hint() {
         Game g = game().selectAll(0).hint("여름");
         assertThat(broken(g, d -> {
-            for (String extra : List.of("가", "나", "다", "라", "마")) {
+            for (String extra : List.of("가", "나", "다", "라", "마", "바", "사", "아", "자", "차")) {
                 d.hints.add(new Hint(extra, 1, HintStatus.SCORED, 10, HintSource.TABLE, 0));
             }
-        })).anyMatch(v -> v.contains("has 6 hints"));
-        assertThat(broken(g, d -> d.attempt = 4)).anyMatch(v -> v.contains("attempt out of range"));
+        })).anyMatch(v -> v.contains("has 11 hints"));
+        assertThat(broken(g, d -> d.attempt = 5)).noneMatch(v -> v.contains("attempt out of range")); // 5차까지 있다
+        assertThat(broken(g, d -> d.attempt = 6)).anyMatch(v -> v.contains("attempt out of range"));
         assertThat(broken(g, d -> {
             d.hints.add(new Hint("가", 1, HintStatus.PENDING, -1, HintSource.LIVE, 5));
             d.hints.add(new Hint("나", 1, HintStatus.PENDING, -1, HintSource.LIVE, 6));
@@ -70,12 +71,45 @@ class WordTempInvariantCheckerTest {
     }
 
     @Test
-    void catches_a_revealed_hint_that_is_not_the_hottest_or_has_the_wrong_floor() {
-        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, "여름", 58, 50, true))))
-                .anyMatch(v -> v.contains("not the best one"));
-        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, "갈매기", 71, 40, true))))
-                .anyMatch(v -> v.contains("wrong floor"));
+    void catches_an_attempt_summary_that_does_not_match_its_hints() {
+        String mismatch = "attempt summary of attempt 1 does not match its hints";
+        // 가장 높은 힌트가 아니다
+        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, "여름", 58, 70, false))))
+                .anyMatch(v -> v.contains(mismatch));
+        // 기준 온도가 그 차수의 값이 아니다
+        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, "갈매기", 71, 50, true))))
+                .anyMatch(v -> v.contains(mismatch));
+        // 넘겼는데 못 넘겼다고 적었다 / 힌트가 있는데 없다고 적었다
+        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, "갈매기", 71, 70, false))))
+                .anyMatch(v -> v.contains(mismatch));
+        assertThat(broken(guessing(), d -> d.revealed.set(0, new Revealed(1, null, -1, 70, false))))
+                .anyMatch(v -> v.contains(mismatch));
         assertThat(broken(guessing(), d -> d.revealed.clear())).anyMatch(v -> v.contains("revealed 0 hints"));
+        // 힌트 0개로 끝난 차수의 요약(낱말 없음·−1·미달)은 정상이다
+        Game empty = game().selectAll(0).timer();
+        assertThat(empty.state.revealed()).containsExactly(new Revealed(1, null, -1, 70, false));
+        assertThat(WordTempInvariantChecker.violations(empty.state, empty.engine.config())).isEmpty();
+    }
+
+    @Test
+    void catches_a_second_hint_at_or_above_the_floor_in_one_attempt() {
+        // 기준을 넘긴 힌트가 나오면 그 자리에서 단계가 끝난다 — 한 차수에 둘일 수 없다(D-320)
+        assertThat(broken(guessing(), d -> d.hints.add(new Hint("파도", 1, HintStatus.SCORED, 93, HintSource.TABLE, 0))))
+                .anyMatch(v -> v.contains("attempt 1 has 2 hints at or above the floor"));
+        // 다음 차수의 기준으로는 따로 센다
+        Game second = game().selectAll(0).hint("배").passAll().timer().hint("섬");
+        assertThat(second.state.attempt()).isEqualTo(2);
+        assertThat(WordTempInvariantChecker.violations(second.state, second.engine.config())).isEmpty();
+    }
+
+    @Test
+    void catches_a_setter_gain_that_is_not_the_attempt_number_times_the_round() {
+        Game g = game().selectAll(0).hint("배").passAll(); // 1차 전원 오답 → +1
+        assertThat(g.state.attempts().get(0).setterGain()).isEqualTo(1);
+        assertThat(broken(g, d -> {
+            d.attempts.set(0, new WordTempState.AttemptResult(1, d.attempts.get(0).guesses(), 3));
+            d.seats.set(0, d.seats.get(0).plus(2, 0));
+        })).anyMatch(v -> v.contains("attempt 1 setter gain 3"));
     }
 
     @Test

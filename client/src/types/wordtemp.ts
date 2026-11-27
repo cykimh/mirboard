@@ -3,16 +3,28 @@
 export type WordTempPhase = 'WORD_SELECT' | 'HINT' | 'GUESS' | 'ATTEMPT_RESULT' | 'TURN_END' | 'FINISHED';
 export type HintStatus = 'SCORED' | 'PENDING' | 'VOID';
 export type VoidReason = 'NOT_A_NOUN' | 'SCORING_FAILED';
-export type TurnEndReason = 'SOLVED' | 'THREE_ATTEMPTS' | 'NO_HINTS' | 'SETTER_OUT';
+/** `THREE_ATTEMPTS`·`NO_HINTS` 는 옛 판(룰 v1)의 기록에만 남는다 — D-320 뒤로는 `ALL_ATTEMPTS`. */
+export type TurnEndReason = 'SOLVED' | 'ALL_ATTEMPTS' | 'THREE_ATTEMPTS' | 'NO_HINTS' | 'SETTER_OUT';
 export type EndReason = 'FINISHED' | 'LAST_SEAT' | 'NO_HUMANS';
 
-/** 차수의 공개 힌트 하나. `floor` = 그 차수의 최저 온도, `floorMet` = 넘겼는가. */
+/**
+ * 끝난 힌트 단계 하나의 요약(D-320) — 그 차수의 가장 높은 힌트와 **기준 온도**(`floor`)를 넘겼는지. 힌트가 하나도 없었으면 `text` null·
+ * `temp` −1 이고 `floorMet` 은 false 다.
+ */
 export interface Revealed {
   attempt: number;
-  text: string;
+  text: string | null;
   temp: number;
   floor: number;
   floorMet: boolean;
+}
+
+/** 모두가 보는 힌트 하나(D-320 — 낼 때마다 공개). `temp` 는 확정이면 0~100, 채점 중이면 −1. */
+export interface HintView {
+  text: string;
+  attempt: number;
+  status: HintStatus;
+  temp: number;
 }
 
 export interface RevealedGuess {
@@ -90,8 +102,10 @@ export interface WordTempTableView {
   phaseRemainingMs: number;
   hintCount: number;
   maxHints: number;
-  /** 차수별 최저 온도(1·2·3차) — 공개 전에도 눈금을 그린다(D-319). */
+  /** 차수별 기준 온도(1~5차 — D-320). 이 온도 이상의 힌트가 나오면 힌트 단계가 끝난다. */
   floors: number[];
+  /** 이 출제 차례의 힌트 전부(확정 + 채점 중, 낸 순서). */
+  hints: HintView[];
   revealed: Revealed[];
   guessedSeats: number[];
   attempts: PublicAttempt[];
@@ -112,21 +126,12 @@ export interface CandidateInfo {
   available: boolean;
 }
 
-/** 출제자 본인의 힌트. `temp` 는 확정이면 0~100, 아니면 −1. */
-export interface OwnHint {
-  text: string;
-  attempt: number;
-  status: HintStatus;
-  temp: number;
-}
-
 /** 비공개 뷰(`privateHand`) — 봇·빠진 좌석·관전자는 null. */
 export interface WordTempPrivateView {
   seat: number;
   candidates: CandidateInfo[];
   chosen: number;
   answer: string | null;
-  hints: OwnHint[];
   myGuess: string | null;
 }
 
@@ -188,7 +193,7 @@ export interface MatchEndedPayload {
   result: MatchResult;
 }
 
-// ── 비공개 이벤트 payload(순번 없음) ──
+// ── 힌트 이벤트 payload — D-320 뒤로 공개(순번 있음). `seat` 는 출제자 ──
 export interface WordCandidatesPayload {
   seat: number;
   round: number;
@@ -210,6 +215,7 @@ export interface HintVoidPayload {
   reason: VoidReason;
   count: number;
 }
+// ── 비공개 이벤트 payload(순번 없음) ──
 export interface GuessAcceptedPayload {
   seat: number;
   text: string;

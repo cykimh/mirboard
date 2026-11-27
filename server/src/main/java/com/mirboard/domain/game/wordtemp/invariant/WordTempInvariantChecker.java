@@ -113,7 +113,7 @@ public final class WordTempInvariantChecker {
         }
     }
 
-    /** 한 차례 출제자 ≤ 6r(= 1+2+3 차수 합 × r), 추리자는 차례당 한 번만 맞힌다, 차수 ≤ 3. */
+    /** 한 차례 출제자 ≤ 차수 합 × r(5차면 15r), 추리자는 차례당 한 번만 맞힌다, 차수 ≤ 상한. */
     private static void checkHistory(WordTempState state, WordTempTuning tuning, List<String> v) {
         int maxGain = tuning.maxAttempts() * (tuning.maxAttempts() + 1) / 2;
         int lastTurn = 0;
@@ -229,10 +229,21 @@ public final class WordTempInvariantChecker {
             v.add("revealed " + state.revealed().size() + " hints in " + phase + " attempt " + state.attempt());
         }
         for (Revealed r : state.revealed()) {
-            boolean best = state.hints().stream().filter(h -> h.attempt() == r.attempt()
-                    && h.status() == HintStatus.SCORED).mapToInt(Hint::temp).max().orElse(-1) == r.temp();
-            if (!best || r.floor() != tuning.floor(r.attempt()) || r.floorMet() != (r.temp() >= r.floor())) {
-                v.add("revealed hint of attempt " + r.attempt() + " is not the best one or has a wrong floor");
+            // D-320 — 차수 요약: 그 차수의 가장 높은 확정 힌트(없으면 낱말 null·온도 −1)와 기준을 넘겼는지
+            int top = state.hints().stream().filter(h -> h.attempt() == r.attempt()
+                    && h.status() == HintStatus.SCORED).mapToInt(Hint::temp).max().orElse(-1);
+            boolean none = top < 0;
+            if (r.temp() != top || (r.text() == null) != none || r.floor() != tuning.floor(r.attempt())
+                    || r.floorMet() != (top >= r.floor())) {
+                v.add("attempt summary of attempt " + r.attempt() + " does not match its hints");
+            }
+        }
+        for (int a = 1; a <= tuning.maxAttempts(); a++) {
+            int attempt = a;
+            long passing = state.hints().stream().filter(h -> h.attempt() == attempt
+                    && h.status() == HintStatus.SCORED && h.temp() >= tuning.floor(attempt)).count();
+            if (passing > 1) {
+                v.add("attempt " + a + " has " + passing + " hints at or above the floor");
             }
         }
         int expectedAttempts = switch (phase) {
@@ -245,8 +256,11 @@ public final class WordTempInvariantChecker {
         }
         for (AttemptResult a : state.attempts()) {
             boolean solved = !a.solvers().isEmpty();
-            if (a.setterGain() != 0 && (solved || a.setterGain() != a.attempt() * state.round())) {
-                v.add("attempt " + a.attempt() + " setter gain " + a.setterGain());
+            // D-320 — 전원 오답이고 그 차수가 기준 온도를 넘겼을 때만 출제자가 차수 × 라운드를 받는다. 그 밖에는 0.
+            boolean floorMet = state.revealed().stream().anyMatch(r -> r.attempt() == a.attempt() && r.floorMet());
+            int expectedGain = !solved && floorMet ? a.attempt() * state.round() : 0;
+            if (a.setterGain() != expectedGain) {
+                v.add("attempt " + a.attempt() + " setter gain " + a.setterGain() + " != " + expectedGain);
             }
             if (solved && phase != Phase.TURN_END && a.attempt() != state.attempt()) {
                 v.add("turn went on after attempt " + a.attempt() + " was solved");

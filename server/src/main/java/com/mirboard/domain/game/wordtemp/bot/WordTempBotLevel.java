@@ -1,58 +1,44 @@
 package com.mirboard.domain.game.wordtemp.bot;
 
 /**
- * 봇 강도(`docs/rules-wordtemp.md` §11 표) — 방 맵 옵션 {@code BOT_LEVEL} 의 값(S2 에서 연결). 수치는 전부 [수치] — S2 봇 평가로 고친다.
+ * 봇 강도(`docs/rules-wordtemp.md` §11, D-320 에서 다시 정함). 출제는 "기준을 넘기는 힌트를 얼마나 빨리 내는가"로, 추리는 "아는 은행·온도
+ * 읽기 잡음·차수당 맞힐 확률 상한"으로 가른다. 힌트가 전부 공개되고 차수가 5번이라 상한을 v1(10·30·50%)보다 낮췄다 — 차수마다 다시
+ * 기회가 오므로 한 출제 차례에 맞힐 확률은 1 − (1 − 상한)^차수 로 쌓인다.
  *
- * @param bandLow     출제 — 공개될 힌트의 목표 띠 아래(절대 온도). {@code floorBand} 면 "그 차수 최저 온도 + bandLow"
- * @param bandHigh    출제 — 목표 띠 위
- * @param floorBand   목표 띠를 차수별 최저 온도에 붙여 잡는가(어려움 — 최저 바로 위)
- * @param minHints    출제 — 차수당 힌트 개수(최소~최대)
- * @param maxHints    〃
- * @param knownPct    추리 — 아는 은행의 비율(%) — 정답이 그 안에 드는지도 운
- * @param noise       추리 — 온도 읽기 잡음(±)
- * @param hitCapPct   추리 — 차수마다 "가장 그럴듯한 답"을 그대로 내는 확률(%) = 맞힐 확률의 상한. 걸리면 두 번째 후보나 패스
+ * @param warmMin   출제 — 기준을 넘기는 힌트 앞에 내는 낮은 힌트 개수(최소~최대). 많을수록 단서가 많아 추리자에게 쉽다
+ * @param warmMax   〃
+ * @param knownPct  추리 — 아는 은행의 비율(%) — 정답이 그 안에 드는지도 운
+ * @param noise     추리 — 온도 읽기 잡음(±)
+ * @param hitCapPct 추리 — 차수마다 "가장 그럴듯한 답"을 그대로 내는 확률(%) = 맞힐 확률의 상한. 걸리면 두 번째 후보나 패스
  */
 public enum WordTempBotLevel {
-    EASY(72, 92, false, 1, 2, 30, 15, 10),
-    NORMAL(65, 85, false, 2, 3, 60, 8, 30),
-    HARD(0, 12, true, 2, 4, 100, 3, 50);
+    EASY(2, 3, 30, 15, 6),
+    NORMAL(1, 2, 60, 8, 14),
+    HARD(0, 1, 100, 3, 25);
 
-    private final int bandLow;
-    private final int bandHigh;
-    private final boolean floorBand;
-    private final int minHints;
-    private final int maxHints;
+    /** 기준을 넘기는 힌트의 목표 띠 — 기준 ~ 기준+5°(넘기되 너무 뜨겁지 않게). */
+    public static final int PASS_BAND = 5;
+
+    private final int warmMin;
+    private final int warmMax;
     private final int knownPct;
     private final int noise;
     private final int hitCapPct;
 
-    WordTempBotLevel(int bandLow, int bandHigh, boolean floorBand, int minHints, int maxHints, int knownPct,
-                     int noise, int hitCapPct) {
-        this.bandLow = bandLow;
-        this.bandHigh = bandHigh;
-        this.floorBand = floorBand;
-        this.minHints = minHints;
-        this.maxHints = maxHints;
+    WordTempBotLevel(int warmMin, int warmMax, int knownPct, int noise, int hitCapPct) {
+        this.warmMin = warmMin;
+        this.warmMax = warmMax;
         this.knownPct = knownPct;
         this.noise = noise;
         this.hitCapPct = hitCapPct;
     }
 
-    /** 그 차수(최저 온도 {@code floor})의 목표 띠 아래. */
-    public int bandLow(int floor) {
-        return floorBand ? floor + bandLow : bandLow;
+    public int warmMin() {
+        return warmMin;
     }
 
-    public int bandHigh(int floor) {
-        return floorBand ? floor + bandHigh : bandHigh;
-    }
-
-    public int minHints() {
-        return minHints;
-    }
-
-    public int maxHints() {
-        return maxHints;
+    public int warmMax() {
+        return warmMax;
     }
 
     public int knownPct() {

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * D-316 — <b>진짜</b> 자원(표 v1·은행·금칙어)을 부팅 때와 같은 길로 읽어 본다. 형태 검증(설계서 §5.4), 은행 기준(D-313), 힙 실측,
- * 그리고 봇 출제 띠가 모든 정답에서 후보를 갖는지(D-313 의 "쉬움 띠를 넓힐 것").
+ * 그리고 룰 v2(D-320)의 기준 온도를 진짜 표가 얼마나 받쳐 주는지(정답마다 기준 이상 힌트가 있는가)와 봇 출제 계획.
  */
 class WordTempRealDataTest {
 
@@ -101,50 +101,150 @@ class WordTempRealDataTest {
         }
     }
 
-    /**
-     * D-313 의 숙제 — 봇 출제 띠가 <b>모든 정답·모든 차수</b>에서 후보를 갖는다(띠가 비면 정책이 "띠에 가장 가까운 낱말"로 물러나 같은 힌트만
-     * 낸다). 쉬움 띠 80~92 는 정답 50개에서 후보가 3개 미만이라 72~92 로 넓혔다(D-316) — 한 출제 차례가 3차수라 최소 3개가 필요하다.
-     */
-    @Test
-    void every_bot_level_has_at_least_three_in_band_hints_for_every_answer_and_attempt() {
-        PackedSimilarityTable table = WORDS.table();
-        WordTempTuning tuning = WordTempTuning.DEFAULT;
-        for (WordTempBotLevel level : WordTempBotLevel.values()) {
-            int min = Integer.MAX_VALUE;
-            for (AnswerEntry answer : WORDS.bank()) {
-                for (int attempt = 1; attempt <= tuning.maxAttempts(); attempt++) {
-                    int low = level.bandLow(tuning.floor(attempt));
-                    int high = level.bandHigh(tuning.floor(attempt));
-                    int inBand = (int) table.neighbors(answer.word()).stream()
-                            .filter(n -> n.temp() >= low && n.temp() <= high && n.temp() < tuning.closeTemp()).count();
-                    min = Math.min(min, inBand);
-                    assertThat(inBand).as(level + " " + answer.word() + " attempt " + attempt + " band " + low + "~" + high)
-                            .isGreaterThanOrEqualTo(3);
-                }
-            }
-            System.out.println("[wordtemp] bot " + level + " 출제 띠 후보 최소 " + min + "개");
-        }
+    /** 이 정답에 낼 수 있는 표 이웃(정규화돼 있고 포함 규칙에 안 걸리는 것) — 봇 정책·사람 출제자가 쓸 수 있는 전부. */
+    private static List<Neighbor> legalHints(PackedSimilarityTable table, AnswerEntry answer) {
+        return table.neighbors(answer.word()).stream()
+                .filter(n -> WordNormalizer.normalize(n.hint()).filter(n.hint()::equals).isPresent()
+                        && HintRules.containment(answer, n.hint()).isEmpty()).toList();
     }
 
-    /** 봇 정책이 진짜 표로 모든 정답에 합법인 힌트를 낸다(쉬움·보통·어려움 × 3차수). */
+    /** 기준 온도들을 차례로, 서로 다른 힌트로 넘길 수 있는 차수 수 — 차수마다 "아직 안 쓴 것 중 기준 이상에서 가장 낮은 것"(탐욕, 최적). */
+    private static int reachableAttempts(List<Neighbor> legal, int[] floors) {
+        List<Integer> temps = new ArrayList<>(legal.stream().map(Neighbor::temp).sorted().toList());
+        int reached = 0;
+        for (int floor : floors) {
+            int at = -1;
+            for (int i = 0; i < temps.size(); i++) {
+                if (temps.get(i) >= floor) {
+                    at = i;
+                    break;
+                }
+            }
+            if (at < 0) {
+                break; // 오르는 기준이라 여기서 못 넘기면 뒤도 못 넘긴다
+            }
+            temps.remove(at);
+            reached++;
+        }
+        return reached;
+    }
+
+    /**
+     * D-320 의 근거 수치 — 진짜 표에서 정답마다 기준 이상 힌트가 있는가. 한 출제 차례 안에서는 힌트를 다시 낼 수 없으므로 "다섯 기준을 서로 다른
+     * 힌트로 차례로 넘길 수 있는가"도 센다. 결과는 표준 출력과 {@code server/build/wordtemp-floor-stats.txt}.
+     */
     @Test
-    void the_setter_policy_finds_a_legal_hint_for_every_answer_on_the_real_table() {
+    void the_real_table_supports_the_attempt_floors_for_most_answers() throws IOException {
+        PackedSimilarityTable table = WORDS.table();
+        int bank = WORDS.bank().size();
+        StringBuilder out = new StringBuilder("낱말 온도 진짜 표의 기준 온도 통계 (D-320) — 은행 " + bank + "개, 표 " + table.version() + "\n");
+        out.append("[a] 기준 이상인 합법 힌트가 하나 이상 있는 정답 수\n");
+        for (int threshold : new int[] {70, 75, 80, 85, 88, 90}) {
+            int count = 0;
+            for (AnswerEntry answer : WORDS.bank()) {
+                if (legalHints(table, answer).stream().anyMatch(n -> n.temp() >= threshold)) {
+                    count++;
+                }
+            }
+            out.append(String.format("    %d° 이상: %d / %d (없는 정답 %d)%n", threshold, count, bank, bank - count));
+            assertThat(count).as(">= " + threshold).isPositive();
+            if (threshold == 70) {
+                assertThat(count).as("70° 는 모든 정답이 넘길 수 있다(은행 기준 75~95 3개 이상)").isEqualTo(bank);
+            }
+        }
+        int five = 0;
+        for (AnswerEntry answer : WORDS.bank()) {
+            if (legalHints(table, answer).stream().filter(n -> n.temp() >= 70).count() >= 5) {
+                five++;
+            }
+        }
+        out.append(String.format("[b] 70° 이상인 서로 다른 합법 힌트가 5개 이상인 정답: %d / %d%n", five, bank));
+        assertThat(five).isPositive();
+        out.append("[c] 기준 세트별 — 서로 다른 힌트로 차례로 넘길 수 있는 차수 수(탐욕: 차수마다 안 쓴 것 중 기준 이상에서 가장 낮은 것)\n");
+        int[][] sets = {{70, 75, 80, 85, 90}, {70, 75, 80, 85, 88}, {65, 70, 75, 80, 85}, {60, 65, 70, 75, 80},
+                {70, 70, 75, 80, 85}, {50, 60, 70}};
+        for (int[] floors : sets) {
+            int[] byReached = new int[floors.length + 1];
+            for (AnswerEntry answer : WORDS.bank()) {
+                byReached[reachableAttempts(legalHints(table, answer), floors)]++;
+            }
+            StringBuilder dist = new StringBuilder();
+            for (int k = 0; k <= floors.length; k++) {
+                dist.append(String.format(" %d차까지 %d", k, byReached[k]));
+            }
+            out.append(String.format("    %-22s 전부 넘길 수 있는 정답 %d / %d (%.1f%%) |%s%n",
+                    java.util.Arrays.toString(floors), byReached[floors.length], bank,
+                    100.0 * byReached[floors.length] / bank, dist));
+            assertThat(byReached[floors.length]).as(java.util.Arrays.toString(floors)).isPositive();
+            assertThat(byReached[0]).as("첫 기준도 못 넘기는 정답은 없다 " + java.util.Arrays.toString(floors)).isZero();
+        }
+        Path file = Path.of("build", "wordtemp-floor-stats.txt");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, out.toString());
+        System.out.print("[wordtemp] " + out);
+    }
+
+    /**
+     * 봇 출제 계획(D-320)을 진짜 표로 — 모든 정답 × 강도 × 1~5차를 엔진처럼 걷는다(앞 차수에 낸 힌트는 {@code usedEarlier} 로 쌓인다).
+     * 계획은 비지 않고, 힌트는 전부 합법이며, 안 쓴 힌트 중 기준 이상이 있으면 마지막 힌트가 기준을 넘기고(기준~기준+5° 에 있으면 그 안),
+     * 없으면 안 쓴 것 중 가장 높은 것으로 끝난다. 그 앞의 힌트는 모두 기준 아래다(단계가 미리 끝나지 않는다).
+     */
+    @Test
+    void the_setter_policy_walks_a_legal_plan_for_every_answer_level_and_attempt_on_the_real_table() {
         PackedSimilarityTable table = WORDS.table();
         WordTempBotPolicy policy = new WordTempBotPolicy(table);
         WordTempTuning tuning = WordTempTuning.DEFAULT;
         for (WordTempBotLevel level : WordTempBotLevel.values()) {
+            int[] met = new int[tuning.maxAttempts() + 1];
             for (AnswerEntry answer : WORDS.bank()) {
+                List<Neighbor> legal = legalHints(table, answer);
                 Set<String> used = new HashSet<>();
                 for (int attempt = 1; attempt <= tuning.maxAttempts(); attempt++) {
-                    Optional<String> hint = policy.nextHint(new WordTempBotPolicy.SetterView(answer,
-                            tuning.floor(attempt), tuning.closeTemp(), tuning.maxHints(), used, 0, level,
-                            answer.word().hashCode() * 31L + attempt));
-                    assertThat(hint).as(level + " " + answer.word() + " attempt " + attempt).isPresent();
-                    int temp = table.lookup(answer.word(), hint.get()).orElseThrow();
-                    assertThat(temp).isBetween(level.bandLow(tuning.floor(attempt)), level.bandHigh(tuning.floor(attempt)));
-                    used.add(hint.get());
+                    int floor = tuning.floor(attempt);
+                    String at = level + " " + answer.word() + " attempt " + attempt;
+                    List<Neighbor> unused = legal.stream().filter(n -> !used.contains(n.hint())).toList();
+                    assertThat(unused).as(at).isNotEmpty();
+                    long seed = answer.word().hashCode() * 31L + attempt;
+                    List<String> given = new ArrayList<>();
+                    int last = -1;
+                    while (given.size() < tuning.maxHints()) {
+                        Optional<String> hint = policy.nextHint(new WordTempBotPolicy.SetterView(answer, floor,
+                                tuning.maxHints(), Set.copyOf(used), given.size(), level, seed));
+                        if (hint.isEmpty()) {
+                            break; // 계획을 다 냈다 — 엔진이 힌트 단계를 닫는다
+                        }
+                        assertThat(given).as(at).doesNotContain(hint.get());
+                        assertThat(used).as(at).doesNotContain(hint.get());
+                        assertThat(WordNormalizer.normalize(hint.get())).as(at).contains(hint.get());
+                        assertThat(HintRules.containment(answer, hint.get())).as(at).isEmpty();
+                        last = table.lookup(answer.word(), hint.get()).orElseThrow();
+                        given.add(hint.get());
+                        if (last >= floor) {
+                            break; // 기준을 넘겼다 — 엔진이 그 자리에서 추리로 넘긴다
+                        }
+                    }
+                    assertThat(given).as(at).isNotEmpty();
+                    assertThat(given.size()).as(at).isLessThanOrEqualTo(level.warmMax() + 1);
+                    int best = unused.stream().mapToInt(Neighbor::temp).max().orElseThrow();
+                    if (best >= floor) {
+                        assertThat(last).as(at).isGreaterThanOrEqualTo(floor);
+                        if (unused.stream().anyMatch(n -> n.temp() >= floor
+                                && n.temp() <= floor + WordTempBotLevel.PASS_BAND)) {
+                            assertThat(last).as(at).isLessThanOrEqualTo(floor + WordTempBotLevel.PASS_BAND);
+                        }
+                        met[attempt]++;
+                    } else {
+                        assertThat(last).as(at + " — 넘길 수 없으면 아는 것 중 가장 높은 것").isEqualTo(best);
+                    }
+                    for (String earlier : given.subList(0, given.size() - 1)) {
+                        assertThat(table.lookup(answer.word(), earlier).orElseThrow()).as(at).isLessThan(floor);
+                    }
+                    used.addAll(given);
                 }
             }
+            System.out.println("[wordtemp] bot " + level + " 출제 — 기준을 넘긴 정답 수(1~5차, 은행 " + WORDS.bank().size()
+                    + "): " + java.util.Arrays.toString(java.util.Arrays.copyOfRange(met, 1, met.length)));
+            assertThat(met[1]).isEqualTo(WORDS.bank().size());
         }
     }
 

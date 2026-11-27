@@ -21,8 +21,8 @@ public final class WordTempBotPolicy {
 
     /** 추리 봇이 표에 없는 (후보, 힌트) 쌍에 어림하는 온도 — "관련 없음"에 가깝게. 채점에는 쓰이지 않는다(표 밖 = 모름, §6). */
     static final int UNKNOWN_TEMP = 20;
-    /** 곁들이는 힌트(가장 높은 힌트가 아닌 것)의 아래 한계 — 너무 엉뚱한 낱말은 내지 않는다. */
-    static final int DECOY_MIN_TEMP = 20;
+    /** 먼저 내는 낮은 힌트의 띠 — 기준 아래 이만큼까지(너무 엉뚱한 낱말은 내지 않는다). */
+    static final int WARM_RANGE = 30;
 
     private final SimilarityTable table;
 
@@ -34,62 +34,63 @@ public final class WordTempBotPolicy {
 
     /**
      * @param answer            내 정답
-     * @param floor             이 차수 최저 온도
-     * @param closeTemp         이 온도 이상은 힌트 단계를 끝내 버린다 — 피한다
+     * @param floor             이 차수의 기준 온도 — 이 온도 이상의 힌트를 내면 힌트 단계가 끝난다(통과)
      * @param maxHints          차수당 상한
-     * @param usedEarlier       앞 차수들에서 이미 낸 힌트(이 출제 차례)
+     * @param usedEarlier       앞 차수들에서 이미 낸 힌트(이 출제 차례 — 전부 공개돼 있고 다시 낼 수 없다)
      * @param countThisAttempt  이번 차수에 이미 낸 개수
      * @param planSeed          이 (판, 출제 차례, 차수, 좌석)의 씨앗 — 같은 차수 안에서는 같은 계획이 다시 나온다
      */
-    public record SetterView(AnswerEntry answer, int floor, int closeTemp, int maxHints, Set<String> usedEarlier,
+    public record SetterView(AnswerEntry answer, int floor, int maxHints, Set<String> usedEarlier,
                              int countThisAttempt, WordTempBotLevel level, long planSeed) {
     }
 
-    /** 다음에 낼 힌트. 빈 값 = [힌트 끝](낼 것이 없거나 계획을 다 냄). */
+    /** 다음에 낼 힌트. 빈 값 = 그만 낸다(낼 것이 없거나, 기준을 넘길 낱말을 몰라 아는 것 중 가장 높은 것까지 다 냄). */
     public Optional<String> nextHint(SetterView view) {
         List<String> plan = hintPlan(view);
         return view.countThisAttempt() < plan.size() ? Optional.of(plan.get(view.countThisAttempt()))
                 : Optional.empty();
     }
 
-    /** 이번 차수의 힌트 계획 — 맨 앞이 목표 띠에 드는 "가장 높은 힌트", 뒤는 그보다 낮은 곁들이 힌트. */
+    /**
+     * 이번 차수의 힌트 계획(D-320) — 낮은 힌트 몇 개(강도마다 다르다) 뒤에 <b>기준을 넘기는 힌트</b> 하나. 넘기는 힌트는 기준 ~ 기준+5°
+     * 에서 고르고, 그 띠가 비면 기준 이상 중 가장 낮은 것을 낸다. 표에 기준 이상인 낱말이 없으면(진짜 표의 정답 3분의 1 은 90° 이상 쌍이
+     * 없다) 아는 것 중 가장 높은 것을 마지막에 내고 그만둔다 — 그 차수는 기준을 못 넘긴다. 표 밖 낱말(실시간 채점)은 쓰지 않는다.
+     */
     List<String> hintPlan(SetterView view) {
         SplittableRandom rng = new SplittableRandom(view.planSeed());
         WordTempBotLevel level = view.level();
-        int count = Math.min(view.maxHints(), level.minHints() + rng.nextInt(level.maxHints() - level.minHints() + 1));
         List<Neighbor> usable = new ArrayList<>();
         for (Neighbor n : table.neighbors(view.answer().word())) {
-            if (n.temp() < view.closeTemp() && !view.usedEarlier().contains(n.hint())
+            if (!view.usedEarlier().contains(n.hint())
                     && WordNormalizer.normalize(n.hint()).filter(n.hint()::equals).isPresent()
                     && HintRules.containment(view.answer(), n.hint()).isEmpty()) {
                 usable.add(n);
             }
         }
-        if (usable.isEmpty() || count <= 0) {
+        if (usable.isEmpty() || view.maxHints() <= 0) {
             return List.of();
         }
-        int low = level.bandLow(view.floor());
-        int high = level.bandHigh(view.floor());
-        List<Neighbor> inBand = usable.stream().filter(n -> n.temp() >= low && n.temp() <= high).toList();
+        int floor = view.floor();
+        List<Neighbor> inBand = usable.stream()
+                .filter(n -> n.temp() >= floor && n.temp() <= floor + WordTempBotLevel.PASS_BAND).toList();
         Neighbor main;
         if (!inBand.isEmpty()) {
             main = inBand.get(rng.nextInt(inBand.size()));
         } else {
-            // 띠가 비면 띠에 가장 가까운 것(같으면 표의 앞 순서).
-            main = usable.stream().min(Comparator.comparingInt(n -> distance(n.temp(), low, high))).orElseThrow();
+            // 띠가 비면 기준 이상 중 가장 낮은 것, 그것도 없으면 아는 것 중 가장 높은 것(같으면 표의 앞 순서).
+            main = usable.stream().filter(n -> n.temp() >= floor).min(Comparator.comparingInt(Neighbor::temp))
+                    .orElseGet(() -> usable.stream().max(Comparator.comparingInt(Neighbor::temp)).orElseThrow());
         }
-        List<String> plan = new ArrayList<>(count);
+        int warm = Math.min(view.maxHints() - 1, level.warmMin() + rng.nextInt(level.warmMax() - level.warmMin() + 1));
+        int warmHigh = Math.min(floor, main.temp()) - 1;
+        List<Neighbor> lower = new ArrayList<>(usable.stream()
+                .filter(n -> n != main && n.temp() <= warmHigh && n.temp() >= floor - WARM_RANGE).toList());
+        List<String> plan = new ArrayList<>(warm + 1);
+        while (plan.size() < warm && !lower.isEmpty()) {
+            plan.add(lower.remove(rng.nextInt(lower.size())).hint());
+        }
         plan.add(main.hint());
-        List<Neighbor> decoys = new ArrayList<>(usable.stream()
-                .filter(n -> n != main && n.temp() < main.temp() && n.temp() >= DECOY_MIN_TEMP).toList());
-        while (plan.size() < count && !decoys.isEmpty()) {
-            plan.add(decoys.remove(rng.nextInt(decoys.size())).hint());
-        }
         return plan;
-    }
-
-    private static int distance(int temp, int low, int high) {
-        return temp < low ? low - temp : temp > high ? temp - high : 0;
     }
 
     // ---- 추리 ----

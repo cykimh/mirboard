@@ -453,10 +453,6 @@ button.wt-badge {
   opacity: 0.6;
 }
 
-.wt-attempt-todo .wt-attempt-floor {
-  display: none;
-}
-
 /* ── 온도계 한 줄 ── */
 .wt-gauge {
   --wt-h: 16px;
@@ -643,68 +639,6 @@ button.wt-badge {
   color: var(--wt-muted);
 }
 
-.wt-board-empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--wt-muted);
-}
-
-.wt-reveals {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.wt-reveals:empty {
-  display: none;
-}
-
-.wt-reveal {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 8px 10px 9px;
-  border-radius: 14px;
-  border: 1.5px solid transparent;
-  background: var(--wt-band-soft, var(--wt-row));
-}
-
-.wt-reveal > .wt-gauge,
-.wt-reveal > .wt-reveal-note,
-.wt-reveal > .wt-pips {
-  grid-column: 1 / -1;
-}
-
-.wt-reveal-attempt {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--wt-panel);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.wt-reveal-word {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 21px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.wt-reveal-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  font-size: 12px;
-}
-
 .wt-band-chip {
   display: inline-flex;
   align-items: center;
@@ -718,130 +652,12 @@ button.wt-badge {
   white-space: nowrap;
 }
 
-.wt-floor-ok {
-  color: var(--wt-ok);
-  font-weight: 700;
-}
-
-.wt-floor-miss {
-  color: var(--wt-warn);
-  font-weight: 700;
-}
-
-.wt-reveal.wt-band-boil {
-  border-color: var(--wt-boil);
-}
-
-.wt-anim .wt-reveal-fresh {
-  animation: wt-drop-in 0.32s ease-out both;
-}
-
-@keyframes wt-drop-in {
-  from {
-    transform: translateY(-8px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* 힌트 단계 — 낱말·온도 없이 개수만 */
-.wt-reveal-wait {
-  border: 1.5px dashed var(--wt-line);
-  background: transparent;
-}
-
-.wt-reveal-wait .wt-reveal-word-wait {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--wt-muted);
-}
-
-.wt-pips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.wt-pip {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--wt-tube-line);
-  background: var(--wt-tube);
-}
-
-.wt-pip-on {
-  border-color: var(--wt-accent);
-  background: var(--wt-accent);
-}
-
-.wt-anim .wt-pip-on {
-  animation: wt-pop 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both;
-}
-
-.wt-pips-text {
-  margin-left: 4px;
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 /* 96 이상 — 줄 위로 끓어오르는 방울(장식). 기본은 투명 — 연출이 꺼져 있으면 보이지 않는다 */
-.wt-fx-boil,
 .wt-fx-cheer {
   position: absolute;
   inset: 0;
   overflow: visible;
   pointer-events: none;
-}
-
-.wt-fx-bubble {
-  position: absolute;
-  bottom: 30%;
-  left: calc(8% + var(--wt-i) * 11.5%);
-  width: calc(8px + var(--wt-i) * 1px);
-  height: calc(8px + var(--wt-i) * 1px);
-  border-radius: 50%;
-  border: 2px solid var(--wt-boil);
-  background: var(--wt-boil-soft);
-  opacity: 0;
-}
-
-.wt-anim .wt-fx-bubble {
-  animation: wt-boil-up 0.9s ease-out both;
-  animation-delay: calc(0.45s + var(--wt-i) * 60ms);
-}
-
-@keyframes wt-boil-up {
-  0% {
-    transform: translateY(10px) scale(0.3);
-    opacity: 0;
-  }
-  25% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-58px) scale(1.25);
-    opacity: 0;
-  }
-}
-
-.wt-anim .wt-reveal-fresh.wt-band-boil {
-  animation:
-    wt-drop-in 0.32s ease-out both,
-    wt-boil-glow 1.1s 0.45s ease-out both;
-}
-
-@keyframes wt-boil-glow {
-  0% {
-    box-shadow: 0 0 0 0 var(--wt-boil);
-  }
-  100% {
-    box-shadow: 0 0 0 14px transparent;
-  }
 }
 
 /* ── 내 칸(공통) ── */
@@ -979,12 +795,6 @@ button.wt-badge {
   overflow-wrap: anywhere;
 }
 
-.wt-cand-gloss {
-  font-size: 12px;
-  line-height: 1.35;
-  opacity: 0.85;
-}
-
 .wt-cand-tag {
   position: absolute;
   top: 6px;
@@ -1086,68 +896,6 @@ button.wt-badge {
   white-space: nowrap;
 }
 
-.wt-own-hints {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.wt-own-hint {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 5px 10px;
-  border-radius: 10px;
-  border: 1.5px solid transparent;
-  background: var(--wt-row);
-  color: var(--wt-ink);
-}
-
-.wt-own-attempt {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--wt-muted);
-}
-
-.wt-own-word {
-  flex: 0 1 auto;
-  min-width: 3.2em;
-  font-size: 15px;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.wt-own-hint-best {
-  border-color: var(--wt-accent);
-}
-
-.wt-own-hint-past {
-  opacity: 0.7;
-}
-
-.wt-own-hint-pending {
-  border: 1.5px dashed var(--wt-line);
-}
-
-.wt-own-tag {
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--wt-accent-soft);
-  color: var(--wt-accent);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.wt-own-tag-boil {
-  background: var(--wt-boil-soft);
-  color: var(--wt-boil-ink);
-}
-
 .wt-scoring {
   display: inline-flex;
   align-items: center;
@@ -1175,19 +923,6 @@ button.wt-badge {
   to {
     width: 26px;
   }
-}
-
-.wt-floor-warn {
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: var(--wt-hot-soft);
-  color: var(--wt-hot-ink);
-  font-size: 12.5px;
-}
-
-.wt-tutorial-samples {
-  margin: 8px 0;
 }
 
 /* ── 차수 결과 ── */
@@ -1511,4 +1246,225 @@ button.wt-badge {
   display: flex;
   justify-content: center;
   gap: 8px;
+}
+
+/* ── 온도계 판(D-320) — 힌트는 낼 때마다 모두에게 보인다. 차수별로 묶고, 지난 차수는 한 줄로 접는다 ── */
+.wt-rounds,
+.wt-hints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wt-rounds {
+  gap: 6px;
+}
+
+.wt-hints {
+  gap: 4px;
+}
+
+.wt-round {
+  border-radius: 14px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+}
+
+.wt-round-now {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-color: var(--wt-accent);
+}
+
+.wt-round-past {
+  opacity: 0.92;
+}
+
+.wt-round-fold > .wt-round-head {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* 접힌 차수 — 누르면 펼쳐진다는 표시(기본 삼각형은 줄 배치에 가려 직접 그린다) */
+.wt-round-fold > .wt-round-head {
+  list-style: none;
+}
+
+.wt-round-fold > .wt-round-head::before {
+  content: '▸';
+  color: var(--wt-muted);
+}
+
+.wt-round-fold[open] > .wt-round-head::before {
+  content: '▾';
+}
+
+.wt-round-fold > .wt-hints {
+  padding: 0 10px 8px;
+}
+
+.wt-round-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12.5px;
+}
+
+.wt-round-no {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.wt-round-floor {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--wt-accent-soft);
+  color: var(--wt-accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-round-count {
+  color: var(--wt-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wt-round-verdict {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.wt-verdict-met {
+  color: var(--wt-ok);
+}
+
+.wt-verdict-miss {
+  color: var(--wt-warn);
+}
+
+/* 힌트 단계가 끝난 순간의 판정 한 줄 — "기준 75° 넘김 → 추리" / "기준 못 넘김 — …점수 없음" */
+.wt-verdict {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  word-break: keep-all;
+}
+
+.wt-verdict.wt-verdict-met {
+  background: var(--wt-ok-soft);
+}
+
+.wt-verdict.wt-verdict-miss {
+  background: var(--wt-hot-soft);
+}
+
+.wt-anim .wt-verdict {
+  animation: wt-pop 0.36s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+
+/* 힌트 한 줄 — 낱말 · 온도계(세로 선 = 기준) · 숫자. 50개가 쌓여도 읽히게 낮고 촘촘하게 */
+.wt-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  border: 1.5px solid transparent;
+  background: var(--wt-row);
+  color: var(--wt-ink);
+}
+
+.wt-hint-word {
+  flex: 0 0 34%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.wt-hint-pass {
+  border-color: var(--wt-ok);
+  background: var(--wt-ok-soft);
+}
+
+.wt-hint-pending {
+  border: 1.5px dashed var(--wt-line);
+}
+
+.wt-hint-empty {
+  justify-content: center;
+  background: transparent;
+  border: 1.5px dashed var(--wt-line);
+  font-size: 13px;
+  color: var(--wt-muted);
+}
+
+.wt-hint-tag {
+  flex: none;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--wt-ok);
+  color: var(--wt-panel);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.wt-anim .wt-hint-fresh {
+  animation: wt-hint-in 0.28s ease-out both;
+}
+
+@keyframes wt-hint-in {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.wt-anim .wt-hint-fresh.wt-hint-pass {
+  animation:
+    wt-hint-in 0.28s ease-out both,
+    wt-pass-glow 0.9s 0.4s ease-out both;
+}
+
+@keyframes wt-pass-glow {
+  0% {
+    box-shadow: 0 0 0 0 var(--wt-ok);
+  }
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+
+/* 출제자 칸 — 기준 온도와 작은 안내 */
+.wt-target {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--wt-accent-soft);
+  color: var(--wt-accent);
+  white-space: nowrap;
+}
+
+.wt-setter-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wt-muted);
+  word-break: keep-all;
+}
+
+/* 튜토리얼의 보기 목록 */
+.wt-tutorial-samples {
+  margin: 8px 0;
 }

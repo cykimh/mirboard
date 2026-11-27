@@ -81,7 +81,16 @@ public record WordTempState(List<Seat> seats,
     public enum VoidReason { NOT_A_NOUN, SCORING_FAILED }
 
     /** 출제 차례가 끝난 이유(§12.2 {@code TURN_ENDED.reason}). */
-    public enum TurnEndReason { SOLVED, THREE_ATTEMPTS, NO_HINTS, SETTER_OUT }
+    public enum TurnEndReason {
+        SOLVED,
+        /** 마지막 차수까지 아무도 못 맞혔다(D-320 — 5차). */
+        ALL_ATTEMPTS,
+        /** 옛 판(룰 v1)의 기록에만 남는다 — 새로 만들지 않는다. */
+        THREE_ATTEMPTS,
+        /** 〃 (v2 에서는 힌트 0개여도 추리로 간다). */
+        NO_HINTS,
+        SETTER_OUT
+    }
 
     /** 판이 끝난 이유(§8). */
     public enum EndReason { FINISHED, LAST_SEAT, NO_HUMANS }
@@ -273,13 +282,13 @@ public record WordTempState(List<Seat> seats,
         return null;
     }
 
-    /** 이번 차수의 힌트 개수(확정 + 채점 중) — 모두가 보는 "힌트 3/5". */
+    /** 이번 차수의 힌트 개수(확정 + 채점 중) — 모두가 보는 "힌트 3/10". */
     public int hintCount() {
         return (int) hints.stream()
                 .filter(h -> h.attempt() == attempt && h.status() != HintStatus.VOID).count();
     }
 
-    /** 이번 차수에 공개될 힌트 — 확정된 것 중 온도가 가장 높은 하나(같으면 먼저 낸 것). 없으면 null. */
+    /** 이번 차수의 가장 높은 힌트 — 확정된 것 중 온도가 가장 높은 하나(같으면 먼저 낸 것). 없으면 null. 기준을 넘겼는지는 이것으로 본다. */
     public Hint bestHint() {
         Hint best = null;
         for (Hint h : hints) {

@@ -1,19 +1,19 @@
 import type { TableCueCall } from '@/features/sound/tableSfx';
-import type { GuessesRevealedPayload, HintRevealedPayload, TurnEndedPayload } from '@/types/wordtemp';
-import { BOIL_FROM } from './wordTempMath';
+import type { GuessesRevealedPayload, HintRevealedPayload, HintScoredPayload, TurnEndedPayload } from '@/types/wordtemp';
 import type { WordTempRoomState } from './wordTempStore';
 
 /** 남이 맞힌 정답은 내 것보다 작게. */
 export const OTHERS_CORRECT_GAIN = 0.6;
-/** 수은주가 다 차오른 뒤(공개 소리 0.32초) 끓는 소리가 붙기까지(초) — CSS `wt-rise` 길이와 같은 박자. */
-export const BOIL_AFTER_REVEAL_SEC = 0.5;
+/** 남이 낸 힌트의 채점음은 내 것보다 작게. */
+export const OTHERS_HINT_GAIN = 0.6;
 
 /**
  * 낱말 온도 공개 이벤트 → 효과음(D-267 방식 — 실제로 적용한 이벤트에서만, 스냅샷·첫 렌더는 울리지 않는다). 순수 함수.
  * 소리 톤은 공용 `tableSfx`(D-271 — 둥근 사인·마림바풍, 흰 잡음·sawtooth·square 없음, `sfxOut` 출구)의 `temp.*` 를 쓴다.
  *
  * <ul>
- *   <li>`HINT_REVEALED` — 수은주가 그 온도까지 차오르는 소리(`temp.reveal`, 온도가 높을수록 높은 음). 96 이상이면 뒤에 보글보글(`temp.boil`).</li>
+ *   <li>`HINT_SCORED` — 힌트가 공개될 때마다 온도만큼 높은 한 음(`temp.scored` — D-320 뒤로 온도는 비밀이 아니다).</li>
+ *   <li>`HINT_REVEALED` — 힌트 단계 끝: 기준을 넘겼으면 수은주가 차오르는 소리(`temp.reveal`), 못 넘겼으면 식는 소리(`temp.wrong`).</li>
  *   <li>`GUESSES_REVEALED` — 누가 맞혔으면 `temp.correct`(내가 맞혔으면 또렷하게), 모두 틀렸으면 `temp.wrong`.</li>
  *   <li>`TURN_ENDED` — 정답이 드러나는 세 음(`temp.answer`). 누가 맞혀서 끝났으면 조용히(이미 정답 소리가 났다).</li>
  *   <li>`SEAT_OUT`·`MATCH_ENDED` — 공용 소리.</li>
@@ -26,12 +26,17 @@ export function wordTempCues(
 ): TableCueCall[] {
   const me = after.mySeat;
   switch (envelope.type) {
+    case 'HINT_SCORED': {
+      // D-320 — 힌트와 온도는 모두가 본다: 온도만큼 높은 한 음(남이 낸 것은 조금 작게).
+      const p = envelope.payload as HintScoredPayload;
+      if (after.hints === before.hints) return [];
+      return [{ cue: 'temp.scored', level: p.temp, gain: p.seat === me ? 1 : OTHERS_HINT_GAIN }];
+    }
     case 'HINT_REVEALED': {
+      // 힌트 단계 끝 — 기준을 넘겼으면 수은주가 차오르는 소리, 못 넘겼으면 식는 소리.
       const p = envelope.payload as HintRevealedPayload;
-      if (p.text === null || after.revealed.length === before.revealed.length) return [];
-      const cues: TableCueCall[] = [{ cue: 'temp.reveal', level: p.temp }];
-      if (p.temp >= BOIL_FROM) cues.push({ cue: 'temp.boil', delaySec: BOIL_AFTER_REVEAL_SEC });
-      return cues;
+      if (after.revealed.length === before.revealed.length) return [];
+      return p.floorMet ? [{ cue: 'temp.reveal', level: p.temp }] : [{ cue: 'temp.wrong', gain: 0.6 }];
     }
     case 'GUESSES_REVEALED': {
       const p = envelope.payload as GuessesRevealedPayload;
@@ -57,14 +62,4 @@ export function wordTempCues(
     default:
       return [];
   }
-}
-
-/**
- * 본인 큐 → 효과음. 내 힌트가 채점되면 짧은 한 음 — **온도와 무관한 같은 높이**다. 친구들이 한자리에 모여 할 때 출제자 휴대폰의
- * 음 높이로 비밀 온도가 들리지 않게(온도에 따른 높이는 모두가 보는 공개 순간의 `temp.reveal` 만).
- */
-export const SCORED_NEUTRAL_LEVEL = 50;
-export function wordTempPrivateCues(type: string, _payload: unknown): TableCueCall[] {
-  if (type !== 'HINT_SCORED') return [];
-  return [{ cue: 'temp.scored', level: SCORED_NEUTRAL_LEVEL }];
 }

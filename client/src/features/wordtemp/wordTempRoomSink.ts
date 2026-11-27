@@ -3,7 +3,7 @@ import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
 import type { HintVoidPayload, VoidReason, WordTempPrivateView, WordTempTableView } from '@/types/wordtemp';
 import { playCues } from '@/features/sound/tableSfx';
-import { wordTempCues, wordTempPrivateCues } from './wordTempSfx';
+import { wordTempCues } from './wordTempSfx';
 import { useWordTempStore } from './wordTempStore';
 
 interface ErrorPayload {
@@ -38,8 +38,8 @@ const VOID_LABEL: Record<VoidReason, string> = {
 /**
  * 낱말 온도용 {@link RoomEventSink} — 모듈 상수이고 각 메서드는 호출 시점에 `useWordTempStore.getState()` 를 읽는다(D-103).
  *
- * <p>본인 큐에는 내 후보(`WORD_CANDIDATES`)·내 힌트의 채점(`HINT_SCORED`·`HINT_PENDING`·`HINT_VOID`)·내 답(`GUESS_ACCEPTED`)·`ERROR` 가
- * 온다(전부 순번 없음, D-126). 방 락 경합(`BUSY`)은 보낸 것을 한 번 다시 보내고(게임판이 신호를 본다), 그 밖의 거절·무효 안내는 화면 위
+ * <p>본인 큐에는 내 후보(`WORD_CANDIDATES`)·내 답(`GUESS_ACCEPTED`)·`ERROR` 만 온다(순번 없음, D-126) — 힌트와 온도는 D-320 뒤로 공개
+ * 토픽으로 모두에게 간다. 방 락 경합(`BUSY`)은 보낸 것을 한 번 다시 보내고(게임판이 신호를 본다), 그 밖의 거절·무효 안내는 화면 위
  * 안내(`FloatingNotice`, D-269)로 띄운다.
  */
 export const wordTempRoomSink: RoomEventSink<WordTempTableView, WordTempPrivateView> = {
@@ -56,6 +56,18 @@ export const wordTempRoomSink: RoomEventSink<WordTempTableView, WordTempPrivateV
     const result = before.applyEvent(envelope);
     // D-267 — 효과음은 실제로 적용한 공개 이벤트에서만(스냅샷은 applySnapshot 길이라 울리지 않는다).
     if (result === 'applied') playCues(wordTempCues(envelope, before, useWordTempStore.getState()));
+    // 무효가 된 힌트(D-320 — 공개 이벤트) — 낸 사람(출제자)에게만 이유를 안내로 띄운다. 남들은 줄이 사라지는 것만 본다.
+    if (result === 'applied' && envelope.type === 'HINT_VOID') {
+      const p = envelope.payload as HintVoidPayload;
+      const now = useWordTempStore.getState();
+      if (now.mySeat >= 0 && p.seat === now.mySeat) {
+        useWordTempStore.setState((st) => ({
+          errorMessage: VOID_LABEL[p.reason] ?? VOID_LABEL.SCORING_FAILED,
+          errorSeq: st.errorSeq + 1,
+          errorSticky: false,
+        }));
+      }
+    }
     return result;
   },
 
@@ -68,18 +80,6 @@ export const wordTempRoomSink: RoomEventSink<WordTempTableView, WordTempPrivateV
       return;
     }
     store.applyPrivate(envelope.type, envelope.payload);
-    // 스토어가 내 좌석 것만 받는다 — 소리·안내도 같은 조건에서만.
-    const mine = store.mySeat >= 0 && (envelope.payload as { seat?: number } | null)?.seat === store.mySeat;
-    if (!mine) return;
-    playCues(wordTempPrivateCues(envelope.type, envelope.payload));
-    if (envelope.type === 'HINT_VOID') {
-      const reason = (envelope.payload as HintVoidPayload).reason;
-      useWordTempStore.setState((s) => ({
-        errorMessage: VOID_LABEL[reason] ?? VOID_LABEL.SCORING_FAILED,
-        errorSeq: s.errorSeq + 1,
-        errorSticky: false,
-      }));
-    }
   },
 
   setError(message) {

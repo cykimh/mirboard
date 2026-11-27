@@ -1,13 +1,5 @@
-import type {
-  CandidateInfo,
-  OwnHint,
-  PublicAttempt,
-  Revealed,
-  TurnEndReason,
-  TurnReveal,
-} from '@/types/wordtemp';
-import { TempGauge, ThermometerArt } from './wordTempArt';
-import { BOIL_FROM } from './wordTempMath';
+import type { CandidateInfo, PublicAttempt, Revealed, TurnEndReason, TurnReveal } from '@/types/wordtemp';
+import { ThermometerArt } from './wordTempArt';
 import { WordInput } from './WordInput';
 
 // ───────────────────────── 낱말 고르기 ─────────────────────────
@@ -47,7 +39,6 @@ export function WordPicker({ round, candidates, chosen, busy, onPick }: PickerPr
               >
                 <span className="wt-cand-category">{c.category}</span>
                 <span className="wt-cand-word">{c.word}</span>
-                {c.gloss && <span className="wt-cand-gloss">{c.gloss}</span>}
                 {mine && <span className="wt-cand-tag">고름</span>}
                 {off && <span className="wt-cand-tag">이미 냄</span>}
               </button>
@@ -64,16 +55,16 @@ export function WordPicker({ round, candidates, chosen, busy, onPick }: PickerPr
 interface SetterProps {
   answer: string | null;
   attempt: number;
-  /** 이번 차수의 최저 온도(서버가 준 값) — 없으면 눈금·안내를 그리지 않는다. */
+  /** 이번 차수의 기준 온도(서버가 준 값) — 없으면 안내에서 뺀다. */
   floor: number | null;
-  hints: OwnHint[];
+  /** 이번 차수에 낸 힌트 개수(확정 + 채점 중). */
   hintCount: number;
   maxHints: number;
-  /** 힌트를 낼 수 있는 단계인가(`HINT`). 아니면 내 힌트만 보여 준다. */
+  /** 채점 중인 힌트가 있다 — 풀릴 때까지 입력을 잠근다(한 번에 하나, §6.2). */
+  scoring: boolean;
+  /** 힌트를 낼 수 있는 단계인가(`HINT`). 아니면 정답만 보여 준다. */
   hinting: boolean;
   busy: boolean;
-  freshScored: string | null;
-  fxSeq: number;
   /** 남은 시간 글자 — 자판이 올라와 머리 줄이 가려져도 입력란 곁에서 보이게. */
   clock?: string | null;
   onHint: (text: string) => boolean;
@@ -81,30 +72,23 @@ interface SetterProps {
 }
 
 /**
- * 출제자 칸(§3.2) — <b>출제자 본인에게만 그린다.</b> 정답, 이번 출제 차례에 낸 힌트와 온도(채점 중이면 "채점 중…"), 힌트 입력, [힌트 끝].
- * 채점 중에는 입력을 잠근다(한 번에 하나 — §6.2). 관 위의 선은 이번 차수의 최저 온도다(서버가 공개 뷰에 실어 준다).
+ * 출제자 칸(§3.2, D-320) — <b>출제자 본인에게만 그린다.</b> 정답(나만 본다), 이번 차수의 기준 온도, 힌트 입력, [그만 내기].
+ * 낸 힌트와 온도는 위 온도계 판에 모두와 같이 보인다 — 기준 온도 이상의 힌트가 나오면 그 자리에서 추리로 넘어간다.
  */
 export function SetterPanel({
   answer,
   attempt,
   floor,
-  hints,
   hintCount,
   maxHints,
+  scoring,
   hinting,
   busy,
-  freshScored,
-  fxSeq,
   clock = null,
   onHint,
   onEnd,
 }: SetterProps) {
-  const current = hints.filter((h) => h.attempt === attempt);
-  const earlier = hints.filter((h) => h.attempt < attempt);
-  const scoring = current.some((h) => h.status === 'PENDING');
-  const scoredNow = current.filter((h) => h.status === 'SCORED');
   const full = hintCount >= maxHints;
-  const best = scoredNow.reduce((m, h) => Math.max(m, h.temp), -1);
   return (
     <section className="wt-panel wt-setter" aria-label="내 문제">
       <div className="wt-setter-head">
@@ -125,51 +109,22 @@ export function SetterPanel({
       </div>
       {hinting && (
         <p className="wt-panel-help">
-          가장 높은 힌트 하나만 모두에게 공개돼요.{' '}
-          {floor !== null && (
+          {floor !== null ? (
             <>
-              <strong>최저 {floor}°</strong>는 넘기되{' '}
+              <strong className="wt-target">
+                {attempt}차 기준 {floor}°
+              </strong>{' '}
+              이상인 힌트가 나오면 바로 추리로 넘어가요. 힌트와 온도는 낼 때마다 모두에게 보여요.
             </>
+          ) : (
+            '힌트와 온도는 낼 때마다 모두에게 보여요.'
           )}
-          정답이 떠오르지 않게!
         </p>
-      )}
-      {(current.length > 0 || earlier.length > 0) && (
-        <ol className="wt-own-hints" aria-label="내 힌트">
-          {earlier.map((h) => (
-            <li key={`${h.attempt}-${h.text}`} className="wt-own-hint wt-own-hint-past">
-              <span className="wt-own-attempt">{h.attempt}차</span>
-              <span className="wt-own-word">{h.text}</span>
-              {h.status === 'SCORED' && <TempGauge temp={h.temp} small />}
-            </li>
-          ))}
-          {current.map((h) => {
-            const fresh = h.status === 'SCORED' && freshScored === h.text;
-            return (
-              <li
-                key={fresh ? `${h.attempt}-${h.text}-${fxSeq}` : `${h.attempt}-${h.text}`}
-                className={`wt-own-hint${h.status === 'PENDING' ? ' wt-own-hint-pending' : ''}${h.status === 'SCORED' && h.temp === best ? ' wt-own-hint-best' : ''}`}
-              >
-                <span className="wt-own-attempt">{h.attempt}차</span>
-                <span className="wt-own-word">{h.text}</span>
-                {h.status === 'PENDING' ? (
-                  <span className="wt-scoring" role="status">
-                    <span className="wt-scoring-dots" aria-hidden="true" />
-                    채점 중…
-                  </span>
-                ) : (
-                  <TempGauge temp={h.temp} floor={floor ?? undefined} small fresh={fresh} />
-                )}
-                {h.status === 'SCORED' && h.temp === best && <span className="wt-own-tag">{hinting ? '공개될 힌트' : '공개'}</span>}
-              </li>
-            );
-          })}
-        </ol>
       )}
       {hinting && (
         <WordInput
           label="힌트 낱말"
-          placeholder={scoring ? '채점 중…' : full ? '힌트를 다 냈어요' : '힌트 낱말 (한글)'}
+          placeholder={scoring ? '채점 중…' : full ? '힌트를 다 냈어요' : floor !== null ? `힌트 · 기준 ${floor}°` : '힌트 낱말 (한글)'}
           submitLabel="힌트 내기"
           locked={scoring || full}
           busy={busy}
@@ -178,20 +133,21 @@ export function SetterPanel({
           <button
             type="button"
             className="wt-secondary"
-            disabled={scoredNow.length === 0 || scoring}
+            disabled={hintCount === 0 || scoring}
             aria-disabled={busy || undefined}
+            title="기준을 못 넘긴 채로 추리로 넘어가요"
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => {
               if (!busy) onEnd();
             }}
           >
-            힌트 끝
+            그만 내기
           </button>
         </WordInput>
       )}
-      {hinting && floor !== null && best >= 0 && best < floor && (
-        <p className="wt-floor-warn" role="note">
-          지금 가장 높은 힌트가 최저 {floor}° 에 못 미쳐요 — 이대로면 이번 차수 점수가 없어요.
+      {hinting && (
+        <p className="wt-setter-note">
+          시간이 끝나거나 {maxHints}개를 다 내도록 기준을 못 넘기면, 아무도 못 맞혀도 이번 차수 점수가 없어요.
         </p>
       )}
     </section>
@@ -266,7 +222,7 @@ interface ResultProps {
 
 /**
  * 차수 결과(§3.4) — 모두의 답을 한꺼번에 보여 준다. 오답도 낱말 그대로(가려진 답은 서버가 `···` 로 보낸다), 맞힌 사람과 얻은 점수(×라운드),
- * 아무도 못 맞혔으면 출제자 점수 — 공개 힌트가 최저 온도에 못 미쳤으면 0점인 이유를 말해 준다.
+ * 아무도 못 맞혔으면 출제자 점수(차수 번호 × 라운드) — 그 차수가 기준 온도를 못 넘겼으면 점수가 없는 이유를 말해 준다(D-320).
  */
 export function AttemptResultPanel({ attempt, round, setterSeat, mySeat, revealed, nameOf, fresh }: ResultProps) {
   const solvers = attempt.guesses.filter((g) => g.correct);
@@ -278,7 +234,7 @@ export function AttemptResultPanel({ attempt, round, setterSeat, mySeat, reveale
   } else if (attempt.setterGain > 0) {
     summary = `아무도 못 맞혔어요 — 출제자 ${nameOf(setterSeat)} +${attempt.setterGain}점`;
   } else if (revealed && !revealed.floorMet) {
-    summary = `아무도 못 맞혔지만, 공개 힌트가 최저 ${revealed.floor}° 에 못 미쳐 출제자도 0점이에요`;
+    summary = '아무도 못 맞혔지만, 기준을 못 넘겨 출제자도 이번 차수 점수가 없어요';
   } else {
     summary = '아무도 못 맞혔어요';
   }
@@ -325,7 +281,8 @@ export function AttemptResultPanel({ attempt, round, setterSeat, mySeat, reveale
 
 const END_TEXT: Record<TurnEndReason, string> = {
   SOLVED: '정답을 맞혔어요!',
-  THREE_ATTEMPTS: '3차까지 아무도 못 맞혔어요.',
+  ALL_ATTEMPTS: '마지막 차수까지 아무도 못 맞혔어요.',
+  THREE_ATTEMPTS: '마지막 차수까지 아무도 못 맞혔어요.',
   NO_HINTS: '힌트가 없어 차례가 끝났어요.',
   SETTER_OUT: '출제자가 나가 차례가 끝났어요.',
 };
@@ -338,7 +295,7 @@ interface TurnEndProps {
   next: string;
 }
 
-/** 차례 끝(§3) — 정답 낱말과 그 차례에 출제자가 낸 힌트 전체·온도(이때 처음 모두에게 공개된다). */
+/** 차례 끝(§3) — 정답 낱말을 공개한다. 힌트와 온도는 위 온도계 판에 그대로 남아 있다(D-320 — 낼 때부터 공개였다). */
 export function TurnEndPanel({ reveal, reason, setterName, next }: TurnEndProps) {
   const top = reveal.hints.reduce((m, h) => Math.max(m, h.temp), 0);
   return (
@@ -351,21 +308,6 @@ export function TurnEndPanel({ reveal, reason, setterName, next }: TurnEndProps)
           <span className="wt-turn-answer-word">{reveal.answer}</span>
         </span>
       </div>
-      {reveal.hints.length > 0 ? (
-        <ol className="wt-own-hints wt-all-hints" aria-label="출제자가 낸 힌트 전체">
-          {reveal.hints.map((h) => (
-            <li key={`${h.attempt}-${h.text}`} className={`wt-own-hint${h.revealed ? ' wt-own-hint-best' : ''}`}>
-              <span className="wt-own-attempt">{h.attempt}차</span>
-              <span className="wt-own-word">{h.text}</span>
-              <TempGauge temp={h.temp} small />
-              {h.revealed && <span className="wt-own-tag">공개</span>}
-              {h.temp >= BOIL_FROM && <span className="wt-own-tag wt-own-tag-boil">거의 정답</span>}
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="wt-panel-help">낸 힌트가 없어요.</p>
-      )}
       <p className="wt-turn-next">{next}</p>
     </section>
   );

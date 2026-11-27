@@ -142,7 +142,10 @@ class WordTempBotMatchSimulationIT {
         runAllBotMatch(6);
     }
 
-    /** 사람은 손을 놓고 봇 둘이 논다 — 사람의 낱말은 무작위로 정해지고, 사람의 출제 차례는 힌트 0개로 끝나며, 전적은 남고 ELO 는 1/4. */
+    /**
+     * 사람은 손을 놓고 봇 둘이 논다 — 사람의 낱말은 무작위로 정해지고, 사람의 출제 차례는 힌트 0개로 5차까지 흘러(D-320 — 힌트가 없어도
+     * 추리로 간다, 단서가 없는 봇은 패스) 출제 점수 없이 끝나며, 전적은 남고 ELO 는 1/4.
+     */
     @Test
     void an_idle_human_with_bots_is_carried_to_the_end_by_the_engine_timer() {
         long human = newUser("wt_idle_");
@@ -153,8 +156,12 @@ class WordTempBotMatchSimulationIT {
         WordTempState ended = awaitEnded(room, 90);
         assertThat(ended.result().endReason()).isEqualTo(EndReason.FINISHED);
         assertThat(ended.history()).hasSize(6); // 3인 × 보통 2라운드
-        assertThat(ended.history()).filteredOn(t -> t.setterSeat() == 0)
-                .allMatch(t -> t.reason() == TurnEndReason.NO_HINTS);
+        assertThat(ended.history()).filteredOn(t -> t.setterSeat() == 0).hasSize(2)
+                .allMatch(t -> t.reason() == TurnEndReason.ALL_ATTEMPTS && t.setterGain() == 0
+                        && t.revealed().size() == 5
+                        && t.revealed().stream().allMatch(r -> r.text() == null && !r.floorMet()));
+        assertThat(ended.history()).noneMatch(t -> t.reason() == TurnEndReason.NO_HINTS
+                || t.reason() == TurnEndReason.THREE_ATTEMPTS);
         assertThat(scorer.requests).isEmpty();
         assertRecorded(room.roomId(), 3);
         GameStats humanStats = stats.get(human, WordTempGameDefinition.ID);
@@ -239,15 +246,18 @@ class WordTempBotMatchSimulationIT {
         assertThat(stateStore.load(roomId).orElseThrow()).isEqualTo(voided);
         assertThat(scorer.requests).hasSize(requestsBefore);
         String tableHint = tableHintFor(answer, voided);
-        act(roomId, setterUser, hint(hinting, tableHint));
+        // 엔진 타이머(250ms 폴링)가 방 락을 쥔 순간과 겹치면 액션이 BUSY 로 조용히 거절된다 — 받아들여질 때까지 다시 보낸다
+        // (클라도 BUSY 를 한 번 다시 보낸다). 그대로 두면 이 걸음이 가끔 실패했다.
+        for (int tries = 0; tries < 10 && stateStore.load(roomId).orElseThrow().equals(voided); tries++) {
+            act(roomId, setterUser, hint(hinting, tableHint));
+            sleep(60);
+        }
         WordTempState withTable = stateStore.load(roomId).orElseThrow();
         assertThat(withTable.hints()).last().satisfies(h -> {
             assertThat(h.source()).isEqualTo(HintSource.TABLE);
             assertThat(h.status()).isEqualTo(HintStatus.SCORED);
         });
-        if (withTable.phase() != Phase.HINT) {
-            return; // 표 힌트가 96 이상이라 단계가 끝났다(드묾) — 아래 갈래는 힌트 단계가 필요하다
-        }
+        assertThat(withTable.phase()).as("기준(70°) 아래 힌트라 단계는 그대로다").isEqualTo(Phase.HINT);
 
         // ⑥ 채점 중 출제자 탈주 — 차례가 그 자리에서 끝나고 채점 중이던 힌트는 버린다. 판은 둘이서 계속.
         scorer.available = true;
@@ -278,10 +288,10 @@ class WordTempBotMatchSimulationIT {
 
     // ---- 도우미 ----
 
-    /** 이 정답의 표 이웃 가운데 아직 안 낸, 96 미만인 낱말 하나. */
+    /** 이 정답의 표 이웃 가운데 아직 안 낸, 1차 기준(70°) 아래인 낱말 하나 — 넘기면 힌트 단계가 그 자리에서 끝난다(D-320). */
     private String tableHintFor(String answer, WordTempState state) {
         return words.table().neighbors(answer).stream()
-                .filter(n -> n.temp() < 96 && n.temp() >= 40)
+                .filter(n -> n.temp() < 70 && n.temp() >= 40)
                 .filter(n -> state.hints().stream().noneMatch(h -> h.text().equals(n.hint())))
                 .findFirst().orElseThrow().hint();
     }
@@ -321,9 +331,14 @@ class WordTempBotMatchSimulationIT {
         WordTempState ended = awaitEnded(room, 120);
         assertThat(ended.result().endReason()).isEqualTo(EndReason.FINISHED);
         assertThat(ended.history()).hasSize(capacity * 2); // 보통 = 2라운드, 모두 한 번씩 출제
-        // 봇 출제자는 늘 표 안의 힌트를 낸다 — 힌트 0개로 끝난 차례가 없고 실시간 채점 호출도 0
-        assertThat(ended.history()).noneMatch(t -> t.reason() == TurnEndReason.NO_HINTS);
-        assertThat(ended.history()).allMatch(t -> !t.revealed().isEmpty());
+        // 봇 출제자는 늘 표 안의 힌트를 낸다 — 힌트 없이 끝난 차수가 없고 실시간 채점 호출도 0
+        assertThat(ended.history()).noneMatch(t -> t.reason() == TurnEndReason.NO_HINTS
+                || t.reason() == TurnEndReason.THREE_ATTEMPTS);
+        assertThat(ended.history()).allMatch(t -> !t.revealed().isEmpty()
+                && t.revealed().stream().allMatch(r -> r.text() != null));
+        // 1차 기준(70°)은 진짜 표의 모든 정답이 넘길 수 있다 — 봇은 1차를 늘 넘긴다
+        assertThat(ended.history()).allMatch(t -> t.revealed().get(0).floorMet() && t.revealed().get(0).floor() == 70);
+        assertThat(ended.history()).allMatch(t -> t.revealed().size() <= 5 && t.setterGain() <= 15 * t.round());
         assertThat(ended.liveRequests()).isZero();
         assertThat(scorer.requests).isEmpty();
         assertThat(ended.result().standings()).hasSize(capacity);

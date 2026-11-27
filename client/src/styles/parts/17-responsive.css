@@ -1394,6 +1394,15 @@
   .wt-phase-title {
     font-size: 15px;
   }
+  .wt-attempt {
+    padding: 2px 6px;
+  }
+  .wt-hint-word {
+    font-size: 14px;
+  }
+  .wt-round-now {
+    padding: 6px 8px 8px;
+  }
   .wt-board,
   .wt-panel {
     padding: 8px 10px 10px;
@@ -1401,12 +1410,6 @@
   }
   .wt-board-sub {
     display: none;
-  }
-  .wt-reveal {
-    padding: 6px 8px 7px;
-  }
-  .wt-reveal-word {
-    font-size: 19px;
   }
   .wt-primary,
   .wt-secondary {
@@ -1427,7 +1430,7 @@
 }
 
 @media (max-width: 359px) {
-  .wt-attempt-floor {
+  .wt-attempt-no {
     display: none;
   }
   .wt-seat-points {
@@ -1475,7 +1478,6 @@
     animation: none !important;
     transition: none !important;
   }
-  :root:not(.motion-forced) .wt-fx-boil,
   :root:not(.motion-forced) .wt-fx-cheer {
     display: none;
   }
@@ -1490,7 +1492,6 @@
   animation: none !important;
   transition: none !important;
 }
-:root.motion-off .wt-fx-boil,
 :root.motion-off .wt-fx-cheer {
   display: none;
 }

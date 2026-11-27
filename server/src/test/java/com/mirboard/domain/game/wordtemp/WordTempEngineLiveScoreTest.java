@@ -19,7 +19,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * `docs/rules-wordtemp.md` §6.2·§6.3, 설계서 §4 — 표 밖 힌트의 "채점 중 → 반영" 경로. 엔진은 I/O 를 하지 않는다: 결과는 테스트(= 어댑터 자리)가
- * {@code applyScore} 로 넣고, 답이 없으면 엔진 타이머가 8초 뒤 무효로 만든다.
+ * {@code applyScore} 로 넣고, 답이 없으면 엔진 타이머가 8초 뒤 무효로 만든다. 룰 v2(D-320): 채점 중·확정·무효 모두 공개 이벤트이고,
+ * 실시간으로 확정된 온도가 기준 이상이면 그 자리에서 추리로 간다.
  */
 class WordTempEngineLiveScoreTest {
 
@@ -38,10 +39,11 @@ class WordTempEngineLiveScoreTest {
     }
 
     @Test
-    void an_unknown_hint_goes_pending_takes_a_slot_and_tells_only_the_setter() {
+    void an_unknown_hint_goes_pending_takes_a_slot_and_everyone_sees_it() {
         Game g = pendingHint();
         assertThat(g.events).containsExactly(new WordTempEvent.HintPending(0, "짠맛"),
-                new WordTempEvent.HintCount(2, 5));
+                new WordTempEvent.HintCount(2, 10));
+        assertThat(g.events).noneMatch(WordTempEvent::isPrivate).allMatch(WordTempEvent::sequenced); // D-320 — 공개
         assertThat(g.state.pendingHint().status()).isEqualTo(HintStatus.PENDING);
         assertThat(g.state.pendingHint().requestedAt()).isEqualTo(g.now);
         assertThat(g.state.pendingHint().source()).isEqualTo(HintSource.LIVE);
@@ -63,8 +65,10 @@ class WordTempEngineLiveScoreTest {
         assertThat(g.state.phase()).isEqualTo(Phase.HINT);
         // 같은 쌍을 이 차례에 다시 낼 수는 없다
         assertThat(g.hintRejected("짠맛")).isEqualTo(RejectionReason.HINT_DUPLICATE);
+        assertThat(g.events).noneMatch(WordTempEvent::isPrivate);
         g.endHints();
-        assertThat(g.event(WordTempEvent.HintRevealed.class).text()).isEqualTo("짠맛");
+        assertThat(g.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, "짠맛", 64, 70, false));
     }
 
     @Test
@@ -75,17 +79,25 @@ class WordTempEngineLiveScoreTest {
     }
 
     @Test
-    void a_live_score_of_ninety_six_or_more_ends_the_hint_phase() {
-        Game g = pendingHint().score("짠맛", new LiveScore.Scored(96));
+    void a_live_score_at_or_above_the_floor_ends_the_hint_phase_as_the_passing_hint() {
+        Game below = pendingHint().score("짠맛", new LiveScore.Scored(69));
+        assertThat(below.state.phase()).isEqualTo(Phase.HINT);
+        assertThat(below.has(WordTempEvent.HintRevealed.class)).isFalse();
+
+        Game g = pendingHint().score("짠맛", new LiveScore.Scored(70));
         assertThat(g.state.phase()).isEqualTo(Phase.GUESS);
-        assertThat(g.event(WordTempEvent.HintRevealed.class).text()).isEqualTo("짠맛");
+        assertThat(g.events).containsExactly(new WordTempEvent.HintScored(0, "짠맛", 70, 2),
+                new WordTempEvent.HintRevealed(1, "짠맛", 70, 70, true),
+                new WordTempEvent.GuessPhaseStarted(1, 30_000, java.util.List.of(1, 2, 3)));
+        g.passAll();
+        assertThat(g.event(WordTempEvent.GuessesRevealed.class).setterGain()).isEqualTo(1);
     }
 
     @Test
     void not_a_noun_voids_the_hint_and_refunds_the_count() {
         Game g = pendingHint().score("짠맛", new LiveScore.NotANoun());
         assertThat(g.events).containsExactly(new WordTempEvent.HintVoid(0, "짠맛", VoidReason.NOT_A_NOUN, 1),
-                new WordTempEvent.HintCount(1, 5));
+                new WordTempEvent.HintCount(1, 10));
         assertThat(g.state.hintCount()).isEqualTo(1);
         assertThat(g.state.hints().get(1).status()).isEqualTo(HintStatus.VOID);
         // 무효가 된 낱말은 다시 낼 수 있다(§5.2)
@@ -106,7 +118,7 @@ class WordTempEngineLiveScoreTest {
         assertThat(early.events()).isEmpty();
         silent.timer();
         assertThat(silent.events).containsExactly(new WordTempEvent.HintVoid(0, "짠맛", VoidReason.SCORING_FAILED, 1),
-                new WordTempEvent.HintCount(1, 5));
+                new WordTempEvent.HintCount(1, 10));
         assertThat(silent.state.phase()).isEqualTo(Phase.HINT);
         assertThat(silent.engine.timer(silent.state, silent.now)).hasValue(90_000 - 1_000 - 8_000);
     }
@@ -134,31 +146,56 @@ class WordTempEngineLiveScoreTest {
         assertThat(late.engine.apply(late.state, 0, new WordTempAction.Tick(1, 1, Phase.HINT), late.now).newState())
                 .isSameAs(late.state);
         late.score("짠맛", new LiveScore.Scored(64));
+        // 마감 뒤에 온 결과 — 기준에 못 미쳐도 그 자리에서 힌트 단계를 닫는다
         assertThat(late.events.get(0)).isEqualTo(new WordTempEvent.HintScored(0, "짠맛", 64, 1));
-        assertThat(late.event(WordTempEvent.HintRevealed.class).text()).isEqualTo("짠맛");
+        assertThat(late.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, "짠맛", 64, 70, false));
         assertThat(late.state.phase()).isEqualTo(Phase.GUESS);
     }
 
     @Test
-    void a_void_after_the_limit_with_no_other_hint_ends_the_turn_with_no_hints() {
+    void a_void_after_the_limit_with_no_other_hint_goes_to_guessing_with_no_hint_at_all() {
         Game g = game().selectAll(0);
         g.live = true;
         g.after(89_000).hint("짠맛").timer(); // 8초 침묵 → 무효, 이미 마감이 지남
         assertThat(g.has(WordTempEvent.HintVoid.class)).isTrue();
-        assertThat(g.event(WordTempEvent.TurnEnded.class).reason()).isEqualTo(TurnEndReason.NO_HINTS);
-        assertThat(g.event(WordTempEvent.TurnEnded.class).hints()).isEmpty();
+        assertThat(g.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, null, -1, 70, false));
+        assertThat(g.has(WordTempEvent.TurnEnded.class)).isFalse(); // D-320 — 힌트 0개여도 차례는 끝나지 않는다
+        assertThat(g.state.phase()).isEqualTo(Phase.GUESS);
+        g.passAll();
+        assertThat(g.event(WordTempEvent.GuessesRevealed.class).setterGain()).isZero();
     }
 
     @Test
-    void the_fifth_slot_pending_closes_the_phase_only_once_it_is_scored() {
+    void the_tenth_slot_pending_closes_the_phase_only_once_it_is_scored() {
         Game g = game().selectAll(0);
         g.live = true;
-        g.hint("여름").hint("여행").hint("하늘").hint("소금").hint("짠맛");
+        for (String low : WordTempFixtures.LOWS.subList(0, 9)) {
+            g.hint(low);
+        }
+        g.hint("짠맛");
         assertThat(g.state.phase()).isEqualTo(Phase.HINT);
-        assertThat(g.state.hintCount()).isEqualTo(5);
+        assertThat(g.state.hintCount()).isEqualTo(10);
+        assertThat(g.hintRejected("낚시")).isEqualTo(RejectionReason.SCORING_IN_PROGRESS);
         g.score("짠맛", new LiveScore.Scored(40));
         assertThat(g.state.phase()).isEqualTo(Phase.GUESS);
-        assertThat(g.state.revealed().get(0).text()).isEqualTo("소금");
+        assertThat(g.state.revealed().get(0)).isEqualTo(
+                new com.mirboard.domain.game.wordtemp.state.WordTempState.Revealed(1, "조개", 68, 70, false));
+    }
+
+    @Test
+    void a_voided_tenth_slot_gives_the_slot_back_and_the_phase_stays_open() {
+        Game g = game().selectAll(0);
+        g.live = true;
+        for (String low : WordTempFixtures.LOWS.subList(0, 9)) {
+            g.hint(low);
+        }
+        g.hint("짠맛").score("짠맛", new LiveScore.NotANoun());
+        assertThat(g.state.phase()).isEqualTo(Phase.HINT);
+        assertThat(g.state.hintCount()).isEqualTo(9);
+        g.hint("배"); // 열 번째 — 기준을 넘긴다
+        assertThat(g.event(WordTempEvent.HintRevealed.class).floorMet()).isTrue();
     }
 
     @Test

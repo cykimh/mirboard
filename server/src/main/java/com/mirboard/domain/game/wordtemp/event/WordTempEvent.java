@@ -50,6 +50,9 @@ public sealed interface WordTempEvent extends GameEvent
                 WordTempEvent.TurnStarted,
                 WordTempEvent.HintPhaseStarted,
                 WordTempEvent.HintCount,
+                WordTempEvent.HintScored,
+                WordTempEvent.HintPending,
+                WordTempEvent.HintVoid,
                 WordTempEvent.HintRevealed,
                 WordTempEvent.GuessPhaseStarted,
                 WordTempEvent.GuessSubmitted,
@@ -177,7 +180,7 @@ public sealed interface WordTempEvent extends GameEvent
     // ---- 비공개 (§12.3) — 본인 큐, 순번 없음 ----
 
     sealed interface Private extends WordTempEvent
-            permits WordCandidates, HintScored, HintPending, HintVoid, GuessAccepted {
+            permits WordCandidates, GuessAccepted {
 
         /** 받는 좌석. */
         int seat();
@@ -206,15 +209,15 @@ public sealed interface WordTempEvent extends GameEvent
     }
 
     /** 힌트의 온도가 확정됐다(표는 바로, 실시간은 반영될 때). {@code count} = 지금 개수. */
-    record HintScored(int seat, String text, int temp, int count) implements Private {
+    record HintScored(int seat, String text, int temp, int count) implements WordTempEvent {
     }
 
     /** 힌트가 채점 중이다 — 입력을 잠근다. 어댑터(S2)는 이것을 보고 채점을 요청한다. */
-    record HintPending(int seat, String text) implements Private {
+    record HintPending(int seat, String text) implements WordTempEvent {
     }
 
     /** 채점 중이던 힌트가 무효가 됐다 — 개수를 돌려준다. */
-    record HintVoid(int seat, String text, VoidReason reason, int count) implements Private {
+    record HintVoid(int seat, String text, VoidReason reason, int count) implements WordTempEvent {
     }
 
     /** 내가 낸 답(정규화된 값, 빈 문자열 = 패스). */

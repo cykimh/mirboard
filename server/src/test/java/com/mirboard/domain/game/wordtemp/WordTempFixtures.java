@@ -17,7 +17,8 @@ import java.util.SplittableRandom;
 
 /**
  * 낱말 온도 엔진 테스트의 고정 표·고정 후보와 작은 진행 도우미. 표는 룰 §14 의 예(정답 바다)를 그대로 담는다 —
- * {@code 짠맛} 은 일부러 표에 없다(실시간 채점 경로).
+ * {@code 짠맛} 은 일부러 표에 없다(실시간 채점 경로). 룰 v2(D-320)의 기준 70/75/80/85/90 을 차례로 넘기는 힌트는
+ * 배(70)·모래(75)·항구(80)·해변(88)·파도(93)다.
  */
 public final class WordTempFixtures {
 
@@ -44,7 +45,9 @@ public final class WordTempFixtures {
         t.put("바다", "여름", 58).put("바다", "갈매기", 71).put("바다", "여행", 44).put("바다", "해변", 88)
                 .put("바다", "파도", 93).put("바다", "해양", 97).put("바다", "소금", 62).put("바다", "항구", 80)
                 .put("바다", "모래", 75).put("바다", "하늘", 31).put("바다", "물", 66).put("바다", "고래", 78)
-                .put("바다", "섬", 72).put("바다", "배", 70).put("바다", "수영", 64);
+                .put("바다", "섬", 72).put("바다", "배", 70).put("바다", "수영", 64)
+                // D-320 — 1차 기준(70°) 아래가 10개가 되게(차수당 힌트 상한 10개를 기준 미달로 다 쓰는 길)
+                .put("바다", "바람", 48).put("바다", "구름", 25).put("바다", "조개", 68).put("바다", "낚시", 54);
         t.put("케이크", "생일", 84).put("케이크", "빵", 79).put("케이크", "촛불", 73).put("케이크", "설탕", 61)
                 .put("케이크", "파티", 67).put("케이크", "접시", 42).put("케이크", "우유", 48)
                 .put("케이크", "디저트", 91).put("케이크", "구름", 18);
@@ -66,6 +69,10 @@ public final class WordTempFixtures {
         t.put("수영", "물", 82).put("수영", "수영복", 90).put("수영", "여름", 60).put("수영", "운동", 70);
         return t;
     }
+
+    /** 정답 바다의 1차 기준(70°) 아래 힌트 10개 — 낸 순서대로. 앞 9개 중 가장 높은 것은 조개(68°), 전부에서도 조개. */
+    public static final List<String> LOWS = List.of("여름", "여행", "하늘", "소금", "물", "수영", "바람", "구름", "조개",
+            "낚시");
 
     /** 좌석 {@code first} 가 첫 출제자가 되는 씨앗. */
     public static long seedStartingAt(int seats, int first) {
@@ -172,6 +179,25 @@ public final class WordTempFixtures {
             for (int seat : engine.pendingSeats(state)) {
                 if (state.phase() == Phase.GUESS) {
                     guess(seat, "");
+                }
+            }
+            return this;
+        }
+
+        /**
+         * 지금 출제 차례를 아무 일 없이 끝까지 보낸다 — 출제자는 힌트를 더 내지 않고(시간 초과) 추리자는 모두 패스. 5차까지 가서
+         * {@code TURN_END} 에서 멈춘다(D-320 — 힌트 0개여도 추리로 간다). 힌트 단계에서 부르면 그 뒤로는 아무도 점수를 받지 않는다.
+         */
+        public Game idleTurn() {
+            int turn = state.turnNo();
+            for (int i = 0; i < 100 && !(state.phase() == Phase.TURN_END && state.turnNo() == turn); i++) {
+                if (state.phase() == Phase.GUESS && !engine.pendingSeats(state).isEmpty()) {
+                    passAll();
+                } else {
+                    timer();
+                }
+                if (state.ended() || state.turnNo() != turn) {
+                    throw new AssertionError("turn " + turn + " did not stop at TURN_END: " + state.phase());
                 }
             }
             return this;
