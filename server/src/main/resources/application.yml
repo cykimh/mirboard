@@ -235,8 +235,9 @@ mirboard:
       enabled: ${MIRBOARD_WORD_TEMP_LIVE_SCORING:false}
       # Fly secrets 로만 넣는다(저장소·로그에 남기지 않는다). docs/deploy.md "낱말 온도 실시간 채점".
       api-key: ${ANTHROPIC_API_KEY:}
-      # 채점 기준문(resources/wordtemp/<버전>.md) — 캐시 키의 일부. 표 v1 은 score-v1 로 만들었고 실시간은 청소한 표에 맞춘 score-v2.
-      prompt-version: score-v2
+      # 채점 기준문(resources/wordtemp/<버전>.md) — 캐시 키의 일부라 바꾸면 예전 실시간 점수는 다시 쓰이지 않는다.
+      # score-v3(D-322): 후한 띠·창의적 연상·고유명사 허용 — 표 v2 도 같은 기준문으로 만들었다(표와 실시간이 같은 감각).
+      prompt-version: score-v3
       # 하루(Asia/Seoul) 호출 상한 — 닿으면 그날은 표만으로 진행한다. 500회 ≈ 최악 하루 약 $1.1(Sonnet 5.5).
       daily-cap: ${MIRBOARD_WORD_TEMP_DAILY_CAP:600}
       # 한 판의 실시간 채점 상한(매치 상태로 센다).

@@ -71,11 +71,11 @@ public final class ClaudeHintJudge implements HintJudge {
     public static final class HintVerdict {
 
         @JsonProperty("isValidNoun")
-        @JsonPropertyDescription("힌트가 기준문의 뜻으로 한국어 보통 명사인가")
+        @JsonPropertyDescription("힌트가 기준문의 뜻으로 쓸 수 있는 낱말(명사 — 고유명사 포함)인가. 쓸 수 없는 힌트면 false")
         public boolean isValidNoun;
 
         @JsonProperty("similarityScore")
-        @JsonPropertyDescription("정답과 힌트의 가까움, 정수 0~100. 명사가 아니면 0")
+        @JsonPropertyDescription("정답과 힌트의 가까움, 정수 0~100. 쓸 수 없는 힌트면 0")
         public int similarityScore;
 
         @JsonProperty("reason")

@@ -19,7 +19,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { loadBank, loadBlocked, loadFlagged, isOffensive, isHangulWord, hintBlockedByAnswer } = await import('./lib.mjs');
   const scores = readScores(); // 4단계가 적어 둔 정본 — 여기서는 Claude 를 부르지 않는다
   const blocked = loadBlocked();
-  const flagged = loadFlagged(); // 5b단계: 고유명사·비하 표현·명사 아님
+  const flagged = loadFlagged(); // 5b단계: 낱말 → 갈래
   const rows = new Map();
   let notNoun = 0;
   const cleaned = { proper_noun: 0, derogatory_or_slur: 0, not_a_noun: 0, blocked: 0 };
@@ -30,7 +30,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const [hint, s] of scores.get(a.word) ?? []) {
       if (s < 0) notNoun++;
       // 은행(같은 말 목록)·금칙어를 채점 뒤에 고쳤을 수 있으니 여기서 한 번 더 거른다
-      else if (flagged.has(hint)) cleaned[flagged.get(hint)]++;
+      // 5b단계가 뺀 것 가운데 비하 표현·명사 아님만 계속 뺀다(고유명사는 D-322 로 힌트가 된다)
+      else if (flagged.get(hint) === 'derogatory_or_slur' || flagged.get(hint) === 'not_a_noun') cleaned[flagged.get(hint)]++;
       else if (isOffensive(hint, blocked)) cleaned.blocked++;
       else if (isHangulWord(hint) && !hintBlockedByAnswer(hint, answers)) hints.set(hint, s);
     }
@@ -73,11 +74,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const total = Object.fromEntries(BANDS.map((b) => [b, kept.reduce((s, a) => s + a.count[b], 0)]));
   const stats = [
     `낱말 온도 표 ${TABLE_VERSION} — ${created} · ${MODEL} · ${PROMPT_VERSION}`,
-    `정답 ${kept.length}개(후보 ${kept.length + dropped.length - 1}개 가운데 ${dropped.length - 1}개 뺌) · 쌍 ${pairs}개 · 명사 아님으로 버린 쌍 ${notNoun}개`,
-    `어휘 청소로 뺀 쌍: 고유명사 ${cleaned.proper_noun} · 비하 표현 ${cleaned.derogatory_or_slur} · 명사 아님 ${cleaned.not_a_noun} · 금칙어 부분 일치 ${cleaned.blocked} (낱말 수는 data/flagged.tsv)`,
+    `정답 ${kept.length}개(후보 ${kept.length + dropped.length - 1}개 가운데 ${dropped.length - 1}개 뺌) · 쌍 ${pairs}개 · 쓸 수 없는 힌트로 판정돼 버린 쌍 ${notNoun}개`,
+    `어휘 청소로 뺀 쌍: 비하 표현 ${cleaned.derogatory_or_slur} · 명사 아님 ${cleaned.not_a_noun} · 금칙어 부분 일치 ${cleaned.blocked}`,
     `띠: ${BANDS.map((b) => `${b} ${total[b]}(${((100 * total[b]) / pairs).toFixed(1)}%)`).join(' · ')}`,
     `파일: ${fs.statSync(tableFile).size} 바이트(gzip) · 풀면 ${Buffer.byteLength(text)} 바이트`,
   ];
+  // 기준 온도를 정할 때 보는 수: 정답마다 그 온도 이상인 이웃이 몇 개인가
+  const sorted = (arr) => [...arr].sort((x, y) => x - y);
+  stats.push('정답당 이웃 수(그 온도 이상) — 가운데값 · 최소 · 0개인 정답 수:');
+  for (const t of [50, 55, 60, 65, 70, 75, 80, 85, 88, 90, 96]) {
+    const counts = sorted(kept.map((a) => [...a.table.values()].filter((s) => s >= t).length));
+    stats.push(`  ≥${t}: ${counts[Math.floor(counts.length / 2)]} · ${counts[0]} · ${counts.filter((c) => c === 0).length}`);
+  }
   fs.writeFileSync(path.join(DATA, 'stats.txt'), stats.join('\n') + '\n');
+  // 눈으로 보는 예: 정답마다 위쪽 25개
+  const tops = kept.map((a) => `${a.word}: ${[...a.table].sort((x, y) => y[1] - x[1]).slice(0, 25).map(([h, s]) => `${h} ${s}`).join(', ')}`);
+  fs.writeFileSync(path.join(DATA, 'top-neighbors.txt'), `# 표 ${TABLE_VERSION} — 정답마다 온도가 높은 힌트 25개(6단계가 만든다)\n${tops.join('\n')}\n`);
+  // 예전 표 파일은 싣지 않는다(서버는 TABLE_RESOURCE 하나만 읽는다)
+  for (const f of fs.readdirSync(RESOURCES)) if (/^table-v\d+\.tsv\.gz$/.test(f) && f !== path.basename(tableFile)) fs.rmSync(path.join(RESOURCES, f));
   console.log(stats.join('\n'));
 }
