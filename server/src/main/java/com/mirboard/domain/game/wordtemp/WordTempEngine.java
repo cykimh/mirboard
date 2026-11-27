@@ -224,6 +224,10 @@ public final class WordTempEngine {
             throw reject(RejectionReason.HINT_LIMIT);
         }
         String text = WordNormalizer.normalize(a.text()).orElseThrow(() -> reject(RejectionReason.HINT_FORMAT));
+        // D-320 덧붙임 — 힌트는 채점 중일 때부터 모두에게 공개되므로, 금칙어를 품은 힌트는 받지 않는다(추리 답의 가림과 같은 목록).
+        if (WordTempVisibility.masked(text, config.blockedWords())) {
+            throw reject(RejectionReason.HINT_BLOCKED);
+        }
         HintRules.containment(d.answer, text).ifPresent(reason -> {
             throw reject(reason);
         });

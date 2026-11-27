@@ -464,3 +464,5 @@
 
 - 재현: `npm --prefix client run test -- wordtemp` · 화면 한 판 `E2E_WORD_TEMP=1 E2E_BASE_URL=http://localhost:5219 npm --prefix client run e2e -- wordtemp`(`.claude/launch.json` 의 wordtemp-server·wordtemp-client) · 단계별 스크린샷 `node client/e2e/wordtempShots.mjs` → `client/e2e/wordtemp-shots/`.
 - 화면이 쓰는 값은 서버가 싣는다(D-319): 차수별 최저 온도는 공개 뷰 `floors`, 후보의 범주 이름·뜻풀이는 비공개 뷰·`WORD_CANDIDATES`(`words/AnswerCategory`), 결과 보기·차례 끝의 남은 시간은 `GUESSES_REVEALED`·`TURN_ENDED`. 클라에 룰 수치는 없다(튜토리얼 문구의 50·60·70 은 §3.4 의 글).
+
+> D-320 덧붙임: 금칙어를 품은 힌트는 받지 않는다(`HINT_BLOCKED`, 판정 순서 `HINT_FORMAT` 바로 뒤) — 힌트가 채점 중일 때부터 모두에게 공개되기 때문.

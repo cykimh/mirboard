@@ -20,6 +20,7 @@ const ERROR_LABEL: Record<string, string> = {
   HINT_FORMAT: '힌트는 한글 낱말 1~10자로 내 주세요.',
   HINT_IS_ANSWER: '정답이 들어간 낱말은 힌트로 낼 수 없어요.',
   HINT_INSIDE_ANSWER: '정답 안에 들어 있는 낱말은 힌트로 낼 수 없어요.',
+  HINT_BLOCKED: '쓸 수 없는 낱말이에요. 다른 낱말로 내 주세요.',
   HINT_DUPLICATE: '이미 낸 힌트예요.',
   HINT_LIMIT: '이번 차수의 힌트를 다 냈어요.',
   SCORING_IN_PROGRESS: '앞 힌트를 채점하는 중이에요. 잠깐만요.',

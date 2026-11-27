@@ -2,7 +2,7 @@ package com.mirboard.domain.game.wordtemp.action;
 
 /**
  * 액션 거절 사유(`docs/rules-wordtemp.md` §5.2·§5.3). 이름이 그대로 STOMP {@code ERROR} 의 {@code code} 가 된다.
- * 힌트 판정 순서(D-315): {@code NOT_YOUR_PHASE} → {@code SCORING_IN_PROGRESS} → {@code HINT_LIMIT} → {@code HINT_FORMAT} →
+ * 힌트 판정 순서(D-315): {@code NOT_YOUR_PHASE} → {@code SCORING_IN_PROGRESS} → {@code HINT_LIMIT} → {@code HINT_FORMAT} → {@code HINT_BLOCKED} →
  * {@code HINT_IS_ANSWER} → {@code HINT_INSIDE_ANSWER} → {@code HINT_DUPLICATE} → (표 조회) {@code UNKNOWN_WORD}.
  */
 public enum RejectionReason {
@@ -15,6 +15,8 @@ public enum RejectionReason {
     /** 낱말 고르기 — 이번 라운드에 이미 골랐다(바꾸기 없음, D-315). */
     ALREADY_CHOSEN,
     HINT_FORMAT,
+    /** 금칙어를 품은 힌트(D-320 덧붙임 — 힌트는 채점 중부터 공개). */
+    HINT_BLOCKED,
     HINT_IS_ANSWER,
     HINT_INSIDE_ANSWER,
     HINT_DUPLICATE,

@@ -385,6 +385,16 @@ class WordTempEngineFlowTest {
         assertThat(g.state.attempts().get(0).guesses().get(0).text()).isEqualTo("왕바보");
     }
 
+    @Test
+    void a_hint_containing_a_blocked_word_is_rejected_before_anyone_sees_it() {
+        Game g = new Game(WordTempConfig.of(4, Set.of(), 1, 90, WordTempBotLevel.NORMAL)
+                .withBlockedWords(Set.of("바보")), 0);
+        g.selectAll(0);
+        assertThat(g.hintRejected("왕바보")).isEqualTo(RejectionReason.HINT_BLOCKED);
+        assertThat(g.state.hintCount()).isZero();
+        assertThat(g.state.pendingHint()).isNull();
+    }
+
     // ---- §3.4·§4 점수 표 ----
 
     @Test
