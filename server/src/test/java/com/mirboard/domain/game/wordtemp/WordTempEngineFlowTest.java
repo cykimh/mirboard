@@ -399,7 +399,7 @@ class WordTempEngineFlowTest {
     void five_attempts_all_wrong_over_rising_floors_give_the_setter_fifteen_and_end_the_turn() {
         Game g = game().selectAll(0);
         String[] passing = {"배", "모래", "항구", "해변", "파도"}; // 70·75·80·88·93
-        int[] floors = {70, 75, 80, 85, 90};
+        int[] floors = {70, 75, 80, 85, 88};
         int total = 0;
         for (int attempt = 1; attempt <= 5; attempt++) {
             assertThat(g.state.attempt()).isEqualTo(attempt);
@@ -473,7 +473,7 @@ class WordTempEngineFlowTest {
         assertThat(three.maxAttempts()).isEqualTo(3);
         assertThat(WordTempTuning.DEFAULT.maxAttempts()).isEqualTo(5);
         assertThat(WordTempTuning.DEFAULT.maxHints()).isEqualTo(10);
-        assertThat(WordTempTuning.DEFAULT.floors()).containsExactly(70, 75, 80, 85, 90);
+        assertThat(WordTempTuning.DEFAULT.floors()).containsExactly(70, 75, 80, 85, 88);
         Game g = new Game(WordTempConfig.of(4, Set.of(), 1, 90, WordTempBotLevel.NORMAL).withTuning(three), 0);
         g.selectAll(0).hint("하늘"); // 31 ≥ 30 → 넘겼다
         assertThat(g.state.phase()).isEqualTo(Phase.GUESS);

@@ -228,8 +228,8 @@ class WordTempBotMatchSimulationIT {
         assertThat(scored.liveRequests()).isEqualTo(1);
 
         // ④ 답이 오지 않는 힌트 — 8초 상한 뒤 무효, 개수를 돌려준다
-        act(roomId, setterUser, hint(hinting, "바사아자차"));
-        assertThat(stateStore.load(roomId).orElseThrow().hintCount()).isEqualTo(2);
+        // 엔진 타이머(250ms 폴링)와 방 락이 겹치면 액션이 BUSY 로 조용히 거절된다 — 받아들여질 때까지 다시 보낸다
+        actUntil(roomId, setterUser, hint(hinting, "바사아자차"), s -> s.hintCount() == 2);
         long asked = System.currentTimeMillis();
         WordTempState voided = Awaitility.await("기다림 상한 뒤 무효").atMost(15, TimeUnit.SECONDS)
                 .pollInterval(Duration.ofMillis(100))
@@ -302,6 +302,19 @@ class WordTempBotMatchSimulationIT {
 
     private void act(String roomId, long userId, Map<String, Object> body) {
         controller.onAction(roomId, body, new AuthPrincipal(userId, "u" + userId));
+    }
+
+    /** 액션을 보내고, 조건이 맞을 때까지(BUSY 로 거절됐으면) 다시 보낸다 — 최대 20번. */
+    private void actUntil(String roomId, long userId, Map<String, Object> body,
+                          java.util.function.Predicate<WordTempState> accepted) {
+        for (int i = 0; i < 20; i++) {
+            act(roomId, userId, body);
+            if (accepted.test(stateStore.load(roomId).orElseThrow())) {
+                return;
+            }
+            sleep(100);
+        }
+        assertThat(accepted.test(stateStore.load(roomId).orElseThrow())).as("액션이 20번 안에 받아들여져야 한다").isTrue();
     }
 
     private WordTempState awaitState(String roomId, java.util.function.Predicate<WordTempState> condition) {

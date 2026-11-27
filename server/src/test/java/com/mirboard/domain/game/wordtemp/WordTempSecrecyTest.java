@@ -331,7 +331,7 @@ class WordTempSecrecyTest {
         WordTempFixtures.Game g = WordTempFixtures.game();
         assertThat(WordTempViews.publicView(g.state, g.engine.config(), g.now).floors())
                 .isEqualTo(g.engine.config().tuning().floors())
-                .containsExactly(70, 75, 80, 85, 90);
+                .containsExactly(70, 75, 80, 85, 88);
     }
 
     @Test

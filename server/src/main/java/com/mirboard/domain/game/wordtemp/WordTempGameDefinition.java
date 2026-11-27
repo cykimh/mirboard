@@ -49,7 +49,7 @@ public final class WordTempGameDefinition implements GameDefinition {
                                   Clock clock,
                                   ApplicationEventPublisher publisher,
                                   @Value("${mirboard.wordtemp.status:DISABLED}") GameStatus status,
-                                  @Value("${mirboard.wordtemp.live-scoring.per-match-cap:60}") int perMatchLiveCap,
+                                  @Value("${mirboard.wordtemp.live-scoring.per-match-cap:120}") int perMatchLiveCap,
                                   @Value("${mirboard.wordtemp.time-scale:1.0}") double timeScale) {
         this.stateStore = stateStore;
         this.words = words;

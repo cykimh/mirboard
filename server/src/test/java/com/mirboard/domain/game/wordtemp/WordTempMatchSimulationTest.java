@@ -294,7 +294,7 @@ class WordTempMatchSimulationTest {
                 assertThat(s.hintPhases()[a]).as("세트의 차수 수를 넘는 차수는 없다").isZero();
             }
         }
-        assertThat(WordTempTuning.DEFAULT.withFloors(FLOOR_SETS[0])).isEqualTo(WordTempTuning.DEFAULT);
+        assertThat(WordTempTuning.DEFAULT.withFloors(FLOOR_SETS[1])).isEqualTo(WordTempTuning.DEFAULT); // 지금 값 = 88 (D-320 덧붙임)
         Stats base = bySet.get(0);
         Stats lower = bySet.get(3); // 60/65/70/75/80
         // 1~3차는 두 세트 모두 넘길 낱말이 거의 늘 있어 차이가 잡음 수준이다 — 넘길 낱말이 드문 4·5차에서 본다

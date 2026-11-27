@@ -35,8 +35,8 @@ public record WordTempTuning(List<Integer> floors,
                              long botGuessMaxMs,
                              long botQuickMs) {
 
-    /** 룰 v2 의 값(D-320) — 차수 5번·기준 70/75/80/85/90·차수당 힌트 10개. 예전 v1(D-311)은 3번·50/60/70·5개·96 이상 조기 종료. */
-    public static final WordTempTuning DEFAULT = new WordTempTuning(List.of(70, 75, 80, 85, 90), 10, 5,
+    /** 룰 v2 의 값(D-320) — 차수 5번·기준 70/75/80/85/88(5차 90 → 88, 관제 조정)·차수당 힌트 10개. 예전 v1(D-311)은 3번·50/60/70·5개·96 이상 조기 종료. */
+    public static final WordTempTuning DEFAULT = new WordTempTuning(List.of(70, 75, 80, 85, 88), 10, 5,
             20_000L, 30_000L, 5_000L, 6_000L, 8_000L, 4_000L, 9_000L, 5_000L, 20_000L, 1_500L);
 
     public WordTempTuning {

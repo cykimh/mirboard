@@ -34,7 +34,7 @@ import org.springframework.stereotype.Component;
  * <p><b>안전장치</b>(전부 여기 한 곳):
  * <ul>
  *   <li>끄기 스위치 {@code mirboard.wordtemp.live-scoring.enabled}(기본 false) · API 키 없음 → {@link #available} false. 게임은 표만으로 진행.</li>
- *   <li>하루(Asia/Seoul) 호출 상한 {@code daily-cap}(기본 500) — 오늘 캐시에 새로 쓰인 행 수(재시작 뒤에도 이어짐) + 이 인스턴스의 호출 수.</li>
+ *   <li>하루(Asia/Seoul) 호출 상한 {@code daily-cap}(기본 600) — 오늘 캐시에 새로 쓰인 행 수(재시작 뒤에도 이어짐) + 이 인스턴스의 호출 수.</li>
  *   <li>400·401·403·404 → ERROR 로그 뒤 이 인스턴스에서 실시간 채점 일시 중지(재배포·재시작 때 풀린다).</li>
  *   <li>같은 쌍은 작업 하나로 합친다(진행 중 맵).</li>
  * </ul>
@@ -83,7 +83,7 @@ public class AsyncLiveHintScorer implements LiveHintScorer {
                                @Value("${mirboard.wordtemp.live-scoring.api-key:}") String apiKey,
                                @Value("${mirboard.wordtemp.model:claude-sonnet-5-5}") String model,
                                @Value("${mirboard.wordtemp.live-scoring.prompt-version:score-v2}") String promptVersion,
-                               @Value("${mirboard.wordtemp.live-scoring.daily-cap:500}") int dailyCap,
+                               @Value("${mirboard.wordtemp.live-scoring.daily-cap:600}") int dailyCap,
                                @Value("${mirboard.wordtemp.live-scoring.max-concurrent:2}") int maxConcurrent,
                                @Value("${mirboard.wordtemp.live-scoring.timeout-ms:5000}") long timeoutMs,
                                LiveScoreStore store,

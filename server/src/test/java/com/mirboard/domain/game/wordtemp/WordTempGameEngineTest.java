@@ -230,7 +230,7 @@ class WordTempGameEngineTest {
             all.addAll(h.events);
         }
         assertThat(all.stream().filter(WordTempEvent.HintRevealed.class::isInstance)
-                .map(e -> ((WordTempEvent.HintRevealed) e).floor())).containsExactly(70, 75, 80, 85, 90);
+                .map(e -> ((WordTempEvent.HintRevealed) e).floor())).containsExactly(70, 75, 80, 85, 88);
         assertThat(h.event(WordTempEvent.TurnEnded.class).reason())
                 .isEqualTo(WordTempState.TurnEndReason.ALL_ATTEMPTS);
         assertThat(h.state().totals()).containsOnly(0);
@@ -357,7 +357,7 @@ class WordTempGameEngineTest {
 
         // D-320 — 힌트(낱말·온도)는 공개 뷰에 있다. 비공개 뷰에는 힌트 목록이 없다
         assertThat(pub.hints()).containsExactly(new WordTempViews.HintView("여름", 1, HintStatus.SCORED, 58));
-        assertThat(pub.floors()).containsExactly(70, 75, 80, 85, 90);
+        assertThat(pub.floors()).containsExactly(70, 75, 80, 85, 88);
         assertThat(pub.maxHints()).isEqualTo(10);
 
         PrivateView setter = (PrivateView) h.adapter.privateView(h.state(), 0).orElseThrow();

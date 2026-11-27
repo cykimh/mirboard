@@ -23,7 +23,7 @@ describe('wordTempStore — 스냅샷', () => {
     expect(st().guessSeats).toEqual([0, 2, 3]);
     expect(st().candidates).toHaveLength(3);
     expect(st().chosen).toBe(0);
-    expect(st().floors).toEqual([70, 75, 80, 85, 90]);
+    expect(st().floors).toEqual([70, 75, 80, 85, 88]);
     expect(floorOf(st(), 2)).toBe(75);
     expect(floorOf({ floors: [] }, 1)).toBeNull(); // 서버가 주지 않으면 눈금 없음
   });

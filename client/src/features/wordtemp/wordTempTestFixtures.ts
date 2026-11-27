@@ -18,7 +18,7 @@ export function view(over: Partial<WordTempTableView> = {}): WordTempTableView {
     phaseRemainingMs: 90_000,
     hintCount: 0,
     maxHints: 10,
-    floors: [70, 75, 80, 85, 90],
+    floors: [70, 75, 80, 85, 88],
     hints: [],
     revealed: [],
     guessedSeats: [],
