@@ -944,6 +944,22 @@ TTL(`suspend:user:{id}`)에만 둔다(users 스키마 비침범). 정지된 유�
 ### DELETE `/api/admin/users/{userId}/suspend`
 유저 정지 해제. 응답 `204`. 에러: `NOT_ADMIN` (403).
 
+### GET `/api/admin/games/{gameType}/feedback` *(D-323)*
+게임이 모은 사용자 신고 가운데 **많이 알려진 것부터**. 게임 중립 — 게임이 선택 포트 `GameFeedbackSource` 를 구현했을 때만 줄이 있고(지금은
+낱말 온도의 "온도가 이상해요"), 없는 게임은 빈 목록이다. 쿼리 `limit` 기본 50, 1~200 clamp. 에러: `NOT_ADMIN` (403).
+
+응답 `200` (낱말 온도 — 줄의 모양은 게임이 정한다. **사용자·방·좌석 식별자는 없다**)
+```json
+{
+  "gameType": "WORD_TEMP",
+  "items": [
+    { "answer": "바다", "hint": "여름", "direction": "LOW", "temp": 58, "version": "v1",
+      "count": 3, "firstSeen": "2026-11-27T04:10:00Z", "lastSeen": "2026-11-27T05:02:11Z" }
+  ]
+}
+```
+`direction`: `LOW`(너무 낮다)·`HIGH`(너무 높다)·`UNSURE`. `version`: 표 힌트면 표 버전, 실시간 채점 힌트면 `live`.
+
 ### GET `/api/admin/chat-reports` *(D-93)*
 채팅 신고 목록(최신순). 쿼리 `limit` 기본 50, 1~200 clamp.
 각 항목에 피신고자의 **누적 신고 수**(`totalAgainstReported`)를 함께 실어 정지 판단을

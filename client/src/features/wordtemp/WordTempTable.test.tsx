@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useToastStore } from '@/components/toast/toastStore';
 import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { BUSY_RETRY_DELAY_MS, LOAD_RETRY_MAX, LOAD_RETRY_MS, WordTempTable } from './WordTempTable';
 import { wordTempRoomSink } from './wordTempRoomSink';
@@ -53,6 +54,7 @@ describe('WordTempTable (S3)', () => {
     socketConnected = true;
     useAuthStore.setState({ token: 't' } as never);
     useCardAnimStore.setState({ enabled: true, forced: false });
+    useToastStore.setState({ toasts: [] });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -115,7 +117,7 @@ describe('WordTempTable (S3)', () => {
     pub('HINT_VOID', { seat: 1, text: '짠맛', reason: 'NOT_A_NOUN', count: 1 });
     expect(within(board).queryByText('짠맛')).not.toBeInTheDocument();
     // 무효 안내는 낸 사람(출제자)에게만 — 추리자 화면에는 뜨지 않는다
-    expect(screen.queryByText(/명사가 아니에요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/힌트로 쓸 수 없다고 봤어요/)).not.toBeInTheDocument();
     expect(within(board).getByLabelText('힌트 1개, 최대 10개')).toBeInTheDocument();
   });
 
@@ -197,13 +199,16 @@ describe('WordTempTable (S3)', () => {
     expect(within(panel).getByRole('button', { name: '그만 내기' })).toBeDisabled();
 
     const input = within(panel).getByRole('textbox', { name: '힌트 낱말' });
-    expect(input).toHaveAttribute('placeholder', '힌트 · 기준 70°');
+    expect(input).toHaveAttribute('placeholder', '한글 낱말 · 기준 70°');
+    // D-323 — 빈 입력란에서는 [힌트 내기]가 꺼져 있다
+    expect(within(panel).getByRole('button', { name: '힌트 내기' })).toBeDisabled();
     fireEvent.change(input, { target: { value: '여름' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'SUBMIT_HINT', turnNo: 1, attempt: 1, text: '여름' });
     // 응답 전 — 버튼은 aria-disabled, 또 눌러도 나가지 않는다
-    expect(within(panel).getByRole('button', { name: '힌트 내기' })).toHaveAttribute('aria-disabled', 'true');
     fireEvent.change(input, { target: { value: '갈매기' } });
+    expect(within(panel).getByRole('button', { name: '힌트 내기' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(panel).getByText('보내는 중…')).toBeInTheDocument();
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(sendAction).toHaveBeenCalledTimes(1);
 
@@ -212,6 +217,7 @@ describe('WordTempTable (S3)', () => {
     expect(within(screen.getByRole('region', { name: '힌트' })).getByRole('img', { name: '온도 58도, 미지근' })).toBeInTheDocument();
     expect(within(panel).getByLabelText('힌트 1개, 최대 10개')).toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: '힌트 내기' })).not.toHaveAttribute('aria-disabled');
+    expect(within(panel).getByRole('button', { name: '힌트 내기' })).toBeEnabled(); // 써 둔 '갈매기' 를 이제 낼 수 있다
     expect(within(panel).getByRole('button', { name: '그만 내기' })).toBeEnabled();
 
     fireEvent.click(within(panel).getByRole('button', { name: '그만 내기' }));
@@ -242,17 +248,22 @@ describe('WordTempTable (S3)', () => {
     expect(within(panel).getByRole('textbox', { name: '힌트 낱말' })).toBeDisabled();
     expect(within(panel).getByRole('button', { name: '그만 내기' })).toBeDisabled();
     expect(screen.getByText('힌트를 채점하는 중…')).toBeInTheDocument();
+    // D-323 — 잠긴 까닭이 입력란 아래에 보인다
+    expect(within(panel).getByText('채점 중… 온도가 나오면 다음 힌트를 낼 수 있어요')).toBeInTheDocument();
 
     pub('HINT_VOID', { seat: 0, text: '짠맛', reason: 'NOT_A_NOUN', count: 1 });
     expect(within(panel).getByRole('textbox', { name: '힌트 낱말' })).toBeEnabled();
-    expect(screen.getByText('명사가 아니에요. 개수는 돌려드렸어요.')).toBeInTheDocument();
+    // D-323 — "명사가 아니에요"가 아니다(명사도, 고유 명사도 무효가 될 수 있고 그 반대도 있다)
+    expect(screen.getByText('채점기가 이 낱말은 힌트로 쓸 수 없다고 봤어요. 개수는 돌려드렸으니 다른 낱말로 내 주세요.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('명사');
   });
 
   it('출제자 — 10개를 다 내면 입력이 잠긴다', () => {
     seedStore({ setterSeat: 0, hintCount: 10 }, mine({ answer: '바다' }));
     renderTable();
     expect(screen.getByRole('textbox', { name: '힌트 낱말' })).toBeDisabled();
-    expect(screen.getByRole('textbox', { name: '힌트 낱말' })).toHaveAttribute('placeholder', '힌트를 다 냈어요');
+    expect(screen.getByRole('button', { name: '힌트 내기' })).toBeDisabled();
+    expect(screen.getByText('힌트 10개를 다 냈어요')).toBeInTheDocument();
   });
 
   it('BUSY — 보낸 힌트를 한 번 다시 보낸다. 소식이 없으면 막음을 풀고 판을 다시 받는다', () => {
@@ -391,7 +402,7 @@ describe('WordTempTable (S3)', () => {
     seedStore({ setterSeat: 0, floors: [], hintCount: 0 }, mine({ answer: '바다' }));
     renderTable();
     expect(screen.getByRole('region', { name: '내 문제' })).not.toHaveTextContent(/기준 \d/);
-    expect(screen.getByRole('textbox', { name: '힌트 낱말' })).toHaveAttribute('placeholder', '힌트 낱말 (한글)');
+    expect(screen.getByRole('textbox', { name: '힌트 낱말' })).toHaveAttribute('placeholder', '한글 낱말');
   });
 
   it('차례 끝 — 정답이 공개되고 힌트는 판에 그대로 남는다, 다음 출제자', () => {
@@ -523,5 +534,79 @@ describe('WordTempTable (S3)', () => {
     expect(screen.getByText('끊김')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '내보내기' }));
     expect(onKick).toHaveBeenCalledWith(30);
+  });
+
+  // ── D-323: [힌트 내기] 버튼이 켜지는 때 ──
+  it('출제자 — 기준을 넘긴 힌트가 나오면 입력·버튼이 잠기고 까닭을 말한다. 추리 단계에서도 까닭이 보인다', () => {
+    seedStore({ setterSeat: 0 }, mine({ answer: '바다' }));
+    renderTable();
+    const panel = screen.getByRole('region', { name: '내 문제' });
+    const input = within(panel).getByRole('textbox', { name: '힌트 낱말' });
+    fireEvent.change(input, { target: { value: '갈매기' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    pub('HINT_SCORED', { seat: 0, text: '갈매기', temp: 71, count: 1 });
+    // 단계 전환 프레임이 오기 전이라도 더 낼 수 없다 — 버튼이 켜져 보이지 않는다
+    expect(within(panel).getByRole('textbox', { name: '힌트 낱말' })).toBeDisabled();
+    expect(within(panel).getByRole('button', { name: '힌트 내기' })).toBeDisabled();
+    expect(within(panel).getByRole('button', { name: '그만 내기' })).toBeDisabled();
+    expect(within(panel).getByText('기준을 넘겼어요 — 추리 차례')).toBeInTheDocument();
+    pub('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true });
+    pub('GUESS_PHASE_STARTED', { attempt: 1, remainingMs: 30_000, seats: [1, 2, 3] });
+    expect(within(panel).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(panel).getByText('기준을 넘겼어요 — 지금은 추리 차례예요.')).toBeInTheDocument();
+  });
+
+  it('추리자 — [답 내기]는 쓴 낱말이 낼 수 있는 꼴일 때만 켜진다. [패스]는 늘 켜져 있다', () => {
+    seedStore({ phase: 'GUESS', hintCount: 2, hints: HINTS, revealed: [{ attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true }] });
+    renderTable();
+    const panel = screen.getByRole('region', { name: '정답 맞히기' });
+    const button = within(panel).getByRole('button', { name: '답 내기' });
+    expect(button).toBeDisabled();
+    expect(within(panel).getByRole('button', { name: '패스' })).toBeEnabled();
+    fireEvent.change(within(panel).getByRole('textbox', { name: '정답 낱말' }), { target: { value: 'sea' } });
+    expect(button).toBeDisabled();
+    expect(within(panel).getByText('한글만 쓸 수 있어요')).toBeInTheDocument();
+    fireEvent.change(within(panel).getByRole('textbox', { name: '정답 낱말' }), { target: { value: '바다' } });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'SUBMIT_GUESS', turnNo: 1, attempt: 1, text: '바다' });
+  });
+
+  // ── D-323: "온도가 이상해요" ──
+  it('온도가 나온 힌트에 [이상해요] — 방향을 골라 FLAG_TEMP 를 보내고, 받으면 토스트 + "알림 ✓"', () => {
+    seedStore({ hintCount: 2, hints: [...HINTS, { text: '짠맛', attempt: 1, status: 'PENDING' as const, temp: -1 }] });
+    renderTable();
+    const board = screen.getByRole('region', { name: '힌트' });
+    // 채점 중인 줄에는 없다
+    expect(within(board).queryByRole('button', { name: '짠맛 온도가 이상해요' })).not.toBeInTheDocument();
+    const flag = within(board).getByRole('button', { name: '여름 온도가 이상해요' });
+    expect(flag).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(flag);
+    const ask = within(board).getByRole('group', { name: '여름 58도가 어떻게 이상한가요' });
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['너무 낮아요', '너무 높아요', '그냥 이상해요']);
+    fireEvent.click(within(ask).getByRole('button', { name: '너무 낮아요' }));
+    expect(sendAction).toHaveBeenLastCalledWith({ '@action': 'FLAG_TEMP', text: '여름', direction: 'LOW' });
+    expect(within(board).queryByRole('group')).not.toBeInTheDocument();
+
+    priv('FLAG_ACCEPTED', { seat: 0, text: '여름', temp: 58, direction: 'LOW', left: 9 });
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(["'여름' 온도가 이상하다고 알렸어요. 고마워요!"]);
+    expect(within(board).queryByRole('button', { name: '여름 온도가 이상해요' })).not.toBeInTheDocument();
+    expect(within(board).getByLabelText('여름 온도가 이상하다고 알렸어요')).toHaveTextContent('알림 ✓');
+    expect(st().sending).toBeNull();
+    // 다른 줄은 그대로 알릴 수 있다
+    expect(within(board).getByRole('button', { name: '갈매기 온도가 이상해요' })).toBeEnabled();
+  });
+
+  it('[이상해요] — 횟수를 다 쓰면 꺼지고, 관전자·빠진 좌석에는 버튼이 없다', () => {
+    seedStore({ hintCount: 2, hints: HINTS });
+    const { unmount } = renderTable();
+    priv('FLAG_ACCEPTED', { seat: 0, text: '여름', temp: 58, direction: 'UNSURE', left: 0 });
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('(이번 판 0번 남음)');
+    expect(screen.getByRole('button', { name: '갈매기 온도가 이상해요' })).toBeDisabled();
+    unmount();
+
+    seedStore({ hintCount: 2, hints: HINTS }, null, -1);
+    renderTable({ spectator: true, myUserId: 99 });
+    expect(screen.queryByRole('button', { name: /온도가 이상해요/ })).not.toBeInTheDocument();
   });
 });

@@ -103,6 +103,8 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
   let passed = 0;
   let missed = 0;
   let myGuesses = 0;
+  let lowHints = 0;
+  let flagged = 0;
   const quick = { timeout: 5_000 };
   const deadline = Date.now() + MATCH_LIMIT_MS;
   while (Date.now() < deadline && !(await result.isVisible())) {
@@ -134,12 +136,25 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
           const low = usable.find((h) => h[1] < floor && h[1] >= floor - 25);
           if (low) {
             hinted.add(`w:${low[0]}`);
+            // D-323 — 빈 입력란에서는 [힌트 내기]가 꺼져 있고, 낼 수 있는 낱말을 쓰면 켜진다
+            const submit = page.getByRole('button', { name: '힌트 내기' });
+            await expect(submit).toBeDisabled(quick);
             await input.fill(low[0]);
+            await expect(submit).toBeEnabled(quick);
             await input.press('Enter');
             const row = page.locator('.wt-round-now .wt-hint', { hasText: low[0] });
             await expect(row.locator('.wt-gauge')).toHaveAttribute('data-temp', String(low[1]), { timeout: 10_000 });
             expect(await phaseOf(page)).toBe('HINT');
             myHints++;
+            lowHints++;
+            if (flagged === 0) {
+              // D-323 — "온도가 이상해요": 방향을 골라 알리면 토스트가 뜨고 그 줄이 "알림 ✓" 로 바뀐다
+              await row.getByRole('button', { name: `${low[0]} 온도가 이상해요` }).click(quick);
+              await row.getByRole('button', { name: '너무 낮아요' }).click(quick);
+              await expect(row.locator('.wt-flag-done')).toBeVisible(quick);
+              await expect(page.getByText(`'${low[0]}' 온도가 이상하다고 알렸어요. 고마워요!`)).toBeVisible(quick);
+              flagged++;
+            }
           }
           // 그다음 기준을 넘기는 힌트(표에 있으면) — 그 자리에서 추리로 넘어간다
           const pass = [...usable].reverse().find((h) => h[1] >= floor && !hinted.has(`w:${h[0]}`));
@@ -182,6 +197,7 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
   expect(passed + missed, '내 힌트 단계가 판정으로 끝났다(넘김/못 넘김)').toBeGreaterThan(0);
   expect(othersHintsSeen, '남의 힌트와 온도가 보였다').toBeGreaterThan(0);
   expect(myGuesses).toBeGreaterThan(0);
+  expect(flagged, '낮은 힌트를 냈으면 한 번 알렸다').toBe(Math.min(1, lowHints));
   await expect(result.locator('.wt-end-row')).toHaveCount(3);
   await expect(result.locator('.wt-end-turn')).toHaveCount(3); // 짧게 = 1라운드 = 세 사람이 한 번씩
   // 모르는 거절 코드(`CODE: 원문`)가 화면에 뜨지 않았다

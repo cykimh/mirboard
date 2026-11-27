@@ -254,7 +254,7 @@ class WordTempGameEngineTest {
     void the_per_match_cap_rejects_further_out_of_table_hints() {
         WordTempAdapterHarness h = new WordTempAdapterHarness(4, Set.of(), 1, WordTempFixtures.table(), null);
         WordTempGameEngine capped = new WordTempGameEngine(h.adapter.context(), h.config.withLiveCap(1),
-                WordTempFixtures.table(), "t", h.scorer, h.store, java.time.Clock.systemUTC(), h.published::add);
+                WordTempFixtures.table(), "t", h.scorer, h.feedback, h.store, java.time.Clock.systemUTC(), h.published::add);
         WordTempState s = capped.rules().start(WordTempFixtures.candidates(4, 1), WordTempFixtures.seedStartingAt(4, 0),
                 System.currentTimeMillis()).newState();
         for (int seat = 0; seat < 4; seat++) {
@@ -425,5 +425,37 @@ class WordTempGameEngineTest {
         assertThat(java.util.Arrays.stream(com.mirboard.domain.game.wordtemp.scoring.LiveHintScorer.class.getMethods())
                 .filter(m -> m.getName().equals("request")).findFirst().orElseThrow().getParameterTypes())
                 .containsExactly(com.mirboard.domain.game.wordtemp.words.AnswerEntry.class, String.class);
+    }
+
+    // ---- D-323: "온도가 이상해요" — 낱말만 남긴다 ----
+
+    @Test
+    void an_accepted_flag_is_stored_with_words_only_and_a_store_failure_does_not_break_the_action() {
+        WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
+        h.hint("여름");
+        h.act(1, new WordTempAction.FlagTemp("여름", WordTempAction.FlagDirection.LOW));
+        // (정답, 힌트, 방향, 온도, 표 버전) — 사용자·방·좌석은 없다
+        assertThat(h.feedback.records).containsExactly("바다/여름/LOW/58/test-table");
+        WordTempEvent.FlagAccepted told = h.event(WordTempEvent.FlagAccepted.class);
+        assertThat(told.privateSeat()).isEqualTo(1);
+        assertThat(told.text()).isEqualTo("여름");
+        // 거절된 신고는 남지 않는다
+        assertThat(h.rejected(1, new WordTempAction.FlagTemp("여름", null))).isEqualTo("FLAG_DUPLICATE");
+        assertThat(h.rejected(2, new WordTempAction.FlagTemp("없는말", null))).isEqualTo("FLAG_UNKNOWN_HINT");
+        assertThat(h.feedback.records).hasSize(1);
+        // 저장이 실패해도 액션은 받아들여진다(판은 그대로)
+        h.feedback.failing = true;
+        h.act(2, new WordTempAction.FlagTemp("여름", null));
+        assertThat(h.event(WordTempEvent.FlagAccepted.class).seat()).isEqualTo(2);
+        assertThat(h.state().flags()).hasSize(2);
+    }
+
+    @Test
+    void a_live_scored_hint_is_stored_with_the_live_version() {
+        WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
+        h.scorer.answerWith("짠맛", new LiveScore.Scored(64));
+        h.hint("짠맛").fire();
+        h.act(1, new WordTempAction.FlagTemp("짠맛", WordTempAction.FlagDirection.HIGH));
+        assertThat(h.feedback.records).containsExactly("바다/짠맛/HIGH/64/live");
     }
 }

@@ -244,6 +244,12 @@ for (;;) {
         await sendHint(page, pickHint(s.answer, s.floor - 7, s.floor - 1));
         await shot('05-setter-two-hints');
         await variant('05c-setter-dark', { dark: true });
+        // D-323 — "온도가 이상해요": 고르는 칸 → 알린 뒤(토스트 + "알림 ✓")
+        await page.locator('.wt-round-now button.wt-flag').first().click({ timeout: 3000 });
+        await shot('05d-flag-ask', { settle: 300 });
+        await page.getByRole('button', { name: '너무 낮아요' }).click({ timeout: 3000 });
+        await page.locator('.wt-round-now .wt-flag-done').waitFor({ timeout: 3000 });
+        await shot('05e-flag-done', { settle: 300 });
         const pass = pickHint(s.answer, s.floor, s.floor + 6) ?? pickHint(s.answer, s.floor, 100);
         if (pass) await sendHint(page, pass);
         else await page.getByRole('button', { name: '그만 내기' }).click({ timeout: 3000 });

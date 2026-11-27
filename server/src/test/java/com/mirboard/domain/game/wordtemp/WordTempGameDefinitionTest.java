@@ -28,7 +28,8 @@ class WordTempGameDefinitionTest {
     private static final WordTempWords WORDS = new WordTempWords();
 
     private static WordTempGameDefinition definition(GameStatus status) {
-        return new WordTempGameDefinition(mock(WordTempStateStore.class), WORDS, LiveHintScorer.OFF, Clock.systemUTC(),
+        return new WordTempGameDefinition(mock(WordTempStateStore.class), WORDS, LiveHintScorer.OFF,
+                new FakeTempFeedbackStore(), Clock.systemUTC(),
                 event -> { }, status, 60, 1.0);
     }
 

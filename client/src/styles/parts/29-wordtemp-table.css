@@ -723,9 +723,10 @@ button.wt-badge {
   cursor: default;
 }
 
+/* 보낸 것을 기다리는 중 — 꺼진 버튼과 같은 모습이다(D-323: 켜져 보이는데 안 눌리는 버튼이 없게) */
 .wt-primary[aria-disabled='true'],
 .wt-secondary[aria-disabled='true'] {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: progress;
 }
 
@@ -754,6 +755,21 @@ button.wt-badge {
 
 .wt-input:disabled {
   opacity: 0.6;
+}
+
+.wt-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 버튼이 꺼져 있는 까닭 한 줄(D-323) — 자리는 늘 잡아 둔다(글이 생겨도 아래가 밀리지 않게) */
+.wt-input-why {
+  min-height: 18px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--wt-muted);
 }
 
 /* ── 낱말 고르기 ── */
@@ -1406,6 +1422,78 @@ button.wt-badge {
   border: 1.5px dashed var(--wt-line);
   font-size: 13px;
   color: var(--wt-muted);
+}
+
+/* "온도가 이상해요"(D-323) — 줄 끝의 작은 버튼. 누르면 줄 아래에 고르는 칸이 펼쳐진다 */
+.wt-hint {
+  flex-wrap: wrap;
+}
+
+/* 줄 안의 온도계는 더 줄어들 수 있다 — [이상해요]가 다음 줄로 밀리지 않게 */
+.wt-hint .wt-gauge {
+  flex-basis: 70px;
+}
+
+.wt-flag {
+  flex: none;
+  box-sizing: border-box;
+  min-height: 26px;
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1.5px solid var(--wt-line);
+  background: transparent;
+  color: var(--wt-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 23px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wt-flag:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wt-flag-done {
+  border-color: transparent;
+  cursor: default;
+}
+
+.wt-flag-ask {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 2px;
+}
+
+.wt-flag-q {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wt-muted);
+}
+
+.wt-flag-choice {
+  box-sizing: border-box;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--wt-line);
+  background: var(--wt-panel);
+  color: var(--wt-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wt-flag-choice[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: progress;
 }
 
 .wt-hint-tag {

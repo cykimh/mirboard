@@ -9,6 +9,7 @@ import com.mirboard.domain.game.wordtemp.action.WordTempAction;
 import com.mirboard.domain.game.wordtemp.bot.WordTempBotLevel;
 import com.mirboard.domain.game.wordtemp.event.WordTempEvent;
 import com.mirboard.domain.game.wordtemp.state.Phase;
+import com.mirboard.domain.game.wordtemp.state.WordTempState;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.EndReason;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.HintStatus;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.Revealed;
@@ -562,5 +563,72 @@ class WordTempEngineFlowTest {
         assertThat(g.state.order()).containsExactly(2, 3, 0, 1);
         g.selectAll(0);
         assertThat(g.state.setterSeat()).isEqualTo(2);
+    }
+
+    // ---- D-323: "온도가 이상해요" ----
+
+    @Test
+    void a_player_can_flag_a_scored_hint_and_only_they_are_told() {
+        Game g = game().selectAll(0).hint("여름");
+        var before = g.state;
+        g.act(2, new WordTempAction.FlagTemp(" 여름 ", WordTempAction.FlagDirection.LOW));
+        assertThat(g.events).containsExactly(new WordTempEvent.FlagAccepted(2, "여름", 58,
+                WordTempAction.FlagDirection.LOW, WordTempEngine.MAX_FLAGS_PER_SEAT - 1));
+        WordTempEvent.FlagAccepted told = g.event(WordTempEvent.FlagAccepted.class);
+        assertThat(told.isPrivate()).isTrue();
+        assertThat(told.privateSeat()).isEqualTo(2);
+        assertThat(told.sequenced()).isFalse();
+        // 판에는 아무 영향이 없다 — 신고 기록만 늘었다
+        assertThat(g.state.flags()).hasSize(1);
+        assertThat(g.state.hints()).isEqualTo(before.hints());
+        assertThat(g.state.phase()).isEqualTo(before.phase());
+        assertThat(g.state.phaseStartedAt()).isEqualTo(before.phaseStartedAt());
+        // 방향은 없어도 된다(UNSURE). 출제자도 신고할 수 있다
+        g.act(0, new WordTempAction.FlagTemp("여름", null));
+        assertThat(g.event(WordTempEvent.FlagAccepted.class).direction()).isEqualTo(WordTempAction.FlagDirection.UNSURE);
+    }
+
+    @Test
+    void flags_are_refused_for_unknown_hints_duplicates_and_non_players() {
+        Game g = game(4, Set.of(3), 1).selectAll(0).hint("여름");
+        assertThat(g.rejected(1, new WordTempAction.FlagTemp("갈매기", null))).isEqualTo(RejectionReason.FLAG_UNKNOWN_HINT);
+        assertThat(g.rejected(1, new WordTempAction.FlagTemp("abc", null))).isEqualTo(RejectionReason.FLAG_UNKNOWN_HINT);
+        g.act(1, new WordTempAction.FlagTemp("여름", WordTempAction.FlagDirection.HIGH));
+        assertThat(g.rejected(1, new WordTempAction.FlagTemp("여름", WordTempAction.FlagDirection.LOW)))
+                .isEqualTo(RejectionReason.FLAG_DUPLICATE);
+        // 다른 사람은 같은 힌트를 신고할 수 있다
+        g.act(2, new WordTempAction.FlagTemp("여름", null));
+        // 봇·범위 밖 좌석은 못 한다
+        assertThat(g.rejected(3, new WordTempAction.FlagTemp("여름", null))).isEqualTo(RejectionReason.NOT_YOUR_PHASE);
+        assertThat(g.rejected(-1, new WordTempAction.FlagTemp("여름", null))).isEqualTo(RejectionReason.NOT_YOUR_PHASE);
+    }
+
+    @Test
+    void a_seat_can_flag_ten_hints_per_match_and_no_more() {
+        Game g = game().selectAll(0).hint("여름");
+        // 좌석 1 이 이 판에서 이미 9번 신고했다(앞 출제 차례들)
+        var d = g.state.draft();
+        for (int i = 0; i < WordTempEngine.MAX_FLAGS_PER_SEAT - 1; i++) {
+            d.flags.add("1:0:앞낱말" + i);
+        }
+        g.state = d.build();
+        g.act(1, new WordTempAction.FlagTemp("여름", null));
+        assertThat(g.event(WordTempEvent.FlagAccepted.class).left()).isZero();
+        g.hint("소금");
+        assertThat(g.rejected(1, new WordTempAction.FlagTemp("소금", null))).isEqualTo(RejectionReason.FLAG_LIMIT);
+        // 횟수는 좌석마다 따로다
+        g.act(2, new WordTempAction.FlagTemp("소금", null));
+        assertThat(g.event(WordTempEvent.FlagAccepted.class).left()).isEqualTo(WordTempEngine.MAX_FLAGS_PER_SEAT - 1);
+    }
+
+    @Test
+    void an_old_state_without_flags_reads_as_no_flags() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
+        Game g = game().selectAll(0).hint("여름");
+        var tree = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.valueToTree(g.state);
+        tree.remove("flags");
+        WordTempState old = mapper.treeToValue(tree, WordTempState.class);
+        assertThat(old.flags()).isEmpty();
+        assertThat(g.engine.apply(old, 1, new WordTempAction.FlagTemp("여름", null), g.now).newState().flags()).hasSize(1);
     }
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeAudioContext, audioLog } from '@/features/sound/testAudio';
 import type { TableCue } from '@/features/sound/tableSfx';
 import type { MatchResult } from '@/types/wordtemp';
-import { attemptDeltas, clockText, normalizeWord, tempBand } from './wordTempMath';
+import { attemptDeltas, checkWord, clockText, normalizeWord, tempBand } from './wordTempMath';
 import { OTHERS_CORRECT_GAIN, OTHERS_HINT_GAIN, wordTempCues } from './wordTempSfx';
 import { useWordTempStore, type WordTempRoomState } from './wordTempStore';
 import { seedStore } from './wordTempTestFixtures';
@@ -26,6 +26,17 @@ describe('wordTempMath', () => {
     expect(normalizeWord(decomposed)).toBe('사과');
     expect(normalizeWord(' 사 과　')).toBe('사과');
     expect(normalizeWord('   ')).toBe('');
+    // D-323 — 서버 `WordNormalizer` 와 같은 규칙: 문장부호·물결표도 뺀다. 이모지·기호는 그대로 남는다(→ 못 보냄)
+    expect(normalizeWord('사과!?… ~～')).toBe('사과');
+    expect(normalizeWord('사과🍎')).toBe('사과🍎');
+    expect(checkWord('사·과')).toEqual({ text: '사과', ok: true, problem: null });
+    expect(checkWord('')).toMatchObject({ ok: false, problem: 'empty' });
+    expect(checkWord('ㅅㅏ과')).toMatchObject({ ok: false, problem: 'jamo' });
+    expect(checkWord('apple')).toMatchObject({ ok: false, problem: 'chars' });
+    expect(checkWord('사과🍎')).toMatchObject({ ok: false, problem: 'chars' });
+    expect(checkWord('사과2')).toMatchObject({ ok: false, problem: 'chars' });
+    expect(checkWord('가나다라마바사아자차')).toMatchObject({ ok: true });
+    expect(checkWord('가나다라마바사아자차카')).toMatchObject({ ok: false, problem: 'long' });
   });
 
   it('남은 시간 글자', () => {

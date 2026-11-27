@@ -18,6 +18,7 @@ import com.mirboard.domain.game.wordtemp.state.Phase;
         @JsonSubTypes.Type(value = WordTempAction.SubmitHint.class, name = "SUBMIT_HINT"),
         @JsonSubTypes.Type(value = WordTempAction.EndHints.class, name = "END_HINTS"),
         @JsonSubTypes.Type(value = WordTempAction.SubmitGuess.class, name = "SUBMIT_GUESS"),
+        @JsonSubTypes.Type(value = WordTempAction.FlagTemp.class, name = "FLAG_TEMP"),
         @JsonSubTypes.Type(value = WordTempAction.Tick.class, name = "TICK")
 })
 public sealed interface WordTempAction extends GameAction
@@ -25,6 +26,7 @@ public sealed interface WordTempAction extends GameAction
                 WordTempAction.SubmitHint,
                 WordTempAction.EndHints,
                 WordTempAction.SubmitGuess,
+                WordTempAction.FlagTemp,
                 WordTempAction.Tick {
 
     /** 이번 라운드의 정답 낱말 고르기. {@code index} = 내 후보 번호(0 부터). */
@@ -42,6 +44,20 @@ public sealed interface WordTempAction extends GameAction
     /** 추리 답(추리자). 빈 문자열(공백·문장부호뿐) = 패스. */
     record SubmitGuess(int turnNo, int attempt, String text) implements WordTempAction {
     }
+
+    /**
+     * "온도가 이상해요"(D-323) — 이 출제 차례에 공개된 힌트 {@code text} 의 온도가 이상하다고 알린다. {@code direction} 은 선택
+     * ({@code LOW} 너무 낮다 · {@code HIGH} 너무 높다, 없으면 {@code UNSURE}). 판에는 아무 영향이 없다 — 좌석마다 판당 횟수만 센다.
+     */
+    record FlagTemp(String text, FlagDirection direction) implements WordTempAction {
+
+        public FlagTemp {
+            direction = direction == null ? FlagDirection.UNSURE : direction;
+        }
+    }
+
+    /** 온도가 어느 쪽으로 이상한가. */
+    enum FlagDirection { LOW, HIGH, UNSURE }
 
     /**
      * 서버 {@code timeoutAction} 용(§9) — "지금 단계가 그 단계이고 마감이 지났을 때만" 엔진 타이머의 마감 전이와 <b>같은 전이</b>를 하고,

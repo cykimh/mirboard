@@ -73,7 +73,8 @@ class WordTempRecorderFailureTest {
         when(roomService.getRoom(ROOM)).thenReturn(new Room(ROOM, "방", "WORD_TEMP", 10L, RoomStatus.IN_GAME, 3, 3,
                 players, Set.of(), TeamPolicy.SEQUENTIAL, 0L, false, List.of(), 1000, 90, 0, Set.of()));
         when(engines.forRoom(any())).thenAnswer(i -> new WordTempGameEngine(new GameContext(ROOM, players),
-                g.engine.config(), WordTempFixtures.table(), "test", LiveHintScorer.OFF, store,
+                g.engine.config(), WordTempFixtures.table(), "test", LiveHintScorer.OFF,
+                new com.mirboard.domain.game.wordtemp.FakeTempFeedbackStore(), store,
                 Clock.fixed(Instant.ofEpochMilli(afterDeadline), ZoneOffset.UTC),
                 event -> {
                     throw new DataAccessResourceFailureException("simulated DB outage in WordTempMatchRecorder");

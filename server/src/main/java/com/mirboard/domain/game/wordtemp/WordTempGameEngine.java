@@ -8,12 +8,14 @@ import com.mirboard.domain.game.core.GameState;
 import com.mirboard.domain.game.wordtemp.WordTempEngine.LiveScore;
 import com.mirboard.domain.game.wordtemp.action.WordTempAction;
 import com.mirboard.domain.game.wordtemp.event.WordTempEvent;
+import com.mirboard.domain.game.wordtemp.feedback.TempFeedbackStore;
 import com.mirboard.domain.game.wordtemp.event.WordTempMatchCompleted;
 import com.mirboard.domain.game.wordtemp.persistence.WordTempStateStore;
 import com.mirboard.domain.game.wordtemp.scoring.LiveHintScorer;
 import com.mirboard.domain.game.wordtemp.state.Phase;
 import com.mirboard.domain.game.wordtemp.state.WordTempState;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.Hint;
+import com.mirboard.domain.game.wordtemp.state.WordTempState.HintSource;
 import com.mirboard.domain.game.wordtemp.state.WordTempViews;
 import com.mirboard.domain.game.wordtemp.words.SimilarityTable;
 import java.time.Clock;
@@ -59,12 +61,14 @@ public final class WordTempGameEngine implements GameEngine {
     private final WordTempStateStore stateStore;
     private final Clock clock;
     private final ApplicationEventPublisher publisher;
+    private final TempFeedbackStore feedback;
 
     public WordTempGameEngine(GameContext context,
                               WordTempConfig config,
                               SimilarityTable table,
                               String tableVersion,
                               LiveHintScorer scorer,
+                              TempFeedbackStore feedback,
                               WordTempStateStore stateStore,
                               Clock clock,
                               ApplicationEventPublisher publisher) {
@@ -75,6 +79,7 @@ public final class WordTempGameEngine implements GameEngine {
                 log.error("Word temperature bot policy failed, falling back: room={} {}", context.roomId(), what, fault));
         this.tableVersion = tableVersion;
         this.scorer = scorer;
+        this.feedback = feedback;
         this.stateStore = stateStore;
         this.clock = clock;
         this.publisher = publisher;
@@ -123,7 +128,27 @@ public final class WordTempGameEngine implements GameEngine {
             // 상태 저장이 실패해도 요청만 나간 것 — 결과는 캐시에 남아 다음에 쓰인다(설계서 §4.4)
             scorer.request(result.newState().answer(), pending.text());
         }
+        recordFlags(before, result.events());
         return new Result(result.newState(), List.<GameEvent>copyOf(result.events()));
+    }
+
+    /**
+     * 받아들인 "온도가 이상해요"(D-323)를 낱말만 남긴다 — (정답, 힌트, 방향, 온도, 버전). 누가·어느 방에서 냈는지는 넘기지 않는다.
+     * 저장 실패는 판을 막지 않는다(신고는 부가 기능이다).
+     */
+    private void recordFlags(WordTempState before, List<WordTempEvent> events) {
+        for (WordTempEvent event : events) {
+            if (!(event instanceof WordTempEvent.FlagAccepted flag) || before.answer() == null) {
+                continue;
+            }
+            try {
+                String version = before.hints().stream().filter(h -> h.text().equals(flag.text())).findFirst()
+                        .filter(h -> h.source() == HintSource.LIVE).map(h -> "live").orElse(tableVersion);
+                feedback.record(before.answer().word(), flag.text(), flag.direction().name(), flag.temp(), version);
+            } catch (RuntimeException e) {
+                log.error("Word temperature feedback not recorded: room={}", context.roomId(), e);
+            }
+        }
     }
 
     // ---------- 단계 / 진행 질의 ----------

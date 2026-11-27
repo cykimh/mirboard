@@ -146,7 +146,7 @@ public final class WordTempEngine {
             seats.add(new Seat(true, 0, 0, candidates.get(i), List.of(), -1));
         }
         WordTempState state = new WordTempState(seats, order, 1, 0, -1, 0, Phase.WORD_SELECT, now, null, List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of(), 0, seed, null);
+                List.of(), List.of(), List.of(), List.of(), List.of(), 0, seed, null, List.of());
         List<WordTempEvent> events = new ArrayList<>();
         announceSelect(state, events);
         return new Result(state, events);
@@ -184,6 +184,7 @@ public final class WordTempEngine {
             case WordTempAction.SubmitHint a -> submitHint(d, seat, a, now, liveAvailable, events);
             case WordTempAction.EndHints a -> endHints(d, seat, a, now, events);
             case WordTempAction.SubmitGuess a -> submitGuess(d, seat, a, now, events);
+            case WordTempAction.FlagTemp a -> flagTemp(d, seat, a, events);
             case WordTempAction.Tick a -> {
                 if (a.phase() != state.phase() || a.turnNo() != state.turnNo() || a.attempt() != state.attempt()
                         || state.pendingHint() != null || now < deadline(state)) {
@@ -289,6 +290,36 @@ public final class WordTempEngine {
         events.add(new WordTempEvent.GuessAccepted(seat, text));
         events.add(new WordTempEvent.GuessSubmitted(seat));
         settleGuesses(d, now, events);
+    }
+
+    // ---- "온도가 이상해요" (D-323) ----
+
+    /** 좌석 하나가 한 판에 보낼 수 있는 온도 신고 횟수. */
+    public static final int MAX_FLAGS_PER_SEAT = 10;
+
+    /**
+     * 공개된 힌트의 온도가 이상하다는 신고. 판의 진행·점수에는 아무 영향이 없다 — 좌석마다 횟수와 "이미 신고한 힌트"만 상태에 적는다.
+     * 받아들이면 낸 사람에게만 {@code FLAG_ACCEPTED}; 저장(낱말만)은 어댑터가 한다.
+     */
+    private void flagTemp(Draft d, int seat, WordTempAction.FlagTemp a, List<WordTempEvent> events) {
+        if (!human(d, seat)) {
+            throw reject(RejectionReason.NOT_YOUR_PHASE);
+        }
+        String text = WordNormalizer.normalize(a.text()).orElseThrow(() -> reject(RejectionReason.FLAG_UNKNOWN_HINT));
+        Hint hint = d.hints.stream().filter(h -> h.status() == HintStatus.SCORED && h.text().equals(text)).findFirst()
+                .orElseThrow(() -> reject(RejectionReason.FLAG_UNKNOWN_HINT));
+        String prefix = seat + ":";
+        String key = prefix + d.turnNo + ":" + text;
+        if (d.flags.contains(key)) {
+            throw reject(RejectionReason.FLAG_DUPLICATE);
+        }
+        long used = d.flags.stream().filter(f -> f.startsWith(prefix)).count();
+        if (used >= MAX_FLAGS_PER_SEAT) {
+            throw reject(RejectionReason.FLAG_LIMIT);
+        }
+        d.flags.add(key);
+        events.add(new WordTempEvent.FlagAccepted(seat, text, hint.temp(), a.direction(),
+                (int) (MAX_FLAGS_PER_SEAT - used - 1)));
     }
 
     // ---- 실시간 채점 결과 (§6.2) ----
