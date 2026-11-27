@@ -222,7 +222,7 @@ class WordTempBotMatchSimulationIT {
         WordTempState scored = awaitState(roomId, s -> s.pendingHint() == null);
         Hint first = scored.hints().get(0);
         assertThat(first.status()).isEqualTo(HintStatus.SCORED);
-        assertThat(first.temp()).isEqualTo(42); // 1차 기준 50° 아래 — 힌트 단계가 이어진다
+        assertThat(first.temp()).isEqualTo(42); // 1차 기준 60° 아래 — 힌트 단계가 이어진다
         assertThat(first.source()).isEqualTo(HintSource.LIVE);
         assertThat(scored.phase()).isEqualTo(Phase.HINT);
         assertThat(scored.liveRequests()).isEqualTo(1);
@@ -257,7 +257,7 @@ class WordTempBotMatchSimulationIT {
             assertThat(h.source()).isEqualTo(HintSource.TABLE);
             assertThat(h.status()).isEqualTo(HintStatus.SCORED);
         });
-        assertThat(withTable.phase()).as("기준(70°) 아래 힌트라 단계는 그대로다").isEqualTo(Phase.HINT);
+        assertThat(withTable.phase()).as("기준(60°) 아래 힌트라 단계는 그대로다").isEqualTo(Phase.HINT);
 
         // ⑥ 채점 중 출제자 탈주 — 차례가 그 자리에서 끝나고 채점 중이던 힌트는 버린다. 판은 둘이서 계속.
         scorer.available = true;
@@ -288,10 +288,10 @@ class WordTempBotMatchSimulationIT {
 
     // ---- 도우미 ----
 
-    /** 이 정답의 표 이웃 가운데 아직 안 낸, 1차 기준(70°) 아래인 낱말 하나 — 넘기면 힌트 단계가 그 자리에서 끝난다(D-320). */
+    /** 이 정답의 표 이웃 가운데 아직 안 낸, 1차 기준(운영 60°, D-324) 아래인 낱말 하나 — 넘기면 힌트 단계가 그 자리에서 끝난다(D-320). */
     private String tableHintFor(String answer, WordTempState state) {
         return words.table().neighbors(answer).stream()
-                .filter(n -> n.temp() < 70 && n.temp() >= 40)
+                .filter(n -> n.temp() < 60 && n.temp() >= 40)
                 .filter(n -> state.hints().stream().noneMatch(h -> h.text().equals(n.hint())))
                 .findFirst().orElseThrow().hint();
     }

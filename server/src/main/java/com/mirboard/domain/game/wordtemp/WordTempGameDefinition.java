@@ -50,12 +50,13 @@ public final class WordTempGameDefinition implements GameDefinition {
     public WordTempGameDefinition(WordTempStateStore stateStore,
                                   WordTempWords words,
                                   LiveHintScorer scorer,
+                                  TempFeedbackStore feedback,
                                   Clock clock,
                                   ApplicationEventPublisher publisher,
                                   GameStatus status,
                                   int perMatchLiveCap,
                                   double timeScale) {
-        this(stateStore, words, scorer, clock, publisher, status, perMatchLiveCap, timeScale, null);
+        this(stateStore, words, scorer, feedback, clock, publisher, status, perMatchLiveCap, timeScale, null);
     }
 
     /**
