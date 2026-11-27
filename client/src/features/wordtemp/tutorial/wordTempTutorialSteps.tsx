@@ -10,7 +10,7 @@ const LIST = { lineHeight: 1.7, paddingLeft: 18 } as const;
 /**
  * 튜토리얼 글에 적는 차수별 기준 온도(룰 §3.4 의 값 — 판에서는 서버가 준 `floors` 로 그린다). 룰 수치를 바꾸면 같이 고친다.
  */
-export const TUTORIAL_FLOORS: readonly number[] = [70, 75, 80, 85, 88];
+export const TUTORIAL_FLOORS: readonly number[] = [50, 55, 60, 65, 70];
 
 /** 온도계 보기 한 줄 — 낱말 + 온도계. */
 function Sample({ word, temp, floor }: { word: string; temp: number; floor?: number }) {

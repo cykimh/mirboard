@@ -36,9 +36,15 @@ public final class WordTempSettings {
      * @param timeScale    시간 배율(운영 1.0)
      */
     public static WordTempConfig config(GameContext ctx, int liveCap, Set<String> blockedWords, double timeScale) {
+        return config(ctx, liveCap, blockedWords, timeScale, WordTempTuning.DEFAULT);
+    }
+
+    /** @param tuning 기준 온도를 담은 수치(D-321 — 운영 기준 온도는 설정 {@code mirboard.wordtemp.floors}) */
+    public static WordTempConfig config(GameContext ctx, int liveCap, Set<String> blockedWords, double timeScale,
+                                        WordTempTuning tuning) {
         return new WordTempConfig(ctx.seatCount(), Set.copyOf(ctx.botSeats()),
                 roundsFor(ctx.option(RoomOption.MATCH_LENGTH)), hintSecondsFor(ctx.turnSeconds()),
                 WordTempBotLevel.fromOption(ctx.option(RoomOption.BOT_LEVEL)), liveCap, blockedWords,
-                WordTempTuning.DEFAULT.scaled(timeScale));
+                tuning.scaled(timeScale));
     }
 }

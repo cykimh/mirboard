@@ -109,4 +109,14 @@ class WordTempGameDefinitionTest {
         assertThat(scaled.floors()).isEqualTo(WordTempTuning.DEFAULT.floors());
         assertThat(WordTempTuning.DEFAULT.scaled(1.0)).isSameAs(WordTempTuning.DEFAULT);
     }
+
+    @org.junit.jupiter.api.Test
+    void production_floors_come_from_config_and_fall_back_to_the_rule_reference() {
+        org.assertj.core.api.Assertions.assertThat(WordTempGameDefinition.parseFloors("50, 55,60,65,70").floors())
+                .containsExactly(50, 55, 60, 65, 70);
+        org.assertj.core.api.Assertions.assertThat(WordTempGameDefinition.parseFloors("50,60,70").maxAttempts()).isEqualTo(3);
+        org.assertj.core.api.Assertions.assertThat(WordTempGameDefinition.parseFloors("")).isEqualTo(WordTempTuning.DEFAULT);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> WordTempGameDefinition.parseFloors("50,120"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -42,7 +42,24 @@ public final class WordTempGameDefinition implements GameDefinition {
     private final GameStatus status;
     private final int perMatchLiveCap;
     private final double timeScale;
+    private final WordTempTuning tuning;
 
+    /** 테스트·조립용 — 기준 온도는 규칙 기준값({@link WordTempTuning#DEFAULT}). */
+    public WordTempGameDefinition(WordTempStateStore stateStore,
+                                  WordTempWords words,
+                                  LiveHintScorer scorer,
+                                  Clock clock,
+                                  ApplicationEventPublisher publisher,
+                                  GameStatus status,
+                                  int perMatchLiveCap,
+                                  double timeScale) {
+        this(stateStore, words, scorer, clock, publisher, status, perMatchLiveCap, timeScale, null);
+    }
+
+    /**
+     * @param floors 운영 기준 온도(D-321 — {@code mirboard.wordtemp.floors}, 쉼표 구분, 기본 50,55,60,65,70). 비면 규칙 기준값.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
     public WordTempGameDefinition(WordTempStateStore stateStore,
                                   WordTempWords words,
                                   LiveHintScorer scorer,
@@ -50,7 +67,9 @@ public final class WordTempGameDefinition implements GameDefinition {
                                   ApplicationEventPublisher publisher,
                                   @Value("${mirboard.wordtemp.status:DISABLED}") GameStatus status,
                                   @Value("${mirboard.wordtemp.live-scoring.per-match-cap:120}") int perMatchLiveCap,
-                                  @Value("${mirboard.wordtemp.time-scale:1.0}") double timeScale) {
+                                  @Value("${mirboard.wordtemp.time-scale:1.0}") double timeScale,
+                                  @Value("${mirboard.wordtemp.floors:50,55,60,65,70}") String floors) {
+        this.tuning = parseFloors(floors);
         this.stateStore = stateStore;
         this.words = words;
         this.scorer = scorer;
@@ -129,7 +148,7 @@ public final class WordTempGameDefinition implements GameDefinition {
 
     /** 이 방의 판 설정 — 어댑터와 라운드 스타터가 같이 쓴다. */
     public WordTempConfig config(GameContext ctx) {
-        return WordTempSettings.config(ctx, perMatchLiveCap, words.blockedWords(), timeScale);
+        return WordTempSettings.config(ctx, perMatchLiveCap, words.blockedWords(), timeScale, tuning);
     }
 
     public double timeScale() {
@@ -138,5 +157,27 @@ public final class WordTempGameDefinition implements GameDefinition {
 
     public int perMatchLiveCap() {
         return perMatchLiveCap;
+    }
+
+    /** "50,55,60,65,70" → 그 기준 온도의 수치(차수 수 = 개수). 비거나 잘못되면 규칙 기준값. */
+    static WordTempTuning parseFloors(String floors) {
+        if (floors == null || floors.isBlank()) {
+            return WordTempTuning.DEFAULT;
+        }
+        Integer[] values = java.util.Arrays.stream(floors.split(","))
+                .map(String::strip).filter(x -> !x.isEmpty()).map(Integer::valueOf).toArray(Integer[]::new);
+        if (values.length == 0) {
+            return WordTempTuning.DEFAULT;
+        }
+        for (int v : values) {
+            if (v < 0 || v > 100) {
+                throw new IllegalArgumentException("mirboard.wordtemp.floors 는 0~100 이어야 한다: " + floors);
+            }
+        }
+        return WordTempTuning.DEFAULT.withFloors(values);
+    }
+
+    WordTempTuning tuning() {
+        return tuning;
     }
 }

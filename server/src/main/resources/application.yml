@@ -227,6 +227,9 @@ mirboard:
     status: ${MIRBOARD_WORD_TEMP_STATUS:DISABLED}
     # 낱말 고르기·추리·결과·차례 끝·봇 간격 배율(D-316). 운영은 1.0 — 봇끼리 도는 통합 테스트만 줄인다.
     time-scale: 1.0
+    # 차수별 기준 온도(D-321 — 사용자 결정 50·55·60·65·70, 개수 = 차수 수). 엔진의 규칙 기준값(WordTempTuning.DEFAULT 70/75/80/85/88)은
+    # 테스트용으로 남기고 운영은 이 값을 쓴다. 바꾸면 새 판부터 적용된다.
+    floors: ${MIRBOARD_WORD_TEMP_FLOORS:50,55,60,65,70}
     # 실시간 채점·(나중에) 표 만들기에 쓰는 모델(D-312). 바꾸면 실시간 캐시 키가 갈려 새로 매긴다.
     model: ${MIRBOARD_WORD_TEMP_MODEL:claude-sonnet-5-5}
     live-scoring:

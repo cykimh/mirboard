@@ -218,11 +218,11 @@ class WordTempBotMatchSimulationIT {
         assertThat(stateStore.load(roomId).orElseThrow()).isEqualTo(pending);
 
         // ③ 결과 도착 → 다음 폴링이 반영한다
-        scorer.deliver(answer, "가나다라마", new LiveScore.Scored(64));
+        scorer.deliver(answer, "가나다라마", new LiveScore.Scored(42));
         WordTempState scored = awaitState(roomId, s -> s.pendingHint() == null);
         Hint first = scored.hints().get(0);
         assertThat(first.status()).isEqualTo(HintStatus.SCORED);
-        assertThat(first.temp()).isEqualTo(64);
+        assertThat(first.temp()).isEqualTo(42); // 1차 기준 50° 아래 — 힌트 단계가 이어진다
         assertThat(first.source()).isEqualTo(HintSource.LIVE);
         assertThat(scored.phase()).isEqualTo(Phase.HINT);
         assertThat(scored.liveRequests()).isEqualTo(1);
@@ -349,8 +349,8 @@ class WordTempBotMatchSimulationIT {
                 || t.reason() == TurnEndReason.THREE_ATTEMPTS);
         assertThat(ended.history()).allMatch(t -> !t.revealed().isEmpty()
                 && t.revealed().stream().allMatch(r -> r.text() != null));
-        // 1차 기준(70°)은 진짜 표의 모든 정답이 넘길 수 있다 — 봇은 1차를 늘 넘긴다
-        assertThat(ended.history()).allMatch(t -> t.revealed().get(0).floorMet() && t.revealed().get(0).floor() == 70);
+        // 1차 기준(50°, 운영 설정 D-321)은 진짜 표의 모든 정답이 넘길 수 있다 — 봇은 1차를 늘 넘긴다
+        assertThat(ended.history()).allMatch(t -> t.revealed().get(0).floorMet() && t.revealed().get(0).floor() == 50);
         assertThat(ended.history()).allMatch(t -> t.revealed().size() <= 5 && t.setterGain() <= 15 * t.round());
         assertThat(ended.liveRequests()).isZero();
         assertThat(scorer.requests).isEmpty();
