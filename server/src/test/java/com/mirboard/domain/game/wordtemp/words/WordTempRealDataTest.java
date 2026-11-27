@@ -25,7 +25,7 @@ import java.util.zip.GZIPInputStream;
 import org.junit.jupiter.api.Test;
 
 /**
- * D-316 — <b>진짜</b> 자원(표 v1·은행·금칙어)을 부팅 때와 같은 길로 읽어 본다. 형태 검증(설계서 §5.4), 은행 기준(D-313), 힙 실측,
+ * D-316 — <b>진짜</b> 자원(표 v2 — D-322·은행·금칙어)을 부팅 때와 같은 길로 읽어 본다. 형태 검증(설계서 §5.4), 은행 기준(D-313), 힙 실측,
  * 그리고 룰 v2(D-320)의 기준 온도를 진짜 표가 얼마나 받쳐 주는지(정답마다 기준 이상 힌트가 있는가)와 봇 출제 계획.
  */
 class WordTempRealDataTest {
@@ -35,10 +35,10 @@ class WordTempRealDataTest {
     @Test
     void the_table_and_bank_load_and_agree() {
         PackedSimilarityTable table = WORDS.table();
-        assertThat(table.version()).isEqualTo("v1");
-        assertThat(table.answers()).hasSize(324).isSorted();
-        assertThat(table.pairCount()).isEqualTo(96_097);
-        assertThat(WORDS.bank()).hasSize(324);
+        assertThat(table.version()).isEqualTo("v2");
+        assertThat(table.answers()).hasSize(351).isSorted();
+        assertThat(table.pairCount()).isEqualTo(110_236);
+        assertThat(WORDS.bank()).hasSize(351);
         assertThat(WORDS.bank().stream().map(AnswerEntry::word)).containsExactlyInAnyOrderElementsOf(table.answers());
         assertThat(WORDS.bank()).allSatisfy(e -> {
             assertThat(e.word().length()).isBetween(2, 6);

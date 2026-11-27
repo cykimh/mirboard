@@ -29,7 +29,7 @@ class ClaudeHintJudgeLiveSmokeTest {
             "지구 표면의 대부분을 덮고 있는 짠물이 넓게 고인 곳", List.of());
 
     private final ClaudeHintJudge judge = new ClaudeHintJudge(System.getenv("ANTHROPIC_API_KEY"),
-            System.getenv().getOrDefault("MIRBOARD_WORD_TEMP_MODEL", "claude-sonnet-5-5"), "score-v2",
+            System.getenv().getOrDefault("MIRBOARD_WORD_TEMP_MODEL", "claude-sonnet-5-5"), "score-v3",
             Duration.ofSeconds(5));
 
     private Verdict ask(String hint) {

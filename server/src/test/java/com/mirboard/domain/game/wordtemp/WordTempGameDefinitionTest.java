@@ -68,9 +68,9 @@ class WordTempGameDefinitionTest {
         assertThat(props.getProperty("mirboard.wordtemp.live-scoring.enabled"))
                 .isEqualTo("${MIRBOARD_WORD_TEMP_LIVE_SCORING:false}");
         assertThat(props.getProperty("mirboard.wordtemp.live-scoring.api-key")).isEqualTo("${ANTHROPIC_API_KEY:}");
-        assertThat(props.getProperty("mirboard.wordtemp.live-scoring.prompt-version")).isEqualTo("score-v2");
+        assertThat(props.getProperty("mirboard.wordtemp.live-scoring.prompt-version")).isEqualTo("score-v3");
         // 실시간 기준문 자원이 있다
-        assertThat(new ClassPathResource("wordtemp/score-v2.md").exists()).isTrue();
+        assertThat(new ClassPathResource("wordtemp/score-v3.md").exists()).isTrue();
     }
 
     @Test

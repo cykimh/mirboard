@@ -149,7 +149,25 @@
 
 ## 6. 온도 채점
 
-정본 결정은 D-312, 경로의 세부는 설계서 §4·§5. 룰로서 지킬 것만 적는다.
+정본 결정은 D-312(경로)·D-322(기준), 경로의 세부는 설계서 §4·§5. 룰로서 지킬 것만 적는다.
+
+### 6.0 무엇을 기준으로 매기나 (D-322 — 기준문 `score-v3`, 표와 실시간이 같은 글)
+
+"이 힌트를 들으면 정답이 얼마나 쉽게 떠오르나"를 보통 한국어 화자의 눈으로, **후하게** 매긴다.
+
+| 온도 | 관계 | 예 |
+| --- | --- | --- |
+| 96~100 | 같은 말(동의어·표기 변형·줄임말) | 기차 ↔ 열차 |
+| 85~95 | 핵심 특징·부분·대표 쓰임, 바로 위 갈래, 누구나 아는 짝 | 피아노 ↔ 건반, 병원 ↔ 의사 |
+| 70~88 | 늘 함께 나오는 물건·장소·사람·때 | 햄버거 ↔ 감자튀김, 피아노 ↔ 연주회 |
+| 60~85 | **창의적 연상** — 이야기·속담·비유, 정답과 묶여 알려진 인물·상표·작품·장소, 감각의 연상 | 토끼 ↔ 거북이, 피아노 ↔ 쇼팽, 햄버거 ↔ 맥도날드 |
+| 45~70 | 넓은 갈래·상황·분위기 | 기차 ↔ 여행 |
+| 20~44 | 억지로 이어야 하는 약한 연관 | 피아노 ↔ 나무 |
+| 0~15 | 무관 | |
+
+- **고유명사도 힌트다**(사람·이야기 속 인물·캐릭터·상표·작품·지명) — 정답과의 연상으로 똑같이 매긴다.
+- **쓸 수 없는 힌트**(무효, `NOT_A_NOUN`): 명사가 아닌 말(활용형·부사·흉내말·없는 말), 그리고 비하·혐오 표현·욕설.
+- 글자·소리가 닮은 것은 점수가 아니다. 정답의 뜻은 은행의 뜻풀이로 고정한다.
 
 ### 6.1 표에 있는 힌트 — 바로
 
@@ -161,7 +179,7 @@
 2. 방 잠금 밖의 채점기가 Claude 에 묻는다. 답은 `{isValidNoun, similarityScore, reason}`.
 3. 엔진 타이머가 결과를 반영한다(보통 2~3초 **[수치]** — 그 동안 출제자 화면은 "채점 중…"):
    - 명사이고 점수가 왔다 → 온도 확정(`HINT_SCORED` — 모두에게). 기준 온도 이상이면 §3.2 대로 단계가 끝난다.
-   - 명사가 아니다 → **무효**(`HINT_VOID{reason: NOT_A_NOUN}`), 개수를 돌려준다.
+   - 쓸 수 없는 힌트다(§6.0) → **무효**(`HINT_VOID{reason: NOT_A_NOUN}`), 개수를 돌려준다.
    - 8초 **[수치]** 안에 답이 없거나 실패·거절 → **무효**(`HINT_VOID{reason: SCORING_FAILED}`), 개수를 돌려준다.
 - 채점 중에는 새 힌트·[힌트 끝]을 받지 않는다(한 번에 하나). 화면은 입력란을 잠근다.
 - **힌트 제한이 끝났는데 채점 중**이면 결과(또는 8초)를 기다렸다가 단계를 끝낸다 — 새 힌트는 더 받지 않는다.
@@ -442,7 +460,7 @@
 | 포트 어댑터 — 뷰·타이머 합성·`TICK`·탈주(§9·§10·§12) | `WordTempGameEngine` | `WordTempGameEngineTest`, `WordTempAdapterSecrecyTest`(JSON 은닉) |
 | 시작(§3.1 — 저장 뒤 `WORD_SELECT_STARTED` 방송, D-319) | `lifecycle/WordTempRoundStarter` | `lifecycle/WordTempRoundStarterTest`, `infra/bot/WordTempBotMatchSimulationIT` |
 | 표·은행·금칙어 싣기(§6.1) | `words/WordTempWords`·`words/PackedSimilarityTable` | `words/PackedSimilarityTableTest`, `words/WordTempRealDataTest`(진짜 자원·힙 실측) |
-| 실시간 채점(§6.2·§6.3) | `scoring/LiveHintScorer`·`AsyncLiveHintScorer`·`ClaudeHintJudge`·`JdbcLiveScoreStore`, 기준문 `resources/wordtemp/score-v2.md` | `scoring/AsyncLiveHintScorerTest`, `WordTempBotMatchSimulationIT`(서버 경로), `scoring/ClaudeHintJudgeLiveSmokeTest`(진짜 API — 평소 꺼짐) |
+| 실시간 채점(§6.2·§6.3) | `scoring/LiveHintScorer`·`AsyncLiveHintScorer`·`ClaudeHintJudge`·`JdbcLiveScoreStore`, 기준문 `resources/wordtemp/score-v3.md`(D-322) | `scoring/AsyncLiveHintScorerTest`, `WordTempBotMatchSimulationIT`(서버 경로), `scoring/ClaudeHintJudgeLiveSmokeTest`(진짜 API — 평소 꺼짐) |
 | 기록(§13) | `persistence/WordTempMatchRecorder`·`WordTempHeadToHead`, `V25__word_temp.sql` | `persistence/WordTempMatchRecorderIT`, `infra/ws/WordTempRecorderFailureTest` |
 
 - 재현: `./gradlew :server:test --tests "com.mirboard.domain.game.wordtemp.*"`(기록기 IT 만 Docker) · `--tests "com.mirboard.infra.bot.WordTempBotMatchSimulationIT" --tests "com.mirboard.infra.ws.WordTempRecorderFailureTest"`.

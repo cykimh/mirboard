@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA, buildParams, runRequests, shuffled, spentUsd, BUDGET_USD, byCodeUnit, loadBank } from './lib.mjs';
-import { readScores } from './04-score.mjs';
+import zlib from 'node:zlib';
 
 const CHUNK = 200;
 export const CLASSES = ['ok', 'proper_noun', 'derogatory_or_slur', 'not_a_noun'];
@@ -44,8 +44,12 @@ function accept(output, request) {
 }
 
 // 검사 대상: 채점된 적 있는 모든 힌트 낱말(명사 아님으로 이미 버린 것 제외). 순서를 고정해야 캐시가 맞는다.
+// (표 v1 때의 채점 기록 data/scores-v1.tsv.gz 에서 읽는다 — 표 v2 는 이 단계의 결과 가운데 비하 표현·명사 아님만 쓴다, D-322)
 const vocab = new Set();
-for (const hints of readScores().values()) for (const [hint, s] of hints) if (s >= 0) vocab.add(hint);
+for (const line of zlib.gunzipSync(fs.readFileSync(path.join(DATA, 'scores-v1.tsv.gz'))).toString('utf8').split('\n')) {
+  const [, hint, s] = line.split('\t');
+  if (hint && Number(s) >= 0) vocab.add(hint);
+}
 const words = [...vocab].sort(byCodeUnit);
 const requests = [];
 for (let i = 0; i < words.length; i += CHUNK) {

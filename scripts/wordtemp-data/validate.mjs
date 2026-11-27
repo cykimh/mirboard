@@ -29,10 +29,14 @@ for (const line of fs.readFileSync(path.join(RES, 'bank.tsv'), 'utf8').split('\n
 for (const [word, b] of bank) for (const a of b.aliases) if (bank.has(a)) fail(`은행: '${word}' 의 같은 말 '${a}' 가 다른 정답임`);
 const blocked = fs.readFileSync(path.join(RES, 'blocked.txt'), 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 
-// 어휘 청소(05b)가 뺀 낱말 — 도구 폴더에 있을 때만 대조한다. 아래 낱말들은 리뷰에서 실제로 나왔던 것이라 늘 확인한다.
+// 어휘 청소(05b)가 뺀 낱말 가운데 **비하 표현·명사 아님** — 도구 폴더에 있을 때만 대조한다.
+// 고유명사(사람·지명·상표·작품·캐릭터)는 D-322 부터 힌트로 쓸 수 있어 대조하지 않는다.
 const flaggedFile = path.resolve(RES, '../../../../../scripts/wordtemp-data/data/flagged.tsv');
-const flagged = new Set(fs.existsSync(flaggedFile) ? fs.readFileSync(flaggedFile, 'utf8').split('\n').filter((l) => l && !l.startsWith('#')).map((l) => l.split('\t')[0]) : []);
-const MUST_NOT_APPEAR = ['절름발이', '난쟁이', '베토벤', '모차르트', '단군', '예수', '부처', '흥부', '이케아', '넷플릭스', '애플', '백설공주'];
+const flagged = new Set(fs.existsSync(flaggedFile)
+  ? fs.readFileSync(flaggedFile, 'utf8').split('\n').filter((l) => l && !l.startsWith('#')).map((l) => l.split('\t')).filter(([, c]) => c !== 'proper_noun').map(([w]) => w)
+  : []);
+// 리뷰에서 실제로 나왔던 비하 표현 — 늘 확인한다.
+const MUST_NOT_APPEAR = ['절름발이', '난쟁이', '벙어리', '귀머거리', '장님', '꼽추', '병신', '거지'];
 for (const w of ['절름발이', '난쟁이']) if (!blocked.includes(w)) fail(`금칙어 목록에 '${w}' 가 없음`);
 
 // ── 표 ──
@@ -77,7 +81,7 @@ for (const line of lines.slice(1)) {
     }
     if (blocked.some((b) => hint.includes(b))) fail(`표: ${answer} 의 힌트 '${hint}' 가 금칙어`);
     if (flagged.has(hint) && !bank.has(hint)) fail(`표: ${answer} 의 힌트 '${hint}' 는 어휘 청소에서 뺀 낱말`);
-    if (MUST_NOT_APPEAR.includes(hint)) fail(`표: ${answer} 의 힌트 '${hint}' 는 고유명사·비하 표현`);
+    if (MUST_NOT_APPEAR.includes(hint)) fail(`표: ${answer} 의 힌트 '${hint}' 는 비하 표현`);
     count[bandOf(score)]++;
     if (!vocab.has(hint)) { vocab.add(hint); vocabChars += hint.length; }
     n++;
@@ -109,7 +113,7 @@ for (const b of bank.values()) categories.set(b.category, (categories.get(b.cate
 
 console.log(`표 ${tableFile} — version=${head.version} promptVersion=${head.promptVersion} model=${head.model} created=${head.created}`);
 console.log(`정답 은행 ${bank.size}개 · 범주 ${categories.size}개(${[...categories].map(([c, n]) => `${c} ${n}`).join(', ')})`);
-console.log(`금칙어 ${blocked.length}개 · 어휘 청소로 뺀 낱말 ${flagged.size}개(대조 ${flagged.size ? '함' : '안 함 — flagged.tsv 없음'})`);
+console.log(`금칙어 ${blocked.length}개 · 어휘 청소로 뺀 낱말(비하 표현·명사 아님) ${flagged.size}개(대조 ${flagged.size ? '함' : '안 함 — flagged.tsv 없음'})`);
 console.log(`같은 말이 있는 정답 ${[...bank.values()].filter((b) => b.aliases.length).length}개`);
 console.log(`쌍 ${pairs}개 · 힌트 어휘 ${vocab.size}개(평균 ${(vocabChars / vocab.size).toFixed(1)}자)`);
 console.log('띠 분포:');

@@ -15,13 +15,15 @@ export const RESOURCES = path.resolve(ROOT, '../../server/src/main/resources/wor
 
 export const MODEL = 'claude-sonnet-5-5'; // 사용자 결정(D-312) — 표와 실시간이 같은 모델
 export const EFFORT = 'low';
-export const PROMPT_VERSION = 'score-v1';
-export const TABLE_VERSION = 'v1';
+export const PROMPT_VERSION = 'score-v3'; // D-322 — v1 표는 score-v1(cache/score.jsonl·data/scores-v1.tsv.gz 에 남아 있다)
+export const TABLE_VERSION = 'v2';
 
 // claude-sonnet-5-5 표준 단가($/100만 토큰). Message Batches 는 절반.
-const PRICE = { input: 2, output: 10 };
-export const BUDGET_USD = Number(process.env.WORDTEMP_BUDGET_USD ?? 12);
-const SPEND_FILE = path.join(CACHE, 'spend.json');
+// 캐시 쓰기(5분) 1.25배, 캐시 읽기 $0.10(0.05배).
+const PRICE = { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.1 };
+// 장부는 일감마다 따로: spend.json = 표 v1(S1a, 상한 $12) · spend-v3.json = 표 v2 다시 채점(D-322, 상한 $50 — 사용자가 올림)
+export const BUDGET_USD = Number(process.env.WORDTEMP_BUDGET_USD ?? 50);
+const SPEND_FILE = path.join(CACHE, process.env.WORDTEMP_LEDGER ?? 'spend-v3.json');
 
 let cachedClient;
 export function client() {
@@ -109,11 +111,12 @@ export const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 // ── 요청 만들기 ─────────────────────────────────────────────────────────────────────────
 /** thinking 은 보내지 않는다(Sonnet 5.5 는 끌 수 없음 — effort 로만 조절). 출력은 구조화 출력. */
-export function buildParams({ system, user, schema, maxTokens = 16000 }) {
+export function buildParams({ system, user, schema, maxTokens = 16000, cacheSystem = false }) {
   return {
     model: MODEL,
     max_tokens: maxTokens,
-    system,
+    // cacheSystem: 같은 기준문을 수천 번 보내는 채점에서 시스템 프롬프트를 프롬프트 캐시에 올린다(읽기 0.05배).
+    system: cacheSystem ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system,
     messages: [{ role: 'user', content: user }],
     output_config: { effort: EFFORT, format: { type: 'json_schema', schema } },
   };
@@ -125,16 +128,24 @@ function loadSpend() {
 }
 export const spentUsd = () => loadSpend().totalUsd;
 function costOf(usage, mode) {
-  const full = ((usage.input_tokens ?? 0) * PRICE.input + (usage.output_tokens ?? 0) * PRICE.output) / 1e6;
+  const full =
+    ((usage.input_tokens ?? 0) * PRICE.input +
+      (usage.output_tokens ?? 0) * PRICE.output +
+      (usage.cache_creation_input_tokens ?? 0) * PRICE.cacheWrite +
+      (usage.cache_read_input_tokens ?? 0) * PRICE.cacheRead) /
+    1e6;
   return mode === 'batch' ? full / 2 : full;
 }
 function recordSpend(step, mode, usages) {
   if (!usages.length) return 0;
-  const input = usages.reduce((s, u) => s + (u.input_tokens ?? 0), 0);
-  const output = usages.reduce((s, u) => s + (u.output_tokens ?? 0), 0);
-  const usd = costOf({ input_tokens: input, output_tokens: output }, mode);
+  const sum = (k) => usages.reduce((s, u) => s + (u[k] ?? 0), 0);
+  const input = sum('input_tokens');
+  const output = sum('output_tokens');
+  const cacheWrite = sum('cache_creation_input_tokens');
+  const cacheRead = sum('cache_read_input_tokens');
+  const usd = costOf({ input_tokens: input, output_tokens: output, cache_creation_input_tokens: cacheWrite, cache_read_input_tokens: cacheRead }, mode);
   const spend = loadSpend();
-  spend.entries.push({ step, mode, requests: usages.length, input, output, usd: +usd.toFixed(4) });
+  spend.entries.push({ step, mode, requests: usages.length, input, output, cacheWrite, cacheRead, usd: +usd.toFixed(4) });
   spend.totalUsd = +(spend.totalUsd + usd).toFixed(4);
   fs.writeFileSync(SPEND_FILE, JSON.stringify(spend, null, 1) + '\n');
   return usd;
@@ -172,7 +183,7 @@ function textOf(message) {
  *  - estimateUsdPerRequest: 보내기 전 어림 → 예산(BUDGET_USD)을 넘기면 보내지 않고 멈춘다.
  *  - accept(parsed, request): 내용 검증. false 면 캐시에 넣지 않고 다음 바퀴에 다시 묻는다.
  */
-export async function runRequests(step, requests, { mode = 'batch', estimateUsdPerRequest, accept = () => true, rounds = 3 } = {}) {
+export async function runRequests(step, requests, { mode = 'batch', estimateUsdPerRequest, estimateFrom, accept = () => true, rounds = 3 } = {}) {
   const cache = loadCache(step);
   const results = new Map();
   const withHash = requests.map((r) => ({ ...r, hash: hashOf(r.params) }));
@@ -183,7 +194,8 @@ export async function runRequests(step, requests, { mode = 'batch', estimateUsdP
   for (let round = 1; round <= rounds; round++) {
     const todo = withHash.filter((r) => !results.has(r.id));
     if (!todo.length) break;
-    const perRequest = estimateUsdPerRequest ?? averageCost(cache, mode);
+    // 어림: 준 값 → 이 단계의 실측 평균 → 비슷한 단계(estimateFrom)의 실측 평균
+    const perRequest = estimateUsdPerRequest ?? averageCost(cache, mode) ?? (estimateFrom ? averageCost(loadCache(estimateFrom), mode) : null);
     if (perRequest == null) throw new Error(`[${step}] 비용 어림이 없어요 — 먼저 --pilot 으로 재세요.`);
     const estimate = perRequest * todo.length;
     const spent = spentUsd();
@@ -204,7 +216,7 @@ export async function runRequests(step, requests, { mode = 'batch', estimateUsdP
         rejected++;
         continue;
       }
-      const row = { id: r.id, hash: r.hash, output, usage: { in: message.usage.input_tokens, out: message.usage.output_tokens }, mode };
+      const row = { id: r.id, hash: r.hash, output, usage: { in: message.usage.input_tokens, out: message.usage.output_tokens, cw: message.usage.cache_creation_input_tokens ?? 0, cr: message.usage.cache_read_input_tokens ?? 0 }, mode };
       appendCache(step, row);
       cache.set(r.id, row);
       results.set(r.id, output);
@@ -220,9 +232,8 @@ export async function runRequests(step, requests, { mode = 'batch', estimateUsdP
 function averageCost(cache, mode) {
   const rows = [...cache.values()];
   if (!rows.length) return null;
-  const input = rows.reduce((s, r) => s + r.usage.in, 0) / rows.length;
-  const output = rows.reduce((s, r) => s + r.usage.out, 0) / rows.length;
-  return costOf({ input_tokens: input, output_tokens: output }, mode) * 1.15; // 여유 15%
+  const avg = (k) => rows.reduce((s, r) => s + (r.usage[k] ?? 0), 0) / rows.length;
+  return costOf({ input_tokens: avg('in'), output_tokens: avg('out'), cache_creation_input_tokens: avg('cw'), cache_read_input_tokens: avg('cr') }, mode) * 1.15; // 여유 15%
 }
 
 async function runSync(todo, concurrency = 4) {
@@ -235,7 +246,8 @@ async function runSync(todo, concurrency = 4) {
       try {
         got.set(r.id, await anthropic.messages.create(r.params));
       } catch (err) {
-        if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.BadRequestError) throw err; // 고쳐야 하는 오류
+        // 고쳐야 하는 오류(키·요청 꼴·결제 한도) — 다시 불러도 같으니 멈춘다
+        if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.BadRequestError || err instanceof Anthropic.PermissionDeniedError) throw err;
         if (err instanceof Anthropic.RateLimitError) console.warn(`  ${r.id}: 429 — 다음 바퀴에 다시`);
         else if (err instanceof Anthropic.APIError) console.warn(`  ${r.id}: API 오류 ${err.status ?? ''} — 다음 바퀴에 다시`);
         else throw err;

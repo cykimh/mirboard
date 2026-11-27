@@ -28,7 +28,7 @@ public class WordTempWords {
     private static final Logger log = LoggerFactory.getLogger(WordTempWords.class);
 
     /** 지금 싣는 표. 새 표를 만들면 파일을 더하고 이 상수를 올린다(판 도중 바뀌어도 매긴 점수는 상태에 있다 — 룰 §6.3). */
-    public static final String TABLE_RESOURCE = "wordtemp/table-v1.tsv.gz";
+    public static final String TABLE_RESOURCE = "wordtemp/table-v2.tsv.gz";
     public static final String BANK_RESOURCE = "wordtemp/bank.tsv";
     public static final String BLOCKED_RESOURCE = "wordtemp/blocked.txt";
 

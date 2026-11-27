@@ -82,7 +82,7 @@ public class AsyncLiveHintScorer implements LiveHintScorer {
     public AsyncLiveHintScorer(@Value("${mirboard.wordtemp.live-scoring.enabled:false}") boolean enabled,
                                @Value("${mirboard.wordtemp.live-scoring.api-key:}") String apiKey,
                                @Value("${mirboard.wordtemp.model:claude-sonnet-5-5}") String model,
-                               @Value("${mirboard.wordtemp.live-scoring.prompt-version:score-v2}") String promptVersion,
+                               @Value("${mirboard.wordtemp.live-scoring.prompt-version:score-v3}") String promptVersion,
                                @Value("${mirboard.wordtemp.live-scoring.daily-cap:600}") int dailyCap,
                                @Value("${mirboard.wordtemp.live-scoring.max-concurrent:2}") int maxConcurrent,
                                @Value("${mirboard.wordtemp.live-scoring.timeout-ms:5000}") long timeoutMs,
