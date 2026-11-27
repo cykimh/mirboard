@@ -33,7 +33,8 @@ public final class WordTempViews {
      * @param phaseRemainingMs 단계 마감까지 남은 시간(엔진 계산 — 화면은 바깥 {@code turnRemainingMs} 가 아니라 이것을 쓴다, §9)
      * @param hintCount        이번 차수 힌트 개수(확정 + 채점 중)
      * @param floors           차수별 최저 온도(1·2·3차) — 비밀이 아니다. 화면이 공개 전에도 눈금을 그린다(§3.4, D-319)
-     * @param revealed         차수별 공개 힌트(쌓여 보인다)
+     * @param hints            이 출제 차례의 힌트 전부(확정 + 채점 중, 무효 제외) — 낼 때마다 모두에게 공개된다(D-320)
+     * @param revealed         끝난 힌트 단계마다 하나 — 그 차수의 가장 높은 힌트와 기준을 넘겼는지(힌트가 없었으면 낱말 null)
      * @param guessedSeats     이번 차수에 추리를 낸 좌석(내용 없음)
      * @param attempts         이번 출제 차례의 끝난 차수 — 동시 공개된 답(금칙어는 가림)
      * @param history          끝난 출제 차례 요약(정답·공개 힌트·맞힌 좌석)
@@ -42,7 +43,7 @@ public final class WordTempViews {
      */
     public record PublicView(Phase phase, int round, int rounds, int turnNo, int setterSeat, int attempt,
                              long phaseRemainingMs, int hintCount, int maxHints, List<Integer> floors,
-                             List<Revealed> revealed,
+                             List<HintView> hints, List<Revealed> revealed,
                              List<Integer> guessedSeats, List<PublicAttempt> attempts, List<SeatView> seats,
                              List<Integer> order, List<TurnSummary> history, TurnReveal turnReveal,
                              MatchResult result) {
@@ -65,15 +66,13 @@ public final class WordTempViews {
      * @param candidates 내 후보(낱말·범주·이번 라운드에 고를 수 있는가)
      * @param chosen     이번 라운드에 고른 후보 번호, 아직이면 −1
      * @param answer     (출제자면) 이번 정답, 아니면 null
-     * @param hints      (출제자면) 이번 출제 차례의 힌트·온도·채점 중 표시, 아니면 빈 목록
      * @param myGuess    (추리자면) 이번 차수에 낸 내 답(빈 문자열 = 패스), 아직이면 null
      */
-    public record PrivateView(int seat, List<CandidateInfo> candidates, int chosen, String answer,
-                              List<OwnHint> hints, String myGuess) {
+    public record PrivateView(int seat, List<CandidateInfo> candidates, int chosen, String answer, String myGuess) {
     }
 
     /** {@code temp} 는 확정이면 0~100, 아니면 −1. */
-    public record OwnHint(String text, int attempt, HintStatus status, int temp) {
+    public record HintView(String text, int attempt, HintStatus status, int temp) {
     }
 
     public static PublicView publicView(WordTempState state, WordTempConfig config, long now) {
@@ -90,7 +89,7 @@ public final class WordTempViews {
         long remaining = state.ended() ? 0 : Math.max(0, state.phaseStartedAt() + config.phaseMs(state.phase()) - now);
         return new PublicView(state.phase(), state.round(), config.rounds(), state.turnNo(), state.setterSeat(),
                 state.attempt(), remaining, state.turnInProgress() ? state.hintCount() : 0,
-                config.tuning().maxHints(), config.tuning().floors(), state.revealed(),
+                config.tuning().maxHints(), config.tuning().floors(), hintViews(state), state.revealed(),
                 state.guesses().stream().map(Guess::seat).sorted().toList(), attempts, seats, state.order(),
                 state.history(), reveal, state.result());
     }
@@ -104,15 +103,12 @@ public final class WordTempViews {
         List<CandidateInfo> candidates = WordTempVisibility.seesCandidates(state, viewer, viewer)
                 ? candidateInfos(seat) : List.of();
         String answer = WordTempVisibility.seesAnswer(state, viewer) ? state.answer().word() : null;
-        List<OwnHint> hints = WordTempVisibility.seesHints(state, viewer)
-                ? state.hints().stream().map(h -> new OwnHint(h.text(), h.attempt(), h.status(), h.temp())).toList()
-                : List.of();
         String myGuess = null;
         if (WordTempVisibility.seesOwnGuess(state, viewer)) {
             Guess g = state.guessOf(viewer);
             myGuess = g == null ? null : g.text();
         }
-        return new PrivateView(viewer, candidates, seat.chosen(), answer, hints, myGuess);
+        return new PrivateView(viewer, candidates, seat.chosen(), answer, myGuess);
     }
 
     public static List<CandidateInfo> candidateInfos(Seat seat) {
@@ -135,13 +131,22 @@ public final class WordTempViews {
         return out;
     }
 
+    /** 모두가 보는 힌트 목록 — 확정·채점 중(무효 제외), 낸 순서. 출제 차례가 아니면 빈 목록. */
+    public static List<HintView> hintViews(WordTempState state) {
+        if (!state.turnInProgress() && state.phase() != Phase.TURN_END) {
+            return List.of();
+        }
+        return state.hints().stream().filter(h -> h.status() != HintStatus.VOID)
+                .map(h -> new HintView(h.text(), h.attempt(), h.status(), h.temp())).toList();
+    }
+
     /** 그 차례의 확정 힌트 전체(무효·채점 중 제외). 출제 차례 끝에만 모두에게 나간다. */
     public static List<HintInfo> hintInfos(WordTempState state) {
         List<HintInfo> out = new ArrayList<>();
         for (Hint h : state.hints()) {
             if (h.status() == HintStatus.SCORED) {
                 boolean revealed = state.revealed().stream()
-                        .anyMatch(r -> r.attempt() == h.attempt() && r.text().equals(h.text()));
+                        .anyMatch(r -> r.attempt() == h.attempt() && r.floorMet() && h.text().equals(r.text()));
                 out.add(new HintInfo(h.attempt(), h.text(), h.temp(), revealed));
             }
         }

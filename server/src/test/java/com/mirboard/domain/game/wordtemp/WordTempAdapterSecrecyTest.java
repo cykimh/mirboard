@@ -26,15 +26,18 @@ import org.junit.jupiter.api.Test;
  * 은닉(룰 §12)을 <b>포트 어댑터가 내보내는 JSON</b>으로 확인한다 — 인프라는 {@code publicView}·{@code privateView}·이벤트를 Jackson 으로
  * 그대로 직렬화해 공개 토픽·본인 큐에 싣는다. 판을 끝까지 몰며 전이마다:
  * <ul>
- *   <li>공개 뷰·공개 이벤트 JSON 에 아직 공개되지 않은 낱말(후보·진행 중인 정답·미공개 힌트·공개 전 추리·가려진 답)이 <b>문자열로도 없다</b>.</li>
- *   <li>좌석마다의 비공개 뷰 JSON 에 <b>남의</b> 비밀이 없다(출제자도 남의 추리를 못 보고, 추리자는 정답·힌트 목록을 못 본다).</li>
+ *   <li>공개 뷰·공개 이벤트 JSON 에 아직 공개되지 않은 낱말(후보·진행 중인 정답·공개 전 추리·가려진 답)이 <b>문자열로도 없다</b>.</li>
+ *   <li>좌석마다의 비공개 뷰 JSON 에 <b>남의</b> 비밀이 없다(출제자도 남의 추리를 못 보고, 추리자는 정답을 못 본다).</li>
  *   <li>비공개 이벤트는 살아 있는 사람 한 좌석에게만 가고 순번을 쓰지 않는다(D-126). 공개 이벤트는 순번을 쓴다.</li>
  * </ul>
+ * 룰 v2(D-320): <b>힌트와 온도는 비밀이 아니다</b> — 낼 때마다 공개 이벤트로 나가고 공개 뷰의 {@code hints} 에 있다. 그래서 힌트 낱말이
+ * 누군가의 후보와 같은 글자열이면(고정 표의 강아지 등) 공개 JSON 에 나올 수 있다 — 그 낱말은 "알려진 낱말"로 친다.
  */
 class WordTempAdapterSecrecyTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private int checks;
+    private int hintsSeen;
 
     private String json(Object o) {
         try {
@@ -44,7 +47,7 @@ class WordTempAdapterSecrecyTest {
         }
     }
 
-    /** 지금 모두가 알아도 되는 낱말 — 끝난 차례의 정답·공개 힌트, 공개된 추리(가려진 것 제외), 차례 끝 동안의 정답·힌트 전체. */
+    /** 지금 모두가 알아도 되는 낱말 — 끝난 차례의 정답·차수 요약, 이번 차례의 힌트 전부(D-320), 공개된 추리(가려진 것 제외), 차례 끝 동안의 정답. */
     private static Set<String> publicWords(WordTempState s) {
         Set<String> words = new LinkedHashSet<>();
         for (TurnSummary turn : s.history()) {
@@ -61,10 +64,10 @@ class WordTempAdapterSecrecyTest {
                 }
             }
         }
+        s.hints().forEach(h -> words.add(h.text())); // 채점 중·무효였던 것도 이벤트로 이미 나갔다
         boolean turnOpen = s.phase() == Phase.HINT || s.phase() == Phase.GUESS || s.phase() == Phase.ATTEMPT_RESULT;
         if (!turnOpen && s.answer() != null) {
             words.add(s.answer().word());
-            s.hints().stream().filter(h -> h.status() == HintStatus.SCORED).forEach(h -> words.add(h.text()));
         }
         return words;
     }
@@ -92,11 +95,6 @@ class WordTempAdapterSecrecyTest {
                 secrets.addAll(c.aliases());
             }
         }
-        if (turnOpen) {
-            for (Hint hint : s.hints()) {
-                secrets.add(hint.text());
-            }
-        }
         for (Guess g : s.guesses()) {
             secrets.add(g.text());
         }
@@ -110,13 +108,22 @@ class WordTempAdapterSecrecyTest {
                 assertThat(e.sequenced()).as("비공개 이벤트는 순번을 쓰지 않는다: " + e.envelopeType()).isFalse();
                 assertThat(h.config.bot(e.privateSeat())).as("봇에게 비공개 이벤트 없음").isFalse();
                 assertThat(e.privateSeat()).isBetween(0, s.seatCount() - 1);
-                if (e instanceof WordTempEvent.HintScored || e instanceof WordTempEvent.HintPending
-                        || e instanceof WordTempEvent.HintVoid) {
-                    assertThat(e.privateSeat()).as("힌트의 온도는 출제자만").isEqualTo(s.setterSeat());
-                }
+                assertThat(e).as("비공개는 후보와 내 추리뿐").isInstanceOfAny(WordTempEvent.WordCandidates.class,
+                        WordTempEvent.GuessAccepted.class);
             } else {
                 assertThat(e.sequenced()).isTrue();
                 pub.append(json(e));
+            }
+        }
+        // D-320 — 진행 중인 차례의 힌트(확정·채점 중)는 공개 뷰에 낱말·온도 그대로 있다
+        if (turnOpen) {
+            String view = json(h.adapter.publicView(s));
+            for (Hint hint : s.hints()) {
+                if (hint.status() != HintStatus.VOID) {
+                    hintsSeen++;
+                    assertThat(view).as("공개 뷰에 힌트 '%s'", hint.text())
+                            .contains("\"text\":\"" + hint.text() + "\",\"attempt\":" + hint.attempt());
+                }
             }
         }
         for (String secret : secrets) {
@@ -137,9 +144,7 @@ class WordTempAdapterSecrecyTest {
             for (AnswerEntry c : s.seat(viewer).candidates()) {
                 ok.add(c.word());
             }
-            if (viewer == s.setterSeat()) {
-                s.hints().forEach(hint -> ok.add(hint.text())); // 출제자는 자기 힌트·온도를 본다
-            }
+            assertThat(mine).as("비공개 뷰에는 힌트 목록이 없다").doesNotContain("\"hints\"");
             Guess own = s.guessOf(viewer);
             if (own != null) {
                 ok.add(own.text());
@@ -174,20 +179,22 @@ class WordTempAdapterSecrecyTest {
             h.act(seat, new WordTempAction.SelectWord(1, 0));
             check(h);
         }
-        // 1차 힌트 — 표 둘 + 채점 중 하나
+        // 1차 힌트(기준 70°) — 기준 아래 표 둘 + 채점 중 하나. 낼 때마다 공개 뷰에 보인다.
         h.hint("여름");
         check(h);
-        h.hint("갈매기");
+        h.hint("소금");
         check(h);
         h.hint("짠맛");
         check(h);
-        assertThat(json(h.adapter.publicView(h.state()))).contains("\"hintCount\":3").doesNotContain("바다");
+        assertThat(json(h.adapter.publicView(h.state()))).contains("\"hintCount\":3").contains("여름").contains("소금")
+                .contains("짠맛").contains("PENDING").doesNotContain("바다");
         h.scorer.deliver("바다", "짠맛", new LiveScore.Scored(64));
         h.fire();
         check(h);
         h.endHints();
         check(h);
-        assertThat(json(h.adapter.publicView(h.state()))).contains("갈매기").doesNotContain("여름").doesNotContain("짠맛");
+        assertThat(json(h.adapter.publicView(h.state()))).contains("여름").contains("소금").contains("짠맛")
+                .contains("\"floorMet\":false").doesNotContain("바다");
 
         // 1차 추리 — 낸 사람만 표시되고 내용은 없다. 금칙어를 품은 답은 공개 뒤에도 가려진다.
         h.guess(1, "항구");
@@ -204,8 +211,9 @@ class WordTempAdapterSecrecyTest {
         // 2차 — 맞힌다
         h.fire();
         check(h);
-        h.hint("파도").endHints();
+        h.hint("파도"); // 93 ≥ 75 — 그 자리에서 추리로
         check(h);
+        assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
         h.guess(1, "바다요").guess(2, "소금").guess(3, "바다");
         check(h);
         h.fire();
@@ -215,7 +223,7 @@ class WordTempAdapterSecrecyTest {
         assertThat(json(h.adapter.publicView(h.state()))).contains("바다").contains("여름").contains("짠맛")
                 .doesNotContain("사과").doesNotContain("휴대폰");
 
-        // 나머지 차례 — 출제자가 손을 놓는다(힌트 0개 → 차례 끝). 끝까지.
+        // 나머지 차례 — 출제자가 손을 놓는다(힌트 0개로 5차까지 → 차례 끝). 끝까지.
         while (!h.state().ended()) {
             h.fire();
             check(h);
@@ -224,6 +232,7 @@ class WordTempAdapterSecrecyTest {
         assertThat(end).as("안 쓴 후보는 판이 끝나도 공개하지 않는다").doesNotContain("사과").doesNotContain("눈사람")
                 .doesNotContain("기차").doesNotContain("축구");
         assertThat(checks).isGreaterThan(20);
+        assertThat(hintsSeen).isPositive();
     }
 
     @Test
@@ -250,5 +259,6 @@ class WordTempAdapterSecrecyTest {
             assertThat(h.state().ended()).isTrue();
         }
         assertThat(checks).isGreaterThan(200);
+        assertThat(hintsSeen).as("봇의 힌트도 공개 뷰에 있었다").isGreaterThan(50);
     }
 }

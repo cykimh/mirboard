@@ -14,7 +14,7 @@ import type {
   HintVoidPayload,
   MatchEndedPayload,
   MatchResult,
-  OwnHint,
+  HintView,
   PublicAttempt,
   Revealed,
   SeatView,
@@ -66,6 +66,9 @@ export interface WordTempRoomState {
   maxHints: number;
   /** 차수별 최저 온도(서버가 준다 — 판정도 서버). */
   floors: number[];
+  /** 이 출제 차례의 힌트 전부 — 낼 때마다 모두에게 공개된다(D-320). 차수가 지나도 쌓인다. */
+  hints: HintView[];
+  /** 끝난 힌트 단계마다 하나 — 가장 높은 힌트와 기준을 넘겼는지. */
   revealed: Revealed[];
   /** 이번 차수에 추리할 좌석들. */
   guessSeats: number[];
@@ -87,8 +90,6 @@ export interface WordTempRoomState {
   chosen: number;
   /** (출제자면) 이번 정답. */
   answer: string | null;
-  /** (출제자면) 이번 출제 차례의 내 힌트·온도·채점 중 표시. */
-  hints: OwnHint[];
   /** (추리자면) 이번 차수에 낸 내 답. 빈 문자열 = 패스, 아직이면 null. */
   myGuess: string | null;
 
@@ -136,7 +137,6 @@ const NO_PRIVATE = {
   candidatesRound: 0,
   chosen: -1,
   answer: null as string | null,
-  hints: [] as OwnHint[],
   myGuess: null as string | null,
 };
 
@@ -154,6 +154,7 @@ const INITIAL: Omit<WordTempRoomState, 'disconnectedSeats' | 'mySeat'> = {
   hintCount: 0,
   maxHints: 5,
   floors: [],
+  hints: [],
   revealed: [],
   guessSeats: [],
   guessedSeats: [],
@@ -191,22 +192,8 @@ const guessersOf = (seats: SeatView[], setterSeat: number) =>
  *
  * <p><b>비밀은 서버가 보내지 않는다</b> — 공개 뷰·공개 이벤트에는 후보·진행 중인 정답·미공개 힌트·공개 전 추리가 없고, 본인 것만 비공개
  * 뷰·본인 큐로 온다(룰 §12). 그래서 추리자·관전자의 스토어에는 출제자의 힌트·온도가 <b>들어올 길이 없다</b>({@link applyPrivate} 도 내 좌석
- * 것만 받는다). 화면은 그 위에 한 번 더 — 내가 출제자일 때만 `hints` 를 그린다.
+ * 것만 받는다). D-320 뒤로 힌트와 온도는 비밀이 아니다 — 공개 뷰·공개 이벤트로 모두에게 온다.
  */
-/**
- * 스냅샷의 내 힌트 목록과 지금 목록을 합친다. 실시간 채점 결과(비공개 `HINT_SCORED`)는 공개 순번을 올리지 않으므로, 채점 중에 나간
- * resync 의 응답이 결과 프레임보다 늦게 닿으면 같은 순번의 낡은 스냅샷이 확정 온도를 "채점 중"으로 되돌려 입력이 잠긴다(리뷰 지적).
- * 같은 차례·차수의 같은 낱말이 이미 확정이면 확정을 지킨다 — 확정은 되돌아가지 않는다(D-312).
- */
-function mergeOwnHints(prev: { turnNo: number; attempt: number; hints: OwnHint[] }, turnNo: number, attempt: number, next: OwnHint[]): OwnHint[] {
-  if (prev.turnNo !== turnNo || prev.attempt !== attempt) return next;
-  return next.map((h) => {
-    if (h.status !== 'PENDING') return h;
-    const known = prev.hints.find((k) => k.text === h.text && k.attempt === h.attempt && k.status === 'SCORED');
-    return known ?? h;
-  });
-}
-
 export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set, get) => ({
   ...INITIAL,
   mySeat: -1,
@@ -236,6 +223,7 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
       hintCount: t.hintCount,
       maxHints: t.maxHints,
       floors: t.floors ?? [],
+      hints: (t.hints ?? []).filter((h) => h.status !== 'VOID'),
       revealed: t.revealed ?? [],
       guessSeats: guessersOf(t.seats, t.setterSeat),
       guessedSeats: t.guessedSeats ?? [],
@@ -251,12 +239,6 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
       candidatesRound: p ? t.round : 0,
       chosen: p?.chosen ?? -1,
       answer: p?.answer ?? null,
-      hints: mergeOwnHints(
-        get(),
-        t.turnNo,
-        t.attempt,
-        (p?.hints ?? []).filter((h) => h.status !== 'VOID'),
-      ),
       myGuess: p?.myGuess ?? null,
       ...NO_FX,
       sending: null,
@@ -385,13 +367,45 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
         return 'applied';
       }
 
+      // ── 힌트(D-320) — 낼 때마다 모두에게 공개된다. 낱말과 온도가 그대로 온다 ──
+      case 'HINT_PENDING': {
+        const p = payload as HintPendingPayload;
+        if (state.hints.some((h) => h.text === p.text && h.attempt === state.attempt)) return 'applied';
+        set({
+          hints: [...state.hints, { text: p.text, attempt: state.attempt, status: 'PENDING', temp: -1 }],
+          sending: null,
+        });
+        return 'applied';
+      }
+
+      case 'HINT_SCORED': {
+        const p = payload as HintScoredPayload;
+        const scored: HintView = { text: p.text, attempt: state.attempt, status: 'SCORED', temp: p.temp };
+        const at = state.hints.findIndex((h) => h.text === p.text && h.attempt === state.attempt);
+        set({
+          hints: at >= 0 ? state.hints.map((h, i) => (i === at ? scored : h)) : [...state.hints, scored],
+          hintCount: p.count,
+          freshScored: p.text,
+          fxSeq: state.fxSeq + 1,
+          sending: null,
+        });
+        return 'applied';
+      }
+
+      case 'HINT_VOID': {
+        // 채점 결과로 무효(명사 아님·시간 초과) — 채점 중이던 줄을 지우고 개수를 돌려받는다.
+        const p = payload as HintVoidPayload;
+        set({
+          hints: state.hints.filter((h) => !(h.text === p.text && h.attempt === state.attempt && h.status === 'PENDING')),
+          hintCount: p.count,
+          sending: null,
+        });
+        return 'applied';
+      }
+
       case 'HINT_REVEALED': {
+        // 힌트 단계 끝 — 이 차수가 기준 온도를 넘겼는지(가장 높은 힌트). 힌트가 없었으면 낱말 null·못 넘김. 곧 추리 단계가 온다.
         const p = payload as HintRevealedPayload;
-        if (p.text === null || p.temp < 0) {
-          // 힌트 0개로 끝남 — 공개할 것이 없다(바로 `TURN_ENDED` 가 온다).
-          set({ clock: null, sending: null });
-          return 'applied';
-        }
         if (state.revealed.some((r) => r.attempt === p.attempt)) return 'applied';
         set({
           revealed: [
@@ -473,6 +487,8 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
         set({
           phase: 'TURN_END',
           turnReveal: { answer: p.answer, hints: p.hints },
+          // 채점 중이던 힌트는 차례가 끝나면 버려진다(서버가 따로 알리지 않는다 — 출제자 탈주 등) — 판에서도 지운다.
+          hints: state.hints.filter((h) => h.status !== 'PENDING'),
           history: [...state.history, summary],
           seats: state.seats.map((s) => (p.totals[s.seat] === undefined ? s : { ...s, total: p.totals[s.seat] })),
           deltas: {},
@@ -516,37 +532,6 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
         if (p.round < state.candidatesRound) return;
         // 새 라운드의 목록이 공개 프레임보다 먼저 왔으면 고른 것을 비운다. 같은 라운드면(늦게 온 목록) 이미 고른 것을 지킨다.
         set({ candidates: p.candidates, candidatesRound: p.round, chosen: p.round > state.round ? -1 : state.chosen });
-        return;
-      }
-      case 'HINT_PENDING': {
-        const p = payload as HintPendingPayload;
-        if (state.hints.some((h) => h.text === p.text && h.attempt === state.attempt)) return;
-        set({
-          hints: [...state.hints, { text: p.text, attempt: state.attempt, status: 'PENDING', temp: -1 }],
-          sending: null,
-        });
-        return;
-      }
-      case 'HINT_SCORED': {
-        const p = payload as HintScoredPayload;
-        const scored: OwnHint = { text: p.text, attempt: state.attempt, status: 'SCORED', temp: p.temp };
-        const at = state.hints.findIndex((h) => h.text === p.text && h.attempt === state.attempt);
-        set({
-          hints: at >= 0 ? state.hints.map((h, i) => (i === at ? scored : h)) : [...state.hints, scored],
-          hintCount: p.count,
-          freshScored: p.text,
-          fxSeq: state.fxSeq + 1,
-          sending: null,
-        });
-        return;
-      }
-      case 'HINT_VOID': {
-        const p = payload as HintVoidPayload;
-        set({
-          hints: state.hints.filter((h) => !(h.text === p.text && h.attempt === state.attempt && h.status === 'PENDING')),
-          hintCount: p.count,
-          sending: null,
-        });
         return;
       }
       case 'GUESS_ACCEPTED': {
@@ -595,8 +580,8 @@ export function iAmSetter(s: Pick<WordTempRoomState, 'mySeat' | 'setterSeat'>): 
   return s.mySeat >= 0 && s.mySeat === s.setterSeat;
 }
 
-/** 채점 중인 내 힌트가 있는가 — 풀릴 때까지 새 힌트·[힌트 끝]을 받지 않는다(§6.2). */
-/** 그 차수의 최저 온도 — 서버가 주지 않았으면 null(눈금을 그리지 않는다). */
+/** 채점 중인 힌트가 있는가 — 풀릴 때까지 새 힌트·[힌트 끝]을 받지 않는다(§6.2). */
+/** 그 차수의 기준 온도 — 서버가 주지 않았으면 null(눈금을 그리지 않는다). */
 export function floorOf(s: Pick<WordTempRoomState, 'floors'>, attempt: number): number | null {
   return s.floors[attempt - 1] ?? null;
 }

@@ -100,7 +100,7 @@ class WordTempMatchRecorderIT {
     }
 
     private static List<TurnSummary> turns() {
-        return List.of(new TurnSummary(1, 1, 0, "바다", List.of(new Revealed(1, "갈매기", 71, 50, true)), List.of(1),
+        return List.of(new TurnSummary(1, 1, 0, "바다", List.of(new Revealed(1, "갈매기", 71, 70, true)), List.of(1),
                 1, TurnEndReason.SOLVED));
     }
 

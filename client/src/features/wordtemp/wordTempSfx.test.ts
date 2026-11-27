@@ -3,7 +3,7 @@ import { FakeAudioContext, audioLog } from '@/features/sound/testAudio';
 import type { TableCue } from '@/features/sound/tableSfx';
 import type { MatchResult } from '@/types/wordtemp';
 import { attemptDeltas, clockText, normalizeWord, tempBand } from './wordTempMath';
-import { BOIL_AFTER_REVEAL_SEC, OTHERS_CORRECT_GAIN, wordTempCues, wordTempPrivateCues } from './wordTempSfx';
+import { OTHERS_CORRECT_GAIN, OTHERS_HINT_GAIN, wordTempCues } from './wordTempSfx';
 import { useWordTempStore, type WordTempRoomState } from './wordTempStore';
 import { seedStore } from './wordTempTestFixtures';
 
@@ -14,7 +14,7 @@ function room(over: Partial<WordTempRoomState> = {}): WordTempRoomState {
   return { ...useWordTempStore.getState(), ...over };
 }
 
-const REVEALED = { attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true };
+const REVEALED = { attempt: 1, text: '갈매기' as string | null, temp: 71, floor: 70, floorMet: true };
 
 describe('wordTempMath', () => {
   it('띠 경계 — 96 · 75 · 40(룰 §1)', () => {
@@ -46,17 +46,23 @@ describe('wordTempMath', () => {
 });
 
 describe('wordTempCues — 공개 이벤트', () => {
-  it('공개 — 온도만큼 높은 음, 96 이상이면 뒤에 끓는 소리', () => {
+  it('힌트 단계 끝 — 기준을 넘겼으면 수은주가 차오르는 소리, 못 넘겼으면 식는 소리(D-320)', () => {
     const before = room();
-    const e = (temp: number) => ({ type: 'HINT_REVEALED', payload: { ...REVEALED, temp } });
-    expect(wordTempCues(e(71), before, room({ revealed: [REVEALED] }))).toEqual([{ cue: 'temp.reveal', level: 71 }]);
-    expect(wordTempCues(e(97), before, room({ revealed: [{ ...REVEALED, temp: 97 }] }))).toEqual([
-      { cue: 'temp.reveal', level: 97 },
-      { cue: 'temp.boil', delaySec: BOIL_AFTER_REVEAL_SEC },
-    ]);
-    // 힌트 0개(text null)·이미 받은 공개는 조용히
-    expect(wordTempCues({ type: 'HINT_REVEALED', payload: { ...REVEALED, text: null, temp: -1 } }, before, before)).toEqual([]);
-    expect(wordTempCues(e(71), before, before)).toEqual([]);
+    const e = (over: object) => ({ type: 'HINT_REVEALED', payload: { ...REVEALED, ...over } });
+    expect(wordTempCues(e({}), before, room({ revealed: [REVEALED] }))).toEqual([{ cue: 'temp.reveal', level: 71 }]);
+    const missed = { ...REVEALED, text: null, temp: -1, floorMet: false };
+    expect(wordTempCues(e(missed), before, room({ revealed: [missed] })).map((c) => c.cue)).toEqual(['temp.wrong']);
+    // 이미 받은 것은 조용히
+    expect(wordTempCues(e({}), before, before)).toEqual([]);
+  });
+
+  it('힌트가 공개될 때마다 온도만큼 높은 한 음 — 온도는 비밀이 아니다. 남이 낸 것은 작게', () => {
+    const before = room();
+    const hint = { text: '여름', attempt: 1, status: 'SCORED' as const, temp: 58 };
+    const e = (seat: number) => ({ type: 'HINT_SCORED', payload: { seat, text: '여름', temp: 58, count: 1 } });
+    expect(wordTempCues(e(0), before, room({ hints: [hint] }))).toEqual([{ cue: 'temp.scored', level: 58, gain: 1 }]);
+    expect(wordTempCues(e(1), before, room({ hints: [hint] }))).toEqual([{ cue: 'temp.scored', level: 58, gain: OTHERS_HINT_GAIN }]);
+    expect(wordTempCues(e(1), before, before)).toEqual([]);
   });
 
   it('동시 공개 — 내가 맞히면 또렷하게, 남이 맞히면 작게, 모두 틀리면 식는 소리', () => {
@@ -94,11 +100,6 @@ describe('wordTempCues — 공개 이벤트', () => {
     expect(wordTempCues(e, room({ mySeat: -1 }), room({ mySeat: -1, result }))).toEqual([]);
   });
 
-  it('본인 큐 — 채점된 내 힌트만 소리가 난다', () => {
-    expect(wordTempPrivateCues('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 })).toEqual([{ cue: 'temp.scored', level: 50 }]); // 온도와 무관한 같은 높이
-    expect(wordTempPrivateCues('HINT_SCORED', { seat: 0, text: '바다물', temp: 97, count: 1 })).toEqual([{ cue: 'temp.scored', level: 50 }]);
-    expect(wordTempPrivateCues('HINT_PENDING', { seat: 0, text: '짠맛' })).toEqual([]);
-  });
 });
 
 describe('낱말 온도 소리 — D-271', () => {

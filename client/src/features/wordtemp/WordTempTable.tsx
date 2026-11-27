@@ -14,7 +14,7 @@ import { useCardAnimStore } from '@/features/theme/cardAnimStore';
 import { TutorialDialog } from '@/features/tutorial/TutorialDialog';
 import { useTutorialGate } from '@/features/tutorial/useTutorialGate';
 import { useStompRoom } from '@/ws/useStompRoom';
-import { HintBoard } from './HintBoard';
+import { HintBoard, verdictText } from './HintBoard';
 import { SeatStrip } from './SeatStrip';
 import { WordTempMatchEnd } from './WordTempMatchEnd';
 import { AttemptResultPanel, GuessPanel, SetterPanel, TurnEndPanel, WordPicker } from './WordTempPanels';
@@ -226,11 +226,15 @@ export function WordTempTable({
     else next = '곧 결과가 나와요.';
   }
 
+  // 차수 수는 서버가 준 기준 온도의 개수다(D-320 — 5).
+  const attemptTotal = s.floors.length || 5;
+  const nowFloor = floorOf(s, s.attempt);
+  const nowSummary = s.revealed.find((r) => r.attempt === s.attempt);
   let title = '';
   if (s.phase === 'WORD_SELECT') title = `${s.round}라운드 · 낱말 고르기`;
-  else if (s.phase === 'HINT') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}차 힌트`;
-  else if (s.phase === 'GUESS') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}차 추리`;
-  else if (s.phase === 'ATTEMPT_RESULT') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}차 결과`;
+  else if (s.phase === 'HINT') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}/${attemptTotal}차 힌트`;
+  else if (s.phase === 'GUESS') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}/${attemptTotal}차 추리`;
+  else if (s.phase === 'ATTEMPT_RESULT') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}/${attemptTotal}차 결과`;
   else if (s.phase === 'TURN_END') title = `${setter ? '내' : `${setterName} 님의`} 문제 · 차례 끝`;
 
   let status: string;
@@ -244,16 +248,20 @@ export function WordTempTable({
     status = setter
       ? scoringInProgress(s)
         ? '힌트를 채점하는 중…'
-        : '힌트를 내 주세요 — 온도는 나만 보여요'
-      : `${setterName} 님이 힌트를 고르고 있어요 — 낱말과 온도는 공개 때까지 비밀!`;
+        : nowFloor !== null
+          ? `힌트를 내 주세요 — 기준 ${nowFloor}° 이상이면 바로 추리로 넘어가요`
+          : '힌트를 내 주세요'
+      : nowFloor !== null
+        ? `${setterName} 님이 힌트를 내고 있어요 — 기준 ${nowFloor}° 를 넘기면 추리 시작`
+        : `${setterName} 님이 힌트를 내고 있어요`;
   else if (s.phase === 'GUESS')
-    status = setter
+    status = (nowSummary ? `${verdictText(nowSummary)} · ` : '') + (setter
       ? `추리를 기다려요 (${s.guessedSeats.length}/${s.guessSeats.length})`
       : s.myGuess !== null
         ? '모두가 내면 한꺼번에 공개돼요'
-        : '공개된 힌트와 온도를 보고 정답을 맞혀 보세요';
+        : '힌트와 온도를 보고 정답을 맞혀 보세요');
   else if (s.phase === 'ATTEMPT_RESULT') status = '모두의 추리를 공개했어요';
-  else status = '정답과 힌트가 모두 공개됐어요';
+  else status = '정답이 공개됐어요';
 
   const showClock = remaining !== null && s.phase !== null && s.phase !== 'FINISHED';
   const inlineClock = showClock ? clockText(remaining!) : null;
@@ -335,8 +343,8 @@ export function WordTempTable({
           <div className="wt-phase">
             <h2 className="wt-phase-title">{title}</h2>
             {inTurn && (
-              <ol className="wt-attempts" aria-label="차수">
-                {Array.from({ length: s.floors.length || 3 }, (_, i) => i + 1).map((a) => {
+              <ol className="wt-attempts" aria-label={`차수 ${s.attempt} / ${attemptTotal}`}>
+                {Array.from({ length: attemptTotal }, (_, i) => i + 1).map((a) => {
                   const floor = floorOf(s, a);
                   const state = a < s.attempt ? 'done' : a === s.attempt ? 'now' : 'todo';
                   return (
@@ -346,7 +354,11 @@ export function WordTempTable({
                       aria-current={state === 'now' ? 'step' : undefined}
                     >
                       <span className="wt-attempt-no">{a}차</span>
-                      {floor !== null && <span className="wt-attempt-floor">최저 {floor}°</span>}
+                      {floor !== null && (
+                        <span className="wt-attempt-floor" aria-label={`기준 ${floor}도`}>
+                          {floor}°
+                        </span>
+                      )}
                     </li>
                   );
                 })}
@@ -359,12 +371,13 @@ export function WordTempTable({
           <HintBoard
             phase={s.phase}
             attempt={s.attempt}
+            floors={s.floors}
+            hints={s.hints}
             revealed={s.revealed}
-            hintCount={s.hintCount}
             maxHints={s.maxHints}
             setterName={setterName}
             mine={setter}
-            freshAttempt={s.freshReveal}
+            freshText={s.freshScored}
             fxSeq={s.fxSeq}
           />
         )}
@@ -396,19 +409,17 @@ export function WordTempTable({
           />
         )}
 
-        {/* 출제자 칸 — 내가 출제자일 때만(남의 힌트·온도는 스토어에도 없다) */}
-        {!s.result && playing && setter && (s.phase === 'HINT' || s.phase === 'GUESS' || s.phase === 'ATTEMPT_RESULT') && (
+        {/* 출제자 칸 — 내가 출제자일 때만(정답은 나만 안다. 힌트와 온도는 위 판에 모두와 같이 보인다) */}
+        {!s.result && playing && setter && (s.phase === 'HINT' || s.phase === 'GUESS') && (
           <SetterPanel
             answer={s.answer}
             attempt={s.attempt}
             floor={floorOf(s, s.attempt)}
-            hints={s.hints}
             hintCount={s.hintCount}
             maxHints={s.maxHints}
+            scoring={scoringInProgress(s)}
             hinting={s.phase === 'HINT'}
             busy={busy}
-            freshScored={s.freshScored}
-            fxSeq={s.fxSeq}
             clock={inlineClock}
             onHint={(text) => send({ '@action': 'SUBMIT_HINT', turnNo: s.turnNo, attempt: s.attempt, text })}
             onEnd={() => send({ '@action': 'END_HINTS', turnNo: s.turnNo, attempt: s.attempt })}

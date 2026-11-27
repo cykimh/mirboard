@@ -3,9 +3,10 @@
 // 계정 둘(찍는 사람 + 친구)과 봇 둘이 보통(2라운드) 한 판을 끝까지 하면서, 단계가 바뀔 때마다 찍는 사람의 화면을 375×812 로
 // client/e2e/wordtemp-shots/ 에 찍는다. 친구는 한 박자 늦게 움직인다 — "골랐어요/냈어요, 기다리는 중" 화면이 남게(사람이 하나뿐이면 내가
 // 내는 순간 단계가 넘어간다).
-// 실시간 채점이 꺼진 로컬에서도 돌게 힌트는 서버 자원의 유사도 표(table-v1.tsv.gz)에서 고른다 — 1라운드 내 차례에는 일부러 차가운 힌트로
-// 시작해 "최저 온도 못 넘김"을, 2라운드에는 가장 뜨거운 힌트로 "거의 정답"을 찍는다. 추리는 1차에 엉뚱한 답, 2차부터는 공개된 힌트·온도와
-// 표가 맞는 낱말을 낸다(정답 축하를 찍으려고 — 사람이 하는 방식이 아니다). 찍을 때마다 가로 넘침을 재서 0 이 아니면 적는다.
+// 실시간 채점이 꺼진 로컬에서도 돌게 힌트는 서버 자원의 유사도 표(table-v1.tsv.gz)에서 고른다. 룰 v2(D-320 — 힌트는 낼 때마다 공개, 기준
+// 온도 이상이면 바로 추리): 1라운드 내 차례의 1차에는 일부러 기준보다 낮은 힌트 10개를 다 내 "기준 못 넘김"과 긴 힌트 목록을, 그 뒤 차수에는
+// 낮은 힌트 둘 + 기준을 넘기는 힌트로 "기준 N° 넘김 → 추리"를 찍는다. 추리는 1차에 엉뚱한 답, 2차부터는 공개된 힌트·온도와 표가 맞는 낱말을
+// 낸다(정답 축하를 찍으려고 — 사람이 하는 방식이 아니다). 찍을 때마다 가로 넘침을 재서 0 이 아니면 적는다.
 import { chromium } from '@playwright/test';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -119,11 +120,15 @@ const state = (p) =>
       round: Number(/(\d+)\/\d+R/.exec(txt('.wt-header-info'))?.[1] ?? 1),
       attempt: Number(document.querySelector('.wt-attempt-now .wt-attempt-no')?.textContent?.replace('차', '') ?? 1),
       answer: txt('.wt-answer-word'),
-      revealed: [...document.querySelectorAll('.wt-reveal:not(.wt-reveal-wait)')].map((li) => ({
-        text: li.querySelector('.wt-reveal-word')?.textContent ?? '',
-        temp: Number(li.querySelector('.wt-gauge')?.getAttribute('data-temp') ?? -1),
-      })),
-      pips: document.querySelectorAll('.wt-pip-on').length,
+      // 공개된 힌트 전부(지난 차수는 접혀 있어도 DOM 에 있다)
+      revealed: [...document.querySelectorAll('.wt-board .wt-hint')]
+        .filter((li) => li.querySelector('.wt-gauge'))
+        .map((li) => ({
+          text: li.querySelector('.wt-hint-word')?.textContent ?? '',
+          temp: Number(li.querySelector('.wt-gauge')?.getAttribute('data-temp') ?? -1),
+        })),
+      floor: Number(/(\d+)/.exec(txt('.wt-round-now .wt-round-floor'))?.[1] ?? 0),
+      pips: document.querySelectorAll('.wt-round-now .wt-hint .wt-gauge').length,
       canHint: !!document.querySelector('.wt-setter .wt-input:not(:disabled)'),
       canGuess: !!document.querySelector('.wt-guess .wt-input'),
       guessed: !!document.querySelector('.wt-guess') && !document.querySelector('.wt-guess .wt-input'),
@@ -147,7 +152,9 @@ async function sendHint(p, word) {
   const input = p.locator('.wt-setter .wt-input');
   await input.fill(word);
   await input.press('Enter');
-  await p.locator('.wt-setter .wt-own-hint', { hasText: word }).locator('.wt-gauge').waitFor({ timeout: 8000 }).catch(() => {});
+  // 낸 힌트는 온도계 판에 모두와 같이 보인다(D-320)
+  await p.locator('.wt-board .wt-hint').filter({ hasText: word }).first().waitFor({ timeout: 8000 }).catch(() => {});
+  await p.waitForTimeout(250);
 }
 
 /** 공개된 힌트·온도와 표가 모두 맞는 정답 후보. */
@@ -175,9 +182,11 @@ async function driveFriend(main) {
     if (s.phase === 'WORD_SELECT' && s.canPick && !s.picked) {
       await other.locator('.wt-cand:not(:disabled)').first().click({ timeout: 2000 });
     } else if (s.phase === 'HINT' && s.role === 'setter' && s.canHint && s.answer) {
-      const floor = [50, 60, 70][s.attempt - 1];
-      await sendHint(other, pickHint(s.answer, floor + 1, floor + 14) ?? pickHint(s.answer, floor, 95));
-      await other.getByRole('button', { name: '힌트 끝' }).click({ timeout: 2000 });
+      // 낮은 힌트 하나, 그다음 기준을 넘기는 힌트(있으면 바로 추리로). 없으면 [그만 내기]
+      await sendHint(other, pickHint(s.answer, s.floor - 20, s.floor - 1));
+      const pass = pickHint(s.answer, s.floor, s.floor + 6) ?? pickHint(s.answer, s.floor, 100);
+      if (pass) await sendHint(other, pass);
+      else await other.getByRole('button', { name: '그만 내기' }).click({ timeout: 2000 });
     } else if (s.phase === 'GUESS' && s.canGuess) {
       await other.getByRole('button', { name: '패스' }).click({ timeout: 2000 });
     } else {
@@ -218,36 +227,41 @@ for (;;) {
         if (s.attempt === 1) setterTurns += 1;
         await shot('03-setter-empty');
         if (setterTurns === 1 && s.attempt === 1) {
-          // 일부러 차가운 힌트 하나만 — 최저 온도를 못 넘긴다
-          await sendHint(page, pickHint(s.answer, 25, 45) ?? pickHint(s.answer, 5, 49));
-          await shot('04-setter-below-floor');
-        } else if (setterTurns >= 2 && s.attempt === 1 && pickHint(s.answer, 96, 100)) {
-          await sendHint(page, pickHint(s.answer, 30, 55));
-          await sendHint(page, pickHint(s.answer, 96, 100)); // 96 이상 — 그 자리에서 공개된다
-          await shot('13-boil-reveal', { settle: 900 });
+          // 일부러 기준보다 낮은 힌트만 10개 — 다 쓰면 "기준 못 넘김"인 채 추리로 간다. 긴 목록이 휴대폰에서 읽히는지도 본다
+          for (let n = 0; n < 10; n++) {
+            const cold = pickHint(s.answer, 20, s.floor - 1);
+            if (!cold) break;
+            await sendHint(page, cold);
+            if (n === 3) await shot('04-setter-hints');
+            if (n === 8) {
+              await shot('04b-setter-nine-hints');
+              await variant('04c-setter-keyboard', { size: KEYBOARD_UP, focus: '.wt-setter .wt-input' });
+            }
+          }
           continue;
-        } else {
-          const floor = [50, 60, 70][s.attempt - 1];
-          await sendHint(page, pickHint(s.answer, 20, 45));
-          await sendHint(page, pickHint(s.answer, floor + 2, floor + 18) ?? pickHint(s.answer, floor, 95));
-          await shot('05-setter-hints');
-          await variant('05b-setter-keyboard', { size: KEYBOARD_UP, focus: '.wt-setter .wt-input' });
-          await variant('05c-setter-dark', { dark: true });
         }
-        await page.getByRole('button', { name: '힌트 끝' }).click({ timeout: 3000 });
+        await sendHint(page, pickHint(s.answer, s.floor - 25, s.floor - 8));
+        await sendHint(page, pickHint(s.answer, s.floor - 7, s.floor - 1));
+        await shot('05-setter-two-hints');
+        await variant('05c-setter-dark', { dark: true });
+        const pass = pickHint(s.answer, s.floor, s.floor + 6) ?? pickHint(s.answer, s.floor, 100);
+        if (pass) await sendHint(page, pass);
+        else await page.getByRole('button', { name: '그만 내기' }).click({ timeout: 3000 });
       }
     } else if (s.phase === 'HINT' && s.role === 'guesser' && s.pips >= 1) {
-      await shot('06-guesser-hint-count');
+      await shot('06-guesser-live-hints', { settle: 300 });
       if (!taken.has('16-tutorial')) {
         await page.getByRole('button', { name: '게임 메뉴' }).click();
         await page.getByRole('menuitem', { name: /규칙/ }).click();
         await shot('16-tutorial');
-        for (let i = 0; i < 3; i++) await page.getByRole('button', { name: '다음' }).click();
-        await shot('16b-tutorial-floors');
+        for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '다음' }).click();
+        await shot('16b-tutorial-hints');
+        await page.getByRole('button', { name: '다음' }).click();
+        await shot('16c-tutorial-floors');
         await page.keyboard.press('Escape');
       }
     } else if (s.phase === 'GUESS' && s.role === 'guesser' && s.canGuess) {
-      await shot('07-guess-input');
+      await shot(s.attempt >= 2 ? '07d-guess-later-attempt' : '07-guess-input');
       await variant('07b-guess-keyboard', { size: KEYBOARD_UP, focus: '.wt-guess .wt-input' });
       await variant('07c-guess-wide', { size: WIDE });
       const guess = s.attempt >= 2 ? (infer(s.revealed) ?? '우산') : '우산';
@@ -257,17 +271,19 @@ for (;;) {
       await page.locator('.wt-my-guess').waitFor({ timeout: 3000 });
       await shot('08-guess-submitted', { settle: 300 });
     } else if (s.phase === 'GUESS' && s.role === 'setter') {
-      await shot('09-setter-waiting');
+      const miss = await page.locator('.wt-verdict.wt-verdict-miss').count();
+      await shot(miss ? '09-setter-floor-missed' : '09b-setter-floor-met', { settle: 500 });
     } else if (s.phase === 'ATTEMPT_RESULT') {
       const solved = await page.locator('.wt-result-solved').count();
-      const zero = await page.locator('.wt-result-summary', { hasText: '0점' }).count();
-      await shot(solved ? '10-result-solved' : zero ? '11-result-floor-zero' : '11b-result-missed', { settle: 1100 });
+      const zero = await page.locator('.wt-result-summary', { hasText: '점수가 없어요' }).count();
+      await shot(solved ? '10-result-solved' : zero ? '11-result-floor-missed' : '11b-result-setter-scores', { settle: 1100 });
       if (solved) await variant('10b-result-solved-dark', { dark: true });
     } else if (s.phase === 'TURN_END') {
       await shot('12-turn-end', { settle: 500 });
       await variant('12b-turn-end-wide', { size: WIDE });
     }
-    if (s.revealed.some((r) => r.temp >= 96)) await shot('13b-boil-board', { settle: 200 });
+    // 차수가 쌓인 판 — 지난 차수는 한 줄로 접혀 있다
+    if (s.attempt >= 3 && (s.phase === 'HINT' || s.phase === 'GUESS')) await shot('13-folded-attempts', { settle: 400 });
   } catch (e) {
     console.log('skip', s.phase, s.role, String(e).split('\n')[0]);
   }

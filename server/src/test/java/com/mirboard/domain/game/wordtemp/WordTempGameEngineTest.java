@@ -14,6 +14,7 @@ import com.mirboard.domain.game.wordtemp.state.WordTempState.EndReason;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.HintSource;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.HintStatus;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.VoidReason;
+import com.mirboard.domain.game.wordtemp.state.WordTempViews;
 import com.mirboard.domain.game.wordtemp.state.WordTempViews.PrivateView;
 import com.mirboard.domain.game.wordtemp.state.WordTempViews.PublicView;
 import java.time.Duration;
@@ -51,6 +52,7 @@ class WordTempGameEngineTest {
         h.hint("여름").after(1_000).hint("짠맛");
 
         assertThat(h.event(WordTempEvent.HintPending.class).text()).isEqualTo("짠맛");
+        assertThat(h.event(WordTempEvent.HintPending.class).isPrivate()).as("채점 중인 힌트도 공개").isFalse();
         assertThat(h.event(WordTempEvent.HintCount.class).count()).isEqualTo(2);
         assertThat(h.state().pendingHint().text()).isEqualTo("짠맛");
         assertThat(h.scorer.requests).containsExactly("바다/짠맛");
@@ -70,10 +72,11 @@ class WordTempGameEngineTest {
         h.fire();
         assertThat(h.rearms).isZero();
         WordTempEvent.HintScored scored = h.event(WordTempEvent.HintScored.class);
-        assertThat(scored.privateSeat()).isZero();
+        assertThat(scored.seat()).isZero();
         assertThat(scored.temp()).isEqualTo(64);
         assertThat(scored.count()).isEqualTo(2);
-        assertThat(h.events).as("개수는 그대로라 공개 이벤트가 없다").allMatch(GameEvent::isPrivate);
+        assertThat(h.events).as("채점 결과는 모두에게 공개된다(D-320)").hasSize(1)
+                .noneMatch(GameEvent::isPrivate).allMatch(GameEvent::sequenced);
         assertThat(h.state().pendingHint()).isNull();
         assertThat(h.state().hints().get(1).status()).isEqualTo(HintStatus.SCORED);
         assertThat(h.state().hints().get(1).source()).isEqualTo(HintSource.LIVE);
@@ -99,14 +102,35 @@ class WordTempGameEngineTest {
     }
 
     @Test
-    void a_live_score_of_96_or_more_closes_the_hint_phase_and_reveals_it() {
+    void a_live_score_at_or_above_the_floor_closes_the_hint_phase_as_the_passing_hint() {
         WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
-        h.scorer.answerWith("대양", new LiveScore.Scored(97));
+        h.scorer.answerWith("대양", new LiveScore.Scored(72));
         h.hint("여름").hint("대양").fire();
         assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
-        WordTempEvent.HintRevealed revealed = h.event(WordTempEvent.HintRevealed.class);
-        assertThat(revealed.text()).isEqualTo("대양");
-        assertThat(revealed.temp()).isEqualTo(97);
+        assertThat(h.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, "대양", 72, 70, true));
+        assertThat(h.has(WordTempEvent.GuessPhaseStarted.class)).isTrue();
+    }
+
+    @Test
+    void a_live_score_below_the_floor_keeps_the_hint_phase_open() {
+        WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
+        h.scorer.answerWith("대양", new LiveScore.Scored(69));
+        h.hint("대양").fire();
+        assertThat(h.state().phase()).isEqualTo(Phase.HINT);
+        assertThat(h.has(WordTempEvent.HintRevealed.class)).isFalse();
+    }
+
+    @Test
+    void a_table_hint_at_or_above_the_floor_closes_the_hint_phase_inside_apply() {
+        WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
+        h.hint("여름").hint("갈매기");
+        assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
+        assertThat(h.events).noneMatch(GameEvent::isPrivate);
+        assertThat(h.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, "갈매기", 71, 70, true));
+        // 추리 단계 — 다음 타이머는 추리 제한 30초
+        assertThat(h.adapter.timer(h.state())).hasValue(Duration.ofMillis(30_000));
     }
 
     @Test
@@ -180,17 +204,36 @@ class WordTempGameEngineTest {
         h.scorer.deliver("바다", "짠맛", new LiveScore.Scored(64));
         h.fire();
         assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
-        assertThat(h.event(WordTempEvent.HintRevealed.class).text()).isEqualTo("짠맛");
+        // 마감 뒤에 온 결과는 기준에 못 미쳐도 단계를 닫는다
+        assertThat(h.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, "짠맛", 64, 70, false));
     }
 
     @Test
-    void the_only_hint_voided_after_the_limit_ends_the_turn_with_no_hints() {
+    void the_only_hint_voided_after_the_limit_goes_to_guessing_with_no_hint() {
         WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
         h.after(89_500).hint("짠맛");
-        h.fire(); // 8초 뒤 무효 → 힌트 0개 → 출제 차례 끝
+        h.fire(); // 8초 뒤 무효 → 힌트 0개 → 그래도 추리로(D-320)
         assertThat(h.event(WordTempEvent.HintVoid.class).reason()).isEqualTo(VoidReason.SCORING_FAILED);
-        assertThat(h.state().phase()).isEqualTo(Phase.TURN_END);
-        assertThat(h.event(WordTempEvent.TurnEnded.class).reason()).isEqualTo(WordTempState.TurnEndReason.NO_HINTS);
+        assertThat(h.event(WordTempEvent.HintRevealed.class))
+                .isEqualTo(new WordTempEvent.HintRevealed(1, null, -1, 70, false));
+        assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
+        assertThat(h.has(WordTempEvent.TurnEnded.class)).isFalse();
+    }
+
+    @Test
+    void a_setter_who_gives_no_hint_at_all_is_walked_through_five_attempts_by_the_timer() {
+        WordTempAdapterHarness h = WordTempAdapterHarness.hinting();
+        List<GameEvent> all = new ArrayList<>();
+        while (h.state().phase() != Phase.TURN_END) {
+            h.fire();
+            all.addAll(h.events);
+        }
+        assertThat(all.stream().filter(WordTempEvent.HintRevealed.class::isInstance)
+                .map(e -> ((WordTempEvent.HintRevealed) e).floor())).containsExactly(70, 75, 80, 85, 90);
+        assertThat(h.event(WordTempEvent.TurnEnded.class).reason())
+                .isEqualTo(WordTempState.TurnEndReason.ALL_ATTEMPTS);
+        assertThat(h.state().totals()).containsOnly(0);
     }
 
     // ---- 끄기 스위치·상한 — 깨끗한 거절, 게임은 계속 ----
@@ -203,7 +246,7 @@ class WordTempGameEngineTest {
         assertThat(h.state().hintCount()).as("개수 유지").isZero();
         assertThat(h.state().liveRequests()).isZero();
         assertThat(h.scorer.requests).isEmpty();
-        h.hint("갈매기").endHints();
+        h.hint("갈매기");
         assertThat(h.state().phase()).isEqualTo(Phase.GUESS);
     }
 
@@ -243,8 +286,8 @@ class WordTempGameEngineTest {
     void the_timeout_tick_is_idempotent_and_matches_the_engine_timer() {
         WordTempAdapterHarness a = WordTempAdapterHarness.hinting();
         WordTempAdapterHarness b = WordTempAdapterHarness.hinting();
-        a.hint("갈매기");
-        b.hint("갈매기");
+        a.hint("여름");
+        b.hint("여름");
         WordTempAction.Tick tick = (WordTempAction.Tick) a.adapter.timeoutAction(a.state(), 0);
         assertThat(tick).isEqualTo(new WordTempAction.Tick(1, 1, Phase.HINT));
 
@@ -312,12 +355,15 @@ class WordTempGameEngineTest {
         assertThat(pub.hintCount()).isEqualTo(1);
         assertThat(h.adapter.phaseName(h.state())).isEqualTo("HINT");
 
+        // D-320 — 힌트(낱말·온도)는 공개 뷰에 있다. 비공개 뷰에는 힌트 목록이 없다
+        assertThat(pub.hints()).containsExactly(new WordTempViews.HintView("여름", 1, HintStatus.SCORED, 58));
+        assertThat(pub.floors()).containsExactly(70, 75, 80, 85, 90);
+        assertThat(pub.maxHints()).isEqualTo(10);
+
         PrivateView setter = (PrivateView) h.adapter.privateView(h.state(), 0).orElseThrow();
         assertThat(setter.answer()).isEqualTo("바다");
-        assertThat(setter.hints()).hasSize(1);
         PrivateView guesser = (PrivateView) h.adapter.privateView(h.state(), 1).orElseThrow();
         assertThat(guesser.answer()).isNull();
-        assertThat(guesser.hints()).isEmpty();
         assertThat(h.adapter.privateView(h.state(), 3)).as("봇").isEmpty();
         assertThat(h.adapter.privateView(h.state(), -1)).as("관전자").isEmpty();
         assertThat(h.adapter.privateView(h.state(), 9)).isEmpty();

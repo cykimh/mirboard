@@ -30,17 +30,12 @@ public final class WordTempVisibility {
         return state.turnInProgress() && viewer == state.setterSeat() && state.alive(viewer);
     }
 
-    /** 이번 출제 차례의 힌트 목록·각 온도·채점 중 표시를 {@code viewer} 가 비공개로 보는가 — 출제자만(정답과 같은 조건). */
-    public static boolean seesHints(WordTempState state, int viewer) {
-        return seesAnswer(state, viewer);
-    }
-
     /** 공개 전의 내 추리 답을 {@code viewer} 가 보는가 — 추리 단계의 추리자 본인만(출제자도 남의 답을 못 본다). */
     public static boolean seesOwnGuess(WordTempState state, int viewer) {
         return state.phase() == Phase.GUESS && viewer != state.setterSeat() && state.alive(viewer);
     }
 
-    /** 정답 낱말과 그 차례의 힌트 전체·온도가 <b>모두에게</b> 공개돼 있는가 — 출제 차례 끝(`TURN_END`) 동안만. */
+    /** 정답 낱말이 <b>모두에게</b> 공개돼 있는가 — 출제 차례 끝(`TURN_END`) 동안만. 힌트·온도는 낼 때부터 공개다(D-320). */
     public static boolean turnSecretsPublic(WordTempState state) {
         return state.phase() == Phase.TURN_END;
     }

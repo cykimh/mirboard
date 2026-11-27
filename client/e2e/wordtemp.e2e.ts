@@ -5,7 +5,8 @@ import { gunzipSync } from 'node:zlib';
 
 /**
  * 낱말 온도 한 판(D-319 — S3 완료 기준). 게스트로 들어가 낱말 온도 방을 만들고 [＋ 봇 추가] 두 번 → 판 길이 "짧게"(1라운드) → [3명으로 시작],
- * 판이 끝날 때까지 화면으로만 한다 — 낱말은 첫 후보, 내 출제 차례에는 힌트 하나를 내고 [힌트 끝], 남의 차례에는 [패스]. 끝나면 결과와 [대기실로].
+ * 판이 끝날 때까지 화면으로만 한다 — 낱말은 첫 후보, 내 출제 차례에는 기준보다 낮은 힌트 하나와 기준을 넘기는 힌트 하나(D-320 — 넘기면 바로
+ * 추리로, 표에 없으면 [그만 내기]), 남의 차례에는 공개되는 힌트를 보고 [패스]. 끝나면 결과와 [대기실로].
  *
  * <p>공개(S4) 전에는 코드 기본값이 `DISABLED` 라 기본 e2e 에서는 건너뛰고 `E2E_WORD_TEMP=1` 일 때만 돈다 — `.claude/launch.json` 의
  * wordtemp-server·wordtemp-client 스택(`E2E_BASE_URL=http://localhost:5219`). 실시간 채점이 꺼진 로컬에서도 돌게 힌트는 서버 자원의 유사도
@@ -92,12 +93,15 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
   expect(timing.select - timing.mounted, '첫 낱말 고르기까지(ms)').toBeLessThan(1200);
   // 후보 카드에 서버가 준 범주 이름(한글)과 뜻풀이가 보인다
   await expect(page.locator('.wt-cand-category').first()).toHaveText(/[가-힣]/);
-  await expect(page.locator('.wt-cand-gloss').first()).toBeVisible();
+  await expect(page.locator('.wt-cand-gloss')).toHaveCount(0); // 뜻풀이는 보이지 않는다(D-320)
 
   const result = page.getByRole('status', { name: '판 결과' });
   const seen = new Set<string>();
   const hinted = new Set<string>();
   let myHints = 0;
+  let othersHintsSeen = 0;
+  let passed = 0;
+  let missed = 0;
   let myGuesses = 0;
   const quick = { timeout: 5_000 };
   const deadline = Date.now() + MATCH_LIMIT_MS;
@@ -114,23 +118,45 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
       } else if (phase === 'HINT') {
         const input = page.getByRole('textbox', { name: '힌트 낱말' });
         const answer = await textOf(page, '.wt-answer-word');
-        const key = `${answer}-${await textOf(page, '.wt-attempt-now .wt-attempt-no')}`;
-        if (answer && (await input.count()) > 0 && (await input.isEnabled()) && !hinted.has(key)) {
+        const attemptNo = await textOf(page, '.wt-attempt-now .wt-attempt-no');
+        const key = `${answer}-${attemptNo}`;
+        if (!answer) {
+          // 남(봇)의 차례 — 힌트는 낼 때마다 모두에게 보인다(D-320): 낱말 옆에 온도계가 뜬다
+          if ((await page.locator('.wt-round-now .wt-hint .wt-gauge').count()) > 0) othersHintsSeen++;
+        } else if ((await input.count()) > 0 && (await input.isEnabled()) && !hinted.has(key)) {
           hinted.add(key);
-          // 미지근한 힌트 하나(정답이 든 낱말·정답 안의 낱말은 서버가 거절한다)
-          const hint = (table.get(answer) ?? []).find(
-            ([w, t]) => t >= 50 && t <= 90 && !w.includes(answer) && !(w.length >= 2 && answer.includes(w)) && !hinted.has(`w:${w}`),
-          );
-          expect(hint, `표에 "${answer}"의 힌트가 있어야 한다`).toBeTruthy();
-          hinted.add(`w:${hint![0]}`);
-          await input.fill(hint![0]);
-          await input.press('Enter');
-          // 내 힌트의 온도가 온도계로 보인다(본인 큐)
-          const row = page.locator('.wt-setter .wt-own-hint', { hasText: hint![0] });
-          await expect(row.locator('.wt-gauge')).toHaveAttribute('data-temp', String(hint![1]), { timeout: 10_000 });
-          myHints++;
-          // 96 미만이면 내가 끝낸다
-          if ((await phaseOf(page)) === 'HINT') await page.getByRole('button', { name: '힌트 끝' }).click(quick);
+          const floor = Number(/(\d+)/.exec(await textOf(page, '.wt-round-now .wt-round-floor'))?.[1] ?? 0);
+          expect(floor, '이번 차수의 기준 온도가 보인다').toBeGreaterThanOrEqual(50);
+          const legal = (h: [string, number]) =>
+            !h[0].includes(answer) && !(h[0].length >= 2 && answer.includes(h[0])) && !hinted.has(`w:${h[0]}`);
+          const usable = (table.get(answer) ?? []).filter(legal); // 온도 높은 순
+          // 먼저 기준보다 낮은 힌트 하나 — 공개되지만 단계는 이어진다
+          const low = usable.find((h) => h[1] < floor && h[1] >= floor - 25);
+          if (low) {
+            hinted.add(`w:${low[0]}`);
+            await input.fill(low[0]);
+            await input.press('Enter');
+            const row = page.locator('.wt-round-now .wt-hint', { hasText: low[0] });
+            await expect(row.locator('.wt-gauge')).toHaveAttribute('data-temp', String(low[1]), { timeout: 10_000 });
+            expect(await phaseOf(page)).toBe('HINT');
+            myHints++;
+          }
+          // 그다음 기준을 넘기는 힌트(표에 있으면) — 그 자리에서 추리로 넘어간다
+          const pass = [...usable].reverse().find((h) => h[1] >= floor && !hinted.has(`w:${h[0]}`));
+          if (pass) {
+            hinted.add(`w:${pass[0]}`);
+            await input.fill(pass[0]);
+            await input.press('Enter');
+            await expect(page.locator('.wt-round-now .wt-verdict')).toContainText(`기준 ${floor}° 넘김`, { timeout: 10_000 });
+            await expect(page.locator('.wt-round-now .wt-hint-pass')).toContainText(pass[0]);
+            myHints++;
+            passed++;
+          } else if (low) {
+            // 표에 기준 이상인 낱말이 없다 — [그만 내기]: 기준을 못 넘긴 채 추리로
+            await page.getByRole('button', { name: '그만 내기' }).click(quick);
+            await expect(page.locator('.wt-round-now .wt-verdict')).toContainText('기준 못 넘김', { timeout: 10_000 });
+            missed++;
+          }
         }
       } else if (phase === 'GUESS') {
         const pass = page.getByRole('button', { name: '패스' });
@@ -153,6 +179,8 @@ test('낱말 온도 — 봇 둘과 짧은 판을 끝까지 하고 대기실로 �
   // 한 판에 모든 단계를 지났고, 내 출제 차례·남의 차례를 모두 했다
   for (const p of ['WORD_SELECT', 'HINT', 'GUESS', 'ATTEMPT_RESULT', 'TURN_END']) expect([...seen], p).toContain(p);
   expect(myHints).toBeGreaterThan(0);
+  expect(passed + missed, '내 힌트 단계가 판정으로 끝났다(넘김/못 넘김)').toBeGreaterThan(0);
+  expect(othersHintsSeen, '남의 힌트와 온도가 보였다').toBeGreaterThan(0);
   expect(myGuesses).toBeGreaterThan(0);
   await expect(result.locator('.wt-end-row')).toHaveCount(3);
   await expect(result.locator('.wt-end-turn')).toHaveCount(3); // 짧게 = 1라운드 = 세 사람이 한 번씩

@@ -6,8 +6,8 @@ import java.util.List;
  * 조정할 수 있는 수치(`docs/rules-wordtemp.md` §15 [수치]) — 코드 상수로 흩지 않고 한 곳에 모은다. 시뮬레이션이 다른 값으로 돌려 보고
  * (`server/build/wordtemp-sim-stats.txt`), 바꿀 때는 룰 문서·결정과 함께 {@link #DEFAULT} 를 고친다.
  *
- * @param floors       차수별 최저 온도(1·2·3차) — 공개 힌트가 이 값 미만이면 전원 오답이어도 출제자 0점
- * @param closeTemp    이 온도 이상의 힌트가 나오면 힌트 단계가 그 자리에서 끝난다
+ * @param floors       차수별 기준 온도(1~5차, D-320) — 이 온도 이상의 힌트가 나오면 힌트 단계가 그 자리에서 끝나고("통과"), 못 넘긴 차수는
+ *                     전원 오답이어도 출제자 0점
  * @param maxHints     차수당 힌트 상한
  * @param maxAttempts  출제 차례당 차수 상한
  * @param selectMs     낱말 고르기
@@ -22,7 +22,6 @@ import java.util.List;
  * @param botQuickMs   사람이 기다릴 것이 없는 단계(추리자가 전원 봇)의 봇 간격 상한
  */
 public record WordTempTuning(List<Integer> floors,
-                             int closeTemp,
                              int maxHints,
                              int maxAttempts,
                              long selectMs,
@@ -36,8 +35,8 @@ public record WordTempTuning(List<Integer> floors,
                              long botGuessMaxMs,
                              long botQuickMs) {
 
-    /** 룰 v1 의 값(D-311). */
-    public static final WordTempTuning DEFAULT = new WordTempTuning(List.of(50, 60, 70), 96, 5, 3,
+    /** 룰 v2 의 값(D-320) — 차수 5번·기준 70/75/80/85/90·차수당 힌트 10개. 예전 v1(D-311)은 3번·50/60/70·5개·96 이상 조기 종료. */
+    public static final WordTempTuning DEFAULT = new WordTempTuning(List.of(70, 75, 80, 85, 90), 10, 5,
             20_000L, 30_000L, 5_000L, 6_000L, 8_000L, 4_000L, 9_000L, 5_000L, 20_000L, 1_500L);
 
     public WordTempTuning {
@@ -52,8 +51,9 @@ public record WordTempTuning(List<Integer> floors,
         return floors.get(attempt - 1);
     }
 
-    public WordTempTuning withFloors(int first, int second, int third) {
-        return new WordTempTuning(List.of(first, second, third), closeTemp, maxHints, maxAttempts, selectMs, guessMs,
+    /** 기준 온도만 바꾼 수치 — 차수 수는 값의 개수가 된다. */
+    public WordTempTuning withFloors(Integer... values) {
+        return new WordTempTuning(List.of(values), maxHints, values.length, selectMs, guessMs,
                 resultMs, turnEndMs, liveWaitMs, botHintMinMs, botHintMaxMs, botGuessMinMs, botGuessMaxMs, botQuickMs);
     }
 
@@ -65,7 +65,7 @@ public record WordTempTuning(List<Integer> floors,
         if (scale == 1.0) {
             return this;
         }
-        return new WordTempTuning(floors, closeTemp, maxHints, maxAttempts, scale(selectMs, scale), scale(guessMs, scale),
+        return new WordTempTuning(floors, maxHints, maxAttempts, scale(selectMs, scale), scale(guessMs, scale),
                 scale(resultMs, scale), scale(turnEndMs, scale), liveWaitMs, scale(botHintMinMs, scale),
                 scale(botHintMaxMs, scale), scale(botGuessMinMs, scale), scale(botGuessMaxMs, scale),
                 scale(botQuickMs, scale));

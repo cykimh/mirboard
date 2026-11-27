@@ -23,8 +23,8 @@ describe('wordTempStore — 스냅샷', () => {
     expect(st().guessSeats).toEqual([0, 2, 3]);
     expect(st().candidates).toHaveLength(3);
     expect(st().chosen).toBe(0);
-    expect(st().floors).toEqual([50, 60, 70]);
-    expect(floorOf(st(), 2)).toBe(60);
+    expect(st().floors).toEqual([70, 75, 80, 85, 90]);
+    expect(floorOf(st(), 2)).toBe(75);
     expect(floorOf({ floors: [] }, 1)).toBeNull(); // 서버가 주지 않으면 눈금 없음
   });
 
@@ -37,38 +37,27 @@ describe('wordTempStore — 스냅샷', () => {
     expect(iAmPlaying(st())).toBe(false);
   });
 
-  it('출제자의 비공개 뷰 — 정답·내 힌트(무효는 뺀다)', () => {
+  it('힌트는 공개 뷰로 온다(D-320) — 채점 중 포함, 무효는 뺀다. 출제자의 비공개 뷰는 정답뿐', () => {
     seedStore(
-      { setterSeat: 0, hintCount: 2 },
-      mine({
-        answer: '바다',
+      {
+        setterSeat: 0,
+        hintCount: 2,
         hints: [
           { text: '여름', attempt: 1, status: 'SCORED', temp: 58 },
           { text: '짠맛', attempt: 1, status: 'PENDING', temp: -1 },
           { text: '아야', attempt: 1, status: 'VOID', temp: -1 },
         ],
-      }),
+      },
+      mine({ answer: '바다' }),
     );
     expect(iAmSetter(st())).toBe(true);
     expect(st().answer).toBe('바다');
     expect(st().hints.map((h) => h.text)).toEqual(['여름', '짠맛']);
     expect(scoringInProgress(st())).toBe(true);
-  });
-
-  it('채점 결과가 먼저 닿고 낡은 스냅샷이 뒤에 와도 확정 온도를 "채점 중"으로 되돌리지 않는다', () => {
-    seedStore({ setterSeat: 0, hintCount: 1 }, mine({ answer: '바다', hints: [{ text: '짠맛', attempt: 1, status: 'PENDING', temp: -1 }] }));
-    st().applyPrivate('HINT_SCORED', { seat: 0, text: '짠맛', temp: 64, count: 1 });
-    expect(scoringInProgress(st())).toBe(false);
-    st().applySnapshot({
-      roomId: 'r1',
-      phase: 'HINT',
-      eventSeq: 3,
-      tableView: view({ setterSeat: 0, hintCount: 1 }),
-      privateHand: mine({ answer: '바다', hints: [{ text: '짠맛', attempt: 1, status: 'PENDING', temp: -1 }] }),
-      turnRemainingMs: 0,
-    });
-    expect(st().hints).toEqual([{ text: '짠맛', attempt: 1, status: 'SCORED', temp: 64 }]);
-    expect(scoringInProgress(st())).toBe(false);
+    // 관전자도 같은 힌트를 본다(정답은 없다)
+    seedStore({ hints: [{ text: '여름', attempt: 1, status: 'SCORED', temp: 58 }] }, null, -1);
+    expect(st().hints).toHaveLength(1);
+    expect(st().answer).toBeNull();
   });
 
   it('결과 보기 단계의 스냅샷은 방금 차수의 점수 증감을 다시 만든다(맞힌 사람 +1×라운드)', () => {
@@ -107,19 +96,58 @@ describe('wordTempStore — 공개 이벤트', () => {
     expect(ev('HINT_COUNT', { count: 1, max: 5 })).toBe('unhandled');
   });
 
-  it('힌트 단계 — 개수만 오른다. 낱말·온도는 어디에도 없다', () => {
-    expect(ev('HINT_COUNT', { count: 2, max: 5 })).toBe('applied');
+  it('힌트 단계 — 낼 때마다 낱말과 온도가 모두에게 쌓인다(채점 중 → 온도, 무효는 사라진다)', () => {
+    expect(ev('HINT_SCORED', { seat: 1, text: '여름', temp: 58, count: 1 })).toBe('applied');
+    expect(ev('HINT_COUNT', { count: 1, max: 10 })).toBe('applied');
+    expect(st().hints).toEqual([{ text: '여름', attempt: 1, status: 'SCORED', temp: 58 }]);
+    expect(st().hintCount).toBe(1);
+    expect(st().freshScored).toBe('여름');
+    ev('HINT_PENDING', { seat: 1, text: '짠맛' });
+    expect(scoringInProgress(st())).toBe(true);
+    ev('HINT_PENDING', { seat: 1, text: '짠맛' }); // 같은 프레임이 또 와도 한 줄
+    expect(st().hints).toHaveLength(2);
+    ev('HINT_SCORED', { seat: 1, text: '짠맛', temp: 64, count: 2 });
+    expect(st().hints.map((h) => [h.text, h.status, h.temp])).toEqual([
+      ['여름', 'SCORED', 58],
+      ['짠맛', 'SCORED', 64],
+    ]);
+    ev('HINT_PENDING', { seat: 1, text: '달려' });
+    ev('HINT_VOID', { seat: 1, text: '달려', reason: 'NOT_A_NOUN', count: 2 });
+    expect(st().hints.map((h) => h.text)).toEqual(['여름', '짠맛']);
     expect(st().hintCount).toBe(2);
-    expect(st().hints).toEqual([]);
     expect(st().revealed).toEqual([]);
   });
 
+  it('차례가 끝나면 채점 중이던 힌트는 판에서 지운다(서버가 버린다 — 출제자 탈주 등)', () => {
+    ev('HINT_SCORED', { seat: 1, text: '여름', temp: 58, count: 1 });
+    ev('HINT_PENDING', { seat: 1, text: '짠맛' });
+    ev('TURN_ENDED', { turnNo: 1, answer: '바다', reason: 'SETTER_OUT', totals: [0, 0, 0, 0], hints: [], remainingMs: 6_000 });
+    expect(st().hints.map((h) => h.text)).toEqual(['여름']);
+    expect(scoringInProgress(st())).toBe(false);
+  });
+
+  it('힌트는 차수가 지나도 쌓이고, 새 출제 차례에 비운다', () => {
+    ev('HINT_SCORED', { seat: 1, text: '여름', temp: 58, count: 1 });
+    ev('HINT_REVEALED', { attempt: 1, text: '여름', temp: 58, floor: 70, floorMet: false });
+    ev('GUESS_PHASE_STARTED', { attempt: 1, remainingMs: 30_000, seats: [0, 2, 3] });
+    ev('GUESSES_REVEALED', { attempt: 1, setterSeat: 1, setterGain: 0, guesses: [], scores: [], remainingMs: 5_000 });
+    ev('HINT_PHASE_STARTED', { turnNo: 1, attempt: 2, remainingMs: 90_000 });
+    expect(st().hintCount).toBe(0);
+    ev('HINT_SCORED', { seat: 1, text: '갈매기', temp: 76, count: 1 });
+    expect(st().hints.map((h) => [h.text, h.attempt])).toEqual([
+      ['여름', 1],
+      ['갈매기', 2],
+    ]);
+    ev('TURN_STARTED', { turnNo: 2, round: 1, setterSeat: 2 });
+    expect(st().hints).toEqual([]);
+  });
+
   it('공개 → 추리 → 동시 공개 → 차례 끝까지 한 바퀴', () => {
-    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true });
-    expect(st().revealed).toEqual([{ attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true }]);
+    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true });
+    expect(st().revealed).toEqual([{ attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true }]);
     expect(st().freshReveal).toBe(1);
     // 같은 차수의 공개가 또 와도 쌓이지 않는다
-    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true });
+    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true });
     expect(st().revealed).toHaveLength(1);
 
     ev('GUESS_PHASE_STARTED', { attempt: 1, remainingMs: 30_000, seats: [0, 2, 3] });
@@ -158,7 +186,7 @@ describe('wordTempStore — 공개 이벤트', () => {
 
     ev('HINT_PHASE_STARTED', { turnNo: 1, attempt: 2, remainingMs: 90_000 });
     expect(st()).toMatchObject({ phase: 'HINT', attempt: 2, hintCount: 0, deltas: {}, freshReveal: null });
-    ev('HINT_REVEALED', { attempt: 2, text: '짠맛', temp: 64, floor: 60, floorMet: true });
+    ev('HINT_REVEALED', { attempt: 2, text: '짠맛', temp: 64, floor: 75, floorMet: true });
     ev('GUESS_PHASE_STARTED', { attempt: 2, remainingMs: 30_000, seats: [0, 2, 3] });
     ev('GUESSES_REVEALED', {
       attempt: 2,
@@ -202,14 +230,14 @@ describe('wordTempStore — 공개 이벤트', () => {
     expect(st().history).toHaveLength(1);
   });
 
-  it('힌트 0개로 끝난 공개(text null)는 판에 아무것도 쌓지 않는다', () => {
-    expect(ev('HINT_REVEALED', { attempt: 1, text: null, temp: -1, floor: 50, floorMet: false })).toBe('applied');
-    expect(st().revealed).toEqual([]);
-    expect(st().freshReveal).toBeNull();
+  it('힌트 없이 끝난 힌트 단계(text null)도 차수 요약으로 남는다 — 기준 못 넘김, 추리로 간다(D-320)', () => {
+    expect(ev('HINT_REVEALED', { attempt: 1, text: null, temp: -1, floor: 70, floorMet: false })).toBe('applied');
+    expect(st().revealed).toEqual([{ attempt: 1, text: null, temp: -1, floor: 70, floorMet: false }]);
+    expect(st().freshReveal).toBe(1);
   });
 
   it('새 출제 차례 — 지난 차례의 공개 힌트·결과·내 힌트·내 답을 비운다', () => {
-    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 50, floorMet: true });
+    ev('HINT_REVEALED', { attempt: 1, text: '갈매기', temp: 71, floor: 70, floorMet: true });
     useWordTempStore.setState({ myGuess: '항구' });
     ev('TURN_STARTED', { turnNo: 2, round: 1, setterSeat: 2 });
     expect(st()).toMatchObject({ turnNo: 2, setterSeat: 2, attempt: 1, revealed: [], attempts: [], myGuess: null, answer: null });
@@ -313,36 +341,20 @@ describe('wordTempStore — 공개 이벤트', () => {
 describe('wordTempStore — 본인 큐', () => {
   beforeEach(() => seedStore({ setterSeat: 0 }, mine({ answer: '바다' })));
 
-  it('표에 있는 힌트는 바로 온도, 표 밖은 채점 중 → 온도 또는 무효', () => {
+  it('본인 큐의 힌트 프레임은 받지 않는다 — 힌트는 공개 이벤트로만 쌓인다(D-320)', () => {
     st().applyPrivate('HINT_SCORED', { seat: 0, text: '여름', temp: 58, count: 1 });
-    expect(st().hints).toEqual([{ text: '여름', attempt: 1, status: 'SCORED', temp: 58 }]);
-    expect(st().hintCount).toBe(1);
-    expect(st().freshScored).toBe('여름');
-
     st().applyPrivate('HINT_PENDING', { seat: 0, text: '짠맛' });
-    expect(scoringInProgress(st())).toBe(true);
-    st().applyPrivate('HINT_SCORED', { seat: 0, text: '짠맛', temp: 64, count: 2 });
-    expect(scoringInProgress(st())).toBe(false);
-    expect(st().hints.map((h) => [h.text, h.temp])).toEqual([
-      ['여름', 58],
-      ['짠맛', 64],
-    ]);
-
-    st().applyPrivate('HINT_PENDING', { seat: 0, text: '달려' });
-    st().applyPrivate('HINT_VOID', { seat: 0, text: '달려', reason: 'NOT_A_NOUN', count: 2 });
-    expect(st().hints.map((h) => h.text)).toEqual(['여름', '짠맛']);
-    expect(st().hintCount).toBe(2);
+    expect(st().hints).toEqual([]);
   });
 
   it('남의 좌석 앞으로 온 것은 받지 않는다(남의 비밀이 들어올 길이 없다)', () => {
-    st().applyPrivate('HINT_SCORED', { seat: 1, text: '갈매기', temp: 71, count: 1 });
     st().applyPrivate('GUESS_ACCEPTED', { seat: 2, text: '항구' });
     expect(st().hints).toEqual([]);
     expect(st().myGuess).toBeNull();
     // 관전자(좌석 −1)는 아무것도 받지 않는다
     seedStore({}, null, -1);
-    st().applyPrivate('HINT_SCORED', { seat: -1, text: '갈매기', temp: 71, count: 1 });
-    expect(st().hints).toEqual([]);
+    st().applyPrivate('GUESS_ACCEPTED', { seat: -1, text: '항구' });
+    expect(st().myGuess).toBeNull();
   });
 
   it('내 답이 받아들여지면 myGuess — 빈 문자열은 패스', () => {

@@ -50,9 +50,9 @@ describe('29-wordtemp-table.css — 네임스페이스 격리', () => {
   });
 
   it('연출 층은 눌림을 받지 않는다', () => {
-    const m = /\.wt-fx-boil,\s*\.wt-fx-cheer\s*\{([^}]*)\}/.exec(cssCode);
+    const m = /(^|})\s*\.wt-fx-cheer\s*\{([^}]*)\}/.exec(cssCode);
     expect(m).not.toBeNull();
-    expect(m![1]).toContain('pointer-events: none');
+    expect(m![2]).toContain('pointer-events: none');
   });
 
   it('얏추(.yt-)와 접두가 겹치지 않는다', () => {
@@ -87,7 +87,7 @@ describe('29-wordtemp-table.css — 네임스페이스 격리', () => {
     expect(sk).toBeGreaterThan(at); // 스컬킹 맨 끝 두 블록 앞
     const block = responsiveCssSource.slice(at, sk);
     expect(block).toContain(':root:not(.motion-forced) .wt-table *');
-    expect(block).toContain(':root:not(.motion-forced) .wt-fx-boil');
+    expect(block).toContain(':root:not(.motion-forced) .wt-fx-cheer');
     expect(block).toContain(':root.motion-off .wt-table *');
     expect(block).toContain(':root.motion-off .wt-fx-cheer');
     expect(block).toMatch(/motion-off:begin[\s\S]*motion-off:end/);

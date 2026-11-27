@@ -18,7 +18,7 @@ interface Props {
 }
 
 /**
- * 판 끝(§8) — 총점 순위(같으면 공동 순위), 출제·추리 점수를 나눠 보여 주고, 아래에 출제 차례마다의 정답과 공개 힌트·맞힌 사람을 돌아본다.
+ * 판 끝(§8) — 총점 순위(같으면 공동 순위), 출제·추리 점수를 나눠 보여 주고, 아래에 출제 차례마다의 정답과 차수별 가장 높은 힌트·맞힌 사람을 돌아본다.
  * 안 쓴 후보는 끝까지 공개되지 않는다(서버가 보내지 않는다).
  */
 export function WordTempMatchEnd({ result, history, mySeat, nameOf, onExit, onBackToRoom }: Props) {
@@ -59,13 +59,15 @@ export function WordTempMatchEnd({ result, history, mySeat, nameOf, onExit, onBa
                   <strong className="wt-end-turn-answer">{h.answer}</strong>
                 </span>
                 <span className="wt-end-turn-hints">
-                  {h.revealed.length === 0
-                    ? '공개 힌트 없음'
-                    : h.revealed.map((r) => (
-                        <span key={r.attempt} className={`wt-band-chip wt-band-${tempBand(r.temp)}`}>
-                          {r.text} {r.temp}°
-                        </span>
-                      ))}
+                  {h.revealed.filter((r) => r.text !== null).length === 0
+                    ? '힌트 없음'
+                    : h.revealed
+                        .filter((r) => r.text !== null)
+                        .map((r) => (
+                          <span key={r.attempt} className={`wt-band-chip wt-band-${tempBand(r.temp)}`}>
+                            {r.attempt}차 {r.text} {r.temp}°
+                          </span>
+                        ))}
                 </span>
                 <span className="wt-end-turn-solvers">
                   {h.solvers.length > 0

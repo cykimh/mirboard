@@ -32,10 +32,11 @@ class WordTempEngineTimerAndDesertionTest {
         games.add(() -> game().act(0, new WordTempAction.SelectWord(1, 0)));                    // WORD_SELECT
         games.add(() -> game().selectAll(0).hint("여름"));                                       // HINT (힌트 있음)
         games.add(() -> game().selectAll(0));                                                    // HINT (힌트 0개)
-        games.add(() -> game().selectAll(0).hint("갈매기").endHints().guess(1, "바다"));          // GUESS
-        games.add(() -> game().selectAll(0).hint("갈매기").endHints().passAll());                 // ATTEMPT_RESULT → 2차
-        games.add(() -> game().selectAll(0).hint("갈매기").endHints().guess(1, "바다").passAll()); // ATTEMPT_RESULT → 끝
-        games.add(() -> game().selectAll(0).timer());                                            // TURN_END
+        games.add(() -> game().selectAll(0).hint("갈매기").guess(1, "바다"));          // GUESS
+        games.add(() -> game().selectAll(0).hint("갈매기").passAll());                 // ATTEMPT_RESULT → 2차
+        games.add(() -> game().selectAll(0).hint("갈매기").guess(1, "바다").passAll()); // ATTEMPT_RESULT → 끝
+        games.add(() -> game().selectAll(0).timer());                                            // GUESS (힌트 0개로 옴)
+        games.add(() -> game().selectAll(0).hint("갈매기").guess(1, "바다").passAll().timer());   // TURN_END
         return games;
     }
 
@@ -96,12 +97,36 @@ class WordTempEngineTimerAndDesertionTest {
     }
 
     @Test
+    void every_phase_is_covered_by_the_timer_tests() {
+        assertThat(everyPhase().stream().map(at -> at.get().state.phase()).distinct())
+                .containsExactlyInAnyOrder(Phase.WORD_SELECT, Phase.HINT, Phase.GUESS, Phase.ATTEMPT_RESULT,
+                        Phase.TURN_END);
+    }
+
+    @Test
+    void the_fifth_attempt_result_times_out_into_the_turn_end() {
+        Game g = game().selectAll(0);
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            g.timer().passAll().timer(); // 힌트 0개 → 추리 → 결과 → 다음 차수
+            assertThat(g.state.attempt()).isEqualTo(attempt + 1);
+            assertThat(g.state.phase()).isEqualTo(Phase.HINT);
+        }
+        g.timer().passAll();
+        assertThat(g.state.phase()).isEqualTo(Phase.ATTEMPT_RESULT);
+        assertThat(g.engine.timer(g.state, g.now)).hasValue(5_000);
+        g.timer();
+        assertThat(g.event(WordTempEvent.TurnEnded.class).reason()).isEqualTo(TurnEndReason.ALL_ATTEMPTS);
+        assertThat(g.state.history().get(0).revealed()).hasSize(5).noneMatch(r -> r.floorMet());
+        assertThat(g.state.totals()).containsOnly(0);
+    }
+
+    @Test
     void pending_seats_are_the_living_humans_with_something_left_to_do() {
         Game g = game(4, Set.of(2), 1);
         assertThat(g.engine.pendingSeats(g.state)).containsExactly(0, 1, 3);
         g.selectAll(0);
         assertThat(g.engine.pendingSeats(g.state)).containsExactly(0);
-        g.hint("갈매기").endHints();
+        g.hint("갈매기");
         assertThat(g.engine.pendingSeats(g.state)).containsExactly(1, 3); // 봇 2 는 엔진 타이머가 움직인다
         g.guess(1, "").guess(3, "");
         assertThat(g.state.phase()).isEqualTo(Phase.ATTEMPT_RESULT);
@@ -112,7 +137,7 @@ class WordTempEngineTimerAndDesertionTest {
 
     @Test
     void a_setter_leaving_mid_turn_ends_the_turn_on_the_spot_and_keeps_points_already_earned() {
-        Game g = game().selectAll(0).hint("갈매기").endHints().passAll().timer(); // 1차 +1, 2차 힌트 중
+        Game g = game().selectAll(0).hint("갈매기").passAll().timer(); // 1차 +1, 2차 힌트 중
         g.hint("소금").endHints().guess(1, "바다");                                // 2차 추리 중 — 한 명은 이미 정답을 냈다
         assertThat(g.state.phase()).isEqualTo(Phase.GUESS);
         g.desert(0);
@@ -130,7 +155,7 @@ class WordTempEngineTimerAndDesertionTest {
 
     @Test
     void a_guesser_leaving_counts_as_a_pass_and_closes_the_phase_if_everyone_else_is_in() {
-        Game g = game().selectAll(0).hint("갈매기").endHints().guess(1, "항구").guess(2, "바다");
+        Game g = game().selectAll(0).hint("갈매기").guess(1, "항구").guess(2, "바다");
         Game left = g.desert(3);
         assertThat(left.state.phase()).isEqualTo(Phase.ATTEMPT_RESULT);
         WordTempEvent.GuessesRevealed r = left.event(WordTempEvent.GuessesRevealed.class);
@@ -140,7 +165,7 @@ class WordTempEngineTimerAndDesertionTest {
 
     @Test
     void a_guesser_who_already_answered_and_then_leaves_does_not_score() {
-        Game g = game().selectAll(0).hint("갈매기").endHints().guess(1, "바다").desert(1).passAll();
+        Game g = game().selectAll(0).hint("갈매기").guess(1, "바다").desert(1).passAll();
         assertThat(g.state.totals()).containsExactly(1, 0, 0, 0); // 남은 둘이 패스 → 전원 오답, 출제자 +1
     }
 
@@ -161,7 +186,7 @@ class WordTempEngineTimerAndDesertionTest {
         Game g = game().selectAll(0);
         g.desert(1);
         assertThat(g.state.phase()).isEqualTo(Phase.HINT);
-        g.hint("갈매기").endHints();
+        g.hint("갈매기");
         assertThat(g.event(WordTempEvent.GuessPhaseStarted.class).seats()).containsExactly(2, 3);
         g.passAll().until(Phase.TURN_END).timer();
         assertThat(g.state.setterSeat()).isEqualTo(2); // 좌석 1 을 건너뛴다
@@ -183,7 +208,7 @@ class WordTempEngineTimerAndDesertionTest {
     @Test
     void two_left_play_on_one_on_one_and_one_left_ends_the_match() {
         Game g = game(3, Set.of(), 1).selectAll(0);
-        g.hint("갈매기").endHints().guess(1, "바다").guess(2, "");
+        g.hint("갈매기").guess(1, "바다").guess(2, "");
         g.desert(2);
         assertThat(g.state.ended()).isFalse();
         g.until(Phase.TURN_END).timer();
@@ -200,7 +225,7 @@ class WordTempEngineTimerAndDesertionTest {
 
     @Test
     void a_setter_whose_leaving_also_ends_the_match_still_has_the_answer_revealed_first() {
-        Game g = game(3, Set.of(), 1).selectAll(0).hint("갈매기").endHints().passAll().timer(); // 1차 +1, 2차 힌트 중
+        Game g = game(3, Set.of(), 1).selectAll(0).hint("갈매기").passAll().timer(); // 1차 +1, 2차 힌트 중
         g.desert(2);
         assertThat(g.state.ended()).isFalse();
         g.desert(0);
@@ -217,7 +242,7 @@ class WordTempEngineTimerAndDesertionTest {
 
     @Test
     void a_guesser_whose_leaving_ends_the_match_mid_turn_leaves_the_answer_unrevealed() {
-        Game g = game(3, Set.of(), 1).selectAll(0).hint("갈매기").endHints().passAll().timer();
+        Game g = game(3, Set.of(), 1).selectAll(0).hint("갈매기").passAll().timer();
         g.desert(2).desert(1);
         assertThat(g.events).hasSize(2);
         assertThat(g.events.get(1)).isInstanceOf(WordTempEvent.MatchEnded.class);

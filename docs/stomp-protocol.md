@@ -652,7 +652,7 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 
 단계 마감·봇의 힌트와 추리·**실시간 채점 결과 반영**은 서버 엔진 타이머다(클라가 보낼 수 없다).
 
-**서버 → 클라 (공개)** — 전부 순번 있음. **후보·진행 중인 정답·미공개 힌트·공개 전 추리는 어디에도 없다**:
+**서버 → 클라 (공개)** — 전부 순번 있음. **후보·진행 중인 정답·공개 전 추리는 어디에도 없다.** 힌트와 온도는 D-320 뒤로 비밀이 아니다 — 낼 때마다 공개 이벤트로 온다:
 
 | type | payload | 의미 |
 | --- | --- | --- |
@@ -660,12 +660,15 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | `WORD_SELECTED` | `{ seat }` | 골랐다(무엇인지는 없다). 마감 때 안 고른 좌석·봇도 한꺼번에 |
 | `TURN_STARTED` | `{ turnNo, round, setterSeat }` | 출제 차례 시작 |
 | `HINT_PHASE_STARTED` | `{ turnNo, attempt, remainingMs }` | 힌트 단계 |
-| `HINT_COUNT` | `{ count, max }` | 이번 차수 힌트 개수(확정 + 채점 중). 무효가 되면 줄어든 값이 다시 온다 |
-| `HINT_REVEALED` | `{ attempt, text, temp, floor, floorMet }` | 차수의 가장 높은 힌트 공개. 힌트 0개면 `text` null·`temp` −1 |
+| `HINT_COUNT` | `{ count, max }` | 이번 차수 힌트 개수(확정 + 채점 중, 최대 10). 무효가 되면 줄어든 값이 다시 온다 |
+| `HINT_SCORED` | `{ seat, text, temp, count }` | **힌트 하나가 모두에게 공개됐다**(D-320 — `seat` 는 출제자). 표 힌트는 `SUBMIT_HINT` 에 바로, 표 밖 힌트는 채점 뒤(보통 2~3초). `temp` 가 이번 차수의 기준 온도 이상이면 곧바로 `HINT_REVEALED`·`GUESS_PHASE_STARTED` 가 뒤따른다 |
+| `HINT_PENDING` | `{ seat, text }` | 표 밖 낱말이 채점 중이다(낱말은 모두에게 보인다). 풀릴 때까지 새 힌트·[그만 내기]는 `SCORING_IN_PROGRESS` |
+| `HINT_VOID` | `{ seat, text, reason, count }` | 채점 중이던 낱말이 무효가 됐다 — `NOT_A_NOUN`(고유명사·비하 표현 포함)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다. 출제 차례가 끝나며 버려진 채점 중 낱말에는 오지 않는다(`TURN_ENDED` 때 지운다) |
+| `HINT_REVEALED` | `{ attempt, text, temp, floor, floorMet }` | **힌트 단계 끝**(D-320) — 그 차수의 가장 높은 힌트(`text`·`temp`, 힌트가 없었으면 null·−1), 기준 온도 `floor`, 넘겼는지 `floorMet`. 못 넘겼어도(힌트 0개 포함) 추리로 간다 — 전원 오답이면 출제자는 그 차수 0점 |
 | `GUESS_PHASE_STARTED` | `{ attempt, remainingMs, seats }` | 추리 단계, 추리할 좌석들 |
 | `GUESS_SUBMITTED` | `{ seat }` | 냈다(내용 없음) |
 | `GUESSES_REVEALED` | `{ attempt, guesses: [{seat, text, pass, correct, masked}], setterSeat, setterGain, scores: [{seat, delta, total}], remainingMs }` | 동시 공개. 금칙어를 품은 답은 `text` 가 `···`(원문 없음) |
-| `TURN_ENDED` | `{ turnNo, answer, hints: [{attempt, text, temp, revealed}], reason, totals, remainingMs }` | 정답과 그 차례의 확정 힌트 전체. `reason`: `SOLVED`·`THREE_ATTEMPTS`·`NO_HINTS`·`SETTER_OUT` |
+| `TURN_ENDED` | `{ turnNo, answer, hints: [{attempt, text, temp, revealed}], reason, totals, remainingMs }` | 정답 공개와 그 차례의 확정 힌트 전체(`revealed` = 기준을 넘긴 힌트). `reason`: `SOLVED`·`ALL_ATTEMPTS`(5차까지 못 맞힘)·`SETTER_OUT` — `THREE_ATTEMPTS`·`NO_HINTS` 는 옛 판(룰 v1)의 기록에만 남는다 |
 | `SEAT_OUT` | `{ seat }` | 탈주·강퇴 |
 | `MATCH_ENDED` | `{ result: { endReason, standings: [{seat, rank, total, setterPoints, guessPoints, out}], draw } }` | `endReason`: `FINISHED`·`LAST_SEAT`·`NO_HUMANS`. 안 쓴 후보는 없다 |
 
@@ -674,9 +677,6 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | type | 받는 사람 | payload |
 | --- | --- | --- |
 | `WORD_CANDIDATES` | 각자(2라운드부터 — 1라운드의 후보는 resync 의 비공개 뷰) | `{ seat, round, candidates: [{index, word, category, gloss, available}] }` — `category` 는 범주의 화면 이름(한글), `gloss` 는 뜻풀이 한 줄(D-319) |
-| `HINT_SCORED` | 출제자 | `{ seat, text, temp, count }` — 표 힌트는 `SUBMIT_HINT` 에 바로, 표 밖 힌트는 채점 뒤(보통 2~3초) |
-| `HINT_PENDING` | 출제자 | `{ seat, text }` — 채점 중. 풀릴 때까지 새 힌트·[힌트 끝]은 `SCORING_IN_PROGRESS` |
-| `HINT_VOID` | 출제자 | `{ seat, text, reason, count }` — `NOT_A_NOUN`(고유명사·비하 표현 포함)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다 |
 | `GUESS_ACCEPTED` | 낸 추리자 | `{ seat, text }` |
 
 그리고 `ERROR` — 낱말 온도 고유 코드 `MATCH_OVER`·`INVALID_ACTION`·`NOT_YOUR_PHASE`·`BAD_CHOICE`·`ALREADY_CHOSEN`·`HINT_FORMAT`·`HINT_IS_ANSWER`·
@@ -684,10 +684,11 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 `UNKNOWN_WORD` 는 표에 없는 낱말인데 실시간 채점이 꺼져 있거나(끄기 스위치·API 키 없음) 하루·판 상한에 닿은 것이다 — 개수는 줄지 않는다.
 
 **resync**: `phase` = `WORD_SELECT`·`HINT`·`GUESS`·`ATTEMPT_RESULT`·`TURN_END`·`FINISHED`, `tableView` = `{ phase, round, rounds, turnNo, setterSeat,
-attempt, phaseRemainingMs, hintCount, maxHints, floors, revealed, guessedSeats, attempts, seats: [{seat, alive, bot, setterPoints, guessPoints, total, chosen}],
+attempt, phaseRemainingMs, hintCount, maxHints, floors, hints: [{text, attempt, status, temp}], revealed, guessedSeats, attempts, seats: [{seat, alive, bot, setterPoints, guessPoints, total, chosen}],
 order, history, turnReveal, result }` — `turnReveal`(정답·힌트 전체)은 `TURN_END` 동안만, 그 밖에는 null. 화면의 남은 시간은 `phaseRemainingMs` 를 쓴다
 (바깥 `turnRemainingMs` 는 이 게임에서 단계 시간이 아니다). **`privateHand`** = `{ seat, candidates, chosen, answer, hints: [{text, attempt, status, temp}], myGuess }` —
-`answer`·`hints` 는 출제자만(`status`: `SCORED`·`PENDING`·`VOID`), `myGuess` 는 추리 단계의 내 답. `floors` 는 차수별 최저 온도(1·2·3차 — 비밀이 아니다, 화면이 공개 전에도 눈금을 그린다). `GUESSES_REVEALED`·`TURN_ENDED` 의 `remainingMs` 는 결과 보기·차례 끝 단계의 남은 시간이다(D-319).
+`answer` 는 출제자만, `myGuess` 는 추리 단계의 내 답(비공개 뷰에 `hints` 는 없다 — D-320). 공개 뷰의 `hints` 는 이 출제 차례의 힌트 전부(확정 `SCORED`·채점 중 `PENDING`, 무효 제외, 낸 순서)이고 `revealed` 는 끝난 힌트 단계마다의 요약 `{attempt, text, temp, floor, floorMet}` 이다. `floors` 는 차수별 기준 온도(1~5차 — 70·75·80·85·90), `maxHints` 는 10.
+`GUESSES_REVEALED`·`TURN_ENDED` 의 `remainingMs` 는 결과 보기·차례 끝 단계의 남은 시간이다(D-319).
 **판 시작 때는 공개 `WORD_SELECT_STARTED` 하나만 보낸다**(저장 뒤) — 내 후보는 resync 의 비공개 뷰로 받는다(시작 때 비공개 이벤트 없음).
 
 ## 보안 검토 체크리스트
