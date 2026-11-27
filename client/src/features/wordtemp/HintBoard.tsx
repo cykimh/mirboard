@@ -1,4 +1,5 @@
-import type { HintView, Revealed, WordTempPhase } from '@/types/wordtemp';
+import { useState } from 'react';
+import type { FlagDirection, HintView, Revealed, WordTempPhase } from '@/types/wordtemp';
 import { TempGauge } from './wordTempArt';
 
 interface Props {
@@ -19,7 +20,25 @@ interface Props {
   freshText: string | null;
   /** 연출 열쇠 — 같은 줄을 다시 그려도 연출이 처음부터 돌게. */
   fxSeq: number;
+  /** "온도가 이상해요"(D-323) — 판에 앉은 사람에게만 준다(관전자·빠진 좌석은 없다). */
+  flag?: FlagControls;
 }
+
+export interface FlagControls {
+  /** 내가 이미 알린 힌트 낱말(이 출제 차례). */
+  flagged: string[];
+  /** 이 판에서 더 알릴 수 있는 횟수(모르면 null). */
+  left: number | null;
+  /** 보낸 것을 기다리는 중. */
+  busy: boolean;
+  onFlag: (text: string, direction: FlagDirection) => void;
+}
+
+const FLAG_CHOICES: { direction: FlagDirection; label: string }[] = [
+  { direction: 'LOW', label: '너무 낮아요' },
+  { direction: 'HIGH', label: '너무 높아요' },
+  { direction: 'UNSURE', label: '그냥 이상해요' },
+];
 
 /** 차수 하나의 판정 문구 — 기준을 넘겼는지(D-320). */
 export function verdictText(r: Revealed): string {
@@ -30,6 +49,9 @@ export function verdictText(r: Revealed): string {
  * 온도계 판(D-320) — <b>힌트는 낼 때마다 모두에게 공개된다.</b> 낱말과 온도(온도계 한 줄)를 차수별로 묶어 보여 준다: 지금 차수는 펼쳐서
  * (기준 온도·개수와 함께), 지난 차수는 한 줄 요약으로 접어 둔다(누르면 펼친다 — 한 출제 차례에 힌트가 50개까지 쌓일 수 있다).
  * 온도계 관 위의 세로 선이 그 차수의 기준 온도다. 채점 중인 낱말은 "채점 중…"으로 보인다.
+ *
+ * <p>온도가 나온 줄에는 작은 [이상해요] 가 있다(D-323) — 누르면 그 줄 아래에 "너무 낮아요 / 너무 높아요 / 그냥 이상해요"가 펼쳐지고,
+ * 하나를 고르면 서버로 간다(낱말과 온도만 남는다 — 누가 알렸는지는 남지 않는다). 알린 줄은 "알림 ✓" 로 바뀐다.
  */
 export function HintBoard({
   phase,
@@ -42,7 +64,10 @@ export function HintBoard({
   mine = false,
   freshText,
   fxSeq,
+  flag,
 }: Props) {
+  // 펼친 줄(낱말) — 한 번에 하나.
+  const [asking, setAsking] = useState<string | null>(null);
   const attempts = Array.from({ length: Math.max(attempt, 0) }, (_, i) => i + 1);
   return (
     <section className="wt-board" aria-label="힌트">
@@ -76,6 +101,45 @@ export function HintBoard({
                       <TempGauge temp={h.temp} floor={floor ?? undefined} small fresh={fresh} />
                     )}
                     {pass && <span className="wt-hint-tag">통과</span>}
+                    {flag &&
+                      h.status === 'SCORED' &&
+                      (flag.flagged.includes(h.text) ? (
+                        <span className="wt-flag wt-flag-done" aria-label={`${h.text} 온도가 이상하다고 알렸어요`}>
+                          알림 ✓
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="wt-flag"
+                          aria-label={`${h.text} 온도가 이상해요`}
+                          aria-expanded={asking === h.text}
+                          disabled={flag.left === 0}
+                          title={flag.left === 0 ? '이번 판에 알릴 수 있는 횟수를 다 썼어요' : '온도가 이상해요'}
+                          onClick={() => setAsking(asking === h.text ? null : h.text)}
+                        >
+                          이상해요
+                        </button>
+                      ))}
+                    {flag && asking === h.text && h.status === 'SCORED' && !flag.flagged.includes(h.text) && (
+                      <div className="wt-flag-ask" role="group" aria-label={`${h.text} ${h.temp}도가 어떻게 이상한가요`}>
+                        <span className="wt-flag-q">{h.temp}° 가…</span>
+                        {FLAG_CHOICES.map((c) => (
+                          <button
+                            key={c.direction}
+                            type="button"
+                            className="wt-flag-choice"
+                            aria-disabled={flag.busy || undefined}
+                            onClick={() => {
+                              if (flag.busy) return;
+                              flag.onFlag(h.text, c.direction);
+                              setAsking(null);
+                            }}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </li>
                 );
               })}

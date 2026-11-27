@@ -1398,7 +1398,12 @@
     padding: 2px 6px;
   }
   .wt-hint-word {
+    flex-basis: 28%;
     font-size: 14px;
+  }
+  /* D-323 — 좁은 화면: [이상해요]가 있는 줄은 "통과" 딱지를 뺀다(초록 줄과 아래 판정 줄이 이미 말한다) */
+  .wt-hint:has(.wt-flag) .wt-hint-tag {
+    display: none;
   }
   .wt-round-now {
     padding: 6px 8px 8px;

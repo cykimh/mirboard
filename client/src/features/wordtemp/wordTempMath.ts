@@ -22,12 +22,34 @@ export const BAND_LABEL: Record<TempBand, string> = {
   boil: '거의 정답',
 };
 
+/** 낱말 최대 길이(§5.1) — 서버 `WordNormalizer.MAX_LENGTH` 와 같다. */
+export const WORD_MAX = 10;
+
 /**
- * 보내기 전 다듬기(§5.1 의 앞 두 걸음 — 서버가 정본이다): 유니코드 NFC(iOS 의 풀어 쓴 자모를 합친다) + 공백 제거.
- * 한글 여부·길이는 서버가 본다(거절 사유를 문구로 보여 준다).
+ * 보내기 전 다듬기(§5.1 — 서버 `WordNormalizer` 와 <b>같은 규칙</b>, 서버가 정본이다): 유니코드 NFC(iOS 의 풀어 쓴 자모를 합친다) →
+ * 공백·구분 문자·문장부호·물결표를 뺀다. 이모지·기호는 빼지 않는다(서버도 거절한다).
  */
 export function normalizeWord(raw: string): string {
-  return raw.normalize('NFC').replace(/\s+/g, '');
+  return raw.normalize('NFC').replace(/[\s\p{Z}\p{P}~～]+/gu, '');
+}
+
+export interface WordCheck {
+  /** 다듬은 낱말(보낼 값). */
+  text: string;
+  /** 지금 보낼 수 있는 꼴인가 — 서버가 받는 꼴(완성형 한글 1~10자)과 <b>정확히 같다</b>. 품사·고유 명사는 여기서 가리지 않는다(D-323). */
+  ok: boolean;
+  /** 못 보내는 까닭: 빈 값 `empty`, 자음·모음만 섞임 `jamo`(쓰는 중일 수 있다), 한글 아닌 글자 `chars`, 11자 이상 `long`. */
+  problem: 'empty' | 'jamo' | 'chars' | 'long' | null;
+}
+
+/** 낱말이 지금 보낼 수 있는 꼴인지 — 버튼이 켜지는 조건 그 자체다(D-323). */
+export function checkWord(raw: string): WordCheck {
+  const text = normalizeWord(raw);
+  if (!text) return { text, ok: false, problem: 'empty' };
+  if (/^[가-힣]+$/.test(text)) {
+    return text.length <= WORD_MAX ? { text, ok: true, problem: null } : { text, ok: false, problem: 'long' };
+  }
+  return { text, ok: false, problem: /^[가-힣ㄱ-ㅎㅏ-ㅣ]+$/.test(text) ? 'jamo' : 'chars' };
 }
 
 /** 남은 시간 글자 — 1분 넘으면 `1:05`, 아니면 초. */

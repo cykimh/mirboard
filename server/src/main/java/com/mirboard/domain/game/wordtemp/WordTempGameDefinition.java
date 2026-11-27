@@ -5,6 +5,7 @@ import com.mirboard.domain.game.core.GameDefinition;
 import com.mirboard.domain.game.core.GameEngine;
 import com.mirboard.domain.game.core.GameStatus;
 import com.mirboard.domain.game.core.RoomOption;
+import com.mirboard.domain.game.wordtemp.feedback.TempFeedbackStore;
 import com.mirboard.domain.game.wordtemp.persistence.WordTempStateStore;
 import com.mirboard.domain.game.wordtemp.scoring.LiveHintScorer;
 import com.mirboard.domain.game.wordtemp.words.WordTempWords;
@@ -37,6 +38,7 @@ public final class WordTempGameDefinition implements GameDefinition {
     private final WordTempStateStore stateStore;
     private final WordTempWords words;
     private final LiveHintScorer scorer;
+    private final TempFeedbackStore feedback;
     private final Clock clock;
     private final ApplicationEventPublisher publisher;
     private final GameStatus status;
@@ -57,22 +59,24 @@ public final class WordTempGameDefinition implements GameDefinition {
     }
 
     /**
-     * @param floors 운영 기준 온도(D-321 — {@code mirboard.wordtemp.floors}, 쉼표 구분, 기본 50,55,60,65,70). 비면 규칙 기준값.
+     * @param floors 운영 기준 온도(D-321 — {@code mirboard.wordtemp.floors}, 쉼표 구분, 기본 60,65,70,75,80 — D-324). 비면 규칙 기준값.
      */
     @org.springframework.beans.factory.annotation.Autowired
     public WordTempGameDefinition(WordTempStateStore stateStore,
                                   WordTempWords words,
                                   LiveHintScorer scorer,
+                                  TempFeedbackStore feedback,
                                   Clock clock,
                                   ApplicationEventPublisher publisher,
                                   @Value("${mirboard.wordtemp.status:DISABLED}") GameStatus status,
                                   @Value("${mirboard.wordtemp.live-scoring.per-match-cap:120}") int perMatchLiveCap,
                                   @Value("${mirboard.wordtemp.time-scale:1.0}") double timeScale,
-                                  @Value("${mirboard.wordtemp.floors:50,55,60,65,70}") String floors) {
+                                  @Value("${mirboard.wordtemp.floors:60,65,70,75,80}") String floors) {
         this.tuning = parseFloors(floors);
         this.stateStore = stateStore;
         this.words = words;
         this.scorer = scorer;
+        this.feedback = feedback;
         this.clock = clock;
         this.publisher = publisher;
         this.status = Objects.requireNonNull(status,
@@ -142,7 +146,7 @@ public final class WordTempGameDefinition implements GameDefinition {
 
     @Override
     public GameEngine newEngine(GameContext ctx) {
-        return new WordTempGameEngine(ctx, config(ctx), words.table(), words.table().version(), scorer, stateStore,
+        return new WordTempGameEngine(ctx, config(ctx), words.table(), words.table().version(), scorer, feedback, stateStore,
                 clock, publisher);
     }
 

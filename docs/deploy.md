@@ -452,6 +452,8 @@ flyctl secrets unset ANTHROPIC_API_KEY -a mirboard
 - **Anthropic Console 에서 월 지출 한도를 건다**(상한의 마지막 줄 — Console → Settings → Limits). 어림: 월 약 $2(표 밖 30% 가정).
 - 보내는 것은 낱말뿐이다(정답·뜻풀이·힌트 — 사용자·방 식별자 없음). 응답은 `word_temp_live_scores` 에 낱말·점수·횟수로 남는다(다음 표의 재료):
   `SELECT answer, hint, valid, score, hits FROM mirboard.word_temp_live_scores ORDER BY hits DESC LIMIT 50;`
+- 사용자가 "온도가 이상해요"로 알린 쌍(D-323, V26 `word_temp_feedback` — 낱말·방향·온도·횟수뿐): 어드민 `GET /api/admin/games/WORD_TEMP/feedback`
+  또는 `SELECT answer, hint, direction, temp, table_version, count FROM mirboard.word_temp_feedback ORDER BY count DESC LIMIT 50;`
 - 사내망에서는 로컬 `flyctl` 이 막힌다 — 시크릿은 Fly 대시보드(Secrets)에서 넣어도 된다.
 - 로컬에서 실제 키로 한 번 확인(약 $0.02, CI 에서는 돌지 않는다):
   `MIRBOARD_WORDTEMP_LIVE_SMOKE=1 ANTHROPIC_API_KEY=… ./gradlew :server:test --rerun --tests "com.mirboard.domain.game.wordtemp.scoring.ClaudeHintJudgeLiveSmokeTest"`

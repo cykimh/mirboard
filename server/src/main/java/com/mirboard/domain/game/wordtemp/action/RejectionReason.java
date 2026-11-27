@@ -25,5 +25,11 @@ public enum RejectionReason {
     UNKNOWN_WORD,
     NO_HINTS_YET,
     GUESS_FORMAT,
-    ALREADY_GUESSED
+    ALREADY_GUESSED,
+    /** 온도 신고(D-323) — 이 출제 차례에 공개된(확정) 힌트가 아니다. */
+    FLAG_UNKNOWN_HINT,
+    /** 온도 신고 — 이 판에서 이미 신고한 힌트다. */
+    FLAG_DUPLICATE,
+    /** 온도 신고 — 이 판의 신고 횟수(좌석당 10번)를 다 썼다. */
+    FLAG_LIMIT
 }

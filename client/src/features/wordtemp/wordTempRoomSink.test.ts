@@ -97,10 +97,30 @@ describe('wordTempRoomSink (D-103)', () => {
   it('룰 §5 의 거절 코드에 모두 문구가 있다', () => {
     for (const code of [
       'MATCH_OVER', 'NOT_YOUR_PHASE', 'BAD_CHOICE', 'ALREADY_CHOSEN', 'HINT_FORMAT', 'HINT_IS_ANSWER', 'HINT_INSIDE_ANSWER',
-      'HINT_DUPLICATE', 'HINT_LIMIT', 'SCORING_IN_PROGRESS', 'UNKNOWN_WORD', 'NO_HINTS_YET', 'GUESS_FORMAT', 'ALREADY_GUESSED',
+      'HINT_BLOCKED', 'HINT_DUPLICATE', 'HINT_LIMIT', 'SCORING_IN_PROGRESS', 'UNKNOWN_WORD', 'NO_HINTS_YET', 'GUESS_FORMAT', 'ALREADY_GUESSED',
+      'FLAG_UNKNOWN_HINT', 'FLAG_DUPLICATE', 'FLAG_LIMIT',
     ]) {
       expect(wordTempErrorLabels[code], code).toBeTruthy();
     }
+  });
+
+  it('문구 어디에도 "명사"라고 하지 않는다(D-323 — 품사·고유 명사는 화면이 가리는 것이 아니다)', () => {
+    for (const text of [...Object.values(wordTempErrorLabels), ...Object.values(wordTempVoidLabels)]) {
+      expect(text).not.toContain('명사');
+    }
+    expect(wordTempVoidLabels.NOT_A_NOUN).toContain('개수는 돌려드렸');
+  });
+
+  it('FLAG_ACCEPTED — 내 것만 기억한다(출제 차례별), 보내기 막음이 풀린다. 거절은 문구로', () => {
+    st().noteSent({ '@action': 'FLAG_TEMP', text: '여름', direction: 'LOW' });
+    wordTempRoomSink.applyPrivateEvent(env('FLAG_ACCEPTED', { seat: 2, text: '여름', temp: 58, direction: 'LOW', left: 9 }));
+    expect(st().flagged).toEqual([]);
+    wordTempRoomSink.applyPrivateEvent(env('FLAG_ACCEPTED', { seat: st().mySeat, text: '여름', temp: 58, direction: 'LOW', left: 9 }));
+    expect(st().flagged).toEqual([`${st().turnNo}:여름`]);
+    expect(st().flagsLeft).toBe(9);
+    expect(st().sending).toBeNull();
+    wordTempRoomSink.applyPrivateEvent(env('ERROR', { code: 'FLAG_DUPLICATE', message: 'x' }));
+    expect(st().errorMessage).toBe(wordTempErrorLabels.FLAG_DUPLICATE);
   });
 
   it('BUSY — 보낸 것이 있으면 문구 없이 다시 보내기 신호, 두 번째 BUSY 는 문구', () => {

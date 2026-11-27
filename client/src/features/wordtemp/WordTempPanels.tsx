@@ -64,6 +64,8 @@ interface SetterProps {
   scoring: boolean;
   /** 힌트를 낼 수 있는 단계인가(`HINT`). 아니면 정답만 보여 준다. */
   hinting: boolean;
+  /** 이번 차수의 힌트가 기준을 넘겼다(D-323) — 더 낼 수 없다. 추리 단계에서는 그 까닭을 말해 준다. */
+  passed?: boolean;
   busy: boolean;
   /** 남은 시간 글자 — 자판이 올라와 머리 줄이 가려져도 입력란 곁에서 보이게. */
   clock?: string | null;
@@ -83,12 +85,22 @@ export function SetterPanel({
   maxHints,
   scoring,
   hinting,
+  passed = false,
   busy,
   clock = null,
   onHint,
   onEnd,
 }: SetterProps) {
   const full = hintCount >= maxHints;
+  // 입력이 잠긴 까닭 — 앞의 것이 먼저다(D-323: 버튼이 꺼져 있으면 왜인지 늘 보인다).
+  const lockedReason = passed
+    ? '기준을 넘겼어요 — 추리 차례'
+    : scoring
+      ? '채점 중… 온도가 나오면 다음 힌트를 낼 수 있어요'
+      : full
+        ? `힌트 ${maxHints}개를 다 냈어요`
+        : null;
+  const endReason = hintCount === 0 ? '힌트를 하나 이상 내야 그만 낼 수 있어요' : '기준을 못 넘긴 채로 추리로 넘어가요';
   return (
     <section className="wt-panel wt-setter" aria-label="내 문제">
       <div className="wt-setter-head">
@@ -124,18 +136,19 @@ export function SetterPanel({
       {hinting && (
         <WordInput
           label="힌트 낱말"
-          placeholder={scoring ? '채점 중…' : full ? '힌트를 다 냈어요' : floor !== null ? `힌트 · 기준 ${floor}°` : '힌트 낱말 (한글)'}
+          placeholder={floor !== null ? `한글 낱말 · 기준 ${floor}°` : '한글 낱말'}
           submitLabel="힌트 내기"
-          locked={scoring || full}
+          locked={lockedReason !== null}
+          lockedReason={lockedReason}
           busy={busy}
           onSubmit={onHint}
         >
           <button
             type="button"
             className="wt-secondary"
-            disabled={hintCount === 0 || scoring}
+            disabled={hintCount === 0 || scoring || passed}
             aria-disabled={busy || undefined}
-            title="기준을 못 넘긴 채로 추리로 넘어가요"
+            title={endReason}
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => {
               if (!busy) onEnd();
@@ -144,6 +157,11 @@ export function SetterPanel({
             그만 내기
           </button>
         </WordInput>
+      )}
+      {!hinting && (
+        <p className="wt-panel-help" role="status">
+          {passed ? '기준을 넘겼어요 — 지금은 추리 차례예요.' : '지금은 추리 차례예요. 힌트는 다음 차수에 다시 낼 수 있어요.'}
+        </p>
       )}
       {hinting && (
         <p className="wt-setter-note">
@@ -192,11 +210,12 @@ export function GuessPanel({ attempt, myGuess, busy, clock = null, onGuess }: Gu
         )}
       </h3>
       <p className="wt-panel-help">답은 한 번만 낼 수 있어요. 모르겠으면 패스!</p>
-      <WordInput label="정답 낱말" placeholder="정답 낱말 (한글)" submitLabel="답 내기" busy={busy} onSubmit={onGuess}>
+      <WordInput label="정답 낱말" placeholder="한글 낱말" submitLabel="답 내기" busy={busy} onSubmit={onGuess}>
         <button
           type="button"
           className="wt-secondary"
           aria-disabled={busy || undefined}
+          onPointerDown={(e) => e.preventDefault()}
           onClick={() => {
             if (!busy) onGuess('');
           }}

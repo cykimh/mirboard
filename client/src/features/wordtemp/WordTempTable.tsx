@@ -22,6 +22,7 @@ import { clockText } from './wordTempMath';
 import { wordTempRoomSink } from './wordTempRoomSink';
 import {
   SEND_GUARD_MS,
+  flagKey,
   floorOf,
   iAmPlaying,
   iAmSetter,
@@ -230,6 +231,10 @@ export function WordTempTable({
   const attemptTotal = s.floors.length || 5;
   const nowFloor = floorOf(s, s.attempt);
   const nowSummary = s.revealed.find((r) => r.attempt === s.attempt);
+  // 이번 차수가 기준을 넘겼는가(D-323) — 넘긴 힌트가 채점됐거나 단계 요약이 그렇게 말한다. 넘겼으면 출제자는 더 못 낸다.
+  const nowPassed =
+    nowSummary?.floorMet === true ||
+    (nowFloor !== null && s.hints.some((h) => h.attempt === s.attempt && h.status === 'SCORED' && h.temp >= nowFloor));
   let title = '';
   if (s.phase === 'WORD_SELECT') title = `${s.round}라운드 · 낱말 고르기`;
   else if (s.phase === 'HINT') title = `${setter ? '내' : `${setterName} 님의`} 문제 · ${s.attempt}/${attemptTotal}차 힌트`;
@@ -379,6 +384,17 @@ export function WordTempTable({
             mine={setter}
             freshText={s.freshScored}
             fxSeq={s.fxSeq}
+            // D-323 — "온도가 이상해요"는 판에 앉은 사람만(관전자·빠진 좌석에는 버튼이 없다)
+            flag={
+              playing
+                ? {
+                    flagged: s.hints.filter((h) => s.flagged.includes(flagKey(s.turnNo, h.text))).map((h) => h.text),
+                    left: s.flagsLeft,
+                    busy,
+                    onFlag: (text, direction) => send({ '@action': 'FLAG_TEMP', text, direction }),
+                  }
+                : undefined
+            }
           />
         )}
 
@@ -419,6 +435,7 @@ export function WordTempTable({
             maxHints={s.maxHints}
             scoring={scoringInProgress(s)}
             hinting={s.phase === 'HINT'}
+            passed={nowPassed}
             busy={busy}
             clock={inlineClock}
             onHint={(text) => send({ '@action': 'SUBMIT_HINT', turnNo: s.turnNo, attempt: s.attempt, text })}

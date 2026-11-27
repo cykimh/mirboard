@@ -3,6 +3,7 @@ import { errorNoticePatch } from '@/components/notice/errorNotice';
 import type { ApplyEventResult, ResyncEnvelope } from '@/types/stomp';
 import type {
   CandidateInfo,
+  FlagAcceptedPayload,
   GuessAcceptedPayload,
   GuessPhaseStartedPayload,
   GuessesRevealedPayload,
@@ -102,6 +103,12 @@ export interface WordTempRoomState {
   freshScored: string | null;
   fxSeq: number;
 
+  // ── "온도가 이상해요"(D-323) — 이 세션이 알린 것만 기억한다(다시 받기로 지워지지 않는다. 서버가 정본 — 겹치면 거절 문구) ──
+  /** 내가 알린 힌트(`출제 차례 번호:낱말`). */
+  flagged: string[];
+  /** 이 판에서 더 알릴 수 있는 횟수 — 한 번도 안 알렸으면 null(모름). */
+  flagsLeft: number | null;
+
   // ── 보내기 ──
   sending: SentAction | null;
   retryNonce: number;
@@ -168,6 +175,8 @@ const INITIAL: Omit<WordTempRoomState, 'disconnectedSeats' | 'mySeat'> = {
   ...NO_PRIVATE,
   ...NO_FX,
   fxSeq: 0,
+  flagged: [],
+  flagsLeft: null,
   sending: null,
   retryNonce: 0,
   pickSent: null,
@@ -539,6 +548,16 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
         set({ myGuess: p.text, sending: null });
         return;
       }
+      case 'FLAG_ACCEPTED': {
+        const p = payload as FlagAcceptedPayload;
+        const key = flagKey(state.turnNo, p.text);
+        set({
+          flagged: state.flagged.includes(key) ? state.flagged : [...state.flagged, key],
+          flagsLeft: p.left,
+          sending: null,
+        });
+        return;
+      }
       default:
         return;
     }
@@ -569,6 +588,11 @@ export const useWordTempStore = create<WordTempRoomState & WordTempActions>((set
     set({ sending: null, pickSent: null });
   },
 }));
+
+/** 알린 힌트의 열쇠 — 같은 낱말이 다른 출제 차례에 또 나올 수 있어 차례 번호를 붙인다. */
+export function flagKey(turnNo: number, text: string): string {
+  return `${turnNo}:${text}`;
+}
 
 /** 살아 있는 내 좌석인가(입력할 수 있는 사람). */
 export function iAmPlaying(s: Pick<WordTempRoomState, 'mySeat' | 'seats' | 'result'>): boolean {

@@ -41,6 +41,8 @@ public final class WordTempAdapterHarness {
     public static final String ROOM = "r1";
     public static final long T0 = 1_000_000L;
 
+    /** D-323 — 받은 온도 신고. */
+    public final FakeTempFeedbackStore feedback = new FakeTempFeedbackStore();
     public final List<Long> players;
     public final FakeLiveHintScorer scorer = new FakeLiveHintScorer();
     public final List<Object> published = new ArrayList<>();
@@ -71,7 +73,7 @@ public final class WordTempAdapterHarness {
             stored.set(i.getArgument(1));
             return null;
         }).when(store).save(eq(ROOM), any());
-        this.adapter = new WordTempGameEngine(ctx, config, table, "test-table", scorer, store, clock,
+        this.adapter = new WordTempGameEngine(ctx, config, table, "test-table", scorer, feedback, store, clock,
                 publisher != null ? publisher : published::add);
     }
 

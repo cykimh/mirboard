@@ -36,6 +36,7 @@ import java.util.stream.IntStream;
  * @param liveRequests   이 판에서 실시간 채점을 요청한 횟수(판 상한 — 설계서 §5.5)
  * @param seed           씨앗 — 출제 순서·무작위 고르기·봇의 결정이 여기서 나온다
  * @param result         끝났으면 결과, 아니면 null
+ * @param flags          이 판에서 받은 온도 신고(D-323) — {@code "좌석:힌트"}. 좌석당 횟수 제한·같은 힌트 두 번 막기에만 쓴다
  */
 @JsonAutoDetect(isGetterVisibility = Visibility.NONE)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -56,7 +57,8 @@ public record WordTempState(List<Seat> seats,
                             List<TurnSummary> history,
                             int liveRequests,
                             long seed,
-                            MatchResult result) implements GameState {
+                            MatchResult result,
+                            List<String> flags) implements GameState {
 
     public WordTempState {
         seats = List.copyOf(seats);
@@ -67,6 +69,7 @@ public record WordTempState(List<Seat> seats,
         attempts = attempts == null ? List.of() : List.copyOf(attempts);
         botPlan = botPlan == null ? List.of() : List.copyOf(botPlan);
         history = history == null ? List.of() : List.copyOf(history);
+        flags = flags == null ? List.of() : List.copyOf(flags); // 옛 상태(JSON)에는 없다
     }
 
     // ---- 값들 ----
@@ -343,6 +346,7 @@ public record WordTempState(List<Seat> seats,
         public int liveRequests;
         public long seed;
         public MatchResult result;
+        public List<String> flags;
 
         private Draft(WordTempState s) {
             seats = new ArrayList<>(s.seats);
@@ -363,11 +367,12 @@ public record WordTempState(List<Seat> seats,
             liveRequests = s.liveRequests;
             seed = s.seed;
             result = s.result;
+            flags = new ArrayList<>(s.flags);
         }
 
         public WordTempState build() {
             return new WordTempState(seats, order, round, turnNo, setterSeat, attempt, phase, phaseStartedAt, answer,
-                    hints, revealed, guesses, attempts, botPlan, history, liveRequests, seed, result);
+                    hints, revealed, guesses, attempts, botPlan, history, liveRequests, seed, result, flags);
         }
 
         /** 지금까지 고친 것을 읽기 전용 상태로 — 초안 위에서 상태의 읽기 함수를 쓰려고. */

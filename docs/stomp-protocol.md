@@ -648,6 +648,7 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | `SUBMIT_HINT` | `turnNo`, `attempt`, `text` | 출제자, `HINT`. 서버가 NFC·공백 제거·한글 1~10자 검사 |
 | `END_HINTS` | `turnNo`, `attempt` | 출제자, 힌트 1개 이상·채점 중 아님 |
 | `SUBMIT_GUESS` | `turnNo`, `attempt`, `text`(빈 문자열 = 패스) | 추리자, `GUESS`. 한 번만 |
+| `FLAG_TEMP` | `text`(힌트 낱말), `direction?`(`LOW`·`HIGH`·`UNSURE` — 없으면 `UNSURE`) | D-323 "온도가 이상해요" — 판에 앉은 사람, 이 출제 차례에 온도가 확정된 힌트. 판을 바꾸지 않는다. 좌석당 한 판 10번·힌트당 한 번 |
 | `TICK` | `turnNo`, `attempt`, `phase` | 서버 `timeoutAction` 용 — 그 단계의 마감이 지났을 때만 엔진 타이머와 같은 전이, 아니면 무변경(클라가 보내도 해가 없다) |
 
 단계 마감·봇의 힌트와 추리·**실시간 채점 결과 반영**은 서버 엔진 타이머다(클라가 보낼 수 없다).
@@ -663,7 +664,7 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | `HINT_COUNT` | `{ count, max }` | 이번 차수 힌트 개수(확정 + 채점 중, 최대 10). 무효가 되면 줄어든 값이 다시 온다 |
 | `HINT_SCORED` | `{ seat, text, temp, count }` | **힌트 하나가 모두에게 공개됐다**(D-320 — `seat` 는 출제자). 표 힌트는 `SUBMIT_HINT` 에 바로, 표 밖 힌트는 채점 뒤(보통 2~3초). `temp` 가 이번 차수의 기준 온도 이상이면 곧바로 `HINT_REVEALED`·`GUESS_PHASE_STARTED` 가 뒤따른다 |
 | `HINT_PENDING` | `{ seat, text }` | 표 밖 낱말이 채점 중이다(낱말은 모두에게 보인다). 풀릴 때까지 새 힌트·[그만 내기]는 `SCORING_IN_PROGRESS` |
-| `HINT_VOID` | `{ seat, text, reason, count }` | 채점 중이던 낱말이 무효가 됐다 — `NOT_A_NOUN`(고유명사·비하 표현 포함)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다. 출제 차례가 끝나며 버려진 채점 중 낱말에는 오지 않는다(`TURN_ENDED` 때 지운다) |
+| `HINT_VOID` | `{ seat, text, reason, count }` | 채점 중이던 낱말이 무효가 됐다 — `NOT_A_NOUN`(채점기가 힌트로 쓸 수 없다고 본 낱말 — 옛 이름, 화면은 "명사가 아니다"라고 하지 않는다 D-323)·`SCORING_FAILED`(8초·실패·거절). 개수를 돌려준다. 출제 차례가 끝나며 버려진 채점 중 낱말에는 오지 않는다(`TURN_ENDED` 때 지운다) |
 | `HINT_REVEALED` | `{ attempt, text, temp, floor, floorMet }` | **힌트 단계 끝**(D-320) — 그 차수의 가장 높은 힌트(`text`·`temp`, 힌트가 없었으면 null·−1), 기준 온도 `floor`, 넘겼는지 `floorMet`. 못 넘겼어도(힌트 0개 포함) 추리로 간다 — 전원 오답이면 출제자는 그 차수 0점 |
 | `GUESS_PHASE_STARTED` | `{ attempt, remainingMs, seats }` | 추리 단계, 추리할 좌석들 |
 | `GUESS_SUBMITTED` | `{ seat }` | 냈다(내용 없음) |
@@ -678,9 +679,11 @@ seats: [{seat, filled, lines, solved, solvePlace, elapsedMs, points, firsts, des
 | --- | --- | --- |
 | `WORD_CANDIDATES` | 각자(2라운드부터 — 1라운드의 후보는 resync 의 비공개 뷰) | `{ seat, round, candidates: [{index, word, category, gloss, available}] }` — `category` 는 범주의 화면 이름(한글), `gloss` 는 뜻풀이 한 줄(D-319) |
 | `GUESS_ACCEPTED` | 낸 추리자 | `{ seat, text }` |
+| `FLAG_ACCEPTED` | 알린 사람(D-323) | `{ seat, text, temp, direction, left }` — `left` 는 이 판에서 더 알릴 수 있는 횟수. 정답은 싣지 않는다 |
 
 그리고 `ERROR` — 낱말 온도 고유 코드 `MATCH_OVER`·`INVALID_ACTION`·`NOT_YOUR_PHASE`·`BAD_CHOICE`·`ALREADY_CHOSEN`·`HINT_FORMAT`·`HINT_IS_ANSWER`·
-`HINT_INSIDE_ANSWER`·`HINT_DUPLICATE`·`HINT_LIMIT`·`SCORING_IN_PROGRESS`·`UNKNOWN_WORD`·`NO_HINTS_YET`·`GUESS_FORMAT`·`ALREADY_GUESSED`(룰 §5).
+`HINT_INSIDE_ANSWER`·`HINT_BLOCKED`·`HINT_DUPLICATE`·`HINT_LIMIT`·`SCORING_IN_PROGRESS`·`UNKNOWN_WORD`·`NO_HINTS_YET`·`GUESS_FORMAT`·`ALREADY_GUESSED`·
+`FLAG_UNKNOWN_HINT`·`FLAG_DUPLICATE`·`FLAG_LIMIT`(룰 §5).
 `UNKNOWN_WORD` 는 표에 없는 낱말인데 실시간 채점이 꺼져 있거나(끄기 스위치·API 키 없음) 하루·판 상한에 닿은 것이다 — 개수는 줄지 않는다.
 
 **resync**: `phase` = `WORD_SELECT`·`HINT`·`GUESS`·`ATTEMPT_RESULT`·`TURN_END`·`FINISHED`, `tableView` = `{ phase, round, rounds, turnNo, setterSeat,

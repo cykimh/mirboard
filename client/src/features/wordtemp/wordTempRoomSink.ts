@@ -1,7 +1,8 @@
 import type { RoomEventSink } from '@/ws/roomEventSink';
 import { errorText } from '@/ws/errorLabels';
 import type { StompEnvelope } from '@/types/stomp';
-import type { HintVoidPayload, VoidReason, WordTempPrivateView, WordTempTableView } from '@/types/wordtemp';
+import type { FlagAcceptedPayload, HintVoidPayload, VoidReason, WordTempPrivateView, WordTempTableView } from '@/types/wordtemp';
+import { showToast } from '@/components/toast/toastStore';
 import { playCues } from '@/features/sound/tableSfx';
 import { wordTempCues } from './wordTempSfx';
 import { useWordTempStore } from './wordTempStore';
@@ -28,18 +29,22 @@ const ERROR_LABEL: Record<string, string> = {
   NO_HINTS_YET: '힌트를 하나 이상 내야 끝낼 수 있어요.',
   GUESS_FORMAT: '답은 한글 낱말 1~10자로 내 주세요.',
   ALREADY_GUESSED: '이번 차수에는 이미 답을 냈어요.',
+  FLAG_UNKNOWN_HINT: '온도가 나온 힌트만 알릴 수 있어요.',
+  FLAG_DUPLICATE: '이미 알려 주신 힌트예요.',
+  FLAG_LIMIT: '이번 판에 알릴 수 있는 횟수를 다 썼어요.',
 };
 
 /** 채점 결과로 무효가 된 힌트(§6.2) — 거절이 아니라 안내다. 개수는 서버가 돌려줬다. */
 const VOID_LABEL: Record<VoidReason, string> = {
-  NOT_A_NOUN: '명사가 아니에요. 개수는 돌려드렸어요.',
+  // 코드 이름은 옛 이름 그대로지만 "명사가 아니다"는 뜻이 아니다(D-323) — 채점기가 힌트로 쓸 수 없다고 본 낱말 전부다.
+  NOT_A_NOUN: '채점기가 이 낱말은 힌트로 쓸 수 없다고 봤어요. 개수는 돌려드렸으니 다른 낱말로 내 주세요.',
   SCORING_FAILED: '채점이 늦어졌어요. 다시 내 주세요.',
 };
 
 /**
  * 낱말 온도용 {@link RoomEventSink} — 모듈 상수이고 각 메서드는 호출 시점에 `useWordTempStore.getState()` 를 읽는다(D-103).
  *
- * <p>본인 큐에는 내 후보(`WORD_CANDIDATES`)·내 답(`GUESS_ACCEPTED`)·`ERROR` 만 온다(순번 없음, D-126) — 힌트와 온도는 D-320 뒤로 공개
+ * <p>본인 큐에는 내 후보(`WORD_CANDIDATES`)·내 답(`GUESS_ACCEPTED`)·내 신고(`FLAG_ACCEPTED`, D-323)·`ERROR` 만 온다(순번 없음, D-126) — 힌트와 온도는 D-320 뒤로 공개
  * 토픽으로 모두에게 간다. 방 락 경합(`BUSY`)은 보낸 것을 한 번 다시 보내고(게임판이 신호를 본다), 그 밖의 거절·무효 안내는 화면 위
  * 안내(`FloatingNotice`, D-269)로 띄운다.
  */
@@ -81,6 +86,13 @@ export const wordTempRoomSink: RoomEventSink<WordTempTableView, WordTempPrivateV
       return;
     }
     store.applyPrivate(envelope.type, envelope.payload);
+    // D-323 — 내 "온도가 이상해요"를 받았다. 버튼을 누른 뒤의 짧은 안내라 토스트로(D-157).
+    if (envelope.type === 'FLAG_ACCEPTED') {
+      const p = envelope.payload as FlagAcceptedPayload;
+      if (store.mySeat >= 0 && p.seat === store.mySeat) {
+        showToast(`'${p.text}' 온도가 이상하다고 알렸어요. 고마워요!${p.left <= 3 ? ` (이번 판 ${p.left}번 남음)` : ''}`);
+      }
+    }
   },
 
   setError(message) {

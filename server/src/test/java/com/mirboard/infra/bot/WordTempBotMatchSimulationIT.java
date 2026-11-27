@@ -349,8 +349,8 @@ class WordTempBotMatchSimulationIT {
                 || t.reason() == TurnEndReason.THREE_ATTEMPTS);
         assertThat(ended.history()).allMatch(t -> !t.revealed().isEmpty()
                 && t.revealed().stream().allMatch(r -> r.text() != null));
-        // 1차 기준(50°, 운영 설정 D-321)은 진짜 표의 모든 정답이 넘길 수 있다 — 봇은 1차를 늘 넘긴다
-        assertThat(ended.history()).allMatch(t -> t.revealed().get(0).floorMet() && t.revealed().get(0).floor() == 50);
+        // 1차 기준(60°, 운영 설정 D-324)은 진짜 표의 모든 정답이 넘길 수 있다 — 봇은 1차를 늘 넘긴다
+        assertThat(ended.history()).allMatch(t -> t.revealed().get(0).floorMet() && t.revealed().get(0).floor() == 60);
         assertThat(ended.history()).allMatch(t -> t.revealed().size() <= 5 && t.setterGain() <= 15 * t.round());
         assertThat(ended.liveRequests()).isZero();
         assertThat(scorer.requests).isEmpty();

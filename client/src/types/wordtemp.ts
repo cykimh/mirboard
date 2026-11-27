@@ -220,3 +220,13 @@ export interface GuessAcceptedPayload {
   seat: number;
   text: string;
 }
+/** "온도가 이상해요"의 방향(D-323) — 너무 낮다·너무 높다·그냥 이상하다. */
+export type FlagDirection = 'LOW' | 'HIGH' | 'UNSURE';
+/** 내 신고를 받았다 — `left` 는 이 판에서 더 알릴 수 있는 횟수. */
+export interface FlagAcceptedPayload {
+  seat: number;
+  text: string;
+  temp: number;
+  direction: FlagDirection;
+  left: number;
+}

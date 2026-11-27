@@ -2,11 +2,13 @@ package com.mirboard.infra.rest.admin;
 
 import com.mirboard.domain.admin.AdminAuthorization;
 import com.mirboard.domain.admin.ChatReportService;
+import com.mirboard.domain.game.core.GameFeedbackSource;
 import com.mirboard.domain.lobby.auth.AuthPrincipal;
 import com.mirboard.domain.lobby.auth.SuspensionService;
 import com.mirboard.infra.ws.GameAbortService;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,14 +39,18 @@ public class AdminController {
     private final SuspensionService suspensions;
     private final ChatReportService chatReports;
     private final GameAbortService aborts;
+    /** D-323 — 게임이 내놓은 신고 목록들(없으면 빈 목록). */
+    private final List<GameFeedbackSource> feedbackSources;
 
     public AdminController(AdminAuthorization adminAuth,
                           SuspensionService suspensions, ChatReportService chatReports,
-                          GameAbortService aborts) {
+                          GameAbortService aborts,
+                           List<GameFeedbackSource> feedbackSources) {
         this.adminAuth = adminAuth;
         this.suspensions = suspensions;
         this.chatReports = chatReports;
         this.aborts = aborts;
+        this.feedbackSources = List.copyOf(feedbackSources);
     }
 
     /**
@@ -69,6 +75,26 @@ public class AdminController {
                         chatReports.countAgainst(r.getReportedUserId())))
                 .toList();
         return new ChatReportsResponse(items);
+    }
+
+    /**
+     * D-323 — 게임이 모은 플레이어 신고(많이 모인 것부터). 게임이 {@link GameFeedbackSource} 를 내놓았을 때만 줄이 있다 — 인프라는 게임
+     * 이름도 줄의 모양도 모른다. 내놓지 않는 게임·모르는 게임은 빈 목록.
+     */
+    @GetMapping("/games/{gameType}/feedback")
+    public GameFeedbackResponse gameFeedback(@AuthenticationPrincipal AuthPrincipal principal,
+                                             @PathVariable String gameType,
+                                             @RequestParam(defaultValue = "50") int limit) {
+        adminAuth.requireAdmin(requireUserId(principal));
+        List<Map<String, Object>> items = feedbackSources.stream()
+                .filter(source -> source.gameType().equalsIgnoreCase(gameType))
+                .findFirst()
+                .map(source -> source.top(Math.max(1, Math.min(200, limit))))
+                .orElse(List.of());
+        return new GameFeedbackResponse(gameType.toUpperCase(java.util.Locale.ROOT), items);
+    }
+
+    public record GameFeedbackResponse(String gameType, List<Map<String, Object>> items) {
     }
 
     /** 진행 중 매치 강제 종료(host 검증 없음). 비어드민은 403 NOT_ADMIN. */

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.mirboard.domain.game.core.GameEvent;
+import com.mirboard.domain.game.wordtemp.action.WordTempAction;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.MatchResult;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.TurnEndReason;
 import com.mirboard.domain.game.wordtemp.state.WordTempState.VoidReason;
@@ -42,7 +43,8 @@ import java.util.List;
         @JsonSubTypes.Type(value = WordTempEvent.HintScored.class, name = "HINT_SCORED"),
         @JsonSubTypes.Type(value = WordTempEvent.HintPending.class, name = "HINT_PENDING"),
         @JsonSubTypes.Type(value = WordTempEvent.HintVoid.class, name = "HINT_VOID"),
-        @JsonSubTypes.Type(value = WordTempEvent.GuessAccepted.class, name = "GUESS_ACCEPTED")
+        @JsonSubTypes.Type(value = WordTempEvent.GuessAccepted.class, name = "GUESS_ACCEPTED"),
+        @JsonSubTypes.Type(value = WordTempEvent.FlagAccepted.class, name = "FLAG_ACCEPTED")
 })
 public sealed interface WordTempEvent extends GameEvent
         permits WordTempEvent.WordSelectStarted,
@@ -82,6 +84,7 @@ public sealed interface WordTempEvent extends GameEvent
             case HintPending __ -> "HINT_PENDING";
             case HintVoid __ -> "HINT_VOID";
             case GuessAccepted __ -> "GUESS_ACCEPTED";
+            case FlagAccepted __ -> "FLAG_ACCEPTED";
         };
     }
 
@@ -180,7 +183,7 @@ public sealed interface WordTempEvent extends GameEvent
     // ---- 비공개 (§12.3) — 본인 큐, 순번 없음 ----
 
     sealed interface Private extends WordTempEvent
-            permits WordCandidates, GuessAccepted {
+            permits WordCandidates, GuessAccepted, FlagAccepted {
 
         /** 받는 좌석. */
         int seat();
@@ -222,5 +225,13 @@ public sealed interface WordTempEvent extends GameEvent
 
     /** 내가 낸 답(정규화된 값, 빈 문자열 = 패스). */
     record GuessAccepted(int seat, String text) implements Private {
+    }
+
+    /**
+     * "온도가 이상해요"를 받았다(D-323) — 낸 사람에게만. {@code left} = 이 판에서 더 신고할 수 있는 횟수. 정답 낱말은 싣지 않는다
+     * (신고는 서버가 정답과 묶어 낱말만 남긴다).
+     */
+    record FlagAccepted(int seat, String text, int temp, WordTempAction.FlagDirection direction, int left)
+            implements Private {
     }
 }
